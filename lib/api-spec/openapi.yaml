@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: stratigraphy
+    description: Bitcoin stratigraphy dataset
 paths:
   /healthz:
     get:
@@ -24,6 +26,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /stratigraphy:
+    get:
+      operationId: getStratigraphy
+      tags: [stratigraphy]
+      summary: List Bitcoin stratigraphy entries
+      description: Returns the complete day-by-day video series dataset.
+      responses:
+        "200":
+          description: Stratigraphy entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StratigraphyEntry"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +50,20 @@ components:
           type: string
       required:
         - status
+    StratigraphyEntry:
+      type: object
+      properties:
+        day:
+          type: integer
+        title:
+          type: string
+        video_id:
+          type: string
+        transcript_summary:
+          type: string
+      required:
+        - day
+        - title
+        - video_id
+        - transcript_summary
 

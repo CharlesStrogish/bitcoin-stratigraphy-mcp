@@ -1,0 +1,28 @@
+kind = "data-app"
+previewPath = "/"
+title = "Bitcoin Stratigraphy Dashboard"
+description = "An interactive explorer for a 422-day Bitcoin price-prediction video series, with searchable titles, day-by-day timeline views, multiple analysis, and linked video details."
+version = "1.0.0"
+id = "artifacts/bitcoin-stratigraphy-dashboard"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20948
+
+[services.development]
+run = "pnpm --filter @workspace/bitcoin-stratigraphy-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bitcoin-stratigraphy-dashboard", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/bitcoin-stratigraphy-dashboard/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20948"
+BASE_PATH = "/"

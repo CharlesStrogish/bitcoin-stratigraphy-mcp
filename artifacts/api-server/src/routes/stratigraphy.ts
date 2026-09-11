@@ -123,9 +123,9 @@ export function registerStratigraphyRoutes(app: Express): void {
   app.get(
     "/api/v1/stratigraphy",
     async (req: Request, res: Response): Promise<void> => {
-      const albyToken = process.env.ALBY_API_TOKEN;
+      const albyToken = process.env.NWC_URI
       if (!albyToken) {
-        res.status(500).json({ error: "ALBY_API_TOKEN is not configured" });
+        res.status(500).json({ error: "NWC_URI is not configured" });
         return;
       }
 

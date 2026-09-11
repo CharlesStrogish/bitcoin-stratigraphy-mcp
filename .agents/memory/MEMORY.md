@@ -1,0 +1,1 @@
+- [Alby invoice funding](alby-invoice-funding.md) — a valid token still requires an enabled wallet funding source before invoices can be created.

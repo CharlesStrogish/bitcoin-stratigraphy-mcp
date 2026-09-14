@@ -1,0 +1,82 @@
+name: bitcoin-stratigraphy
+displayName: Bitcoin Stratigraphy
+description: >-
+  Query validated day-by-day Bitcoin stratigraphy records, including target
+  multipliers, estimated difficulty epoch progress, and thermodynamic signals.
+homepage: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app
+
+transport:
+  type: sse
+  url: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp
+
+tools:
+  - name: get_bitcoin_stratigraphy
+    title: Get Bitcoin Stratigraphy
+    description: >-
+      Returns validated Bitcoin Stratigraphy entries. Use days for the most
+      recent entries or date for one exact dataset date. If neither parameter
+      is supplied, the complete dataset is returned.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        days:
+          type: integer
+          minimum: 1
+          maximum: 422
+          description: Number of most recent day entries to return.
+        date:
+          type: string
+          format: date
+          description: Exact dataset date to return in YYYY-MM-DD format.
+      allOf:
+        - not:
+            required:
+              - days
+              - date
+    outputSchema:
+      type: object
+      required:
+        - records
+      properties:
+        records:
+          type: array
+          description: Validated stratigraphy day entries with quantitative alpha.
+          items:
+            type: object
+            required:
+              - day
+              - title
+              - video_id
+              - transcript_summary
+              - quantitative_alpha
+            properties:
+              day:
+                type: integer
+              title:
+                type: string
+              video_id:
+                type: string
+              transcript_summary:
+                type: string
+              quantitative_alpha:
+                type: object
+                required:
+                  - target_multiplier
+                  - difficulty_epoch_progress
+                  - thermodynamic_signal
+                properties:
+                  target_multiplier:
+                    type: number
+                    format: float
+                  difficulty_epoch_progress:
+                    type: string
+                    description: Percentage-formatted difficulty epoch progress.
+                  thermodynamic_signal:
+                    type: string
+
+configSchema:
+  type: object
+  additionalProperties: false
+  properties: {}
+exampleConfig: {}

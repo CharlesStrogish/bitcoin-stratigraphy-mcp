@@ -667,6 +667,10 @@ importers:
         version: 0.31.10
 
   scripts:
+    dependencies:
+      nostr-tools:
+        specifier: 2.25.2
+        version: 2.25.2(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

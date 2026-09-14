@@ -5,8 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "broadcast:nostr": "tsx ./broadcast-nostr.ts",
     "hello": "tsx ./src/hello.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "nostr-tools": "2.25.2"
   },
   "devDependencies": {
     "@types/node": "catalog:",

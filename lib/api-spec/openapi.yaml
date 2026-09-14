@@ -82,12 +82,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaymentChallengeRateLimitError"
+        "500":
+          description: Lightning payment is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentConfigurationError"
         "502":
           description: The wallet could not create or verify a payment invoice
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WalletGatewayError"
+        "503":
+          description: Payment challenge coordination is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentChallengeServiceUnavailableError"
 components:
   securitySchemes:
     L402:
@@ -148,6 +160,22 @@ components:
         - error
         - code
         - retry_after
+    PaymentConfigurationError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: NWC_URI is not configured
+      required:
+        - error
+    PaymentChallengeServiceUnavailableError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: Payment challenge service unavailable
+      required:
+        - error
     WalletGatewayError:
       type: object
       properties:

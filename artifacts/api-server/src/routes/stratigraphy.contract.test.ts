@@ -46,6 +46,10 @@ function paymentContract(document: OpenApiDocument) {
     challengeSchema: document.components.schemas.L402Challenge,
     rateLimitSchema:
       document.components.schemas.PaymentChallengeRateLimitError,
+    configurationErrorSchema:
+      document.components.schemas.PaymentConfigurationError,
+    challengeServiceUnavailableSchema:
+      document.components.schemas.PaymentChallengeServiceUnavailableError,
     walletGatewaySchema: document.components.schemas.WalletGatewayError,
     entrySchema: document.components.schemas.StratigraphyEntry,
   };
@@ -181,6 +185,26 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
       servedContract.paid.responses as Record<
         string,
         {
+          content: {
+            "application/json": { schema: { $ref: string } };
+          };
+        }
+      >
+    )["500"],
+    {
+      description: "Lightning payment is not configured",
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/PaymentConfigurationError" },
+        },
+      },
+    },
+  );
+  assert.deepEqual(
+    (
+      servedContract.paid.responses as Record<
+        string,
+        {
           headers?: Record<string, unknown>;
           content: {
             "application/json": { schema: { $ref: string } };
@@ -201,6 +225,29 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
         "application/json": {
           schema: {
             $ref: "#/components/schemas/PaymentChallengeRateLimitError",
+          },
+        },
+      },
+    },
+  );
+  assert.deepEqual(
+    (
+      servedContract.paid.responses as Record<
+        string,
+        {
+          content: {
+            "application/json": { schema: { $ref: string } };
+          };
+        }
+      >
+    )["503"],
+    {
+      description: "Payment challenge coordination is unavailable",
+      content: {
+        "application/json": {
+          schema: {
+            $ref:
+              "#/components/schemas/PaymentChallengeServiceUnavailableError",
           },
         },
       },
@@ -259,6 +306,52 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     },
     required: ["error"],
   });
+  assert.deepEqual(servedContract.configurationErrorSchema, {
+    type: "object",
+    properties: {
+      error: {
+        type: "string",
+        const: "NWC_URI is not configured",
+      },
+    },
+    required: ["error"],
+  });
+  assert.deepEqual(servedContract.challengeServiceUnavailableSchema, {
+    type: "object",
+    properties: {
+      error: {
+        type: "string",
+        const: "Payment challenge service unavailable",
+      },
+    },
+    required: ["error"],
+  });
+});
+
+test("returns the documented generic 500 when payment is not configured", async () => {
+  const configuredNwcUri = process.env.NWC_URI;
+  delete process.env.NWC_URI;
+  const unconfiguredApp = express();
+  registerStratigraphyRoutes(unconfiguredApp);
+  const unconfiguredServer = unconfiguredApp.listen(0);
+  await new Promise<void>((resolve) =>
+    unconfiguredServer.once("listening", resolve),
+  );
+
+  try {
+    const address = unconfiguredServer.address() as AddressInfo;
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/api/v1/stratigraphy`,
+    );
+    assert.equal(response.status, 500);
+    assert.deepEqual(await response.json(), {
+      error: "NWC_URI is not configured",
+    });
+  } finally {
+    unconfiguredServer.close();
+    if (configuredNwcUri === undefined) delete process.env.NWC_URI;
+    else process.env.NWC_URI = configuredNwcUri;
+  }
 });
 
 test("coalesces concurrent cold-cache requests into one usable challenge", async () => {
@@ -398,6 +491,9 @@ test("fails closed when shared challenge coordination is unavailable", async () 
       `http://127.0.0.1:${address.port}/api/v1/stratigraphy`,
     );
     assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      error: "Payment challenge service unavailable",
+    });
     assert.equal(creations, 0);
   } finally {
     unavailableServer.close();

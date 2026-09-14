@@ -8,4 +8,9 @@
 
 export * from './healthStatus';
 export * from './l402Challenge';
+export * from './paymentChallengeRateLimitError';
+export * from './paymentChallengeServiceUnavailableError';
+export * from './paymentConfigurationError';
 export * from './stratigraphyEntry';
+export * from './walletGatewayError';
+export * from './walletGatewayErrorError';

@@ -18,7 +18,11 @@ import type {
 import type {
   HealthStatus,
   L402Challenge,
-  StratigraphyEntry
+  PaymentChallengeRateLimitError,
+  PaymentChallengeServiceUnavailableError,
+  PaymentConfigurationError,
+  StratigraphyEntry,
+  WalletGatewayError
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -237,7 +241,7 @@ export const getGetPaidStratigraphyQueryKey = () => {
     }
 
 
-export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<L402Challenge>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -256,14 +260,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetPaidStratigraphyQueryResult = NonNullable<Awaited<ReturnType<typeof getPaidStratigraphy>>>
-export type GetPaidStratigraphyQueryError = ErrorType<L402Challenge>
+export type GetPaidStratigraphyQueryError = ErrorType<L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>
 
 
 /**
  * @summary Get the complete L402-protected dataset
  */
 
-export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<L402Challenge>>(
+export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

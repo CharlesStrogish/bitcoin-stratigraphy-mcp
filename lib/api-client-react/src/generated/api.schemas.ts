@@ -23,3 +23,35 @@ export interface L402Challenge {
   payment_hash: string;
 }
 
+export interface PaymentChallengeRateLimitError {
+  error: 'Too many payment invoices requested';
+  code: 'payment_challenge_rate_limited';
+  /**
+     * Seconds until the client may request another payment invoice
+     * @minimum 1
+     */
+  retry_after: number;
+}
+
+export const PaymentConfigurationErrorValue = {
+  error: 'NWC_URI is not configured',
+} as const;
+export type PaymentConfigurationError = typeof PaymentConfigurationErrorValue;
+
+export const PaymentChallengeServiceUnavailableErrorValue = {
+  error: 'Payment challenge service unavailable',
+} as const;
+export type PaymentChallengeServiceUnavailableError = typeof PaymentChallengeServiceUnavailableErrorValue;
+
+export type WalletGatewayErrorError = typeof WalletGatewayErrorError[keyof typeof WalletGatewayErrorError];
+
+
+export const WalletGatewayErrorError = {
+  Unable_to_create_payment_invoice: 'Unable to create payment invoice',
+  Unable_to_verify_payment: 'Unable to verify payment',
+} as const;
+
+export interface WalletGatewayError {
+  error: WalletGatewayErrorError;
+}
+

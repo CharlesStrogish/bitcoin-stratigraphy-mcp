@@ -14,6 +14,7 @@ const workspaceRoot = path.resolve(
 
 // Release checks should fail promptly enough to leave time for actionable output.
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+export const DEFAULT_ASSET_CONCURRENCY = 8;
 
 function readTomlString(source, key) {
   return source.match(new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
@@ -186,6 +187,69 @@ async function consumeAssetBody(
   }
 }
 
+async function checkAsset(
+  assetUrl,
+  artifactName,
+  fetchImpl,
+  requestTimeoutMs,
+) {
+  const assetResponse = await requestSuccessful(
+    assetUrl,
+    artifactName,
+    "asset",
+    fetchImpl,
+    requestTimeoutMs,
+  );
+  assertAssetMediaType(assetResponse, assetUrl, artifactName);
+  await consumeAssetBody(
+    assetResponse,
+    assetUrl,
+    artifactName,
+    requestTimeoutMs,
+  );
+}
+
+async function checkAssetsConcurrently(
+  assetUrls,
+  artifactName,
+  fetchImpl,
+  requestTimeoutMs,
+  assetConcurrency,
+) {
+  const failures = [];
+  let nextAssetIndex = 0;
+
+  async function worker() {
+    while (nextAssetIndex < assetUrls.length) {
+      const assetUrl = assetUrls[nextAssetIndex++];
+      try {
+        await checkAsset(
+          assetUrl,
+          artifactName,
+          fetchImpl,
+          requestTimeoutMs,
+        );
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(assetConcurrency, assetUrls.length) },
+      () => worker(),
+    ),
+  );
+
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      failures.map((error) => error.message).join("\n"),
+    );
+  }
+}
+
 async function assertHealthyApiResponse(response, livenessUrl, artifactName) {
   if (response.url && response.url !== livenessUrl.href) {
     throw new Error(
@@ -230,11 +294,16 @@ export async function checkPublishedAssets({
   apiArtifacts = discoverPublishedApiArtifacts(),
   fetchImpl = fetch,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  assetConcurrency = DEFAULT_ASSET_CONCURRENCY,
 }) {
   assert.ok(deploymentUrl, "PUBLISHED_URL must be provided");
   assert.ok(
     Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0,
     "requestTimeoutMs must be a positive number",
+  );
+  assert.ok(
+    Number.isInteger(assetConcurrency) && assetConcurrency > 0,
+    "assetConcurrency must be a positive integer",
   );
   assert.ok(
     artifacts.length + apiArtifacts.length > 0,
@@ -278,22 +347,13 @@ export async function checkPublishedAssets({
       `${artifact.name}: entry page ${entryUrl} referenced no JavaScript or CSS assets`,
     );
 
-    for (const assetUrl of assetUrls) {
-      const assetResponse = await requestSuccessful(
-        assetUrl,
-        artifact.name,
-        "asset",
-        fetchImpl,
-        requestTimeoutMs,
-      );
-      assertAssetMediaType(assetResponse, assetUrl, artifact.name);
-      await consumeAssetBody(
-        assetResponse,
-        assetUrl,
-        artifact.name,
-        requestTimeoutMs,
-      );
-    }
+    await checkAssetsConcurrently(
+      assetUrls,
+      artifact.name,
+      fetchImpl,
+      requestTimeoutMs,
+      assetConcurrency,
+    );
 
     console.log(
       `${artifact.name}: ${entryUrl} and ${assetUrls.length} assets are reachable`,

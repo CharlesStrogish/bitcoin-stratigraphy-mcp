@@ -244,6 +244,66 @@ test("times out asset bodies that start but never finish", async () => {
   );
 });
 
+test("times out several stalled asset bodies concurrently and reports every URL", async () => {
+  const requestTimeoutMs = 40;
+  const startedAt = Date.now();
+  let failure;
+
+  try {
+    await checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [{ name: "Many Slow Assets", previewPath: "/many-slow/" }],
+      apiArtifacts: [],
+      requestTimeoutMs,
+      fetchImpl: async (url) => {
+        if (url.toString().endsWith("/many-slow/")) {
+          return new Response(`
+            <script src="/many-slow/assets/first.js"></script>
+            <script src="/many-slow/assets/second.js"></script>
+            <link rel="stylesheet" href="/many-slow/assets/third.css">
+          `);
+        }
+
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode("stalled"));
+            },
+          }),
+          {
+            headers: {
+              "content-type": url.toString().endsWith(".css")
+                ? "text/css"
+                : "text/javascript",
+            },
+          },
+        );
+      },
+    });
+  } catch (error) {
+    failure = error;
+  }
+
+  const elapsedMs = Date.now() - startedAt;
+  assert.ok(failure, "stalled assets must fail the release check");
+  assert.match(
+    failure.message,
+    /Many Slow Assets: asset body timed out after 40ms for https:\/\/published\.example\/many-slow\/assets\/first\.js/,
+  );
+  assert.match(
+    failure.message,
+    /Many Slow Assets: asset body timed out after 40ms for https:\/\/published\.example\/many-slow\/assets\/second\.js/,
+  );
+  assert.match(
+    failure.message,
+    /Many Slow Assets: asset body timed out after 40ms for https:\/\/published\.example\/many-slow\/assets\/third\.css/,
+  );
+  assert.ok(
+    elapsedMs < requestTimeoutMs * 2,
+    `expected concurrent timeouts in under ${requestTimeoutMs * 2}ms, took ${elapsedMs}ms`,
+  );
+});
+
 test("reports truncated asset bodies with the artifact and URL", async () => {
   await assert.rejects(
     checkPublishedAssets({

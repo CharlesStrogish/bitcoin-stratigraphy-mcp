@@ -64,6 +64,11 @@ export interface L402Challenge {
   payment_hash: string;
 }
 
+export interface InvalidRangeError {
+  error: 'Invalid stratigraphy range';
+  detail: string;
+}
+
 export interface PaymentChallengeRateLimitError {
   error: 'Too many payment invoices requested';
   code: 'payment_challenge_rate_limited';
@@ -95,4 +100,17 @@ export const WalletGatewayErrorError = {
 export interface WalletGatewayError {
   error: WalletGatewayErrorError;
 }
+
+export type GetPaidStratigraphyParams = {
+/**
+ * Number of most recent days to return. Cannot be combined with from.
+ * @minimum 1
+ * @maximum 422
+ */
+days?: number;
+/**
+ * First date to include, using the daily series anchored at day 422 on 2026-09-09. Cannot be combined with days.
+ */
+from?: string;
+};
 

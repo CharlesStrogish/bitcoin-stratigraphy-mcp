@@ -17,7 +17,9 @@ import type {
 
 import type {
   DatasetHealthStatus,
+  GetPaidStratigraphyParams,
   HealthStatus,
+  InvalidRangeError,
   L402Challenge,
   PaymentChallengeRateLimitError,
   PaymentChallengeServiceUnavailableError,
@@ -365,21 +367,28 @@ export function useGetStratigraphy<TData = Awaited<ReturnType<typeof getStratigr
 
 
 
-export const getGetPaidStratigraphyUrl = () => {
+export const getGetPaidStratigraphyUrl = (params?: GetPaidStratigraphyParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/v1/stratigraphy`
+  return stringifiedParams.length > 0 ? `/api/v1/stratigraphy?${stringifiedParams}` : `/api/v1/stratigraphy`
 }
 
 /**
- * Without valid payment proof, creates a 21-satoshi Lightning invoice and returns an L402 challenge.
+ * Returns the selected range after payment. Pricing is 1 satoshi per requested day with a minimum invoice of 5 satoshis. Without query parameters, all 422 days are selected.
  * @summary Get the complete L402-protected dataset
  */
-export const getPaidStratigraphy = async ( options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyEntry[]> => {
+export const getPaidStratigraphy = async (params?: GetPaidStratigraphyParams, options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyEntry[]> => {
 
-  return customFetch<StratigraphyEntry[]>(getGetPaidStratigraphyUrl(),
+  return customFetch<StratigraphyEntry[]>(getGetPaidStratigraphyUrl(params),
   {
     ...options,
     method: 'GET'
@@ -392,23 +401,23 @@ export const getPaidStratigraphy = async ( options?: Parameters<typeof customFet
 
 
 
-export const getGetPaidStratigraphyQueryKey = () => {
+export const getGetPaidStratigraphyQueryKey = (params?: GetPaidStratigraphyParams,) => {
     return [
-    `/api/v1/stratigraphy`
+    `/api/v1/stratigraphy`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>>(params?: GetPaidStratigraphyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPaidStratigraphyQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetPaidStratigraphyQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaidStratigraphy>>> = ({ signal }) => getPaidStratigraphy({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaidStratigraphy>>> = ({ signal }) => getPaidStratigraphy(params, { signal, ...requestOptions });
 
 
 
@@ -418,19 +427,19 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetPaidStratigraphyQueryResult = NonNullable<Awaited<ReturnType<typeof getPaidStratigraphy>>>
-export type GetPaidStratigraphyQueryError = ErrorType<L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>
+export type GetPaidStratigraphyQueryError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>
 
 
 /**
  * @summary Get the complete L402-protected dataset
  */
 
-export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>>(
+ params?: GetPaidStratigraphyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetPaidStratigraphyQueryOptions(options)
+  const queryOptions = getGetPaidStratigraphyQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -16,15 +16,18 @@ export interface PaymentChallengeStore {
   checkHealth(): Promise<void>;
   getOrCreate(
     caller: string,
+    scope: string,
     policy: ChallengeStorePolicy,
     create: () => Promise<PaymentChallenge>,
   ): Promise<ChallengeStoreResult>;
-  consume(caller: string, paymentHash: string): Promise<void>;
+  consume(caller: string, scope: string, paymentHash: string): Promise<void>;
 }
 
 type StoredState = {
-  challenge?: PaymentChallenge;
-  challengeExpiresAt: number;
+  challenges: Map<
+    string,
+    { challenge: PaymentChallenge; expiresAt: number }
+  >;
   invoiceAttemptedAt: number[];
 };
 
@@ -38,16 +41,20 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
 
   return {
     async checkHealth() {},
-    async getOrCreate(caller, policy, create) {
-      const existingPending = pending.get(caller);
+    async getOrCreate(caller, scope, policy, create) {
+      const pendingKey = `${caller}|${scope}`;
+      const existingPending = pending.get(pendingKey);
       if (existingPending) return existingPending;
 
       const operation = (async () => {
         const now = policy.now();
         for (const [key, state] of states) {
+          for (const [scope, stored] of state.challenges) {
+            if (stored.expiresAt <= now) state.challenges.delete(scope);
+          }
           const newestAttempt = state.invoiceAttemptedAt.at(-1) ?? 0;
           if (
-            state.challengeExpiresAt <= now &&
+            state.challenges.size === 0 &&
             newestAttempt + policy.limitWindowMs <= now
           ) {
             states.delete(key);
@@ -60,7 +67,7 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
             return { kind: "limited", retryAfter: 60 } as const;
           }
           state = {
-            challengeExpiresAt: 0,
+            challenges: new Map(),
             invoiceAttemptedAt: [],
           };
           states.set(caller, state);
@@ -69,8 +76,9 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
         state.invoiceAttemptedAt = state.invoiceAttemptedAt.filter(
           (attemptedAt) => now - attemptedAt < policy.limitWindowMs,
         );
-        if (state.challenge && state.challengeExpiresAt > now) {
-          return { kind: "challenge", challenge: state.challenge } as const;
+        const existing = state.challenges.get(scope);
+        if (existing && existing.expiresAt > now) {
+          return { kind: "challenge", challenge: existing.challenge } as const;
         }
         if (
           state.invoiceAttemptedAt.length >= policy.maxInvoicesPerWindow
@@ -87,20 +95,25 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
 
         state.invoiceAttemptedAt.push(now);
         const challenge = await create();
-        state.challenge = challenge;
-        state.challengeExpiresAt = policy.now() + policy.reuseMs;
+        state.challenges.set(scope, {
+          challenge,
+          expiresAt: policy.now() + policy.reuseMs,
+        });
         return { kind: "challenge", challenge } as const;
       })();
-      pending.set(caller, operation);
+      pending.set(pendingKey, operation);
       try {
         return await operation;
       } finally {
-        if (pending.get(caller) === operation) pending.delete(caller);
+        if (pending.get(pendingKey) === operation) pending.delete(pendingKey);
       }
     },
-    async consume(caller, paymentHash) {
+    async consume(caller, scope, paymentHash) {
       const state = states.get(caller);
-      if (state?.challenge?.paymentHash === paymentHash) states.delete(caller);
+      const stored = state?.challenges.get(scope);
+      if (stored?.challenge.paymentHash === paymentHash) {
+        state?.challenges.delete(scope);
+      }
     },
   };
 }

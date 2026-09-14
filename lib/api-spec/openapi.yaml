@@ -85,7 +85,21 @@ paths:
       operationId: getPaidStratigraphy
       tags: [stratigraphy]
       summary: Get the complete L402-protected dataset
-      description: Without valid payment proof, creates a 21-satoshi Lightning invoice and returns an L402 challenge.
+      description: Returns the selected range after payment. Pricing is 1 satoshi per requested day with a minimum invoice of 5 satoshis. Without query parameters, all 422 days are selected.
+      parameters:
+        - name: days
+          in: query
+          description: Number of most recent days to return. Cannot be combined with from.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 422
+        - name: from
+          in: query
+          description: First date to include, using the daily series anchored at day 422 on 2026-09-09. Cannot be combined with days.
+          schema:
+            type: string
+            format: date
       security:
         - L402: []
       responses:
@@ -108,6 +122,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/L402Challenge"
+        "400":
+          description: Invalid or conflicting range parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvalidRangeError"
         "429":
           description: Payment invoice creation is temporarily limited
           headers:
@@ -224,6 +244,17 @@ components:
       required:
         - invoice
         - payment_hash
+    InvalidRangeError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: Invalid stratigraphy range
+        detail:
+          type: string
+      required:
+        - error
+        - detail
     PaymentChallengeRateLimitError:
       type: object
       properties:

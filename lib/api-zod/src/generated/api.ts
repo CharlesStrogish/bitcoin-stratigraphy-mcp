@@ -54,9 +54,18 @@ export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).mi
 
 
 /**
- * Without valid payment proof, creates a 21-satoshi Lightning invoice and returns an L402 challenge.
+ * Returns the selected range after payment. Pricing is 1 satoshi per requested day with a minimum invoice of 5 satoshis. Without query parameters, all 422 days are selected.
  * @summary Get the complete L402-protected dataset
  */
+export const getPaidStratigraphyQueryDaysMax = 422;
+
+
+
+export const GetPaidStratigraphyQueryParams = zod.object({
+  "days": zod.coerce.number().int().min(1).max(getPaidStratigraphyQueryDaysMax).optional().describe('Number of most recent days to return. Cannot be combined with from.'),
+  "from": zod.date().optional().describe('First date to include, using the daily series anchored at day 422 on 2026-09-09. Cannot be combined with days.')
+})
+
 export const GetPaidStratigraphyResponseItem = zod.object({
   "day": zod.number().int(),
   "title": zod.string(),

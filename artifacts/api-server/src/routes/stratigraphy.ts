@@ -17,8 +17,9 @@ import {
   type PaymentChallengeStore,
 } from "../lib/payment-challenge-store";
 
-const ACCESS_PRICE_MSATS = 21_000;
-const INVOICE_DESCRIPTION = "Bitcoin Stratigraphy 422-day dataset access";
+const MIN_INVOICE_SATS = 5;
+const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
+const DAY_MS = 24 * 60 * 60 * 1000;
 const CHALLENGE_REUSE_MS = 5 * 60 * 1000;
 const INVOICE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const MAX_INVOICES_PER_WINDOW = 3;
@@ -28,9 +29,16 @@ const datasetPath = fileURLToPath(
 );
 const silentNwcLogger = { debug: (..._args: unknown[]) => undefined };
 
-export async function readDataset() {
+async function readValidatedDataset() {
   const raw = await readFile(datasetPath, "utf8");
   return GetPaidStratigraphyResponse.parse(JSON.parse(raw));
+}
+
+let datasetPromise: ReturnType<typeof readValidatedDataset> | undefined;
+
+export function readDataset() {
+  datasetPromise ??= readValidatedDataset();
+  return datasetPromise;
 }
 
 type NwcClient = Pick<NWCClient, "lookupInvoice" | "makeInvoice" | "close">;
@@ -41,6 +49,13 @@ type ChallengePolicy = {
   limitWindowMs: number;
   maxInvoicesPerWindow: number;
   maxCallers: number;
+};
+type Dataset = Awaited<ReturnType<typeof readDataset>>;
+type SelectedRange = {
+  records: Dataset;
+  amountMsats: number;
+  description: string;
+  key: string;
 };
 
 class InvoiceCreationError extends Error {
@@ -68,6 +83,59 @@ function callerKey(req: Request) {
   return req.ip || req.socket.remoteAddress || "unknown";
 }
 
+function singleQueryValue(value: unknown) {
+  return typeof value === "string" ? value : undefined;
+}
+
+function selectRange(req: Request, dataset: Dataset): SelectedRange | string {
+  const daysValue = singleQueryValue(req.query.days);
+  const fromValue = singleQueryValue(req.query.from);
+  if (req.query.days !== undefined && daysValue === undefined) {
+    return "days must be a single integer";
+  }
+  if (req.query.from !== undefined && fromValue === undefined) {
+    return "from must be a single date";
+  }
+  if (daysValue !== undefined && fromValue !== undefined) {
+    return "days and from cannot be used together";
+  }
+
+  let records = dataset;
+  if (daysValue !== undefined) {
+    if (!/^[1-9]\d*$/.test(daysValue)) {
+      return "days must be an integer between 1 and 422";
+    }
+    const days = Number(daysValue);
+    if (days > dataset.length) {
+      return `days must be an integer between 1 and ${dataset.length}`;
+    }
+    records = dataset.slice(-days);
+  } else if (fromValue !== undefined) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fromValue);
+    if (!match) return "from must use YYYY-MM-DD";
+    const fromMs = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    const normalized = new Date(fromMs).toISOString().slice(0, 10);
+    if (normalized !== fromValue) return "from must be a valid calendar date";
+    const firstDateMs = LATEST_DATASET_DATE_MS - (dataset.length - 1) * DAY_MS;
+    if (fromMs < firstDateMs || fromMs > LATEST_DATASET_DATE_MS) {
+      return `from must be between ${new Date(firstDateMs).toISOString().slice(0, 10)} and 2026-09-09`;
+    }
+    records = dataset.slice((fromMs - firstDateMs) / DAY_MS);
+  }
+
+  const firstDay = records[0].day;
+  const lastDay = records.at(-1)!.day;
+  const count = records.length;
+  const amountSats = Math.max(MIN_INVOICE_SATS, count);
+  const dayLabel = count === 1 ? "day" : "days";
+  return {
+    records,
+    amountMsats: amountSats * 1_000,
+    description: `Bitcoin Stratigraphy days ${firstDay}-${lastDay} (${count} ${dayLabel}) access`,
+    key: `${firstDay}-${lastDay}`,
+  };
+}
+
 function parseL402Authorization(value: string | undefined) {
   if (!value) return null;
 
@@ -87,6 +155,8 @@ async function verifyPayment(
   paymentHash: string,
   preimage: string,
   clientFactory: NwcClientFactory,
+  expectedAmountMsats: number,
+  expectedDescription: string,
 ) {
   const computedHash = createHash("sha256")
     .update(Buffer.from(preimage, "hex"))
@@ -101,8 +171,8 @@ async function verifyPayment(
     return (
       transaction.type === "incoming" &&
       transaction.state === "settled" &&
-      transaction.amount >= ACCESS_PRICE_MSATS &&
-      transaction.description === INVOICE_DESCRIPTION &&
+      transaction.amount === expectedAmountMsats &&
+      transaction.description === expectedDescription &&
       transaction.payment_hash.toLowerCase() === paymentHash &&
       (!transaction.preimage ||
         transaction.preimage.toLowerCase() === preimage)
@@ -119,12 +189,14 @@ async function verifyPayment(
 async function createInvoice(
   nwcUri: string,
   clientFactory: NwcClientFactory,
+  amountMsats: number,
+  description: string,
 ) {
   const client = clientFactory(nwcUri);
   try {
     const transaction = await client.makeInvoice({
-      amount: ACCESS_PRICE_MSATS,
-      description: INVOICE_DESCRIPTION,
+      amount: amountMsats,
+      description,
       expiry: 3600,
     });
 
@@ -151,13 +223,20 @@ async function sendPaymentChallenge(
   clientFactory: NwcClientFactory,
   challengeStore: PaymentChallengeStore,
   policy: ChallengePolicy,
+  caller: string,
+  rangeKey: string,
+  amountMsats: number,
+  description: string,
 ) {
-  const caller = callerKey(req);
-
   try {
-    const result = await challengeStore.getOrCreate(caller, policy, async () => {
+    const result = await challengeStore.getOrCreate(caller, rangeKey, policy, async () => {
       try {
-        return await createInvoice(nwcUri, clientFactory);
+        return await createInvoice(
+          nwcUri,
+          clientFactory,
+          amountMsats,
+          description,
+        );
       } catch (error) {
         throw new InvoiceCreationError(error);
       }
@@ -242,6 +321,16 @@ export function registerStratigraphyRoutes(
   app.get(
     "/api/v1/stratigraphy",
     async (req: Request, res: Response): Promise<void> => {
+      const dataset = await readDataset();
+      const selectedRange = selectRange(req, dataset);
+      if (typeof selectedRange === "string") {
+        res.status(400).json({
+          error: "Invalid stratigraphy range",
+          detail: selectedRange,
+        });
+        return;
+      }
+      const caller = callerKey(req);
       const nwcUri = process.env.NWC_URI;
       if (!nwcUri) {
         res.status(500).json({ error: "NWC_URI is not configured" });
@@ -256,7 +345,9 @@ export function registerStratigraphyRoutes(
           nwcUri,
           authorization.paymentHash,
           authorization.preimage,
-           clientFactory,
+          clientFactory,
+          selectedRange.amountMsats,
+          selectedRange.description,
         );
         if (verification === "unavailable") {
           res.status(502).json({ error: "Unable to verify payment" });
@@ -265,7 +356,8 @@ export function registerStratigraphyRoutes(
         if (verification === "valid") {
           try {
             await challengeStore.consume(
-              callerKey(req),
+              caller,
+              selectedRange.key,
               authorization.paymentHash,
             );
           } catch (error) {
@@ -274,8 +366,7 @@ export function registerStratigraphyRoutes(
               "Unable to remove consumed payment challenge",
             );
           }
-          const data = await readDataset();
-          res.status(200).json(data);
+          res.status(200).json(selectedRange.records);
           return;
         }
       }
@@ -287,6 +378,10 @@ export function registerStratigraphyRoutes(
         clientFactory,
         challengeStore,
         policy,
+        caller,
+        selectedRange.key,
+        selectedRange.amountMsats,
+        selectedRange.description,
       );
     },
   );

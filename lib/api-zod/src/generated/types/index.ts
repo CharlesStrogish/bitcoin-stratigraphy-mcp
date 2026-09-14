@@ -7,7 +7,9 @@
  */
 
 export * from './datasetHealthStatus';
+export * from './getPaidStratigraphyParams';
 export * from './healthStatus';
+export * from './invalidRangeError';
 export * from './l402Challenge';
 export * from './paymentChallengeRateLimitError';
 export * from './paymentChallengeServiceUnavailableError';

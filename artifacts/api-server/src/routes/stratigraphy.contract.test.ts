@@ -19,6 +19,9 @@ const paymentHash = createHash("sha256")
   .update(Buffer.from(preimage, "hex"))
   .digest("hex");
 const invoice = "lnbc210n1contracttest";
+const fullDatasetAmountMsats = 422_000;
+const fullDatasetDescription =
+  "Bitcoin Stratigraphy days 1-422 (422 days) access";
 
 type OpenApiDocument = {
   paths: Record<string, { get?: unknown }>;
@@ -110,8 +113,8 @@ async function withContractServer(
 const validTransaction: Transaction = {
   type: "incoming",
   state: "settled",
-  amount: 21_000,
-  description: "Bitcoin Stratigraphy 422-day dataset access",
+  amount: fullDatasetAmountMsats,
+  description: fullDatasetDescription,
   payment_hash: paymentHash,
   preimage,
   invoice,
@@ -132,7 +135,13 @@ registerStratigraphyRoutes(app, () => ({
     return validTransaction as never;
   },
   close: () => undefined,
-}), undefined, createMemoryPaymentChallengeStore());
+}), {
+  now: Date.now,
+  reuseMs: 5 * 60 * 1000,
+  limitWindowMs: 60 * 60 * 1000,
+  maxInvoicesPerWindow: 100,
+  maxCallers: 10_000,
+}, createMemoryPaymentChallengeStore());
 
 let baseUrl: string;
 const server = app.listen(0);
@@ -552,8 +561,8 @@ test("coalesces concurrent cold-cache requests into one usable challenge", async
   assert.ok(responses.every((item) => item.status === 402));
   assert.equal(invoiceRequestCount, 1);
   assert.deepEqual(invoiceRequest, {
-    amount: 21_000,
-    description: "Bitcoin Stratigraphy 422-day dataset access",
+    amount: fullDatasetAmountMsats,
+    description: fullDatasetDescription,
     expiry: 3600,
   });
   assert.equal(
@@ -677,6 +686,10 @@ test("fails closed when shared challenge coordination is unavailable", async () 
 
 test("the PostgreSQL store coalesces concurrent instance requests", async () => {
   const caller = "contract-postgres-concurrent";
+  await pool.query(
+    "DELETE FROM payment_range_challenges WHERE caller_key = $1",
+    [caller],
+  );
   await pool.query("DELETE FROM payment_challenges WHERE caller_key = $1", [
     caller,
   ]);
@@ -701,8 +714,8 @@ test("the PostgreSQL store coalesces concurrent instance requests", async () => 
   };
 
   try {
-    const first = firstStore.getOrCreate(caller, policy, create);
-    const second = secondStore.getOrCreate(caller, policy, create);
+    const first = firstStore.getOrCreate(caller, "full", policy, create);
+    const second = secondStore.getOrCreate(caller, "full", policy, create);
     const deadline = Date.now() + 2_000;
     while (creations === 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -712,8 +725,48 @@ test("the PostgreSQL store coalesces concurrent instance requests", async () => 
     const results = await Promise.all([first, second]);
     assert.ok(results.every((result) => result.kind === "challenge"));
     assert.equal(creations, 1);
+
+    const secondRange = await firstStore.getOrCreate(
+      caller,
+      "days-10",
+      policy,
+      create,
+    );
+    assert.equal(secondRange.kind, "challenge");
+    assert.equal(creations, 2);
+    const reusedFirstRange = await secondStore.getOrCreate(
+      caller,
+      "full",
+      policy,
+      create,
+    );
+    assert.equal(reusedFirstRange.kind, "challenge");
+    assert.equal(creations, 2);
+
+    await firstStore.consume(caller, "full", paymentHash);
+    const recreatedFirstRange = await firstStore.getOrCreate(
+      caller,
+      "full",
+      policy,
+      create,
+    );
+    assert.equal(recreatedFirstRange.kind, "challenge");
+    assert.equal(creations, 3);
+    await firstStore.consume(caller, "days-10", paymentHash);
+    const stillLimited = await secondStore.getOrCreate(
+      caller,
+      "days-10",
+      policy,
+      create,
+    );
+    assert.equal(stillLimited.kind, "limited");
+    assert.equal(creations, 3);
   } finally {
     release();
+    await pool.query(
+      "DELETE FROM payment_range_challenges WHERE caller_key = $1",
+      [caller],
+    );
     await pool.query(
       "DELETE FROM payment_challenges WHERE caller_key = $1",
       [caller],
@@ -723,6 +776,10 @@ test("the PostgreSQL store coalesces concurrent instance requests", async () => 
 
 test("failed PostgreSQL invoice creations consume shared quota", async () => {
   const caller = "contract-postgres-failures";
+  await pool.query(
+    "DELETE FROM payment_range_challenges WHERE caller_key = $1",
+    [caller],
+  );
   await pool.query("DELETE FROM payment_challenges WHERE caller_key = $1", [
     caller,
   ]);
@@ -744,12 +801,21 @@ test("failed PostgreSQL invoice creations consume shared quota", async () => {
   };
 
   try {
-    await assert.rejects(stores[0].getOrCreate(caller, policy, fail));
-    await assert.rejects(stores[1].getOrCreate(caller, policy, fail));
-    const limited = await stores[0].getOrCreate(caller, policy, fail);
+    await assert.rejects(stores[0].getOrCreate(caller, "days-1", policy, fail));
+    await assert.rejects(stores[1].getOrCreate(caller, "days-10", policy, fail));
+    const limited = await stores[0].getOrCreate(
+      caller,
+      "from-2026-09-01",
+      policy,
+      fail,
+    );
     assert.equal(limited.kind, "limited");
     assert.equal(attempts, 2);
   } finally {
+    await pool.query(
+      "DELETE FROM payment_range_challenges WHERE caller_key = $1",
+      [caller],
+    );
     await pool.query(
       "DELETE FROM payment_challenges WHERE caller_key = $1",
       [caller],
@@ -897,6 +963,40 @@ test("failed invoice attempts consume quota and retain caller capacity", async (
   }
 });
 
+test("memory store reuses ranges and preserves caller quota after consume", async () => {
+  const store = createMemoryPaymentChallengeStore();
+  const policy = {
+    now: Date.now,
+    reuseMs: 60_000,
+    limitWindowMs: 60_000,
+    maxInvoicesPerWindow: 3,
+    maxCallers: 10,
+  };
+  let creations = 0;
+  const create = async () => {
+    creations += 1;
+    return { invoice, paymentHash };
+  };
+
+  await store.getOrCreate("caller", "days-1", policy, create);
+  await store.getOrCreate("caller", "days-10", policy, create);
+  await store.getOrCreate("caller", "days-1", policy, create);
+  assert.equal(creations, 2);
+
+  await store.consume("caller", "days-1", paymentHash);
+  await store.getOrCreate("caller", "days-1", policy, create);
+  assert.equal(creations, 3);
+  await store.consume("caller", "days-10", paymentHash);
+  const limited = await store.getOrCreate(
+    "caller",
+    "days-10",
+    policy,
+    create,
+  );
+  assert.equal(limited.kind, "limited");
+  assert.equal(creations, 3);
+});
+
 test("returns a generic 502 and closes the wallet when invoice creation is rejected", async () => {
   let closeCount = 0;
 
@@ -1041,7 +1141,8 @@ test("rejects a preimage that does not match the payment hash", async () => {
 });
 
 for (const [name, unsuitable] of [
-  ["underpaid", { amount: 20_999 }],
+  ["underpaid", { amount: fullDatasetAmountMsats - 1 }],
+  ["overpaid", { amount: fullDatasetAmountMsats + 1 }],
   ["unrelated", { description: "A different purchase" }],
   ["outgoing", { type: "outgoing" }],
   ["pending", { state: "pending" }],
@@ -1065,6 +1166,85 @@ test("returns the full dataset for a suitable payment", async () => {
   assert.equal(response.status, 200);
   const body = (await response.json()) as unknown[];
   assert.ok(body.length > 5);
+});
+
+test("prices recent-day ranges at one sat per day with a five-sat minimum", async () => {
+  for (const [days, amount, description] of [
+    [1, 5_000, "Bitcoin Stratigraphy days 422-422 (1 day) access"],
+    [10, 10_000, "Bitcoin Stratigraphy days 413-422 (10 days) access"],
+  ] as const) {
+    invoiceRequest = undefined;
+    const response = await fetch(
+      `${baseUrl}/api/v1/stratigraphy?days=${days}`,
+    );
+    assert.equal(response.status, 402);
+    assert.deepEqual(invoiceRequest, {
+      amount,
+      description,
+      expiry: 3600,
+    });
+  }
+});
+
+test("maps from dates from the September 9, 2026 day-422 anchor", async () => {
+  invoiceRequest = undefined;
+  const response = await fetch(
+    `${baseUrl}/api/v1/stratigraphy?from=2026-09-01`,
+  );
+  assert.equal(response.status, 402);
+  assert.deepEqual(invoiceRequest, {
+    amount: 9_000,
+    description: "Bitcoin Stratigraphy days 414-422 (9 days) access",
+    expiry: 3600,
+  });
+});
+
+test("returns only the paid range and rejects a cheaper range proof", async () => {
+  transaction = {
+    ...validTransaction,
+    amount: 10_000,
+    description: "Bitcoin Stratigraphy days 413-422 (10 days) access",
+  };
+  const paidResponse = await fetch(
+    `${baseUrl}/api/v1/stratigraphy?days=10`,
+    { headers: { Authorization: `L402 ${paymentHash}:${preimage}` } },
+  );
+  assert.equal(paidResponse.status, 200);
+  const paidBody = (await paidResponse.json()) as Array<{ day: number }>;
+  assert.equal(paidBody.length, 10);
+  assert.equal(paidBody[0].day, 413);
+  assert.equal(paidBody.at(-1)?.day, 422);
+
+  transaction = {
+    ...validTransaction,
+    amount: 5_000,
+    description: "Bitcoin Stratigraphy days 422-422 (1 day) access",
+  };
+  const replayResponse = await fetch(
+    `${baseUrl}/api/v1/stratigraphy?days=10`,
+    { headers: { Authorization: `L402 ${paymentHash}:${preimage}` } },
+  );
+  assert.ok([402, 429].includes(replayResponse.status));
+});
+
+test("rejects invalid or conflicting ranges before creating an invoice", async () => {
+  const requestsBefore = invoiceRequestCount;
+  for (const query of [
+    "days=0",
+    "days=423",
+    "days=1.5",
+    "from=2026-02-30",
+    "from=2026-09-10",
+    "days=5&from=2026-09-01",
+  ]) {
+    const response = await fetch(
+      `${baseUrl}/api/v1/stratigraphy?${query}`,
+    );
+    assert.equal(response.status, 400);
+    const body = (await response.json()) as { error: string };
+    assert.equal(body.error, "Invalid stratigraphy range");
+  }
+  assert.equal(invoiceRequestCount, requestsBefore);
 });
 
 test("keeps the free sample at exactly five records", async () => {

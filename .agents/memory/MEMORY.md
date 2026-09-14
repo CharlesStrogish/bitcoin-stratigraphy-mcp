@@ -1,1 +1,1 @@
-- [NWC payment proof binding](nwc-payment-proof-binding.md) — L402 proofs must match an incoming settled invoice’s product description and minimum amount.
+- [NWC payment proof binding](nwc-payment-proof-binding.md) — Range-priced L402 proofs must exactly match the selected records, price, and product description.

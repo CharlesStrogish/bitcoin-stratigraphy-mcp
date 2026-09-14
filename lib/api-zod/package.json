@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./health-check-contract": {
+      "types": "./health-check-contract.d.ts",
+      "default": "./health-check-contract.mjs"
+    }
   },
   "dependencies": {
     "zod": "catalog:"

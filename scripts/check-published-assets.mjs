@@ -3,6 +3,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  HEALTH_CHECK_RESPONSE,
+  isHealthCheckResponse,
+} from "../lib/api-zod/health-check-contract.mjs";
+
 const workspaceRoot = path.resolve(
   fileURLToPath(new URL("..", import.meta.url)),
 );
@@ -68,7 +73,10 @@ export function discoverPublishedApiArtifacts(root = workspaceRoot) {
       const livenessPath = config.match(
         /^\[services\.production\.health\.startup\]\s*$[\s\S]*?^path\s*=\s*"([^"]+)"/m,
       )?.[1];
-      assert.ok(livenessPath, `${entry.name} must declare a startup health path`);
+      assert.ok(
+        livenessPath,
+        `${entry.name} must declare a startup health path`,
+      );
 
       return [
         {
@@ -207,14 +215,11 @@ async function assertHealthyApiResponse(response, livenessUrl, artifactName) {
     );
   }
 
-  if (
-    body === null ||
-    typeof body !== "object" ||
-    Array.isArray(body) ||
-    body.status !== "ok"
-  ) {
+  if (!isHealthCheckResponse(body)) {
     throw new Error(
-      `${artifactName}: liveness endpoint returned an unhealthy response for ${livenessUrl}`,
+      `${artifactName}: liveness endpoint response does not match the shared health contract for ${livenessUrl}; expected ${JSON.stringify(
+        HEALTH_CHECK_RESPONSE,
+      )}, received ${JSON.stringify(body)}`,
     );
   }
 }

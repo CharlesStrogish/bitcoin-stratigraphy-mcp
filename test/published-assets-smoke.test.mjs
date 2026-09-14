@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { HEALTH_CHECK_RESPONSE } from "../lib/api-zod/health-check-contract.mjs";
 import {
   checkPublishedAssets,
   discoverPublishedApiArtifacts,
@@ -87,12 +88,10 @@ test("checks API liveness without payment or data mutation", async () => {
   await checkPublishedAssets({
     deploymentUrl: "https://published.example",
     artifacts: [],
-    apiArtifacts: [
-      { name: "Example API", livenessPath: "/api/healthz" },
-    ],
+    apiArtifacts: [{ name: "Example API", livenessPath: "/api/healthz" }],
     fetchImpl: async (url) => {
       requested.push(url.toString());
-      return new Response('{"status":"ok"}', {
+      return Response.json(HEALTH_CHECK_RESPONSE, {
         headers: { "content-type": "application/json; charset=utf-8" },
       });
     },
@@ -106,9 +105,7 @@ test("rejects API liveness responses redirected away from the configured URL", a
     checkPublishedAssets({
       deploymentUrl: "https://published.example",
       artifacts: [],
-      apiArtifacts: [
-        { name: "Example API", livenessPath: "/api/healthz" },
-      ],
+      apiArtifacts: [{ name: "Example API", livenessPath: "/api/healthz" }],
       fetchImpl: async () => {
         const response = Response.json({ status: "ok" });
         Object.defineProperty(response, "url", {
@@ -126,9 +123,7 @@ test("API liveness failures identify the artifact and URL", async () => {
     checkPublishedAssets({
       deploymentUrl: "https://published.example",
       artifacts: [],
-      apiArtifacts: [
-        { name: "Example API", livenessPath: "/api/healthz" },
-      ],
+      apiArtifacts: [{ name: "Example API", livenessPath: "/api/healthz" }],
       fetchImpl: async () =>
         new Response("unavailable", {
           status: 503,
@@ -144,9 +139,7 @@ test("rejects HTML fallback responses returned for API liveness", async () => {
     checkPublishedAssets({
       deploymentUrl: "https://published.example",
       artifacts: [],
-      apiArtifacts: [
-        { name: "Example API", livenessPath: "/api/healthz" },
-      ],
+      apiArtifacts: [{ name: "Example API", livenessPath: "/api/healthz" }],
       fetchImpl: async () =>
         new Response("<!doctype html><title>Example App</title>", {
           headers: { "content-type": "text/html; charset=utf-8" },
@@ -161,13 +154,10 @@ test("rejects unhealthy API liveness response shapes", async () => {
     checkPublishedAssets({
       deploymentUrl: "https://published.example",
       artifacts: [],
-      apiArtifacts: [
-        { name: "Example API", livenessPath: "/api/healthz" },
-      ],
-      fetchImpl: async () =>
-        Response.json({ status: "degraded" }),
+      apiArtifacts: [{ name: "Example API", livenessPath: "/api/healthz" }],
+      fetchImpl: async () => Response.json({ status: "degraded" }),
     }),
-    /Example API: liveness endpoint returned an unhealthy response for https:\/\/published\.example\/api\/healthz/,
+    /Example API: liveness endpoint response does not match the shared health contract for https:\/\/published\.example\/api\/healthz; expected \{"status":"ok"\}, received \{"status":"degraded"\}/,
   );
 });
 
@@ -176,9 +166,7 @@ test("rejects malformed JSON returned for API liveness", async () => {
     checkPublishedAssets({
       deploymentUrl: "https://published.example",
       artifacts: [],
-      apiArtifacts: [
-        { name: "Example API", livenessPath: "/api/healthz" },
-      ],
+      apiArtifacts: [{ name: "Example API", livenessPath: "/api/healthz" }],
       fetchImpl: async () =>
         new Response('{"status":', {
           headers: { "content-type": "application/json" },

@@ -3,12 +3,13 @@ import {
   DatasetHealthCheckResponse,
   HealthCheckResponse,
 } from "@workspace/api-zod";
+import { HEALTH_CHECK_RESPONSE } from "@workspace/api-zod/health-check-contract";
 import { readDataset } from "./stratigraphy";
 
 const router: IRouter = Router();
 
 router.get("/healthz", (_req, res) => {
-  const data = HealthCheckResponse.parse({ status: "ok" });
+  const data = HealthCheckResponse.parse(HEALTH_CHECK_RESPONSE);
   res.json(data);
 });
 

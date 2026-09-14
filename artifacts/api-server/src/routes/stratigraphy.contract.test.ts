@@ -562,6 +562,55 @@ test("returns a generic 502 and closes the wallet when invoice creation is rejec
   );
 });
 
+test("coalesces concurrent rejected invoice attempts and allows a later retry", async () => {
+  let attemptCount = 0;
+  let closeCount = 0;
+  let rejectSharedAttempt!: (reason?: unknown) => void;
+  const sharedAttempt = new Promise<never>((_resolve, reject) => {
+    rejectSharedAttempt = reject;
+  });
+
+  await withContractServer(
+    () => ({
+      lookupInvoice: async () => validTransaction as never,
+      makeInvoice: async () => {
+        attemptCount += 1;
+        if (attemptCount === 1) return sharedAttempt;
+        throw new Error("wallet remains unavailable");
+      },
+      close: () => {
+        closeCount += 1;
+      },
+    }),
+    async (url) => {
+      const responsePromises = Array.from({ length: 10 }, () => fetch(url));
+      await new Promise((resolve) => setTimeout(resolve, 25));
+
+      assert.equal(attemptCount, 1);
+      rejectSharedAttempt(new Error("shared wallet outage"));
+
+      const responses = await Promise.all(responsePromises);
+      assert.ok(responses.every((response) => response.status === 502));
+      assert.deepEqual(
+        await Promise.all(responses.map((response) => response.json())),
+        Array.from({ length: responses.length }, () => ({
+          error: "Unable to create payment invoice",
+        })),
+      );
+      assert.equal(attemptCount, 1);
+      assert.equal(closeCount, 1);
+
+      const retry = await fetch(url);
+      assert.equal(retry.status, 502);
+      assert.deepEqual(await retry.json(), {
+        error: "Unable to create payment invoice",
+      });
+      assert.equal(attemptCount, 2);
+      assert.equal(closeCount, 2);
+    },
+  );
+});
+
 test("returns a generic 502 and closes the wallet for an incomplete invoice", async () => {
   let closeCount = 0;
 

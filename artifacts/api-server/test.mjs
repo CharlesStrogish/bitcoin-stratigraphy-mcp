@@ -9,7 +9,7 @@ await build({
   bundle: true,
   platform: "node",
   format: "esm",
-  external: ["express", "@getalby/sdk"],
+  external: ["express", "@getalby/sdk", "yaml"],
   sourcemap: "inline",
 });
 

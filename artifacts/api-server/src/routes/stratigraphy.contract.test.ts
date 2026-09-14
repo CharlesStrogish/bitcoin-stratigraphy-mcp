@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { after, before, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express from "express";
+import { parse } from "yaml";
+import { openApiDocument } from "../openapi";
 import { registerStratigraphyRoutes } from "./stratigraphy";
 
 const preimage = "11".repeat(32);
@@ -10,6 +14,35 @@ const paymentHash = createHash("sha256")
   .update(Buffer.from(preimage, "hex"))
   .digest("hex");
 const invoice = "lnbc210n1contracttest";
+
+type OpenApiDocument = {
+  paths: Record<string, { get?: unknown }>;
+  components: {
+    securitySchemes: Record<string, unknown>;
+    schemas: Record<string, unknown>;
+  };
+};
+
+function paymentContract(document: OpenApiDocument) {
+  const sample = document.paths["/v1/stratigraphy/sample"]?.get as {
+    responses?: unknown;
+  };
+  const paid = document.paths["/v1/stratigraphy"]?.get as {
+    security?: unknown;
+    responses?: unknown;
+  };
+
+  return {
+    sample: { responses: sample?.responses },
+    paid: {
+      security: paid?.security,
+      responses: paid?.responses,
+    },
+    securityScheme: document.components.securitySchemes.L402,
+    challengeSchema: document.components.schemas.L402Challenge,
+    entrySchema: document.components.schemas.StratigraphyEntry,
+  };
+}
 
 type Transaction = {
   type: "incoming" | "outgoing";
@@ -87,6 +120,48 @@ before(async () => {
 });
 
 after(() => server.close());
+
+test("keeps served and shared payment OpenAPI contracts in parity", async () => {
+  const sharedDocument = parse(
+    await readFile(
+      resolve(process.cwd(), "../../lib/api-spec/openapi.yaml"),
+      "utf8",
+    ),
+  ) as OpenApiDocument;
+  const servedContract = paymentContract(
+    openApiDocument as unknown as OpenApiDocument,
+  );
+  const sharedContract = paymentContract(sharedDocument);
+
+  assert.deepEqual(servedContract, sharedContract);
+  assert.deepEqual(
+    (
+      servedContract.sample as {
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: { minItems: number; maxItems: number };
+              };
+            };
+          };
+        };
+      }
+    ).responses["200"].content["application/json"].schema,
+    {
+      type: "array",
+      minItems: 5,
+      maxItems: 5,
+      items: { $ref: "#/components/schemas/StratigraphyEntry" },
+    },
+  );
+  assert.deepEqual(servedContract.securityScheme, {
+    type: "apiKey",
+    in: "header",
+    name: "Authorization",
+    description: "L402 <payment_hash>:<preimage>",
+  });
+});
 
 test("coalesces concurrent cold-cache requests into one usable challenge", async () => {
   invoiceRequest = undefined;

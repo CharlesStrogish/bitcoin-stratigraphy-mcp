@@ -15,6 +15,7 @@ const workspaceRoot = path.resolve(
 // Release checks should fail promptly enough to leave time for actionable output.
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 export const DEFAULT_ASSET_CONCURRENCY = 8;
+export const DEFAULT_ASSET_BODY_LIMIT_BYTES = 25 * 1024 * 1024;
 
 function readTomlString(source, key) {
   return source.match(new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
@@ -158,9 +159,33 @@ async function consumeAssetBody(
   assetUrl,
   artifactName,
   requestTimeoutMs,
+  assetBodyLimitBytes,
 ) {
   let timeout;
-  const bodyRead = response.arrayBuffer();
+  const reader = response.body?.getReader();
+  assert.ok(
+    reader,
+    `${artifactName}: asset response had no readable body for ${assetUrl}`,
+  );
+  const bodyRead = (async () => {
+    let bytesRead = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        return;
+      }
+
+      bytesRead += value.byteLength;
+      if (bytesRead > assetBodyLimitBytes) {
+        const error = new Error(
+          `${artifactName}: asset body exceeded ${assetBodyLimitBytes} bytes for ${assetUrl}`,
+        );
+        await reader.cancel(error).catch(() => {});
+        throw error;
+      }
+    }
+  })();
   const bodyTimeout = new Promise((_, reject) => {
     timeout = setTimeout(() => {
       reject(
@@ -174,8 +199,11 @@ async function consumeAssetBody(
   try {
     await Promise.race([bodyRead, bodyTimeout]);
   } catch (error) {
-    if (error.message.startsWith(`${artifactName}: asset body timed out`)) {
-      void response.body?.cancel(error).catch(() => {});
+    if (
+      error.message.startsWith(`${artifactName}: asset body timed out`) ||
+      error.message.startsWith(`${artifactName}: asset body exceeded`)
+    ) {
+      void reader.cancel(error).catch(() => {});
       throw error;
     }
     throw new Error(
@@ -192,6 +220,7 @@ async function checkAsset(
   artifactName,
   fetchImpl,
   requestTimeoutMs,
+  assetBodyLimitBytes,
 ) {
   const assetResponse = await requestSuccessful(
     assetUrl,
@@ -206,6 +235,7 @@ async function checkAsset(
     assetUrl,
     artifactName,
     requestTimeoutMs,
+    assetBodyLimitBytes,
   );
 }
 
@@ -215,6 +245,7 @@ async function checkAssetsConcurrently(
   fetchImpl,
   requestTimeoutMs,
   assetConcurrency,
+  assetBodyLimitBytes,
 ) {
   const failures = [];
   let nextAssetIndex = 0;
@@ -228,6 +259,7 @@ async function checkAssetsConcurrently(
           artifactName,
           fetchImpl,
           requestTimeoutMs,
+          assetBodyLimitBytes,
         );
       } catch (error) {
         failures.push(error);
@@ -295,6 +327,7 @@ export async function checkPublishedAssets({
   fetchImpl = fetch,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   assetConcurrency = DEFAULT_ASSET_CONCURRENCY,
+  assetBodyLimitBytes = DEFAULT_ASSET_BODY_LIMIT_BYTES,
 }) {
   assert.ok(deploymentUrl, "PUBLISHED_URL must be provided");
   assert.ok(
@@ -304,6 +337,10 @@ export async function checkPublishedAssets({
   assert.ok(
     Number.isInteger(assetConcurrency) && assetConcurrency > 0,
     "assetConcurrency must be a positive integer",
+  );
+  assert.ok(
+    Number.isInteger(assetBodyLimitBytes) && assetBodyLimitBytes > 0,
+    "assetBodyLimitBytes must be a positive integer",
   );
   assert.ok(
     artifacts.length + apiArtifacts.length > 0,
@@ -353,6 +390,7 @@ export async function checkPublishedAssets({
       fetchImpl,
       requestTimeoutMs,
       assetConcurrency,
+      assetBodyLimitBytes,
     );
 
     console.log(

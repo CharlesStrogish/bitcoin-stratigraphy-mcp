@@ -4,6 +4,7 @@ import test from "node:test";
 import { HEALTH_CHECK_RESPONSE } from "../lib/api-zod/health-check-contract.mjs";
 import {
   checkPublishedAssets,
+  DEFAULT_ASSET_BODY_LIMIT_BYTES,
   discoverPublishedApiArtifacts,
   discoverPublishedWebArtifacts,
   findJavaScriptAndCssUrls,
@@ -330,6 +331,33 @@ test("reports truncated asset bodies with the artifact and URL", async () => {
     }),
     /Truncated App: asset body download failed for https:\/\/published\.example\/truncated\/assets\/site\.css: connection terminated/,
   );
+});
+
+test("rejects asset bodies that exceed the configured byte limit", async () => {
+  const assetBodyLimitBytes = 8;
+
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [{ name: "Oversized App", previewPath: "/oversized/" }],
+      apiArtifacts: [],
+      assetBodyLimitBytes,
+      fetchImpl: async (url) => {
+        if (url.toString().endsWith("/oversized/")) {
+          return new Response(
+            '<script src="/oversized/assets/main.js"></script>',
+          );
+        }
+
+        return new Response("123456789", {
+          headers: { "content-type": "text/javascript" },
+        });
+      },
+    }),
+    /Oversized App: asset body exceeded 8 bytes for https:\/\/published\.example\/oversized\/assets\/main\.js/,
+  );
+
+  assert.equal(DEFAULT_ASSET_BODY_LIMIT_BYTES, 25 * 1024 * 1024);
 });
 
 test("rejects HTML fallback responses returned for missing assets", async () => {

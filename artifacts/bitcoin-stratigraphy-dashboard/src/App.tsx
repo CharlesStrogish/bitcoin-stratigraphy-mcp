@@ -51,7 +51,50 @@ const queryClient = new QueryClient({
 const CHART_COLORS = ["#d99a16", "#b9533c", "#3f766a", "#53657d", "#c57b3d"];
 const PAGE_SIZE = 10;
 const EXPECTED_DATASET_LENGTH = 422;
-const completeDataset = stratigraphyDataset as StratigraphyEntry[];
+
+type RawStratigraphyEntry = Omit<StratigraphyEntry, "quantitative_alpha"> & {
+  quantitative_alpha?: Partial<StratigraphyEntry["quantitative_alpha"]>;
+};
+
+function supplyQuantitativeAlpha(
+  entry: RawStratigraphyEntry,
+  previousMultiplier: number,
+): StratigraphyEntry {
+  const match = /(\d+(?:\.\d+)?)\s*[x×]\s*away/i.exec(entry.title);
+  const derivedMultiplier = match ? Number(match[1]) : 0;
+  const multiplier =
+    typeof entry.quantitative_alpha?.target_multiplier === "number"
+      ? entry.quantitative_alpha.target_multiplier
+      : derivedMultiplier || previousMultiplier;
+
+  return {
+    ...entry,
+    quantitative_alpha: {
+      target_multiplier: multiplier,
+      difficulty_epoch_progress:
+        entry.quantitative_alpha?.difficulty_epoch_progress ??
+        `${((((entry.day - 1) % 14) + 1) / 14 * 100).toFixed(2)}%`,
+      thermodynamic_signal:
+        entry.quantitative_alpha?.thermodynamic_signal ??
+        (multiplier >= 120
+          ? "extended-target-distance"
+          : multiplier >= 100
+            ? "elevated-target-distance"
+            : multiplier > 0
+              ? "compressed-target-distance"
+              : "signal-unavailable"),
+    },
+  };
+}
+
+let previousMultiplier = 0;
+const completeDataset = (stratigraphyDataset as RawStratigraphyEntry[]).map(
+  (entry) => {
+    const suppliedEntry = supplyQuantitativeAlpha(entry, previousMultiplier);
+    previousMultiplier = suppliedEntry.quantitative_alpha.target_multiplier;
+    return suppliedEntry;
+  },
+);
 
 async function loadCompleteDataset() {
   if (

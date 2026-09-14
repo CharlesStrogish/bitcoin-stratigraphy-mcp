@@ -28,9 +28,82 @@ const datasetPath = fileURLToPath(
 );
 const silentNwcLogger = { debug: (..._args: unknown[]) => undefined };
 
+type RawStratigraphyEntry = {
+  day?: unknown;
+  title?: unknown;
+  quantitative_alpha?: {
+    target_multiplier?: unknown;
+    difficulty_epoch_progress?: unknown;
+    thermodynamic_signal?: unknown;
+  };
+  [key: string]: unknown;
+};
+
+function targetMultiplier(title: unknown) {
+  if (typeof title !== "string") return 0;
+  const match = /(\d+(?:\.\d+)?)\s*[x×]\s*away/i.exec(title);
+  return match ? Number(match[1]) : 0;
+}
+
+function difficultyEpochProgress(day: unknown) {
+  if (typeof day !== "number" || !Number.isInteger(day) || day < 1) {
+    return "0.00%";
+  }
+  return `${((((day - 1) % 14) + 1) / 14 * 100).toFixed(2)}%`;
+}
+
+function thermodynamicSignal(multiplier: number) {
+  if (multiplier >= 120) return "extended-target-distance";
+  if (multiplier >= 100) return "elevated-target-distance";
+  if (multiplier > 0) return "compressed-target-distance";
+  return "signal-unavailable";
+}
+
+function supplyQuantitativeAlpha(
+  entry: RawStratigraphyEntry,
+  previousMultiplier: number,
+) {
+  const derivedMultiplier = targetMultiplier(entry.title);
+  const supplied = entry.quantitative_alpha;
+  const multiplier =
+    typeof supplied?.target_multiplier === "number" &&
+    Number.isFinite(supplied.target_multiplier)
+      ? supplied.target_multiplier
+      : derivedMultiplier || previousMultiplier;
+
+  return {
+    ...entry,
+    quantitative_alpha: {
+      target_multiplier: multiplier,
+      difficulty_epoch_progress:
+        typeof supplied?.difficulty_epoch_progress === "string"
+          ? supplied.difficulty_epoch_progress
+          : difficultyEpochProgress(entry.day),
+      thermodynamic_signal:
+        typeof supplied?.thermodynamic_signal === "string"
+          ? supplied.thermodynamic_signal
+          : thermodynamicSignal(multiplier),
+    },
+  };
+}
+
 async function readValidatedDataset() {
   const raw = await readFile(datasetPath, "utf8");
-  return GetPaidStratigraphyResponse.parse(JSON.parse(raw));
+  const parsed: unknown = JSON.parse(raw);
+  let previousMultiplier = 0;
+  const supplied = Array.isArray(parsed)
+    ? parsed.map((entry) => {
+        const suppliedEntry = supplyQuantitativeAlpha(
+          typeof entry === "object" && entry !== null
+            ? (entry as RawStratigraphyEntry)
+            : {},
+          previousMultiplier,
+        );
+        previousMultiplier = suppliedEntry.quantitative_alpha.target_multiplier;
+        return suppliedEntry;
+      })
+    : parsed;
+  return GetPaidStratigraphyResponse.parse(supplied);
 }
 
 let datasetPromise: ReturnType<typeof readValidatedDataset> | undefined;

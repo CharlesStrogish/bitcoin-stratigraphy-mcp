@@ -50,11 +50,24 @@ export interface ReadinessStatus {
   dependencies: ReadinessStatusDependencies;
 }
 
+export interface QuantitativeAlpha {
+  /** Numeric distance multiplier parsed from the day's title */
+  target_multiplier: number;
+  /**
+     * Estimated progress through the current 14-day difficulty epoch
+     * @pattern ^(100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)%$
+     */
+  difficulty_epoch_progress: string;
+  /** Qualitative target-distance band derived from the multiplier */
+  thermodynamic_signal: string;
+}
+
 export interface StratigraphyEntry {
   day: number;
   title: string;
   video_id: string;
   transcript_summary: string;
+  quantitative_alpha: QuantitativeAlpha;
 }
 
 export interface L402Challenge {

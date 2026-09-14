@@ -44,11 +44,19 @@ export const ReadinessCheckResponse = zod.object({
 /**
  * @summary Get the free five-record sample
  */
+export const getStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
+
+
 export const GetStratigraphyResponseItem = zod.object({
   "day": zod.number().int(),
   "title": zod.string(),
   "video_id": zod.string(),
-  "transcript_summary": zod.string()
+  "transcript_summary": zod.string(),
+  "quantitative_alpha": zod.object({
+  "target_multiplier": zod.number().describe('Numeric distance multiplier parsed from the day\'s title'),
+  "difficulty_epoch_progress": zod.string().regex(getStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp).describe('Estimated progress through the current 14-day difficulty epoch'),
+  "thermodynamic_signal": zod.string().describe('Qualitative target-distance band derived from the multiplier')
+})
 })
 export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).min(5).max(5)
 
@@ -66,11 +74,19 @@ export const GetPaidStratigraphyQueryParams = zod.object({
   "from": zod.date().optional().describe('First date to include, using the daily series anchored at day 422 on 2026-09-09. Cannot be combined with days.')
 })
 
+export const getPaidStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
+
+
 export const GetPaidStratigraphyResponseItem = zod.object({
   "day": zod.number().int(),
   "title": zod.string(),
   "video_id": zod.string(),
-  "transcript_summary": zod.string()
+  "transcript_summary": zod.string(),
+  "quantitative_alpha": zod.object({
+  "target_multiplier": zod.number().describe('Numeric distance multiplier parsed from the day\'s title'),
+  "difficulty_epoch_progress": zod.string().regex(getPaidStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp).describe('Estimated progress through the current 14-day difficulty epoch'),
+  "thermodynamic_signal": zod.string().describe('Qualitative target-distance band derived from the multiplier')
+})
 })
 export const GetPaidStratigraphyResponse = zod.array(GetPaidStratigraphyResponseItem)
 

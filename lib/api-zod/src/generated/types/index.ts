@@ -14,6 +14,7 @@ export * from './l402Challenge';
 export * from './paymentChallengeRateLimitError';
 export * from './paymentChallengeServiceUnavailableError';
 export * from './paymentConfigurationError';
+export * from './quantitativeAlpha';
 export * from './readinessStatus';
 export * from './readinessStatusDependencies';
 export * from './readinessStatusDependenciesChallengeCoordination';

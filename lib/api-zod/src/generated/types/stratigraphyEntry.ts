@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QuantitativeAlpha } from './quantitativeAlpha';
 
 export interface StratigraphyEntry {
   day: number;
   title: string;
   video_id: string;
   transcript_summary: string;
+  quantitative_alpha: QuantitativeAlpha;
 }

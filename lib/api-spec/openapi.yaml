@@ -227,11 +227,32 @@ components:
           type: string
         transcript_summary:
           type: string
+        quantitative_alpha:
+          $ref: "#/components/schemas/QuantitativeAlpha"
       required:
         - day
         - title
         - video_id
         - transcript_summary
+        - quantitative_alpha
+    QuantitativeAlpha:
+      type: object
+      properties:
+        target_multiplier:
+          type: number
+          format: float
+          description: Numeric distance multiplier parsed from the day's title
+        difficulty_epoch_progress:
+          type: string
+          pattern: "^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$"
+          description: Estimated progress through the current 14-day difficulty epoch
+        thermodynamic_signal:
+          type: string
+          description: Qualitative target-distance band derived from the multiplier
+      required:
+        - target_multiplier
+        - difficulty_epoch_progress
+        - thermodynamic_signal
     L402Challenge:
       type: object
       properties:

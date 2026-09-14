@@ -9,7 +9,7 @@ import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
 import { registerOpenApiRoute } from "./openapi";
-import { registerStratigraphyRoutes } from "./stratigraphy";
+import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
 import type { PaymentChallengeStore } from "../lib/payment-challenge-store";
 import { createPostgresPaymentChallengeStore } from "../lib/postgres-payment-challenge-store";
@@ -1307,8 +1307,40 @@ test("rejects invalid or conflicting ranges before creating an invoice", async (
 test("keeps the free sample at exactly five records", async () => {
   const response = await fetch(`${baseUrl}/api/v1/stratigraphy/sample`);
   assert.equal(response.status, 200);
-  const body = (await response.json()) as unknown[];
+  const body = (await response.json()) as Array<{
+    quantitative_alpha?: {
+      target_multiplier?: unknown;
+      difficulty_epoch_progress?: unknown;
+      thermodynamic_signal?: unknown;
+    };
+  }>;
   assert.equal(body.length, 5);
+  for (const entry of body) {
+    assert.equal(
+      typeof entry.quantitative_alpha?.target_multiplier,
+      "number",
+    );
+    assert.match(
+      String(entry.quantitative_alpha?.difficulty_epoch_progress),
+      /^(100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)%$/,
+    );
+    assert.equal(
+      typeof entry.quantitative_alpha?.thermodynamic_signal,
+      "string",
+    );
+  }
+});
+
+test("supplies nonzero quantitative multipliers across the primary dataset", async () => {
+  const dataset = await readDataset();
+  assert.equal(dataset.length, 422);
+  assert.ok(
+    dataset.every(
+      (entry) =>
+        Number.isFinite(entry.quantitative_alpha.target_multiplier) &&
+        entry.quantitative_alpha.target_multiplier > 0,
+    ),
+  );
 });
 
 test("keeps the legacy full-data route unavailable", async () => {

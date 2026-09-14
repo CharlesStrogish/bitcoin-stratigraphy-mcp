@@ -1,0 +1,3 @@
+kind = "web-app"
+title = "Astro Missing Build Fixture"
+previewPath = "/astro-missing-build"

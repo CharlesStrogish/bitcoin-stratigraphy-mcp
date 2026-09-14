@@ -1,0 +1,6 @@
+{
+  "name": "@fixtures/astro-missing-build",
+  "dependencies": {
+    "astro": "^5.0.0"
+  }
+}

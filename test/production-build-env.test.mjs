@@ -240,6 +240,34 @@ test("discovery rejects a Vite artifact without a build script", () => {
   );
 });
 
+test("discovery rejects an Astro artifact without a package name", () => {
+  assert.throws(
+    () => discoverFixture("astro-missing-name"),
+    /sample must declare a package name/,
+  );
+});
+
+test("discovery rejects an Astro artifact without a build script", () => {
+  assert.throws(
+    () => discoverFixture("astro-missing-build"),
+    /sample uses Astro and must declare a build script/,
+  );
+});
+
+test("discovery rejects a Parcel artifact without a package name", () => {
+  assert.throws(
+    () => discoverFixture("parcel-missing-name"),
+    /sample must declare a package name/,
+  );
+});
+
+test("discovery rejects a Parcel artifact without a build script", () => {
+  assert.throws(
+    () => discoverFixture("parcel-missing-build"),
+    /sample uses Parcel and must declare a build script/,
+  );
+});
+
 test("discovery identifies an artifact with missing metadata", () => {
   assert.throws(
     () => discoverFixture("missing-metadata"),

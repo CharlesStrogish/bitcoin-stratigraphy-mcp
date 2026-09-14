@@ -1,0 +1,6 @@
+{
+  "name": "@fixtures/parcel-missing-build",
+  "devDependencies": {
+    "parcel": "^2.0.0"
+  }
+}

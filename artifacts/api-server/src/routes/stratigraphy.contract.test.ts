@@ -44,6 +44,9 @@ function paymentContract(document: OpenApiDocument) {
     },
     securityScheme: document.components.securitySchemes.L402,
     challengeSchema: document.components.schemas.L402Challenge,
+    rateLimitSchema:
+      document.components.schemas.PaymentChallengeRateLimitError,
+    walletGatewaySchema: document.components.schemas.WalletGatewayError,
     entrySchema: document.components.schemas.StratigraphyEntry,
   };
 }
@@ -172,6 +175,89 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     in: "header",
     name: "Authorization",
     description: "L402 <payment_hash>:<preimage>",
+  });
+  assert.deepEqual(
+    (
+      servedContract.paid.responses as Record<
+        string,
+        {
+          headers?: Record<string, unknown>;
+          content: {
+            "application/json": { schema: { $ref: string } };
+          };
+        }
+      >
+    )["429"],
+    {
+      description: "Payment invoice creation is temporarily limited",
+      headers: {
+        "Retry-After": {
+          description:
+            "Seconds until the client may request another payment invoice",
+          schema: { type: "integer", minimum: 1 },
+        },
+      },
+      content: {
+        "application/json": {
+          schema: {
+            $ref: "#/components/schemas/PaymentChallengeRateLimitError",
+          },
+        },
+      },
+    },
+  );
+  assert.deepEqual(
+    (
+      servedContract.paid.responses as Record<
+        string,
+        {
+          content: {
+            "application/json": { schema: { $ref: string } };
+          };
+        }
+      >
+    )["502"],
+    {
+      description: "The wallet could not create or verify a payment invoice",
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/WalletGatewayError" },
+        },
+      },
+    },
+  );
+  assert.deepEqual(servedContract.rateLimitSchema, {
+    type: "object",
+    properties: {
+      error: {
+        type: "string",
+        const: "Too many payment invoices requested",
+      },
+      code: {
+        type: "string",
+        const: "payment_challenge_rate_limited",
+      },
+      retry_after: {
+        type: "integer",
+        minimum: 1,
+        description:
+          "Seconds until the client may request another payment invoice",
+      },
+    },
+    required: ["error", "code", "retry_after"],
+  });
+  assert.deepEqual(servedContract.walletGatewaySchema, {
+    type: "object",
+    properties: {
+      error: {
+        type: "string",
+        enum: [
+          "Unable to create payment invoice",
+          "Unable to verify payment",
+        ],
+      },
+    },
+    required: ["error"],
   });
 });
 
@@ -442,10 +528,13 @@ test("evicts inactive callers so cache capacity recovers", async () => {
       headers: { "X-Forwarded-For": "198.51.100.3" },
     });
     assert.equal(limited.status, 429);
-    assert.equal(
-      ((await limited.json()) as { code: string }).code,
-      "payment_challenge_rate_limited",
-    );
+    const retryAfter = Number(limited.headers.get("retry-after"));
+    assert.ok(Number.isInteger(retryAfter) && retryAfter >= 1);
+    assert.deepEqual(await limited.json(), {
+      error: "Too many payment invoices requested",
+      code: "payment_challenge_rate_limited",
+      retry_after: retryAfter,
+    });
 
     now = 1_001;
     assert.equal(

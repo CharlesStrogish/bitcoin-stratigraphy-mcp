@@ -70,6 +70,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/L402Challenge"
+        "429":
+          description: Payment invoice creation is temporarily limited
+          headers:
+            Retry-After:
+              description: Seconds until the client may request another payment invoice
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentChallengeRateLimitError"
+        "502":
+          description: The wallet could not create or verify a payment invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletGatewayError"
 components:
   securitySchemes:
     L402:
@@ -113,4 +131,31 @@ components:
       required:
         - invoice
         - payment_hash
+    PaymentChallengeRateLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: Too many payment invoices requested
+        code:
+          type: string
+          const: payment_challenge_rate_limited
+        retry_after:
+          type: integer
+          minimum: 1
+          description: Seconds until the client may request another payment invoice
+      required:
+        - error
+        - code
+        - retry_after
+    WalletGatewayError:
+      type: object
+      properties:
+        error:
+          type: string
+          enum:
+            - Unable to create payment invoice
+            - Unable to verify payment
+      required:
+        - error
 

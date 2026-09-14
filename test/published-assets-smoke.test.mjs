@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   checkPublishedAssets,
+  discoverPublishedApiArtifacts,
   discoverPublishedWebArtifacts,
   findJavaScriptAndCssUrls,
 } from "../scripts/check-published-assets.mjs";
@@ -18,6 +19,19 @@ test("discovers registered web artifacts with production services", () => {
   assert.ok(
     !artifacts.some((artifact) => artifact.directory === "mockup-sandbox"),
     "development-only artifacts must not be checked as published routes",
+  );
+});
+
+test("discovers API artifacts with published liveness endpoints", () => {
+  const artifacts = discoverPublishedApiArtifacts();
+
+  assert.ok(
+    artifacts.some(
+      (artifact) =>
+        artifact.directory === "api-server" &&
+        artifact.name === "API Server" &&
+        artifact.livenessPath === "/api/healthz",
+    ),
   );
 });
 
@@ -56,6 +70,7 @@ test("checks entry pages and their referenced assets", async () => {
   await checkPublishedAssets({
     deploymentUrl: "https://published.example",
     artifacts: [{ name: "Example App", previewPath: "/app" }],
+    apiArtifacts: [],
     fetchImpl: async (url) => {
       const key = url.toString();
       requested.push(key);
@@ -66,11 +81,48 @@ test("checks entry pages and their referenced assets", async () => {
   assert.deepEqual(requested, [...responses.keys()]);
 });
 
+test("checks API liveness without payment or data mutation", async () => {
+  const requested = [];
+
+  await checkPublishedAssets({
+    deploymentUrl: "https://published.example",
+    artifacts: [],
+    apiArtifacts: [
+      { name: "Example API", livenessPath: "/api/healthz" },
+    ],
+    fetchImpl: async (url) => {
+      requested.push(url.toString());
+      return new Response('{"status":"ok"}');
+    },
+  });
+
+  assert.deepEqual(requested, ["https://published.example/api/healthz"]);
+});
+
+test("API liveness failures identify the artifact and URL", async () => {
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [],
+      apiArtifacts: [
+        { name: "Example API", livenessPath: "/api/healthz" },
+      ],
+      fetchImpl: async () =>
+        new Response("unavailable", {
+          status: 503,
+          statusText: "Service Unavailable",
+        }),
+    }),
+    /Example API: liveness endpoint returned 503 Service Unavailable for https:\/\/published\.example\/api\/healthz/,
+  );
+});
+
 test("asset failures identify the artifact and broken URL", async () => {
   await assert.rejects(
     checkPublishedAssets({
       deploymentUrl: "https://published.example",
       artifacts: [{ name: "Example App", previewPath: "/app/" }],
+      apiArtifacts: [],
       fetchImpl: async (url) =>
         url.toString().endsWith("/app/")
           ? new Response('<script src="/app/assets/broken.js"></script>')
@@ -85,6 +137,7 @@ test("rejects HTML fallback responses returned for missing assets", async () => 
     checkPublishedAssets({
       deploymentUrl: "https://published.example",
       artifacts: [{ name: "Example App", previewPath: "/app/" }],
+      apiArtifacts: [],
       fetchImpl: async (url) =>
         url.toString().endsWith("/app/")
           ? new Response('<script src="/app/assets/missing.js"></script>')

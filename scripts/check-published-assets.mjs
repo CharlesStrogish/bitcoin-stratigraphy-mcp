@@ -44,6 +44,39 @@ export function discoverPublishedWebArtifacts(root = workspaceRoot) {
     });
 }
 
+export function discoverPublishedApiArtifacts(root = workspaceRoot) {
+  const artifactsDirectory = path.join(root, "artifacts");
+
+  return readdirSync(artifactsDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => {
+      const configPath = path.join(
+        artifactsDirectory,
+        entry.name,
+        ".replit-artifact",
+        "artifact.toml",
+      );
+      const config = readFileSync(configPath, "utf8");
+
+      if (readTomlString(config, "kind") !== "api") {
+        return [];
+      }
+
+      const livenessPath = config.match(
+        /^\[services\.production\.health\.startup\]\s*$[\s\S]*?^path\s*=\s*"([^"]+)"/m,
+      )?.[1];
+      assert.ok(livenessPath, `${entry.name} must declare a startup health path`);
+
+      return [
+        {
+          directory: entry.name,
+          name: readTomlString(config, "title") ?? entry.name,
+          livenessPath,
+        },
+      ];
+    });
+}
+
 export function findJavaScriptAndCssUrls(html) {
   return [
     ...html.matchAll(
@@ -99,15 +132,27 @@ function assertAssetMediaType(response, assetUrl, artifactName) {
 export async function checkPublishedAssets({
   deploymentUrl,
   artifacts = discoverPublishedWebArtifacts(),
+  apiArtifacts = discoverPublishedApiArtifacts(),
   fetchImpl = fetch,
 }) {
   assert.ok(deploymentUrl, "PUBLISHED_URL must be provided");
   assert.ok(
-    artifacts.length > 0,
-    "At least one published web artifact must be covered",
+    artifacts.length + apiArtifacts.length > 0,
+    "At least one published artifact must be covered",
   );
 
   const deploymentBase = new URL(deploymentUrl);
+
+  for (const artifact of apiArtifacts) {
+    const livenessUrl = new URL(artifact.livenessPath, deploymentBase);
+    await requestSuccessful(
+      livenessUrl,
+      artifact.name,
+      "liveness endpoint",
+      fetchImpl,
+    );
+    console.log(`${artifact.name}: ${livenessUrl} is reachable`);
+  }
 
   for (const artifact of artifacts) {
     const entryUrl = new URL(artifact.previewPath, deploymentBase);

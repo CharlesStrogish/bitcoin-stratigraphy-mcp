@@ -1,0 +1,3 @@
+kind = "web-app"
+title = "Fixture Web App"
+previewPath = "/fixture"

@@ -1,0 +1,6 @@
+{
+  "name": "@fixtures/vite-missing-build",
+  "dependencies": {
+    "vite": "^7.0.0"
+  }
+}

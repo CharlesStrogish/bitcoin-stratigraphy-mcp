@@ -36,8 +36,11 @@ function readTomlString(source, key) {
   return source.match(new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
 }
 
-function discoverWebArtifacts() {
-  const artifactsDirectory = path.join(workspaceRoot, "artifacts");
+function discoverWebArtifacts(
+  rootDirectory = workspaceRoot,
+  artifactConfigFilename = "artifact.toml",
+) {
+  const artifactsDirectory = path.join(rootDirectory, "artifacts");
 
   return readdirSync(artifactsDirectory, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -48,7 +51,7 @@ function discoverWebArtifacts() {
           artifactsDirectory,
           artifactDirectory,
           ".replit-artifact",
-          "artifact.toml",
+          artifactConfigFilename,
         ),
         "utf8",
       );
@@ -101,6 +104,66 @@ assert.ok(
   artifacts.length > 0,
   "At least one registered web artifact using a supported build tool must be covered",
 );
+
+const discoveryFixturesDirectory = path.join(
+  workspaceRoot,
+  "test",
+  "fixtures",
+  "artifact-discovery",
+);
+
+function discoverFixture(name) {
+  return discoverWebArtifacts(
+    path.join(discoveryFixturesDirectory, name),
+    "fixture.toml",
+  );
+}
+
+test("discovery includes a registered Vite web artifact", () => {
+  assert.deepEqual(
+    discoverFixture("vite-web").map(
+      ({ name, packageName, artifactDirectory, buildTool }) => ({
+        name,
+        packageName,
+        artifactDirectory,
+        buildTool: buildTool.name,
+      }),
+    ),
+    [
+      {
+        name: "Fixture Web App",
+        packageName: "@fixtures/vite-web",
+        artifactDirectory: "sample",
+        buildTool: "Vite",
+      },
+    ],
+  );
+});
+
+test("discovery excludes an API artifact with Vite build metadata", () => {
+  assert.deepEqual(discoverFixture("api-vite"), []);
+});
+
+test("discovery accepts a Vite artifact with a wrapped build command", () => {
+  const discovered = discoverFixture("vite-wrapped");
+
+  assert.equal(discovered.length, 1);
+  assert.equal(discovered[0].packageName, "@fixtures/vite-wrapped");
+});
+
+test("discovery rejects a Vite artifact without a package name", () => {
+  assert.throws(
+    () => discoverFixture("vite-missing-name"),
+    /sample must declare a package name/,
+  );
+});
+
+test("discovery rejects a Vite artifact without a build script", () => {
+  assert.throws(
+    () => discoverFixture("vite-missing-build"),
+    /sample uses Vite and must declare a build script/,
+  );
+});
 
 function readArtifactBasePath(artifactDirectory) {
   const artifactConfig = readFileSync(

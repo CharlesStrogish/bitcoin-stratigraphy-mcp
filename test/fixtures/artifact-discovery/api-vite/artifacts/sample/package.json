@@ -1,0 +1,9 @@
+{
+  "name": "@fixtures/api-vite",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "vite": "^7.0.0"
+  }
+}

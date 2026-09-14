@@ -1,0 +1,9 @@
+{
+  "name": "@fixtures/vite-wrapped",
+  "scripts": {
+    "build": "node ./prepare-build.mjs && vite build"
+  },
+  "dependencies": {
+    "vite": "^7.0.0"
+  }
+}

@@ -81,7 +81,7 @@ type Transaction = {
 
 async function withContractServer(
   clientFactory: Parameters<typeof registerStratigraphyRoutes>[1],
-  run: (url: string) => Promise<void>,
+  run: (paidUrl: string, baseUrl: string) => Promise<void>,
 ) {
   const contractApp = express();
   contractApp.use((req, _res, next) => {
@@ -90,6 +90,7 @@ async function withContractServer(
     };
     next();
   });
+  registerOpenApiRoute(contractApp);
   registerStratigraphyRoutes(
     contractApp,
     clientFactory,
@@ -103,9 +104,8 @@ async function withContractServer(
   const address = contractServer.address() as AddressInfo;
 
   try {
-    await run(
-      `http://127.0.0.1:${address.port}/api/v1/stratigraphy`,
-    );
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    await run(`${baseUrl}/api/v1/stratigraphy`, baseUrl);
   } finally {
     contractServer.close();
   }
@@ -401,6 +401,50 @@ test("serves the root OpenAPI document as raw JSON", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.doesNotMatch(response.headers.get("content-type") ?? "", /text\/html/);
   assert.deepEqual(await response.json(), openApiDocument);
+});
+
+test("keeps OpenAPI public while the paid dataset requires L402", async () => {
+  const configuredNwcUri = process.env.NWC_URI;
+  process.env.NWC_URI = "nostr+walletconnect://configured";
+  let makeInvoiceCalls = 0;
+
+  try {
+    await withContractServer(
+      () => ({
+        lookupInvoice: async () => validTransaction as never,
+        makeInvoice: async () => {
+          makeInvoiceCalls += 1;
+          return validTransaction as never;
+        },
+        close: () => undefined,
+      }),
+      async (paidUrl, contractBaseUrl) => {
+        const openapiResponse = await fetch(
+          `${contractBaseUrl}/openapi.json`,
+          { redirect: "manual" },
+        );
+        assert.equal(openapiResponse.status, 200);
+        assert.match(
+          openapiResponse.headers.get("content-type") ?? "",
+          /^application\/json\b/,
+        );
+        assert.equal(openapiResponse.headers.has("www-authenticate"), false);
+        assert.equal(makeInvoiceCalls, 0);
+        assert.deepEqual(await openapiResponse.json(), openApiDocument);
+
+        const paidResponse = await fetch(`${paidUrl}?days=1`);
+        assert.equal(paidResponse.status, 402);
+        assert.match(
+          paidResponse.headers.get("www-authenticate") ?? "",
+          /^L402 /,
+        );
+        assert.equal(makeInvoiceCalls, 1);
+      },
+    );
+  } finally {
+    if (configuredNwcUri === undefined) delete process.env.NWC_URI;
+    else process.env.NWC_URI = configuredNwcUri;
+  }
 });
 
 test("keeps liveness healthy when payment dependencies are unavailable", async () => {

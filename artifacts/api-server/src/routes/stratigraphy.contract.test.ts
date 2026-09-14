@@ -33,11 +33,15 @@ const validTransaction: Transaction = {
 
 let transaction = validTransaction;
 let invoiceRequest: Record<string, unknown> | undefined;
+let invoiceRequestCount = 0;
+let invoiceGate: Promise<void> | undefined;
 const app = express();
 registerStratigraphyRoutes(app, () => ({
   lookupInvoice: async () => transaction as never,
   makeInvoice: async (request) => {
     invoiceRequest = request;
+    invoiceRequestCount += 1;
+    await invoiceGate;
     return validTransaction as never;
   },
   close: () => undefined,
@@ -57,11 +61,31 @@ before(async () => {
 
 after(() => server.close());
 
-test("creates a 21,000-msat invoice and returns an L402 challenge", async () => {
+test("coalesces concurrent cold-cache requests into one usable challenge", async () => {
   invoiceRequest = undefined;
-  const response = await fetch(`${baseUrl}/api/v1/stratigraphy`);
+  invoiceRequestCount = 0;
+  let releaseInvoice!: () => void;
+  invoiceGate = new Promise<void>((resolve) => {
+    releaseInvoice = resolve;
+  });
+  const responses = await Promise.all(
+    Array.from({ length: 10 }, async () => {
+      const responsePromise = fetch(`${baseUrl}/api/v1/stratigraphy`);
+      return responsePromise;
+    }).map(async (responsePromise, index, all) => {
+      if (index === all.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        assert.equal(invoiceRequestCount, 1);
+        releaseInvoice();
+      }
+      return responsePromise;
+    }),
+  );
+  invoiceGate = undefined;
+  const response = responses[0];
 
-  assert.equal(response.status, 402);
+  assert.ok(responses.every((item) => item.status === 402));
+  assert.equal(invoiceRequestCount, 1);
   assert.deepEqual(invoiceRequest, {
     amount: 21_000,
     description: "Bitcoin Stratigraphy 422-day dataset access",
@@ -75,6 +99,162 @@ test("creates a 21,000-msat invoice and returns an L402 challenge", async () => 
     invoice,
     payment_hash: paymentHash,
   });
+});
+
+test("reuses a caller's payment challenge instead of creating more invoices", async () => {
+  const requestsBefore = invoiceRequestCount;
+  const responses = await Promise.all(
+    Array.from({ length: 10 }, () =>
+      fetch(`${baseUrl}/api/v1/stratigraphy`),
+    ),
+  );
+
+  assert.ok(responses.every((response) => response.status === 402));
+  assert.equal(invoiceRequestCount, requestsBefore);
+  const bodies = (await Promise.all(
+    responses.map((response) => response.json()),
+  )) as Array<{ invoice: string; payment_hash: string }>;
+  assert.ok(
+    bodies.every(
+      (body) =>
+        body.invoice === invoice && body.payment_hash === paymentHash,
+    ),
+  );
+});
+
+test("evicts inactive callers so cache capacity recovers", async () => {
+  let now = 0;
+  let requests = 0;
+  const capacityApp = express();
+  capacityApp.set("trust proxy", 1);
+  registerStratigraphyRoutes(
+    capacityApp,
+    () => ({
+      lookupInvoice: async () => validTransaction as never,
+      makeInvoice: async () => {
+        requests += 1;
+        return validTransaction as never;
+      },
+      close: () => undefined,
+    }),
+    {
+      now: () => now,
+      reuseMs: 100,
+      limitWindowMs: 1_000,
+      maxInvoicesPerWindow: 3,
+      maxCallers: 2,
+    },
+  );
+  const capacityServer = capacityApp.listen(0);
+  await new Promise<void>((resolve) =>
+    capacityServer.once("listening", resolve),
+  );
+  const address = capacityServer.address() as AddressInfo;
+  const url = `http://127.0.0.1:${address.port}/api/v1/stratigraphy`;
+
+  try {
+    for (const ip of ["198.51.100.1", "198.51.100.2"]) {
+      assert.equal(
+        (await fetch(url, { headers: { "X-Forwarded-For": ip } })).status,
+        402,
+      );
+    }
+    const limited = await fetch(url, {
+      headers: { "X-Forwarded-For": "198.51.100.3" },
+    });
+    assert.equal(limited.status, 429);
+    assert.equal(
+      ((await limited.json()) as { code: string }).code,
+      "payment_challenge_rate_limited",
+    );
+
+    now = 1_001;
+    assert.equal(
+      (
+        await fetch(url, {
+          headers: { "X-Forwarded-For": "198.51.100.3" },
+        })
+      ).status,
+      402,
+    );
+    assert.equal(requests, 3);
+  } finally {
+    capacityServer.close();
+  }
+});
+
+test("failed invoice attempts consume quota and retain caller capacity", async () => {
+  let now = 0;
+  let attempts = 0;
+  const failureApp = express();
+  failureApp.set("trust proxy", 1);
+  failureApp.use((req, _res, next) => {
+    (req as any).log = {
+      error: () => undefined,
+    };
+    next();
+  });
+  registerStratigraphyRoutes(
+    failureApp,
+    () => ({
+      lookupInvoice: async () => validTransaction as never,
+      makeInvoice: async () => {
+        attempts += 1;
+        throw new Error("wallet unavailable");
+      },
+      close: () => undefined,
+    }),
+    {
+      now: () => now,
+      reuseMs: 100,
+      limitWindowMs: 1_000,
+      maxInvoicesPerWindow: 2,
+      maxCallers: 1,
+    },
+  );
+  const failureServer = failureApp.listen(0);
+  await new Promise<void>((resolve) =>
+    failureServer.once("listening", resolve),
+  );
+  const address = failureServer.address() as AddressInfo;
+  const url = `http://127.0.0.1:${address.port}/api/v1/stratigraphy`;
+
+  try {
+    for (let index = 0; index < 2; index += 1) {
+      assert.equal(
+        (
+          await fetch(url, {
+            headers: { "X-Forwarded-For": "203.0.113.1" },
+          })
+        ).status,
+        502,
+      );
+    }
+    const callerLimited = await fetch(url, {
+      headers: { "X-Forwarded-For": "203.0.113.1" },
+    });
+    assert.equal(callerLimited.status, 429);
+    assert.equal(attempts, 2);
+
+    const capacityLimited = await fetch(url, {
+      headers: { "X-Forwarded-For": "203.0.113.2" },
+    });
+    assert.equal(capacityLimited.status, 429);
+    assert.equal(attempts, 2);
+
+    now = 1_001;
+    assert.equal(
+      (
+        await fetch(url, {
+          headers: { "X-Forwarded-For": "203.0.113.2" },
+        })
+      ).status,
+      502,
+    );
+    assert.equal(attempts, 3);
+  } finally {
+    failureServer.close();
+  }
 });
 
 test("rejects a preimage that does not match the payment hash", async () => {

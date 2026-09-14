@@ -12,6 +12,10 @@ import { openApiDocument } from "../openapi";
 
 const ACCESS_PRICE_MSATS = 21_000;
 const INVOICE_DESCRIPTION = "Bitcoin Stratigraphy 422-day dataset access";
+const CHALLENGE_REUSE_MS = 5 * 60 * 1000;
+const INVOICE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const MAX_INVOICES_PER_WINDOW = 3;
+const MAX_CHALLENGE_CALLERS = 10_000;
 const datasetPath = fileURLToPath(
   new URL("../data/stratigraphy.json", import.meta.url),
 );
@@ -24,6 +28,28 @@ async function readDataset() {
 
 type NwcClient = Pick<NWCClient, "lookupInvoice" | "makeInvoice" | "close">;
 type NwcClientFactory = (nwcUri: string) => NwcClient;
+type Challenge = { invoice: string; paymentHash: string };
+type CallerChallenge = {
+  challenge?: Challenge;
+  challengeExpiresAt: number;
+  invoiceAttemptedAt: number[];
+  pending?: Promise<Challenge>;
+};
+type ChallengePolicy = {
+  now: () => number;
+  reuseMs: number;
+  limitWindowMs: number;
+  maxInvoicesPerWindow: number;
+  maxCallers: number;
+};
+
+const defaultChallengePolicy: ChallengePolicy = {
+  now: Date.now,
+  reuseMs: CHALLENGE_REUSE_MS,
+  limitWindowMs: INVOICE_LIMIT_WINDOW_MS,
+  maxInvoicesPerWindow: MAX_INVOICES_PER_WINDOW,
+  maxCallers: MAX_CHALLENGE_CALLERS,
+};
 
 const createNwcClient: NwcClientFactory = (nwcUri) => {
   return new NWCClient({
@@ -31,6 +57,10 @@ const createNwcClient: NwcClientFactory = (nwcUri) => {
     logger: silentNwcLogger,
   });
 };
+
+function callerKey(req: Request) {
+  return req.ip || req.socket.remoteAddress || "unknown";
+}
 
 function parseL402Authorization(value: string | undefined) {
   if (!value) return null;
@@ -111,9 +141,88 @@ async function sendPaymentChallenge(
   res: Response,
   nwcUri: string,
   clientFactory: NwcClientFactory,
+  challenges: Map<string, CallerChallenge>,
+  policy: ChallengePolicy,
 ) {
+  const now = policy.now();
+  const caller = callerKey(req);
+  let state = challenges.get(caller);
+
+  if (!state) {
+    if (challenges.size >= policy.maxCallers) {
+      for (const [key, candidate] of challenges) {
+        const newestAttemptAt = candidate.invoiceAttemptedAt.at(-1) ?? 0;
+        const inactiveAt = Math.max(
+          candidate.challengeExpiresAt,
+          newestAttemptAt + policy.limitWindowMs,
+        );
+        if (!candidate.pending && inactiveAt <= now) {
+          challenges.delete(key);
+        }
+      }
+    }
+    if (challenges.size >= policy.maxCallers) {
+      res.setHeader("Retry-After", "60");
+      res.status(429).json({
+        error: "Payment challenge limit reached",
+        code: "payment_challenge_rate_limited",
+        retry_after: 60,
+      });
+      return;
+    }
+    state = {
+      challengeExpiresAt: 0,
+      invoiceAttemptedAt: [],
+    };
+    challenges.set(caller, state);
+  }
+
+  state.invoiceAttemptedAt = state.invoiceAttemptedAt.filter(
+    (createdAt) => now - createdAt < policy.limitWindowMs,
+  );
+
   try {
-    const challenge = await createInvoice(nwcUri, clientFactory);
+    let challenge = state.challenge;
+    if (!challenge || state.challengeExpiresAt <= now) {
+      if (state.pending) {
+        challenge = await state.pending;
+      } else {
+        if (state.invoiceAttemptedAt.length >= policy.maxInvoicesPerWindow) {
+          const retryAfter = Math.max(
+            1,
+            Math.ceil(
+              (policy.limitWindowMs -
+                (now - state.invoiceAttemptedAt[0])) /
+                1000,
+            ),
+          );
+          res.setHeader("Retry-After", String(retryAfter));
+          res.status(429).json({
+            error: "Too many payment invoices requested",
+            code: "payment_challenge_rate_limited",
+            retry_after: retryAfter,
+          });
+          return;
+        }
+
+        state.invoiceAttemptedAt.push(now);
+        const pending = createInvoice(nwcUri, clientFactory).then((created) => {
+          const createdAt = policy.now();
+          state.challenge = created;
+          state.challengeExpiresAt = createdAt + policy.reuseMs;
+          return created;
+        });
+        state.pending = pending;
+        try {
+          challenge = await pending;
+        } finally {
+          if (state.pending === pending) {
+            state.pending = undefined;
+          }
+        }
+      }
+    }
+
     res.setHeader(
       "WWW-Authenticate",
       `L402 macaroon="${challenge.paymentHash}", invoice="${challenge.invoice}"`,
@@ -132,7 +241,10 @@ async function sendPaymentChallenge(
 export function registerStratigraphyRoutes(
   app: Express,
   clientFactory: NwcClientFactory = createNwcClient,
+  policy: ChallengePolicy = defaultChallengePolicy,
 ): void {
+  const challenges = new Map<string, CallerChallenge>();
+
   app.get("/api", (_req, res): void => {
     res.status(200).json({
       status: "online",
@@ -166,12 +278,25 @@ export function registerStratigraphyRoutes(
            clientFactory,
         ))
       ) {
+        const callerState = challenges.get(callerKey(req));
+        if (
+          callerState?.challenge?.paymentHash === authorization.paymentHash
+        ) {
+          challenges.delete(callerKey(req));
+        }
         const data = await readDataset();
         res.status(200).json(data);
         return;
       }
 
-      await sendPaymentChallenge(req, res, nwcUri, clientFactory);
+      await sendPaymentChallenge(
+        req,
+        res,
+        nwcUri,
+        clientFactory,
+        challenges,
+        policy,
+      );
     },
   );
 

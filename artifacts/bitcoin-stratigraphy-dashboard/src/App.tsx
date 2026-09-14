@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { getGetStratigraphyQueryKey, useGetStratigraphy, type StratigraphyEntry } from "@workspace/api-client-react";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import type { StratigraphyEntry } from "@workspace/api-client-react";
+import stratigraphyDataset from "../../api-server/data/stratigraphy.json";
 import {
   ArrowDownAZ,
   ArrowUpAZ,
@@ -49,6 +50,23 @@ const queryClient = new QueryClient({
 
 const CHART_COLORS = ["#d99a16", "#b9533c", "#3f766a", "#53657d", "#c57b3d"];
 const PAGE_SIZE = 10;
+const EXPECTED_DATASET_LENGTH = 422;
+const completeDataset = stratigraphyDataset as StratigraphyEntry[];
+
+async function loadCompleteDataset() {
+  if (
+    completeDataset.length !== EXPECTED_DATASET_LENGTH ||
+    completeDataset[0]?.day !== 1 ||
+    completeDataset.at(-1)?.day !== EXPECTED_DATASET_LENGTH
+  ) {
+    throw new Error("The primary stratigraphy dataset is incomplete");
+  }
+  return completeDataset;
+}
+
+function formatDay(day: number) {
+  return String(day).padStart(3, "0");
+}
 
 function csvCell(value: unknown) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
@@ -301,7 +319,11 @@ function Insights({ rows }: { rows: StratigraphyEntry[] }) {
 }
 
 function Home() {
-  const query = useGetStratigraphy({ query: { queryKey: getGetStratigraphyQueryKey(), staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false } });
+  const query = useQuery({
+    queryKey: ["stratigraphy", "complete-primary-dataset"],
+    queryFn: loadCompleteDataset,
+    staleTime: Infinity,
+  });
   const [isDark, setIsDark] = useState(false);
   const [search, setSearch] = useState("");
   const [minDay, setMinDay] = useState("");
@@ -340,7 +362,7 @@ function Home() {
           <>
             <div className="stats-row">
               <StatCard label="VISIBLE ENTRIES" value={loading ? "—" : filteredRows.length.toLocaleString()} detail={loading ? "Reading dataset" : `${allRows.length.toLocaleString()} total in source`} />
-              <StatCard label="STRATA SPAN" value={loading || !filteredRows.length ? "—" : `${stats.first}–${stats.last}`} detail="Day range in current view" accent="rust" />
+              <StatCard label="STRATA SPAN" value={loading || !filteredRows.length ? "—" : `${formatDay(stats.first)}–${formatDay(stats.last)}`} detail="Day range in current view" accent="rust" />
               <StatCard label="10M SIGNAL" value={loading ? "—" : `${stats.density}%`} detail={loading ? "Calculating signals" : `${stats.signals} titles reference the thesis`} accent="teal" />
               <StatCard label="SERIES COMPLETION" value={loading || !allRows.length ? "—" : `${Math.round((allRows.length / 422) * 100)}%`} detail="Of 422 planned day layers" accent="slate" />
             </div>

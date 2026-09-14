@@ -207,6 +207,51 @@ function findEscapingCssAssetUrls(css, stylesheetUrl, basePath) {
     .filter(({ resolvedPath }) => !resolvedPath.startsWith(basePath));
 }
 
+function findHtmlEntryPoints(directory, relativeDirectory = "") {
+  return readdirSync(path.join(directory, relativeDirectory), {
+    withFileTypes: true,
+  }).flatMap((entry) => {
+    const relativePath = path.join(relativeDirectory, entry.name);
+
+    if (entry.isDirectory()) {
+      return findHtmlEntryPoints(directory, relativePath);
+    }
+
+    return entry.isFile() && entry.name.endsWith(".html") ? [relativePath] : [];
+  });
+}
+
+test("HTML entry point discovery includes nested pages", () => {
+  const outputDirectory = mkdtempSync(
+    path.join(tmpdir(), "production-html-entry-points-"),
+  );
+
+  try {
+    spawnSync(
+      process.execPath,
+      [
+        "-e",
+        [
+          "const fs = require('node:fs');",
+          `const root = ${JSON.stringify(outputDirectory)};`,
+          "fs.mkdirSync(`${root}/guides`, { recursive: true });",
+          "fs.writeFileSync(`${root}/index.html`, '');",
+          "fs.writeFileSync(`${root}/guides/setup.html`, '');",
+          "fs.writeFileSync(`${root}/guides/notes.txt`, '');",
+        ].join(""),
+      ],
+      { encoding: "utf8" },
+    );
+
+    assert.deepEqual(
+      findHtmlEntryPoints(outputDirectory).sort(),
+      ["guides/setup.html", "index.html"],
+    );
+  } finally {
+    rmSync(outputDirectory, { force: true, recursive: true });
+  }
+});
+
 test("CSS asset URLs must resolve within the artifact preview path", () => {
   const css = `
     @font-face { src: url("./font.woff2") }
@@ -265,65 +310,78 @@ function buildWithArtifactRouting({
       `${name} must build with the artifact preview path.\n${result.stdout}\n${result.stderr}`,
     );
 
-    const html = readFileSync(path.join(outputDirectory, "index.html"), "utf8");
-    const emittedUrls = [
-      ...html.matchAll(
-        /<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/g,
-      ),
-    ].map((match) => match[1]);
-    const assetUrls = buildTool.assetPathSegment
-      ? emittedUrls.filter((url) => url.includes(buildTool.assetPathSegment))
-      : emittedUrls.filter(
-          (url) =>
-            !/^(?:data:|https?:|\/\/|#)/.test(url) && !url.endsWith(".html"),
-        );
+    const htmlEntryPoints = findHtmlEntryPoints(outputDirectory);
+    assert.ok(htmlEntryPoints.length > 0, `${name} must emit an HTML entry point`);
+    let assetUrlCount = 0;
 
-    assert.ok(
-      assetUrls.length > 0,
-      `${name} must emit asset URLs in index.html`,
-    );
-    assert.ok(
-      assetUrls.every((url) => url.startsWith(environment.BASE_PATH)),
-      `${name} assets must use ${environment.BASE_PATH}. Found: ${assetUrls.join(", ")}`,
-    );
-
-    const stylesheetUrls = emittedUrls.filter(
-      (url) =>
-        !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url) &&
-        new URL(url, "https://artifact.test").pathname.endsWith(".css"),
-    );
-    const escapingCssAssetUrls = stylesheetUrls.flatMap((stylesheetUrl) => {
-      const stylesheetPath = new URL(stylesheetUrl, "https://artifact.test")
-        .pathname;
-      const relativeStylesheetPath = stylesheetPath.slice(
-        environment.BASE_PATH.length,
-      );
-      const css = readFileSync(
-        path.join(outputDirectory, relativeStylesheetPath),
+    for (const htmlEntryPoint of htmlEntryPoints) {
+      const html = readFileSync(
+        path.join(outputDirectory, htmlEntryPoint),
         "utf8",
       );
+      const pageUrl = new URL(
+        htmlEntryPoint.split(path.sep).join("/"),
+        `https://artifact.test${environment.BASE_PATH}`,
+      );
+      const emittedUrls = [
+        ...html.matchAll(
+          /<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/g,
+        ),
+      ].map((match) => match[1]);
+      const assetUrls = buildTool.assetPathSegment
+        ? emittedUrls.filter((url) => url.includes(buildTool.assetPathSegment))
+        : emittedUrls.filter(
+            (url) =>
+              !/^(?:data:|https?:|\/\/|#)/.test(url) && !url.endsWith(".html"),
+          );
+      assetUrlCount += assetUrls.length;
 
-      return findEscapingCssAssetUrls(
-        css,
-        stylesheetUrl,
-        environment.BASE_PATH,
-      ).map(({ url, resolvedPath }) => ({
-        stylesheetUrl,
-        url,
-        resolvedPath,
-      }));
-    });
+      assert.ok(
+        assetUrls.every((url) =>
+          new URL(url, pageUrl).pathname.startsWith(environment.BASE_PATH),
+        ),
+        `${name} assets in ${htmlEntryPoint} must resolve under ${environment.BASE_PATH}. Found: ${assetUrls.join(", ")}`,
+      );
 
-    assert.deepEqual(
-      escapingCssAssetUrls,
-      [],
-      `${name} CSS assets must resolve under ${environment.BASE_PATH}. Found: ${escapingCssAssetUrls
-        .map(
-          ({ stylesheetUrl, url, resolvedPath }) =>
-            `${stylesheetUrl}: ${url} -> ${resolvedPath}`,
-        )
-        .join(", ")}`,
-    );
+      const stylesheetUrls = emittedUrls.filter(
+        (url) =>
+          !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url) &&
+          new URL(url, pageUrl).pathname.endsWith(".css"),
+      );
+      const escapingCssAssetUrls = stylesheetUrls.flatMap((stylesheetUrl) => {
+        const resolvedStylesheetUrl = new URL(stylesheetUrl, pageUrl);
+        const relativeStylesheetPath = resolvedStylesheetUrl.pathname.slice(
+          environment.BASE_PATH.length,
+        );
+        const css = readFileSync(
+          path.join(outputDirectory, relativeStylesheetPath),
+          "utf8",
+        );
+
+        return findEscapingCssAssetUrls(
+          css,
+          resolvedStylesheetUrl.href,
+          environment.BASE_PATH,
+        ).map(({ url, resolvedPath }) => ({
+          stylesheetUrl,
+          url,
+          resolvedPath,
+        }));
+      });
+
+      assert.deepEqual(
+        escapingCssAssetUrls,
+        [],
+        `${name} CSS assets referenced by ${htmlEntryPoint} must resolve under ${environment.BASE_PATH}. Found: ${escapingCssAssetUrls
+          .map(
+            ({ stylesheetUrl, url, resolvedPath }) =>
+              `${stylesheetUrl}: ${url} -> ${resolvedPath}`,
+          )
+          .join(", ")}`,
+      );
+    }
+
+    assert.ok(assetUrlCount > 0, `${name} must emit asset URLs in its HTML`);
   } finally {
     rmSync(outputDirectory, { force: true, recursive: true });
   }

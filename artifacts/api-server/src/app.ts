@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { registerStratigraphyRoutes } from "./routes/stratigraphy";
 import { registerOpenApiRoute } from "./routes/openapi";
+import { registerMcpRoute } from "./routes/mcp";
 import { logger } from "./lib/logger";
 import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
 
@@ -35,6 +36,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 registerOpenApiRoute(app);
+registerMcpRoute(app);
 app.use("/api", router);
 registerStratigraphyRoutes(
   app,

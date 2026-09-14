@@ -123,6 +123,11 @@ type ChallengePolicy = {
   maxCallers: number;
 };
 type Dataset = Awaited<ReturnType<typeof readDataset>>;
+export type StratigraphyFilter = {
+  days?: number;
+  from?: string;
+  date?: string;
+};
 type SelectedRange = {
   records: Dataset;
   amountMsats: number;
@@ -159,6 +164,69 @@ function singleQueryValue(value: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
+function dateIndex(value: string, datasetLength: number) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return "date must use YYYY-MM-DD";
+  const dateMs = Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  );
+  if (new Date(dateMs).toISOString().slice(0, 10) !== value) {
+    return "date must be a valid calendar date";
+  }
+  const firstDateMs = LATEST_DATASET_DATE_MS - (datasetLength - 1) * DAY_MS;
+  if (dateMs < firstDateMs || dateMs > LATEST_DATASET_DATE_MS) {
+    return `date must be between ${new Date(firstDateMs).toISOString().slice(0, 10)} and 2026-09-09`;
+  }
+  return (dateMs - firstDateMs) / DAY_MS;
+}
+
+function filterDataset(
+  dataset: Dataset,
+  filter: StratigraphyFilter,
+): Dataset | string {
+  const selectedFilters = [
+    filter.days !== undefined,
+    filter.from !== undefined,
+    filter.date !== undefined,
+  ].filter(Boolean).length;
+  if (selectedFilters > 1) {
+    return "days, from, and date cannot be combined";
+  }
+  if (filter.days !== undefined) {
+    if (
+      !Number.isInteger(filter.days) ||
+      filter.days < 1 ||
+      filter.days > dataset.length
+    ) {
+      return `days must be an integer between 1 and ${dataset.length}`;
+    }
+    return dataset.slice(-filter.days);
+  }
+  const dateValue = filter.from ?? filter.date;
+  if (dateValue !== undefined) {
+    const index = dateIndex(dateValue, dataset.length);
+    if (typeof index === "string") {
+      return filter.from === undefined
+        ? index
+        : index.replaceAll("date", "from");
+    }
+    return filter.date === undefined
+      ? dataset.slice(index)
+      : dataset.slice(index, index + 1);
+  }
+  return dataset;
+}
+
+export async function getStratigraphyData(filter: StratigraphyFilter = {}) {
+  const result = filterDataset(await readDataset(), filter);
+  if (typeof result === "string") {
+    throw new RangeError(result);
+  }
+  return result;
+}
+
 function selectRange(req: Request, dataset: Dataset): SelectedRange | string {
   const daysValue = singleQueryValue(req.query.days);
   const fromValue = singleQueryValue(req.query.from);
@@ -172,27 +240,18 @@ function selectRange(req: Request, dataset: Dataset): SelectedRange | string {
     return "days and from cannot be used together";
   }
 
-  let records = dataset;
+  let filter: StratigraphyFilter = {};
   if (daysValue !== undefined) {
     if (!/^[1-9]\d*$/.test(daysValue)) {
       return "days must be an integer between 1 and 422";
     }
-    const days = Number(daysValue);
-    if (days > dataset.length) {
-      return `days must be an integer between 1 and ${dataset.length}`;
-    }
-    records = dataset.slice(-days);
+    filter = { days: Number(daysValue) };
   } else if (fromValue !== undefined) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fromValue);
-    if (!match) return "from must use YYYY-MM-DD";
-    const fromMs = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    const normalized = new Date(fromMs).toISOString().slice(0, 10);
-    if (normalized !== fromValue) return "from must be a valid calendar date";
-    const firstDateMs = LATEST_DATASET_DATE_MS - (dataset.length - 1) * DAY_MS;
-    if (fromMs < firstDateMs || fromMs > LATEST_DATASET_DATE_MS) {
-      return `from must be between ${new Date(firstDateMs).toISOString().slice(0, 10)} and 2026-09-09`;
-    }
-    records = dataset.slice((fromMs - firstDateMs) / DAY_MS);
+    filter = { from: fromValue };
+  }
+  const records = filterDataset(dataset, filter);
+  if (typeof records === "string") {
+    return records;
   }
 
   const firstDay = records[0].day;

@@ -8,6 +8,7 @@ import express from "express";
 import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
+import { registerMcpRoute } from "./mcp";
 import { registerOpenApiRoute } from "./openapi";
 import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
@@ -127,6 +128,7 @@ let invoiceRequestCount = 0;
 let invoiceGate: Promise<void> | undefined;
 const app = express();
 registerOpenApiRoute(app);
+registerMcpRoute(app);
 app.use("/api", healthRouter);
 registerStratigraphyRoutes(app, () => ({
   lookupInvoice: async () => transaction as never,
@@ -161,6 +163,28 @@ after(async () => {
   server.close();
   await pool.end();
 });
+
+async function mcpRequest(method: string, params?: Record<string, unknown>) {
+  const response = await fetch(`${baseUrl}/mcp`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2025-03-26",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method,
+      ...(params ? { params } : {}),
+    }),
+  });
+  assert.equal(response.status, 200);
+  return (await response.json()) as {
+    result?: Record<string, any>;
+    error?: { message: string };
+  };
+}
 
 test("keeps served and shared payment OpenAPI contracts in parity", async () => {
   const sharedDocument = parse(
@@ -390,6 +414,67 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     },
     required: ["error"],
   });
+});
+
+test("exposes the stratigraphy MCP tool with structured quantitative data", async () => {
+  const initialized = await mcpRequest("initialize", {
+    protocolVersion: "2025-03-26",
+    capabilities: {},
+    clientInfo: { name: "contract-test", version: "1.0.0" },
+  });
+  assert.equal(initialized.result?.serverInfo.name, "bitcoin-stratigraphy");
+
+  const listed = await mcpRequest("tools/list");
+  const tool = listed.result?.tools.find(
+    (candidate: { name: string }) =>
+      candidate.name === "get_bitcoin_stratigraphy",
+  );
+  assert.ok(tool);
+
+  const called = await mcpRequest("tools/call", {
+    name: "get_bitcoin_stratigraphy",
+    arguments: { date: "2026-09-09" },
+  });
+  const records = called.result?.structuredContent.records as Array<{
+    day: number;
+    quantitative_alpha: {
+      target_multiplier: number;
+      difficulty_epoch_progress: string;
+      thermodynamic_signal: string;
+    };
+  }>;
+  assert.equal(records.length, 1);
+  assert.equal(records[0].day, 422);
+  assert.equal(records[0].quantitative_alpha.target_multiplier, 125.83);
+  assert.match(
+    records[0].quantitative_alpha.difficulty_epoch_progress,
+    /%$/,
+  );
+  assert.equal(
+    typeof records[0].quantitative_alpha.thermodynamic_signal,
+    "string",
+  );
+});
+
+test("offers SSE transport without changing the public OpenAPI route", async () => {
+  const abortController = new AbortController();
+  const sseResponse = await fetch(`${baseUrl}/mcp`, {
+    headers: {
+      Accept: "text/event-stream",
+      "MCP-Protocol-Version": "2025-03-26",
+    },
+    signal: abortController.signal,
+  });
+  assert.equal(sseResponse.status, 200);
+  assert.match(
+    sseResponse.headers.get("content-type") ?? "",
+    /^text\/event-stream/,
+  );
+  abortController.abort();
+
+  const openApiResponse = await fetch(`${baseUrl}/openapi.json`);
+  assert.equal(openApiResponse.status, 200);
+  assert.equal(openApiResponse.headers.get("www-authenticate"), null);
 });
 
 test("serves the root OpenAPI document as raw JSON", async () => {

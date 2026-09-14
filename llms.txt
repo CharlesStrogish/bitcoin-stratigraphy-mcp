@@ -1,0 +1,7 @@
+# Bitcoin Stratigraphy 422-Day Dataset
+> 422 consecutive days of Bitcoin structural network metrics, thermodynamic production cost floors, and price models toward $10M.
+
+## Machine Payment Gateway
+- Access Price: 100 Satoshis (Lightning / L402)
+- Checkout URL: [PASTE YOUR COINSNAP PAYMENT LINK HERE]
+- Target Dataset URL: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/

@@ -11,7 +11,6 @@ import {
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { openApiDocument } from "../openapi";
 import {
   createMemoryPaymentChallengeStore,
   type PaymentChallengeStore,
@@ -385,10 +384,6 @@ export function registerStratigraphyRoutes(
       );
     },
   );
-
-  app.get("/openapi.json", (_req, res): void => {
-    res.status(200).json(openApiDocument);
-  });
 
   app.get("/llms.txt", (_req, res): void => {
     res.type("text/plain").send(`# Bitcoin Stratigraphy API

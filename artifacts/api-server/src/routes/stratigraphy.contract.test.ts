@@ -8,6 +8,7 @@ import express from "express";
 import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
+import { registerOpenApiRoute } from "./openapi";
 import { registerStratigraphyRoutes } from "./stratigraphy";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
 import type { PaymentChallengeStore } from "../lib/payment-challenge-store";
@@ -125,6 +126,7 @@ let invoiceRequest: Record<string, unknown> | undefined;
 let invoiceRequestCount = 0;
 let invoiceGate: Promise<void> | undefined;
 const app = express();
+registerOpenApiRoute(app);
 app.use("/api", healthRouter);
 registerStratigraphyRoutes(app, () => ({
   lookupInvoice: async () => transaction as never,
@@ -388,6 +390,17 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     },
     required: ["error"],
   });
+});
+
+test("serves the root OpenAPI document as raw JSON", async () => {
+  const response = await fetch(`${baseUrl}/openapi.json`, {
+    redirect: "manual",
+  });
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
+  assert.doesNotMatch(response.headers.get("content-type") ?? "", /text\/html/);
+  assert.deepEqual(await response.json(), openApiDocument);
 });
 
 test("keeps liveness healthy when payment dependencies are unavailable", async () => {

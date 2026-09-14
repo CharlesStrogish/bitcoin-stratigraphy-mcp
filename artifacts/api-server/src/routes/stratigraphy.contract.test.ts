@@ -8,6 +8,10 @@ import express from "express";
 import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import { registerStratigraphyRoutes } from "./stratigraphy";
+import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
+import type { PaymentChallengeStore } from "../lib/payment-challenge-store";
+import { createPostgresPaymentChallengeStore } from "../lib/postgres-payment-challenge-store";
+import { pool } from "@workspace/db";
 
 const preimage = "11".repeat(32);
 const paymentHash = createHash("sha256")
@@ -65,7 +69,12 @@ async function withContractServer(
     };
     next();
   });
-  registerStratigraphyRoutes(contractApp, clientFactory);
+  registerStratigraphyRoutes(
+    contractApp,
+    clientFactory,
+    undefined,
+    createMemoryPaymentChallengeStore(),
+  );
   const contractServer = contractApp.listen(0);
   await new Promise<void>((resolve) =>
     contractServer.once("listening", resolve),
@@ -105,7 +114,7 @@ registerStratigraphyRoutes(app, () => ({
     return validTransaction as never;
   },
   close: () => undefined,
-}));
+}), undefined, createMemoryPaymentChallengeStore());
 
 let baseUrl: string;
 const server = app.listen(0);
@@ -119,7 +128,10 @@ before(async () => {
   baseUrl = `http://127.0.0.1:${address.port}`;
 });
 
-after(() => server.close());
+after(async () => {
+  server.close();
+  await pool.end();
+});
 
 test("keeps served and shared payment OpenAPI contracts in parity", async () => {
   const sharedDocument = parse(
@@ -224,6 +236,170 @@ test("reuses a caller's payment challenge instead of creating more invoices", as
   );
 });
 
+test("coordinates challenge reuse across API instances", async () => {
+  const sharedStore = createMemoryPaymentChallengeStore();
+  let creations = 0;
+  const clientFactory = () => ({
+    lookupInvoice: async () => validTransaction as never,
+    makeInvoice: async () => {
+      creations += 1;
+      return validTransaction as never;
+    },
+    close: () => undefined,
+  });
+  const firstApp = express();
+  const secondApp = express();
+  registerStratigraphyRoutes(firstApp, clientFactory, undefined, sharedStore);
+  registerStratigraphyRoutes(secondApp, clientFactory, undefined, sharedStore);
+  const servers = [firstApp.listen(0), secondApp.listen(0)];
+  await Promise.all(
+    servers.map(
+      (item) =>
+        new Promise<void>((resolve) => item.once("listening", resolve)),
+    ),
+  );
+
+  try {
+    const responses = await Promise.all(
+      servers.map((item) => {
+        const address = item.address() as AddressInfo;
+        return fetch(
+          `http://127.0.0.1:${address.port}/api/v1/stratigraphy`,
+        );
+      }),
+    );
+    assert.ok(responses.every((response) => response.status === 402));
+    assert.equal(creations, 1);
+  } finally {
+    servers.forEach((item) => item.close());
+  }
+});
+
+test("fails closed when shared challenge coordination is unavailable", async () => {
+  let creations = 0;
+  const unavailableStore: PaymentChallengeStore = {
+    getOrCreate: async () => {
+      throw new Error("database unavailable");
+    },
+    consume: async () => undefined,
+  };
+  const unavailableApp = express();
+  unavailableApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerStratigraphyRoutes(
+    unavailableApp,
+    () => ({
+      lookupInvoice: async () => validTransaction as never,
+      makeInvoice: async () => {
+        creations += 1;
+        return validTransaction as never;
+      },
+      close: () => undefined,
+    }),
+    undefined,
+    unavailableStore,
+  );
+  const unavailableServer = unavailableApp.listen(0);
+  await new Promise<void>((resolve) =>
+    unavailableServer.once("listening", resolve),
+  );
+
+  try {
+    const address = unavailableServer.address() as AddressInfo;
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/api/v1/stratigraphy`,
+    );
+    assert.equal(response.status, 503);
+    assert.equal(creations, 0);
+  } finally {
+    unavailableServer.close();
+  }
+});
+
+test("the PostgreSQL store coalesces concurrent instance requests", async () => {
+  const caller = "contract-postgres-concurrent";
+  await pool.query("DELETE FROM payment_challenges WHERE caller_key = $1", [
+    caller,
+  ]);
+  const firstStore = createPostgresPaymentChallengeStore();
+  const secondStore = createPostgresPaymentChallengeStore();
+  let creations = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const policy = {
+    now: Date.now,
+    reuseMs: 60_000,
+    limitWindowMs: 60_000,
+    maxInvoicesPerWindow: 3,
+    maxCallers: 10_000,
+  };
+  const create = async () => {
+    creations += 1;
+    await gate;
+    return { invoice, paymentHash };
+  };
+
+  try {
+    const first = firstStore.getOrCreate(caller, policy, create);
+    const second = secondStore.getOrCreate(caller, policy, create);
+    const deadline = Date.now() + 2_000;
+    while (creations === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(creations, 1);
+    release();
+    const results = await Promise.all([first, second]);
+    assert.ok(results.every((result) => result.kind === "challenge"));
+    assert.equal(creations, 1);
+  } finally {
+    release();
+    await pool.query(
+      "DELETE FROM payment_challenges WHERE caller_key = $1",
+      [caller],
+    );
+  }
+});
+
+test("failed PostgreSQL invoice creations consume shared quota", async () => {
+  const caller = "contract-postgres-failures";
+  await pool.query("DELETE FROM payment_challenges WHERE caller_key = $1", [
+    caller,
+  ]);
+  const stores = [
+    createPostgresPaymentChallengeStore(),
+    createPostgresPaymentChallengeStore(),
+  ];
+  let attempts = 0;
+  const policy = {
+    now: Date.now,
+    reuseMs: 60_000,
+    limitWindowMs: 60_000,
+    maxInvoicesPerWindow: 2,
+    maxCallers: 10_000,
+  };
+  const fail = async () => {
+    attempts += 1;
+    throw new Error("wallet unavailable");
+  };
+
+  try {
+    await assert.rejects(stores[0].getOrCreate(caller, policy, fail));
+    await assert.rejects(stores[1].getOrCreate(caller, policy, fail));
+    const limited = await stores[0].getOrCreate(caller, policy, fail);
+    assert.equal(limited.kind, "limited");
+    assert.equal(attempts, 2);
+  } finally {
+    await pool.query(
+      "DELETE FROM payment_challenges WHERE caller_key = $1",
+      [caller],
+    );
+  }
+});
+
 test("evicts inactive callers so cache capacity recovers", async () => {
   let now = 0;
   let requests = 0;
@@ -246,6 +422,7 @@ test("evicts inactive callers so cache capacity recovers", async () => {
       maxInvoicesPerWindow: 3,
       maxCallers: 2,
     },
+    createMemoryPaymentChallengeStore(),
   );
   const capacityServer = capacityApp.listen(0);
   await new Promise<void>((resolve) =>
@@ -313,6 +490,7 @@ test("failed invoice attempts consume quota and retain caller capacity", async (
       maxInvoicesPerWindow: 2,
       maxCallers: 1,
     },
+    createMemoryPaymentChallengeStore(),
   );
   const failureServer = failureApp.listen(0);
   await new Promise<void>((resolve) =>

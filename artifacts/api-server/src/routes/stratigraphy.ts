@@ -9,6 +9,10 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { openApiDocument } from "../openapi";
+import {
+  createMemoryPaymentChallengeStore,
+  type PaymentChallengeStore,
+} from "../lib/payment-challenge-store";
 
 const ACCESS_PRICE_MSATS = 21_000;
 const INVOICE_DESCRIPTION = "Bitcoin Stratigraphy 422-day dataset access";
@@ -28,13 +32,6 @@ async function readDataset() {
 
 type NwcClient = Pick<NWCClient, "lookupInvoice" | "makeInvoice" | "close">;
 type NwcClientFactory = (nwcUri: string) => NwcClient;
-type Challenge = { invoice: string; paymentHash: string };
-type CallerChallenge = {
-  challenge?: Challenge;
-  challengeExpiresAt: number;
-  invoiceAttemptedAt: number[];
-  pending?: Promise<Challenge>;
-};
 type ChallengePolicy = {
   now: () => number;
   reuseMs: number;
@@ -42,6 +39,12 @@ type ChallengePolicy = {
   maxInvoicesPerWindow: number;
   maxCallers: number;
 };
+
+class InvoiceCreationError extends Error {
+  constructor(cause: unknown) {
+    super("Unable to create payment invoice", { cause });
+  }
+}
 
 const defaultChallengePolicy: ChallengePolicy = {
   now: Date.now,
@@ -143,87 +146,29 @@ async function sendPaymentChallenge(
   res: Response,
   nwcUri: string,
   clientFactory: NwcClientFactory,
-  challenges: Map<string, CallerChallenge>,
+  challengeStore: PaymentChallengeStore,
   policy: ChallengePolicy,
 ) {
-  const now = policy.now();
   const caller = callerKey(req);
-  let state = challenges.get(caller);
 
-  if (!state) {
-    if (challenges.size >= policy.maxCallers) {
-      for (const [key, candidate] of challenges) {
-        const newestAttemptAt = candidate.invoiceAttemptedAt.at(-1) ?? 0;
-        const inactiveAt = Math.max(
-          candidate.challengeExpiresAt,
-          newestAttemptAt + policy.limitWindowMs,
-        );
-        if (!candidate.pending && inactiveAt <= now) {
-          challenges.delete(key);
-        }
+  try {
+    const result = await challengeStore.getOrCreate(caller, policy, async () => {
+      try {
+        return await createInvoice(nwcUri, clientFactory);
+      } catch (error) {
+        throw new InvoiceCreationError(error);
       }
-    }
-    if (challenges.size >= policy.maxCallers) {
-      res.setHeader("Retry-After", "60");
+    });
+    if (result.kind === "limited") {
+      res.setHeader("Retry-After", String(result.retryAfter));
       res.status(429).json({
-        error: "Payment challenge limit reached",
+        error: "Too many payment invoices requested",
         code: "payment_challenge_rate_limited",
-        retry_after: 60,
+        retry_after: result.retryAfter,
       });
       return;
     }
-    state = {
-      challengeExpiresAt: 0,
-      invoiceAttemptedAt: [],
-    };
-    challenges.set(caller, state);
-  }
-
-  state.invoiceAttemptedAt = state.invoiceAttemptedAt.filter(
-    (createdAt) => now - createdAt < policy.limitWindowMs,
-  );
-
-  try {
-    let challenge = state.challenge;
-    if (!challenge || state.challengeExpiresAt <= now) {
-      if (state.pending) {
-        challenge = await state.pending;
-      } else {
-        if (state.invoiceAttemptedAt.length >= policy.maxInvoicesPerWindow) {
-          const retryAfter = Math.max(
-            1,
-            Math.ceil(
-              (policy.limitWindowMs -
-                (now - state.invoiceAttemptedAt[0])) /
-                1000,
-            ),
-          );
-          res.setHeader("Retry-After", String(retryAfter));
-          res.status(429).json({
-            error: "Too many payment invoices requested",
-            code: "payment_challenge_rate_limited",
-            retry_after: retryAfter,
-          });
-          return;
-        }
-
-        state.invoiceAttemptedAt.push(now);
-        const pending = createInvoice(nwcUri, clientFactory).then((created) => {
-          const createdAt = policy.now();
-          state.challenge = created;
-          state.challengeExpiresAt = createdAt + policy.reuseMs;
-          return created;
-        });
-        state.pending = pending;
-        try {
-          challenge = await pending;
-        } finally {
-          if (state.pending === pending) {
-            state.pending = undefined;
-          }
-        }
-      }
-    }
+    const challenge = result.challenge;
 
     res.setHeader(
       "WWW-Authenticate",
@@ -235,8 +180,12 @@ async function sendPaymentChallenge(
       payment_hash: challenge.paymentHash,
     });
   } catch (error) {
-    req.log.error({ err: error }, "CoinOS NWC invoice creation failed");
-    res.status(502).json({ error: "Unable to create payment invoice" });
+    req.log.error({ err: error }, "Payment challenge creation failed");
+    if (error instanceof InvoiceCreationError) {
+      res.status(502).json({ error: "Unable to create payment invoice" });
+      return;
+    }
+    res.status(503).json({ error: "Payment challenge service unavailable" });
   }
 }
 
@@ -244,9 +193,8 @@ export function registerStratigraphyRoutes(
   app: Express,
   clientFactory: NwcClientFactory = createNwcClient,
   policy: ChallengePolicy = defaultChallengePolicy,
+  challengeStore: PaymentChallengeStore = createMemoryPaymentChallengeStore(),
 ): void {
-  const challenges = new Map<string, CallerChallenge>();
-
   app.get("/api", (_req, res): void => {
     res.status(200).json({
       status: "online",
@@ -283,11 +231,16 @@ export function registerStratigraphyRoutes(
           return;
         }
         if (verification === "valid") {
-          const callerState = challenges.get(callerKey(req));
-          if (
-            callerState?.challenge?.paymentHash === authorization.paymentHash
-          ) {
-            challenges.delete(callerKey(req));
+          try {
+            await challengeStore.consume(
+              callerKey(req),
+              authorization.paymentHash,
+            );
+          } catch (error) {
+            req.log.error(
+              { err: error },
+              "Unable to remove consumed payment challenge",
+            );
           }
           const data = await readDataset();
           res.status(200).json(data);
@@ -300,7 +253,7 @@ export function registerStratigraphyRoutes(
         res,
         nwcUri,
         clientFactory,
-        challenges,
+        challengeStore,
         policy,
       );
     },

@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { registerStratigraphyRoutes } from "./routes/stratigraphy";
 import { logger } from "./lib/logger";
+import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
 
 const app: Express = express();
 
@@ -33,6 +34,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
-registerStratigraphyRoutes(app);
+registerStratigraphyRoutes(
+  app,
+  undefined,
+  undefined,
+  createPostgresPaymentChallengeStore(),
+);
 
 export default app;

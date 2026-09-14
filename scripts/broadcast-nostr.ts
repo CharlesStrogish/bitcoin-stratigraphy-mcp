@@ -1,6 +1,5 @@
 import {
   finalizeEvent,
-  getPublicKey,
   nip19,
   SimplePool,
   type EventTemplate,
@@ -57,48 +56,81 @@ function relayUrls(value: string | undefined): string[] {
   return relays;
 }
 
+function apiUrls(apiBaseUrl: string) {
+  const base = httpsUrl(apiBaseUrl, "NOSTR_API_BASE_URL");
+  return {
+    base,
+    endpoint: new URL("/api/v1/stratigraphy", base).toString(),
+    preflightEndpoint: new URL(
+      "/api/v1/stratigraphy?days=1",
+      base,
+    ).toString(),
+    openapi: new URL("/openapi.json", base).toString(),
+  };
+}
+
+async function preflight(endpoint: string, openapi: string) {
+  const openapiResponse = await fetch(openapi, {
+    redirect: "manual",
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (
+    openapiResponse.status !== 200 ||
+    !openapiResponse.headers.get("content-type")?.includes("json")
+  ) {
+    throw new Error(
+      `OpenAPI preflight failed: ${openapiResponse.status} ${openapiResponse.headers.get("content-type") ?? "unknown content type"}`,
+    );
+  }
+  const document = (await openapiResponse.json()) as { openapi?: unknown };
+  if (typeof document.openapi !== "string") {
+    throw new Error("OpenAPI preflight failed: response is not an OpenAPI document");
+  }
+
+  const endpointResponse = await fetch(endpoint, {
+    redirect: "manual",
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (
+    endpointResponse.status !== 402 ||
+    !endpointResponse.headers
+      .get("www-authenticate")
+      ?.toLowerCase()
+      .startsWith("l402 ")
+  ) {
+    throw new Error(
+      `L402 endpoint preflight failed: expected a 402 L402 challenge, received ${endpointResponse.status}`,
+    );
+  }
+}
+
 export function buildAnnouncement(
   secretKey: Uint8Array,
   apiBaseUrl = DEFAULT_API_BASE_URL,
-  supportedKind = "5000",
   createdAt = Math.floor(Date.now() / 1000),
 ): VerifiedEvent {
-  if (!/^\d+$/.test(supportedKind)) {
-    throw new Error("NOSTR_SUPPORTED_KIND must be an integer event kind");
-  }
-
-  const base = httpsUrl(apiBaseUrl, "NOSTR_API_BASE_URL");
-  const endpoint = new URL("/api/v1/stratigraphy", base).toString();
-  const openapi = new URL("/openapi.json", base).toString();
-  const pubkey = getPublicKey(secretKey);
+  const { endpoint, openapi } = apiUrls(apiBaseUrl);
   const template: EventTemplate = {
-    kind: 31990,
+    kind: 1,
     created_at: createdAt,
-    content: JSON.stringify({
-      name: "Bitcoin Stratigraphy L402 API",
-      about:
-        "HTTP data vending API for date-ranged Bitcoin Stratigraphy records. Discover the contract through OpenAPI and purchase responses with L402.",
-      website: base.toString(),
-      endpoint,
-      openapi,
-      protocol: "L402",
-      transport: "https",
-      pricing: "1 satoshi per requested day; 5 satoshi minimum",
-      nostr_kind_note:
-        "The k tag is a discovery category; requests are made over the documented HTTP API.",
-    }),
+    content: [
+      "Bitcoin Stratigraphy L402 API",
+      "",
+      "Machine-discoverable HTTP data vending API for date-ranged Bitcoin Stratigraphy records.",
+      `Endpoint: ${endpoint}`,
+      `OpenAPI: ${openapi}`,
+      "Protocol: L402",
+      "Pricing: 1 satoshi per requested day; 5 satoshi minimum",
+    ].join("\n"),
     tags: [
-      ["d", "bitcoin-stratigraphy-l402-api"],
-      ["k", supportedKind],
       ["t", "bitcoin"],
       ["t", "l402"],
       ["t", "openapi"],
       ["t", "api"],
+      ["t", "data-vending"],
       ["r", endpoint],
       ["r", openapi],
-      ["web", endpoint],
-      ["alt", "Bitcoin Stratigraphy L402 API handler announcement"],
-      ["p", pubkey],
+      ["alt", "Bitcoin Stratigraphy L402 HTTP API announcement"],
     ],
   };
 
@@ -107,15 +139,13 @@ export function buildAnnouncement(
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
-  const secretKey = requiredSecretKey(process.env.NOSTR_PRIVATE_KEY);
   const baseUrl = process.env.NOSTR_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-  const supportedKind = process.env.NOSTR_SUPPORTED_KIND ?? "5000";
   const relays = relayUrls(process.env.NOSTR_RELAYS);
-  const event = buildAnnouncement(secretKey, baseUrl, supportedKind);
-  const metadata = JSON.parse(event.content) as {
-    endpoint: string;
-    openapi: string;
-  };
+  const { endpoint, preflightEndpoint, openapi } = apiUrls(baseUrl);
+  if (!dryRun) await preflight(preflightEndpoint, openapi);
+
+  const secretKey = requiredSecretKey(process.env.NOSTR_PRIVATE_KEY);
+  const event = buildAnnouncement(secretKey, baseUrl);
 
   if (dryRun) {
     console.log(
@@ -124,8 +154,8 @@ async function main() {
           dryRun: true,
           relays,
           event,
-          endpoint: metadata.endpoint,
-          openapi: metadata.openapi,
+          endpoint,
+          openapi,
         },
         null,
         2,
@@ -155,8 +185,8 @@ async function main() {
         {
           eventId: event.id,
           pubkey: event.pubkey,
-          endpoint: metadata.endpoint,
-          openapi: metadata.openapi,
+          endpoint,
+          openapi,
           published,
           attempted: relays.length,
           results,

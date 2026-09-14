@@ -21,6 +21,10 @@ author = "agent"
 task = "workflow.run"
 args = "test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck"
+
 [[workflows.workflow]]
 name = "test"
 author = "agent"
@@ -28,6 +32,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm test"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "typecheck"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm typecheck"
 
 [workflows.workflow.metadata]
 isValidation = true

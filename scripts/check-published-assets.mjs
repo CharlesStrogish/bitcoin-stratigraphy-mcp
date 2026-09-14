@@ -179,6 +179,12 @@ async function consumeAssetBody(
 }
 
 async function assertHealthyApiResponse(response, livenessUrl, artifactName) {
+  if (response.url && response.url !== livenessUrl.href) {
+    throw new Error(
+      `${artifactName}: liveness endpoint redirected from configured URL ${livenessUrl} to final URL ${response.url}`,
+    );
+  }
+
   const mediaType = response.headers
     .get("content-type")
     ?.split(";", 1)[0]

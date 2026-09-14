@@ -101,6 +101,26 @@ test("checks API liveness without payment or data mutation", async () => {
   assert.deepEqual(requested, ["https://published.example/api/healthz"]);
 });
 
+test("rejects API liveness responses redirected away from the configured URL", async () => {
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [],
+      apiArtifacts: [
+        { name: "Example API", livenessPath: "/api/healthz" },
+      ],
+      fetchImpl: async () => {
+        const response = Response.json({ status: "ok" });
+        Object.defineProperty(response, "url", {
+          value: "https://published.example/api/status",
+        });
+        return response;
+      },
+    }),
+    /Example API: liveness endpoint redirected from configured URL https:\/\/published\.example\/api\/healthz to final URL https:\/\/published\.example\/api\/status/,
+  );
+});
+
 test("API liveness failures identify the artifact and URL", async () => {
   await assert.rejects(
     checkPublishedAssets({

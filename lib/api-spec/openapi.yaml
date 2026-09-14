@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: stratigraphy
     description: Bitcoin stratigraphy dataset
+security:
+  - L402: []
 paths:
   /healthz:
     get:
@@ -19,6 +21,7 @@ paths:
       tags: [health]
       summary: Health check
       description: Returns server health status
+      security: []
       responses:
         "200":
           description: Healthy
@@ -31,6 +34,7 @@ paths:
       operationId: getStratigraphy
       tags: [stratigraphy]
       summary: Get the free five-record sample
+      security: []
       responses:
         "200":
           description: Latest five stratigraphy records

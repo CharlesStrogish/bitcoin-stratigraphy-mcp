@@ -144,6 +144,41 @@ function assertAssetMediaType(response, assetUrl, artifactName) {
   }
 }
 
+async function assertHealthyApiResponse(response, livenessUrl, artifactName) {
+  const mediaType = response.headers
+    .get("content-type")
+    ?.split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+
+  if (mediaType !== "application/json") {
+    throw new Error(
+      `${artifactName}: liveness endpoint returned ${mediaType ?? "no content type"} instead of JSON for ${livenessUrl}`,
+    );
+  }
+
+  let body;
+  try {
+    body = await response.json();
+  } catch (error) {
+    throw new Error(
+      `${artifactName}: liveness endpoint returned invalid JSON for ${livenessUrl}: ${error.message}`,
+      { cause: error },
+    );
+  }
+
+  if (
+    body === null ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    body.status !== "ok"
+  ) {
+    throw new Error(
+      `${artifactName}: liveness endpoint returned an unhealthy response for ${livenessUrl}`,
+    );
+  }
+}
+
 export async function checkPublishedAssets({
   deploymentUrl,
   artifacts = discoverPublishedWebArtifacts(),
@@ -165,14 +200,19 @@ export async function checkPublishedAssets({
 
   for (const artifact of apiArtifacts) {
     const livenessUrl = new URL(artifact.livenessPath, deploymentBase);
-    await requestSuccessful(
+    const livenessResponse = await requestSuccessful(
       livenessUrl,
       artifact.name,
       "liveness endpoint",
       fetchImpl,
       requestTimeoutMs,
     );
-    console.log(`${artifact.name}: ${livenessUrl} is reachable`);
+    await assertHealthyApiResponse(
+      livenessResponse,
+      livenessUrl,
+      artifact.name,
+    );
+    console.log(`${artifact.name}: ${livenessUrl} is healthy`);
   }
 
   for (const artifact of artifacts) {

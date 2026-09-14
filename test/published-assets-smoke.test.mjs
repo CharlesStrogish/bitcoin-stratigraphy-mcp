@@ -92,7 +92,9 @@ test("checks API liveness without payment or data mutation", async () => {
     ],
     fetchImpl: async (url) => {
       requested.push(url.toString());
-      return new Response('{"status":"ok"}');
+      return new Response('{"status":"ok"}', {
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
     },
   });
 
@@ -114,6 +116,55 @@ test("API liveness failures identify the artifact and URL", async () => {
         }),
     }),
     /Example API: liveness endpoint returned 503 Service Unavailable for https:\/\/published\.example\/api\/healthz/,
+  );
+});
+
+test("rejects HTML fallback responses returned for API liveness", async () => {
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [],
+      apiArtifacts: [
+        { name: "Example API", livenessPath: "/api/healthz" },
+      ],
+      fetchImpl: async () =>
+        new Response("<!doctype html><title>Example App</title>", {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+    }),
+    /Example API: liveness endpoint returned text\/html instead of JSON for https:\/\/published\.example\/api\/healthz/,
+  );
+});
+
+test("rejects unhealthy API liveness response shapes", async () => {
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [],
+      apiArtifacts: [
+        { name: "Example API", livenessPath: "/api/healthz" },
+      ],
+      fetchImpl: async () =>
+        Response.json({ status: "degraded" }),
+    }),
+    /Example API: liveness endpoint returned an unhealthy response for https:\/\/published\.example\/api\/healthz/,
+  );
+});
+
+test("rejects malformed JSON returned for API liveness", async () => {
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [],
+      apiArtifacts: [
+        { name: "Example API", livenessPath: "/api/healthz" },
+      ],
+      fetchImpl: async () =>
+        new Response('{"status":', {
+          headers: { "content-type": "application/json" },
+        }),
+    }),
+    /Example API: liveness endpoint returned invalid JSON for https:\/\/published\.example\/api\/healthz/,
   );
 });
 

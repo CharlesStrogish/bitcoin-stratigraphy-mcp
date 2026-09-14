@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,18 +15,74 @@ const workspaceRoot = path.resolve(
   fileURLToPath(new URL("..", import.meta.url)),
 );
 
-const artifacts = [
-  {
-    name: "Canvas",
-    packageName: "@workspace/mockup-sandbox",
-    artifactDirectory: "mockup-sandbox",
-  },
-  {
-    name: "Bitcoin Stratigraphy Dashboard",
-    packageName: "@workspace/bitcoin-stratigraphy-dashboard",
-    artifactDirectory: "bitcoin-stratigraphy-dashboard",
-  },
-];
+const excludedArtifactKinds = new Set(["api"]);
+
+function readTomlString(source, key) {
+  return source.match(new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
+}
+
+function discoverViteWebArtifacts() {
+  const artifactsDirectory = path.join(workspaceRoot, "artifacts");
+
+  return readdirSync(artifactsDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => {
+      const artifactDirectory = entry.name;
+      const artifactConfig = readFileSync(
+        path.join(
+          artifactsDirectory,
+          artifactDirectory,
+          ".replit-artifact",
+          "artifact.toml",
+        ),
+        "utf8",
+      );
+      const kind = readTomlString(artifactConfig, "kind");
+
+      if (excludedArtifactKinds.has(kind)) {
+        return [];
+      }
+
+      const packageManifest = JSON.parse(
+        readFileSync(
+          path.join(artifactsDirectory, artifactDirectory, "package.json"),
+          "utf8",
+        ),
+      );
+
+      const usesVite =
+        packageManifest.dependencies?.vite ||
+        packageManifest.devDependencies?.vite;
+
+      if (!usesVite) {
+        return [];
+      }
+
+      assert.ok(
+        packageManifest.scripts?.build,
+        `${artifactDirectory} uses Vite and must declare a build script`,
+      );
+      assert.ok(
+        packageManifest.name,
+        `${artifactDirectory} must declare a package name`,
+      );
+
+      return [
+        {
+          name: readTomlString(artifactConfig, "title") ?? artifactDirectory,
+          packageName: packageManifest.name,
+          artifactDirectory,
+        },
+      ];
+    });
+}
+
+const artifacts = discoverViteWebArtifacts();
+
+assert.ok(
+  artifacts.length > 0,
+  "At least one registered Vite web artifact must be covered",
+);
 
 function readArtifactBasePath(artifactDirectory) {
   const artifactConfig = readFileSync(

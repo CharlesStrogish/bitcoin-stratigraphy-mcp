@@ -22,7 +22,7 @@ const replitPlugins =
 export default defineConfig(({ command }) => {
   const isBuild = command === "build";
   const rawPort = process.env.PORT;
-  const basePath = process.env.BASE_PATH ?? (isBuild ? "/" : undefined);
+  const basePath = process.env.BASE_PATH;
 
   if (!basePath) {
     throw new Error(

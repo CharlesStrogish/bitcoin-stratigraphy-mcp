@@ -36,6 +36,34 @@ function readTomlString(source, key) {
   return source.match(new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
 }
 
+function readArtifactFile(filePath, artifactDirectory, description) {
+  try {
+    return readFileSync(filePath, "utf8");
+  } catch (error) {
+    throw new Error(
+      `Artifact "${artifactDirectory}" is missing ${description} at ${filePath}`,
+      { cause: error },
+    );
+  }
+}
+
+function readArtifactPackageManifest(filePath, artifactDirectory) {
+  const source = readArtifactFile(
+    filePath,
+    artifactDirectory,
+    "package manifest",
+  );
+
+  try {
+    return JSON.parse(source);
+  } catch (error) {
+    throw new Error(
+      `Artifact "${artifactDirectory}" has a malformed package manifest at ${filePath}: ${error.message}`,
+      { cause: error },
+    );
+  }
+}
+
 function discoverWebArtifacts(
   rootDirectory = workspaceRoot,
   artifactConfigFilename = "artifact.toml",
@@ -46,14 +74,16 @@ function discoverWebArtifacts(
     .filter((entry) => entry.isDirectory())
     .flatMap((entry) => {
       const artifactDirectory = entry.name;
-      const artifactConfig = readFileSync(
-        path.join(
-          artifactsDirectory,
-          artifactDirectory,
-          ".replit-artifact",
-          artifactConfigFilename,
-        ),
-        "utf8",
+      const artifactConfigPath = path.join(
+        artifactsDirectory,
+        artifactDirectory,
+        ".replit-artifact",
+        artifactConfigFilename,
+      );
+      const artifactConfig = readArtifactFile(
+        artifactConfigPath,
+        artifactDirectory,
+        "artifact metadata",
       );
       const kind = readTomlString(artifactConfig, "kind");
 
@@ -61,11 +91,14 @@ function discoverWebArtifacts(
         return [];
       }
 
-      const packageManifest = JSON.parse(
-        readFileSync(
-          path.join(artifactsDirectory, artifactDirectory, "package.json"),
-          "utf8",
-        ),
+      const packageManifestPath = path.join(
+        artifactsDirectory,
+        artifactDirectory,
+        "package.json",
+      );
+      const packageManifest = readArtifactPackageManifest(
+        packageManifestPath,
+        artifactDirectory,
       );
 
       const buildTool = supportedBuildTools.find(
@@ -204,6 +237,27 @@ test("discovery rejects a Vite artifact without a build script", () => {
   assert.throws(
     () => discoverFixture("vite-missing-build"),
     /sample uses Vite and must declare a build script/,
+  );
+});
+
+test("discovery identifies an artifact with missing metadata", () => {
+  assert.throws(
+    () => discoverFixture("missing-metadata"),
+    /Artifact "sample" is missing artifact metadata at .*sample.*\.replit-artifact.*fixture\.toml/,
+  );
+});
+
+test("discovery identifies an artifact with a missing package manifest", () => {
+  assert.throws(
+    () => discoverFixture("missing-package"),
+    /Artifact "sample" is missing package manifest at .*sample.*package\.json/,
+  );
+});
+
+test("discovery identifies an artifact with a malformed package manifest", () => {
+  assert.throws(
+    () => discoverFixture("malformed-package"),
+    /Artifact "sample" has a malformed package manifest at .*sample.*package\.json:/,
   );
 });
 

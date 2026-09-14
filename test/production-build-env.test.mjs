@@ -303,6 +303,66 @@ function findEscapingCssAssetUrls(css, stylesheetUrl, basePath) {
     .filter(({ resolvedPath }) => !resolvedPath.startsWith(basePath));
 }
 
+function findLocalCssImportUrls(css) {
+  return [
+    ...css.matchAll(
+      /@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^'")\s][^)]*))\s*\)|"([^"]*)"|'([^']*)')/gi,
+    ),
+  ]
+    .map((match) =>
+      (match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5]).trim(),
+    )
+    .filter((url) => url && !isExcludedCssUrl(url));
+}
+
+function inspectCssAssetUrls({
+  stylesheetUrl,
+  basePath,
+  readStylesheet,
+  visitedStylesheets = new Set(),
+}) {
+  const resolvedStylesheetUrl = new URL(
+    stylesheetUrl,
+    "https://artifact.test",
+  );
+  resolvedStylesheetUrl.hash = "";
+
+  if (visitedStylesheets.has(resolvedStylesheetUrl.href)) {
+    return [];
+  }
+  visitedStylesheets.add(resolvedStylesheetUrl.href);
+
+  const css = readStylesheet(resolvedStylesheetUrl);
+  const escapingUrls = findEscapingCssAssetUrls(
+    css,
+    resolvedStylesheetUrl.href,
+    basePath,
+  ).map(({ url, resolvedPath }) => ({
+    stylesheetUrl: resolvedStylesheetUrl.pathname,
+    url,
+    resolvedPath,
+  }));
+
+  for (const importUrl of findLocalCssImportUrls(css)) {
+    const resolvedImportUrl = new URL(importUrl, resolvedStylesheetUrl);
+
+    if (!resolvedImportUrl.pathname.startsWith(basePath)) {
+      continue;
+    }
+
+    escapingUrls.push(
+      ...inspectCssAssetUrls({
+        stylesheetUrl: resolvedImportUrl.href,
+        basePath,
+        readStylesheet,
+        visitedStylesheets,
+      }),
+    );
+  }
+
+  return escapingUrls;
+}
+
 function findHtmlEntryPoints(directory, relativeDirectory = "") {
   return readdirSync(path.join(directory, relativeDirectory), {
     withFileTypes: true,
@@ -367,6 +427,50 @@ test("CSS asset URLs must resolve within the artifact preview path", () => {
     ),
     [{ url: "/icons/mask.svg#shape", resolvedPath: "/icons/mask.svg" }],
   );
+});
+
+test("CSS imports are inspected recursively without loops", () => {
+  const stylesheets = new Map([
+    [
+      "/registered/assets/styles.css",
+      `
+        @import "./nested/theme.css";
+        @import url("https://example.com/external.css");
+        @import url(data:text/css,.ignored{});
+      `,
+    ],
+    [
+      "/registered/assets/nested/theme.css",
+      `
+        @import url("../styles.css");
+        @font-face { src: url("../fonts/local.woff2") }
+        .escaped { background: url("/images/escaped.png") }
+      `,
+    ],
+  ]);
+  const reads = [];
+
+  assert.deepEqual(
+    inspectCssAssetUrls({
+      stylesheetUrl: "/registered/assets/styles.css",
+      basePath: "/registered/",
+      readStylesheet: ({ pathname }) => {
+        reads.push(pathname);
+        return stylesheets.get(pathname);
+      },
+    }),
+    [
+      {
+        stylesheetUrl: "/registered/assets/nested/theme.css",
+        url: "/images/escaped.png",
+        resolvedPath: "/images/escaped.png",
+      },
+    ],
+  );
+  assert.deepEqual(reads, [
+    "/registered/assets/styles.css",
+    "/registered/assets/nested/theme.css",
+  ]);
 });
 
 function buildWithArtifactRouting({
@@ -444,26 +548,23 @@ function buildWithArtifactRouting({
           !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url) &&
           new URL(url, pageUrl).pathname.endsWith(".css"),
       );
-      const escapingCssAssetUrls = stylesheetUrls.flatMap((stylesheetUrl) => {
-        const resolvedStylesheetUrl = new URL(stylesheetUrl, pageUrl);
-        const relativeStylesheetPath = resolvedStylesheetUrl.pathname.slice(
-          environment.BASE_PATH.length,
-        );
-        const css = readFileSync(
-          path.join(outputDirectory, relativeStylesheetPath),
-          "utf8",
-        );
-
-        return findEscapingCssAssetUrls(
-          css,
-          resolvedStylesheetUrl.href,
-          environment.BASE_PATH,
-        ).map(({ url, resolvedPath }) => ({
-          stylesheetUrl,
-          url,
-          resolvedPath,
-        }));
-      });
+      const visitedStylesheets = new Set();
+      const escapingCssAssetUrls = stylesheetUrls.flatMap((stylesheetUrl) =>
+        inspectCssAssetUrls({
+          stylesheetUrl: new URL(stylesheetUrl, pageUrl).href,
+          basePath: environment.BASE_PATH,
+          visitedStylesheets,
+          readStylesheet: ({ pathname }) => {
+            const relativeStylesheetPath = pathname.slice(
+              environment.BASE_PATH.length,
+            );
+            return readFileSync(
+              path.join(outputDirectory, relativeStylesheetPath),
+              "utf8",
+            );
+          },
+        }),
+      );
 
       assert.deepEqual(
         escapingCssAssetUrls,

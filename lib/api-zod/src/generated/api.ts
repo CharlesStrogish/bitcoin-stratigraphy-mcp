@@ -18,6 +18,19 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Reports whether the dependencies required to sell the paid dataset are available
+ * @summary Payment readiness check
+ */
+export const ReadinessCheckResponse = zod.object({
+  "status": zod.enum(['ready', 'not_ready']),
+  "dependencies": zod.object({
+  "wallet_configuration": zod.enum(['available', 'unavailable']),
+  "challenge_coordination": zod.enum(['available', 'unavailable'])
+})
+})
+
+
+/**
  * @summary Get the free five-record sample
  */
 export const GetStratigraphyResponseItem = zod.object({

@@ -1,5 +1,8 @@
 import { NWCClient } from "@getalby/sdk";
-import { GetPaidStratigraphyResponse } from "@workspace/api-zod";
+import {
+  GetPaidStratigraphyResponse,
+  ReadinessCheckResponse,
+} from "@workspace/api-zod";
 import {
   type Express,
   type Request,
@@ -200,6 +203,35 @@ export function registerStratigraphyRoutes(
       status: "online",
       service: "Bitcoin Stratigraphy API",
     });
+  });
+
+  app.get("/api/readyz", async (req, res): Promise<void> => {
+    const walletConfiguration =
+      typeof process.env.NWC_URI === "string" &&
+      process.env.NWC_URI.trim().length > 0
+        ? "available"
+        : "unavailable";
+    let challengeCoordination = "available";
+    try {
+      await challengeStore.checkHealth();
+    } catch (error) {
+      challengeCoordination = "unavailable";
+      req.log.error(
+        { err: error },
+        "Payment challenge readiness check failed",
+      );
+    }
+    const ready =
+      walletConfiguration === "available" &&
+      challengeCoordination === "available";
+    const data = ReadinessCheckResponse.parse({
+      status: ready ? "ready" : "not_ready",
+      dependencies: {
+        wallet_configuration: walletConfiguration,
+        challenge_coordination: challengeCoordination,
+      },
+    });
+    res.status(ready ? 200 : 503).json(data);
   });
 
   app.get("/api/v1/stratigraphy/sample", async (_req, res): Promise<void> => {

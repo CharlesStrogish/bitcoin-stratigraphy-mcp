@@ -43,6 +43,9 @@ export function createPostgresPaymentChallengeStore(
   databasePool: DatabasePool = pool,
 ): PaymentChallengeStore {
   return {
+    async checkHealth() {
+      await databasePool.query("SELECT 1");
+    },
     async getOrCreate(caller, policy, create) {
       const client = await databasePool.connect();
       let transactionOpen = false;

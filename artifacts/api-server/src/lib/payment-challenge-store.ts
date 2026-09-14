@@ -13,6 +13,7 @@ export type ChallengeStoreResult =
   | { kind: "limited"; retryAfter: number };
 
 export interface PaymentChallengeStore {
+  checkHealth(): Promise<void>;
   getOrCreate(
     caller: string,
     policy: ChallengeStorePolicy,
@@ -36,6 +37,7 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
   const pending = new Map<string, Promise<ChallengeStoreResult>>();
 
   return {
+    async checkHealth() {},
     async getOrCreate(caller, policy, create) {
       const existingPending = pending.get(caller);
       if (existingPending) return existingPending;

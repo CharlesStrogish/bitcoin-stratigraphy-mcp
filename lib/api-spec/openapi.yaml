@@ -29,6 +29,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /readyz:
+    get:
+      operationId: readinessCheck
+      tags: [health]
+      summary: Payment readiness check
+      description: Reports whether the dependencies required to sell the paid dataset are available
+      security: []
+      responses:
+        "200":
+          description: Ready to accept paid dataset requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessStatus"
+        "503":
+          description: One or more payment dependencies are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessStatus"
   /v1/stratigraphy/sample:
     get:
       operationId: getStratigraphy
@@ -119,6 +139,33 @@ components:
           type: string
       required:
         - status
+    ReadinessStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ready
+            - not_ready
+        dependencies:
+          type: object
+          properties:
+            wallet_configuration:
+              type: string
+              enum:
+                - available
+                - unavailable
+            challenge_coordination:
+              type: string
+              enum:
+                - available
+                - unavailable
+          required:
+            - wallet_configuration
+            - challenge_coordination
+      required:
+        - status
+        - dependencies
     StratigraphyEntry:
       type: object
       properties:

@@ -9,6 +9,40 @@ export interface HealthStatus {
   status: string;
 }
 
+export type ReadinessStatusStatus = typeof ReadinessStatusStatus[keyof typeof ReadinessStatusStatus];
+
+
+export const ReadinessStatusStatus = {
+  ready: 'ready',
+  not_ready: 'not_ready',
+} as const;
+
+export type ReadinessStatusDependenciesWalletConfiguration = typeof ReadinessStatusDependenciesWalletConfiguration[keyof typeof ReadinessStatusDependenciesWalletConfiguration];
+
+
+export const ReadinessStatusDependenciesWalletConfiguration = {
+  available: 'available',
+  unavailable: 'unavailable',
+} as const;
+
+export type ReadinessStatusDependenciesChallengeCoordination = typeof ReadinessStatusDependenciesChallengeCoordination[keyof typeof ReadinessStatusDependenciesChallengeCoordination];
+
+
+export const ReadinessStatusDependenciesChallengeCoordination = {
+  available: 'available',
+  unavailable: 'unavailable',
+} as const;
+
+export type ReadinessStatusDependencies = {
+  wallet_configuration: ReadinessStatusDependenciesWalletConfiguration;
+  challenge_coordination: ReadinessStatusDependenciesChallengeCoordination;
+};
+
+export interface ReadinessStatus {
+  status: ReadinessStatusStatus;
+  dependencies: ReadinessStatusDependencies;
+}
+
 export interface StratigraphyEntry {
   day: number;
   title: string;

@@ -7,6 +7,7 @@ import type { AddressInfo } from "node:net";
 import express from "express";
 import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
+import healthRouter from "./health";
 import { registerStratigraphyRoutes } from "./stratigraphy";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
 import type { PaymentChallengeStore } from "../lib/payment-challenge-store";
@@ -28,6 +29,10 @@ type OpenApiDocument = {
 };
 
 function paymentContract(document: OpenApiDocument) {
+  const readiness = document.paths["/readyz"]?.get as {
+    security?: unknown;
+    responses?: unknown;
+  };
   const sample = document.paths["/v1/stratigraphy/sample"]?.get as {
     responses?: unknown;
   };
@@ -37,6 +42,10 @@ function paymentContract(document: OpenApiDocument) {
   };
 
   return {
+    readiness: {
+      security: readiness?.security,
+      responses: readiness?.responses,
+    },
     sample: { responses: sample?.responses },
     paid: {
       security: paid?.security,
@@ -52,6 +61,7 @@ function paymentContract(document: OpenApiDocument) {
       document.components.schemas.PaymentChallengeServiceUnavailableError,
     walletGatewaySchema: document.components.schemas.WalletGatewayError,
     entrySchema: document.components.schemas.StratigraphyEntry,
+    readinessSchema: document.components.schemas.ReadinessStatus,
   };
 }
 
@@ -112,6 +122,7 @@ let invoiceRequest: Record<string, unknown> | undefined;
 let invoiceRequestCount = 0;
 let invoiceGate: Promise<void> | undefined;
 const app = express();
+app.use("/api", healthRouter);
 registerStratigraphyRoutes(app, () => ({
   lookupInvoice: async () => transaction as never,
   makeInvoice: async (request) => {
@@ -179,6 +190,48 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     in: "header",
     name: "Authorization",
     description: "L402 <payment_hash>:<preimage>",
+  });
+  assert.deepEqual(servedContract.readiness, {
+    security: [],
+    responses: {
+      "200": {
+        description: "Ready to accept paid dataset requests",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ReadinessStatus" },
+          },
+        },
+      },
+      "503": {
+        description: "One or more payment dependencies are unavailable",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ReadinessStatus" },
+          },
+        },
+      },
+    },
+  });
+  assert.deepEqual(servedContract.readinessSchema, {
+    type: "object",
+    properties: {
+      status: { type: "string", enum: ["ready", "not_ready"] },
+      dependencies: {
+        type: "object",
+        properties: {
+          wallet_configuration: {
+            type: "string",
+            enum: ["available", "unavailable"],
+          },
+          challenge_coordination: {
+            type: "string",
+            enum: ["available", "unavailable"],
+          },
+        },
+        required: ["wallet_configuration", "challenge_coordination"],
+      },
+    },
+    required: ["status", "dependencies"],
   });
   assert.deepEqual(
     (
@@ -328,6 +381,105 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
   });
 });
 
+test("keeps liveness healthy when payment dependencies are unavailable", async () => {
+  const configuredNwcUri = process.env.NWC_URI;
+  delete process.env.NWC_URI;
+  try {
+    const response = await fetch(`${baseUrl}/api/healthz`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { status: "ok" });
+  } finally {
+    if (configuredNwcUri === undefined) delete process.env.NWC_URI;
+    else process.env.NWC_URI = configuredNwcUri;
+  }
+});
+
+test("reports ready when payment dependencies are available", async () => {
+  const configuredNwcUri = process.env.NWC_URI;
+  process.env.NWC_URI = "nostr+walletconnect://configured";
+  try {
+    const response = await fetch(`${baseUrl}/api/readyz`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      status: "ready",
+      dependencies: {
+        wallet_configuration: "available",
+        challenge_coordination: "available",
+      },
+    });
+  } finally {
+    if (configuredNwcUri === undefined) delete process.env.NWC_URI;
+    else process.env.NWC_URI = configuredNwcUri;
+  }
+});
+
+test("reports not ready when wallet configuration is missing", async () => {
+  const configuredNwcUri = process.env.NWC_URI;
+  delete process.env.NWC_URI;
+  try {
+    const response = await fetch(`${baseUrl}/api/readyz`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      status: "not_ready",
+      dependencies: {
+        wallet_configuration: "unavailable",
+        challenge_coordination: "available",
+      },
+    });
+  } finally {
+    if (configuredNwcUri === undefined) delete process.env.NWC_URI;
+    else process.env.NWC_URI = configuredNwcUri;
+  }
+});
+
+test("reports not ready when challenge coordination is unavailable", async () => {
+  const configuredNwcUri = process.env.NWC_URI;
+  process.env.NWC_URI = "nostr+walletconnect://configured";
+  const unavailableStore: PaymentChallengeStore = {
+    checkHealth: async () => {
+      throw new Error("database unavailable");
+    },
+    getOrCreate: async () => {
+      throw new Error("database unavailable");
+    },
+    consume: async () => undefined,
+  };
+  const readinessApp = express();
+  readinessApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerStratigraphyRoutes(
+    readinessApp,
+    undefined,
+    undefined,
+    unavailableStore,
+  );
+  const readinessServer = readinessApp.listen(0);
+  await new Promise<void>((resolve) =>
+    readinessServer.once("listening", resolve),
+  );
+
+  try {
+    const address = readinessServer.address() as AddressInfo;
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/api/readyz`,
+    );
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      status: "not_ready",
+      dependencies: {
+        wallet_configuration: "available",
+        challenge_coordination: "unavailable",
+      },
+    });
+  } finally {
+    readinessServer.close();
+    if (configuredNwcUri === undefined) delete process.env.NWC_URI;
+    else process.env.NWC_URI = configuredNwcUri;
+  }
+});
+
 test("returns the documented generic 500 when payment is not configured", async () => {
   const configuredNwcUri = process.env.NWC_URI;
   delete process.env.NWC_URI;
@@ -457,6 +609,9 @@ test("coordinates challenge reuse across API instances", async () => {
 test("fails closed when shared challenge coordination is unavailable", async () => {
   let creations = 0;
   const unavailableStore: PaymentChallengeStore = {
+    checkHealth: async () => {
+      throw new Error("database unavailable");
+    },
     getOrCreate: async () => {
       throw new Error("database unavailable");
     },

@@ -208,6 +208,62 @@ test("times out stalled requests and identifies the artifact and URL", async () 
   );
 });
 
+test("times out asset bodies that start but never finish", async () => {
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [{ name: "Slow Body App", previewPath: "/slow-body/" }],
+      apiArtifacts: [],
+      requestTimeoutMs: 10,
+      fetchImpl: async (url) => {
+        if (url.toString().endsWith("/slow-body/")) {
+          return new Response(
+            '<script src="/slow-body/assets/stalled.js"></script>',
+          );
+        }
+
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode("export const"));
+            },
+          }),
+          { headers: { "content-type": "text/javascript" } },
+        );
+      },
+    }),
+    /Slow Body App: asset body timed out after 10ms for https:\/\/published\.example\/slow-body\/assets\/stalled\.js/,
+  );
+});
+
+test("reports truncated asset bodies with the artifact and URL", async () => {
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [{ name: "Truncated App", previewPath: "/truncated/" }],
+      apiArtifacts: [],
+      fetchImpl: async (url) => {
+        if (url.toString().endsWith("/truncated/")) {
+          return new Response(
+            '<link rel="stylesheet" href="/truncated/assets/site.css">',
+          );
+        }
+
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode("body{"));
+              controller.error(new Error("connection terminated"));
+            },
+          }),
+          { headers: { "content-type": "text/css" } },
+        );
+      },
+    }),
+    /Truncated App: asset body download failed for https:\/\/published\.example\/truncated\/assets\/site\.css: connection terminated/,
+  );
+});
+
 test("rejects HTML fallback responses returned for missing assets", async () => {
   await assert.rejects(
     checkPublishedAssets({

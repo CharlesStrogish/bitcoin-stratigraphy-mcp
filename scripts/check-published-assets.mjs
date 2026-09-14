@@ -144,6 +144,40 @@ function assertAssetMediaType(response, assetUrl, artifactName) {
   }
 }
 
+async function consumeAssetBody(
+  response,
+  assetUrl,
+  artifactName,
+  requestTimeoutMs,
+) {
+  let timeout;
+  const bodyRead = response.arrayBuffer();
+  const bodyTimeout = new Promise((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(
+        new Error(
+          `${artifactName}: asset body timed out after ${requestTimeoutMs}ms for ${assetUrl}`,
+        ),
+      );
+    }, requestTimeoutMs);
+  });
+
+  try {
+    await Promise.race([bodyRead, bodyTimeout]);
+  } catch (error) {
+    if (error.message.startsWith(`${artifactName}: asset body timed out`)) {
+      void response.body?.cancel(error).catch(() => {});
+      throw error;
+    }
+    throw new Error(
+      `${artifactName}: asset body download failed for ${assetUrl}: ${error.message}`,
+      { cause: error },
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function assertHealthyApiResponse(response, livenessUrl, artifactName) {
   const mediaType = response.headers
     .get("content-type")
@@ -242,6 +276,12 @@ export async function checkPublishedAssets({
         requestTimeoutMs,
       );
       assertAssetMediaType(assetResponse, assetUrl, artifact.name);
+      await consumeAssetBody(
+        assetResponse,
+        assetUrl,
+        artifact.name,
+        requestTimeoutMs,
+      );
     }
 
     console.log(

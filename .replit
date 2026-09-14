@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "python-base-3.13"]
+modules = ["nodejs-24"]
 
 [deployment]
 router = "application"
@@ -18,9 +18,3 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
-
-[[ports]]
-localPort = 5000
-externalPort = 80
-run = "PORT=5000 pnpm --filter @workspace/api-server dev"
-run = "PORT=5000 pnpm --filter @workspace/api-server dev"

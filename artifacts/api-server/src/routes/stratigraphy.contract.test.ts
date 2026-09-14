@@ -21,6 +21,33 @@ type Transaction = {
   invoice: string;
 };
 
+async function withContractServer(
+  clientFactory: Parameters<typeof registerStratigraphyRoutes>[1],
+  run: (url: string) => Promise<void>,
+) {
+  const contractApp = express();
+  contractApp.use((req, _res, next) => {
+    (req as any).log = {
+      error: () => undefined,
+    };
+    next();
+  });
+  registerStratigraphyRoutes(contractApp, clientFactory);
+  const contractServer = contractApp.listen(0);
+  await new Promise<void>((resolve) =>
+    contractServer.once("listening", resolve),
+  );
+  const address = contractServer.address() as AddressInfo;
+
+  try {
+    await run(
+      `http://127.0.0.1:${address.port}/api/v1/stratigraphy`,
+    );
+  } finally {
+    contractServer.close();
+  }
+}
+
 const validTransaction: Transaction = {
   type: "incoming",
   state: "settled",
@@ -255,6 +282,92 @@ test("failed invoice attempts consume quota and retain caller capacity", async (
   } finally {
     failureServer.close();
   }
+});
+
+test("returns a generic 502 and closes the wallet when invoice creation is rejected", async () => {
+  let closeCount = 0;
+
+  await withContractServer(
+    () => ({
+      lookupInvoice: async () => validTransaction as never,
+      makeInvoice: async () => {
+        throw new Error("wallet connection exposed detail");
+      },
+      close: () => {
+        closeCount += 1;
+      },
+    }),
+    async (url) => {
+      const response = await fetch(url);
+
+      assert.equal(response.status, 502);
+      assert.deepEqual(await response.json(), {
+        error: "Unable to create payment invoice",
+      });
+      assert.equal(closeCount, 1);
+    },
+  );
+});
+
+test("returns a generic 502 and closes the wallet for an incomplete invoice", async () => {
+  let closeCount = 0;
+
+  await withContractServer(
+    () => ({
+      lookupInvoice: async () => validTransaction as never,
+      makeInvoice: async () =>
+        ({
+          ...validTransaction,
+          invoice: "",
+          payment_hash: "not-a-payment-hash",
+        }) as never,
+      close: () => {
+        closeCount += 1;
+      },
+    }),
+    async (url) => {
+      const response = await fetch(url);
+
+      assert.equal(response.status, 502);
+      assert.deepEqual(await response.json(), {
+        error: "Unable to create payment invoice",
+      });
+      assert.equal(closeCount, 1);
+    },
+  );
+});
+
+test("returns a generic 502 without a fresh invoice when payment lookup fails", async () => {
+  let closeCount = 0;
+  let makeInvoiceCount = 0;
+
+  await withContractServer(
+    () => ({
+      lookupInvoice: async () => {
+        throw new Error("wallet lookup exposed detail");
+      },
+      makeInvoice: async () => {
+        makeInvoiceCount += 1;
+        return validTransaction as never;
+      },
+      close: () => {
+        closeCount += 1;
+      },
+    }),
+    async (url) => {
+      const response = await fetch(url, {
+        headers: { Authorization: `L402 ${paymentHash}:${preimage}` },
+      });
+
+      assert.equal(response.status, 502);
+      assert.deepEqual(await response.json(), {
+        error: "Unable to verify payment",
+      });
+      assert.equal(response.headers.get("www-authenticate"), null);
+      assert.equal(makeInvoiceCount, 0);
+      assert.equal(closeCount, 1);
+    },
+  );
 });
 
 test("rejects a preimage that does not match the payment hash", async () => {

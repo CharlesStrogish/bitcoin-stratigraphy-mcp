@@ -85,7 +85,7 @@ async function verifyPayment(
   const computedHash = createHash("sha256")
     .update(Buffer.from(preimage, "hex"))
     .digest("hex");
-  if (computedHash !== paymentHash) return false;
+  if (computedHash !== paymentHash) return "invalid";
 
   const client = clientFactory(nwcUri);
   try {
@@ -100,9 +100,11 @@ async function verifyPayment(
       transaction.payment_hash.toLowerCase() === paymentHash &&
       (!transaction.preimage ||
         transaction.preimage.toLowerCase() === preimage)
-    );
+    )
+      ? "valid"
+      : "invalid";
   } catch {
-    return false;
+    return "unavailable";
   } finally {
     client.close();
   }
@@ -269,24 +271,28 @@ export function registerStratigraphyRoutes(
       const authorization = parseL402Authorization(
         req.header("Authorization"),
       );
-      if (
-        authorization &&
-        (await verifyPayment(
+      if (authorization) {
+        const verification = await verifyPayment(
           nwcUri,
           authorization.paymentHash,
           authorization.preimage,
            clientFactory,
-        ))
-      ) {
-        const callerState = challenges.get(callerKey(req));
-        if (
-          callerState?.challenge?.paymentHash === authorization.paymentHash
-        ) {
-          challenges.delete(callerKey(req));
+        );
+        if (verification === "unavailable") {
+          res.status(502).json({ error: "Unable to verify payment" });
+          return;
         }
-        const data = await readDataset();
-        res.status(200).json(data);
-        return;
+        if (verification === "valid") {
+          const callerState = challenges.get(callerKey(req));
+          if (
+            callerState?.challenge?.paymentHash === authorization.paymentHash
+          ) {
+            challenges.delete(callerKey(req));
+          }
+          const data = await readDataset();
+          res.status(200).json(data);
+          return;
+        }
       }
 
       await sendPaymentChallenge(

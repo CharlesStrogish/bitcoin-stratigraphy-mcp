@@ -9,6 +9,7 @@ await build({
   bundle: true,
   platform: "node",
   format: "esm",
+  loader: { ".yaml": "text" },
   external: ["express", "@getalby/sdk", "yaml"],
   banner: {
     js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',

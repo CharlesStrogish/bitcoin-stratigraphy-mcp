@@ -132,6 +132,31 @@ test("asset failures identify the artifact and broken URL", async () => {
   );
 });
 
+test("times out stalled requests and identifies the artifact and URL", async () => {
+  await assert.rejects(
+    checkPublishedAssets({
+      deploymentUrl: "https://published.example",
+      artifacts: [{ name: "Slow App", previewPath: "/slow/" }],
+      apiArtifacts: [],
+      requestTimeoutMs: 10,
+      fetchImpl: async (url, { signal }) => {
+        if (url.toString().endsWith("/slow/")) {
+          return new Response(
+            '<script src="/slow/assets/stalled.js"></script>',
+          );
+        }
+
+        return new Promise((resolve, reject) => {
+          signal.addEventListener("abort", () => reject(signal.reason), {
+            once: true,
+          });
+        });
+      },
+    }),
+    /Slow App: asset request timed out after 10ms for https:\/\/published\.example\/slow\/assets\/stalled\.js/,
+  );
+});
+
 test("rejects HTML fallback responses returned for missing assets", async () => {
   await assert.rejects(
     checkPublishedAssets({

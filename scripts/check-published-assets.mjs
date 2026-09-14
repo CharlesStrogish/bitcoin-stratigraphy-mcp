@@ -7,6 +7,9 @@ const workspaceRoot = path.resolve(
   fileURLToPath(new URL("..", import.meta.url)),
 );
 
+// Release checks should fail promptly enough to leave time for actionable output.
+export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+
 function readTomlString(source, key) {
   return source.match(new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
 }
@@ -87,13 +90,25 @@ export function findJavaScriptAndCssUrls(html) {
     .filter((url) => /\.(?:css|m?js)(?:[?#]|$)/i.test(url));
 }
 
-async function requestSuccessful(url, artifactName, resourceType, fetchImpl) {
+async function requestSuccessful(
+  url,
+  artifactName,
+  resourceType,
+  fetchImpl,
+  requestTimeoutMs,
+) {
   let response;
   try {
-    response = await fetchImpl(url);
+    response = await fetchImpl(url, {
+      signal: AbortSignal.timeout(requestTimeoutMs),
+    });
   } catch (error) {
+    const timeoutDetail =
+      error?.name === "TimeoutError"
+        ? ` timed out after ${requestTimeoutMs}ms`
+        : " failed";
     throw new Error(
-      `${artifactName}: ${resourceType} request failed for ${url}: ${error.message}`,
+      `${artifactName}: ${resourceType} request${timeoutDetail} for ${url}: ${error.message}`,
       { cause: error },
     );
   }
@@ -134,8 +149,13 @@ export async function checkPublishedAssets({
   artifacts = discoverPublishedWebArtifacts(),
   apiArtifacts = discoverPublishedApiArtifacts(),
   fetchImpl = fetch,
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 }) {
   assert.ok(deploymentUrl, "PUBLISHED_URL must be provided");
+  assert.ok(
+    Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0,
+    "requestTimeoutMs must be a positive number",
+  );
   assert.ok(
     artifacts.length + apiArtifacts.length > 0,
     "At least one published artifact must be covered",
@@ -150,6 +170,7 @@ export async function checkPublishedAssets({
       artifact.name,
       "liveness endpoint",
       fetchImpl,
+      requestTimeoutMs,
     );
     console.log(`${artifact.name}: ${livenessUrl} is reachable`);
   }
@@ -161,6 +182,7 @@ export async function checkPublishedAssets({
       artifact.name,
       "entry page",
       fetchImpl,
+      requestTimeoutMs,
     );
     const assetUrls = findJavaScriptAndCssUrls(await entryResponse.text()).map(
       (assetUrl) => new URL(assetUrl, entryUrl),
@@ -177,6 +199,7 @@ export async function checkPublishedAssets({
         artifact.name,
         "asset",
         fetchImpl,
+        requestTimeoutMs,
       );
       assertAssetMediaType(assetResponse, assetUrl, artifact.name);
     }

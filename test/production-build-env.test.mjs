@@ -102,8 +102,51 @@ function buildWithArtifactRouting({
   }
 }
 
+function assertServeModeRequiresEnvironment(
+  { name, packageName, artifactDirectory },
+  missingVariable,
+) {
+  const environment = {
+    ...process.env,
+    NODE_ENV: "production",
+    BASE_PATH: readArtifactBasePath(artifactDirectory),
+    PORT: "4173",
+  };
+  delete environment[missingVariable];
+
+  const result = spawnSync(
+    "pnpm",
+    ["--filter", packageName, "run", "dev"],
+    {
+      cwd: workspaceRoot,
+      encoding: "utf8",
+      env: environment,
+      timeout: 10_000,
+    },
+  );
+  const output = `${result.stdout}\n${result.stderr}`;
+  const expectedMessage = `${missingVariable} environment variable is required but was not provided.`;
+
+  assert.notEqual(
+    result.status,
+    0,
+    `${name} serve mode must fail when ${missingVariable} is missing.`,
+  );
+  assert.match(
+    output,
+    new RegExp(expectedMessage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    `${name} must explain that ${missingVariable} is required.\n${output}`,
+  );
+}
+
 for (const artifact of artifacts) {
   test(`${artifact.name} production assets follow the artifact preview path`, () => {
     buildWithArtifactRouting(artifact);
   });
+
+  for (const missingVariable of ["PORT", "BASE_PATH"]) {
+    test(`${artifact.name} serve mode requires ${missingVariable}`, () => {
+      assertServeModeRequiresEnvironment(artifact, missingVariable);
+    });
+  }
 }

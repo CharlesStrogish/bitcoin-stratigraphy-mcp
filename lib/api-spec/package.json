@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "validate": "redocly lint openapi.yaml --extends=minimal",
+    "validate": "pnpm run validate:spec openapi.yaml",
+    "validate:spec": "redocly lint --extends=minimal",
+    "test": "node --test test/*.test.mjs",
     "codegen": "pnpm run validate && orval --config ./orval.config.ts && pnpm -w run typecheck:libs"
   },
   "devDependencies": {

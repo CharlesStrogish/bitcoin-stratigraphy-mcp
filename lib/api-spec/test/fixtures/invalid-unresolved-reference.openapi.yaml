@@ -1,0 +1,17 @@
+# Test fixture only: intentionally invalid and never served.
+openapi: 3.1.0
+info:
+  title: Invalid unresolved reference test fixture
+  version: 0.0.0
+paths:
+  /fixture:
+    get:
+      responses:
+        "200":
+          description: This response intentionally references a missing schema
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DefinitelyMissingSchema"
+components:
+  schemas: {}

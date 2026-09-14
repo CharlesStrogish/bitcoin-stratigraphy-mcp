@@ -191,6 +191,43 @@ function readArtifactBasePath(artifactDirectory) {
   return basePath.replace(/\/?$/, "/");
 }
 
+function isExcludedCssUrl(url) {
+  return /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(url);
+}
+
+function findEscapingCssAssetUrls(css, stylesheetUrl, basePath) {
+  return [...css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^'")\s][^)]*))\s*\)/gi)]
+    .map((match) => (match[1] ?? match[2] ?? match[3]).trim())
+    .filter((url) => url && !isExcludedCssUrl(url))
+    .map((url) => ({
+      url,
+      resolvedPath: new URL(url, new URL(stylesheetUrl, "https://artifact.test"))
+        .pathname,
+    }))
+    .filter(({ resolvedPath }) => !resolvedPath.startsWith(basePath));
+}
+
+test("CSS asset URLs must resolve within the artifact preview path", () => {
+  const css = `
+    @font-face { src: url("./font.woff2") }
+    .local { background: url('../images/background.png') }
+    .escaped { mask: url('/icons/mask.svg#shape') }
+    .external { background: url("https://example.com/image.png") }
+    .protocol-relative { background: url(//example.com/image.png) }
+    .inline { background: url(data:image/svg+xml;base64,PHN2Zy8+) }
+    .fragment { filter: url(#shadow) }
+  `;
+
+  assert.deepEqual(
+    findEscapingCssAssetUrls(
+      css,
+      "/registered/assets/styles.css",
+      "/registered/",
+    ),
+    [{ url: "/icons/mask.svg#shape", resolvedPath: "/icons/mask.svg" }],
+  );
+});
+
 function buildWithArtifactRouting({
   name,
   packageName,
@@ -248,6 +285,44 @@ function buildWithArtifactRouting({
     assert.ok(
       assetUrls.every((url) => url.startsWith(environment.BASE_PATH)),
       `${name} assets must use ${environment.BASE_PATH}. Found: ${assetUrls.join(", ")}`,
+    );
+
+    const stylesheetUrls = emittedUrls.filter(
+      (url) =>
+        !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url) &&
+        new URL(url, "https://artifact.test").pathname.endsWith(".css"),
+    );
+    const escapingCssAssetUrls = stylesheetUrls.flatMap((stylesheetUrl) => {
+      const stylesheetPath = new URL(stylesheetUrl, "https://artifact.test")
+        .pathname;
+      const relativeStylesheetPath = stylesheetPath.slice(
+        environment.BASE_PATH.length,
+      );
+      const css = readFileSync(
+        path.join(outputDirectory, relativeStylesheetPath),
+        "utf8",
+      );
+
+      return findEscapingCssAssetUrls(
+        css,
+        stylesheetUrl,
+        environment.BASE_PATH,
+      ).map(({ url, resolvedPath }) => ({
+        stylesheetUrl,
+        url,
+        resolvedPath,
+      }));
+    });
+
+    assert.deepEqual(
+      escapingCssAssetUrls,
+      [],
+      `${name} CSS assets must resolve under ${environment.BASE_PATH}. Found: ${escapingCssAssetUrls
+        .map(
+          ({ stylesheetUrl, url, resolvedPath }) =>
+            `${stylesheetUrl}: ${url} -> ${resolvedPath}`,
+        )
+        .join(", ")}`,
     );
   } finally {
     rmSync(outputDirectory, { force: true, recursive: true });

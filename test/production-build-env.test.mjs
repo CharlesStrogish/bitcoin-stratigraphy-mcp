@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import {
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -15,13 +10,33 @@ const workspaceRoot = path.resolve(
   fileURLToPath(new URL("..", import.meta.url)),
 );
 
-const excludedArtifactKinds = new Set(["api"]);
+const webArtifactKinds = new Set(["data-app", "design", "web-app", "website"]);
+const supportedBuildTools = [
+  {
+    name: "Vite",
+    dependency: "vite",
+    outputDirectoryArgument: "--outDir",
+    assetPathSegment: "/assets/",
+  },
+  {
+    name: "Astro",
+    dependency: "astro",
+    outputDirectoryArgument: "--outDir",
+    assetPathSegment: "/_astro/",
+  },
+  {
+    name: "Parcel",
+    dependency: "parcel",
+    outputDirectoryArgument: "--dist-dir",
+    assetPathSegment: null,
+  },
+];
 
 function readTomlString(source, key) {
   return source.match(new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
 }
 
-function discoverViteWebArtifacts() {
+function discoverWebArtifacts() {
   const artifactsDirectory = path.join(workspaceRoot, "artifacts");
 
   return readdirSync(artifactsDirectory, { withFileTypes: true })
@@ -39,7 +54,7 @@ function discoverViteWebArtifacts() {
       );
       const kind = readTomlString(artifactConfig, "kind");
 
-      if (excludedArtifactKinds.has(kind)) {
+      if (!webArtifactKinds.has(kind)) {
         return [];
       }
 
@@ -50,17 +65,19 @@ function discoverViteWebArtifacts() {
         ),
       );
 
-      const usesVite =
-        packageManifest.dependencies?.vite ||
-        packageManifest.devDependencies?.vite;
+      const buildTool = supportedBuildTools.find(
+        ({ dependency }) =>
+          packageManifest.dependencies?.[dependency] ||
+          packageManifest.devDependencies?.[dependency],
+      );
 
-      if (!usesVite) {
+      if (!buildTool) {
         return [];
       }
 
       assert.ok(
         packageManifest.scripts?.build,
-        `${artifactDirectory} uses Vite and must declare a build script`,
+        `${artifactDirectory} uses ${buildTool.name} and must declare a build script`,
       );
       assert.ok(
         packageManifest.name,
@@ -72,16 +89,17 @@ function discoverViteWebArtifacts() {
           name: readTomlString(artifactConfig, "title") ?? artifactDirectory,
           packageName: packageManifest.name,
           artifactDirectory,
+          buildTool,
         },
       ];
     });
 }
 
-const artifacts = discoverViteWebArtifacts();
+const artifacts = discoverWebArtifacts();
 
 assert.ok(
   artifacts.length > 0,
-  "At least one registered Vite web artifact must be covered",
+  "At least one registered web artifact using a supported build tool must be covered",
 );
 
 function readArtifactBasePath(artifactDirectory) {
@@ -95,7 +113,9 @@ function readArtifactBasePath(artifactDirectory) {
     ),
     "utf8",
   );
-  const previewPath = artifactConfig.match(/^previewPath\s*=\s*"([^"]+)"$/m)?.[1];
+  const previewPath = artifactConfig.match(
+    /^previewPath\s*=\s*"([^"]+)"$/m,
+  )?.[1];
   const basePath = artifactConfig.match(/^BASE_PATH\s*=\s*"([^"]+)"$/m)?.[1];
 
   assert.ok(previewPath, `${artifactDirectory} must declare previewPath`);
@@ -112,6 +132,7 @@ function buildWithArtifactRouting({
   name,
   packageName,
   artifactDirectory,
+  buildTool,
 }) {
   const outputDirectory = mkdtempSync(
     path.join(tmpdir(), `${packageName.split("/").at(-1)}-production-build-`),
@@ -128,7 +149,7 @@ function buildWithArtifactRouting({
         packageName,
         "run",
         "build",
-        "--outDir",
+        buildTool.outputDirectoryArgument,
         outputDirectory,
       ],
       {
@@ -145,15 +166,22 @@ function buildWithArtifactRouting({
     );
 
     const html = readFileSync(path.join(outputDirectory, "index.html"), "utf8");
-    const assetUrls = [
+    const emittedUrls = [
       ...html.matchAll(
         /<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/g,
       ),
-    ]
-      .map((match) => match[1])
-      .filter((url) => url.includes("/assets/"));
+    ].map((match) => match[1]);
+    const assetUrls = buildTool.assetPathSegment
+      ? emittedUrls.filter((url) => url.includes(buildTool.assetPathSegment))
+      : emittedUrls.filter(
+          (url) =>
+            !/^(?:data:|https?:|\/\/|#)/.test(url) && !url.endsWith(".html"),
+        );
 
-    assert.ok(assetUrls.length > 0, `${name} must emit asset URLs in index.html`);
+    assert.ok(
+      assetUrls.length > 0,
+      `${name} must emit asset URLs in index.html`,
+    );
     assert.ok(
       assetUrls.every((url) => url.startsWith(environment.BASE_PATH)),
       `${name} assets must use ${environment.BASE_PATH}. Found: ${assetUrls.join(", ")}`,
@@ -175,16 +203,12 @@ function assertServeModeRequiresEnvironment(
   };
   delete environment[missingVariable];
 
-  const result = spawnSync(
-    "pnpm",
-    ["--filter", packageName, "run", "dev"],
-    {
-      cwd: workspaceRoot,
-      encoding: "utf8",
-      env: environment,
-      timeout: 10_000,
-    },
-  );
+  const result = spawnSync("pnpm", ["--filter", packageName, "run", "dev"], {
+    cwd: workspaceRoot,
+    encoding: "utf8",
+    env: environment,
+    timeout: 10_000,
+  });
   const output = `${result.stdout}\n${result.stderr}`;
   const expectedMessage = `${missingVariable} environment variable is required but was not provided.`;
 

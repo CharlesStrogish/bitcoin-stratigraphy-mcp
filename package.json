@@ -12,6 +12,7 @@
   },
   "private": true,
   "dependencies": {
+    "@iarna/toml": "^2.2.5",
     "@replit/connectors-sdk": "^0.4.1"
   },
   "devDependencies": {

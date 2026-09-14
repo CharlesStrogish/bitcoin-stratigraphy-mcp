@@ -1,0 +1,3 @@
+kind = "web-app"
+title = "Malformed Metadata Fixture"
+this is not valid TOML

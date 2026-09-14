@@ -1,2 +1,3 @@
 - [NWC payment proof binding](nwc-payment-proof-binding.md) — Range-priced L402 proofs must exactly match the selected records, price, and product description.
 - [Nostr API announcements](nostr-api-announcements.md) — Announce HTTP APIs with general events; reserve NIP-89 for genuine Nostr event-kind handlers.
+- [Workspace-root package installs](workspace-root-package-installs.md) — root dependency installs need pnpm's workspace-root check handled explicitly.

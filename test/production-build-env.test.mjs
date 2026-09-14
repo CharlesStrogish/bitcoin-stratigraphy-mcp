@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import TOML from "@iarna/toml";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -32,8 +33,15 @@ const supportedBuildTools = [
   },
 ];
 
-function readTomlString(source, key) {
-  return source.match(new RegExp(`^${key}\\s*=\\s*"([^"]+)"`, "m"))?.[1];
+function parseArtifactMetadata(source, filePath, artifactDirectory) {
+  try {
+    return TOML.parse(source);
+  } catch (error) {
+    throw new Error(
+      `Artifact "${artifactDirectory}" has malformed artifact metadata at ${filePath}: ${error.message}`,
+      { cause: error },
+    );
+  }
 }
 
 function readArtifactFile(filePath, artifactDirectory, description) {
@@ -80,12 +88,22 @@ function discoverWebArtifacts(
         ".replit-artifact",
         artifactConfigFilename,
       );
-      const artifactConfig = readArtifactFile(
+      const artifactConfigSource = readArtifactFile(
         artifactConfigPath,
         artifactDirectory,
         "artifact metadata",
       );
-      const kind = readTomlString(artifactConfig, "kind");
+      const artifactMetadata = parseArtifactMetadata(
+        artifactConfigSource,
+        artifactConfigPath,
+        artifactDirectory,
+      );
+      const kind = artifactMetadata.kind;
+
+      assert.ok(
+        kind,
+        `Artifact "${artifactDirectory}" must declare kind in artifact metadata at ${artifactConfigPath}`,
+      );
 
       if (!webArtifactKinds.has(kind)) {
         return [];
@@ -122,7 +140,7 @@ function discoverWebArtifacts(
 
       return [
         {
-          name: readTomlString(artifactConfig, "title") ?? artifactDirectory,
+          name: artifactMetadata.title ?? artifactDirectory,
           packageName: packageManifest.name,
           artifactDirectory,
           buildTool,
@@ -272,6 +290,20 @@ test("discovery identifies an artifact with missing metadata", () => {
   assert.throws(
     () => discoverFixture("missing-metadata"),
     /Artifact "sample" is missing artifact metadata at .*sample.*\.replit-artifact.*fixture\.toml/,
+  );
+});
+
+test("discovery identifies an artifact with malformed metadata", () => {
+  assert.throws(
+    () => discoverFixture("malformed-metadata"),
+    /Artifact "sample" has malformed artifact metadata at .*sample.*\.replit-artifact.*fixture\.toml:/,
+  );
+});
+
+test("discovery identifies an artifact metadata file with missing kind", () => {
+  assert.throws(
+    () => discoverFixture("missing-kind"),
+    /Artifact "sample" must declare kind in artifact metadata at .*sample.*\.replit-artifact.*fixture\.toml/,
   );
 });
 

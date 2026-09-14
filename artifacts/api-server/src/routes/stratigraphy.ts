@@ -28,7 +28,7 @@ const datasetPath = fileURLToPath(
 );
 const silentNwcLogger = { debug: (..._args: unknown[]) => undefined };
 
-async function readDataset() {
+export async function readDataset() {
   const raw = await readFile(datasetPath, "utf8");
   return GetPaidStratigraphyResponse.parse(JSON.parse(raw));
 }

@@ -16,6 +16,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  DatasetHealthStatus,
   HealthStatus,
   L402Challenge,
   PaymentChallengeRateLimitError,
@@ -119,6 +120,84 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDatasetHealthCheckUrl = () => {
+
+
+
+
+  return `/api/v1/health`
+}
+
+/**
+ * Reports dataset availability and the paid-access protocol without requiring payment
+ * @summary Public dataset health check
+ */
+export const datasetHealthCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<DatasetHealthStatus> => {
+
+  return customFetch<DatasetHealthStatus>(getDatasetHealthCheckUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDatasetHealthCheckQueryKey = () => {
+    return [
+    `/api/v1/health`
+    ] as const;
+    }
+
+
+export const getDatasetHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof datasetHealthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof datasetHealthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDatasetHealthCheckQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof datasetHealthCheck>>> = ({ signal }) => datasetHealthCheck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof datasetHealthCheck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DatasetHealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof datasetHealthCheck>>>
+export type DatasetHealthCheckQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public dataset health check
+ */
+
+export function useDatasetHealthCheck<TData = Awaited<ReturnType<typeof datasetHealthCheck>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof datasetHealthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDatasetHealthCheckQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -9,6 +9,13 @@ export interface HealthStatus {
   status: string;
 }
 
+export const DatasetHealthStatusValue = {
+  status: 'ok',
+  datasetLength: 422,
+  protocol: 'L402',
+} as const;
+export type DatasetHealthStatus = typeof DatasetHealthStatusValue;
+
 export type ReadinessStatusStatus = typeof ReadinessStatusStatus[keyof typeof ReadinessStatusStatus];
 
 

@@ -18,6 +18,17 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Reports dataset availability and the paid-access protocol without requiring payment
+ * @summary Public dataset health check
+ */
+export const DatasetHealthCheckResponse = zod.object({
+  "status": zod.literal("ok"),
+  "datasetLength": zod.literal(422),
+  "protocol": zod.literal("L402")
+})
+
+
+/**
  * Reports whether the dependencies required to sell the paid dataset are available
  * @summary Payment readiness check
  */

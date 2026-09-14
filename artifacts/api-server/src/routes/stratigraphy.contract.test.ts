@@ -394,6 +394,26 @@ test("keeps liveness healthy when payment dependencies are unavailable", async (
   }
 });
 
+test("reports public dataset health without creating an L402 challenge", async () => {
+  const configuredNwcUri = process.env.NWC_URI;
+  const invoicesBeforeRequest = invoiceRequestCount;
+  delete process.env.NWC_URI;
+  try {
+    const response = await fetch(`${baseUrl}/api/v1/health`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      status: "ok",
+      datasetLength: 422,
+      protocol: "L402",
+    });
+    assert.equal(invoiceRequestCount, invoicesBeforeRequest);
+    assert.equal(response.headers.has("www-authenticate"), false);
+  } finally {
+    if (configuredNwcUri === undefined) delete process.env.NWC_URI;
+    else process.env.NWC_URI = configuredNwcUri;
+  }
+});
+
 test("reports ready when payment dependencies are available", async () => {
   const configuredNwcUri = process.env.NWC_URI;
   process.env.NWC_URI = "nostr+walletconnect://configured";

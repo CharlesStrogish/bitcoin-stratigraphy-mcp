@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './datasetHealthStatus';
 export * from './healthStatus';
 export * from './l402Challenge';
 export * from './paymentChallengeRateLimitError';

@@ -29,6 +29,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /v1/health:
+    get:
+      operationId: datasetHealthCheck
+      tags: [health]
+      summary: Public dataset health check
+      description: Reports dataset availability and the paid-access protocol without requiring payment
+      security: []
+      responses:
+        "200":
+          description: Dataset API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetHealthStatus"
   /readyz:
     get:
       operationId: readinessCheck
@@ -139,6 +153,22 @@ components:
           type: string
       required:
         - status
+    DatasetHealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          const: ok
+        datasetLength:
+          type: integer
+          const: 422
+        protocol:
+          type: string
+          const: L402
+      required:
+        - status
+        - datasetLength
+        - protocol
     ReadinessStatus:
       type: object
       properties:

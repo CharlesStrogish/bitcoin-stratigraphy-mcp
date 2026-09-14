@@ -1,0 +1,3 @@
+kind = "web-app"
+title = "Fixture Astro App"
+previewPath = "/astro-fixture"

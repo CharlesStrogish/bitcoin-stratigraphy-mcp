@@ -140,6 +140,48 @@ test("discovery includes a registered Vite web artifact", () => {
   );
 });
 
+test("discovery includes a registered Astro web artifact from dependencies", () => {
+  assert.deepEqual(
+    discoverFixture("astro-web").map(
+      ({ name, packageName, artifactDirectory, buildTool }) => ({
+        name,
+        packageName,
+        artifactDirectory,
+        buildTool: buildTool.name,
+      }),
+    ),
+    [
+      {
+        name: "Fixture Astro App",
+        packageName: "@fixtures/astro-web",
+        artifactDirectory: "sample",
+        buildTool: "Astro",
+      },
+    ],
+  );
+});
+
+test("discovery includes a registered Parcel web artifact from devDependencies", () => {
+  assert.deepEqual(
+    discoverFixture("parcel-web").map(
+      ({ name, packageName, artifactDirectory, buildTool }) => ({
+        name,
+        packageName,
+        artifactDirectory,
+        buildTool: buildTool.name,
+      }),
+    ),
+    [
+      {
+        name: "Fixture Parcel Site",
+        packageName: "@fixtures/parcel-web",
+        artifactDirectory: "sample",
+        buildTool: "Parcel",
+      },
+    ],
+  );
+});
+
 test("discovery excludes an API artifact with Vite build metadata", () => {
   assert.deepEqual(discoverFixture("api-vite"), []);
 });

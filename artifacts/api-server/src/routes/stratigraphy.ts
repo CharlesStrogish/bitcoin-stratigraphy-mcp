@@ -22,12 +22,15 @@ async function readDataset() {
   return GetPaidStratigraphyResponse.parse(JSON.parse(raw));
 }
 
-function createNwcClient(nwcUri: string) {
+type NwcClient = Pick<NWCClient, "lookupInvoice" | "makeInvoice" | "close">;
+type NwcClientFactory = (nwcUri: string) => NwcClient;
+
+const createNwcClient: NwcClientFactory = (nwcUri) => {
   return new NWCClient({
     nostrWalletConnectUrl: nwcUri,
     logger: silentNwcLogger,
   });
-}
+};
 
 function parseL402Authorization(value: string | undefined) {
   if (!value) return null;
@@ -47,13 +50,14 @@ async function verifyPayment(
   nwcUri: string,
   paymentHash: string,
   preimage: string,
+  clientFactory: NwcClientFactory,
 ) {
   const computedHash = createHash("sha256")
     .update(Buffer.from(preimage, "hex"))
     .digest("hex");
   if (computedHash !== paymentHash) return false;
 
-  const client = createNwcClient(nwcUri);
+  const client = clientFactory(nwcUri);
   try {
     const transaction = await client.lookupInvoice({
       payment_hash: paymentHash,
@@ -74,8 +78,11 @@ async function verifyPayment(
   }
 }
 
-async function createInvoice(nwcUri: string) {
-  const client = createNwcClient(nwcUri);
+async function createInvoice(
+  nwcUri: string,
+  clientFactory: NwcClientFactory,
+) {
+  const client = clientFactory(nwcUri);
   try {
     const transaction = await client.makeInvoice({
       amount: ACCESS_PRICE_MSATS,
@@ -103,9 +110,10 @@ async function sendPaymentChallenge(
   req: Request,
   res: Response,
   nwcUri: string,
+  clientFactory: NwcClientFactory,
 ) {
   try {
-    const challenge = await createInvoice(nwcUri);
+    const challenge = await createInvoice(nwcUri, clientFactory);
     res.setHeader(
       "WWW-Authenticate",
       `L402 macaroon="${challenge.paymentHash}", invoice="${challenge.invoice}"`,
@@ -121,7 +129,10 @@ async function sendPaymentChallenge(
   }
 }
 
-export function registerStratigraphyRoutes(app: Express): void {
+export function registerStratigraphyRoutes(
+  app: Express,
+  clientFactory: NwcClientFactory = createNwcClient,
+): void {
   app.get("/api", (_req, res): void => {
     res.status(200).json({
       status: "online",
@@ -152,6 +163,7 @@ export function registerStratigraphyRoutes(app: Express): void {
           nwcUri,
           authorization.paymentHash,
           authorization.preimage,
+           clientFactory,
         ))
       ) {
         const data = await readDataset();
@@ -159,7 +171,7 @@ export function registerStratigraphyRoutes(app: Express): void {
         return;
       }
 
-      await sendPaymentChallenge(req, res, nwcUri);
+      await sendPaymentChallenge(req, res, nwcUri, clientFactory);
     },
   );
 

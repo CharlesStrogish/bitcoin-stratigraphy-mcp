@@ -1,1 +1,1 @@
-- [Alby invoice funding](alby-invoice-funding.md) — a valid token still requires an enabled wallet funding source before invoices can be created.
+- [NWC payment proof binding](nwc-payment-proof-binding.md) — L402 proofs must match an incoming settled invoice’s product description and minimum amount.

@@ -7,4 +7,5 @@
  */
 
 export * from './healthStatus';
+export * from './l402Challenge';
 export * from './stratigraphyEntry';

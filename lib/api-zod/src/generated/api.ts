@@ -18,8 +18,7 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * Returns the complete day-by-day video series dataset.
- * @summary List Bitcoin stratigraphy entries
+ * @summary Get the free five-record sample
  */
 export const GetStratigraphyResponseItem = zod.object({
   "day": zod.number().int(),
@@ -27,6 +26,19 @@ export const GetStratigraphyResponseItem = zod.object({
   "video_id": zod.string(),
   "transcript_summary": zod.string()
 })
-export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem)
+export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).min(5).max(5)
+
+
+/**
+ * Without valid payment proof, creates a 21-satoshi Lightning invoice and returns an L402 challenge.
+ * @summary Get the complete L402-protected dataset
+ */
+export const GetPaidStratigraphyResponseItem = zod.object({
+  "day": zod.number().int(),
+  "title": zod.string(),
+  "video_id": zod.string(),
+  "transcript_summary": zod.string()
+})
+export const GetPaidStratigraphyResponse = zod.array(GetPaidStratigraphyResponseItem)
 
 

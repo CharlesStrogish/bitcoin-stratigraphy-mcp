@@ -26,7 +26,7 @@ app.use(
     },
   }),
 );
-app.use(cors());
+app.use(cors({ exposedHeaders: ["WWW-Authenticate"] }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

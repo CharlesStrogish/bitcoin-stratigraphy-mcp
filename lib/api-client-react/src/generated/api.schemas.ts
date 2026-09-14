@@ -16,3 +16,10 @@ export interface StratigraphyEntry {
   transcript_summary: string;
 }
 
+export interface L402Challenge {
+  /** BOLT11 invoice */
+  invoice: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  payment_hash: string;
+}
+

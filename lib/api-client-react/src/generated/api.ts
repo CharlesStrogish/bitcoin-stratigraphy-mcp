@@ -17,6 +17,7 @@ import type {
 
 import type {
   HealthStatus,
+  L402Challenge,
   StratigraphyEntry
 } from './api.schemas';
 
@@ -130,12 +131,11 @@ export const getGetStratigraphyUrl = () => {
 
 
 
-  return `/api/stratigraphy`
+  return `/api/v1/stratigraphy/sample`
 }
 
 /**
- * Returns the complete day-by-day video series dataset.
- * @summary List Bitcoin stratigraphy entries
+ * @summary Get the free five-record sample
  */
 export const getStratigraphy = async ( options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyEntry[]> => {
 
@@ -154,7 +154,7 @@ export const getStratigraphy = async ( options?: Parameters<typeof customFetch>[
 
 export const getGetStratigraphyQueryKey = () => {
     return [
-    `/api/stratigraphy`
+    `/api/v1/stratigraphy/sample`
     ] as const;
     }
 
@@ -182,7 +182,7 @@ export type GetStratigraphyQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List Bitcoin stratigraphy entries
+ * @summary Get the free five-record sample
  */
 
 export function useGetStratigraphy<TData = Awaited<ReturnType<typeof getStratigraphy>>, TError = ErrorType<unknown>>(
@@ -191,6 +191,84 @@ export function useGetStratigraphy<TData = Awaited<ReturnType<typeof getStratigr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStratigraphyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPaidStratigraphyUrl = () => {
+
+
+
+
+  return `/api/v1/stratigraphy`
+}
+
+/**
+ * Without valid payment proof, creates a 21-satoshi Lightning invoice and returns an L402 challenge.
+ * @summary Get the complete L402-protected dataset
+ */
+export const getPaidStratigraphy = async ( options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyEntry[]> => {
+
+  return customFetch<StratigraphyEntry[]>(getGetPaidStratigraphyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPaidStratigraphyQueryKey = () => {
+    return [
+    `/api/v1/stratigraphy`
+    ] as const;
+    }
+
+
+export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<L402Challenge>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPaidStratigraphyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaidStratigraphy>>> = ({ signal }) => getPaidStratigraphy({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPaidStratigraphyQueryResult = NonNullable<Awaited<ReturnType<typeof getPaidStratigraphy>>>
+export type GetPaidStratigraphyQueryError = ErrorType<L402Challenge>
+
+
+/**
+ * @summary Get the complete L402-protected dataset
+ */
+
+export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<L402Challenge>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPaidStratigraphyQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

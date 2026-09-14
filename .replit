@@ -1,4 +1,5 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-24", "python-base-3.13"]
+run = "PORT=5000 pnpm --filter @workspace/api-server dev"
 
 [deployment]
 router = "application"

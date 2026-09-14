@@ -291,6 +291,78 @@ function isExcludedCssUrl(url) {
   return /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(url);
 }
 
+function isExcludedHtmlAssetUrl(url) {
+  return /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(url);
+}
+
+function parseSrcsetUrls(srcset) {
+  const urls = [];
+  let position = 0;
+
+  while (position < srcset.length) {
+    while (/[\s,]/.test(srcset[position] ?? "")) {
+      position += 1;
+    }
+
+    const urlStart = position;
+    while (position < srcset.length && !/\s/.test(srcset[position])) {
+      position += 1;
+    }
+
+    let url = srcset.slice(urlStart, position);
+    const trailingCommas = url.match(/,+$/)?.[0].length ?? 0;
+    if (trailingCommas > 0) {
+      url = url.slice(0, -trailingCommas);
+    }
+    if (url) {
+      urls.push(url);
+    }
+
+    if (trailingCommas === 0) {
+      while (position < srcset.length && srcset[position] !== ",") {
+        position += 1;
+      }
+    }
+  }
+
+  return urls;
+}
+
+function findEscapingHtmlMediaUrls(html, pageUrl, basePath) {
+  const mediaAttributes = [
+    ["audio", "src"],
+    ["embed", "src"],
+    ["img", "src"],
+    ["input", "src"],
+    ["object", "data"],
+    ["source", "src"],
+    ["track", "src"],
+    ["video", "poster"],
+    ["video", "src"],
+  ];
+  const singleUrls = mediaAttributes.flatMap(([tag, attribute]) => [
+    ...html.matchAll(
+      new RegExp(
+        `<${tag}\\b[^>]*\\b${attribute}\\s*=\\s*(["'])(.*?)\\1`,
+        "gi",
+      ),
+    ),
+  ]).map((match) => match[2].trim());
+  const srcsetUrls = [
+    ...html.matchAll(
+      /<(?:img|source)\b[^>]*\bsrcset\s*=\s*(["'])(.*?)\1/gi,
+    ),
+  ].flatMap((match) => parseSrcsetUrls(match[2]));
+
+  return [...singleUrls, ...srcsetUrls]
+    .filter((url) => url && !isExcludedHtmlAssetUrl(url))
+    .map((url) => ({
+      url,
+      resolvedPath: new URL(url, pageUrl).pathname,
+    }))
+    .filter(({ resolvedPath }) => !resolvedPath.startsWith(basePath));
+}
+
 function findEscapingCssAssetUrls(css, stylesheetUrl, basePath) {
   return [...css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^'")\s][^)]*))\s*\)/gi)]
     .map((match) => (match[1] ?? match[2] ?? match[3]).trim())
@@ -406,6 +478,37 @@ test("HTML entry point discovery includes nested pages", () => {
   } finally {
     rmSync(outputDirectory, { force: true, recursive: true });
   }
+});
+
+test("HTML media URLs must resolve within the artifact preview path", () => {
+  const html = `
+    <img src="./local.png" srcset="./small.png 1x, ../large.png 2x">
+    <source src="./clip.webm" srcset="/escaped/clip-2x.webm 2x">
+    <img srcset="data:image/svg+xml,%3Csvg%3E 1x, ./inline-fallback.png 2x">
+    <video src="../video.mp4" poster="/escaped/poster.jpg"></video>
+    <audio src="https://example.com/audio.mp3"></audio>
+    <track src="//example.com/captions.vtt">
+    <object data="data:image/svg+xml;base64,PHN2Zy8+"></object>
+    <embed src="#inline-media">
+  `;
+
+  assert.deepEqual(
+    findEscapingHtmlMediaUrls(
+      html,
+      "https://artifact.test/registered/guides/page.html",
+      "/registered/",
+    ),
+    [
+      {
+        url: "/escaped/poster.jpg",
+        resolvedPath: "/escaped/poster.jpg",
+      },
+      {
+        url: "/escaped/clip-2x.webm",
+        resolvedPath: "/escaped/clip-2x.webm",
+      },
+    ],
+  );
 });
 
 test("CSS asset URLs must resolve within the artifact preview path", () => {
@@ -541,6 +644,19 @@ function buildWithArtifactRouting({
           new URL(url, pageUrl).pathname.startsWith(environment.BASE_PATH),
         ),
         `${name} assets in ${htmlEntryPoint} must resolve under ${environment.BASE_PATH}. Found: ${assetUrls.join(", ")}`,
+      );
+
+      const escapingHtmlMediaUrls = findEscapingHtmlMediaUrls(
+        html,
+        pageUrl,
+        environment.BASE_PATH,
+      );
+      assert.deepEqual(
+        escapingHtmlMediaUrls,
+        [],
+        `${name} media referenced by ${htmlEntryPoint} must resolve under ${environment.BASE_PATH}. Found: ${escapingHtmlMediaUrls
+          .map(({ url, resolvedPath }) => `${url} -> ${resolvedPath}`)
+          .join(", ")}`,
       );
 
       const stylesheetUrls = emittedUrls.filter(

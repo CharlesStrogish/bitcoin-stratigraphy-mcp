@@ -503,10 +503,11 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   assert.deepEqual(await response.json(), mcpServerCard);
 });
 
-test("serves both public Glama connector discovery routes exactly", async () => {
+test("serves all public Glama connector discovery routes exactly", async () => {
   for (const path of [
     "/.well-known/mcp/connector.json",
     "/.well-known/glama-mcp-connector.json",
+    "/.well-known/glama.json",
   ]) {
     const response = await fetch(`${baseUrl}${path}`, {
       headers: {

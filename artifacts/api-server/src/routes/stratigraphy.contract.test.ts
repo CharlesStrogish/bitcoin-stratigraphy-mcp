@@ -10,6 +10,7 @@ import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
 import { registerMcpRoute } from "./mcp";
 import {
+  glamaConnector,
   mcpServerCard,
   registerMcpServerCardRoute,
 } from "./mcp-server-card";
@@ -500,6 +501,27 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.equal(response.headers.get("www-authenticate"), null);
   assert.deepEqual(await response.json(), mcpServerCard);
+});
+
+test("serves both public Glama connector discovery routes exactly", async () => {
+  for (const path of [
+    "/.well-known/mcp/connector.json",
+    "/.well-known/glama-mcp-connector.json",
+  ]) {
+    const response = await fetch(`${baseUrl}${path}`, {
+      headers: {
+        Authorization: `L402 ${paymentHash}:${preimage}`,
+      },
+    });
+
+    assert.equal(response.status, 200);
+    assert.match(
+      response.headers.get("content-type") ?? "",
+      /^application\/json\b/,
+    );
+    assert.equal(response.headers.get("www-authenticate"), null);
+    assert.deepEqual(await response.json(), glamaConnector);
+  }
 });
 
 test("serves the root OpenAPI document as raw JSON", async () => {

@@ -15,8 +15,22 @@ export const mcpServerCard = {
   },
 } as const;
 
+export const glamaConnector = {
+  $schema: "https://glama.ai/mcp/schemas/connector.json",
+  claim: "glama_claim_4N7ubcwaG0adHJjd-Go2ue11blsBugXo",
+} as const;
+
 export function registerMcpServerCardRoute(app: Express): void {
   app.get("/.well-known/mcp/server-card.json", (_req, res): void => {
     res.status(200).json(mcpServerCard);
   });
+
+  for (const path of [
+    "/.well-known/mcp/connector.json",
+    "/.well-known/glama-mcp-connector.json",
+  ]) {
+    app.get(path, (_req, res): void => {
+      res.status(200).json(glamaConnector);
+    });
+  }
 }

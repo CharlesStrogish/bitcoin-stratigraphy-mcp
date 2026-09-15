@@ -9,6 +9,10 @@ import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
 import { registerMcpRoute } from "./mcp";
+import {
+  mcpServerCard,
+  registerMcpServerCardRoute,
+} from "./mcp-server-card";
 import { registerOpenApiRoute } from "./openapi";
 import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
@@ -128,6 +132,7 @@ let invoiceRequestCount = 0;
 let invoiceGate: Promise<void> | undefined;
 const app = express();
 registerOpenApiRoute(app);
+registerMcpServerCardRoute(app);
 registerMcpRoute(app);
 app.use("/api", healthRouter);
 registerStratigraphyRoutes(app, () => ({
@@ -475,6 +480,22 @@ test("offers SSE transport without changing the public OpenAPI route", async () 
   const openApiResponse = await fetch(`${baseUrl}/openapi.json`);
   assert.equal(openApiResponse.status, 200);
   assert.equal(openApiResponse.headers.get("www-authenticate"), null);
+});
+
+test("serves the public MCP server card without an L402 challenge", async () => {
+  const response = await fetch(
+    `${baseUrl}/.well-known/mcp/server-card.json`,
+    {
+      headers: {
+        Authorization: `L402 ${paymentHash}:${preimage}`,
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
+  assert.equal(response.headers.get("www-authenticate"), null);
+  assert.deepEqual(await response.json(), mcpServerCard);
 });
 
 test("serves the root OpenAPI document as raw JSON", async () => {

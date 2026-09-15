@@ -5,10 +5,16 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { L402SubscriptionPass } from './l402SubscriptionPass';
 
 export interface L402Challenge {
   /** BOLT11 invoice */
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  passes: L402SubscriptionPass[];
 }

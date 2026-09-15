@@ -11,6 +11,8 @@ export * from './getPaidStratigraphyParams';
 export * from './healthStatus';
 export * from './invalidRangeError';
 export * from './l402Challenge';
+export * from './l402SubscriptionPass';
+export * from './l402SubscriptionPassTier';
 export * from './paymentChallengeRateLimitError';
 export * from './paymentChallengeServiceUnavailableError';
 export * from './paymentConfigurationError';

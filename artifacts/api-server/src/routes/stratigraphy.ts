@@ -15,13 +15,19 @@ import {
   createMemoryPaymentChallengeStore,
   type PaymentChallengeStore,
 } from "../lib/payment-challenge-store";
+import {
+  createSubscriptionMacaroon,
+  SUBSCRIPTION_TIERS,
+  type SubscriptionTier,
+  verifySubscriptionMacaroon,
+} from "../lib/subscription-pass";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CHALLENGE_REUSE_MS = 5 * 60 * 1000;
 const INVOICE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
-const MAX_INVOICES_PER_WINDOW = 3;
+const MAX_INVOICES_PER_WINDOW = 5;
 const MAX_CHALLENGE_CALLERS = 10_000;
 const datasetPath = fileURLToPath(
   new URL("../data/stratigraphy.json", import.meta.url),
@@ -270,15 +276,22 @@ function selectRange(req: Request, dataset: Dataset): SelectedRange | string {
 function parseL402Authorization(value: string | undefined) {
   if (!value) return null;
 
-  const match = /^L402\s+([0-9a-fA-F]{64}):([0-9a-fA-F]{64})$/.exec(
+  const match = /^L402\s+([^:\s]+):([0-9a-fA-F]{64})$/.exec(
     value.trim(),
   );
   if (!match) return null;
 
-  return {
-    paymentHash: match[1].toLowerCase(),
-    preimage: match[2].toLowerCase(),
-  };
+  return /^[0-9a-fA-F]{64}$/.test(match[1])
+    ? {
+        kind: "legacy" as const,
+        paymentHash: match[1].toLowerCase(),
+        preimage: match[2].toLowerCase(),
+      }
+    : {
+        kind: "subscription" as const,
+        macaroon: match[1],
+        preimage: match[2].toLowerCase(),
+      };
 }
 
 async function verifyPayment(
@@ -299,16 +312,21 @@ async function verifyPayment(
     const transaction = await client.lookupInvoice({
       payment_hash: paymentHash,
     });
-    return (
+    const valid =
       transaction.type === "incoming" &&
       transaction.state === "settled" &&
       transaction.amount === expectedAmountMsats &&
       transaction.description === expectedDescription &&
       transaction.payment_hash.toLowerCase() === paymentHash &&
       (!transaction.preimage ||
-        transaction.preimage.toLowerCase() === preimage)
-    )
-      ? "valid"
+        transaction.preimage.toLowerCase() === preimage);
+    return valid
+      ? {
+          settledAt:
+            typeof transaction.settled_at === "number"
+              ? transaction.settled_at
+              : 0,
+        }
       : "invalid";
   } catch {
     return "unavailable";
@@ -341,6 +359,7 @@ async function createInvoice(
     return {
       invoice: transaction.invoice,
       paymentHash: transaction.payment_hash.toLowerCase(),
+      issuedAt: Date.now(),
     };
   } finally {
     client.close();
@@ -360,37 +379,98 @@ async function sendPaymentChallenge(
   description: string,
 ) {
   try {
-    const result = await challengeStore.getOrCreate(caller, rangeKey, policy, async () => {
-      try {
-        return await createInvoice(
-          nwcUri,
-          clientFactory,
-          amountMsats,
-          description,
-        );
-      } catch (error) {
-        throw new InvoiceCreationError(error);
-      }
-    });
-    if (result.kind === "limited") {
-      res.setHeader("Retry-After", String(result.retryAfter));
+    const getChallenge = async (
+      scope: string,
+      challengeAmountMsats: number,
+      challengeDescription: string,
+    ) => {
+      return challengeStore.getOrCreate(caller, scope, policy, async () => {
+        try {
+          const challenge = await createInvoice(
+            nwcUri,
+            clientFactory,
+            challengeAmountMsats,
+            challengeDescription,
+          );
+          return { ...challenge, issuedAt: policy.now() };
+        } catch (error) {
+          throw new InvoiceCreationError(error);
+        }
+      });
+    };
+    const legacyResult = await getChallenge(rangeKey, amountMsats, description);
+    if (legacyResult.kind === "limited") {
+      res.setHeader("Retry-After", String(legacyResult.retryAfter));
       res.status(429).json({
         error: "Too many payment invoices requested",
         code: "payment_challenge_rate_limited",
-        retry_after: result.retryAfter,
+        retry_after: legacyResult.retryAfter,
       });
       return;
     }
-    const challenge = result.challenge;
+    const passResults = await Promise.all(
+      (Object.keys(SUBSCRIPTION_TIERS) as SubscriptionTier[]).map(
+        async (tier) => {
+          const definition = SUBSCRIPTION_TIERS[tier];
+          const result = await getChallenge(
+            `subscription:${tier}`,
+            definition.amountMsats,
+            definition.description,
+          );
+          return { tier, definition, result };
+        },
+      ),
+    );
+    const limited = passResults.find(({ result }) => result.kind === "limited");
+    if (limited?.result.kind === "limited") {
+      res.setHeader("Retry-After", String(limited.result.retryAfter));
+      res.status(429).json({
+        error: "Too many payment invoices requested",
+        code: "payment_challenge_rate_limited",
+        retry_after: limited.result.retryAfter,
+      });
+      return;
+    }
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) {
+      res.status(500).json({ error: "SESSION_SECRET is not configured" });
+      return;
+    }
+    const passes = passResults.map(({ tier, definition, result }) => {
+      if (result.kind !== "challenge") throw new Error("unreachable");
+      const validUntil =
+        Math.floor(result.challenge.issuedAt / 1000) +
+        60 * 60 +
+        definition.durationSeconds;
+      return {
+        tier,
+        invoice: result.challenge.invoice,
+        payment_hash: result.challenge.paymentHash,
+        macaroon: createSubscriptionMacaroon({
+          secret,
+          paymentHash: result.challenge.paymentHash,
+          tier,
+          validUntil,
+        }),
+        valid_until: validUntil,
+      };
+    });
 
     res.setHeader(
       "WWW-Authenticate",
-      `L402 macaroon="${challenge.paymentHash}", invoice="${challenge.invoice}"`,
+      [
+        `L402 macaroon="${legacyResult.challenge.paymentHash}", invoice="${legacyResult.challenge.invoice}"`,
+        ...passes.map(
+          (pass) =>
+            `L402 macaroon="${pass.macaroon}", invoice="${pass.invoice}", tier="${pass.tier}"`,
+        ),
+      ],
     );
     res.setHeader("Cache-Control", "no-store");
     res.status(402).json({
-      invoice: challenge.invoice,
-      payment_hash: challenge.paymentHash,
+      invoice: legacyResult.challenge.invoice,
+      payment_hash: legacyResult.challenge.paymentHash,
+      passes,
     });
   } catch (error) {
     req.log.error({ err: error }, "Payment challenge creation failed");
@@ -472,6 +552,41 @@ export function registerStratigraphyRoutes(
         req.header("Authorization"),
       );
       if (authorization) {
+        if (authorization.kind === "subscription") {
+          const secret = process.env.SESSION_SECRET;
+          const pass =
+            secret &&
+            verifySubscriptionMacaroon(
+              authorization.macaroon,
+              secret,
+              Math.floor(policy.now() / 1000),
+            );
+          if (pass) {
+            const definition = SUBSCRIPTION_TIERS[pass.tier];
+            const verification = await verifyPayment(
+              nwcUri,
+              pass.paymentHash,
+              authorization.preimage,
+              clientFactory,
+              definition.amountMsats,
+              definition.description,
+            );
+            if (verification === "unavailable") {
+              res.status(502).json({ error: "Unable to verify payment" });
+              return;
+            }
+            if (
+              typeof verification === "object" &&
+              verification.settledAt > 0 &&
+              Math.floor(policy.now() / 1000) <
+                verification.settledAt + definition.durationSeconds
+            ) {
+              res.status(200).json(selectedRange.records);
+              return;
+            }
+          }
+        }
+        if (authorization.kind === "legacy") {
         const verification = await verifyPayment(
           nwcUri,
           authorization.paymentHash,
@@ -484,7 +599,7 @@ export function registerStratigraphyRoutes(
           res.status(502).json({ error: "Unable to verify payment" });
           return;
         }
-        if (verification === "valid") {
+        if (typeof verification === "object") {
           try {
             await challengeStore.consume(
               caller,
@@ -499,6 +614,7 @@ export function registerStratigraphyRoutes(
           }
           res.status(200).json(selectedRange.records);
           return;
+        }
         }
       }
 
@@ -524,11 +640,17 @@ Machine-readable OpenAPI: GET /openapi.json
 Free sample: GET /api/v1/stratigraphy/sample
 Paid dataset: GET /api/v1/stratigraphy
 
-The full 422-record dataset costs 21 satoshis. An unauthenticated request returns
-HTTP 402 with a BOLT11 invoice and a WWW-Authenticate L402 challenge. After
-payment, retry with:
+Legacy single-query access costs one satoshi per selected day with a five-satoshi
+minimum. The same HTTP 402 response also offers a 1-Day Micro-Pass for 5 sats and
+a 30-Day Pass for 100 sats. Passes allow unlimited queries until their signed
+valid_until caveat and settlement-based entitlement expiry. After payment, retry
+with:
 
 Authorization: L402 <payment_hash>:<preimage>
+
+For a pass, use:
+
+Authorization: L402 <signed_macaroon>:<preimage>
 `);
   });
 }

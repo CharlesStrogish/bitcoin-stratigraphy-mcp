@@ -383,7 +383,7 @@ export const getGetPaidStratigraphyUrl = (params?: GetPaidStratigraphyParams,) =
 }
 
 /**
- * Returns the selected range after payment. Pricing is 1 satoshi per requested day with a minimum invoice of 5 satoshis. Without query parameters, all 422 days are selected.
+ * Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable passes provide unlimited queries for 24 hours (5 sats) or 30 days (100 sats).
  * @summary Get the complete L402-protected dataset
  */
 export const getPaidStratigraphy = async (params?: GetPaidStratigraphyParams, options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyEntry[]> => {

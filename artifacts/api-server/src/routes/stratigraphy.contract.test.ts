@@ -18,6 +18,7 @@ import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
 import type { PaymentChallengeStore } from "../lib/payment-challenge-store";
 import { createPostgresPaymentChallengeStore } from "../lib/postgres-payment-challenge-store";
+import { createSubscriptionMacaroon } from "../lib/subscription-pass";
 import { pool } from "@workspace/db";
 
 const preimage = "11".repeat(32);
@@ -82,6 +83,7 @@ type Transaction = {
   payment_hash: string;
   preimage?: string;
   invoice: string;
+  settled_at: number;
 };
 
 async function withContractServer(
@@ -124,6 +126,7 @@ const validTransaction: Transaction = {
   payment_hash: paymentHash,
   preimage,
   invoice,
+  settled_at: Math.floor(Date.now() / 1000),
 };
 
 let transaction = validTransaction;
@@ -229,7 +232,8 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     type: "apiKey",
     in: "header",
     name: "Authorization",
-    description: "L402 <payment_hash>:<preimage>",
+    description:
+      "Legacy: L402 <payment_hash>:<preimage>. Subscription: L402 <signed_macaroon>:<preimage>.",
   });
   assert.deepEqual(servedContract.readiness, {
     security: [],
@@ -544,7 +548,7 @@ test("keeps OpenAPI public while the paid dataset requires L402", async () => {
           paidResponse.headers.get("www-authenticate") ?? "",
           /^L402 /,
         );
-        assert.equal(makeInvoiceCalls, 1);
+        assert.equal(makeInvoiceCalls, 3);
       },
     );
   } finally {
@@ -722,20 +726,28 @@ test("coalesces concurrent cold-cache requests into one usable challenge", async
   const response = responses[0];
 
   assert.ok(responses.every((item) => item.status === 402));
-  assert.equal(invoiceRequestCount, 1);
+  assert.equal(invoiceRequestCount, 3);
   assert.deepEqual(invoiceRequest, {
-    amount: fullDatasetAmountMsats,
-    description: fullDatasetDescription,
+    amount: 100_000,
+    description: "Bitcoin Stratigraphy 30-Day Pass",
     expiry: 3600,
   });
-  assert.equal(
-    response.headers.get("www-authenticate"),
-    `L402 macaroon="${paymentHash}", invoice="${invoice}"`,
+  const authenticate = response.headers.get("www-authenticate") ?? "";
+  assert.match(
+    authenticate,
+    new RegExp(`L402 macaroon="${paymentHash}", invoice="${invoice}"`),
   );
-  assert.deepEqual(await response.json(), {
-    invoice,
-    payment_hash: paymentHash,
-  });
+  assert.match(authenticate, /tier="1-day"/);
+  assert.match(authenticate, /tier="30-day"/);
+  const body = await response.json() as {
+    invoice: string;
+    payment_hash: string;
+    passes: Array<{ tier: string; macaroon: string; valid_until: number }>;
+  };
+  assert.equal(body.invoice, invoice);
+  assert.equal(body.payment_hash, paymentHash);
+  assert.deepEqual(body.passes.map((pass) => pass.tier), ["1-day", "30-day"]);
+  assert.ok(body.passes.every((pass) => pass.macaroon.length > 64));
 });
 
 test("reuses a caller's payment challenge instead of creating more invoices", async () => {
@@ -757,6 +769,119 @@ test("reuses a caller's payment challenge instead of creating more invoices", as
         body.invoice === invoice && body.payment_hash === paymentHash,
     ),
   );
+});
+
+test("accepts a paid subscription pass for unlimited queries until expiration", async () => {
+  const challengeResponse = await fetch(`${baseUrl}/api/v1/stratigraphy`);
+  const challenge = await challengeResponse.json() as {
+    passes: Array<{ tier: string; macaroon: string }>;
+  };
+
+  try {
+    for (const tier of [
+      {
+        name: "1-day",
+        amount: 5_000,
+        description: "Bitcoin Stratigraphy 1-Day Micro-Pass",
+      },
+      {
+        name: "30-day",
+        amount: 100_000,
+        description: "Bitcoin Stratigraphy 30-Day Pass",
+      },
+    ]) {
+      const pass = challenge.passes.find(({ tier: name }) => name === tier.name);
+      assert.ok(pass);
+      transaction = {
+        ...validTransaction,
+        amount: tier.amount,
+        description: tier.description,
+      };
+      for (const query of ["days=1", "days=30"]) {
+        const response = await fetch(
+          `${baseUrl}/api/v1/stratigraphy?${query}`,
+          {
+            headers: {
+              Authorization: `L402 ${pass.macaroon}:${preimage}`,
+            },
+          },
+        );
+        assert.equal(response.status, 200);
+      }
+    }
+  } finally {
+    transaction = validTransaction;
+  }
+});
+
+test("rejects expired or tampered subscription caveats during proof checks", async () => {
+  const secret = process.env.SESSION_SECRET ?? "contract-test-secret";
+  const configuredSecret = process.env.SESSION_SECRET;
+  process.env.SESSION_SECRET = secret;
+  const now = Date.now();
+  const expired = createSubscriptionMacaroon({
+    secret,
+    paymentHash,
+    tier: "1-day",
+    validUntil: Math.floor(now / 1000) - 1,
+  });
+  const tampered = `${expired.slice(0, -1)}${expired.endsWith("A") ? "B" : "A"}`;
+  const settlementExpired = createSubscriptionMacaroon({
+    secret,
+    paymentHash,
+    tier: "1-day",
+    validUntil: Math.floor(now / 1000) + 60 * 60,
+  });
+  let settledAt = Math.floor(now / 1000);
+  const passApp = express();
+  passApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerStratigraphyRoutes(
+    passApp,
+    () => ({
+      lookupInvoice: async () => ({
+        ...validTransaction,
+        amount: 5_000,
+        description: "Bitcoin Stratigraphy 1-Day Micro-Pass",
+        settled_at: settledAt,
+      }) as never,
+      makeInvoice: async () => validTransaction as never,
+      close: () => undefined,
+    }),
+    {
+      now: () => now,
+      reuseMs: 60_000,
+      limitWindowMs: 60_000,
+      maxInvoicesPerWindow: 10,
+      maxCallers: 10,
+    },
+  );
+  const passServer = passApp.listen(0);
+  await new Promise<void>((resolve) =>
+    passServer.once("listening", resolve),
+  );
+
+  try {
+    const address = passServer.address() as AddressInfo;
+    for (const macaroon of [expired, tampered, settlementExpired]) {
+      if (macaroon === settlementExpired) {
+        settledAt = Math.floor(now / 1000) - 24 * 60 * 60 - 1;
+      }
+      const response = await fetch(
+        `http://127.0.0.1:${address.port}/api/v1/stratigraphy`,
+        {
+          headers: { Authorization: `L402 ${macaroon}:${preimage}` },
+        },
+      );
+      assert.equal(response.status, 402);
+    }
+  } finally {
+    passServer.close();
+    if (configuredSecret === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = configuredSecret;
+  }
 });
 
 test("coordinates challenge reuse across API instances", async () => {
@@ -792,7 +917,7 @@ test("coordinates challenge reuse across API instances", async () => {
       }),
     );
     assert.ok(responses.every((response) => response.status === 402));
-    assert.equal(creations, 1);
+    assert.equal(creations, 3);
   } finally {
     servers.forEach((item) => item.close());
   }
@@ -873,7 +998,7 @@ test("the PostgreSQL store coalesces concurrent instance requests", async () => 
   const create = async () => {
     creations += 1;
     await gate;
-    return { invoice, paymentHash };
+    return { invoice, paymentHash, issuedAt: policy.now() };
   };
 
   try {
@@ -1045,7 +1170,7 @@ test("evicts inactive callers so cache capacity recovers", async () => {
       ).status,
       402,
     );
-    assert.equal(requests, 3);
+    assert.equal(requests, 9);
   } finally {
     capacityServer.close();
   }
@@ -1138,7 +1263,7 @@ test("memory store reuses ranges and preserves caller quota after consume", asyn
   let creations = 0;
   const create = async () => {
     creations += 1;
-    return { invoice, paymentHash };
+    return { invoice, paymentHash, issuedAt: policy.now() };
   };
 
   await store.getOrCreate("caller", "days-1", policy, create);

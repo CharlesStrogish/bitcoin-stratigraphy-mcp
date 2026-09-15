@@ -85,7 +85,7 @@ paths:
       operationId: getPaidStratigraphy
       tags: [stratigraphy]
       summary: Get the complete L402-protected dataset
-      description: Returns the selected range after payment. Pricing is 1 satoshi per requested day with a minimum invoice of 5 satoshis. Without query parameters, all 422 days are selected.
+      description: Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable passes provide unlimited queries for 24 hours (5 sats) or 30 days (100 sats).
       parameters:
         - name: days
           in: query
@@ -115,7 +115,7 @@ paths:
           description: Lightning payment required
           headers:
             WWW-Authenticate:
-              description: L402 challenge containing the payment hash and BOLT11 invoice
+              description: L402 challenges for the legacy single query plus tiered 1-day and 30-day subscription passes
               schema:
                 type: string
           content:
@@ -164,7 +164,7 @@ components:
       type: apiKey
       in: header
       name: Authorization
-      description: "L402 <payment_hash>:<preimage>"
+      description: "Legacy: L402 <payment_hash>:<preimage>. Subscription: L402 <signed_macaroon>:<preimage>."
   schemas:
     HealthStatus:
       type: object
@@ -262,9 +262,40 @@ components:
         payment_hash:
           type: string
           pattern: "^[0-9a-f]{64}$"
+        passes:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/L402SubscriptionPass"
       required:
         - invoice
         - payment_hash
+        - passes
+    L402SubscriptionPass:
+      type: object
+      properties:
+        tier:
+          type: string
+          enum: [1-day, 30-day]
+        invoice:
+          type: string
+          description: BOLT11 invoice for this subscription tier
+        payment_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        macaroon:
+          type: string
+          description: Signed first-party macaroon containing payment_hash, tier, and valid_until caveats
+        valid_until:
+          type: integer
+          description: Unix timestamp in seconds after which this pass is invalid
+      required:
+        - tier
+        - invoice
+        - payment_hash
+        - macaroon
+        - valid_until
     InvalidRangeError:
       type: object
       properties:

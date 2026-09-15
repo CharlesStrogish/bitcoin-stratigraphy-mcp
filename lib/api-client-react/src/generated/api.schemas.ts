@@ -70,11 +70,36 @@ export interface StratigraphyEntry {
   quantitative_alpha: QuantitativeAlpha;
 }
 
+export type L402SubscriptionPassTier = typeof L402SubscriptionPassTier[keyof typeof L402SubscriptionPassTier];
+
+
+export const L402SubscriptionPassTier = {
+  '1-day': '1-day',
+  '30-day': '30-day',
+} as const;
+
+export interface L402SubscriptionPass {
+  tier: L402SubscriptionPassTier;
+  /** BOLT11 invoice for this subscription tier */
+  invoice: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  payment_hash: string;
+  /** Signed first-party macaroon containing payment_hash, tier, and valid_until caveats */
+  macaroon: string;
+  /** Unix timestamp in seconds after which this pass is invalid */
+  valid_until: number;
+}
+
 export interface L402Challenge {
   /** BOLT11 invoice */
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  passes: L402SubscriptionPass[];
 }
 
 export interface InvalidRangeError {

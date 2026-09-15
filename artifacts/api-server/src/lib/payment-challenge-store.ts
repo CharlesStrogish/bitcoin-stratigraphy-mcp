@@ -1,4 +1,8 @@
-export type PaymentChallenge = { invoice: string; paymentHash: string };
+export type PaymentChallenge = {
+  invoice: string;
+  paymentHash: string;
+  issuedAt: number;
+};
 
 export type ChallengeStorePolicy = {
   now: () => number;

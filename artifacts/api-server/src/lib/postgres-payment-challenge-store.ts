@@ -95,6 +95,8 @@ export function createPostgresPaymentChallengeStore(
             challenge: {
               invoice: existingChallenge.invoice,
               paymentHash: existingChallenge.payment_hash,
+              issuedAt:
+                existingChallenge.expires_at.getTime() - policy.reuseMs,
             },
           };
         }

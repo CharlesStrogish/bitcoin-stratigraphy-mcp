@@ -40,6 +40,13 @@ import {
   type NwcClientFactory,
   type SettlementRouter,
 } from "../services/settlement";
+import {
+  createStratigraphyTelemetryHub,
+  nodeIntervalScheduler,
+  readLiveBitcoinTelemetry,
+  type IntervalScheduler,
+  type StratigraphyTelemetryHub,
+} from "../services/stratigraphy-stream";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -360,14 +367,16 @@ async function rejectRevokedMacaroon(
   res: Response,
   macaroon: string,
   revocationStore: MacaroonRevocationStore,
+  signal?: AbortSignal,
 ) {
   const signatureId = getMacaroonSignatureId(macaroon);
   if (!signatureId) return false;
   try {
-    if (!(await revocationStore.isRevoked(signatureId))) return false;
+    if (!(await revocationStore.isRevoked(signatureId, signal))) return false;
     res.status(401).json({ error: "Token has been revoked" });
     return true;
   } catch (error) {
+    if (signal?.aborted) return true;
     req.log.error({ err: error }, "Macaroon revocation lookup failed");
     res.status(503).json({ error: "Token revocation service unavailable" });
     return true;
@@ -551,7 +560,31 @@ export function registerStratigraphyRoutes(
   pricingEngine: PricingEngine = createPricingEngine(),
   settlementRouter: SettlementRouter =
     createDefaultSettlementRouter(clientFactory),
+  streamOptions: {
+    telemetryHub?: StratigraphyTelemetryHub;
+    heartbeatScheduler?: IntervalScheduler;
+  } = {},
 ): void {
+  const telemetryHub =
+    streamOptions.telemetryHub ??
+    createStratigraphyTelemetryHub({
+      async readTelemetry() {
+        const latest = (await readDataset()).at(-1);
+        return readLiveBitcoinTelemetry({
+          epochProgressPercent: currentDifficultyEpochProgress(
+            latest ? [latest] : [],
+          ),
+          thermodynamicSignal:
+            latest?.quantitative_alpha.thermodynamic_signal ??
+            "signal-unavailable",
+          targetMultiplier:
+            latest?.quantitative_alpha.target_multiplier ?? 0,
+          now: policy.now,
+        });
+      },
+    });
+  const heartbeatScheduler =
+    streamOptions.heartbeatScheduler ?? nodeIntervalScheduler;
   app.use("/api/v1", (_req, _res, next) => {
     pricingEngine.recordRequest(policy.now());
     next();
@@ -833,6 +866,182 @@ export function registerStratigraphyRoutes(
           .join(", "),
       );
       res.status(200).end();
+    },
+  );
+
+  app.get(
+    "/api/v1/stratigraphy/stream",
+    async (req: Request, res: Response): Promise<void> => {
+      const requestController = new AbortController();
+      let disconnected = req.destroyed || res.destroyed;
+      let unsubscribe: (() => void) | undefined;
+      let heartbeat: unknown;
+      let waitingForDrain = false;
+      const drained = () => {
+        waitingForDrain = false;
+      };
+      const close = () => {
+        if (disconnected && !unsubscribe && heartbeat === undefined) return;
+        disconnected = true;
+        requestController.abort(
+          new DOMException("SSE client disconnected", "AbortError"),
+        );
+        res.off("drain", drained);
+        if (heartbeat !== undefined) {
+          heartbeatScheduler.clearInterval(heartbeat);
+          heartbeat = undefined;
+        }
+        unsubscribe?.();
+        unsubscribe = undefined;
+      };
+      req.once("aborted", close);
+      res.once("close", close);
+
+      const dataset = await readDataset();
+      if (disconnected) return;
+      const selectedRange = selectRange(req, dataset);
+      if (typeof selectedRange === "string") {
+        res.status(400).json({
+          error: "Invalid stratigraphy range",
+          detail: selectedRange,
+        });
+        return;
+      }
+      const caller = callerKey(req);
+      if (!settlementRouter.isConfigured()) {
+        res.status(500).json({ error: "NWC_URI is not configured" });
+        return;
+      }
+
+      const authorization = parseL402Authorization(
+        req.header("Authorization"),
+      );
+      let paymentHash: string | undefined;
+      if (authorization?.kind === "subscription") {
+        if (
+          await rejectRevokedMacaroon(
+            req,
+            res,
+            authorization.macaroon,
+            revocationStore,
+            requestController.signal,
+          )
+        ) {
+          return;
+        }
+        const secret = process.env.SESSION_SECRET;
+        const pass =
+          secret &&
+          verifySubscriptionMacaroon(
+            authorization.macaroon,
+            secret,
+            Math.floor(policy.now() / 1000),
+          );
+        if (pass) {
+          if (
+            pass.allowedPaths.some((allowedPath) => allowedPath !== req.path)
+          ) {
+            res.status(403).json({ error: "Macaroon path is not allowed" });
+            return;
+          }
+          const definition = SUBSCRIPTION_TIERS[pass.tier];
+          let verification;
+          try {
+            verification = await settlementRouter.verifyPayment({
+              paymentHash: pass.paymentHash,
+              preimage: authorization.preimage,
+              expectedAmountMsats:
+                pass.amountMsats ?? definition.amountMsats,
+              expectedDescription: definition.description,
+              signal: requestController.signal,
+            });
+          } catch (error) {
+            if (disconnected) return;
+            throw error;
+          }
+          if (disconnected) return;
+          if (verification === "unavailable") {
+            res.status(502).json({ error: "Unable to verify payment" });
+            return;
+          }
+          if (
+            typeof verification === "object" &&
+            verification.settledAt > 0 &&
+            Math.floor(policy.now() / 1000) <
+              verification.settledAt + definition.durationSeconds
+          ) {
+            if (
+              pass.maxRequests !== undefined &&
+              !(await macaroonUsageStore.consume(
+                pass.requestLimits,
+                pass.validUntil,
+                requestController.signal,
+              ))
+            ) {
+              if (disconnected) return;
+              res.status(429).json({
+                error: "Macaroon request limit exhausted",
+              });
+              return;
+            }
+            paymentHash = pass.paymentHash;
+          }
+        }
+      }
+
+      if (!paymentHash) {
+        if (disconnected) return;
+        await sendPaymentChallenge(
+          req,
+          res,
+          settlementRouter,
+          challengeStore,
+          policy,
+          caller,
+          `stream:${selectedRange.key}`,
+          selectedRange.amountMsats,
+          selectedRange.description,
+          pricingEngine,
+          currentDifficultyEpochProgress(dataset),
+        );
+        return;
+      }
+
+      if (disconnected || res.destroyed) return;
+      res.status(200);
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      const writeEvent = (event: "telemetry" | "ping", data: unknown) => {
+        if (
+          disconnected ||
+          waitingForDrain ||
+          res.destroyed ||
+          res.writableEnded
+        ) {
+          return;
+        }
+        if (!res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)) {
+          waitingForDrain = true;
+          res.once("drain", drained);
+        }
+      };
+      unsubscribe = telemetryHub.subscribe((telemetry) => {
+        writeEvent("telemetry", telemetry);
+      });
+      if (disconnected) {
+        close();
+        return;
+      }
+      heartbeat = heartbeatScheduler.setInterval(() => {
+        writeEvent("ping", {
+          observed_at: new Date(policy.now()).toISOString(),
+        });
+      }, 15_000);
+      if (disconnected) close();
     },
   );
 

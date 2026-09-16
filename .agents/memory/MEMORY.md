@@ -6,3 +6,4 @@
 - [Macaroon revocation scope](macaroon-revocation-scope.md) — revoke exact final signatures, keep relatives valid, and fail closed when the shared index is unavailable.
 - [Dynamic pass price binding](dynamic-pass-price-binding.md) — bind each issued scarcity price into the macaroon and cache scope; verify against issuance, not the latest quote.
 - [Settlement failover invariants](settlement-failover-invariants.md) — abort timed-out clients, single-probe recovery, and cache fallback invoices under predicted and actual providers.
+- [Paid SSE lifecycle](paid-sse-lifecycle.md) — authenticate before headers, propagate disconnect aborts through paid checks, bound upstream reads, and stop shared timers at zero listeners.

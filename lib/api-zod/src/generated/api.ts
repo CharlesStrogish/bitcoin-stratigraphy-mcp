@@ -243,3 +243,10 @@ export const GetPaidStratigraphyResponseItem = zod.object({
 export const GetPaidStratigraphyResponse = zod.array(GetPaidStratigraphyResponseItem)
 
 
+/**
+ * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its Lightning payment preimage. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+ * @summary Stream live Bitcoin stratigraphy telemetry
+ */
+export const StreamStratigraphyTelemetryResponse = zod.unknown()
+
+

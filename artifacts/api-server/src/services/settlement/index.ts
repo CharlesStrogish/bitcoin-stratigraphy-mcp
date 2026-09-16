@@ -12,6 +12,13 @@ import {
 
 export type SettlementCircuitState = "closed" | "open" | "half-open";
 
+class SettlementRequestAbortedError extends Error {
+  constructor() {
+    super("Settlement request aborted");
+    this.name = "AbortError";
+  }
+}
+
 export interface SettlementRouter {
   isConfigured(): boolean;
   activeProvider(): string;
@@ -73,12 +80,24 @@ export function createSettlementRouter(input: {
       provider: SettlementProvider,
       signal: AbortSignal,
     ) => Promise<T>,
+    requestSignal?: AbortSignal,
   ) => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let rejectRequestAbort!: (error: SettlementRequestAbortedError) => void;
+    const requestAborted = new Promise<never>((_resolve, reject) => {
+      rejectRequestAbort = reject;
+    });
+    const abortRequest = () => {
+      controller.abort(requestSignal?.reason);
+      rejectRequestAbort(new SettlementRequestAbortedError());
+    };
+    requestSignal?.addEventListener("abort", abortRequest, { once: true });
     try {
+      if (requestSignal?.aborted) throw new SettlementRequestAbortedError();
       return await Promise.race([
         operation(provider, controller.signal),
+        requestAborted,
         new Promise<never>((_resolve, reject) => {
           timer = setTimeout(() => {
             controller.abort();
@@ -93,6 +112,7 @@ export function createSettlementRouter(input: {
       ]);
     } finally {
       if (timer) clearTimeout(timer);
+      requestSignal?.removeEventListener("abort", abortRequest);
     }
   };
 
@@ -101,29 +121,31 @@ export function createSettlementRouter(input: {
       provider: SettlementProvider,
       signal: AbortSignal,
     ) => Promise<T>,
-  ) => withTimeout(input.fallback, operation);
+    requestSignal?: AbortSignal,
+  ) => withTimeout(input.fallback, operation, requestSignal);
 
   const route = async <T>(
     operation: (
       provider: SettlementProvider,
       signal: AbortSignal,
     ) => Promise<T>,
+    requestSignal?: AbortSignal,
   ): Promise<{ value: T; provider: SettlementProvider }> => {
     if (!input.primary.isConfigured()) {
       return {
-        value: await useFallback(operation),
+        value: await useFallback(operation, requestSignal),
         provider: input.fallback,
       };
     }
     if (state === "open" && !shouldProbe()) {
       return {
-        value: await useFallback(operation),
+        value: await useFallback(operation, requestSignal),
         provider: input.fallback,
       };
     }
     if ((state === "half-open" || shouldProbe()) && probeInProgress) {
       return {
-        value: await useFallback(operation),
+        value: await useFallback(operation, requestSignal),
         provider: input.fallback,
       };
     }
@@ -134,14 +156,19 @@ export function createSettlementRouter(input: {
       probeInProgress = true;
     }
     try {
-      const result = await withTimeout(input.primary, operation);
+      const result = await withTimeout(
+        input.primary,
+        operation,
+        requestSignal,
+      );
       primarySucceeded();
       return { value: result, provider: input.primary };
     } catch (error) {
+      if (error instanceof SettlementRequestAbortedError) throw error;
       const fallbackAllowed = primaryFailed(error);
       if (!fallbackAllowed) throw error;
       return {
-        value: await useFallback(operation),
+        value: await useFallback(operation, requestSignal),
         provider: input.fallback,
       };
     } finally {
@@ -159,8 +186,10 @@ export function createSettlementRouter(input: {
     circuitState: () => state,
     async createInvoice(request) {
       return (
-        await route((provider, signal) =>
-          provider.createInvoice({ ...request, signal }),
+        await route(
+          (provider, signal) =>
+            provider.createInvoice({ ...request, signal }),
+          request.signal,
         )
       ).value;
     },
@@ -189,12 +218,16 @@ export function createSettlementRouter(input: {
           probeInProgress = true;
         }
         try {
-          const result = await withTimeout(provider, (selected, signal) =>
-            selected.verifyPayment({ ...request, signal }),
+          const result = await withTimeout(
+            provider,
+            (selected, signal) =>
+              selected.verifyPayment({ ...request, signal }),
+            request.signal,
           );
           if (provider === input.primary) primarySucceeded();
           if (result !== "invalid") return result;
         } catch (error) {
+          if (error instanceof SettlementRequestAbortedError) throw error;
           unavailable = true;
           if (provider === input.primary) primaryFailed(error);
         } finally {

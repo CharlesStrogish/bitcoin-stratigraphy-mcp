@@ -21,13 +21,23 @@ export function createPostgresMacaroonRevocationStore(
   databasePool: DatabasePool = pool,
 ): MacaroonRevocationStore {
   return {
-    async isRevoked(signatureId) {
-      const result = await databasePool.query<{ revoked: boolean }>(
-        `SELECT EXISTS(
+    async isRevoked(signatureId, signal) {
+      const text = `SELECT EXISTS(
            SELECT 1 FROM revoked_macaroons WHERE signature_id = $1
-         ) AS revoked`,
-        [signatureId],
-      );
+         ) AS revoked`;
+      const result = signal
+        ? await (databasePool.query as unknown as <Row>(
+            config: {
+              text: string;
+              values: unknown[];
+              signal: AbortSignal;
+            },
+          ) => Promise<{ rows: Row[] }>)<{ revoked: boolean }>({
+            text,
+            values: [signatureId],
+            signal,
+          })
+        : await databasePool.query<{ revoked: boolean }>(text, [signatureId]);
       return result.rows[0]?.revoked === true;
     },
     async revoke(signatureId, reason) {

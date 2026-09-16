@@ -842,3 +842,81 @@ export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaid
 
 
 
+export const getStreamStratigraphyTelemetryUrl = () => {
+
+
+
+
+  return `/api/v1/stratigraphy/stream`
+}
+
+/**
+ * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its Lightning payment preimage. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+ * @summary Stream live Bitcoin stratigraphy telemetry
+ */
+export const streamStratigraphyTelemetry = async ( options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getStreamStratigraphyTelemetryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getStreamStratigraphyTelemetryQueryKey = () => {
+    return [
+    `/api/v1/stratigraphy/stream`
+    ] as const;
+    }
+
+
+export const getStreamStratigraphyTelemetryQueryOptions = <TData = Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError = ErrorType<L402Challenge | void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStreamStratigraphyTelemetryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>> = ({ signal }) => streamStratigraphyTelemetry({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type StreamStratigraphyTelemetryQueryResult = NonNullable<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>>
+export type StreamStratigraphyTelemetryQueryError = ErrorType<L402Challenge | void>
+
+
+/**
+ * @summary Stream live Bitcoin stratigraphy telemetry
+ */
+
+export function useStreamStratigraphyTelemetry<TData = Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError = ErrorType<L402Challenge | void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getStreamStratigraphyTelemetryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+

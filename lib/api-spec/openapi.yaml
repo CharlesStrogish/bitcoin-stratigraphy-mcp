@@ -299,6 +299,52 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/PaymentChallengeServiceUnavailableError"
                   - $ref: "#/components/schemas/TokenRevocationServiceUnavailableError"
+  /v1/stratigraphy/stream:
+    get:
+      operationId: streamStratigraphyTelemetry
+      tags: [stratigraphy]
+      summary: Stream live Bitcoin stratigraphy telemetry
+      description: Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its Lightning payment preimage. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+      security:
+        - L402: []
+      responses:
+        "200":
+          description: Authenticated telemetry event stream
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-cache
+            Connection:
+              schema:
+                type: string
+                const: keep-alive
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE messages with telemetry and ping event types and JSON data payloads.
+        "402":
+          description: Lightning payment required
+          headers:
+            WWW-Authenticate:
+              description: L402 challenges including tiered subscription passes
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/L402Challenge"
+        "403":
+          description: The macaroon path caveat does not permit this stream
+        "429":
+          description: Payment invoice creation or macaroon usage is limited
+        "500":
+          description: Lightning payment or server signing is not configured
+        "502":
+          description: Wallet payment verification is unavailable
+        "503":
+          description: Payment challenge coordination or token revocation lookup is unavailable
 components:
   securitySchemes:
     L402:

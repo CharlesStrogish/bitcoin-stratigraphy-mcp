@@ -5,14 +5,15 @@ export type MacaroonRevocation = {
 };
 
 export interface MacaroonRevocationStore {
-  isRevoked(signatureId: string): Promise<boolean>;
+  isRevoked(signatureId: string, signal?: AbortSignal): Promise<boolean>;
   revoke(signatureId: string, reason?: string): Promise<MacaroonRevocation>;
 }
 
 export function createMemoryMacaroonRevocationStore(): MacaroonRevocationStore {
   const revoked = new Map<string, MacaroonRevocation>();
   return {
-    async isRevoked(signatureId) {
+    async isRevoked(signatureId, signal) {
+      if (signal?.aborted) throw signal.reason;
       return revoked.has(signatureId);
     },
     async revoke(signatureId, reason) {

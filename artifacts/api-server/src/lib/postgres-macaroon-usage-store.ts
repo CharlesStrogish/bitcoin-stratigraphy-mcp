@@ -33,24 +33,43 @@ export function createPostgresMacaroonUsageStore(
   };
 
   return {
-    async consume(limits, validUntil) {
+    async consume(limits, validUntil, signal) {
       await initialize();
+      if (signal?.aborted) throw signal.reason;
       const client = await databasePool.connect();
+      const query = <Row = Record<string, unknown>>(
+        text: string,
+        values?: unknown[],
+      ) =>
+        signal
+          ? (client.query as unknown as <ResultRow>(
+              config: {
+                text: string;
+                values?: unknown[];
+                signal: AbortSignal;
+              },
+            ) => Promise<{ rows: ResultRow[] }>)<Row>({
+              text,
+              values,
+              signal,
+            })
+          : client.query<Row>(text, values);
       try {
-        await client.query("BEGIN");
-        await client.query(
+        if (signal?.aborted) throw signal.reason;
+        await query("BEGIN");
+        await query(
           "DELETE FROM macaroon_request_usage WHERE expires_at <= NOW()",
         );
         for (const { tokenId } of [...limits].sort((a, b) =>
           a.tokenId.localeCompare(b.tokenId),
         )) {
-          await client.query(
+          await query(
             "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
             [tokenId],
           );
         }
         for (const { tokenId, maxRequests } of limits) {
-          const result = await client.query<{ token_id: string }>(
+          const result = await query<{ token_id: string }>(
             `INSERT INTO macaroon_request_usage
                (token_id, request_count, expires_at)
              VALUES ($1, 1, to_timestamp($3))
@@ -69,7 +88,7 @@ export function createPostgresMacaroonUsageStore(
             return false;
           }
         }
-        await client.query("COMMIT");
+        await query("COMMIT");
         return true;
       } catch (error) {
         await client.query("ROLLBACK").catch(() => undefined);

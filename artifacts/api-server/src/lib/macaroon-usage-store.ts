@@ -2,6 +2,7 @@ export interface MacaroonUsageStore {
   consume(
     limits: Array<{ tokenId: string; maxRequests: number }>,
     validUntil: number,
+    signal?: AbortSignal,
   ): Promise<boolean>;
 }
 
@@ -9,7 +10,7 @@ export function createMemoryMacaroonUsageStore(): MacaroonUsageStore {
   const counts = new Map<string, number>();
   let pending: Promise<void> = Promise.resolve();
   return {
-    async consume(limits) {
+    async consume(limits, _validUntil, signal) {
       let resolveOperation!: () => void;
       const operationDone = new Promise<void>((resolve) => {
         resolveOperation = resolve;
@@ -17,6 +18,10 @@ export function createMemoryMacaroonUsageStore(): MacaroonUsageStore {
       const previous = pending;
       pending = operationDone;
       await previous;
+      if (signal?.aborted) {
+        resolveOperation();
+        throw signal.reason;
+      }
       const allowed = limits.every(
         ({ tokenId, maxRequests }) =>
           (counts.get(tokenId) ?? 0) < maxRequests,

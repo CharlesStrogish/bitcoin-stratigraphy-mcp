@@ -44,6 +44,9 @@ export const ReadinessStatusStatus = {
   not_ready: 'not_ready',
 } as const;
 
+/**
+ * Availability of either the primary Coinos or fallback Alby/NWC settlement configuration
+ */
 export type ReadinessStatusDependenciesWalletConfiguration = typeof ReadinessStatusDependenciesWalletConfiguration[keyof typeof ReadinessStatusDependenciesWalletConfiguration];
 
 
@@ -61,6 +64,7 @@ export const ReadinessStatusDependenciesChallengeCoordination = {
 } as const;
 
 export type ReadinessStatusDependencies = {
+  /** Availability of either the primary Coinos or fallback Alby/NWC settlement configuration */
   wallet_configuration: ReadinessStatusDependenciesWalletConfiguration;
   challenge_coordination: ReadinessStatusDependenciesChallengeCoordination;
 };

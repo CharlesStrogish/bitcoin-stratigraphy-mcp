@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Availability of either the primary Coinos or fallback Alby/NWC settlement configuration
+ */
 export type ReadinessStatusDependenciesWalletConfiguration = typeof ReadinessStatusDependenciesWalletConfiguration[keyof typeof ReadinessStatusDependenciesWalletConfiguration];
 
 

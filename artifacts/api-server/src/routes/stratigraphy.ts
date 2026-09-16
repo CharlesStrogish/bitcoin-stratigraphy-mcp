@@ -1,4 +1,3 @@
-import { NWCClient } from "@getalby/sdk";
 import {
   GetPaidStratigraphyResponse,
   ReadinessCheckResponse,
@@ -35,6 +34,12 @@ import {
   createPricingEngine,
   type PricingEngine,
 } from "../services/pricing";
+import {
+  createDefaultSettlementRouter,
+  createNwcClient,
+  type NwcClientFactory,
+  type SettlementRouter,
+} from "../services/settlement";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -78,7 +83,6 @@ const RESPONSE_SCHEMA = {
 const datasetPath = fileURLToPath(
   new URL("../data/stratigraphy.json", import.meta.url),
 );
-const silentNwcLogger = { debug: (..._args: unknown[]) => undefined };
 
 type RawStratigraphyEntry = {
   day?: unknown;
@@ -171,8 +175,6 @@ export async function refreshDataset() {
   return refreshed;
 }
 
-type NwcClient = Pick<NWCClient, "lookupInvoice" | "makeInvoice" | "close">;
-type NwcClientFactory = (nwcUri: string) => NwcClient;
 type ChallengePolicy = {
   now: () => number;
   reuseMs: number;
@@ -205,13 +207,6 @@ const defaultChallengePolicy: ChallengePolicy = {
   limitWindowMs: INVOICE_LIMIT_WINDOW_MS,
   maxInvoicesPerWindow: MAX_INVOICES_PER_WINDOW,
   maxCallers: MAX_CHALLENGE_CALLERS,
-};
-
-const createNwcClient: NwcClientFactory = (nwcUri) => {
-  return new NWCClient({
-    nostrWalletConnectUrl: nwcUri,
-    logger: silentNwcLogger,
-  });
 };
 
 function callerKey(req: Request) {
@@ -408,83 +403,10 @@ function sendPaidDataset(
   res.status(200).type("application/json").send(body);
 }
 
-async function verifyPayment(
-  nwcUri: string,
-  paymentHash: string,
-  preimage: string,
-  clientFactory: NwcClientFactory,
-  expectedAmountMsats: number,
-  expectedDescription: string,
-) {
-  const computedHash = createHash("sha256")
-    .update(Buffer.from(preimage, "hex"))
-    .digest("hex");
-  if (computedHash !== paymentHash) return "invalid";
-
-  const client = clientFactory(nwcUri);
-  try {
-    const transaction = await client.lookupInvoice({
-      payment_hash: paymentHash,
-    });
-    const valid =
-      transaction.type === "incoming" &&
-      transaction.state === "settled" &&
-      transaction.amount === expectedAmountMsats &&
-      transaction.description === expectedDescription &&
-      transaction.payment_hash.toLowerCase() === paymentHash &&
-      (!transaction.preimage ||
-        transaction.preimage.toLowerCase() === preimage);
-    return valid
-      ? {
-          settledAt:
-            typeof transaction.settled_at === "number"
-              ? transaction.settled_at
-              : 0,
-        }
-      : "invalid";
-  } catch {
-    return "unavailable";
-  } finally {
-    client.close();
-  }
-}
-
-async function createInvoice(
-  nwcUri: string,
-  clientFactory: NwcClientFactory,
-  amountMsats: number,
-  description: string,
-) {
-  const client = clientFactory(nwcUri);
-  try {
-    const transaction = await client.makeInvoice({
-      amount: amountMsats,
-      description,
-      expiry: 3600,
-    });
-
-    if (
-      !transaction.invoice.startsWith("ln") ||
-      !/^[0-9a-fA-F]{64}$/.test(transaction.payment_hash)
-    ) {
-      throw new Error("CoinOS returned an incomplete NWC invoice");
-    }
-
-    return {
-      invoice: transaction.invoice,
-      paymentHash: transaction.payment_hash.toLowerCase(),
-      issuedAt: Date.now(),
-    };
-  } finally {
-    client.close();
-  }
-}
-
 async function sendPaymentChallenge(
   req: Request,
   res: Response,
-  nwcUri: string,
-  clientFactory: NwcClientFactory,
+  settlementRouter: SettlementRouter,
   challengeStore: PaymentChallengeStore,
   policy: ChallengePolicy,
   caller: string,
@@ -500,19 +422,29 @@ async function sendPaymentChallenge(
       challengeAmountMsats: number,
       challengeDescription: string,
     ) => {
-      return challengeStore.getOrCreate(caller, scope, policy, async () => {
-        try {
-          const challenge = await createInvoice(
-            nwcUri,
-            clientFactory,
-            challengeAmountMsats,
-            challengeDescription,
-          );
-          return { ...challenge, issuedAt: policy.now() };
-        } catch (error) {
-          throw new InvoiceCreationError(error);
-        }
-      });
+      const providerScope =
+        `${scope}:settlement:${settlementRouter.activeProvider()}`;
+      return challengeStore.getOrCreate(
+        caller,
+        providerScope,
+        policy,
+        async () => {
+          try {
+            const challenge = await settlementRouter.createInvoice({
+              amountMsats: challengeAmountMsats,
+              description: challengeDescription,
+              expirySeconds: 3600,
+            });
+            return { ...challenge, issuedAt: policy.now() };
+          } catch (error) {
+            throw new InvoiceCreationError(error);
+          }
+        },
+        (challenge) =>
+          `${scope}:settlement:${
+            challenge.provider ?? settlementRouter.activeProvider()
+          }`,
+      );
     };
     const legacyResult = await getChallenge(rangeKey, amountMsats, description);
     if (legacyResult.kind === "limited") {
@@ -617,6 +549,8 @@ export function registerStratigraphyRoutes(
   revocationStore: MacaroonRevocationStore =
     createMemoryMacaroonRevocationStore(),
   pricingEngine: PricingEngine = createPricingEngine(),
+  settlementRouter: SettlementRouter =
+    createDefaultSettlementRouter(clientFactory),
 ): void {
   app.use("/api/v1", (_req, _res, next) => {
     pricingEngine.recordRequest(policy.now());
@@ -631,11 +565,9 @@ export function registerStratigraphyRoutes(
   });
 
   app.get("/api/readyz", async (req, res): Promise<void> => {
-    const walletConfiguration =
-      typeof process.env.NWC_URI === "string" &&
-      process.env.NWC_URI.trim().length > 0
-        ? "available"
-        : "unavailable";
+    const walletConfiguration = settlementRouter.isConfigured()
+      ? "available"
+      : "unavailable";
     let challengeCoordination = "available";
     try {
       await challengeStore.checkHealth();
@@ -818,20 +750,17 @@ export function registerStratigraphyRoutes(
         res.status(401).json({ error: "Invalid parent macaroon" });
         return;
       }
-      const nwcUri = process.env.NWC_URI;
-      if (!nwcUri) {
+      if (!settlementRouter.isConfigured()) {
         res.status(500).json({ error: "NWC_URI is not configured" });
         return;
       }
       const definition = SUBSCRIPTION_TIERS[parent.tier];
-      const verification = await verifyPayment(
-        nwcUri,
-        parent.paymentHash,
-        authorization.preimage,
-        clientFactory,
-        parent.amountMsats ?? definition.amountMsats,
-        definition.description,
-      );
+      const verification = await settlementRouter.verifyPayment({
+        paymentHash: parent.paymentHash,
+        preimage: authorization.preimage,
+        expectedAmountMsats: parent.amountMsats ?? definition.amountMsats,
+        expectedDescription: definition.description,
+      });
       if (verification === "unavailable") {
         res.status(502).json({ error: "Unable to verify payment" });
         return;
@@ -920,8 +849,7 @@ export function registerStratigraphyRoutes(
         return;
       }
       const caller = callerKey(req);
-      const nwcUri = process.env.NWC_URI;
-      if (!nwcUri) {
+      if (!settlementRouter.isConfigured()) {
         res.status(500).json({ error: "NWC_URI is not configured" });
         return;
       }
@@ -957,14 +885,13 @@ export function registerStratigraphyRoutes(
               return;
             }
             const definition = SUBSCRIPTION_TIERS[pass.tier];
-            const verification = await verifyPayment(
-              nwcUri,
-              pass.paymentHash,
-              authorization.preimage,
-              clientFactory,
-              pass.amountMsats ?? definition.amountMsats,
-              definition.description,
-            );
+            const verification = await settlementRouter.verifyPayment({
+              paymentHash: pass.paymentHash,
+              preimage: authorization.preimage,
+              expectedAmountMsats:
+                pass.amountMsats ?? definition.amountMsats,
+              expectedDescription: definition.description,
+            });
             if (verification === "unavailable") {
               res.status(502).json({ error: "Unable to verify payment" });
               return;
@@ -998,14 +925,12 @@ export function registerStratigraphyRoutes(
           }
         }
         if (authorization.kind === "legacy") {
-        const verification = await verifyPayment(
-          nwcUri,
-          authorization.paymentHash,
-          authorization.preimage,
-          clientFactory,
-          selectedRange.amountMsats,
-          selectedRange.description,
-        );
+        const verification = await settlementRouter.verifyPayment({
+          paymentHash: authorization.paymentHash,
+          preimage: authorization.preimage,
+          expectedAmountMsats: selectedRange.amountMsats,
+          expectedDescription: selectedRange.description,
+        });
         if (verification === "unavailable") {
           res.status(502).json({ error: "Unable to verify payment" });
           return;
@@ -1037,8 +962,7 @@ export function registerStratigraphyRoutes(
       await sendPaymentChallenge(
         req,
         res,
-        nwcUri,
-        clientFactory,
+        settlementRouter,
         challengeStore,
         policy,
         caller,

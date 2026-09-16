@@ -9,6 +9,7 @@ import type { ReadinessStatusDependenciesChallengeCoordination } from './readine
 import type { ReadinessStatusDependenciesWalletConfiguration } from './readinessStatusDependenciesWalletConfiguration';
 
 export type ReadinessStatusDependencies = {
+  /** Availability of either the primary Coinos or fallback Alby/NWC settlement configuration */
   wallet_configuration: ReadinessStatusDependenciesWalletConfiguration;
   challenge_coordination: ReadinessStatusDependenciesChallengeCoordination;
 };

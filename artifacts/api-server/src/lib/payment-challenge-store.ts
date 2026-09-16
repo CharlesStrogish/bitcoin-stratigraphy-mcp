@@ -2,6 +2,7 @@ export type PaymentChallenge = {
   invoice: string;
   paymentHash: string;
   issuedAt: number;
+  provider?: string;
 };
 
 export type ChallengeStorePolicy = {
@@ -23,6 +24,7 @@ export interface PaymentChallengeStore {
     scope: string,
     policy: ChallengeStorePolicy,
     create: () => Promise<PaymentChallenge>,
+    scopeForChallenge?: (challenge: PaymentChallenge) => string,
   ): Promise<ChallengeStoreResult>;
   consume(caller: string, scope: string, paymentHash: string): Promise<void>;
 }
@@ -45,7 +47,7 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
 
   return {
     async checkHealth() {},
-    async getOrCreate(caller, scope, policy, create) {
+    async getOrCreate(caller, scope, policy, create, scopeForChallenge) {
       const pendingKey = `${caller}|${scope}`;
       const existingPending = pending.get(pendingKey);
       if (existingPending) return existingPending;
@@ -99,10 +101,13 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
 
         state.invoiceAttemptedAt.push(now);
         const challenge = await create();
-        state.challenges.set(scope, {
+        const finalScope = scopeForChallenge?.(challenge) ?? scope;
+        const stored = {
           challenge,
           expiresAt: policy.now() + policy.reuseMs,
-        });
+        };
+        state.challenges.set(finalScope, stored);
+        if (finalScope !== scope) state.challenges.set(scope, stored);
         return { kind: "challenge", challenge } as const;
       })();
       pending.set(pendingKey, operation);
@@ -114,9 +119,14 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
     },
     async consume(caller, scope, paymentHash) {
       const state = states.get(caller);
-      const stored = state?.challenges.get(scope);
-      if (stored?.challenge.paymentHash === paymentHash) {
-        state?.challenges.delete(scope);
+      for (const [storedScope, stored] of state?.challenges ?? []) {
+        if (
+          (storedScope === scope ||
+            storedScope.startsWith(`${scope}:settlement:`)) &&
+          stored.challenge.paymentHash === paymentHash
+        ) {
+          state?.challenges.delete(storedScope);
+        }
       }
     },
   };

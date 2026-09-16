@@ -35,7 +35,7 @@ export const DatasetHealthCheckResponse = zod.object({
 export const ReadinessCheckResponse = zod.object({
   "status": zod.enum(['ready', 'not_ready']),
   "dependencies": zod.object({
-  "wallet_configuration": zod.enum(['available', 'unavailable']),
+  "wallet_configuration": zod.enum(['available', 'unavailable']).describe('Availability of either the primary Coinos or fallback Alby\/NWC settlement configuration'),
   "challenge_coordination": zod.enum(['available', 'unavailable'])
 })
 })

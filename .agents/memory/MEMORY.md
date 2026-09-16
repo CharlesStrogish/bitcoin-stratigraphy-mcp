@@ -5,3 +5,4 @@
 - [Macaroon attenuation budgets](macaroon-attenuation-budgets.md) — descendants must consume every inherited request-cap scope atomically, not only their final token cap.
 - [Macaroon revocation scope](macaroon-revocation-scope.md) — revoke exact final signatures, keep relatives valid, and fail closed when the shared index is unavailable.
 - [Dynamic pass price binding](dynamic-pass-price-binding.md) — bind each issued scarcity price into the macaroon and cache scope; verify against issuance, not the latest quote.
+- [Settlement failover invariants](settlement-failover-invariants.md) — abort timed-out clients, single-probe recovery, and cache fallback invoices under predicted and actual providers.

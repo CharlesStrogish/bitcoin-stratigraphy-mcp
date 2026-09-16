@@ -322,6 +322,8 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
         properties: {
           wallet_configuration: {
             type: "string",
+            description:
+              "Availability of either the primary Coinos or fallback Alby/NWC settlement configuration",
             enum: ["available", "unavailable"],
           },
           challenge_coordination: {
@@ -1079,7 +1081,11 @@ test("reports ready when payment dependencies are available", async () => {
 
 test("reports not ready when wallet configuration is missing", async () => {
   const configuredNwcUri = process.env.NWC_URI;
+  const configuredAlbyNwcUri = process.env.ALBY_NWC_URI;
+  const configuredFallbackNwcUri = process.env.NWC_FALLBACK_URI;
   delete process.env.NWC_URI;
+  delete process.env.ALBY_NWC_URI;
+  delete process.env.NWC_FALLBACK_URI;
   try {
     const response = await fetch(`${baseUrl}/api/readyz`);
     assert.equal(response.status, 503);
@@ -1093,6 +1099,11 @@ test("reports not ready when wallet configuration is missing", async () => {
   } finally {
     if (configuredNwcUri === undefined) delete process.env.NWC_URI;
     else process.env.NWC_URI = configuredNwcUri;
+    if (configuredAlbyNwcUri === undefined) delete process.env.ALBY_NWC_URI;
+    else process.env.ALBY_NWC_URI = configuredAlbyNwcUri;
+    if (configuredFallbackNwcUri === undefined) {
+      delete process.env.NWC_FALLBACK_URI;
+    } else process.env.NWC_FALLBACK_URI = configuredFallbackNwcUri;
   }
 });
 
@@ -1146,7 +1157,11 @@ test("reports not ready when challenge coordination is unavailable", async () =>
 
 test("returns the documented generic 500 when payment is not configured", async () => {
   const configuredNwcUri = process.env.NWC_URI;
+  const configuredAlbyNwcUri = process.env.ALBY_NWC_URI;
+  const configuredFallbackNwcUri = process.env.NWC_FALLBACK_URI;
   delete process.env.NWC_URI;
+  delete process.env.ALBY_NWC_URI;
+  delete process.env.NWC_FALLBACK_URI;
   const unconfiguredApp = express();
   registerStratigraphyRoutes(unconfiguredApp);
   const unconfiguredServer = unconfiguredApp.listen(0);
@@ -1167,6 +1182,11 @@ test("returns the documented generic 500 when payment is not configured", async 
     unconfiguredServer.close();
     if (configuredNwcUri === undefined) delete process.env.NWC_URI;
     else process.env.NWC_URI = configuredNwcUri;
+    if (configuredAlbyNwcUri === undefined) delete process.env.ALBY_NWC_URI;
+    else process.env.ALBY_NWC_URI = configuredAlbyNwcUri;
+    if (configuredFallbackNwcUri === undefined) {
+      delete process.env.NWC_FALLBACK_URI;
+    } else process.env.NWC_FALLBACK_URI = configuredFallbackNwcUri;
   }
 });
 

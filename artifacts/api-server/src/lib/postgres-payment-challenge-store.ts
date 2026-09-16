@@ -48,7 +48,7 @@ export function createPostgresPaymentChallengeStore(
     async checkHealth() {
       await databasePool.query("SELECT 1");
     },
-    async getOrCreate(caller, scope, policy, create) {
+    async getOrCreate(caller, scope, policy, create, scopeForChallenge) {
       const client = await databasePool.connect();
       let transactionOpen = false;
       let callerLocked = false;
@@ -149,6 +149,7 @@ export function createPostgresPaymentChallengeStore(
         }
 
         const challenge = await create();
+        const finalScope = scopeForChallenge?.(challenge) ?? scope;
         const createdAt = policy.now();
         await client.query("BEGIN");
         transactionOpen = true;
@@ -163,12 +164,31 @@ export function createPostgresPaymentChallengeStore(
              updated_at = NOW()`,
           [
             caller,
-            scope,
+            finalScope,
             challenge.invoice,
             challenge.paymentHash,
             new Date(createdAt + policy.reuseMs),
           ],
         );
+        if (finalScope !== scope) {
+          await client.query(
+            `INSERT INTO payment_range_challenges
+               (caller_key, scope, invoice, payment_hash, expires_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())
+             ON CONFLICT (caller_key, scope) DO UPDATE SET
+               invoice = EXCLUDED.invoice,
+               payment_hash = EXCLUDED.payment_hash,
+               expires_at = EXCLUDED.expires_at,
+               updated_at = NOW()`,
+            [
+              caller,
+              scope,
+              challenge.invoice,
+              challenge.paymentHash,
+              new Date(createdAt + policy.reuseMs),
+            ],
+          );
+        }
         await client.query("COMMIT");
         transactionOpen = false;
         return { kind: "challenge", challenge };
@@ -199,7 +219,9 @@ export function createPostgresPaymentChallengeStore(
     async consume(caller, scope, paymentHash) {
       await databasePool.query(
         `DELETE FROM payment_range_challenges
-          WHERE caller_key = $1 AND scope = $2 AND payment_hash = $3`,
+          WHERE caller_key = $1
+            AND (scope = $2 OR scope LIKE $2 || ':settlement:%')
+            AND payment_hash = $3`,
         [caller, scope, paymentHash],
       );
     },

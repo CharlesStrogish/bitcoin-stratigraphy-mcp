@@ -384,6 +384,7 @@ components:
           properties:
             wallet_configuration:
               type: string
+              description: Availability of either the primary Coinos or fallback Alby/NWC settlement configuration
               enum:
                 - available
                 - unavailable

@@ -4,12 +4,15 @@ import { rm } from "node:fs/promises";
 const outputs = [
   "./dist/stratigraphy.contract.test.js",
   "./dist/pricing.test.js",
+  "./dist/settlement_redundancy.test.js",
 ];
 
 await build({
   entryPoints: {
     "stratigraphy.contract.test": "./src/routes/stratigraphy.contract.test.ts",
     "pricing.test": "./tests/unit/pricing.test.ts",
+    "settlement_redundancy.test":
+      "./tests/unit/settlement_redundancy.test.ts",
   },
   outdir: "./dist",
   bundle: true,

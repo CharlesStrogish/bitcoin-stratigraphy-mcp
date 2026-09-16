@@ -8,7 +8,7 @@ import {
   type Request,
   type Response,
 } from "express";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
@@ -18,6 +18,7 @@ import {
 import {
   attenuateSubscriptionMacaroon,
   createSubscriptionMacaroon,
+  getMacaroonSignatureId,
   SUBSCRIPTION_TIERS,
   type SubscriptionTier,
   verifySubscriptionMacaroon,
@@ -26,6 +27,10 @@ import {
   createMemoryMacaroonUsageStore,
   type MacaroonUsageStore,
 } from "../lib/macaroon-usage-store";
+import {
+  createMemoryMacaroonRevocationStore,
+  type MacaroonRevocationStore,
+} from "../lib/macaroon-revocation-store";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -337,6 +342,33 @@ function parseL402Authorization(value: string | undefined) {
       };
 }
 
+function operatorAuthorized(value: string | undefined, secret: string) {
+  const match = /^Bearer\s+(.+)$/.exec(value?.trim() ?? "");
+  if (!match) return false;
+  const supplied = createHash("sha256").update(match[1]).digest();
+  const expected = createHash("sha256").update(secret).digest();
+  return timingSafeEqual(supplied, expected);
+}
+
+async function rejectRevokedMacaroon(
+  req: Request,
+  res: Response,
+  macaroon: string,
+  revocationStore: MacaroonRevocationStore,
+) {
+  const signatureId = getMacaroonSignatureId(macaroon);
+  if (!signatureId) return false;
+  try {
+    if (!(await revocationStore.isRevoked(signatureId))) return false;
+    res.status(401).json({ error: "Token has been revoked" });
+    return true;
+  } catch (error) {
+    req.log.error({ err: error }, "Macaroon revocation lookup failed");
+    res.status(503).json({ error: "Token revocation service unavailable" });
+    return true;
+  }
+}
+
 function sendPaidDataset(
   res: Response,
   records: Dataset,
@@ -560,6 +592,8 @@ export function registerStratigraphyRoutes(
   policy: ChallengePolicy = defaultChallengePolicy,
   challengeStore: PaymentChallengeStore = createMemoryPaymentChallengeStore(),
   macaroonUsageStore: MacaroonUsageStore = createMemoryMacaroonUsageStore(),
+  revocationStore: MacaroonRevocationStore =
+    createMemoryMacaroonRevocationStore(),
 ): void {
   app.get("/api", (_req, res): void => {
     res.status(200).json({
@@ -641,6 +675,59 @@ export function registerStratigraphyRoutes(
   });
 
   app.post(
+    "/api/v1/macaroon/revoke",
+    async (req: Request, res: Response): Promise<void> => {
+      const operatorSecret = process.env.MACAROON_OPERATOR_SECRET;
+      if (!operatorSecret) {
+        res.status(503).json({ error: "Macaroon revocation is not configured" });
+        return;
+      }
+      if (!operatorAuthorized(req.header("Authorization"), operatorSecret)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const macaroon =
+        typeof req.body?.macaroon === "string" ? req.body.macaroon : undefined;
+      const suppliedSignatureId =
+        typeof req.body?.signature_id === "string"
+          ? req.body.signature_id.toLowerCase()
+          : undefined;
+      if (
+        (macaroon ? 1 : 0) + (suppliedSignatureId ? 1 : 0) !== 1 ||
+        (suppliedSignatureId &&
+          !/^[0-9a-f]{64}$/.test(suppliedSignatureId))
+      ) {
+        res.status(400).json({
+          error: "Provide exactly one valid macaroon or signature_id",
+        });
+        return;
+      }
+      const signatureId = macaroon
+        ? getMacaroonSignatureId(macaroon)
+        : suppliedSignatureId!;
+      if (!signatureId) {
+        res.status(400).json({ error: "Invalid macaroon" });
+        return;
+      }
+      const reason =
+        typeof req.body?.reason === "string" && req.body.reason.trim()
+          ? req.body.reason.trim().slice(0, 500)
+          : undefined;
+      try {
+        const revocation = await revocationStore.revoke(signatureId, reason);
+        res.status(200).json({
+          signature_id: revocation.signatureId,
+          revoked_at: revocation.revokedAt.toISOString(),
+          ...(revocation.reason ? { reason: revocation.reason } : {}),
+        });
+      } catch (error) {
+        req.log.error({ err: error }, "Macaroon revocation failed");
+        res.status(503).json({ error: "Token revocation service unavailable" });
+      }
+    },
+  );
+
+  app.post(
     "/api/v1/macaroon/attenuate",
     async (req: Request, res: Response): Promise<void> => {
       const authorization = parseL402Authorization(
@@ -664,6 +751,16 @@ export function registerStratigraphyRoutes(
         caveats.length === 0
       ) {
         res.status(400).json({ error: "Invalid attenuation request" });
+        return;
+      }
+      if (
+        await rejectRevokedMacaroon(
+          req,
+          res,
+          parentMacaroon,
+          revocationStore,
+        )
+      ) {
         return;
       }
       const parent = verifySubscriptionMacaroon(
@@ -779,6 +876,16 @@ export function registerStratigraphyRoutes(
       );
       if (authorization) {
         if (authorization.kind === "subscription") {
+          if (
+            await rejectRevokedMacaroon(
+              req,
+              res,
+              authorization.macaroon,
+              revocationStore,
+            )
+          ) {
+            return;
+          }
           const secret = process.env.SESSION_SECRET;
           const pass =
             secret &&

@@ -160,6 +160,31 @@ export const AttenuateMacaroonResponse = zod.object({
 
 
 /**
+ * Adds a macaroon's final signature identifier to the shared revocation index. Requires the dedicated operator bearer secret.
+ * @summary Revoke a subscription macaroon immediately
+ */
+export const revokeMacaroonBodyThreeSignatureIdRegExp = new RegExp('^[0-9a-fA-F]{64}$');
+export const revokeMacaroonBodyThreeReasonMax = 500;
+
+
+
+export const RevokeMacaroonBody = zod.union([zod.unknown(),zod.unknown()]).and(zod.object({
+  "macaroon": zod.string().optional(),
+  "signature_id": zod.string().regex(revokeMacaroonBodyThreeSignatureIdRegExp).optional(),
+  "reason": zod.string().max(revokeMacaroonBodyThreeReasonMax).optional()
+}))
+
+export const revokeMacaroonResponseSignatureIdRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const RevokeMacaroonResponse = zod.object({
+  "signature_id": zod.string().regex(revokeMacaroonResponseSignatureIdRegExp),
+  "revoked_at": zod.coerce.date(),
+  "reason": zod.string().optional()
+})
+
+
+/**
  * Returns public dataset range and cost headers without creating an invoice or requiring L402 authorization.
  * @summary Inspect selected dataset size and cost
  */

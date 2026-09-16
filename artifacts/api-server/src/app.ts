@@ -10,6 +10,7 @@ import { logger } from "./lib/logger";
 import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
 import { registerNostrStatusRoute } from "./routes/nostr-status";
 import { createPostgresMacaroonUsageStore } from "./lib/postgres-macaroon-usage-store";
+import { createPostgresMacaroonRevocationStore } from "./lib/postgres-macaroon-revocation-store";
 
 const app: Express = express();
 
@@ -62,6 +63,7 @@ registerStratigraphyRoutes(
   undefined,
   createPostgresPaymentChallengeStore(),
   createPostgresMacaroonUsageStore(),
+  createPostgresMacaroonRevocationStore(),
 );
 
 export default app;

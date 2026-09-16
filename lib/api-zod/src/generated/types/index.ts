@@ -20,6 +20,8 @@ export * from './l402SubscriptionPassTier';
 export * from './macaroonAttenuationRequest';
 export * from './macaroonAttenuationResponse';
 export * from './macaroonAttenuationResponseCaveats';
+export * from './macaroonRevocationRequest';
+export * from './macaroonRevocationResponse';
 export * from './mcpToolParameter';
 export * from './nostrHeartbeatStatus';
 export * from './nostrHeartbeatStatusRelaysItem';

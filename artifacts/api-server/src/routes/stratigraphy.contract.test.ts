@@ -23,6 +23,7 @@ import {
   attenuateSubscriptionMacaroon,
   createSubscriptionMacaroon,
   verifySubscriptionMacaroon,
+  getMacaroonSignatureId,
 } from "../lib/subscription-pass";
 import { pool } from "@workspace/db";
 import { buildHeartbeatEvent } from "../lib/nostr-heartbeat";
@@ -34,6 +35,8 @@ const paymentHash = createHash("sha256")
   .update(Buffer.from(preimage, "hex"))
   .digest("hex");
 const invoice = "lnbc210n1contracttest";
+const operatorSecret = "contract-test-operator-secret";
+process.env.MACAROON_OPERATOR_SECRET = operatorSecret;
 const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
@@ -141,6 +144,7 @@ let transaction = validTransaction;
 let invoiceRequest: Record<string, unknown> | undefined;
 let invoiceRequestCount = 0;
 let invoiceGate: Promise<void> | undefined;
+let lookupInvoiceCount = 0;
 const app = express();
 app.use(express.json());
 registerOpenApiRoute(app);
@@ -149,7 +153,10 @@ registerMcpRoute(app);
 registerNostrStatusRoute(app);
 app.use("/api", healthRouter);
 registerStratigraphyRoutes(app, () => ({
-  lookupInvoice: async () => transaction as never,
+  lookupInvoice: async () => {
+    lookupInvoiceCount += 1;
+    return transaction as never;
+  },
   makeInvoice: async (request) => {
     invoiceRequest = request;
     invoiceRequestCount += 1;
@@ -1070,6 +1077,94 @@ test("attenuates a paid parent macaroon through the helper route", async () => {
     assert.equal(child?.maxRequests, 2);
   } finally {
     transaction = validTransaction;
+  }
+});
+
+test("revokes a macaroon before payment validation", async () => {
+  const macaroon = createSubscriptionMacaroon({
+    secret: process.env.SESSION_SECRET!,
+    paymentHash,
+    tier: "1-day",
+    validUntil: Math.floor(Date.now() / 1000) + 3600,
+  });
+  const unauthorized = await fetch(`${baseUrl}/api/v1/macaroon/revoke`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer incorrect-secret",
+    },
+    body: JSON.stringify({ macaroon }),
+  });
+  assert.equal(unauthorized.status, 401);
+
+  const revoked = await fetch(`${baseUrl}/api/v1/macaroon/revoke`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${operatorSecret}`,
+    },
+    body: JSON.stringify({ macaroon, reason: "delegated token compromised" }),
+  });
+  assert.equal(revoked.status, 200);
+  const revokedBody = await revoked.json() as {
+    signature_id: string;
+    revoked_at: string;
+    reason: string;
+  };
+  assert.equal(revokedBody.signature_id, getMacaroonSignatureId(macaroon));
+  assert.equal(
+    new Date(revokedBody.revoked_at).toISOString(),
+    revokedBody.revoked_at,
+  );
+  assert.equal(revokedBody.reason, "delegated token compromised");
+
+  const lookupsBefore = lookupInvoiceCount;
+  const denied = await fetch(`${baseUrl}/api/v1/stratigraphy?days=1`, {
+    headers: { Authorization: `L402 ${macaroon}:${preimage}` },
+  });
+  assert.equal(denied.status, 401);
+  assert.deepEqual(await denied.json(), { error: "Token has been revoked" });
+  assert.equal(lookupInvoiceCount, lookupsBefore);
+
+  const attenuationDenied = await fetch(
+    `${baseUrl}/api/v1/macaroon/attenuate`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `L402 ${macaroon}:${preimage}`,
+      },
+      body: JSON.stringify({
+        macaroon,
+        caveats: ["max_requests=1"],
+      }),
+    },
+  );
+  assert.equal(attenuationDenied.status, 401);
+  assert.deepEqual(await attenuationDenied.json(), {
+    error: "Token has been revoked",
+  });
+  assert.equal(lookupInvoiceCount, lookupsBefore);
+});
+
+test("revokes by signature id idempotently", async () => {
+  const signatureId = "ab".repeat(32);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api/v1/macaroon/revoke`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${operatorSecret}`,
+      },
+      body: JSON.stringify({ signature_id: signatureId }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      signature_id: string;
+      revoked_at: string;
+    };
+    assert.equal(body.signature_id, signatureId);
+    assert.equal(new Date(body.revoked_at).toISOString(), body.revoked_at);
   }
 });
 

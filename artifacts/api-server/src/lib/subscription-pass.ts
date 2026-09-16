@@ -61,6 +61,10 @@ function decodeMacaroon(encoded: string): SerializedMacaroon | null {
   }
 }
 
+export function getMacaroonSignatureId(encoded: string): string | null {
+  return decodeMacaroon(encoded)?.signature ?? null;
+}
+
 export function attenuateSubscriptionMacaroon(
   encoded: string,
   newCaveats: string[],

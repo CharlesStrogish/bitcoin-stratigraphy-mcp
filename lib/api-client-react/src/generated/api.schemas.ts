@@ -5,6 +5,21 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type MacaroonRevocationRequest = (unknown & {
+  macaroon?: string;
+  /** @pattern ^[0-9a-fA-F]{64}$ */
+  signature_id?: string;
+  /** @maxLength 500 */
+  reason?: string;
+});
+
+export interface MacaroonRevocationResponse {
+  /** @pattern ^[0-9a-f]{64}$ */
+  signature_id: string;
+  revoked_at: string;
+  reason?: string;
+}
+
 export interface HealthStatus {
   status: string;
 }

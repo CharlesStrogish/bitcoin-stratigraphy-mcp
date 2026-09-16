@@ -28,6 +28,8 @@ import type {
   L402Challenge,
   MacaroonAttenuationRequest,
   MacaroonAttenuationResponse,
+  MacaroonRevocationRequest,
+  MacaroonRevocationResponse,
   NostrHeartbeatStatus,
   PaymentChallengeRateLimitError,
   PaymentChallengeServiceUnavailableError,
@@ -601,6 +603,78 @@ export const useAttenuateMacaroon = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getAttenuateMacaroonMutationOptions(options));
+    }
+
+export const getRevokeMacaroonUrl = () => {
+
+
+
+
+  return `/api/v1/macaroon/revoke`
+}
+
+/**
+ * Adds a macaroon's final signature identifier to the shared revocation index. Requires the dedicated operator bearer secret.
+ * @summary Revoke a subscription macaroon immediately
+ */
+export const revokeMacaroon = async (macaroonRevocationRequest: MacaroonRevocationRequest, options?: Parameters<typeof customFetch>[1]): Promise<MacaroonRevocationResponse> => {
+
+  return customFetch<MacaroonRevocationResponse>(getRevokeMacaroonUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(macaroonRevocationRequest)
+  }
+);}
+
+
+
+
+
+export const getRevokeMacaroonMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeMacaroon>>, TError,{data: BodyType<MacaroonRevocationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeMacaroon>>, TError,{data: BodyType<MacaroonRevocationRequest>}, TContext> => {
+
+const mutationKey = ['revokeMacaroon'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeMacaroon>>, {data: BodyType<MacaroonRevocationRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  revokeMacaroon(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeMacaroonMutationResult = NonNullable<Awaited<ReturnType<typeof revokeMacaroon>>>
+    export type RevokeMacaroonMutationBody = BodyType<MacaroonRevocationRequest>
+    export type RevokeMacaroonMutationError = ErrorType<void>
+
+    /**
+ * @summary Revoke a subscription macaroon immediately
+ */
+export const useRevokeMacaroon = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeMacaroon>>, TError,{data: BodyType<MacaroonRevocationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeMacaroon>>,
+        TError,
+        {data: BodyType<MacaroonRevocationRequest>},
+        TContext
+      > => {
+      return useMutation(getRevokeMacaroonMutationOptions(options));
     }
 
 export const getHeadPaidStratigraphyUrl = (params?: HeadPaidStratigraphyParams,) => {

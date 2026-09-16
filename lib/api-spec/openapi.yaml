@@ -134,6 +134,33 @@ paths:
           description: Invalid or unpaid parent macaroon
         "502":
           description: Wallet payment verification unavailable
+  /v1/macaroon/revoke:
+    post:
+      operationId: revokeMacaroon
+      tags: [stratigraphy]
+      summary: Revoke a subscription macaroon immediately
+      description: Adds a macaroon's final signature identifier to the shared revocation index. Requires the dedicated operator bearer secret.
+      security:
+        - MacaroonOperator: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MacaroonRevocationRequest"
+      responses:
+        "200":
+          description: Token is revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MacaroonRevocationResponse"
+        "400":
+          description: Invalid macaroon or signature identifier
+        "401":
+          description: Operator authorization failed
+        "503":
+          description: Revocation is not configured or storage is unavailable
   /v1/stratigraphy:
     head:
       operationId: headPaidStratigraphy
@@ -266,7 +293,39 @@ components:
       in: header
       name: Authorization
       description: "Legacy: L402 <payment_hash>:<preimage>. Subscription: L402 <signed_macaroon>:<preimage>."
+    MacaroonOperator:
+      type: http
+      scheme: bearer
+      description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    MacaroonRevocationRequest:
+      type: object
+      properties:
+        macaroon:
+          type: string
+        signature_id:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+        reason:
+          type: string
+          maxLength: 500
+      anyOf:
+        - required: [macaroon]
+        - required: [signature_id]
+    MacaroonRevocationResponse:
+      type: object
+      properties:
+        signature_id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        revoked_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+      required:
+        - signature_id
+        - revoked_at
     HealthStatus:
       type: object
       properties:

@@ -29,6 +29,7 @@ export type VerifiedSubscriptionMacaroon = {
   maxRequests?: number;
   requestLimits: Array<{ tokenId: string; maxRequests: number }>;
   tokenId: string;
+  amountMsats?: number;
 };
 
 function hmac(key: string | Buffer, value: string): Buffer {
@@ -95,12 +96,16 @@ export function createSubscriptionMacaroon(input: {
   paymentHash: string;
   tier: SubscriptionTier;
   validUntil: number;
+  amountMsats?: number;
 }): string {
   const identifier = "bitcoin-stratigraphy-subscription-v1";
   const caveats = [
     `payment_hash=${input.paymentHash}`,
     `tier=${input.tier}`,
     `valid_until=${input.validUntil}`,
+    ...(input.amountMsats === undefined
+      ? []
+      : [`amount_msats=${input.amountMsats}`]),
   ];
   const token: SerializedMacaroon = {
     identifier,
@@ -148,7 +153,7 @@ export function verifySubscriptionMacaroon(
         });
       } else {
         if (
-          !["payment_hash", "tier", "valid_until"].includes(key) ||
+          !["payment_hash", "tier", "valid_until", "amount_msats"].includes(key) ||
           rootValues.has(key)
         ) {
           return null;
@@ -158,7 +163,7 @@ export function verifySubscriptionMacaroon(
     }
     if (!timingSafeEqual(supplied, runningSignature)) return null;
     if (
-      rootValues.size !== 3 ||
+      (rootValues.size !== 3 && rootValues.size !== 4) ||
       !rootValues.has("payment_hash") ||
       !rootValues.has("tier") ||
       !rootValues.has("valid_until")
@@ -168,11 +173,17 @@ export function verifySubscriptionMacaroon(
     const paymentHash = rootValues.get("payment_hash")!;
     const tier = rootValues.get("tier") as SubscriptionTier;
     const validUntil = Number(rootValues.get("valid_until"));
+    const amountMsatsValue = rootValues.get("amount_msats");
+    const amountMsats =
+      amountMsatsValue === undefined ? undefined : Number(amountMsatsValue);
     if (
       !/^[0-9a-f]{64}$/.test(paymentHash) ||
       !(tier in SUBSCRIPTION_TIERS) ||
       !Number.isSafeInteger(validUntil) ||
       validUntil <= nowSeconds
+      || (amountMsatsValue !== undefined &&
+        (!/^[1-9]\d*$/.test(amountMsatsValue) ||
+          !Number.isSafeInteger(amountMsats)))
     ) {
       return null;
     }
@@ -185,6 +196,7 @@ export function verifySubscriptionMacaroon(
         requestLimits.length > 0 ? Math.min(...requestLimits) : undefined,
       requestLimits: meteredScopes,
       tokenId: token.signature,
+      amountMsats,
     };
   } catch {
     return null;

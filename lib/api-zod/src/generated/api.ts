@@ -68,6 +68,11 @@ export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).mi
 export const getStratigraphyCostResponseAccessTiersMin = 2;
 export const getStratigraphyCostResponseAccessTiersMax = 2;
 
+export const getStratigraphyCostResponseDynamicPricingDifficultyEpochProgressMin = 0;
+export const getStratigraphyCostResponseDynamicPricingDifficultyEpochProgressMax = 100;
+
+export const getStratigraphyCostResponseDynamicPricingRequestVelocityRpmMin = 0;
+
 export const getStratigraphyCostResponseDatasetDaysMin = 422;
 
 export const getStratigraphyCostResponseDatasetLastDayMin = 422;
@@ -79,8 +84,16 @@ export const GetStratigraphyCostResponse = zod.object({
   "access_tiers": zod.array(zod.object({
   "id": zod.enum(['1-day', '30-day']),
   "duration_days": zod.number().int(),
-  "price_sats": zod.number().int()
+  "price_sats": zod.number().int(),
+  "base_price_sats": zod.number().int(),
+  "max_price_sats": zod.number().int(),
+  "multiplier": zod.number()
 })).min(getStratigraphyCostResponseAccessTiersMin).max(getStratigraphyCostResponseAccessTiersMax),
+  "dynamic_pricing": zod.object({
+  "difficulty_epoch_progress": zod.number().min(getStratigraphyCostResponseDynamicPricingDifficultyEpochProgressMin).max(getStratigraphyCostResponseDynamicPricingDifficultyEpochProgressMax),
+  "request_velocity_rpm": zod.number().min(getStratigraphyCostResponseDynamicPricingRequestVelocityRpmMin),
+  "calculated_at": zod.coerce.date()
+}),
   "legacy_query_pricing": zod.object({
   "sats_per_day": zod.literal(1),
   "minimum_sats": zod.literal(5)
@@ -201,7 +214,7 @@ export const HeadPaidStratigraphyResponse = zod.unknown()
 
 
 /**
- * Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable passes provide unlimited queries for 24 hours (5 sats) or 30 days (100 sats).
+ * Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable 24-hour passes are dynamically priced from 5 to 15 sats and 30-day passes from 100 to 250 sats; inspect /v1/cost or the issued L402 challenge for the current exact price.
  * @summary Get the complete L402-protected dataset
  */
 export const getPaidStratigraphyQueryDaysMax = 422;

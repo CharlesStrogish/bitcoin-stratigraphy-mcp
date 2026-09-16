@@ -90,6 +90,11 @@ paths:
       responses:
         "200":
           description: Dataset access, MCP parameter, and response schema metadata
+          headers:
+            X-L402-Subscription-Tiers:
+              description: Current dynamic tier prices in satoshis
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -214,7 +219,7 @@ paths:
       operationId: getPaidStratigraphy
       tags: [stratigraphy]
       summary: Get the complete L402-protected dataset
-      description: Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable passes provide unlimited queries for 24 hours (5 sats) or 30 days (100 sats).
+      description: Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable 24-hour passes are dynamically priced from 5 to 15 sats and 30-day passes from 100 to 250 sats; inspect /v1/cost or the issued L402 challenge for the current exact price.
       parameters:
         - name: days
           in: query
@@ -413,7 +418,36 @@ components:
                 type: integer
               price_sats:
                 type: integer
-            required: [id, duration_days, price_sats]
+              base_price_sats:
+                type: integer
+              max_price_sats:
+                type: integer
+              multiplier:
+                type: number
+            required:
+              - id
+              - duration_days
+              - price_sats
+              - base_price_sats
+              - max_price_sats
+              - multiplier
+        dynamic_pricing:
+          type: object
+          properties:
+            difficulty_epoch_progress:
+              type: number
+              minimum: 0
+              maximum: 100
+            request_velocity_rpm:
+              type: number
+              minimum: 0
+            calculated_at:
+              type: string
+              format: date-time
+          required:
+            - difficulty_epoch_progress
+            - request_velocity_rpm
+            - calculated_at
         legacy_query_pricing:
           type: object
           properties:
@@ -460,6 +494,7 @@ components:
       required:
         - protocol
         - access_tiers
+        - dynamic_pricing
         - legacy_query_pricing
         - dataset
         - mcp_tool
@@ -618,16 +653,20 @@ components:
           pattern: "^[0-9a-f]{64}$"
         macaroon:
           type: string
-          description: Signed first-party macaroon containing payment_hash, tier, and valid_until caveats
+          description: Signed first-party macaroon containing payment_hash, tier, valid_until, and exact issued amount caveats
         valid_until:
           type: integer
           description: Unix timestamp in seconds after which this pass is invalid
+        price_sats:
+          type: integer
+          description: Dynamic price bound into this pass and its invoice
       required:
         - tier
         - invoice
         - payment_hash
         - macaroon
         - valid_until
+        - price_sats
     InvalidRangeError:
       type: object
       properties:

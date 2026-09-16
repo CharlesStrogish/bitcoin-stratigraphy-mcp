@@ -773,7 +773,7 @@ export const getGetPaidStratigraphyUrl = (params?: GetPaidStratigraphyParams,) =
 }
 
 /**
- * Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable passes provide unlimited queries for 24 hours (5 sats) or 30 days (100 sats).
+ * Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable 24-hour passes are dynamically priced from 5 to 15 sats and 30-day passes from 100 to 250 sats; inspect /v1/cost or the issued L402 challenge for the current exact price.
  * @summary Get the complete L402-protected dataset
  */
 export const getPaidStratigraphy = async (params?: GetPaidStratigraphyParams, options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyEntry[]> => {

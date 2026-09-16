@@ -82,6 +82,20 @@ export type StratigraphyCostAccessTiersItem = {
   id: StratigraphyCostAccessTiersItemId;
   duration_days: number;
   price_sats: number;
+  base_price_sats: number;
+  max_price_sats: number;
+  multiplier: number;
+};
+
+export type StratigraphyCostDynamicPricing = {
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  difficulty_epoch_progress: number;
+  /** @minimum 0 */
+  request_velocity_rpm: number;
+  calculated_at: string;
 };
 
 export type StratigraphyCostLegacyQueryPricing = {
@@ -134,6 +148,7 @@ export interface StratigraphyCost {
      * @maxItems 2
      */
   access_tiers: StratigraphyCostAccessTiersItem[];
+  dynamic_pricing: StratigraphyCostDynamicPricing;
   legacy_query_pricing: StratigraphyCostLegacyQueryPricing;
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;
@@ -219,10 +234,12 @@ export interface L402SubscriptionPass {
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
-  /** Signed first-party macaroon containing payment_hash, tier, and valid_until caveats */
+  /** Signed first-party macaroon containing payment_hash, tier, valid_until, and exact issued amount caveats */
   macaroon: string;
   /** Unix timestamp in seconds after which this pass is invalid */
   valid_until: number;
+  /** Dynamic price bound into this pass and its invoice */
+  price_sats: number;
 }
 
 export interface L402Challenge {

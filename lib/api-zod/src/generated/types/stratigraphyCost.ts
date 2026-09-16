@@ -8,6 +8,7 @@
 import type { JsonSchema } from './jsonSchema';
 import type { StratigraphyCostAccessTiersItem } from './stratigraphyCostAccessTiersItem';
 import type { StratigraphyCostDataset } from './stratigraphyCostDataset';
+import type { StratigraphyCostDynamicPricing } from './stratigraphyCostDynamicPricing';
 import type { StratigraphyCostLegacyQueryPricing } from './stratigraphyCostLegacyQueryPricing';
 import type { StratigraphyCostMcpTool } from './stratigraphyCostMcpTool';
 
@@ -18,6 +19,7 @@ export interface StratigraphyCost {
      * @maxItems 2
      */
   access_tiers: StratigraphyCostAccessTiersItem[];
+  dynamic_pricing: StratigraphyCostDynamicPricing;
   legacy_query_pricing: StratigraphyCostLegacyQueryPricing;
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;

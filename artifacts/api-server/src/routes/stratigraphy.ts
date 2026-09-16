@@ -31,6 +31,10 @@ import {
   createMemoryMacaroonRevocationStore,
   type MacaroonRevocationStore,
 } from "../lib/macaroon-revocation-store";
+import {
+  createPricingEngine,
+  type PricingEngine,
+} from "../services/pricing";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -281,6 +285,12 @@ export async function getStratigraphyData(filter: StratigraphyFilter = {}) {
   return result;
 }
 
+function currentDifficultyEpochProgress(dataset: Dataset) {
+  const raw = dataset.at(-1)?.quantitative_alpha.difficulty_epoch_progress;
+  const parsed = Number.parseFloat(raw ?? "");
+  return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
+}
+
 function selectRange(req: Request, dataset: Dataset): SelectedRange | string {
   const daysValue = singleQueryValue(req.query.days);
   const fromValue = singleQueryValue(req.query.from);
@@ -481,6 +491,8 @@ async function sendPaymentChallenge(
   rangeKey: string,
   amountMsats: number,
   description: string,
+  pricingEngine: PricingEngine,
+  difficultyEpochProgress: number,
 ) {
   try {
     const getChallenge = async (
@@ -516,12 +528,18 @@ async function sendPaymentChallenge(
       (Object.keys(SUBSCRIPTION_TIERS) as SubscriptionTier[]).map(
         async (tier) => {
           const definition = SUBSCRIPTION_TIERS[tier];
+          const pricing = pricingEngine.quote(
+            tier,
+            difficultyEpochProgress,
+            policy.now(),
+          );
+          const amountMsats = pricing.priceSats * 1_000;
           const result = await getChallenge(
-            `subscription:${tier}`,
-            definition.amountMsats,
+            `subscription:${tier}:${amountMsats}`,
+            amountMsats,
             definition.description,
           );
-          return { tier, definition, result };
+          return { tier, definition, pricing, amountMsats, result };
         },
       ),
     );
@@ -540,7 +558,8 @@ async function sendPaymentChallenge(
       res.status(500).json({ error: "SESSION_SECRET is not configured" });
       return;
     }
-    const passes = passResults.map(({ tier, definition, result }) => {
+    const passes = passResults.map(
+      ({ tier, definition, pricing, amountMsats, result }) => {
       if (result.kind !== "challenge") throw new Error("unreachable");
       const validUntil =
         Math.floor(result.challenge.issuedAt / 1000) +
@@ -555,10 +574,13 @@ async function sendPaymentChallenge(
           paymentHash: result.challenge.paymentHash,
           tier,
           validUntil,
+          amountMsats,
         }),
         valid_until: validUntil,
+        price_sats: pricing.priceSats,
       };
-    });
+      },
+    );
 
     res.setHeader(
       "WWW-Authenticate",
@@ -594,7 +616,13 @@ export function registerStratigraphyRoutes(
   macaroonUsageStore: MacaroonUsageStore = createMemoryMacaroonUsageStore(),
   revocationStore: MacaroonRevocationStore =
     createMemoryMacaroonRevocationStore(),
+  pricingEngine: PricingEngine = createPricingEngine(),
 ): void {
+  app.use("/api/v1", (_req, _res, next) => {
+    pricingEngine.recordRequest(policy.now());
+    next();
+  });
+
   app.get("/api", (_req, res): void => {
     res.status(200).json({
       status: "online",
@@ -638,12 +666,30 @@ export function registerStratigraphyRoutes(
 
   app.get("/api/v1/cost", async (_req, res): Promise<void> => {
     const dataset = await readDataset();
+    const epochProgress = currentDifficultyEpochProgress(dataset);
+    const calculatedAt = policy.now();
+    const quotes = (Object.keys(SUBSCRIPTION_TIERS) as SubscriptionTier[]).map(
+      (tier) => pricingEngine.quote(tier, epochProgress, calculatedAt),
+    );
+    res.setHeader(
+      "X-L402-Subscription-Tiers",
+      quotes.map(({ tier, priceSats }) => `${tier}=${priceSats}`).join(", "),
+    );
     res.status(200).json({
       protocol: "L402",
-      access_tiers: [
-        { id: "1-day", duration_days: 1, price_sats: 5 },
-        { id: "30-day", duration_days: 30, price_sats: 100 },
-      ],
+      access_tiers: quotes.map((quote) => ({
+        id: quote.tier,
+        duration_days: quote.tier === "1-day" ? 1 : 30,
+        price_sats: quote.priceSats,
+        base_price_sats: quote.basePriceSats,
+        max_price_sats: quote.maxPriceSats,
+        multiplier: quote.multiplier,
+      })),
+      dynamic_pricing: {
+        difficulty_epoch_progress: epochProgress,
+        request_velocity_rpm: pricingEngine.requestVelocity(calculatedAt),
+        calculated_at: new Date(calculatedAt).toISOString(),
+      },
       legacy_query_pricing: {
         sats_per_day: 1,
         minimum_sats: MIN_INVOICE_SATS,
@@ -783,7 +829,7 @@ export function registerStratigraphyRoutes(
         parent.paymentHash,
         authorization.preimage,
         clientFactory,
-        definition.amountMsats,
+        parent.amountMsats ?? definition.amountMsats,
         definition.description,
       );
       if (verification === "unavailable") {
@@ -846,7 +892,16 @@ export function registerStratigraphyRoutes(
       res.setHeader("X-L402-Minimum-Cost-Sats", String(MIN_INVOICE_SATS));
       res.setHeader(
         "X-L402-Subscription-Tiers",
-        "1-day=5, 30-day=100",
+        (Object.keys(SUBSCRIPTION_TIERS) as SubscriptionTier[])
+          .map((tier) => {
+            const quote = pricingEngine.quote(
+              tier,
+              currentDifficultyEpochProgress(dataset),
+              policy.now(),
+            );
+            return `${tier}=${quote.priceSats}`;
+          })
+          .join(", "),
       );
       res.status(200).end();
     },
@@ -907,7 +962,7 @@ export function registerStratigraphyRoutes(
               pass.paymentHash,
               authorization.preimage,
               clientFactory,
-              definition.amountMsats,
+              pass.amountMsats ?? definition.amountMsats,
               definition.description,
             );
             if (verification === "unavailable") {
@@ -990,6 +1045,8 @@ export function registerStratigraphyRoutes(
         selectedRange.key,
         selectedRange.amountMsats,
         selectedRange.description,
+        pricingEngine,
+        currentDifficultyEpochProgress(dataset),
       );
     },
   );
@@ -1002,8 +1059,9 @@ Free sample: GET /api/v1/stratigraphy/sample
 Paid dataset: GET /api/v1/stratigraphy
 
 Legacy single-query access costs one satoshi per selected day with a five-satoshi
-minimum. The same HTTP 402 response also offers a 1-Day Micro-Pass for 5 sats and
-a 30-Day Pass for 100 sats. Passes allow unlimited queries until their signed
+minimum. The same HTTP 402 response offers dynamically priced 1-Day and 30-Day
+passes; query GET /api/v1/cost for the current bounded price. Passes allow
+unlimited queries until their signed
 valid_until caveat and settlement-based entitlement expiry. After payment, retry
 with:
 

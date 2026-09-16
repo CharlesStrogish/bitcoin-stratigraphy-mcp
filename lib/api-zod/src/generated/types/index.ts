@@ -39,6 +39,7 @@ export * from './stratigraphyCost';
 export * from './stratigraphyCostAccessTiersItem';
 export * from './stratigraphyCostAccessTiersItemId';
 export * from './stratigraphyCostDataset';
+export * from './stratigraphyCostDynamicPricing';
 export * from './stratigraphyCostLegacyQueryPricing';
 export * from './stratigraphyCostMcpTool';
 export * from './stratigraphyCostMcpToolParameters';

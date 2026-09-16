@@ -31,6 +31,10 @@ import { registerNostrStatusRoute } from "./nostr-status";
 import { generateSecretKey, verifyEvent } from "nostr-tools";
 import { createMemoryMacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { createPostgresMacaroonRevocationStore } from "../lib/postgres-macaroon-revocation-store";
+import {
+  calculateTierCost,
+  createPricingEngine,
+} from "../services/pricing";
 
 const preimage = "11".repeat(32);
 const paymentHash = createHash("sha256")
@@ -148,6 +152,11 @@ let invoiceRequestCount = 0;
 let invoiceGate: Promise<void> | undefined;
 let lookupInvoiceCount = 0;
 const app = express();
+const staticPricingEngine = {
+  recordRequest: () => undefined,
+  requestVelocity: () => 0,
+  quote: (tier: "1-day" | "30-day") => calculateTierCost(tier),
+};
 app.use(express.json());
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
@@ -172,7 +181,11 @@ registerStratigraphyRoutes(app, () => ({
   limitWindowMs: 60 * 60 * 1000,
   maxInvoicesPerWindow: 100,
   maxCallers: 10_000,
-}, createMemoryPaymentChallengeStore());
+},
+createMemoryPaymentChallengeStore(),
+undefined,
+undefined,
+staticPricingEngine);
 
 let baseUrl: string;
 const server = app.listen(0);
@@ -612,6 +625,283 @@ test("serves public pre-flight cost and schema metadata", async () => {
   assert.deepEqual(Object.keys(body.mcp_tool.parameters), ["days", "date"]);
   assert.equal(body.response_schema.type, "array");
   assert.equal(invoiceRequestCount, requestsBefore);
+});
+
+test("serves bounded high-demand prices in JSON and L402 metadata", async () => {
+  let now = 1_800_000_000_000;
+  const pricingEngine = createPricingEngine({ now: () => now });
+  for (let index = 0; index < 600; index += 1) {
+    pricingEngine.recordRequest(now);
+  }
+  const pricingApp = express();
+  const issuedAmounts: number[] = [];
+  pricingApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerStratigraphyRoutes(
+    pricingApp,
+    () => ({
+      lookupInvoice: async () => validTransaction as never,
+      makeInvoice: async (request) => {
+        issuedAmounts.push(request.amount);
+        return {
+          ...validTransaction,
+          amount: request.amount,
+          description: request.description,
+          invoice: `lnbc${request.amount}dynamic`,
+          payment_hash: createHash("sha256")
+            .update(`${request.amount}:${request.description}`)
+            .digest("hex"),
+        } as never;
+      },
+      close: () => undefined,
+    }),
+    {
+      now: () => now,
+      reuseMs: 5 * 60 * 1000,
+      limitWindowMs: 60 * 60 * 1000,
+      maxInvoicesPerWindow: 100,
+      maxCallers: 10_000,
+    },
+    createMemoryPaymentChallengeStore(),
+    undefined,
+    undefined,
+    pricingEngine,
+  );
+  const pricingServer = pricingApp.listen(0);
+  await new Promise<void>((resolve) =>
+    pricingServer.once("listening", resolve),
+  );
+  const address = pricingServer.address() as AddressInfo;
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/api/v1/cost`,
+    );
+    assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get("x-l402-subscription-tiers"),
+      "1-day=15, 30-day=250",
+    );
+    const body = await response.json() as {
+      access_tiers: Array<{
+        id: string;
+        price_sats: number;
+        base_price_sats: number;
+        max_price_sats: number;
+      }>;
+      dynamic_pricing: {
+        request_velocity_rpm: number;
+        calculated_at: string;
+      };
+    };
+    assert.deepEqual(
+      body.access_tiers.map(
+        ({ id, price_sats, base_price_sats, max_price_sats }) => ({
+          id,
+          price_sats,
+          base_price_sats,
+          max_price_sats,
+        }),
+      ),
+      [
+        {
+          id: "1-day",
+          price_sats: 15,
+          base_price_sats: 5,
+          max_price_sats: 15,
+        },
+        {
+          id: "30-day",
+          price_sats: 250,
+          base_price_sats: 100,
+          max_price_sats: 250,
+        },
+      ],
+    );
+    assert.equal(body.dynamic_pricing.request_velocity_rpm, 601);
+    assert.equal(
+      body.dynamic_pricing.calculated_at,
+      new Date(now).toISOString(),
+    );
+    const challenge = await fetch(
+      `http://127.0.0.1:${address.port}/api/v1/stratigraphy?days=1`,
+    );
+    assert.equal(challenge.status, 402);
+    const challengeBody = await challenge.json() as {
+      passes: Array<{ price_sats: number; macaroon: string }>;
+    };
+    assert.deepEqual(
+      challengeBody.passes.map(({ price_sats }) => price_sats),
+      [15, 250],
+    );
+    assert.deepEqual(issuedAmounts.sort((a, b) => a - b), [
+      5_000,
+      15_000,
+      250_000,
+    ]);
+    assert.deepEqual(
+      challengeBody.passes.map(({ macaroon }) =>
+        verifySubscriptionMacaroon(
+          macaroon,
+          process.env.SESSION_SECRET!,
+          Math.floor(now / 1000),
+        )?.amountMsats
+      ),
+      [15_000, 250_000],
+    );
+  } finally {
+    pricingServer.close();
+  }
+});
+
+test("binds dynamic payments to their issued quote across later price changes", async () => {
+  const now = Date.now();
+  let velocity = 600;
+  let invoiceSequence = 0;
+  const transactions = new Map<
+    string,
+    Transaction & { preimage: string }
+  >();
+  const mutablePricingEngine = {
+    recordRequest: () => undefined,
+    requestVelocity: () => velocity,
+    quote: (tier: "1-day" | "30-day", epochProgress: number) =>
+      calculateTierCost(tier, epochProgress, velocity),
+  };
+  const dynamicApp = express();
+  dynamicApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerStratigraphyRoutes(
+    dynamicApp,
+    () => ({
+      lookupInvoice: async ({ payment_hash }) =>
+        transactions.get(payment_hash!) as never,
+      makeInvoice: async (request) => {
+        invoiceSequence += 1;
+        const invoicePreimage = createHash("sha256")
+          .update(`dynamic-preimage:${invoiceSequence}`)
+          .digest("hex");
+        const invoicePaymentHash = createHash("sha256")
+          .update(Buffer.from(invoicePreimage, "hex"))
+          .digest("hex");
+        const created = {
+          type: "incoming" as const,
+          state: "settled" as const,
+          amount: request.amount,
+          description: request.description ?? "",
+          payment_hash: invoicePaymentHash,
+          preimage: invoicePreimage,
+          invoice: `lnbc${request.amount}dynamic${invoiceSequence}`,
+          settled_at: Math.floor(now / 1000),
+        };
+        transactions.set(invoicePaymentHash, created);
+        return created as never;
+      },
+      close: () => undefined,
+    }),
+    {
+      now: () => now,
+      reuseMs: 5 * 60 * 1000,
+      limitWindowMs: 60 * 60 * 1000,
+      maxInvoicesPerWindow: 100,
+      maxCallers: 10_000,
+    },
+    createMemoryPaymentChallengeStore(),
+    undefined,
+    undefined,
+    mutablePricingEngine,
+  );
+  const dynamicServer = dynamicApp.listen(0);
+  await new Promise<void>((resolve) =>
+    dynamicServer.once("listening", resolve),
+  );
+  const address = dynamicServer.address() as AddressInfo;
+  const dynamicBaseUrl = `http://127.0.0.1:${address.port}`;
+  try {
+    const highResponse = await fetch(
+      `${dynamicBaseUrl}/api/v1/stratigraphy?days=1`,
+    );
+    assert.equal(highResponse.status, 402);
+    const highChallenge = await highResponse.json() as {
+      passes: Array<{
+        tier: string;
+        price_sats: number;
+        payment_hash: string;
+        macaroon: string;
+      }>;
+    };
+    const highOneDay = highChallenge.passes.find(
+      ({ tier }) => tier === "1-day",
+    );
+    assert.ok(highOneDay);
+    assert.equal(highOneDay.price_sats, 15);
+
+    velocity = 0;
+    const baseResponse = await fetch(
+      `${dynamicBaseUrl}/api/v1/stratigraphy?days=1`,
+    );
+    assert.equal(baseResponse.status, 402);
+    const baseChallenge = await baseResponse.json() as typeof highChallenge;
+    const baseOneDay = baseChallenge.passes.find(
+      ({ tier }) => tier === "1-day",
+    );
+    assert.ok(baseOneDay);
+    assert.equal(baseOneDay.price_sats, 5);
+    assert.notEqual(baseOneDay.payment_hash, highOneDay.payment_hash);
+
+    const highTransaction = transactions.get(highOneDay.payment_hash);
+    assert.ok(highTransaction);
+    const paidAtIssuedPrice = await fetch(
+      `${dynamicBaseUrl}/api/v1/stratigraphy?days=1`,
+      {
+        headers: {
+          Authorization:
+            `L402 ${highOneDay.macaroon}:${highTransaction.preimage}`,
+        },
+      },
+    );
+    assert.equal(paidAtIssuedPrice.status, 200);
+
+    transactions.set(highOneDay.payment_hash, {
+      ...highTransaction,
+      amount: 5_000,
+    });
+    const wrongAmount = await fetch(
+      `${dynamicBaseUrl}/api/v1/stratigraphy?days=1`,
+      {
+        headers: {
+          Authorization:
+            `L402 ${highOneDay.macaroon}:${highTransaction.preimage}`,
+        },
+      },
+    );
+    assert.equal(wrongAmount.status, 402);
+
+    transactions.set(paymentHash, {
+      ...validTransaction,
+      amount: 5_000,
+      description: "Bitcoin Stratigraphy 1-Day Micro-Pass",
+      preimage,
+    });
+    const legacyMacaroon = createSubscriptionMacaroon({
+      secret: process.env.SESSION_SECRET!,
+      paymentHash,
+      tier: "1-day",
+      validUntil: Math.floor(now / 1000) + 3600,
+    });
+    const legacyPaid = await fetch(
+      `${dynamicBaseUrl}/api/v1/stratigraphy?days=1`,
+      {
+        headers: { Authorization: `L402 ${legacyMacaroon}:${preimage}` },
+      },
+    );
+    assert.equal(legacyPaid.status, 200);
+  } finally {
+    dynamicServer.close();
+  }
 });
 
 test("serves public Nostr heartbeat status metadata", async () => {

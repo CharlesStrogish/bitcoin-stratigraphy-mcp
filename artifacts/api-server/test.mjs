@@ -1,11 +1,17 @@
 import { build } from "esbuild";
 import { rm } from "node:fs/promises";
 
-const output = "./dist/stratigraphy.contract.test.mjs";
+const outputs = [
+  "./dist/stratigraphy.contract.test.js",
+  "./dist/pricing.test.js",
+];
 
 await build({
-  entryPoints: ["./src/routes/stratigraphy.contract.test.ts"],
-  outfile: output,
+  entryPoints: {
+    "stratigraphy.contract.test": "./src/routes/stratigraphy.contract.test.ts",
+    "pricing.test": "./tests/unit/pricing.test.ts",
+  },
+  outdir: "./dist",
   bundle: true,
   platform: "node",
   format: "esm",
@@ -17,12 +23,12 @@ await build({
   sourcemap: "inline",
 });
 
-const result = await import("node:child_process").then(
-  ({ spawnSync }) =>
-    spawnSync(process.execPath, ["--test", output], {
-      stdio: "inherit",
-    }),
+const { spawnSync } = await import("node:child_process");
+const results = outputs.map((output) =>
+  spawnSync(process.execPath, ["--test", output], {
+    stdio: "inherit",
+  }),
 );
 
-await rm(output, { force: true });
-process.exitCode = result.status ?? 1;
+await Promise.all(outputs.map((output) => rm(output, { force: true })));
+process.exitCode = results.some((result) => result.status !== 0) ? 1 : 0;

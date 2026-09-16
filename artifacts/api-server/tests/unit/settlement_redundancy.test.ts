@@ -8,8 +8,12 @@ import { createMemoryPaymentChallengeStore } from "../../src/lib/payment-challen
 import { createPostgresPaymentChallengeStore } from "../../src/lib/postgres-payment-challenge-store";
 import { registerStratigraphyRoutes } from "../../src/routes/stratigraphy";
 import { calculateTierCost } from "../../src/services/pricing";
+import {
+  albySettlementMode,
+} from "../../src/services/settlement/alby";
 import { createCoinosSettlementProvider } from "../../src/services/settlement/coinos";
 import {
+  createDefaultSettlementRouter,
   createSettlementRouter,
   SettlementProviderError,
   type SettlementProvider,
@@ -22,6 +26,49 @@ const invoice = (provider: string, sequence = 1) => ({
     .update(`${provider}:${sequence}`)
     .digest("hex"),
   provider,
+});
+
+test("keeps Alby optional in standby while Coinos remains operational", async () => {
+  const configuredNwcUri = process.env.NWC_URI;
+  const configuredAlbyNwcUri = process.env.ALBY_NWC_URI;
+  const configuredFallbackNwcUri = process.env.NWC_FALLBACK_URI;
+  process.env.NWC_URI = "nostr+walletconnect://coinos";
+  delete process.env.ALBY_NWC_URI;
+  delete process.env.NWC_FALLBACK_URI;
+  let closeCalls = 0;
+  const router = createDefaultSettlementRouter(() => ({
+    makeInvoice: async () => ({
+      invoice: "lnbc-coinos-standby",
+      payment_hash: "a".repeat(64),
+    }),
+    lookupInvoice: async () => {
+      throw new Error("unused");
+    },
+    close: () => {
+      closeCalls += 1;
+    },
+  }) as never);
+  try {
+    assert.equal(albySettlementMode(), "standby");
+    assert.equal(router.isConfigured(), true);
+    assert.equal(
+      (await router.createInvoice({
+        amountMsats: 5_000,
+        description: "test",
+        expirySeconds: 3600,
+      })).provider,
+      "coinos",
+    );
+    assert.equal(closeCalls, 1);
+  } finally {
+    if (configuredNwcUri === undefined) delete process.env.NWC_URI;
+    else process.env.NWC_URI = configuredNwcUri;
+    if (configuredAlbyNwcUri === undefined) delete process.env.ALBY_NWC_URI;
+    else process.env.ALBY_NWC_URI = configuredAlbyNwcUri;
+    if (configuredFallbackNwcUri === undefined) {
+      delete process.env.NWC_FALLBACK_URI;
+    } else process.env.NWC_FALLBACK_URI = configuredFallbackNwcUri;
+  }
 });
 
 function provider(input: {

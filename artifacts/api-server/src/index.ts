@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
+import { albySettlementMode } from "./services/settlement/alby";
 
 const rawPort = process.env["PORT"];
 
@@ -23,6 +24,12 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  if (albySettlementMode() === "standby") {
+    logger.warn(
+      { settlementProvider: "alby", mode: "standby" },
+      "Alby settlement fallback is in standby mode; set ALBY_NWC_URI to enable live failover",
+    );
+  }
   void startNostrHeartbeat().catch((error) => {
     logger.warn({ err: error }, "Nostr heartbeat startup failed");
   });

@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,7 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  void startNostrHeartbeat().catch((error) => {
+    logger.warn({ err: error }, "Nostr heartbeat startup failed");
+  });
 });

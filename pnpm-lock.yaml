@@ -197,6 +197,9 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
+      nostr-tools:
+        specifier: 2.25.2
+        version: 2.25.2(typescript@5.9.3)
       pino:
         specifier: ^9.14.0
         version: 9.14.0

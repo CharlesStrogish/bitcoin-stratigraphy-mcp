@@ -2,3 +2,4 @@
 - [Nostr API announcements](nostr-api-announcements.md) — Announce HTTP APIs with general events; reserve NIP-89 for genuine Nostr event-kind handlers.
 - [Workspace-root package installs](workspace-root-package-installs.md) — root dependency installs need pnpm's workspace-root check handled explicitly.
 - [API artifact root routes](api-artifact-root-routes.md) — root-level API endpoints must be listed in artifact service paths or the Replit proxy returns 404.
+- [Macaroon attenuation budgets](macaroon-attenuation-budgets.md) — descendants must consume every inherited request-cap scope atomically, not only their final token cap.

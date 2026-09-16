@@ -120,6 +120,46 @@ export const GetStratigraphyCostResponse = zod.object({
 
 
 /**
+ * @summary Get the latest Nostr heartbeat status
+ */
+export const GetNostrHeartbeatStatusResponse = zod.object({
+  "event_id": zod.string().nullable(),
+  "pubkey": zod.string().nullable(),
+  "published_at": zod.coerce.date().nullable(),
+  "relays": zod.array(zod.object({
+  "relay": zod.string().url(),
+  "status": zod.enum(['pending', 'settled', 'failed']),
+  "message": zod.string().optional()
+}))
+})
+
+
+/**
+ * Requires a valid paid parent macaroon and preimage in the L402 Authorization header. Appends allowed_path and max_requests first-party caveats without exposing the server signing secret.
+ * @summary Create a more restrictive child subscription macaroon
+ */
+export const attenuateMacaroonBodyCaveatsItemRegExp = new RegExp('^(allowed_path=/[^\\s]*|max_requests=[1-9]\\d*)$');
+
+
+
+export const AttenuateMacaroonBody = zod.object({
+  "macaroon": zod.string(),
+  "caveats": zod.array(zod.string().regex(attenuateMacaroonBodyCaveatsItemRegExp)).min(1)
+})
+
+
+
+
+export const AttenuateMacaroonResponse = zod.object({
+  "macaroon": zod.string(),
+  "caveats": zod.object({
+  "allowed_path": zod.array(zod.string()),
+  "max_requests": zod.number().int().min(1).optional()
+})
+})
+
+
+/**
  * Returns public dataset range and cost headers without creating an invoice or requiring L402 authorization.
  * @summary Inspect selected dataset size and cost
  */

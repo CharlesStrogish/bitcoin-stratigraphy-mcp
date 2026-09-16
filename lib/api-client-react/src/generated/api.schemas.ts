@@ -120,6 +120,51 @@ export interface StratigraphyCost {
   response_schema: JsonSchema;
 }
 
+export interface MacaroonAttenuationRequest {
+  macaroon: string;
+  /**
+     * @minItems 1
+     * @items.pattern ^(allowed_path=/[^\s]*|max_requests=[1-9]\d*)$
+     */
+  caveats: string[];
+}
+
+export type MacaroonAttenuationResponseCaveats = {
+  allowed_path: string[];
+  /** @minimum 1 */
+  max_requests?: number;
+};
+
+export interface MacaroonAttenuationResponse {
+  macaroon: string;
+  caveats: MacaroonAttenuationResponseCaveats;
+}
+
+export type NostrHeartbeatStatusRelaysItemStatus = typeof NostrHeartbeatStatusRelaysItemStatus[keyof typeof NostrHeartbeatStatusRelaysItemStatus];
+
+
+export const NostrHeartbeatStatusRelaysItemStatus = {
+  pending: 'pending',
+  settled: 'settled',
+  failed: 'failed',
+} as const;
+
+export type NostrHeartbeatStatusRelaysItem = {
+  relay: string;
+  status: NostrHeartbeatStatusRelaysItemStatus;
+  message?: string;
+};
+
+export interface NostrHeartbeatStatus {
+  /** @nullable */
+  event_id: string | null;
+  /** @nullable */
+  pubkey: string | null;
+  /** @nullable */
+  published_at: string | null;
+  relays: NostrHeartbeatStatusRelaysItem[];
+}
+
 export interface QuantitativeAlpha {
   /** Numeric distance multiplier parsed from the day's title */
   target_multiplier: number;

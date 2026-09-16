@@ -94,6 +94,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StratigraphyCost"
+  /v1/nostr/status:
+    get:
+      operationId: getNostrHeartbeatStatus
+      tags: [health]
+      summary: Get the latest Nostr heartbeat status
+      security: []
+      responses:
+        "200":
+          description: Latest signed event and relay acknowledgement status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NostrHeartbeatStatus"
+  /v1/macaroon/attenuate:
+    post:
+      operationId: attenuateMacaroon
+      tags: [stratigraphy]
+      summary: Create a more restrictive child subscription macaroon
+      description: Requires a valid paid parent macaroon and preimage in the L402 Authorization header. Appends allowed_path and max_requests first-party caveats without exposing the server signing secret.
+      security:
+        - L402: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MacaroonAttenuationRequest"
+      responses:
+        "200":
+          description: Cryptographically attenuated child macaroon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MacaroonAttenuationResponse"
+        "400":
+          description: Invalid request or caveat
+        "401":
+          description: Invalid or unpaid parent macaroon
+        "502":
+          description: Wallet payment verification unavailable
   /v1/stratigraphy:
     head:
       operationId: headPaidStratigraphy
@@ -378,6 +418,60 @@ components:
           items:
             type: string
       required: [type]
+    MacaroonAttenuationRequest:
+      type: object
+      properties:
+        macaroon:
+          type: string
+        caveats:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            pattern: "^(allowed_path=/[^\\s]*|max_requests=[1-9]\\d*)$"
+      required: [macaroon, caveats]
+    MacaroonAttenuationResponse:
+      type: object
+      properties:
+        macaroon:
+          type: string
+        caveats:
+          type: object
+          properties:
+            allowed_path:
+              type: array
+              items:
+                type: string
+            max_requests:
+              type: integer
+              minimum: 1
+          required: [allowed_path]
+      required: [macaroon, caveats]
+    NostrHeartbeatStatus:
+      type: object
+      properties:
+        event_id:
+          type: [string, "null"]
+        pubkey:
+          type: [string, "null"]
+        published_at:
+          type: [string, "null"]
+          format: date-time
+        relays:
+          type: array
+          items:
+            type: object
+            properties:
+              relay:
+                type: string
+                format: uri
+              status:
+                type: string
+                enum: [pending, settled, failed]
+              message:
+                type: string
+            required: [relay, status]
+      required: [event_id, pubkey, published_at, relays]
     StratigraphyEntry:
       type: object
       properties:

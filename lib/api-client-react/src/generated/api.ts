@@ -26,6 +26,9 @@ import type {
   HealthStatus,
   InvalidRangeError,
   L402Challenge,
+  MacaroonAttenuationRequest,
+  MacaroonAttenuationResponse,
+  NostrHeartbeatStatus,
   PaymentChallengeRateLimitError,
   PaymentChallengeServiceUnavailableError,
   PaymentConfigurationError,
@@ -36,7 +39,7 @@ import type {
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -450,6 +453,155 @@ export function useGetStratigraphyCost<TData = Awaited<ReturnType<typeof getStra
 
 
 
+
+export const getGetNostrHeartbeatStatusUrl = () => {
+
+
+
+
+  return `/api/v1/nostr/status`
+}
+
+/**
+ * @summary Get the latest Nostr heartbeat status
+ */
+export const getNostrHeartbeatStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<NostrHeartbeatStatus> => {
+
+  return customFetch<NostrHeartbeatStatus>(getGetNostrHeartbeatStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNostrHeartbeatStatusQueryKey = () => {
+    return [
+    `/api/v1/nostr/status`
+    ] as const;
+    }
+
+
+export const getGetNostrHeartbeatStatusQueryOptions = <TData = Awaited<ReturnType<typeof getNostrHeartbeatStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNostrHeartbeatStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNostrHeartbeatStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNostrHeartbeatStatus>>> = ({ signal }) => getNostrHeartbeatStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNostrHeartbeatStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNostrHeartbeatStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getNostrHeartbeatStatus>>>
+export type GetNostrHeartbeatStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the latest Nostr heartbeat status
+ */
+
+export function useGetNostrHeartbeatStatus<TData = Awaited<ReturnType<typeof getNostrHeartbeatStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNostrHeartbeatStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNostrHeartbeatStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAttenuateMacaroonUrl = () => {
+
+
+
+
+  return `/api/v1/macaroon/attenuate`
+}
+
+/**
+ * Requires a valid paid parent macaroon and preimage in the L402 Authorization header. Appends allowed_path and max_requests first-party caveats without exposing the server signing secret.
+ * @summary Create a more restrictive child subscription macaroon
+ */
+export const attenuateMacaroon = async (macaroonAttenuationRequest: MacaroonAttenuationRequest, options?: Parameters<typeof customFetch>[1]): Promise<MacaroonAttenuationResponse> => {
+
+  return customFetch<MacaroonAttenuationResponse>(getAttenuateMacaroonUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(macaroonAttenuationRequest)
+  }
+);}
+
+
+
+
+
+export const getAttenuateMacaroonMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attenuateMacaroon>>, TError,{data: BodyType<MacaroonAttenuationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof attenuateMacaroon>>, TError,{data: BodyType<MacaroonAttenuationRequest>}, TContext> => {
+
+const mutationKey = ['attenuateMacaroon'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof attenuateMacaroon>>, {data: BodyType<MacaroonAttenuationRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  attenuateMacaroon(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AttenuateMacaroonMutationResult = NonNullable<Awaited<ReturnType<typeof attenuateMacaroon>>>
+    export type AttenuateMacaroonMutationBody = BodyType<MacaroonAttenuationRequest>
+    export type AttenuateMacaroonMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a more restrictive child subscription macaroon
+ */
+export const useAttenuateMacaroon = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attenuateMacaroon>>, TError,{data: BodyType<MacaroonAttenuationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof attenuateMacaroon>>,
+        TError,
+        {data: BodyType<MacaroonAttenuationRequest>},
+        TContext
+      > => {
+      return useMutation(getAttenuateMacaroonMutationOptions(options));
+    }
 
 export const getHeadPaidStratigraphyUrl = (params?: HeadPaidStratigraphyParams,) => {
   const normalizedParams = new URLSearchParams();

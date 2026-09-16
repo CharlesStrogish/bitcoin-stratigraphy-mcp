@@ -19,8 +19,15 @@ import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
 import type { PaymentChallengeStore } from "../lib/payment-challenge-store";
 import { createPostgresPaymentChallengeStore } from "../lib/postgres-payment-challenge-store";
-import { createSubscriptionMacaroon } from "../lib/subscription-pass";
+import {
+  attenuateSubscriptionMacaroon,
+  createSubscriptionMacaroon,
+  verifySubscriptionMacaroon,
+} from "../lib/subscription-pass";
 import { pool } from "@workspace/db";
+import { buildHeartbeatEvent } from "../lib/nostr-heartbeat";
+import { registerNostrStatusRoute } from "./nostr-status";
+import { generateSecretKey, verifyEvent } from "nostr-tools";
 
 const preimage = "11".repeat(32);
 const paymentHash = createHash("sha256")
@@ -135,9 +142,11 @@ let invoiceRequest: Record<string, unknown> | undefined;
 let invoiceRequestCount = 0;
 let invoiceGate: Promise<void> | undefined;
 const app = express();
+app.use(express.json());
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
 registerMcpRoute(app);
+registerNostrStatusRoute(app);
 app.use("/api", healthRouter);
 registerStratigraphyRoutes(app, () => ({
   lookupInvoice: async () => transaction as never,
@@ -587,6 +596,52 @@ test("serves public pre-flight cost and schema metadata", async () => {
   assert.equal(invoiceRequestCount, requestsBefore);
 });
 
+test("serves public Nostr heartbeat status metadata", async () => {
+  const response = await fetch(`${baseUrl}/api/v1/nostr/status`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("www-authenticate"), null);
+  const body = await response.json() as {
+    event_id: string | null;
+    pubkey: string | null;
+    relays: Array<{ relay: string; status: string }>;
+  };
+  assert.equal(body.event_id, null);
+  assert.equal(body.pubkey, null);
+  assert.deepEqual(
+    body.relays.map(({ relay }) => relay),
+    [
+      "wss://relay.damus.io",
+      "wss://nos.lol",
+      "wss://relay.nostr.band",
+    ],
+  );
+});
+
+test("builds a valid signed parameterized Nostr heartbeat", () => {
+  const event = buildHeartbeatEvent(
+    generateSecretKey(),
+    422,
+    1_800_000_000,
+    "https://example.com",
+  );
+  assert.equal(event.kind, 30078);
+  assert.ok(event.tags.some((tag) => tag[0] === "d"));
+  assert.equal(verifyEvent(event), true);
+  const content = JSON.parse(event.content) as {
+    status: string;
+    dataset_height: number;
+    access_tiers: Array<{ price_sats: number }>;
+    mcp_endpoint: string;
+  };
+  assert.equal(content.status, "healthy");
+  assert.equal(content.dataset_height, 422);
+  assert.deepEqual(
+    content.access_tiers.map(({ price_sats }) => price_sats),
+    [5, 100],
+  );
+  assert.equal(content.mcp_endpoint, "https://example.com/mcp");
+});
+
 test("serves public HEAD range and cost metadata without an L402 challenge", async () => {
   const requestsBefore = invoiceRequestCount;
   const response = await fetch(`${baseUrl}/api/v1/stratigraphy?days=10`, {
@@ -915,6 +970,104 @@ test("accepts a paid subscription pass for unlimited queries until expiration", 
         await assertValidReceipt(response, paymentHash);
       }
     }
+  } finally {
+    transaction = validTransaction;
+  }
+});
+
+test("recursively verifies attenuated caveats and enforces restrictions", async () => {
+  const secret = process.env.SESSION_SECRET!;
+  const validUntil = Math.floor(Date.now() / 1000) + 3600;
+  const master = createSubscriptionMacaroon({
+    secret,
+    paymentHash,
+    tier: "1-day",
+    validUntil,
+  });
+  const firstChild = attenuateSubscriptionMacaroon(master, [
+    "allowed_path=/api/v1/stratigraphy",
+    "max_requests=1",
+  ]);
+  assert.ok(firstChild);
+  const secondChild = attenuateSubscriptionMacaroon(firstChild, [
+    "max_requests=5",
+  ]);
+  assert.ok(secondChild);
+  const verified = verifySubscriptionMacaroon(
+    secondChild,
+    secret,
+    Math.floor(Date.now() / 1000),
+  );
+  assert.ok(verified);
+  assert.equal(verified.paymentHash, paymentHash);
+  assert.equal(verified.validUntil, validUntil);
+  assert.deepEqual(verified.allowedPaths, ["/api/v1/stratigraphy"]);
+  assert.equal(verified.maxRequests, 1);
+
+  transaction = {
+    ...validTransaction,
+    amount: 5_000,
+    description: "Bitcoin Stratigraphy 1-Day Micro-Pass",
+  };
+  try {
+    const first = await fetch(`${baseUrl}/api/v1/stratigraphy?days=1`, {
+      headers: { Authorization: `L402 ${firstChild}:${preimage}` },
+    });
+    assert.equal(first.status, 200);
+    const second = await fetch(`${baseUrl}/api/v1/stratigraphy?days=1`, {
+      headers: { Authorization: `L402 ${secondChild}:${preimage}` },
+    });
+    assert.equal(second.status, 429);
+
+    const denied = attenuateSubscriptionMacaroon(master, [
+      "allowed_path=/api/v1/stratigraphy/today",
+    ]);
+    assert.ok(denied);
+    const deniedResponse = await fetch(`${baseUrl}/api/v1/stratigraphy`, {
+      headers: { Authorization: `L402 ${denied}:${preimage}` },
+    });
+    assert.equal(deniedResponse.status, 403);
+  } finally {
+    transaction = validTransaction;
+  }
+});
+
+test("attenuates a paid parent macaroon through the helper route", async () => {
+  const challengeResponse = await fetch(`${baseUrl}/api/v1/stratigraphy`);
+  const challenge = await challengeResponse.json() as {
+    passes: Array<{ tier: string; macaroon: string }>;
+  };
+  const parent = challenge.passes.find(({ tier }) => tier === "1-day");
+  assert.ok(parent);
+  transaction = {
+    ...validTransaction,
+    amount: 5_000,
+    description: "Bitcoin Stratigraphy 1-Day Micro-Pass",
+  };
+  try {
+    const response = await fetch(`${baseUrl}/api/v1/macaroon/attenuate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `L402 ${parent.macaroon}:${preimage}`,
+      },
+      body: JSON.stringify({
+        macaroon: parent.macaroon,
+        caveats: [
+          "allowed_path=/api/v1/stratigraphy",
+          "max_requests=2",
+        ],
+      }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json() as { macaroon: string };
+    const child = verifySubscriptionMacaroon(
+      body.macaroon,
+      process.env.SESSION_SECRET!,
+      Math.floor(Date.now() / 1000),
+    );
+    assert.deepEqual(child?.allowedPaths, ["/api/v1/stratigraphy"]);
+    assert.equal(child?.maxRequests, 2);
   } finally {
     transaction = validTransaction;
   }

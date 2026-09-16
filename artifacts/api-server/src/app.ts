@@ -8,6 +8,8 @@ import { registerMcpRoute } from "./routes/mcp";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
 import { logger } from "./lib/logger";
 import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
+import { registerNostrStatusRoute } from "./routes/nostr-status";
+import { createPostgresMacaroonUsageStore } from "./lib/postgres-macaroon-usage-store";
 
 const app: Express = express();
 
@@ -52,12 +54,14 @@ app.use(express.urlencoded({ extended: true }));
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
 registerMcpRoute(app);
+registerNostrStatusRoute(app);
 app.use("/api", router);
 registerStratigraphyRoutes(
   app,
   undefined,
   undefined,
   createPostgresPaymentChallengeStore(),
+  createPostgresMacaroonUsageStore(),
 );
 
 export default app;

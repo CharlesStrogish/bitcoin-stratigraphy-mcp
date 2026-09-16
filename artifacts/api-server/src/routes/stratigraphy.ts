@@ -16,11 +16,16 @@ import {
   type PaymentChallengeStore,
 } from "../lib/payment-challenge-store";
 import {
+  attenuateSubscriptionMacaroon,
   createSubscriptionMacaroon,
   SUBSCRIPTION_TIERS,
   type SubscriptionTier,
   verifySubscriptionMacaroon,
 } from "../lib/subscription-pass";
+import {
+  createMemoryMacaroonUsageStore,
+  type MacaroonUsageStore,
+} from "../lib/macaroon-usage-store";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -149,6 +154,12 @@ let datasetPromise: ReturnType<typeof readValidatedDataset> | undefined;
 export function readDataset() {
   datasetPromise ??= readValidatedDataset();
   return datasetPromise;
+}
+
+export async function refreshDataset() {
+  const refreshed = await readValidatedDataset();
+  datasetPromise = Promise.resolve(refreshed);
+  return refreshed;
 }
 
 type NwcClient = Pick<NWCClient, "lookupInvoice" | "makeInvoice" | "close">;
@@ -548,6 +559,7 @@ export function registerStratigraphyRoutes(
   clientFactory: NwcClientFactory = createNwcClient,
   policy: ChallengePolicy = defaultChallengePolicy,
   challengeStore: PaymentChallengeStore = createMemoryPaymentChallengeStore(),
+  macaroonUsageStore: MacaroonUsageStore = createMemoryMacaroonUsageStore(),
 ): void {
   app.get("/api", (_req, res): void => {
     res.status(200).json({
@@ -628,6 +640,90 @@ export function registerStratigraphyRoutes(
     });
   });
 
+  app.post(
+    "/api/v1/macaroon/attenuate",
+    async (req: Request, res: Response): Promise<void> => {
+      const authorization = parseL402Authorization(
+        req.header("Authorization"),
+      );
+      const parentMacaroon =
+        typeof req.body?.macaroon === "string" ? req.body.macaroon : undefined;
+      const rawCaveats: unknown = req.body?.caveats;
+      const caveats =
+        Array.isArray(rawCaveats) &&
+        rawCaveats.every((caveat): caveat is string => typeof caveat === "string")
+          ? rawCaveats
+          : undefined;
+      const secret = process.env.SESSION_SECRET;
+      if (
+        !secret ||
+        !authorization ||
+        authorization.kind !== "subscription" ||
+        parentMacaroon !== authorization.macaroon ||
+        !caveats ||
+        caveats.length === 0
+      ) {
+        res.status(400).json({ error: "Invalid attenuation request" });
+        return;
+      }
+      const parent = verifySubscriptionMacaroon(
+        parentMacaroon,
+        secret,
+        Math.floor(policy.now() / 1000),
+      );
+      if (!parent) {
+        res.status(401).json({ error: "Invalid parent macaroon" });
+        return;
+      }
+      const nwcUri = process.env.NWC_URI;
+      if (!nwcUri) {
+        res.status(500).json({ error: "NWC_URI is not configured" });
+        return;
+      }
+      const definition = SUBSCRIPTION_TIERS[parent.tier];
+      const verification = await verifyPayment(
+        nwcUri,
+        parent.paymentHash,
+        authorization.preimage,
+        clientFactory,
+        definition.amountMsats,
+        definition.description,
+      );
+      if (verification === "unavailable") {
+        res.status(502).json({ error: "Unable to verify payment" });
+        return;
+      }
+      if (
+        typeof verification !== "object" ||
+        verification.settledAt <= 0 ||
+        Math.floor(policy.now() / 1000) >=
+          verification.settledAt + definition.durationSeconds
+      ) {
+        res.status(401).json({ error: "Invalid parent macaroon" });
+        return;
+      }
+      const macaroon = attenuateSubscriptionMacaroon(parentMacaroon, caveats);
+      if (!macaroon) {
+        res.status(400).json({ error: "Invalid attenuation caveats" });
+        return;
+      }
+      const child = verifySubscriptionMacaroon(
+        macaroon,
+        secret,
+        Math.floor(policy.now() / 1000),
+      );
+      res.status(200).json({
+        macaroon,
+        caveats: child
+          ? {
+              allowed_path: child.allowedPaths,
+              max_requests: child.maxRequests,
+            }
+          : undefined,
+      });
+    },
+  );
+
   app.head(
     "/api/v1/stratigraphy",
     async (req: Request, res: Response): Promise<void> => {
@@ -692,6 +788,12 @@ export function registerStratigraphyRoutes(
               Math.floor(policy.now() / 1000),
             );
           if (pass) {
+            if (
+              pass.allowedPaths.some((allowedPath) => allowedPath !== req.path)
+            ) {
+              res.status(403).json({ error: "Macaroon path is not allowed" });
+              return;
+            }
             const definition = SUBSCRIPTION_TIERS[pass.tier];
             const verification = await verifyPayment(
               nwcUri,
@@ -711,6 +813,18 @@ export function registerStratigraphyRoutes(
               Math.floor(policy.now() / 1000) <
                 verification.settledAt + definition.durationSeconds
             ) {
+              if (
+                pass.maxRequests !== undefined &&
+                !(await macaroonUsageStore.consume(
+                  pass.requestLimits,
+                  pass.validUntil,
+                ))
+              ) {
+                res.status(429).json({
+                  error: "Macaroon request limit exhausted",
+                });
+                return;
+              }
               sendPaidDataset(
                 res,
                 selectedRange.records,

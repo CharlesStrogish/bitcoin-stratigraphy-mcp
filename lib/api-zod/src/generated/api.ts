@@ -62,6 +62,80 @@ export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).mi
 
 
 /**
+ * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization.
+ * @summary Inspect dataset access costs and schemas
+ */
+export const getStratigraphyCostResponseAccessTiersMin = 2;
+export const getStratigraphyCostResponseAccessTiersMax = 2;
+
+export const getStratigraphyCostResponseDatasetDaysMin = 422;
+
+export const getStratigraphyCostResponseDatasetLastDayMin = 422;
+
+
+
+export const GetStratigraphyCostResponse = zod.object({
+  "protocol": zod.literal("L402"),
+  "access_tiers": zod.array(zod.object({
+  "id": zod.enum(['1-day', '30-day']),
+  "duration_days": zod.number().int(),
+  "price_sats": zod.number().int()
+})).min(getStratigraphyCostResponseAccessTiersMin).max(getStratigraphyCostResponseAccessTiersMax),
+  "legacy_query_pricing": zod.object({
+  "sats_per_day": zod.literal(1),
+  "minimum_sats": zod.literal(5)
+}),
+  "dataset": zod.object({
+  "days": zod.number().int().min(getStratigraphyCostResponseDatasetDaysMin),
+  "first_day": zod.literal(1),
+  "last_day": zod.number().int().min(getStratigraphyCostResponseDatasetLastDayMin),
+  "grows_over_time": zod.literal(true)
+}),
+  "mcp_tool": zod.object({
+  "name": zod.literal("get_bitcoin_stratigraphy"),
+  "parameters": zod.object({
+  "days": zod.object({
+  "type": zod.string(),
+  "minimum": zod.number().int().optional(),
+  "maximum": zod.number().int().optional(),
+  "format": zod.string().optional(),
+  "required": zod.boolean()
+}),
+  "date": zod.object({
+  "type": zod.string(),
+  "minimum": zod.number().int().optional(),
+  "maximum": zod.number().int().optional(),
+  "format": zod.string().optional(),
+  "required": zod.boolean()
+})
+})
+}),
+  "response_schema": zod.object({
+  "type": zod.string(),
+  "items": zod.record(zod.string(), zod.unknown()).optional(),
+  "properties": zod.record(zod.string(), zod.unknown()).optional(),
+  "required": zod.array(zod.string()).optional()
+})
+})
+
+
+/**
+ * Returns public dataset range and cost headers without creating an invoice or requiring L402 authorization.
+ * @summary Inspect selected dataset size and cost
+ */
+export const headPaidStratigraphyQueryDaysMax = 422;
+
+
+
+export const HeadPaidStratigraphyQueryParams = zod.object({
+  "days": zod.coerce.number().int().min(1).max(headPaidStratigraphyQueryDaysMax).optional(),
+  "from": zod.date().optional()
+})
+
+export const HeadPaidStratigraphyResponse = zod.unknown()
+
+
+/**
  * Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable passes provide unlimited queries for 24 hours (5 sats) or 30 days (100 sats).
  * @summary Get the complete L402-protected dataset
  */

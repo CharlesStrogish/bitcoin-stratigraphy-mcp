@@ -80,7 +80,63 @@ paths:
                 maxItems: 5
                 items:
                   $ref: "#/components/schemas/StratigraphyEntry"
+  /v1/cost:
+    get:
+      operationId: getStratigraphyCost
+      tags: [stratigraphy]
+      summary: Inspect dataset access costs and schemas
+      description: Returns public pre-flight metadata without creating an invoice or requiring L402 authorization.
+      security: []
+      responses:
+        "200":
+          description: Dataset access, MCP parameter, and response schema metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StratigraphyCost"
   /v1/stratigraphy:
+    head:
+      operationId: headPaidStratigraphy
+      tags: [stratigraphy]
+      summary: Inspect selected dataset size and cost
+      description: Returns public dataset range and cost headers without creating an invoice or requiring L402 authorization.
+      security: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 422
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Selected dataset metadata
+          headers:
+            X-Stratigraphy-Records:
+              schema:
+                type: integer
+            X-Stratigraphy-First-Day:
+              schema:
+                type: integer
+            X-Stratigraphy-Last-Day:
+              schema:
+                type: integer
+            X-L402-Cost-Sats:
+              schema:
+                type: integer
+            X-L402-Minimum-Cost-Sats:
+              schema:
+                type: integer
+            X-L402-Subscription-Tiers:
+              schema:
+                type: string
+        "400":
+          description: Invalid or conflicting range parameters
     get:
       operationId: getPaidStratigraphy
       tags: [stratigraphy]
@@ -105,6 +161,11 @@ paths:
       responses:
         "200":
           description: Complete stratigraphy dataset after payment
+          headers:
+            X-L402-Receipt:
+              description: JSON receipt containing the exact response-body hash, verified payment hash, delivery timestamp, and HMAC-SHA256 signature
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -216,6 +277,107 @@ components:
       required:
         - status
         - dependencies
+    StratigraphyCost:
+      type: object
+      properties:
+        protocol:
+          type: string
+          const: L402
+        access_tiers:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                enum: [1-day, 30-day]
+              duration_days:
+                type: integer
+              price_sats:
+                type: integer
+            required: [id, duration_days, price_sats]
+        legacy_query_pricing:
+          type: object
+          properties:
+            sats_per_day:
+              type: integer
+              const: 1
+            minimum_sats:
+              type: integer
+              const: 5
+          required: [sats_per_day, minimum_sats]
+        dataset:
+          type: object
+          properties:
+            days:
+              type: integer
+              minimum: 422
+            first_day:
+              type: integer
+              const: 1
+            last_day:
+              type: integer
+              minimum: 422
+            grows_over_time:
+              type: boolean
+              const: true
+          required: [days, first_day, last_day, grows_over_time]
+        mcp_tool:
+          type: object
+          properties:
+            name:
+              type: string
+              const: get_bitcoin_stratigraphy
+            parameters:
+              type: object
+              properties:
+                days:
+                  $ref: "#/components/schemas/McpToolParameter"
+                date:
+                  $ref: "#/components/schemas/McpToolParameter"
+              required: [days, date]
+          required: [name, parameters]
+        response_schema:
+          $ref: "#/components/schemas/JsonSchema"
+      required:
+        - protocol
+        - access_tiers
+        - legacy_query_pricing
+        - dataset
+        - mcp_tool
+        - response_schema
+    McpToolParameter:
+      type: object
+      properties:
+        type:
+          type: string
+        minimum:
+          type: integer
+        maximum:
+          type: integer
+        format:
+          type: string
+        required:
+          type: boolean
+      required: [type, required]
+    JsonSchema:
+      type: object
+      properties:
+        type:
+          type: string
+        items:
+          type: object
+          additionalProperties: true
+        properties:
+          type: object
+          additionalProperties: true
+        required:
+          type: array
+          items:
+            type: string
+      required: [type]
     StratigraphyEntry:
       type: object
       properties:

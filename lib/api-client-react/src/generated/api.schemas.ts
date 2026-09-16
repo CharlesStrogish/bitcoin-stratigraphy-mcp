@@ -50,6 +50,76 @@ export interface ReadinessStatus {
   dependencies: ReadinessStatusDependencies;
 }
 
+export type StratigraphyCostAccessTiersItemId = typeof StratigraphyCostAccessTiersItemId[keyof typeof StratigraphyCostAccessTiersItemId];
+
+
+export const StratigraphyCostAccessTiersItemId = {
+  '1-day': '1-day',
+  '30-day': '30-day',
+} as const;
+
+export type StratigraphyCostAccessTiersItem = {
+  id: StratigraphyCostAccessTiersItemId;
+  duration_days: number;
+  price_sats: number;
+};
+
+export type StratigraphyCostLegacyQueryPricing = {
+  sats_per_day: 1;
+  minimum_sats: 5;
+};
+
+export type StratigraphyCostDataset = {
+  /** @minimum 422 */
+  days: number;
+  first_day: 1;
+  /** @minimum 422 */
+  last_day: number;
+  grows_over_time: true;
+};
+
+export interface McpToolParameter {
+  type: string;
+  minimum?: number;
+  maximum?: number;
+  format?: string;
+  required: boolean;
+}
+
+export type StratigraphyCostMcpToolParameters = {
+  days: McpToolParameter;
+  date: McpToolParameter;
+};
+
+export type StratigraphyCostMcpTool = {
+  name: 'get_bitcoin_stratigraphy';
+  parameters: StratigraphyCostMcpToolParameters;
+};
+
+export type JsonSchemaItems = { [key: string]: unknown };
+
+export type JsonSchemaProperties = { [key: string]: unknown };
+
+export interface JsonSchema {
+  type: string;
+  items?: JsonSchemaItems;
+  properties?: JsonSchemaProperties;
+  required?: string[];
+}
+
+export interface StratigraphyCost {
+  protocol: 'L402';
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  access_tiers: StratigraphyCostAccessTiersItem[];
+  legacy_query_pricing: StratigraphyCostLegacyQueryPricing;
+  dataset: StratigraphyCostDataset;
+  mcp_tool: StratigraphyCostMcpTool;
+  response_schema: JsonSchema;
+}
+
 export interface QuantitativeAlpha {
   /** Numeric distance multiplier parsed from the day's title */
   target_multiplier: number;
@@ -138,6 +208,15 @@ export const WalletGatewayErrorError = {
 export interface WalletGatewayError {
   error: WalletGatewayErrorError;
 }
+
+export type HeadPaidStratigraphyParams = {
+/**
+ * @minimum 1
+ * @maximum 422
+ */
+days?: number;
+from?: string;
+};
 
 export type GetPaidStratigraphyParams = {
 /**

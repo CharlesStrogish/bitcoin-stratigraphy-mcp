@@ -32,7 +32,20 @@ app.use(
     },
   }),
 );
-app.use(cors({ exposedHeaders: ["WWW-Authenticate"] }));
+app.use(
+  cors({
+    exposedHeaders: [
+      "WWW-Authenticate",
+      "X-L402-Receipt",
+      "X-Stratigraphy-Records",
+      "X-Stratigraphy-First-Day",
+      "X-Stratigraphy-Last-Day",
+      "X-L402-Cost-Sats",
+      "X-L402-Minimum-Cost-Sats",
+      "X-L402-Subscription-Tiers",
+    ],
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

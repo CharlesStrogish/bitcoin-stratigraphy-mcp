@@ -6,11 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -18,6 +22,7 @@ import type {
 import type {
   DatasetHealthStatus,
   GetPaidStratigraphyParams,
+  HeadPaidStratigraphyParams,
   HealthStatus,
   InvalidRangeError,
   L402Challenge,
@@ -25,6 +30,7 @@ import type {
   PaymentChallengeServiceUnavailableError,
   PaymentConfigurationError,
   ReadinessStatus,
+  StratigraphyCost,
   StratigraphyEntry,
   WalletGatewayError
 } from './api.schemas';
@@ -366,6 +372,163 @@ export function useGetStratigraphy<TData = Awaited<ReturnType<typeof getStratigr
 
 
 
+
+export const getGetStratigraphyCostUrl = () => {
+
+
+
+
+  return `/api/v1/cost`
+}
+
+/**
+ * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization.
+ * @summary Inspect dataset access costs and schemas
+ */
+export const getStratigraphyCost = async ( options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyCost> => {
+
+  return customFetch<StratigraphyCost>(getGetStratigraphyCostUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStratigraphyCostQueryKey = () => {
+    return [
+    `/api/v1/cost`
+    ] as const;
+    }
+
+
+export const getGetStratigraphyCostQueryOptions = <TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStratigraphyCostQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStratigraphyCost>>> = ({ signal }) => getStratigraphyCost({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStratigraphyCostQueryResult = NonNullable<Awaited<ReturnType<typeof getStratigraphyCost>>>
+export type GetStratigraphyCostQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Inspect dataset access costs and schemas
+ */
+
+export function useGetStratigraphyCost<TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStratigraphyCostQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getHeadPaidStratigraphyUrl = (params?: HeadPaidStratigraphyParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/stratigraphy?${stringifiedParams}` : `/api/v1/stratigraphy`
+}
+
+/**
+ * Returns public dataset range and cost headers without creating an invoice or requiring L402 authorization.
+ * @summary Inspect selected dataset size and cost
+ */
+export const headPaidStratigraphy = async (params?: HeadPaidStratigraphyParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getHeadPaidStratigraphyUrl(params),
+  {
+    ...options,
+    method: 'HEAD'
+
+
+  }
+);}
+
+
+
+
+
+export const getHeadPaidStratigraphyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headPaidStratigraphy>>, TError,{params?: HeadPaidStratigraphyParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof headPaidStratigraphy>>, TError,{params?: HeadPaidStratigraphyParams}, TContext> => {
+
+const mutationKey = ['headPaidStratigraphy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof headPaidStratigraphy>>, {params?: HeadPaidStratigraphyParams}> = (props) => {
+          const {params} = props ?? {};
+
+          return  headPaidStratigraphy(params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type HeadPaidStratigraphyMutationResult = NonNullable<Awaited<ReturnType<typeof headPaidStratigraphy>>>
+
+    export type HeadPaidStratigraphyMutationError = ErrorType<void>
+
+    /**
+ * @summary Inspect selected dataset size and cost
+ */
+export const useHeadPaidStratigraphy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headPaidStratigraphy>>, TError,{params?: HeadPaidStratigraphyParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof headPaidStratigraphy>>,
+        TError,
+        {params?: HeadPaidStratigraphyParams},
+        TContext
+      > => {
+      return useMutation(getHeadPaidStratigraphyMutationOptions(options));
+    }
 
 export const getGetPaidStratigraphyUrl = (params?: GetPaidStratigraphyParams,) => {
   const normalizedParams = new URLSearchParams();

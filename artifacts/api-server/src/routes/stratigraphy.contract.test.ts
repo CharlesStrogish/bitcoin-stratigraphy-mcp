@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { after, before, test } from "node:test";
@@ -193,6 +193,31 @@ async function mcpRequest(method: string, params?: Record<string, unknown>) {
     result?: Record<string, any>;
     error?: { message: string };
   };
+}
+
+async function assertValidReceipt(response: Response, expectedPaymentHash: string) {
+  const rawBody = await response.text();
+  const receipt = JSON.parse(response.headers.get("x-l402-receipt") ?? "") as {
+    payload_sha256: string;
+    payment_hash: string;
+    timestamp: string;
+    signature: string;
+  };
+  assert.equal(
+    receipt.payload_sha256,
+    createHash("sha256").update(rawBody).digest("hex"),
+  );
+  assert.equal(receipt.payment_hash, expectedPaymentHash);
+  assert.equal(new Date(receipt.timestamp).toISOString(), receipt.timestamp);
+  assert.equal(
+    receipt.signature,
+    createHmac("sha256", process.env.SESSION_SECRET!)
+      .update(
+        receipt.payload_sha256 + receipt.payment_hash + receipt.timestamp,
+      )
+      .digest("hex"),
+  );
+  return JSON.parse(rawBody) as unknown;
 }
 
 test("keeps served and shared payment OpenAPI contracts in parity", async () => {
@@ -536,6 +561,63 @@ test("serves the root OpenAPI document as raw JSON", async () => {
   assert.deepEqual(await response.json(), openApiDocument);
 });
 
+test("serves public pre-flight cost and schema metadata", async () => {
+  const requestsBefore = invoiceRequestCount;
+  const response = await fetch(`${baseUrl}/api/v1/cost`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("www-authenticate"), null);
+  const body = await response.json() as {
+    access_tiers: Array<{ id: string; price_sats: number }>;
+    dataset: { days: number; grows_over_time: boolean };
+    mcp_tool: { name: string; parameters: Record<string, unknown> };
+    response_schema: { type: string };
+  };
+  assert.deepEqual(
+    body.access_tiers.map(({ id, price_sats }) => ({ id, price_sats })),
+    [
+      { id: "1-day", price_sats: 5 },
+      { id: "30-day", price_sats: 100 },
+    ],
+  );
+  assert.equal(body.dataset.days, 422);
+  assert.equal(body.dataset.grows_over_time, true);
+  assert.equal(body.mcp_tool.name, "get_bitcoin_stratigraphy");
+  assert.deepEqual(Object.keys(body.mcp_tool.parameters), ["days", "date"]);
+  assert.equal(body.response_schema.type, "array");
+  assert.equal(invoiceRequestCount, requestsBefore);
+});
+
+test("serves public HEAD range and cost metadata without an L402 challenge", async () => {
+  const requestsBefore = invoiceRequestCount;
+  const response = await fetch(`${baseUrl}/api/v1/stratigraphy?days=10`, {
+    method: "HEAD",
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("www-authenticate"), null);
+  assert.equal(response.headers.get("x-stratigraphy-records"), "10");
+  assert.equal(response.headers.get("x-stratigraphy-first-day"), "413");
+  assert.equal(response.headers.get("x-stratigraphy-last-day"), "422");
+  assert.equal(response.headers.get("x-l402-cost-sats"), "10");
+  assert.equal(
+    response.headers.get("x-l402-subscription-tiers"),
+    "1-day=5, 30-day=100",
+  );
+  assert.equal(await response.text(), "");
+  assert.equal(invoiceRequestCount, requestsBefore);
+});
+
+test("rejects invalid public HEAD ranges without creating an invoice", async () => {
+  const requestsBefore = invoiceRequestCount;
+  const response = await fetch(
+    `${baseUrl}/api/v1/stratigraphy?days=5&from=2026-09-01`,
+    { method: "HEAD" },
+  );
+  assert.equal(response.status, 400);
+  assert.equal(response.headers.get("www-authenticate"), null);
+  assert.equal(await response.text(), "");
+  assert.equal(invoiceRequestCount, requestsBefore);
+});
+
 test("keeps OpenAPI public while the paid dataset requires L402", async () => {
   const configuredNwcUri = process.env.NWC_URI;
   process.env.NWC_URI = "nostr+walletconnect://configured";
@@ -830,6 +912,7 @@ test("accepts a paid subscription pass for unlimited queries until expiration", 
           },
         );
         assert.equal(response.status, 200);
+        await assertValidReceipt(response, paymentHash);
       }
     }
   } finally {
@@ -1475,7 +1558,7 @@ test("returns the full dataset for a suitable payment", async () => {
     headers: { Authorization: `L402 ${paymentHash}:${preimage}` },
   });
   assert.equal(response.status, 200);
-  const body = (await response.json()) as unknown[];
+  const body = (await assertValidReceipt(response, paymentHash)) as unknown[];
   assert.ok(body.length > 5);
 });
 

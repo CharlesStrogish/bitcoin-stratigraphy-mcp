@@ -8,7 +8,7 @@ import {
   type Request,
   type Response,
 } from "express";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
@@ -29,6 +29,38 @@ const CHALLENGE_REUSE_MS = 5 * 60 * 1000;
 const INVOICE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const MAX_INVOICES_PER_WINDOW = 5;
 const MAX_CHALLENGE_CALLERS = 10_000;
+const RESPONSE_SCHEMA = {
+  type: "array",
+  items: {
+    type: "object",
+    required: [
+      "day",
+      "title",
+      "video_id",
+      "transcript_summary",
+      "quantitative_alpha",
+    ],
+    properties: {
+      day: { type: "integer" },
+      title: { type: "string" },
+      video_id: { type: "string" },
+      transcript_summary: { type: "string" },
+      quantitative_alpha: {
+        type: "object",
+        required: [
+          "target_multiplier",
+          "difficulty_epoch_progress",
+          "thermodynamic_signal",
+        ],
+        properties: {
+          target_multiplier: { type: "number" },
+          difficulty_epoch_progress: { type: "string" },
+          thermodynamic_signal: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
 const datasetPath = fileURLToPath(
   new URL("../data/stratigraphy.json", import.meta.url),
 );
@@ -294,6 +326,35 @@ function parseL402Authorization(value: string | undefined) {
       };
 }
 
+function sendPaidDataset(
+  res: Response,
+  records: Dataset,
+  paymentHash: string,
+  timestampMs: number,
+): void {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    res.status(500).json({ error: "SESSION_SECRET is not configured" });
+    return;
+  }
+  const body = JSON.stringify(records);
+  const payloadSha256 = createHash("sha256").update(body).digest("hex");
+  const timestamp = new Date(timestampMs).toISOString();
+  const signature = createHmac("sha256", secret)
+    .update(payloadSha256 + paymentHash + timestamp)
+    .digest("hex");
+  res.setHeader(
+    "X-L402-Receipt",
+    JSON.stringify({
+      payload_sha256: payloadSha256,
+      payment_hash: paymentHash,
+      timestamp,
+      signature,
+    }),
+  );
+  res.status(200).type("application/json").send(body);
+}
+
 async function verifyPayment(
   nwcUri: string,
   paymentHash: string,
@@ -529,6 +590,75 @@ export function registerStratigraphyRoutes(
     res.status(200).json(data.slice(-5));
   });
 
+  app.get("/api/v1/cost", async (_req, res): Promise<void> => {
+    const dataset = await readDataset();
+    res.status(200).json({
+      protocol: "L402",
+      access_tiers: [
+        { id: "1-day", duration_days: 1, price_sats: 5 },
+        { id: "30-day", duration_days: 30, price_sats: 100 },
+      ],
+      legacy_query_pricing: {
+        sats_per_day: 1,
+        minimum_sats: MIN_INVOICE_SATS,
+      },
+      dataset: {
+        days: dataset.length,
+        first_day: dataset[0].day,
+        last_day: dataset.at(-1)!.day,
+        grows_over_time: true,
+      },
+      mcp_tool: {
+        name: "get_bitcoin_stratigraphy",
+        parameters: {
+          days: {
+            type: "integer",
+            minimum: 1,
+            maximum: dataset.length,
+            required: false,
+          },
+          date: {
+            type: "string",
+            format: "date",
+            required: false,
+          },
+        },
+      },
+      response_schema: RESPONSE_SCHEMA,
+    });
+  });
+
+  app.head(
+    "/api/v1/stratigraphy",
+    async (req: Request, res: Response): Promise<void> => {
+      const dataset = await readDataset();
+      const selectedRange = selectRange(req, dataset);
+      if (typeof selectedRange === "string") {
+        res.status(400).end();
+        return;
+      }
+      res.setHeader("X-Stratigraphy-Records", String(selectedRange.records.length));
+      res.setHeader(
+        "X-Stratigraphy-First-Day",
+        String(selectedRange.records[0].day),
+      );
+      res.setHeader(
+        "X-Stratigraphy-Last-Day",
+        String(selectedRange.records.at(-1)!.day),
+      );
+      res.setHeader(
+        "X-L402-Cost-Sats",
+        String(selectedRange.amountMsats / 1_000),
+      );
+      res.setHeader("X-L402-Minimum-Cost-Sats", String(MIN_INVOICE_SATS));
+      res.setHeader(
+        "X-L402-Subscription-Tiers",
+        "1-day=5, 30-day=100",
+      );
+      res.status(200).end();
+    },
+  );
+
   app.get(
     "/api/v1/stratigraphy",
     async (req: Request, res: Response): Promise<void> => {
@@ -581,7 +711,12 @@ export function registerStratigraphyRoutes(
               Math.floor(policy.now() / 1000) <
                 verification.settledAt + definition.durationSeconds
             ) {
-              res.status(200).json(selectedRange.records);
+              sendPaidDataset(
+                res,
+                selectedRange.records,
+                pass.paymentHash,
+                policy.now(),
+              );
               return;
             }
           }
@@ -612,7 +747,12 @@ export function registerStratigraphyRoutes(
               "Unable to remove consumed payment challenge",
             );
           }
-          res.status(200).json(selectedRange.records);
+          sendPaidDataset(
+            res,
+            selectedRange.records,
+            authorization.paymentHash,
+            policy.now(),
+          );
           return;
         }
         }

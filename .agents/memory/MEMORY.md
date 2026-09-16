@@ -7,3 +7,4 @@
 - [Dynamic pass price binding](dynamic-pass-price-binding.md) — bind each issued scarcity price into the macaroon and cache scope; verify against issuance, not the latest quote.
 - [Settlement failover invariants](settlement-failover-invariants.md) — abort timed-out clients, single-probe recovery, and cache fallback invoices under predicted and actual providers.
 - [Paid SSE lifecycle](paid-sse-lifecycle.md) — authenticate before headers, propagate disconnect aborts through paid checks, bound upstream reads, and stop shared timers at zero listeners.
+- [L402 SDK payment coordination](l402-sdk-payment-coordination.md) — bind preimages to challenge hashes and never let delayed 402 responses replace or repay newer credentials.

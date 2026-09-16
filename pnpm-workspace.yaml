@@ -38,6 +38,7 @@ packages:
   - artifacts/*
   - lib/*
   - lib/integrations/*
+  - sdk/*
   - scripts
 
 catalog:

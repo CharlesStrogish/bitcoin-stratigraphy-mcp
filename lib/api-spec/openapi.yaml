@@ -134,6 +134,12 @@ paths:
           description: Invalid or unpaid parent macaroon
         "502":
           description: Wallet payment verification unavailable
+        "503":
+          description: Token revocation lookup unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenRevocationServiceUnavailableError"
   /v1/macaroon/revoke:
     post:
       operationId: revokeMacaroon
@@ -281,11 +287,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/WalletGatewayError"
         "503":
-          description: Payment challenge coordination is unavailable
+          description: Payment challenge coordination or token revocation lookup is unavailable
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaymentChallengeServiceUnavailableError"
+                oneOf:
+                  - $ref: "#/components/schemas/PaymentChallengeServiceUnavailableError"
+                  - $ref: "#/components/schemas/TokenRevocationServiceUnavailableError"
 components:
   securitySchemes:
     L402:
@@ -300,6 +308,7 @@ components:
   schemas:
     MacaroonRevocationRequest:
       type: object
+      additionalProperties: false
       properties:
         macaroon:
           type: string
@@ -309,7 +318,7 @@ components:
         reason:
           type: string
           maxLength: 500
-      anyOf:
+      oneOf:
         - required: [macaroon]
         - required: [signature_id]
     MacaroonRevocationResponse:
@@ -326,6 +335,14 @@ components:
       required:
         - signature_id
         - revoked_at
+    TokenRevocationServiceUnavailableError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: Token revocation service unavailable
+      required:
+        - error
     HealthStatus:
       type: object
       properties:

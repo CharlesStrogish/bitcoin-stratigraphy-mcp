@@ -29,6 +29,8 @@ import { pool } from "@workspace/db";
 import { buildHeartbeatEvent } from "../lib/nostr-heartbeat";
 import { registerNostrStatusRoute } from "./nostr-status";
 import { generateSecretKey, verifyEvent } from "nostr-tools";
+import { createMemoryMacaroonRevocationStore } from "../lib/macaroon-revocation-store";
+import { createPostgresMacaroonRevocationStore } from "../lib/postgres-macaroon-revocation-store";
 
 const preimage = "11".repeat(32);
 const paymentHash = createHash("sha256")
@@ -381,12 +383,21 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
       >
     )["503"],
     {
-      description: "Payment challenge coordination is unavailable",
+      description:
+        "Payment challenge coordination or token revocation lookup is unavailable",
       content: {
         "application/json": {
           schema: {
-            $ref:
-              "#/components/schemas/PaymentChallengeServiceUnavailableError",
+            oneOf: [
+              {
+                $ref:
+                  "#/components/schemas/PaymentChallengeServiceUnavailableError",
+              },
+              {
+                $ref:
+                  "#/components/schemas/TokenRevocationServiceUnavailableError",
+              },
+            ],
           },
         },
       },
@@ -1149,6 +1160,7 @@ test("revokes a macaroon before payment validation", async () => {
 
 test("revokes by signature id idempotently", async () => {
   const signatureId = "ab".repeat(32);
+  let firstRevokedAt: string | undefined;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const response = await fetch(`${baseUrl}/api/v1/macaroon/revoke`, {
       method: "POST",
@@ -1165,7 +1177,164 @@ test("revokes by signature id idempotently", async () => {
     };
     assert.equal(body.signature_id, signatureId);
     assert.equal(new Date(body.revoked_at).toISOString(), body.revoked_at);
+    firstRevokedAt ??= body.revoked_at;
+    assert.equal(body.revoked_at, firstRevokedAt);
   }
+});
+
+test("revokes only the selected final macaroon signature", async () => {
+  const secret = process.env.SESSION_SECRET!;
+  const parent = createSubscriptionMacaroon({
+    secret,
+    paymentHash,
+    tier: "1-day",
+    validUntil: Math.floor(Date.now() / 1000) + 7200,
+  });
+  const revokedChild = attenuateSubscriptionMacaroon(parent, [
+    "allowed_path=/api/v1/stratigraphy",
+  ]);
+  const sibling = attenuateSubscriptionMacaroon(parent, ["max_requests=2"]);
+  assert.ok(revokedChild);
+  assert.ok(sibling);
+  const response = await fetch(`${baseUrl}/api/v1/macaroon/revoke`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${operatorSecret}`,
+    },
+    body: JSON.stringify({ macaroon: revokedChild }),
+  });
+  assert.equal(response.status, 200);
+
+  transaction = {
+    ...validTransaction,
+    amount: 5_000,
+    description: "Bitcoin Stratigraphy 1-Day Micro-Pass",
+  };
+  try {
+    const revokedResponse = await fetch(
+      `${baseUrl}/api/v1/stratigraphy?days=1`,
+      {
+        headers: { Authorization: `L402 ${revokedChild}:${preimage}` },
+      },
+    );
+    assert.equal(revokedResponse.status, 401);
+    for (const macaroon of [sibling, parent]) {
+      const allowed = await fetch(`${baseUrl}/api/v1/stratigraphy?days=1`, {
+        headers: { Authorization: `L402 ${macaroon}:${preimage}` },
+      });
+      assert.equal(allowed.status, 200);
+    }
+  } finally {
+    transaction = validTransaction;
+  }
+});
+
+test("fails closed before payment lookup when revocation storage is unavailable", async () => {
+  const secret = process.env.SESSION_SECRET!;
+  const macaroon = createSubscriptionMacaroon({
+    secret,
+    paymentHash,
+    tier: "1-day",
+    validUntil: Math.floor(Date.now() / 1000) + 3600,
+  });
+  let paymentLookups = 0;
+  const unavailableApp = express();
+  unavailableApp.use(express.json());
+  unavailableApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerStratigraphyRoutes(
+    unavailableApp,
+    () => ({
+      lookupInvoice: async () => {
+        paymentLookups += 1;
+        return validTransaction as never;
+      },
+      makeInvoice: async () => validTransaction as never,
+      close: () => undefined,
+    }),
+    undefined,
+    createMemoryPaymentChallengeStore(),
+    undefined,
+    {
+      isRevoked: async () => {
+        throw new Error("database unavailable");
+      },
+      revoke: async () => {
+        throw new Error("database unavailable");
+      },
+    },
+  );
+  const unavailableServer = unavailableApp.listen(0);
+  await new Promise<void>((resolve) =>
+    unavailableServer.once("listening", resolve),
+  );
+  const address = unavailableServer.address() as AddressInfo;
+  const unavailableBaseUrl = `http://127.0.0.1:${address.port}`;
+  try {
+    for (const request of [
+      {
+        url: `${unavailableBaseUrl}/api/v1/stratigraphy`,
+        init: {
+          headers: { Authorization: `L402 ${macaroon}:${preimage}` },
+        },
+      },
+      {
+        url: `${unavailableBaseUrl}/api/v1/macaroon/attenuate`,
+        init: {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `L402 ${macaroon}:${preimage}`,
+          },
+          body: JSON.stringify({ macaroon, caveats: ["max_requests=1"] }),
+        },
+      },
+    ]) {
+      const response = await fetch(request.url, request.init);
+      assert.equal(response.status, 503);
+      assert.deepEqual(await response.json(), {
+        error: "Token revocation service unavailable",
+      });
+    }
+    assert.equal(paymentLookups, 0);
+  } finally {
+    unavailableServer.close();
+  }
+});
+
+test("uses parameterized idempotent PostgreSQL revocation queries", async () => {
+  const calls: Array<{ text: string; values?: unknown[] }> = [];
+  const revokedAt = new Date("2026-09-16T01:00:00.000Z");
+  const databasePool = {
+    async query<Row>(text: string, values?: unknown[]) {
+      calls.push({ text, values });
+      if (text.includes("SELECT EXISTS")) {
+        return { rows: [{ revoked: true }] as Row[] };
+      }
+      return {
+        rows: [{
+          signature_id: "cd".repeat(32),
+          revoked_at: revokedAt,
+          reason: "compromised",
+        }] as Row[],
+      };
+    },
+  };
+  const store = createPostgresMacaroonRevocationStore(databasePool);
+  const signatureId = "cd".repeat(32);
+  assert.equal(await store.isRevoked(signatureId), true);
+  const result = await store.revoke(signatureId, "compromised");
+  assert.deepEqual(result, {
+    signatureId,
+    revokedAt,
+    reason: "compromised",
+  });
+  assert.deepEqual(calls[0].values, [signatureId]);
+  assert.deepEqual(calls[1].values, [signatureId, "compromised"]);
+  assert.match(calls[1].text, /ON CONFLICT \(signature_id\) DO UPDATE/);
 });
 
 test("rejects expired or tampered subscription caveats during proof checks", async () => {

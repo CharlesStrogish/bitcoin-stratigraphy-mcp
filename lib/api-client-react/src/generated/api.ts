@@ -37,6 +37,7 @@ import type {
   ReadinessStatus,
   StratigraphyCost,
   StratigraphyEntry,
+  TokenRevocationServiceUnavailableError,
   WalletGatewayError
 } from './api.schemas';
 
@@ -560,7 +561,7 @@ export const attenuateMacaroon = async (macaroonAttenuationRequest: MacaroonAtte
 
 
 
-export const getAttenuateMacaroonMutationOptions = <TError = ErrorType<void>,
+export const getAttenuateMacaroonMutationOptions = <TError = ErrorType<void | TokenRevocationServiceUnavailableError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attenuateMacaroon>>, TError,{data: BodyType<MacaroonAttenuationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof attenuateMacaroon>>, TError,{data: BodyType<MacaroonAttenuationRequest>}, TContext> => {
 
@@ -589,12 +590,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AttenuateMacaroonMutationResult = NonNullable<Awaited<ReturnType<typeof attenuateMacaroon>>>
     export type AttenuateMacaroonMutationBody = BodyType<MacaroonAttenuationRequest>
-    export type AttenuateMacaroonMutationError = ErrorType<void>
+    export type AttenuateMacaroonMutationError = ErrorType<void | TokenRevocationServiceUnavailableError>
 
     /**
  * @summary Create a more restrictive child subscription macaroon
  */
-export const useAttenuateMacaroon = <TError = ErrorType<void>,
+export const useAttenuateMacaroon = <TError = ErrorType<void | TokenRevocationServiceUnavailableError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attenuateMacaroon>>, TError,{data: BodyType<MacaroonAttenuationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof attenuateMacaroon>>,
@@ -797,7 +798,7 @@ export const getGetPaidStratigraphyQueryKey = (params?: GetPaidStratigraphyParam
     }
 
 
-export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>>(params?: GetPaidStratigraphyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>>(params?: GetPaidStratigraphyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -816,14 +817,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetPaidStratigraphyQueryResult = NonNullable<Awaited<ReturnType<typeof getPaidStratigraphy>>>
-export type GetPaidStratigraphyQueryError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>
+export type GetPaidStratigraphyQueryError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>
 
 
 /**
  * @summary Get the complete L402-protected dataset
  */
 
-export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError>>(
+export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>>(
  params?: GetPaidStratigraphyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

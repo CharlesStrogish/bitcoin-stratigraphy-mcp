@@ -20,6 +20,11 @@ export interface MacaroonRevocationResponse {
   reason?: string;
 }
 
+export const TokenRevocationServiceUnavailableErrorValue = {
+  error: 'Token revocation service unavailable',
+} as const;
+export type TokenRevocationServiceUnavailableError = typeof TokenRevocationServiceUnavailableErrorValue;
+
 export interface HealthStatus {
   status: string;
 }

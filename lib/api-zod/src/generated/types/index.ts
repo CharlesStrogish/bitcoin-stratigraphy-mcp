@@ -43,5 +43,6 @@ export * from './stratigraphyCostLegacyQueryPricing';
 export * from './stratigraphyCostMcpTool';
 export * from './stratigraphyCostMcpToolParameters';
 export * from './stratigraphyEntry';
+export * from './tokenRevocationServiceUnavailableError';
 export * from './walletGatewayError';
 export * from './walletGatewayErrorError';

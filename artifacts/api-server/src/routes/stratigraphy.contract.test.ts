@@ -28,13 +28,19 @@ import {
 import { pool } from "@workspace/db";
 import { buildHeartbeatEvent } from "../lib/nostr-heartbeat";
 import { registerNostrStatusRoute } from "./nostr-status";
-import { generateSecretKey, verifyEvent } from "nostr-tools";
+import {
+  finalizeEvent,
+  generateSecretKey,
+  getPublicKey,
+  verifyEvent,
+} from "nostr-tools";
 import { createMemoryMacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { createPostgresMacaroonRevocationStore } from "../lib/postgres-macaroon-revocation-store";
 import {
   calculateTierCost,
   createPricingEngine,
 } from "../services/pricing";
+import { createAgentReputationService } from "../services/agentReputation";
 
 const preimage = "11".repeat(32);
 const paymentHash = createHash("sha256")
@@ -42,6 +48,9 @@ const paymentHash = createHash("sha256")
   .digest("hex");
 const invoice = "lnbc210n1contracttest";
 const operatorSecret = "contract-test-operator-secret";
+const vipAgentKey = generateSecretKey();
+const vipAgentPubkey = getPublicKey(vipAgentKey);
+const otherAgentKey = generateSecretKey();
 process.env.MACAROON_OPERATOR_SECRET = operatorSecret;
 const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
@@ -157,7 +166,43 @@ const staticPricingEngine = {
   requestVelocity: () => 0,
   quote: (tier: "1-day" | "30-day") => calculateTierCost(tier),
 };
-app.use(express.json());
+
+function agentAuthorization(
+  key: Uint8Array,
+  url: string,
+  method = "GET",
+  payload?: string,
+) {
+  const event = finalizeEvent(
+    {
+      kind: 27_235,
+      created_at: Math.floor(Date.now() / 1_000),
+      tags: [
+        ["u", url],
+        ["method", method],
+        ...(payload === undefined
+          ? []
+          : [
+              [
+                "payload",
+                createHash("sha256").update(payload).digest("hex"),
+              ],
+            ]),
+      ],
+      content: "",
+    },
+    key,
+  );
+  return `Nostr ${Buffer.from(JSON.stringify(event)).toString("base64")}`;
+}
+app.use(
+  express.json({
+    verify(req, _res, buffer) {
+      (req as express.Request & { rawBody?: Buffer }).rawBody =
+        Buffer.from(buffer);
+    },
+  }),
+);
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
 registerMcpRoute(app);
@@ -185,7 +230,13 @@ registerStratigraphyRoutes(app, () => ({
 createMemoryPaymentChallengeStore(),
 undefined,
 undefined,
-staticPricingEngine);
+staticPricingEngine,
+undefined,
+{
+  agentReputation: createAgentReputationService({
+    tiers: { [vipAgentPubkey]: "VIP" },
+  }),
+});
 
 let baseUrl: string;
 const server = app.listen(0);
@@ -627,6 +678,146 @@ test("serves public pre-flight cost and schema metadata", async () => {
   assert.deepEqual(Object.keys(body.mcp_tool.parameters), ["days", "date"]);
   assert.equal(body.response_schema.type, "array");
   assert.equal(invoiceRequestCount, requestsBefore);
+});
+
+test("applies NIP-98 agent discounts and binds issued pass caveats", async () => {
+  const costUrl = `${baseUrl}/api/v1/cost`;
+  const costResponse = await fetch(costUrl, {
+    headers: { Authorization: agentAuthorization(vipAgentKey, costUrl) },
+  });
+  assert.equal(costResponse.status, 200);
+  const cost = (await costResponse.json()) as {
+    agent: {
+      pubkey: string;
+      tier: string;
+      discount_percent: number;
+      rate_limit_multiplier: number;
+    };
+    access_tiers: Array<{
+      id: string;
+      price_sats: number;
+      original_price_sats: number;
+    }>;
+  };
+  assert.deepEqual(cost.agent, {
+    pubkey: vipAgentPubkey,
+    tier: "VIP",
+    discount_percent: 15,
+    rate_limit_multiplier: 2,
+  });
+  assert.deepEqual(
+    cost.access_tiers.find(({ id }) => id === "30-day"),
+    {
+      id: "30-day",
+      duration_days: 30,
+      price_sats: 85,
+      original_price_sats: 100,
+      discount_sats: 15,
+      discount_percent: 15,
+      base_price_sats: 100,
+      max_price_sats: 250,
+      multiplier: 1,
+    },
+  );
+
+  const paidUrl = `${baseUrl}/api/v1/stratigraphy`;
+  const challengeResponse = await fetch(paidUrl, {
+    headers: { Authorization: agentAuthorization(vipAgentKey, paidUrl) },
+  });
+  assert.equal(challengeResponse.status, 402);
+  const challenge = (await challengeResponse.json()) as {
+    passes: Array<{
+      tier: string;
+      macaroon: string;
+      price_sats: number;
+      original_price_sats: number;
+      agent_tier: string;
+    }>;
+  };
+  const pass = challenge.passes.find(({ tier }) => tier === "30-day");
+  assert.ok(pass);
+  assert.equal(pass.price_sats, 85);
+  assert.equal(pass.original_price_sats, 100);
+  assert.equal(pass.agent_tier, "VIP");
+  const inspected = verifySubscriptionMacaroon(
+    pass.macaroon,
+    process.env.SESSION_SECRET!,
+    Math.floor(Date.now() / 1_000),
+  );
+  assert.equal(inspected?.agentPubkey, vipAgentPubkey);
+  assert.equal(inspected?.agentTier, "VIP");
+
+  const mismatch = await fetch(paidUrl, {
+    headers: {
+      Authorization: `L402 ${pass.macaroon}:${preimage}`,
+      "X-Nostr-Authorization": agentAuthorization(otherAgentKey, paidUrl),
+    },
+  });
+  assert.equal(mismatch.status, 401);
+  assert.deepEqual(await mismatch.json(), {
+    error: "Agent identity does not match macaroon caveat",
+  });
+
+  transaction = {
+    ...validTransaction,
+    amount: 85_000,
+    description: "Bitcoin Stratigraphy 30-Day Pass",
+  };
+  try {
+    const accepted = await fetch(paidUrl, {
+      headers: {
+        Authorization: `L402 ${pass.macaroon}:${preimage}`,
+        "X-Nostr-Authorization": agentAuthorization(vipAgentKey, paidUrl),
+      },
+    });
+    assert.equal(accepted.status, 200);
+    const body = (await accepted.json()) as unknown[];
+    assert.ok(body.length > 5);
+
+    const attenuationUrl = `${baseUrl}/api/v1/macaroon/attenuate`;
+    const attenuationBody = JSON.stringify({
+      macaroon: pass.macaroon,
+      caveats: ["max_requests=2"],
+    });
+    const attenuation = await fetch(attenuationUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `L402 ${pass.macaroon}:${preimage}`,
+        "X-Nostr-Authorization": agentAuthorization(
+          vipAgentKey,
+          attenuationUrl,
+          "POST",
+          attenuationBody,
+        ),
+      },
+      body: attenuationBody,
+    });
+    assert.equal(attenuation.status, 200);
+    const child = (await attenuation.json()) as { macaroon: string };
+    assert.ok(
+      verifySubscriptionMacaroon(
+        child.macaroon,
+        process.env.SESSION_SECRET!,
+        Math.floor(Date.now() / 1_000),
+        createAgentReputationService({
+          tiers: { [vipAgentPubkey]: "VIP" },
+        }).identityForPubkey(vipAgentPubkey),
+      ),
+    );
+  } finally {
+    transaction = validTransaction;
+  }
+});
+
+test("rejects an empty attenuation request without a server error", async () => {
+  const response = await fetch(`${baseUrl}/api/v1/macaroon/attenuate`, {
+    method: "POST",
+  });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "Invalid attenuation request",
+  });
 });
 
 test("serves bounded high-demand prices in JSON and L402 metadata", async () => {

@@ -52,6 +52,11 @@ import {
   createNostrAttestor,
   type NostrAttestor,
 } from "../services/nostrAttestation";
+import {
+  createAgentReputationService,
+  type AgentIdentity,
+  type AgentReputationService,
+} from "../services/agentReputation";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -359,6 +364,35 @@ function parseL402Authorization(value: string | undefined) {
       };
 }
 
+function requestNip98Url(req: Request): string {
+  const configuredOrigin = process.env.NIP98_PUBLIC_ORIGIN;
+  const origin = configuredOrigin
+    ? new URL(configuredOrigin).origin
+    : `${req.protocol}://${req.get("host")}`;
+  return new URL(req.originalUrl, `${origin}/`).toString();
+}
+
+function verifyRequestAgent(
+  req: Request,
+  reputation: AgentReputationService,
+  nowMs: number,
+  payload?: Uint8Array,
+): { provided: boolean; identity?: AgentIdentity } {
+  const supplemental = req.header("X-Nostr-Authorization");
+  const primary = req.header("Authorization");
+  const authorization =
+    supplemental ?? (primary?.startsWith("Nostr ") ? primary : undefined);
+  if (!authorization) return { provided: false };
+  const identity = reputation.verifyNip98Authorization({
+    authorization,
+    method: req.method,
+    url: requestNip98Url(req),
+    nowSeconds: Math.floor(nowMs / 1_000),
+    payload,
+  });
+  return identity ? { provided: true, identity } : { provided: true };
+}
+
 function operatorAuthorized(value: string | undefined, secret: string) {
   const match = /^Bearer\s+(.+)$/.exec(value?.trim() ?? "");
   if (!match) return false;
@@ -432,19 +466,33 @@ async function sendPaymentChallenge(
   description: string,
   pricingEngine: PricingEngine,
   difficultyEpochProgress: number,
+  reputation: AgentReputationService,
+  agent?: AgentIdentity,
 ) {
   try {
+    const agentScope = agent ? `:agent:${agent.pubkey}` : "";
+    const adjustedPolicy = agent
+      ? {
+          ...policy,
+          maxInvoicesPerWindow: Math.max(
+            1,
+            Math.floor(
+              policy.maxInvoicesPerWindow * agent.rateLimitMultiplier,
+            ),
+          ),
+        }
+      : policy;
     const getChallenge = async (
       scope: string,
       challengeAmountMsats: number,
       challengeDescription: string,
     ) => {
       const providerScope =
-        `${scope}:settlement:${settlementRouter.activeProvider()}`;
+        `${scope}${agentScope}:settlement:${settlementRouter.activeProvider()}`;
       return challengeStore.getOrCreate(
         caller,
         providerScope,
-        policy,
+        adjustedPolicy,
         async () => {
           try {
             const challenge = await settlementRouter.createInvoice({
@@ -458,7 +506,7 @@ async function sendPaymentChallenge(
           }
         },
         (challenge) =>
-          `${scope}:settlement:${
+          `${scope}${agentScope}:settlement:${
             challenge.provider ?? settlementRouter.activeProvider()
           }`,
       );
@@ -482,13 +530,24 @@ async function sendPaymentChallenge(
             difficultyEpochProgress,
             policy.now(),
           );
-          const amountMsats = pricing.priceSats * 1_000;
+          const adjustedPricing = reputation.applyPricing(
+            pricing.priceSats,
+            agent,
+          );
+          const amountMsats = adjustedPricing.priceSats * 1_000;
           const result = await getChallenge(
             `subscription:${tier}:${amountMsats}`,
             amountMsats,
             definition.description,
           );
-          return { tier, definition, pricing, amountMsats, result };
+          return {
+            tier,
+            definition,
+            pricing,
+            adjustedPricing,
+            amountMsats,
+            result,
+          };
         },
       ),
     );
@@ -508,7 +567,7 @@ async function sendPaymentChallenge(
       return;
     }
     const passes = passResults.map(
-      ({ tier, definition, pricing, amountMsats, result }) => {
+      ({ tier, definition, pricing, adjustedPricing, amountMsats, result }) => {
       if (result.kind !== "challenge") throw new Error("unreachable");
       const validUntil =
         Math.floor(result.challenge.issuedAt / 1000) +
@@ -524,9 +583,14 @@ async function sendPaymentChallenge(
           tier,
           validUntil,
           amountMsats,
+          agentIdentity: agent,
         }),
         valid_until: validUntil,
-        price_sats: pricing.priceSats,
+        price_sats: adjustedPricing.priceSats,
+        original_price_sats: pricing.priceSats,
+        discount_sats: adjustedPricing.discountSats,
+        discount_percent: adjustedPricing.discountPercent,
+        agent_tier: adjustedPricing.tier,
       };
       },
     );
@@ -537,7 +601,7 @@ async function sendPaymentChallenge(
         `L402 macaroon="${legacyResult.challenge.paymentHash}", invoice="${legacyResult.challenge.invoice}"`,
         ...passes.map(
           (pass) =>
-            `L402 macaroon="${pass.macaroon}", invoice="${pass.invoice}", tier="${pass.tier}"`,
+            `L402 macaroon="${pass.macaroon}", invoice="${pass.invoice}", tier="${pass.tier}", price_sats="${pass.price_sats}", agent_tier="${pass.agent_tier}"`,
         ),
       ],
     );
@@ -545,6 +609,14 @@ async function sendPaymentChallenge(
     res.status(402).json({
       invoice: legacyResult.challenge.invoice,
       payment_hash: legacyResult.challenge.paymentHash,
+      agent: agent
+        ? {
+            pubkey: agent.pubkey,
+            tier: agent.tier,
+            discount_percent: agent.discountPercent,
+            rate_limit_multiplier: agent.rateLimitMultiplier,
+          }
+        : undefined,
       passes,
     });
   } catch (error) {
@@ -571,6 +643,7 @@ export function registerStratigraphyRoutes(
   streamOptions: {
     telemetryHub?: StratigraphyTelemetryHub;
     heartbeatScheduler?: IntervalScheduler;
+    agentReputation?: AgentReputationService;
   } = {},
 ): void {
   const attest = createNostrAttestor();
@@ -595,6 +668,8 @@ export function registerStratigraphyRoutes(
     });
   const heartbeatScheduler =
     streamOptions.heartbeatScheduler ?? nodeIntervalScheduler;
+  const agentReputation =
+    streamOptions.agentReputation ?? createAgentReputationService();
   app.use("/api/v1", (_req, _res, next) => {
     pricingEngine.recordRequest(policy.now());
     next();
@@ -639,27 +714,57 @@ export function registerStratigraphyRoutes(
     res.status(200).json(data.slice(-5));
   });
 
-  app.get("/api/v1/cost", async (_req, res): Promise<void> => {
+  app.get("/api/v1/cost", async (req, res): Promise<void> => {
     const dataset = await readDataset();
     const epochProgress = currentDifficultyEpochProgress(dataset);
     const calculatedAt = policy.now();
+    const agentAuth = verifyRequestAgent(req, agentReputation, calculatedAt);
+    if (agentAuth.provided && !agentAuth.identity) {
+      res.status(401).json({ error: "Invalid NIP-98 authorization" });
+      return;
+    }
     const quotes = (Object.keys(SUBSCRIPTION_TIERS) as SubscriptionTier[]).map(
       (tier) => pricingEngine.quote(tier, epochProgress, calculatedAt),
     );
     res.setHeader(
       "X-L402-Subscription-Tiers",
-      quotes.map(({ tier, priceSats }) => `${tier}=${priceSats}`).join(", "),
+      quotes
+        .map((quote) => {
+          const adjusted = agentReputation.applyPricing(
+            quote.priceSats,
+            agentAuth.identity,
+          );
+          return `${quote.tier}=${adjusted.priceSats}`;
+        })
+        .join(", "),
     );
     res.status(200).json({
       protocol: "L402",
-      access_tiers: quotes.map((quote) => ({
-        id: quote.tier,
-        duration_days: quote.tier === "1-day" ? 1 : 30,
-        price_sats: quote.priceSats,
-        base_price_sats: quote.basePriceSats,
-        max_price_sats: quote.maxPriceSats,
-        multiplier: quote.multiplier,
-      })),
+      access_tiers: quotes.map((quote) => {
+        const adjusted = agentReputation.applyPricing(
+          quote.priceSats,
+          agentAuth.identity,
+        );
+        return {
+          id: quote.tier,
+          duration_days: quote.tier === "1-day" ? 1 : 30,
+          price_sats: adjusted.priceSats,
+          original_price_sats: quote.priceSats,
+          discount_sats: adjusted.discountSats,
+          discount_percent: adjusted.discountPercent,
+          base_price_sats: quote.basePriceSats,
+          max_price_sats: quote.maxPriceSats,
+          multiplier: quote.multiplier,
+        };
+      }),
+      agent: agentAuth.identity
+        ? {
+            pubkey: agentAuth.identity.pubkey,
+            tier: agentAuth.identity.tier,
+            discount_percent: agentAuth.identity.discountPercent,
+            rate_limit_multiplier: agentAuth.identity.rateLimitMultiplier,
+          }
+        : undefined,
       dynamic_pricing: {
         difficulty_epoch_progress: epochProgress,
         request_velocity_rpm: pricingEngine.requestVelocity(calculatedAt),
@@ -751,6 +856,22 @@ export function registerStratigraphyRoutes(
   app.post(
     "/api/v1/macaroon/attenuate",
     async (req: Request, res: Response): Promise<void> => {
+      const serializedBody = JSON.stringify(req.body);
+      const agentPayload =
+        (req as Request & { rawBody?: Buffer }).rawBody ??
+        (serializedBody === undefined
+          ? undefined
+          : Buffer.from(serializedBody));
+      const agentAuth = verifyRequestAgent(
+        req,
+        agentReputation,
+        policy.now(),
+        agentPayload,
+      );
+      if (agentAuth.provided && !agentAuth.identity) {
+        res.status(401).json({ error: "Invalid NIP-98 authorization" });
+        return;
+      }
       const authorization = parseL402Authorization(
         req.header("Authorization"),
       );
@@ -788,6 +909,7 @@ export function registerStratigraphyRoutes(
         parentMacaroon,
         secret,
         Math.floor(policy.now() / 1000),
+        agentAuth.identity ?? null,
       );
       if (!parent) {
         res.status(401).json({ error: "Invalid parent macaroon" });
@@ -826,6 +948,7 @@ export function registerStratigraphyRoutes(
         macaroon,
         secret,
         Math.floor(policy.now() / 1000),
+        agentAuth.identity ?? null,
       );
       res.status(200).json({
         macaroon,
@@ -926,6 +1049,15 @@ export function registerStratigraphyRoutes(
       const authorization = parseL402Authorization(
         req.header("Authorization"),
       );
+      const agentAuth = verifyRequestAgent(
+        req,
+        agentReputation,
+        policy.now(),
+      );
+      if (agentAuth.provided && !agentAuth.identity) {
+        res.status(401).json({ error: "Invalid NIP-98 authorization" });
+        return;
+      }
       let paymentHash: string | undefined;
       if (authorization?.kind === "subscription") {
         if (
@@ -946,7 +1078,21 @@ export function registerStratigraphyRoutes(
             authorization.macaroon,
             secret,
             Math.floor(policy.now() / 1000),
+            agentAuth.identity ?? null,
           );
+        const structurallyValidPass = secret
+          ? verifySubscriptionMacaroon(
+            authorization.macaroon,
+            secret,
+            Math.floor(policy.now() / 1000),
+          )
+          : null;
+        if (structurallyValidPass?.agentPubkey && !pass) {
+          res.status(401).json({
+            error: "Agent identity does not match macaroon caveat",
+          });
+          return;
+        }
         if (pass) {
           if (
             pass.allowedPaths.some((allowedPath) => allowedPath !== req.path)
@@ -1007,12 +1153,16 @@ export function registerStratigraphyRoutes(
           settlementRouter,
           challengeStore,
           policy,
-          caller,
+          agentAuth.identity
+            ? `nostr:${agentAuth.identity.pubkey}`
+            : caller,
           `stream:${selectedRange.key}`,
           selectedRange.amountMsats,
           selectedRange.description,
           pricingEngine,
           currentDifficultyEpochProgress(dataset),
+          agentReputation,
+          agentAuth.identity,
         );
         return;
       }
@@ -1092,6 +1242,15 @@ export function registerStratigraphyRoutes(
       const authorization = parseL402Authorization(
         req.header("Authorization"),
       );
+      const agentAuth = verifyRequestAgent(
+        req,
+        agentReputation,
+        policy.now(),
+      );
+      if (agentAuth.provided && !agentAuth.identity) {
+        res.status(401).json({ error: "Invalid NIP-98 authorization" });
+        return;
+      }
       if (authorization) {
         if (authorization.kind === "subscription") {
           if (
@@ -1111,7 +1270,21 @@ export function registerStratigraphyRoutes(
               authorization.macaroon,
               secret,
               Math.floor(policy.now() / 1000),
+              agentAuth.identity ?? null,
             );
+          const structurallyValidPass = secret
+            ? verifySubscriptionMacaroon(
+              authorization.macaroon,
+              secret,
+              Math.floor(policy.now() / 1000),
+            )
+            : null;
+          if (structurallyValidPass?.agentPubkey && !pass) {
+            res.status(401).json({
+              error: "Agent identity does not match macaroon caveat",
+            });
+            return;
+          }
           if (pass) {
             if (
               pass.allowedPaths.some((allowedPath) => allowedPath !== req.path)
@@ -1202,12 +1375,16 @@ export function registerStratigraphyRoutes(
         settlementRouter,
         challengeStore,
         policy,
-        caller,
+        agentAuth.identity
+          ? `nostr:${agentAuth.identity.pubkey}`
+          : caller,
         selectedRange.key,
         selectedRange.amountMsats,
         selectedRange.description,
         pricingEngine,
         currentDifficultyEpochProgress(dataset),
+        agentReputation,
+        agentAuth.identity,
       );
     },
   );

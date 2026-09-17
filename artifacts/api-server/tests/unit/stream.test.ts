@@ -3,7 +3,12 @@ import { createHash } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 import express from "express";
-import { verifyEvent } from "nostr-tools";
+import {
+  finalizeEvent,
+  generateSecretKey,
+  getPublicKey,
+  verifyEvent,
+} from "nostr-tools";
 import { createMemoryPaymentChallengeStore } from "../../src/lib/payment-challenge-store";
 import { createSubscriptionMacaroon } from "../../src/lib/subscription-pass";
 import { registerStratigraphyRoutes } from "../../src/routes/stratigraphy";
@@ -16,6 +21,13 @@ import { readLiveBitcoinTelemetry } from "../../src/services/stratigraphy-stream
 import type {
   SettlementRouter,
 } from "../../src/services/settlement";
+import { createAgentReputationService } from "../../src/services/agentReputation";
+
+const vipAgentKey = generateSecretKey();
+const vipAgentPubkey = getPublicKey(vipAgentKey);
+const vipAgentReputation = createAgentReputationService({
+  tiers: { [vipAgentPubkey]: "VIP" },
+});
 
 const telemetry: StratigraphyTelemetry = {
   observed_at: "2026-09-16T12:00:00.000Z",
@@ -149,6 +161,7 @@ async function withStreamServer(
     {
       telemetryHub: hubState.hub,
       heartbeatScheduler: schedulerState.scheduler,
+      agentReputation: vipAgentReputation,
     },
   );
   const server = app.listen(0);
@@ -178,6 +191,37 @@ function streamAuthorization() {
     validUntil: Math.floor(Date.now() / 1000) + 3600,
   });
   return `L402 ${macaroon}:${preimage}`;
+}
+
+function boundStreamAuthorization(url: string) {
+  const secret = process.env.SESSION_SECRET!;
+  const preimage = "b".repeat(64);
+  const paymentHash = createHash("sha256")
+    .update(Buffer.from(preimage, "hex"))
+    .digest("hex");
+  const macaroon = createSubscriptionMacaroon({
+    secret,
+    paymentHash,
+    tier: "1-day",
+    validUntil: Math.floor(Date.now() / 1000) + 3600,
+    agentIdentity: vipAgentReputation.identityForPubkey(vipAgentPubkey),
+  });
+  const event = finalizeEvent(
+    {
+      kind: 27_235,
+      created_at: Math.floor(Date.now() / 1_000),
+      tags: [
+        ["u", url],
+        ["method", "GET"],
+      ],
+      content: "",
+    },
+    vipAgentKey,
+  );
+  return {
+    l402: `L402 ${macaroon}:${preimage}`,
+    nip98: `Nostr ${Buffer.from(JSON.stringify(event)).toString("base64")}`,
+  };
 }
 
 async function readUntil(
@@ -241,6 +285,23 @@ test("opens an authenticated SSE stream and sends telemetry JSON", async () => {
     assert.equal(verifyEvent(attestation.event), true);
     await reader.cancel();
     controller.abort();
+  });
+});
+
+test("opens an agent-bound SSE stream with matching NIP-98 identity", async () => {
+  await withStreamServer(async ({ url }) => {
+    const authorization = boundStreamAuthorization(url);
+    const response = await fetch(url, {
+      headers: {
+        Authorization: authorization.l402,
+        "X-Nostr-Authorization": authorization.nip98,
+      },
+    });
+    assert.equal(response.status, 200);
+    const reader = response.body!.getReader();
+    const content = await readUntil(reader, "\n\n");
+    assert.match(content, /event: telemetry/);
+    await reader.cancel();
   });
 });
 

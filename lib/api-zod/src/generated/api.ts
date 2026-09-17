@@ -80,7 +80,7 @@ export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).mi
 
 
 /**
- * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization.
+ * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization. Clients may send a NIP-98 event as `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted prices.
  * @summary Inspect dataset access costs and schemas
  */
 export const getStratigraphyCostResponseAccessTiersMin = 2;
@@ -91,6 +91,7 @@ export const getStratigraphyCostResponseDynamicPricingDifficultyEpochProgressMax
 
 export const getStratigraphyCostResponseDynamicPricingRequestVelocityRpmMin = 0;
 
+export const getStratigraphyCostResponseAgentPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
 export const getStratigraphyCostResponseDatasetDaysMin = 422;
 
 export const getStratigraphyCostResponseDatasetLastDayMin = 422;
@@ -103,6 +104,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "id": zod.enum(['1-day', '30-day']),
   "duration_days": zod.number().int(),
   "price_sats": zod.number().int(),
+  "original_price_sats": zod.number().int(),
+  "discount_sats": zod.number().int(),
+  "discount_percent": zod.number(),
   "base_price_sats": zod.number().int(),
   "max_price_sats": zod.number().int(),
   "multiplier": zod.number()
@@ -112,6 +116,12 @@ export const GetStratigraphyCostResponse = zod.object({
   "request_velocity_rpm": zod.number().min(getStratigraphyCostResponseDynamicPricingRequestVelocityRpmMin),
   "calculated_at": zod.coerce.date()
 }),
+  "agent": zod.object({
+  "pubkey": zod.string().regex(getStratigraphyCostResponseAgentPubkeyRegExp),
+  "tier": zod.enum(['STANDARD', 'VIP', 'SWARM']),
+  "discount_percent": zod.number(),
+  "rate_limit_multiplier": zod.number()
+}).optional(),
   "legacy_query_pricing": zod.object({
   "sats_per_day": zod.literal(1),
   "minimum_sats": zod.literal(5)
@@ -169,6 +179,10 @@ export const GetNostrHeartbeatStatusResponse = zod.object({
  * Requires a valid paid parent macaroon and preimage in the L402 Authorization header. Appends allowed_path and max_requests first-party caveats without exposing the server signing secret.
  * @summary Create a more restrictive child subscription macaroon
  */
+export const AttenuateMacaroonHeader = zod.object({
+  "X-Nostr-Authorization": zod.string().optional().describe('Required NIP-98 identity for an agent-bound parent. The event payload tag must contain the SHA-256 of the exact request body.')
+})
+
 export const attenuateMacaroonBodyCaveatsItemRegExp = new RegExp('^(allowed_path=/[^\\s]*|max_requests=[1-9]\\d*)$');
 
 
@@ -244,6 +258,10 @@ export const GetPaidStratigraphyQueryParams = zod.object({
   "from": zod.date().optional().describe('First date to include, using the daily series anchored at day 422 on 2026-09-09. Cannot be combined with days.')
 })
 
+export const GetPaidStratigraphyHeader = zod.object({
+  "X-Nostr-Authorization": zod.string().optional().describe('Required NIP-98 identity when presenting an agent-bound L402 macaroon because Authorization carries the L402 credential.')
+})
+
 export const getPaidStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
 export const getPaidStratigraphyResponseAttestationPayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
 export const getPaidStratigraphyResponseAttestationEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -283,6 +301,10 @@ export const GetPaidStratigraphyResponse = zod.array(GetPaidStratigraphyResponse
  * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its Lightning payment preimage. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
  * @summary Stream live Bitcoin stratigraphy telemetry
  */
+export const StreamStratigraphyTelemetryHeader = zod.object({
+  "X-Nostr-Authorization": zod.string().optional().describe('Required NIP-98 identity when presenting an agent-bound L402 macaroon.')
+})
+
 export const StreamStratigraphyTelemetryResponse = zod.unknown()
 
 

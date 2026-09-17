@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AgentReputationMetadata } from './agentReputationMetadata';
 import type { L402SubscriptionPass } from './l402SubscriptionPass';
 
 export interface L402Challenge {
@@ -12,6 +13,7 @@ export interface L402Challenge {
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
+  agent?: AgentReputationMetadata;
   /**
      * @minItems 2
      * @maxItems 2

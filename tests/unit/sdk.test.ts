@@ -19,6 +19,9 @@ const cost: CostDiscovery = {
       id: "1-day",
       duration_days: 1,
       price_sats: 7,
+      original_price_sats: 7,
+      discount_sats: 0,
+      discount_percent: 0,
       base_price_sats: 5,
       max_price_sats: 15,
       multiplier: 1.4,
@@ -45,6 +48,10 @@ const challenge = {
       macaroon: "cached-macaroon",
       valid_until: 2_000_000_000,
       price_sats: 7,
+      original_price_sats: 7,
+      discount_sats: 0,
+      discount_percent: 0,
+      agent_tier: "STANDARD",
     },
   ],
 };
@@ -108,6 +115,45 @@ test("intercepts an L402 challenge, pays it, and retries automatically", async (
     requests[2].authorization,
     `L402 cached-macaroon:${preimage}`,
   );
+});
+
+test("sends NIP-98 identity while acquiring and redeeming a bound pass", async () => {
+  const headers: Headers[] = [];
+  const signed: string[] = [];
+  const client = new BitcoinStratigraphyClient({
+    baseUrl: "https://node.example",
+    wallet: { payInvoice: async () => preimage },
+    nip98: {
+      pubkey: "12".repeat(32),
+      signAuthorization({ url, method }) {
+        signed.push(`${method} ${url}`);
+        return `Nostr signed-${signed.length}`;
+      },
+    },
+    fetch: async (input, init) => {
+      const requestHeaders = new Headers(init?.headers);
+      headers.push(requestHeaders);
+      if (String(input).endsWith("/cost")) return Response.json(cost);
+      if (!requestHeaders.has("X-Nostr-Authorization")) {
+        return Response.json(challenge, { status: 402 });
+      }
+      return Response.json(records);
+    },
+  });
+
+  assert.deepEqual(await client.getLatest(), records);
+  assert.equal(headers[0].get("Authorization"), "Nostr signed-1");
+  assert.equal(headers[1].get("Authorization"), "Nostr signed-2");
+  assert.equal(
+    headers[2].get("Authorization"),
+    `L402 cached-macaroon:${preimage}`,
+  );
+  assert.equal(headers[2].get("X-Nostr-Authorization"), "Nostr signed-3");
+  assert.deepEqual(signed, [
+    "GET https://node.example/api/v1/cost",
+    "GET https://node.example/api/v1/stratigraphy",
+    "GET https://node.example/api/v1/stratigraphy",
+  ]);
 });
 
 test("reuses cached macaroons without paying another invoice", async () => {

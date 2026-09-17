@@ -1,4 +1,12 @@
 export type SubscriptionTier = "1-day" | "30-day";
+export type AgentTier = "STANDARD" | "VIP" | "SWARM";
+
+export type AgentReputationMetadata = {
+  pubkey: string;
+  tier: AgentTier;
+  discount_percent: number;
+  rate_limit_multiplier: number;
+};
 
 export type NostrAttestation = {
   protocol: "nostr";
@@ -52,10 +60,14 @@ export type CostDiscovery = {
     id: SubscriptionTier;
     duration_days: number;
     price_sats: number;
+    original_price_sats: number;
+    discount_sats: number;
+    discount_percent: number;
     base_price_sats: number;
     max_price_sats: number;
     multiplier: number;
   }>;
+  agent?: AgentReputationMetadata;
   dynamic_pricing: {
     difficulty_epoch_progress: number;
     request_velocity_rpm: number;
@@ -148,6 +160,14 @@ export type BitcoinStratigraphyClientOptions = {
   };
   sleep?: (delayMs: number, signal: AbortSignal) => Promise<void>;
   now?: () => number;
+  nip98?: {
+    pubkey: string;
+    signAuthorization(input: {
+      url: string;
+      method: string;
+      payload?: string;
+    }): string | Promise<string>;
+  };
 };
 
 type L402Pass = {
@@ -157,11 +177,16 @@ type L402Pass = {
   macaroon: string;
   valid_until: number;
   price_sats: number;
+  original_price_sats: number;
+  discount_sats: number;
+  discount_percent: number;
+  agent_tier: AgentTier;
 };
 
 type L402Challenge = {
   invoice: string;
   payment_hash: string;
+  agent?: AgentReputationMetadata;
   passes: L402Pass[];
 };
 
@@ -175,6 +200,7 @@ export class BitcoinStratigraphyClient {
   private readonly maxReconnectDelayMs: number;
   private readonly sleep: (delayMs: number, signal: AbortSignal) => Promise<void>;
   private readonly now: () => number;
+  private readonly nip98?: BitcoinStratigraphyClientOptions["nip98"];
   private paymentInFlight?: Promise<CachedL402Credential>;
 
   constructor(options: BitcoinStratigraphyClientOptions) {
@@ -187,6 +213,13 @@ export class BitcoinStratigraphyClient {
     this.maxReconnectDelayMs = options.reconnect?.maxDelayMs ?? 30_000;
     this.sleep = options.sleep ?? abortableSleep;
     this.now = options.now ?? Date.now;
+    if (
+      options.nip98 &&
+      !/^[0-9a-f]{64}$/.test(options.nip98.pubkey)
+    ) {
+      throw new Error("NIP-98 pubkey must be 64 lowercase hexadecimal characters");
+    }
+    this.nip98 = options.nip98;
   }
 
   async getCost(): Promise<CostDiscovery> {
@@ -248,7 +281,9 @@ export class BitcoinStratigraphyClient {
   }
 
   private credentialKey(): string {
-    return `${this.baseUrl}:${this.tier}`;
+    return this.nip98
+      ? `${this.baseUrl}:${this.tier}:${this.nip98.pubkey}`
+      : `${this.baseUrl}:${this.tier}`;
   }
 
   private currentCredential(): CachedL402Credential | undefined {
@@ -266,6 +301,30 @@ export class BitcoinStratigraphyClient {
     return `L402 ${credential.macaroon}:${credential.preimage}`;
   }
 
+  private async requestHeaders(
+    path: string,
+    credential?: CachedL402Credential,
+  ): Promise<HeadersInit | undefined> {
+    const l402 = credential ? this.authorization(credential) : undefined;
+    if (!this.nip98) {
+      return l402 ? { Authorization: l402 } : undefined;
+    }
+    const url = `${this.baseUrl}${path}`;
+    const nip98 = await this.nip98.signAuthorization({
+      url,
+      method: "GET",
+    });
+    if (!/^Nostr\s+\S+$/.test(nip98)) {
+      throw new Error("NIP-98 signer returned an invalid authorization value");
+    }
+    return l402
+      ? {
+          Authorization: l402,
+          "X-Nostr-Authorization": nip98,
+        }
+      : { Authorization: nip98 };
+  }
+
   private async authorizedJson<T>(path: string): Promise<T> {
     const response = await this.authorizedResponse(path);
     return parseJson<T>(response);
@@ -280,9 +339,7 @@ export class BitcoinStratigraphyClient {
       ? this.authorization(credential)
       : undefined;
     let response = await this.fetcher(`${this.baseUrl}${path}`, {
-      headers: sentAuthorization
-        ? { Authorization: sentAuthorization }
-        : undefined,
+      headers: await this.requestHeaders(path, credential),
       signal,
     });
 
@@ -307,7 +364,7 @@ export class BitcoinStratigraphyClient {
       credential = newerCredential;
       sentAuthorization = this.authorization(credential);
       response = await this.fetcher(`${this.baseUrl}${path}`, {
-        headers: { Authorization: sentAuthorization },
+        headers: await this.requestHeaders(path, credential),
         signal,
       });
       if (response.ok) return response;
@@ -317,7 +374,7 @@ export class BitcoinStratigraphyClient {
     const challenge = await parseJson<L402Challenge>(response);
     credential = await this.payChallenge(challenge);
     response = await this.fetcher(`${this.baseUrl}${path}`, {
-      headers: { Authorization: this.authorization(credential) },
+      headers: await this.requestHeaders(path, credential),
       signal,
     });
     if (!response.ok) throw await httpError(response);
@@ -364,7 +421,9 @@ export class BitcoinStratigraphyClient {
   }
 
   private async fetchJson<T>(path: string): Promise<T> {
-    const response = await this.fetcher(`${this.baseUrl}${path}`);
+    const response = await this.fetcher(`${this.baseUrl}${path}`, {
+      headers: await this.requestHeaders(path),
+    });
     if (!response.ok) throw await httpError(response);
     return parseJson<T>(response);
   }

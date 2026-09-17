@@ -9,6 +9,7 @@ const outputs = [
   "./dist/settlement_redundancy.test.js",
   "./dist/stream.test.js",
   "./dist/nostrAttestation.test.js",
+  "./dist/agentReputation.test.js",
 ];
 
 await build({
@@ -19,6 +20,7 @@ await build({
       "./tests/unit/settlement_redundancy.test.ts",
     "stream.test": "./tests/unit/stream.test.ts",
     "nostrAttestation.test": "../../tests/nostrAttestation.test.ts",
+    "agentReputation.test": "../../tests/agentReputation.test.ts",
   },
   outdir: "./dist",
   bundle: true,

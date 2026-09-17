@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { L402SubscriptionPassAgentTier } from './l402SubscriptionPassAgentTier';
 import type { L402SubscriptionPassTier } from './l402SubscriptionPassTier';
 
 export interface L402SubscriptionPass {
@@ -19,4 +20,9 @@ export interface L402SubscriptionPass {
   valid_until: number;
   /** Dynamic price bound into this pass and its invoice */
   price_sats: number;
+  /** Dynamic scarcity price before the presenting agent's tier discount */
+  original_price_sats: number;
+  discount_sats: number;
+  discount_percent: number;
+  agent_tier: L402SubscriptionPassAgentTier;
 }

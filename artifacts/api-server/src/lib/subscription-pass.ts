@@ -1,4 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { AgentIdentity, AgentTier } from "../services/agentReputation";
+import {
+  constructAgentIdentityCaveats,
+  parseAgentIdentityCaveats,
+  presentingAgentMatchesCaveats,
+} from "../services/l402Caveats";
 
 export type SubscriptionTier = "1-day" | "30-day";
 
@@ -30,6 +36,8 @@ export type VerifiedSubscriptionMacaroon = {
   requestLimits: Array<{ tokenId: string; maxRequests: number }>;
   tokenId: string;
   amountMsats?: number;
+  agentPubkey?: string;
+  agentTier?: AgentTier;
 };
 
 function hmac(key: string | Buffer, value: string): Buffer {
@@ -97,6 +105,7 @@ export function createSubscriptionMacaroon(input: {
   tier: SubscriptionTier;
   validUntil: number;
   amountMsats?: number;
+  agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
 }): string {
   const identifier = "bitcoin-stratigraphy-subscription-v1";
   const caveats = [
@@ -106,6 +115,7 @@ export function createSubscriptionMacaroon(input: {
     ...(input.amountMsats === undefined
       ? []
       : [`amount_msats=${input.amountMsats}`]),
+    ...constructAgentIdentityCaveats(input.agentIdentity),
   ];
   const token: SerializedMacaroon = {
     identifier,
@@ -119,6 +129,7 @@ export function verifySubscriptionMacaroon(
   encoded: string,
   secret: string,
   nowSeconds: number,
+  presentingAgent?: Pick<AgentIdentity, "pubkey" | "tier"> | null,
 ):
   | VerifiedSubscriptionMacaroon
   | null {
@@ -153,7 +164,14 @@ export function verifySubscriptionMacaroon(
         });
       } else {
         if (
-          !["payment_hash", "tier", "valid_until", "amount_msats"].includes(key) ||
+          ![
+            "payment_hash",
+            "tier",
+            "valid_until",
+            "amount_msats",
+            "agent_pubkey",
+            "agent_tier",
+          ].includes(key) ||
           rootValues.has(key)
         ) {
           return null;
@@ -163,7 +181,6 @@ export function verifySubscriptionMacaroon(
     }
     if (!timingSafeEqual(supplied, runningSignature)) return null;
     if (
-      (rootValues.size !== 3 && rootValues.size !== 4) ||
       !rootValues.has("payment_hash") ||
       !rootValues.has("tier") ||
       !rootValues.has("valid_until")
@@ -176,6 +193,7 @@ export function verifySubscriptionMacaroon(
     const amountMsatsValue = rootValues.get("amount_msats");
     const amountMsats =
       amountMsatsValue === undefined ? undefined : Number(amountMsatsValue);
+    const agentCaveats = parseAgentIdentityCaveats(rootValues);
     if (
       !/^[0-9a-f]{64}$/.test(paymentHash) ||
       !(tier in SUBSCRIPTION_TIERS) ||
@@ -183,7 +201,16 @@ export function verifySubscriptionMacaroon(
       validUntil <= nowSeconds
       || (amountMsatsValue !== undefined &&
         (!/^[1-9]\d*$/.test(amountMsatsValue) ||
-          !Number.isSafeInteger(amountMsats)))
+          !Number.isSafeInteger(amountMsats))) ||
+      agentCaveats === null ||
+      (presentingAgent !== undefined &&
+        !presentingAgentMatchesCaveats(
+          agentCaveats,
+          presentingAgent ?? undefined,
+        )) ||
+      rootValues.size !==
+        3 + (amountMsatsValue === undefined ? 0 : 1) +
+          (agentCaveats === undefined ? 0 : 2)
     ) {
       return null;
     }
@@ -197,6 +224,8 @@ export function verifySubscriptionMacaroon(
       requestLimits: meteredScopes,
       tokenId: token.signature,
       amountMsats,
+      agentPubkey: agentCaveats?.agentPubkey,
+      agentTier: agentCaveats?.agentTier,
     };
   } catch {
     return null;

@@ -86,6 +86,9 @@ export type StratigraphyCostAccessTiersItem = {
   id: StratigraphyCostAccessTiersItemId;
   duration_days: number;
   price_sats: number;
+  original_price_sats: number;
+  discount_sats: number;
+  discount_percent: number;
   base_price_sats: number;
   max_price_sats: number;
   multiplier: number;
@@ -134,6 +137,23 @@ export type StratigraphyCostMcpTool = {
   parameters: StratigraphyCostMcpToolParameters;
 };
 
+export type AgentReputationMetadataTier = typeof AgentReputationMetadataTier[keyof typeof AgentReputationMetadataTier];
+
+
+export const AgentReputationMetadataTier = {
+  STANDARD: 'STANDARD',
+  VIP: 'VIP',
+  SWARM: 'SWARM',
+} as const;
+
+export interface AgentReputationMetadata {
+  /** @pattern ^[0-9a-f]{64}$ */
+  pubkey: string;
+  tier: AgentReputationMetadataTier;
+  discount_percent: number;
+  rate_limit_multiplier: number;
+}
+
 export type JsonSchemaItems = { [key: string]: unknown };
 
 export type JsonSchemaProperties = { [key: string]: unknown };
@@ -153,6 +173,7 @@ export interface StratigraphyCost {
      */
   access_tiers: StratigraphyCostAccessTiersItem[];
   dynamic_pricing: StratigraphyCostDynamicPricing;
+  agent?: AgentReputationMetadata;
   legacy_query_pricing: StratigraphyCostLegacyQueryPricing;
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;
@@ -257,6 +278,15 @@ export const L402SubscriptionPassTier = {
   '30-day': '30-day',
 } as const;
 
+export type L402SubscriptionPassAgentTier = typeof L402SubscriptionPassAgentTier[keyof typeof L402SubscriptionPassAgentTier];
+
+
+export const L402SubscriptionPassAgentTier = {
+  STANDARD: 'STANDARD',
+  VIP: 'VIP',
+  SWARM: 'SWARM',
+} as const;
+
 export interface L402SubscriptionPass {
   tier: L402SubscriptionPassTier;
   /** BOLT11 invoice for this subscription tier */
@@ -269,6 +299,11 @@ export interface L402SubscriptionPass {
   valid_until: number;
   /** Dynamic price bound into this pass and its invoice */
   price_sats: number;
+  /** Dynamic scarcity price before the presenting agent's tier discount */
+  original_price_sats: number;
+  discount_sats: number;
+  discount_percent: number;
+  agent_tier: L402SubscriptionPassAgentTier;
 }
 
 export interface L402Challenge {
@@ -276,6 +311,7 @@ export interface L402Challenge {
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
+  agent?: AgentReputationMetadata;
   /**
      * @minItems 2
      * @maxItems 2

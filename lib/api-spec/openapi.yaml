@@ -85,8 +85,14 @@ paths:
       operationId: getStratigraphyCost
       tags: [stratigraphy]
       summary: Inspect dataset access costs and schemas
-      description: Returns public pre-flight metadata without creating an invoice or requiring L402 authorization.
-      security: []
+      description: >-
+        Returns public pre-flight metadata without creating an invoice or
+        requiring L402 authorization. Clients may send a NIP-98 event as
+        `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted
+        prices.
+      security:
+        - {}
+        - NIP98: []
       responses:
         "200":
           description: Dataset access, MCP parameter, and response schema metadata
@@ -99,6 +105,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StratigraphyCost"
+        "401":
+          description: Invalid NIP-98 authorization
   /v1/nostr/status:
     get:
       operationId: getNostrHeartbeatStatus
@@ -120,6 +128,12 @@ paths:
       description: Requires a valid paid parent macaroon and preimage in the L402 Authorization header. Appends allowed_path and max_requests first-party caveats without exposing the server signing secret.
       security:
         - L402: []
+      parameters:
+        - name: X-Nostr-Authorization
+          in: header
+          description: Required NIP-98 identity for an agent-bound parent. The event payload tag must contain the SHA-256 of the exact request body.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -234,6 +248,11 @@ paths:
           schema:
             type: string
             format: date
+        - name: X-Nostr-Authorization
+          in: header
+          description: Required NIP-98 identity when presenting an agent-bound L402 macaroon because Authorization carries the L402 credential.
+          schema:
+            type: string
       security:
         - L402: []
       responses:
@@ -267,6 +286,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InvalidRangeError"
+        "401":
+          description: Invalid NIP-98 authorization or agent identity mismatch
         "429":
           description: Payment invoice creation is temporarily limited
           headers:
@@ -305,6 +326,12 @@ paths:
       tags: [stratigraphy]
       summary: Stream live Bitcoin stratigraphy telemetry
       description: Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its Lightning payment preimage. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+      parameters:
+        - name: X-Nostr-Authorization
+          in: header
+          description: Required NIP-98 identity when presenting an agent-bound L402 macaroon.
+          schema:
+            type: string
       security:
         - L402: []
       responses:
@@ -335,6 +362,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/L402Challenge"
+        "401":
+          description: Invalid NIP-98 authorization or agent identity mismatch
         "403":
           description: The macaroon path caveat does not permit this stream
         "429":
@@ -352,6 +381,11 @@ components:
       in: header
       name: Authorization
       description: "Legacy: L402 <payment_hash>:<preimage>. Subscription: L402 <signed_macaroon>:<preimage>."
+    NIP98:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "Optional agent identity during discovery or challenge issuance: Nostr <base64_event>. When Authorization carries L402, provide the NIP-98 value in X-Nostr-Authorization."
     MacaroonOperator:
       type: http
       scheme: bearer
@@ -465,6 +499,12 @@ components:
                 type: integer
               price_sats:
                 type: integer
+              original_price_sats:
+                type: integer
+              discount_sats:
+                type: integer
+              discount_percent:
+                type: number
               base_price_sats:
                 type: integer
               max_price_sats:
@@ -475,6 +515,9 @@ components:
               - id
               - duration_days
               - price_sats
+              - original_price_sats
+              - discount_sats
+              - discount_percent
               - base_price_sats
               - max_price_sats
               - multiplier
@@ -495,6 +538,8 @@ components:
             - difficulty_epoch_progress
             - request_velocity_rpm
             - calculated_at
+        agent:
+          $ref: "#/components/schemas/AgentReputationMetadata"
         legacy_query_pricing:
           type: object
           properties:
@@ -720,6 +765,8 @@ components:
         payment_hash:
           type: string
           pattern: "^[0-9a-f]{64}$"
+        agent:
+          $ref: "#/components/schemas/AgentReputationMetadata"
         passes:
           type: array
           minItems: 2
@@ -751,6 +798,16 @@ components:
         price_sats:
           type: integer
           description: Dynamic price bound into this pass and its invoice
+        original_price_sats:
+          type: integer
+          description: Dynamic scarcity price before the presenting agent's tier discount
+        discount_sats:
+          type: integer
+        discount_percent:
+          type: number
+        agent_tier:
+          type: string
+          enum: [STANDARD, VIP, SWARM]
       required:
         - tier
         - invoice
@@ -758,6 +815,24 @@ components:
         - macaroon
         - valid_until
         - price_sats
+        - original_price_sats
+        - discount_sats
+        - discount_percent
+        - agent_tier
+    AgentReputationMetadata:
+      type: object
+      properties:
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        tier:
+          type: string
+          enum: [STANDARD, VIP, SWARM]
+        discount_percent:
+          type: number
+        rate_limit_multiplier:
+          type: number
+      required: [pubkey, tier, discount_percent, rate_limit_multiplier]
     InvalidRangeError:
       type: object
       properties:

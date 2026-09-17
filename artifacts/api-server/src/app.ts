@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -49,7 +49,13 @@ app.use(
     ],
   }),
 );
-app.use(express.json());
+app.use(
+  express.json({
+    verify(req, _res, buffer) {
+      (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 
 registerOpenApiRoute(app);

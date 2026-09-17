@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AgentReputationMetadata } from './agentReputationMetadata';
 import type { JsonSchema } from './jsonSchema';
 import type { StratigraphyCostAccessTiersItem } from './stratigraphyCostAccessTiersItem';
 import type { StratigraphyCostDataset } from './stratigraphyCostDataset';
@@ -20,6 +21,7 @@ export interface StratigraphyCost {
      */
   access_tiers: StratigraphyCostAccessTiersItem[];
   dynamic_pricing: StratigraphyCostDynamicPricing;
+  agent?: AgentReputationMetadata;
   legacy_query_pricing: StratigraphyCostLegacyQueryPricing;
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;

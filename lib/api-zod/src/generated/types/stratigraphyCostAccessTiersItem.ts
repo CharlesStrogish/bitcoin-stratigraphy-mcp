@@ -11,6 +11,9 @@ export type StratigraphyCostAccessTiersItem = {
   id: StratigraphyCostAccessTiersItemId;
   duration_days: number;
   price_sats: number;
+  original_price_sats: number;
+  discount_sats: number;
+  discount_percent: number;
   base_price_sats: number;
   max_price_sats: number;
   multiplier: number;

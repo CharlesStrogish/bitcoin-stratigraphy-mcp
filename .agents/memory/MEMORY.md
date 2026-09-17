@@ -9,3 +9,4 @@
 - [Settlement failover invariants](settlement-failover-invariants.md) — abort timed-out clients, single-probe recovery, and cache fallback invoices under predicted and actual providers.
 - [Paid SSE lifecycle](paid-sse-lifecycle.md) — authenticate before headers, propagate disconnect aborts through paid checks, bound upstream reads, and stop shared timers at zero listeners.
 - [L402 SDK payment coordination](l402-sdk-payment-coordination.md) — bind preimages to challenge hashes and never let delayed 402 responses replace or repay newer credentials.
+- [Agent-bound L402 identity](agent-bound-l402-identity.md) — discounted passes bind NIP-98 pubkey and tier; every use must present the same fresh identity.

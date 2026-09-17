@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './agentReputationMetadata';
+export * from './agentReputationMetadataTier';
 export * from './datasetHealthStatus';
 export * from './getPaidStratigraphyParams';
 export * from './headPaidStratigraphyParams';
@@ -16,6 +18,7 @@ export * from './jsonSchemaItems';
 export * from './jsonSchemaProperties';
 export * from './l402Challenge';
 export * from './l402SubscriptionPass';
+export * from './l402SubscriptionPassAgentTier';
 export * from './l402SubscriptionPassTier';
 export * from './macaroonAttenuationRequest';
 export * from './macaroonAttenuationResponse';

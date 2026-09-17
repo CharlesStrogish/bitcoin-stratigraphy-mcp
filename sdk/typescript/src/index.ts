@@ -1,5 +1,20 @@
 export type SubscriptionTier = "1-day" | "30-day";
 
+export type NostrAttestation = {
+  protocol: "nostr";
+  nip: 78;
+  payload_sha256: string;
+  event: {
+    id: string;
+    pubkey: string;
+    created_at: number;
+    kind: 30078;
+    tags: string[][];
+    content: string;
+    sig: string;
+  };
+};
+
 export type StratigraphyEntry = {
   day: number;
   title: string;
@@ -10,6 +25,7 @@ export type StratigraphyEntry = {
     difficulty_epoch_progress: string;
     thermodynamic_signal: string;
   };
+  attestation?: NostrAttestation;
 };
 
 export type StratigraphyTelemetry = {
@@ -27,6 +43,7 @@ export type StratigraphyTelemetry = {
     signal: string;
     target_multiplier: number;
   };
+  attestation?: NostrAttestation;
 };
 
 export type CostDiscovery = {

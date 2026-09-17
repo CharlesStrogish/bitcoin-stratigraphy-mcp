@@ -47,6 +47,11 @@ import {
   type IntervalScheduler,
   type StratigraphyTelemetryHub,
 } from "../services/stratigraphy-stream";
+import {
+  createCachedNostrAttestor,
+  createNostrAttestor,
+  type NostrAttestor,
+} from "../services/nostrAttestation";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -388,13 +393,16 @@ function sendPaidDataset(
   records: Dataset,
   paymentHash: string,
   timestampMs: number,
+  attest: NostrAttestor,
 ): void {
   const secret = process.env.SESSION_SECRET;
   if (!secret) {
     res.status(500).json({ error: "SESSION_SECRET is not configured" });
     return;
   }
-  const body = JSON.stringify(records);
+  const createdAt = Math.floor(timestampMs / 1_000);
+  const attestedRecords = records.map((record) => attest(record, createdAt));
+  const body = JSON.stringify(attestedRecords);
   const payloadSha256 = createHash("sha256").update(body).digest("hex");
   const timestamp = new Date(timestampMs).toISOString();
   const signature = createHmac("sha256", secret)
@@ -565,6 +573,8 @@ export function registerStratigraphyRoutes(
     heartbeatScheduler?: IntervalScheduler;
   } = {},
 ): void {
+  const attest = createNostrAttestor();
+  const attestDataset = createCachedNostrAttestor(attest);
   const telemetryHub =
     streamOptions.telemetryHub ??
     createStratigraphyTelemetryHub({
@@ -1015,7 +1025,10 @@ export function registerStratigraphyRoutes(
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders();
 
-      const writeEvent = (event: "telemetry" | "ping", data: unknown) => {
+      const writeEvent = (
+        event: "telemetry" | "ping",
+        data: Record<string, unknown>,
+      ) => {
         if (
           disconnected ||
           waitingForDrain ||
@@ -1024,7 +1037,20 @@ export function registerStratigraphyRoutes(
         ) {
           return;
         }
-        if (!res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)) {
+        let attested;
+        try {
+          attested = attest(data, Math.floor(policy.now() / 1_000));
+        } catch (error) {
+          req.log.error({ err: error }, "Nostr SSE attestation failed");
+          close();
+          if (!res.writableEnded) res.end();
+          return;
+        }
+        if (
+          !res.write(
+            `event: ${event}\ndata: ${JSON.stringify(attested)}\n\n`,
+          )
+        ) {
           waitingForDrain = true;
           res.once("drain", drained);
         }
@@ -1128,6 +1154,7 @@ export function registerStratigraphyRoutes(
                 selectedRange.records,
                 pass.paymentHash,
                 policy.now(),
+                attestDataset,
               );
               return;
             }
@@ -1162,6 +1189,7 @@ export function registerStratigraphyRoutes(
             selectedRange.records,
             authorization.paymentHash,
             policy.now(),
+            attestDataset,
           );
           return;
         }

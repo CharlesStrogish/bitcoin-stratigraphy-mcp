@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { NostrAttestation } from './nostrAttestation';
 import type { QuantitativeAlpha } from './quantitativeAlpha';
 
 export interface StratigraphyEntry {
@@ -13,4 +14,5 @@ export interface StratigraphyEntry {
   video_id: string;
   transcript_summary: string;
   quantitative_alpha: QuantitativeAlpha;
+  attestation?: NostrAttestation;
 }

@@ -45,6 +45,10 @@ export const ReadinessCheckResponse = zod.object({
  * @summary Get the free five-record sample
  */
 export const getStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
+export const getStratigraphyResponseAttestationPayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const getStratigraphyResponseAttestationEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getStratigraphyResponseAttestationEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getStratigraphyResponseAttestationEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
 
 
 export const GetStratigraphyResponseItem = zod.object({
@@ -56,7 +60,21 @@ export const GetStratigraphyResponseItem = zod.object({
   "target_multiplier": zod.number().describe('Numeric distance multiplier parsed from the day\'s title'),
   "difficulty_epoch_progress": zod.string().regex(getStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp).describe('Estimated progress through the current 14-day difficulty epoch'),
   "thermodynamic_signal": zod.string().describe('Qualitative target-distance band derived from the multiplier')
+}),
+  "attestation": zod.object({
+  "protocol": zod.literal("nostr"),
+  "nip": zod.literal(78),
+  "payload_sha256": zod.string().regex(getStratigraphyResponseAttestationPayloadSha256RegExp),
+  "event": zod.object({
+  "id": zod.string().regex(getStratigraphyResponseAttestationEventIdRegExp),
+  "pubkey": zod.string().regex(getStratigraphyResponseAttestationEventPubkeyRegExp),
+  "created_at": zod.number().int(),
+  "kind": zod.literal(30078),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string(),
+  "sig": zod.string().regex(getStratigraphyResponseAttestationEventSigRegExp)
 })
+}).optional().describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached')
 })
 export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).min(5).max(5)
 
@@ -227,6 +245,10 @@ export const GetPaidStratigraphyQueryParams = zod.object({
 })
 
 export const getPaidStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
+export const getPaidStratigraphyResponseAttestationPayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const getPaidStratigraphyResponseAttestationEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getPaidStratigraphyResponseAttestationEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getPaidStratigraphyResponseAttestationEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
 
 
 export const GetPaidStratigraphyResponseItem = zod.object({
@@ -238,7 +260,21 @@ export const GetPaidStratigraphyResponseItem = zod.object({
   "target_multiplier": zod.number().describe('Numeric distance multiplier parsed from the day\'s title'),
   "difficulty_epoch_progress": zod.string().regex(getPaidStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp).describe('Estimated progress through the current 14-day difficulty epoch'),
   "thermodynamic_signal": zod.string().describe('Qualitative target-distance band derived from the multiplier')
+}),
+  "attestation": zod.object({
+  "protocol": zod.literal("nostr"),
+  "nip": zod.literal(78),
+  "payload_sha256": zod.string().regex(getPaidStratigraphyResponseAttestationPayloadSha256RegExp),
+  "event": zod.object({
+  "id": zod.string().regex(getPaidStratigraphyResponseAttestationEventIdRegExp),
+  "pubkey": zod.string().regex(getPaidStratigraphyResponseAttestationEventPubkeyRegExp),
+  "created_at": zod.number().int(),
+  "kind": zod.literal(30078),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string(),
+  "sig": zod.string().regex(getPaidStratigraphyResponseAttestationEventSigRegExp)
 })
+}).optional().describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached')
 })
 export const GetPaidStratigraphyResponse = zod.array(GetPaidStratigraphyResponseItem)
 

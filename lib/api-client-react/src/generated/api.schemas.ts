@@ -216,12 +216,37 @@ export interface QuantitativeAlpha {
   thermodynamic_signal: string;
 }
 
+export interface NostrSignedEvent {
+  /** @pattern ^[0-9a-f]{64}$ */
+  id: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  pubkey: string;
+  created_at: number;
+  kind: 30078;
+  tags: string[][];
+  content: string;
+  /** @pattern ^[0-9a-f]{128}$ */
+  sig: string;
+}
+
+/**
+ * NIP-01 signed NIP-78 attestation over the payload before this block was attached
+ */
+export interface NostrAttestation {
+  protocol: 'nostr';
+  nip: 78;
+  /** @pattern ^[0-9a-f]{64}$ */
+  payload_sha256: string;
+  event: NostrSignedEvent;
+}
+
 export interface StratigraphyEntry {
   day: number;
   title: string;
   video_id: string;
   transcript_summary: string;
   quantitative_alpha: QuantitativeAlpha;
+  attestation?: NostrAttestation;
 }
 
 export type L402SubscriptionPassTier = typeof L402SubscriptionPassTier[keyof typeof L402SubscriptionPassTier];

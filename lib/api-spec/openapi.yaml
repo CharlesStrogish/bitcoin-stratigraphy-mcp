@@ -643,12 +643,56 @@ components:
           type: string
         quantitative_alpha:
           $ref: "#/components/schemas/QuantitativeAlpha"
+        attestation:
+          $ref: "#/components/schemas/NostrAttestation"
       required:
         - day
         - title
         - video_id
         - transcript_summary
         - quantitative_alpha
+    NostrAttestation:
+      type: object
+      description: NIP-01 signed NIP-78 attestation over the payload before this block was attached
+      properties:
+        protocol:
+          type: string
+          const: nostr
+        nip:
+          type: integer
+          const: 78
+        payload_sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        event:
+          $ref: "#/components/schemas/NostrSignedEvent"
+      required: [protocol, nip, payload_sha256, event]
+    NostrSignedEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        created_at:
+          type: integer
+        kind:
+          type: integer
+          const: 30078
+        tags:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        content:
+          type: string
+        sig:
+          type: string
+          pattern: "^[0-9a-f]{128}$"
+      required: [id, pubkey, created_at, kind, tags, content, sig]
     QuantitativeAlpha:
       type: object
       properties:

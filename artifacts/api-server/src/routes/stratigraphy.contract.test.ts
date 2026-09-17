@@ -2285,8 +2285,32 @@ test("returns the full dataset for a suitable payment", async () => {
     headers: { Authorization: `L402 ${paymentHash}:${preimage}` },
   });
   assert.equal(response.status, 200);
-  const body = (await assertValidReceipt(response, paymentHash)) as unknown[];
+  const body = (await assertValidReceipt(response, paymentHash)) as Array<
+    Record<string, unknown> & {
+      attestation: {
+        payload_sha256: string;
+        event: Parameters<typeof verifyEvent>[0];
+      };
+    }
+  >;
   assert.ok(body.length > 5);
+  const { attestation, ...unsignedRecord } = body[0];
+  assert.deepEqual(JSON.parse(attestation.event.content), unsignedRecord);
+  assert.equal(
+    createHash("sha256").update(attestation.event.content).digest("hex"),
+    attestation.payload_sha256,
+  );
+  assert.equal(attestation.event.kind, 30078);
+  assert.equal(verifyEvent(attestation.event), true);
+  const repeatedResponse = await fetch(`${baseUrl}/api/v1/stratigraphy`, {
+    headers: { Authorization: `L402 ${paymentHash}:${preimage}` },
+  });
+  assert.equal(repeatedResponse.status, 200);
+  const repeatedBody = (await repeatedResponse.json()) as typeof body;
+  assert.equal(
+    repeatedBody[0].attestation.event.id,
+    attestation.event.id,
+  );
 });
 
 test("prices recent-day ranges at one sat per day with a five-sat minimum", async () => {

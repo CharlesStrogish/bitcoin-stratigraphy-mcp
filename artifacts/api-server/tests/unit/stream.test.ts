@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 import express from "express";
+import { verifyEvent } from "nostr-tools";
 import { createMemoryPaymentChallengeStore } from "../../src/lib/payment-challenge-store";
 import { createSubscriptionMacaroon } from "../../src/lib/subscription-pass";
 import { registerStratigraphyRoutes } from "../../src/routes/stratigraphy";
@@ -231,10 +232,13 @@ test("opens an authenticated SSE stream and sends telemetry JSON", async () => {
     const reader = response.body!.getReader();
     const content = await readUntil(reader, "\n\n");
     assert.match(content, /event: telemetry/);
-    assert.deepEqual(
-      JSON.parse(content.split("data: ")[1].split("\n\n")[0]),
-      telemetry,
+    const payload = JSON.parse(
+      content.split("data: ")[1].split("\n\n")[0],
     );
+    const { attestation, ...unsignedTelemetry } = payload;
+    assert.deepEqual(unsignedTelemetry, telemetry);
+    assert.deepEqual(JSON.parse(attestation.event.content), telemetry);
+    assert.equal(verifyEvent(attestation.event), true);
     await reader.cancel();
     controller.abort();
   });
@@ -269,6 +273,16 @@ test("emits JSON ping heartbeats every 15 seconds", async () => {
     assert.match(content, /event: ping/);
     const payload = JSON.parse(content.split("data: ")[1].split("\n\n")[0]);
     assert.equal(typeof payload.observed_at, "string");
+    const { attestation, ...unsignedPing } = payload;
+    assert.deepEqual(JSON.parse(attestation.event.content), unsignedPing);
+    assert.equal(
+      createHash("sha256")
+        .update(attestation.event.content)
+        .digest("hex"),
+      attestation.payload_sha256,
+    );
+    assert.equal(attestation.event.kind, 30078);
+    assert.equal(verifyEvent(attestation.event), true);
     await reader.cancel();
   });
 });

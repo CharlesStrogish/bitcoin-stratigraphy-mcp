@@ -1,5 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import {
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { getStratigraphyData } from "./stratigraphy";
@@ -19,10 +23,25 @@ const entrySchema = z.object({
 });
 
 function createBitcoinStratigraphyMcpServer() {
-  const server = new McpServer({
-    name: "bitcoin-stratigraphy",
-    version: "1.0.0",
-  });
+  const server = new McpServer(
+    {
+      name: "bitcoin-stratigraphy",
+      version: "1.0.0",
+    },
+    {
+      capabilities: {
+        prompts: {},
+        resources: {},
+      },
+    },
+  );
+
+  server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: [],
+  }));
+  server.server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    prompts: [],
+  }));
 
   server.registerTool(
     "get_bitcoin_stratigraphy",

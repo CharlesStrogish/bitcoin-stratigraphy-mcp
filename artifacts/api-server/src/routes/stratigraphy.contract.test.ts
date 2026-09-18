@@ -570,6 +570,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     audience: ["assistant"],
     priority: 1,
   });
+  assert.deepEqual((await mcpRequest("resources/list")).result, {
+    resources: [],
+  });
+  assert.deepEqual((await mcpRequest("prompts/list")).result, {
+    prompts: [],
+  });
 
   const called = await mcpRequest("tools/call", {
     name: "get_bitcoin_stratigraphy",

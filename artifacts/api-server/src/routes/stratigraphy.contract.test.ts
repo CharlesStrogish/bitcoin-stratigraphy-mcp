@@ -561,6 +561,15 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       candidate.name === "get_bitcoin_stratigraphy",
   );
   assert.ok(tool);
+  assert.deepEqual(tool.annotations, {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+    readOnly: true,
+    audience: ["assistant"],
+    priority: 1,
+  });
 
   const called = await mcpRequest("tools/call", {
     name: "get_bitcoin_stratigraphy",

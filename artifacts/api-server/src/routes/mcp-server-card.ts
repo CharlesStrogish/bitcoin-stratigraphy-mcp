@@ -10,6 +10,15 @@ export const mcpServerCard = {
     tools: [
       {
         name: "get_bitcoin_stratigraphy",
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+          readOnly: true,
+          audience: ["assistant"],
+          priority: 1,
+        },
       },
     ],
   },

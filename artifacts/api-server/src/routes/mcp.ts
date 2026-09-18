@@ -30,6 +30,15 @@ function createBitcoinStratigraphyMcpServer() {
       title: "Get Bitcoin Stratigraphy",
       description:
         "Return validated Bitcoin Stratigraphy day entries. Use days for the most recent N entries or date for one exact YYYY-MM-DD entry.",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+        readOnly: true,
+        audience: ["assistant"],
+        priority: 1,
+      },
       inputSchema: {
         days: z
           .number()

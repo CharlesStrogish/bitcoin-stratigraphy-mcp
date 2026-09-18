@@ -1,5 +1,9 @@
 export type SubscriptionTier = "1-day" | "30-day";
 export type AgentTier = "STANDARD" | "VIP" | "SWARM";
+export type SettlementAsset =
+  | "btc-lightning"
+  | "l-btc"
+  | "taproot-assets";
 
 export type AgentReputationMetadata = {
   pubkey: string;
@@ -56,6 +60,9 @@ export type StratigraphyTelemetry = {
 
 export type CostDiscovery = {
   protocol: "L402";
+  settlement_asset: SettlementAsset;
+  supported_assets: SettlementAsset[];
+  available_assets: SettlementAsset[];
   access_tiers: Array<{
     id: SubscriptionTier;
     duration_days: number;
@@ -119,6 +126,7 @@ export type CachedL402Credential = {
   preimage: string;
   validUntil: number;
   tier: SubscriptionTier;
+  paymentAsset?: SettlementAsset;
 };
 
 export type CredentialStore = {
@@ -152,6 +160,7 @@ export type BitcoinStratigraphyClientOptions = {
   baseUrl: string;
   wallet: L402WalletAdapter;
   tier?: SubscriptionTier;
+  settlementAsset?: SettlementAsset;
   fetch?: typeof globalThis.fetch;
   credentialStore?: CredentialStore;
   reconnect?: {
@@ -181,11 +190,15 @@ type L402Pass = {
   discount_sats: number;
   discount_percent: number;
   agent_tier: AgentTier;
+  payment_asset: SettlementAsset;
 };
 
 type L402Challenge = {
   invoice: string;
   payment_hash: string;
+  settlement_asset: SettlementAsset;
+  supported_assets: SettlementAsset[];
+  available_assets: SettlementAsset[];
   agent?: AgentReputationMetadata;
   passes: L402Pass[];
 };
@@ -194,6 +207,7 @@ export class BitcoinStratigraphyClient {
   private readonly baseUrl: string;
   private readonly wallet: L402WalletAdapter;
   private readonly tier: SubscriptionTier;
+  private readonly settlementAsset: SettlementAsset;
   private readonly fetcher: typeof globalThis.fetch;
   private readonly credentials: CredentialStore;
   private readonly initialReconnectDelayMs: number;
@@ -207,6 +221,7 @@ export class BitcoinStratigraphyClient {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.wallet = options.wallet;
     this.tier = options.tier ?? "1-day";
+    this.settlementAsset = options.settlementAsset ?? "btc-lightning";
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.credentials = options.credentialStore ?? new MemoryCredentialStore();
     this.initialReconnectDelayMs = options.reconnect?.initialDelayMs ?? 1_000;
@@ -281,9 +296,11 @@ export class BitcoinStratigraphyClient {
   }
 
   private credentialKey(): string {
-    return this.nip98
-      ? `${this.baseUrl}:${this.tier}:${this.nip98.pubkey}`
-      : `${this.baseUrl}:${this.tier}`;
+    const assetScope =
+      this.settlementAsset === "btc-lightning"
+        ? `${this.baseUrl}:${this.tier}`
+        : `${this.baseUrl}:${this.tier}:${this.settlementAsset}`;
+    return this.nip98 ? `${assetScope}:${this.nip98.pubkey}` : assetScope;
   }
 
   private currentCredential(): CachedL402Credential | undefined {
@@ -307,7 +324,10 @@ export class BitcoinStratigraphyClient {
   ): Promise<HeadersInit | undefined> {
     const l402 = credential ? this.authorization(credential) : undefined;
     if (!this.nip98) {
-      return l402 ? { Authorization: l402 } : undefined;
+      return {
+        ...(l402 ? { Authorization: l402 } : {}),
+        "X-Settlement-Asset": this.settlementAsset,
+      };
     }
     const url = `${this.baseUrl}${path}`;
     const nip98 = await this.nip98.signAuthorization({
@@ -321,8 +341,12 @@ export class BitcoinStratigraphyClient {
       ? {
           Authorization: l402,
           "X-Nostr-Authorization": nip98,
+          "X-Settlement-Asset": this.settlementAsset,
         }
-      : { Authorization: nip98 };
+      : {
+          Authorization: nip98,
+          "X-Settlement-Asset": this.settlementAsset,
+        };
   }
 
   private async authorizedJson<T>(path: string): Promise<T> {
@@ -391,6 +415,7 @@ export class BitcoinStratigraphyClient {
       typeof selected.invoice !== "string" ||
       typeof selected.macaroon !== "string" ||
       typeof selected.valid_until !== "number" ||
+      selected.payment_asset !== this.settlementAsset ||
       !/^[0-9a-fA-F]{64}$/.test(selected.payment_hash)
     ) {
       throw new Error(`L402 challenge did not include tier ${this.tier}`);
@@ -410,6 +435,7 @@ export class BitcoinStratigraphyClient {
           preimage,
           validUntil: selected.valid_until,
           tier: selected.tier,
+          paymentAsset: selected.payment_asset,
         };
         this.credentials.set(this.credentialKey(), credential);
         return credential;

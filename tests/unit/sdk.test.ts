@@ -14,6 +14,9 @@ const paymentHash = createHash("sha256")
   .digest("hex");
 const cost: CostDiscovery = {
   protocol: "L402",
+  settlement_asset: "btc-lightning",
+  supported_assets: ["btc-lightning", "l-btc", "taproot-assets"],
+  available_assets: ["btc-lightning"],
   access_tiers: [
     {
       id: "1-day",
@@ -52,6 +55,7 @@ const challenge = {
       discount_sats: 0,
       discount_percent: 0,
       agent_tier: "STANDARD",
+      payment_asset: "btc-lightning",
     },
   ],
 };

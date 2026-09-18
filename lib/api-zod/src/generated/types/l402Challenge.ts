@@ -7,12 +7,17 @@
  */
 import type { AgentReputationMetadata } from './agentReputationMetadata';
 import type { L402SubscriptionPass } from './l402SubscriptionPass';
+import type { SettlementAsset } from './settlementAsset';
 
 export interface L402Challenge {
-  /** BOLT11 invoice */
+  /** Invoice or payment request for the selected settlement asset */
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
+  settlement_asset: SettlementAsset;
+  /** @minItems 1 */
+  supported_assets: SettlementAsset[];
+  available_assets: SettlementAsset[];
   agent?: AgentReputationMetadata;
   /**
      * @minItems 2

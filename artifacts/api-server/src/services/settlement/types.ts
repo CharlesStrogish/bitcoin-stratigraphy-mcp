@@ -1,7 +1,15 @@
+export const SETTLEMENT_ASSETS = [
+  "btc-lightning",
+  "l-btc",
+  "taproot-assets",
+] as const;
+export type SettlementAsset = (typeof SETTLEMENT_ASSETS)[number];
+
 export type SettlementInvoiceInput = {
   amountMsats: number;
   description: string;
   expirySeconds: number;
+  asset?: SettlementAsset;
   signal?: AbortSignal;
 };
 
@@ -9,6 +17,7 @@ export type SettlementInvoice = {
   invoice: string;
   paymentHash: string;
   provider: string;
+  asset?: SettlementAsset;
 };
 
 export type SettlementVerificationInput = {
@@ -16,11 +25,13 @@ export type SettlementVerificationInput = {
   preimage: string;
   expectedAmountMsats: number;
   expectedDescription: string;
+  expectedProvider?: string;
+  asset?: SettlementAsset;
   signal?: AbortSignal;
 };
 
 export type SettlementVerification =
-  | { settledAt: number; provider: string }
+  | { settledAt: number; provider: string; asset?: SettlementAsset }
   | "invalid"
   | "unavailable";
 

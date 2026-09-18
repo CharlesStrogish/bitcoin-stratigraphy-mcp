@@ -10,6 +10,9 @@ type ChallengeRow = {
 type RangeChallengeRow = {
   invoice: string;
   payment_hash: string;
+  provider: string;
+  asset: "btc-lightning" | "l-btc" | "taproot-assets";
+  redeem_until: Date;
   expires_at: Date;
 };
 type QueryResult<Row> = { rows: Row[] };
@@ -67,6 +70,10 @@ export function createPostgresPaymentChallengeStore(
           [new Date(now)],
         );
         await client.query(
+          "DELETE FROM payment_invoice_bindings WHERE redeem_until <= $1",
+          [new Date(now)],
+        );
+        await client.query(
           "DELETE FROM payment_challenges WHERE expires_at <= $1",
           [new Date(now)],
         );
@@ -81,7 +88,7 @@ export function createPostgresPaymentChallengeStore(
         );
 
         const challengeResult = await client.query<RangeChallengeRow>(
-          `SELECT invoice, payment_hash, expires_at
+          `SELECT invoice, payment_hash, provider, expires_at
              FROM payment_range_challenges
             WHERE caller_key = $1 AND scope = $2 FOR UPDATE`,
           [caller, scope],
@@ -95,6 +102,7 @@ export function createPostgresPaymentChallengeStore(
             challenge: {
               invoice: existingChallenge.invoice,
               paymentHash: existingChallenge.payment_hash,
+              provider: existingChallenge.provider,
               issuedAt:
                 existingChallenge.expires_at.getTime() - policy.reuseMs,
             },
@@ -154,12 +162,29 @@ export function createPostgresPaymentChallengeStore(
         await client.query("BEGIN");
         transactionOpen = true;
         await client.query(
+          `INSERT INTO payment_invoice_bindings
+             (caller_key, payment_hash, provider, asset, redeem_until)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (caller_key, payment_hash) DO UPDATE SET
+             provider = EXCLUDED.provider,
+             asset = EXCLUDED.asset,
+             redeem_until = EXCLUDED.redeem_until`,
+          [
+            caller,
+            challenge.paymentHash,
+            challenge.provider ?? "legacy-unbound",
+            challenge.asset ?? "btc-lightning",
+            new Date(challenge.redeemUntil ?? createdAt + 60 * 60 * 1000),
+          ],
+        );
+        await client.query(
           `INSERT INTO payment_range_challenges
-             (caller_key, scope, invoice, payment_hash, expires_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, NOW())
+             (caller_key, scope, invoice, payment_hash, provider, expires_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
            ON CONFLICT (caller_key, scope) DO UPDATE SET
              invoice = EXCLUDED.invoice,
              payment_hash = EXCLUDED.payment_hash,
+              provider = EXCLUDED.provider,
              expires_at = EXCLUDED.expires_at,
              updated_at = NOW()`,
           [
@@ -167,17 +192,19 @@ export function createPostgresPaymentChallengeStore(
             finalScope,
             challenge.invoice,
             challenge.paymentHash,
+            challenge.provider ?? "legacy-unbound",
             new Date(createdAt + policy.reuseMs),
           ],
         );
         if (finalScope !== scope) {
           await client.query(
             `INSERT INTO payment_range_challenges
-               (caller_key, scope, invoice, payment_hash, expires_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())
+               (caller_key, scope, invoice, payment_hash, provider, expires_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6, NOW())
              ON CONFLICT (caller_key, scope) DO UPDATE SET
                invoice = EXCLUDED.invoice,
                payment_hash = EXCLUDED.payment_hash,
+                provider = EXCLUDED.provider,
                expires_at = EXCLUDED.expires_at,
                updated_at = NOW()`,
             [
@@ -185,6 +212,7 @@ export function createPostgresPaymentChallengeStore(
               scope,
               challenge.invoice,
               challenge.paymentHash,
+              challenge.provider ?? "legacy-unbound",
               new Date(createdAt + policy.reuseMs),
             ],
           );
@@ -220,10 +248,32 @@ export function createPostgresPaymentChallengeStore(
       await databasePool.query(
         `DELETE FROM payment_range_challenges
           WHERE caller_key = $1
-            AND (scope = $2 OR scope LIKE $2 || ':settlement:%')
+             AND (scope = $2 OR scope LIKE $2 || ':%')
             AND payment_hash = $3`,
         [caller, scope, paymentHash],
       );
+    },
+    async findByPaymentHash(caller, paymentHash) {
+      const result = await databasePool.query<RangeChallengeRow>(
+        `SELECT payment_hash, provider, asset, redeem_until
+           FROM payment_invoice_bindings
+          WHERE caller_key = $1
+            AND payment_hash = $2
+            AND redeem_until > NOW()
+          LIMIT 1`,
+        [caller, paymentHash],
+      );
+      const row = result.rows[0];
+      return row
+        ? {
+            invoice: "",
+            paymentHash: row.payment_hash,
+            provider: row.provider,
+            asset: row.asset,
+            issuedAt: 0,
+            redeemUntil: row.redeem_until.getTime(),
+          }
+        : null;
     },
   };
 }

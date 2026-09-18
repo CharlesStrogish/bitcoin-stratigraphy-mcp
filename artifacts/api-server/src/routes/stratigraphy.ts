@@ -35,11 +35,17 @@ import {
   type PricingEngine,
 } from "../services/pricing";
 import {
-  createDefaultSettlementRouter,
   createNwcClient,
   type NwcClientFactory,
   type SettlementRouter,
+  SETTLEMENT_ASSETS,
+  type SettlementAsset,
 } from "../services/settlement";
+import {
+  createDefaultMultiSettlementRouter,
+  isSettlementAsset,
+  type MultiSettlementRouter,
+} from "../services/multiSettlement";
 import {
   createStratigraphyTelemetryHub,
   nodeIntervalScheduler,
@@ -364,6 +370,38 @@ function parseL402Authorization(value: string | undefined) {
       };
 }
 
+function requestSettlementAsset(
+  req: Request,
+): { asset: SettlementAsset } | { error: string } {
+  const primary = req.header("X-Settlement-Asset")?.trim().toLowerCase();
+  const fallback = req.header("Accept-Asset")?.trim().toLowerCase();
+  if (primary && fallback && primary !== fallback) {
+    return { error: "Conflicting settlement asset headers" };
+  }
+  const requested = primary || fallback || "btc-lightning";
+  return isSettlementAsset(requested)
+    ? { asset: requested }
+    : { error: "Unsupported settlement asset" };
+}
+
+function supportedSettlementAssets(
+  router: SettlementRouter,
+): readonly SettlementAsset[] {
+  return "supportedAssets" in router
+    ? (router as MultiSettlementRouter).supportedAssets()
+    : ["btc-lightning"];
+}
+
+function availableSettlementAssets(
+  router: SettlementRouter,
+): readonly SettlementAsset[] {
+  return "availableAssets" in router
+    ? (router as MultiSettlementRouter).availableAssets()
+    : router.isConfigured()
+      ? ["btc-lightning"]
+      : [];
+}
+
 function requestNip98Url(req: Request): string {
   const configuredOrigin = process.env.NIP98_PUBLIC_ORIGIN;
   const origin = configuredOrigin
@@ -467,6 +505,7 @@ async function sendPaymentChallenge(
   pricingEngine: PricingEngine,
   difficultyEpochProgress: number,
   reputation: AgentReputationService,
+  paymentAsset: SettlementAsset,
   agent?: AgentIdentity,
 ) {
   try {
@@ -488,7 +527,7 @@ async function sendPaymentChallenge(
       challengeDescription: string,
     ) => {
       const providerScope =
-        `${scope}${agentScope}:settlement:${settlementRouter.activeProvider()}`;
+        `${scope}${agentScope}:asset:${paymentAsset}:settlement:${settlementRouter.activeProvider(paymentAsset)}`;
       return challengeStore.getOrCreate(
         caller,
         providerScope,
@@ -499,15 +538,21 @@ async function sendPaymentChallenge(
               amountMsats: challengeAmountMsats,
               description: challengeDescription,
               expirySeconds: 3600,
+              asset: paymentAsset,
             });
-            return { ...challenge, issuedAt: policy.now() };
+            const issuedAt = policy.now();
+            return {
+              ...challenge,
+              issuedAt,
+              redeemUntil: issuedAt + 3_600_000,
+            };
           } catch (error) {
             throw new InvoiceCreationError(error);
           }
         },
         (challenge) =>
-          `${scope}${agentScope}:settlement:${
-            challenge.provider ?? settlementRouter.activeProvider()
+          `${scope}${agentScope}:asset:${paymentAsset}:settlement:${
+            challenge.provider ?? settlementRouter.activeProvider(paymentAsset)
           }`,
       );
     };
@@ -583,6 +628,8 @@ async function sendPaymentChallenge(
           tier,
           validUntil,
           amountMsats,
+           paymentAsset,
+           paymentProvider: result.challenge.provider,
           agentIdentity: agent,
         }),
         valid_until: validUntil,
@@ -591,6 +638,7 @@ async function sendPaymentChallenge(
         discount_sats: adjustedPricing.discountSats,
         discount_percent: adjustedPricing.discountPercent,
         agent_tier: adjustedPricing.tier,
+        payment_asset: paymentAsset,
       };
       },
     );
@@ -609,6 +657,9 @@ async function sendPaymentChallenge(
     res.status(402).json({
       invoice: legacyResult.challenge.invoice,
       payment_hash: legacyResult.challenge.paymentHash,
+      settlement_asset: paymentAsset,
+      supported_assets: supportedSettlementAssets(settlementRouter),
+      available_assets: availableSettlementAssets(settlementRouter),
       agent: agent
         ? {
             pubkey: agent.pubkey,
@@ -639,7 +690,7 @@ export function registerStratigraphyRoutes(
     createMemoryMacaroonRevocationStore(),
   pricingEngine: PricingEngine = createPricingEngine(),
   settlementRouter: SettlementRouter =
-    createDefaultSettlementRouter(clientFactory),
+    createDefaultMultiSettlementRouter(clientFactory),
   streamOptions: {
     telemetryHub?: StratigraphyTelemetryHub;
     heartbeatScheduler?: IntervalScheduler;
@@ -715,6 +766,11 @@ export function registerStratigraphyRoutes(
   });
 
   app.get("/api/v1/cost", async (req, res): Promise<void> => {
+    const assetSelection = requestSettlementAsset(req);
+    if ("error" in assetSelection) {
+      res.status(400).json({ error: assetSelection.error });
+      return;
+    }
     const dataset = await readDataset();
     const epochProgress = currentDifficultyEpochProgress(dataset);
     const calculatedAt = policy.now();
@@ -740,6 +796,9 @@ export function registerStratigraphyRoutes(
     );
     res.status(200).json({
       protocol: "L402",
+      settlement_asset: assetSelection.asset,
+      supported_assets: supportedSettlementAssets(settlementRouter),
+      available_assets: availableSettlementAssets(settlementRouter),
       access_tiers: quotes.map((quote) => {
         const adjusted = agentReputation.applyPricing(
           quote.priceSats,
@@ -925,6 +984,8 @@ export function registerStratigraphyRoutes(
         preimage: authorization.preimage,
         expectedAmountMsats: parent.amountMsats ?? definition.amountMsats,
         expectedDescription: definition.description,
+        asset: parent.paymentAsset,
+        expectedProvider: parent.paymentProvider,
       });
       if (verification === "unavailable") {
         res.status(502).json({ error: "Unable to verify payment" });
@@ -1041,6 +1102,11 @@ export function registerStratigraphyRoutes(
         return;
       }
       const caller = callerKey(req);
+      const assetSelection = requestSettlementAsset(req);
+      if ("error" in assetSelection) {
+        res.status(400).json({ error: assetSelection.error });
+        return;
+      }
       if (!settlementRouter.isConfigured()) {
         res.status(500).json({ error: "NWC_URI is not configured" });
         return;
@@ -1058,6 +1124,9 @@ export function registerStratigraphyRoutes(
         res.status(401).json({ error: "Invalid NIP-98 authorization" });
         return;
       }
+      const challengeCaller = agentAuth.identity
+        ? `nostr:${agentAuth.identity.pubkey}`
+        : caller;
       let paymentHash: string | undefined;
       if (authorization?.kind === "subscription") {
         if (
@@ -1109,6 +1178,8 @@ export function registerStratigraphyRoutes(
               expectedAmountMsats:
                 pass.amountMsats ?? definition.amountMsats,
               expectedDescription: definition.description,
+              asset: pass.paymentAsset,
+              expectedProvider: pass.paymentProvider,
               signal: requestController.signal,
             });
           } catch (error) {
@@ -1147,21 +1218,26 @@ export function registerStratigraphyRoutes(
 
       if (!paymentHash) {
         if (disconnected) return;
+        if (!settlementRouter.isConfigured(assetSelection.asset)) {
+          res.status(500).json({
+            error: "Requested settlement asset is not configured",
+          });
+          return;
+        }
         await sendPaymentChallenge(
           req,
           res,
           settlementRouter,
           challengeStore,
           policy,
-          agentAuth.identity
-            ? `nostr:${agentAuth.identity.pubkey}`
-            : caller,
+          challengeCaller,
           `stream:${selectedRange.key}`,
           selectedRange.amountMsats,
           selectedRange.description,
           pricingEngine,
           currentDifficultyEpochProgress(dataset),
           agentReputation,
+          assetSelection.asset,
           agentAuth.identity,
         );
         return;
@@ -1234,6 +1310,11 @@ export function registerStratigraphyRoutes(
         return;
       }
       const caller = callerKey(req);
+      const assetSelection = requestSettlementAsset(req);
+      if ("error" in assetSelection) {
+        res.status(400).json({ error: assetSelection.error });
+        return;
+      }
       if (!settlementRouter.isConfigured()) {
         res.status(500).json({ error: "NWC_URI is not configured" });
         return;
@@ -1251,6 +1332,9 @@ export function registerStratigraphyRoutes(
         res.status(401).json({ error: "Invalid NIP-98 authorization" });
         return;
       }
+      const challengeCaller = agentAuth.identity
+        ? `nostr:${agentAuth.identity.pubkey}`
+        : caller;
       if (authorization) {
         if (authorization.kind === "subscription") {
           if (
@@ -1299,6 +1383,8 @@ export function registerStratigraphyRoutes(
               expectedAmountMsats:
                 pass.amountMsats ?? definition.amountMsats,
               expectedDescription: definition.description,
+              asset: pass.paymentAsset,
+              expectedProvider: pass.paymentProvider,
             });
             if (verification === "unavailable") {
               res.status(502).json({ error: "Unable to verify payment" });
@@ -1334,11 +1420,28 @@ export function registerStratigraphyRoutes(
           }
         }
         if (authorization.kind === "legacy") {
+        const issuedChallenge = await challengeStore.findByPaymentHash(
+          challengeCaller,
+          authorization.paymentHash,
+        );
+        if (
+          !issuedChallenge?.provider ||
+          issuedChallenge.provider === "legacy-unbound"
+        ) {
+          res.status(401).json({ error: "Invalid payment challenge" });
+          return;
+        }
+        if (issuedChallenge.asset !== assetSelection.asset) {
+          res.status(401).json({ error: "Settlement asset does not match challenge" });
+          return;
+        }
         const verification = await settlementRouter.verifyPayment({
           paymentHash: authorization.paymentHash,
           preimage: authorization.preimage,
           expectedAmountMsats: selectedRange.amountMsats,
           expectedDescription: selectedRange.description,
+          asset: assetSelection.asset,
+          expectedProvider: issuedChallenge.provider,
         });
         if (verification === "unavailable") {
           res.status(502).json({ error: "Unable to verify payment" });
@@ -1369,21 +1472,26 @@ export function registerStratigraphyRoutes(
         }
       }
 
+      if (!settlementRouter.isConfigured(assetSelection.asset)) {
+        res.status(500).json({
+          error: "Requested settlement asset is not configured",
+        });
+        return;
+      }
       await sendPaymentChallenge(
         req,
         res,
         settlementRouter,
         challengeStore,
         policy,
-        agentAuth.identity
-          ? `nostr:${agentAuth.identity.pubkey}`
-          : caller,
+          challengeCaller,
         selectedRange.key,
         selectedRange.amountMsats,
         selectedRange.description,
         pricingEngine,
         currentDifficultyEpochProgress(dataset),
         agentReputation,
+        assetSelection.asset,
         agentAuth.identity,
       );
     },

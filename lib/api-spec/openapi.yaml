@@ -93,6 +93,17 @@ paths:
       security:
         - {}
         - NIP98: []
+      parameters:
+        - name: X-Settlement-Asset
+          in: header
+          description: Preferred settlement asset. Accept-Asset is supported as an alias.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+        - name: Accept-Asset
+          in: header
+          description: Alias for X-Settlement-Asset.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
       responses:
         "200":
           description: Dataset access, MCP parameter, and response schema metadata
@@ -105,6 +116,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StratigraphyCost"
+        "400":
+          description: Unsupported or conflicting settlement asset headers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementAssetSelectionError"
         "401":
           description: Invalid NIP-98 authorization
   /v1/nostr/status:
@@ -253,6 +270,16 @@ paths:
           description: Required NIP-98 identity when presenting an agent-bound L402 macaroon because Authorization carries the L402 credential.
           schema:
             type: string
+        - name: X-Settlement-Asset
+          in: header
+          description: Preferred settlement asset for a new challenge. Accept-Asset is supported as an alias.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+        - name: Accept-Asset
+          in: header
+          description: Alias for X-Settlement-Asset.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
       security:
         - L402: []
       responses:
@@ -270,7 +297,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/StratigraphyEntry"
         "402":
-          description: Lightning payment required
+          description: Payment in the selected settlement asset is required
           headers:
             WWW-Authenticate:
               description: L402 challenges for the legacy single query plus tiered 1-day and 30-day subscription passes
@@ -281,11 +308,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/L402Challenge"
         "400":
-          description: Invalid or conflicting range parameters
+          description: Invalid range or settlement asset selection
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/InvalidRangeError"
+                oneOf:
+                  - $ref: "#/components/schemas/InvalidRangeError"
+                  - $ref: "#/components/schemas/SettlementAssetSelectionError"
         "401":
           description: Invalid NIP-98 authorization or agent identity mismatch
         "429":
@@ -301,7 +330,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaymentChallengeRateLimitError"
         "500":
-          description: Lightning payment is not configured
+          description: The selected settlement asset is not configured
           content:
             application/json:
               schema:
@@ -325,13 +354,23 @@ paths:
       operationId: streamStratigraphyTelemetry
       tags: [stratigraphy]
       summary: Stream live Bitcoin stratigraphy telemetry
-      description: Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its Lightning payment preimage. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+      description: Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
       parameters:
         - name: X-Nostr-Authorization
           in: header
           description: Required NIP-98 identity when presenting an agent-bound L402 macaroon.
           schema:
             type: string
+        - name: X-Settlement-Asset
+          in: header
+          description: Preferred settlement asset for a new challenge.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+        - name: Accept-Asset
+          in: header
+          description: Alias for X-Settlement-Asset.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
       security:
         - L402: []
       responses:
@@ -352,7 +391,7 @@ paths:
                 type: string
                 description: SSE messages with telemetry and ping event types and JSON data payloads.
         "402":
-          description: Lightning payment required
+          description: Payment in the selected settlement asset is required
           headers:
             WWW-Authenticate:
               description: L402 challenges including tiered subscription passes
@@ -364,12 +403,18 @@ paths:
                 $ref: "#/components/schemas/L402Challenge"
         "401":
           description: Invalid NIP-98 authorization or agent identity mismatch
+        "400":
+          description: Unsupported or conflicting settlement asset headers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementAssetSelectionError"
         "403":
           description: The macaroon path caveat does not permit this stream
         "429":
           description: Payment invoice creation or macaroon usage is limited
         "500":
-          description: Lightning payment or server signing is not configured
+          description: The selected settlement asset or server signing is not configured
         "502":
           description: Wallet payment verification is unavailable
         "503":
@@ -391,6 +436,9 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    SettlementAsset:
+      type: string
+      enum: [btc-lightning, l-btc, taproot-assets]
     MacaroonRevocationRequest:
       type: object
       additionalProperties: false
@@ -485,6 +533,19 @@ components:
         protocol:
           type: string
           const: L402
+        settlement_asset:
+          $ref: "#/components/schemas/SettlementAsset"
+        supported_assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettlementAsset"
+          minItems: 1
+          uniqueItems: true
+        available_assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettlementAsset"
+          uniqueItems: true
         access_tiers:
           type: array
           minItems: 2
@@ -585,6 +646,9 @@ components:
           $ref: "#/components/schemas/JsonSchema"
       required:
         - protocol
+        - settlement_asset
+        - supported_assets
+        - available_assets
         - access_tiers
         - dynamic_pricing
         - legacy_query_pricing
@@ -761,10 +825,23 @@ components:
       properties:
         invoice:
           type: string
-          description: BOLT11 invoice
+          description: Invoice or payment request for the selected settlement asset
         payment_hash:
           type: string
           pattern: "^[0-9a-f]{64}$"
+        settlement_asset:
+          $ref: "#/components/schemas/SettlementAsset"
+        supported_assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettlementAsset"
+          minItems: 1
+          uniqueItems: true
+        available_assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettlementAsset"
+          uniqueItems: true
         agent:
           $ref: "#/components/schemas/AgentReputationMetadata"
         passes:
@@ -776,6 +853,9 @@ components:
       required:
         - invoice
         - payment_hash
+        - settlement_asset
+        - supported_assets
+        - available_assets
         - passes
     L402SubscriptionPass:
       type: object
@@ -785,13 +865,13 @@ components:
           enum: [1-day, 30-day]
         invoice:
           type: string
-          description: BOLT11 invoice for this subscription tier
+          description: Asset-specific settlement invoice for this subscription tier
         payment_hash:
           type: string
           pattern: "^[0-9a-f]{64}$"
         macaroon:
           type: string
-          description: Signed first-party macaroon containing payment_hash, tier, valid_until, and exact issued amount caveats
+          description: Signed first-party macaroon containing payment hash, tier, validity, exact amount, payment asset, and issuing provider caveats
         valid_until:
           type: integer
           description: Unix timestamp in seconds after which this pass is invalid
@@ -808,6 +888,8 @@ components:
         agent_tier:
           type: string
           enum: [STANDARD, VIP, SWARM]
+        payment_asset:
+          $ref: "#/components/schemas/SettlementAsset"
       required:
         - tier
         - invoice
@@ -819,6 +901,7 @@ components:
         - discount_sats
         - discount_percent
         - agent_tier
+        - payment_asset
     AgentReputationMetadata:
       type: object
       properties:
@@ -844,6 +927,16 @@ components:
       required:
         - error
         - detail
+    SettlementAssetSelectionError:
+      type: object
+      properties:
+        error:
+          type: string
+          enum:
+            - Unsupported settlement asset
+            - Conflicting settlement asset headers
+      required:
+        - error
     PaymentChallengeRateLimitError:
       type: object
       properties:
@@ -866,7 +959,9 @@ components:
       properties:
         error:
           type: string
-          const: NWC_URI is not configured
+          enum:
+            - NWC_URI is not configured
+            - Requested settlement asset is not configured
       required:
         - error
     PaymentChallengeServiceUnavailableError:

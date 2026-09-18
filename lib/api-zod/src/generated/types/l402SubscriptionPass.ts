@@ -7,14 +7,15 @@
  */
 import type { L402SubscriptionPassAgentTier } from './l402SubscriptionPassAgentTier';
 import type { L402SubscriptionPassTier } from './l402SubscriptionPassTier';
+import type { SettlementAsset } from './settlementAsset';
 
 export interface L402SubscriptionPass {
   tier: L402SubscriptionPassTier;
-  /** BOLT11 invoice for this subscription tier */
+  /** Asset-specific settlement invoice for this subscription tier */
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
-  /** Signed first-party macaroon containing payment_hash, tier, valid_until, and exact issued amount caveats */
+  /** Signed first-party macaroon containing payment hash, tier, validity, exact amount, payment asset, and issuing provider caveats */
   macaroon: string;
   /** Unix timestamp in seconds after which this pass is invalid */
   valid_until: number;
@@ -25,4 +26,5 @@ export interface L402SubscriptionPass {
   discount_sats: number;
   discount_percent: number;
   agent_tier: L402SubscriptionPassAgentTier;
+  payment_asset: SettlementAsset;
 }

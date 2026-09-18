@@ -5,8 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PaymentConfigurationErrorError } from './paymentConfigurationErrorError';
 
-export const PaymentConfigurationErrorValue = {
-  error: 'NWC_URI is not configured',
-} as const;
-export type PaymentConfigurationError = typeof PaymentConfigurationErrorValue;
+export interface PaymentConfigurationError {
+  error: PaymentConfigurationErrorError;
+}

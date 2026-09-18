@@ -2,9 +2,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { AgentIdentity, AgentTier } from "../services/agentReputation";
 import {
   constructAgentIdentityCaveats,
+  constructPaymentAssetCaveat,
+  constructPaymentProviderCaveat,
   parseAgentIdentityCaveats,
+  parsePaymentAssetCaveat,
+  parsePaymentProviderCaveat,
   presentingAgentMatchesCaveats,
 } from "../services/l402Caveats";
+import type { SettlementAsset } from "../services/settlement/types";
 
 export type SubscriptionTier = "1-day" | "30-day";
 
@@ -38,6 +43,8 @@ export type VerifiedSubscriptionMacaroon = {
   amountMsats?: number;
   agentPubkey?: string;
   agentTier?: AgentTier;
+  paymentAsset: SettlementAsset;
+  paymentProvider?: string;
 };
 
 function hmac(key: string | Buffer, value: string): Buffer {
@@ -106,7 +113,12 @@ export function createSubscriptionMacaroon(input: {
   validUntil: number;
   amountMsats?: number;
   agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
+  paymentAsset?: SettlementAsset;
+  paymentProvider?: string;
 }): string {
+  if (input.paymentAsset && !input.paymentProvider) {
+    throw new Error("Asset-bound macaroons require a settlement provider");
+  }
   const identifier = "bitcoin-stratigraphy-subscription-v1";
   const caveats = [
     `payment_hash=${input.paymentHash}`,
@@ -115,6 +127,8 @@ export function createSubscriptionMacaroon(input: {
     ...(input.amountMsats === undefined
       ? []
       : [`amount_msats=${input.amountMsats}`]),
+    ...constructPaymentAssetCaveat(input.paymentAsset),
+    ...constructPaymentProviderCaveat(input.paymentProvider),
     ...constructAgentIdentityCaveats(input.agentIdentity),
   ];
   const token: SerializedMacaroon = {
@@ -171,6 +185,8 @@ export function verifySubscriptionMacaroon(
             "amount_msats",
             "agent_pubkey",
             "agent_tier",
+            "payment_asset",
+            "payment_provider",
           ].includes(key) ||
           rootValues.has(key)
         ) {
@@ -194,6 +210,8 @@ export function verifySubscriptionMacaroon(
     const amountMsats =
       amountMsatsValue === undefined ? undefined : Number(amountMsatsValue);
     const agentCaveats = parseAgentIdentityCaveats(rootValues);
+    const paymentAssetCaveat = parsePaymentAssetCaveat(rootValues);
+    const paymentProviderCaveat = parsePaymentProviderCaveat(rootValues);
     if (
       !/^[0-9a-f]{64}$/.test(paymentHash) ||
       !(tier in SUBSCRIPTION_TIERS) ||
@@ -203,6 +221,8 @@ export function verifySubscriptionMacaroon(
         (!/^[1-9]\d*$/.test(amountMsatsValue) ||
           !Number.isSafeInteger(amountMsats))) ||
       agentCaveats === null ||
+      paymentAssetCaveat === null ||
+      paymentProviderCaveat === null ||
       (presentingAgent !== undefined &&
         !presentingAgentMatchesCaveats(
           agentCaveats,
@@ -210,6 +230,8 @@ export function verifySubscriptionMacaroon(
         )) ||
       rootValues.size !==
         3 + (amountMsatsValue === undefined ? 0 : 1) +
+          (paymentAssetCaveat === undefined ? 0 : 1) +
+          (paymentProviderCaveat === undefined ? 0 : 1) +
           (agentCaveats === undefined ? 0 : 2)
     ) {
       return null;
@@ -226,6 +248,8 @@ export function verifySubscriptionMacaroon(
       amountMsats,
       agentPubkey: agentCaveats?.agentPubkey,
       agentTier: agentCaveats?.agentTier,
+      paymentAsset: paymentAssetCaveat ?? "btc-lightning",
+      paymentProvider: paymentProviderCaveat,
     };
   } catch {
     return null;

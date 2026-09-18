@@ -7,6 +7,7 @@
  */
 import type { AgentReputationMetadata } from './agentReputationMetadata';
 import type { JsonSchema } from './jsonSchema';
+import type { SettlementAsset } from './settlementAsset';
 import type { StratigraphyCostAccessTiersItem } from './stratigraphyCostAccessTiersItem';
 import type { StratigraphyCostDataset } from './stratigraphyCostDataset';
 import type { StratigraphyCostDynamicPricing } from './stratigraphyCostDynamicPricing';
@@ -15,6 +16,10 @@ import type { StratigraphyCostMcpTool } from './stratigraphyCostMcpTool';
 
 export interface StratigraphyCost {
   protocol: 'L402';
+  settlement_asset: SettlementAsset;
+  /** @minItems 1 */
+  supported_assets: SettlementAsset[];
+  available_assets: SettlementAsset[];
   /**
      * @minItems 2
      * @maxItems 2

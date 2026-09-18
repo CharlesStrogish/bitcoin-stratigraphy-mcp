@@ -35,6 +35,7 @@ import type {
   PaymentChallengeServiceUnavailableError,
   PaymentConfigurationError,
   ReadinessStatus,
+  SettlementAssetSelectionError,
   StratigraphyCost,
   StratigraphyEntry,
   TokenRevocationServiceUnavailableError,
@@ -413,7 +414,7 @@ export const getGetStratigraphyCostQueryKey = () => {
     }
 
 
-export const getGetStratigraphyCostQueryOptions = <TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetStratigraphyCostQueryOptions = <TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<SettlementAssetSelectionError | void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -432,14 +433,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStratigraphyCostQueryResult = NonNullable<Awaited<ReturnType<typeof getStratigraphyCost>>>
-export type GetStratigraphyCostQueryError = ErrorType<void>
+export type GetStratigraphyCostQueryError = ErrorType<SettlementAssetSelectionError | void>
 
 
 /**
  * @summary Inspect dataset access costs and schemas
  */
 
-export function useGetStratigraphyCost<TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<void>>(
+export function useGetStratigraphyCost<TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<SettlementAssetSelectionError | void>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -798,7 +799,7 @@ export const getGetPaidStratigraphyQueryKey = (params?: GetPaidStratigraphyParam
     }
 
 
-export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | void | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>>(params?: GetPaidStratigraphyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPaidStratigraphyQueryOptions = <TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | SettlementAssetSelectionError | void | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>>(params?: GetPaidStratigraphyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -817,14 +818,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetPaidStratigraphyQueryResult = NonNullable<Awaited<ReturnType<typeof getPaidStratigraphy>>>
-export type GetPaidStratigraphyQueryError = ErrorType<InvalidRangeError | void | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>
+export type GetPaidStratigraphyQueryError = ErrorType<InvalidRangeError | SettlementAssetSelectionError | void | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>
 
 
 /**
  * @summary Get the complete L402-protected dataset
  */
 
-export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | void | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>>(
+export function useGetPaidStratigraphy<TData = Awaited<ReturnType<typeof getPaidStratigraphy>>, TError = ErrorType<InvalidRangeError | SettlementAssetSelectionError | void | L402Challenge | PaymentChallengeRateLimitError | PaymentConfigurationError | WalletGatewayError | PaymentChallengeServiceUnavailableError | TokenRevocationServiceUnavailableError>>(
  params?: GetPaidStratigraphyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaidStratigraphy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -851,7 +852,7 @@ export const getStreamStratigraphyTelemetryUrl = () => {
 }
 
 /**
- * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its Lightning payment preimage. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+ * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
  * @summary Stream live Bitcoin stratigraphy telemetry
  */
 export const streamStratigraphyTelemetry = async ( options?: Parameters<typeof customFetch>[1]): Promise<string> => {
@@ -876,7 +877,7 @@ export const getStreamStratigraphyTelemetryQueryKey = () => {
     }
 
 
-export const getStreamStratigraphyTelemetryQueryOptions = <TData = Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError = ErrorType<void | L402Challenge>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getStreamStratigraphyTelemetryQueryOptions = <TData = Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError = ErrorType<SettlementAssetSelectionError | void | L402Challenge>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -895,14 +896,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type StreamStratigraphyTelemetryQueryResult = NonNullable<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>>
-export type StreamStratigraphyTelemetryQueryError = ErrorType<void | L402Challenge>
+export type StreamStratigraphyTelemetryQueryError = ErrorType<SettlementAssetSelectionError | void | L402Challenge>
 
 
 /**
  * @summary Stream live Bitcoin stratigraphy telemetry
  */
 
-export function useStreamStratigraphyTelemetry<TData = Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError = ErrorType<void | L402Challenge>>(
+export function useStreamStratigraphyTelemetry<TData = Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError = ErrorType<SettlementAssetSelectionError | void | L402Challenge>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamStratigraphyTelemetry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

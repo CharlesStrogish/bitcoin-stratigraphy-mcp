@@ -9,7 +9,10 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Literal, Mapping, Protocol
+
+
+SettlementAsset = Literal["btc-lightning", "l-btc", "taproot-assets"]
 
 
 class WalletAdapter(Protocol):
@@ -42,11 +45,13 @@ class BitcoinStratigraphyClient:
         base_url: str,
         wallet: WalletAdapter,
         tier: str = "1-day",
+        settlement_asset: SettlementAsset = "btc-lightning",
         timeout: float = 30.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.wallet = wallet
         self.tier = tier
+        self.settlement_asset = settlement_asset
         self.timeout = timeout
         self._credential: dict[str, Any] | None = None
         self._credential_lock = threading.Lock()
@@ -119,7 +124,9 @@ class BitcoinStratigraphyClient:
             return json.load(response)
 
     def _open_authorized(self, path: str):
-        headers: dict[str, str] = {}
+        headers: dict[str, str] = {
+            "X-Settlement-Asset": self.settlement_asset
+        }
         credential = self._current_credential()
         sent_authorization: str | None = None
         if credential:
@@ -142,7 +149,11 @@ class BitcoinStratigraphyClient:
                 challenge, sent_authorization
             )
             return self._open(
-                path, {"Authorization": self._authorization(credential)}
+                path,
+                {
+                    "Authorization": self._authorization(credential),
+                    "X-Settlement-Asset": self.settlement_asset,
+                },
             )
 
     def _pay_challenge(
@@ -169,6 +180,10 @@ class BitcoinStratigraphyClient:
                 raise ValueError(
                     f"L402 challenge did not include tier {self.tier}"
                 )
+            if selected.get("payment_asset") != self.settlement_asset:
+                raise ValueError(
+                    "L402 challenge did not match the requested settlement asset"
+                )
             result = self.wallet.pay_invoice(selected["invoice"])
             if isinstance(result, str):
                 preimage = result
@@ -194,6 +209,7 @@ class BitcoinStratigraphyClient:
                 "macaroon": selected["macaroon"],
                 "preimage": preimage.lower(),
                 "valid_until": selected["valid_until"],
+                "payment_asset": selected["payment_asset"],
             }
             return self._credential
 
@@ -213,7 +229,9 @@ class BitcoinStratigraphyClient:
         )
 
     def _json_request(self, path: str) -> dict[str, Any]:
-        with self._open(path, {}) as response:
+        with self._open(
+            path, {"X-Settlement-Asset": self.settlement_asset}
+        ) as response:
             return json.load(response)
 
     def _open(self, path: str, headers: Mapping[str, str]):
@@ -227,4 +245,5 @@ __all__ = [
     "BitcoinStratigraphyClient",
     "StreamSubscription",
     "WalletAdapter",
+    "SettlementAsset",
 ]

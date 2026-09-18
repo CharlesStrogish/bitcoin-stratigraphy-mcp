@@ -399,7 +399,7 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
       >
     )["500"],
     {
-      description: "Lightning payment is not configured",
+      description: "The selected settlement asset is not configured",
       content: {
         "application/json": {
           schema: { $ref: "#/components/schemas/PaymentConfigurationError" },
@@ -527,7 +527,10 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     properties: {
       error: {
         type: "string",
-        const: "NWC_URI is not configured",
+        enum: [
+          "NWC_URI is not configured",
+          "Requested settlement asset is not configured",
+        ],
       },
     },
     required: ["error"],
@@ -1309,6 +1312,7 @@ test("reports not ready when challenge coordination is unavailable", async () =>
       throw new Error("database unavailable");
     },
     consume: async () => undefined,
+    findByPaymentHash: async () => null,
   };
   const readinessApp = express();
   readinessApp.use((req, _res, next) => {
@@ -1957,6 +1961,7 @@ test("fails closed when shared challenge coordination is unavailable", async () 
       throw new Error("database unavailable");
     },
     consume: async () => undefined,
+    findByPaymentHash: async () => null,
   };
   const unavailableApp = express();
   unavailableApp.use((req, _res, next) => {
@@ -2411,7 +2416,7 @@ test("returns a generic 502 and closes the wallet for an incomplete invoice", as
   );
 });
 
-test("returns a generic 502 without a fresh invoice when payment lookup fails", async () => {
+test("rejects a legacy proof without a stored issuing provider", async () => {
   let closeCount = 0;
   let makeInvoiceCount = 0;
 
@@ -2433,13 +2438,13 @@ test("returns a generic 502 without a fresh invoice when payment lookup fails", 
         headers: { Authorization: `L402 ${paymentHash}:${preimage}` },
       });
 
-      assert.equal(response.status, 502);
+      assert.equal(response.status, 401);
       assert.deepEqual(await response.json(), {
-        error: "Unable to verify payment",
+        error: "Invalid payment challenge",
       });
       assert.equal(response.headers.get("www-authenticate"), null);
       assert.equal(makeInvoiceCount, 0);
-      assert.equal(closeCount, 1);
+      assert.equal(closeCount, 0);
     },
   );
 });

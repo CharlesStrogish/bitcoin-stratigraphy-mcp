@@ -1,8 +1,12 @@
+import type { SettlementAsset } from "../services/settlement";
+
 export type PaymentChallenge = {
   invoice: string;
   paymentHash: string;
   issuedAt: number;
   provider?: string;
+  asset?: SettlementAsset;
+  redeemUntil?: number;
 };
 
 export type ChallengeStorePolicy = {
@@ -27,6 +31,10 @@ export interface PaymentChallengeStore {
     scopeForChallenge?: (challenge: PaymentChallenge) => string,
   ): Promise<ChallengeStoreResult>;
   consume(caller: string, scope: string, paymentHash: string): Promise<void>;
+  findByPaymentHash(
+    caller: string,
+    paymentHash: string,
+  ): Promise<PaymentChallenge | null>;
 }
 
 type StoredState = {
@@ -43,6 +51,10 @@ function retryAfter(now: number, oldestAttempt: number, windowMs: number) {
 
 export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
   const states = new Map<string, StoredState>();
+  const bindings = new Map<
+    string,
+    { challenge: PaymentChallenge; now: () => number }
+  >();
   const pending = new Map<string, Promise<ChallengeStoreResult>>();
 
   return {
@@ -54,6 +66,11 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
 
       const operation = (async () => {
         const now = policy.now();
+        for (const [key, binding] of bindings) {
+          if ((binding.challenge.redeemUntil ?? 0) <= binding.now()) {
+            bindings.delete(key);
+          }
+        }
         for (const [key, state] of states) {
           for (const [scope, stored] of state.challenges) {
             if (stored.expiresAt <= now) state.challenges.delete(scope);
@@ -108,6 +125,10 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
         };
         state.challenges.set(finalScope, stored);
         if (finalScope !== scope) state.challenges.set(scope, stored);
+        bindings.set(`${caller}|${challenge.paymentHash}`, {
+          challenge,
+          now: policy.now,
+        });
         return { kind: "challenge", challenge } as const;
       })();
       pending.set(pendingKey, operation);
@@ -121,13 +142,24 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
       const state = states.get(caller);
       for (const [storedScope, stored] of state?.challenges ?? []) {
         if (
-          (storedScope === scope ||
-            storedScope.startsWith(`${scope}:settlement:`)) &&
+          (storedScope === scope || storedScope.startsWith(`${scope}:`)) &&
           stored.challenge.paymentHash === paymentHash
         ) {
           state?.challenges.delete(storedScope);
         }
       }
+    },
+    async findByPaymentHash(caller, paymentHash) {
+      const key = `${caller}|${paymentHash}`;
+      const binding = bindings.get(key);
+      if (
+        binding &&
+        (binding.challenge.redeemUntil ?? 0) <= binding.now()
+      ) {
+        bindings.delete(key);
+        return null;
+      }
+      return binding?.challenge ?? null;
     },
   };
 }

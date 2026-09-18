@@ -5,6 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type SettlementAsset = typeof SettlementAsset[keyof typeof SettlementAsset];
+
+
+export const SettlementAsset = {
+  'btc-lightning': 'btc-lightning',
+  'l-btc': 'l-btc',
+  'taproot-assets': 'taproot-assets',
+} as const;
+
 export type MacaroonRevocationRequest = (unknown & {
   macaroon?: string;
   /** @pattern ^[0-9a-fA-F]{64}$ */
@@ -167,6 +176,10 @@ export interface JsonSchema {
 
 export interface StratigraphyCost {
   protocol: 'L402';
+  settlement_asset: SettlementAsset;
+  /** @minItems 1 */
+  supported_assets: SettlementAsset[];
+  available_assets: SettlementAsset[];
   /**
      * @minItems 2
      * @maxItems 2
@@ -289,11 +302,11 @@ export const L402SubscriptionPassAgentTier = {
 
 export interface L402SubscriptionPass {
   tier: L402SubscriptionPassTier;
-  /** BOLT11 invoice for this subscription tier */
+  /** Asset-specific settlement invoice for this subscription tier */
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
-  /** Signed first-party macaroon containing payment_hash, tier, valid_until, and exact issued amount caveats */
+  /** Signed first-party macaroon containing payment hash, tier, validity, exact amount, payment asset, and issuing provider caveats */
   macaroon: string;
   /** Unix timestamp in seconds after which this pass is invalid */
   valid_until: number;
@@ -304,13 +317,18 @@ export interface L402SubscriptionPass {
   discount_sats: number;
   discount_percent: number;
   agent_tier: L402SubscriptionPassAgentTier;
+  payment_asset: SettlementAsset;
 }
 
 export interface L402Challenge {
-  /** BOLT11 invoice */
+  /** Invoice or payment request for the selected settlement asset */
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
+  settlement_asset: SettlementAsset;
+  /** @minItems 1 */
+  supported_assets: SettlementAsset[];
+  available_assets: SettlementAsset[];
   agent?: AgentReputationMetadata;
   /**
      * @minItems 2
@@ -324,6 +342,18 @@ export interface InvalidRangeError {
   detail: string;
 }
 
+export type SettlementAssetSelectionErrorError = typeof SettlementAssetSelectionErrorError[keyof typeof SettlementAssetSelectionErrorError];
+
+
+export const SettlementAssetSelectionErrorError = {
+  Unsupported_settlement_asset: 'Unsupported settlement asset',
+  Conflicting_settlement_asset_headers: 'Conflicting settlement asset headers',
+} as const;
+
+export interface SettlementAssetSelectionError {
+  error: SettlementAssetSelectionErrorError;
+}
+
 export interface PaymentChallengeRateLimitError {
   error: 'Too many payment invoices requested';
   code: 'payment_challenge_rate_limited';
@@ -334,10 +364,17 @@ export interface PaymentChallengeRateLimitError {
   retry_after: number;
 }
 
-export const PaymentConfigurationErrorValue = {
-  error: 'NWC_URI is not configured',
+export type PaymentConfigurationErrorError = typeof PaymentConfigurationErrorError[keyof typeof PaymentConfigurationErrorError];
+
+
+export const PaymentConfigurationErrorError = {
+  NWC_URI_is_not_configured: 'NWC_URI is not configured',
+  Requested_settlement_asset_is_not_configured: 'Requested settlement asset is not configured',
 } as const;
-export type PaymentConfigurationError = typeof PaymentConfigurationErrorValue;
+
+export interface PaymentConfigurationError {
+  error: PaymentConfigurationErrorError;
+}
 
 export const PaymentChallengeServiceUnavailableErrorValue = {
   error: 'Payment challenge service unavailable',

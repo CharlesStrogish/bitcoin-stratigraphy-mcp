@@ -1,7 +1,12 @@
 import type { AgentIdentity, AgentTier } from "./agentReputation";
+import {
+  SETTLEMENT_ASSETS,
+  type SettlementAsset,
+} from "./settlement/types";
 
 const PUBKEY_PATTERN = /^[0-9a-f]{64}$/;
 const AGENT_TIERS = new Set<AgentTier>(["STANDARD", "VIP", "SWARM"]);
+const PAYMENT_ASSETS = new Set<SettlementAsset>(SETTLEMENT_ASSETS);
 
 export type AgentIdentityCaveats = {
   agentPubkey: string;
@@ -50,4 +55,40 @@ export function presentingAgentMatchesCaveats(
     presenting?.pubkey === caveats.agentPubkey &&
     presenting.tier === caveats.agentTier
   );
+}
+
+export function constructPaymentAssetCaveat(
+  asset?: SettlementAsset,
+): string[] {
+  if (!asset) return [];
+  if (!PAYMENT_ASSETS.has(asset)) {
+    throw new Error("Cannot bind an invalid settlement asset");
+  }
+  return [`payment_asset=${asset}`];
+}
+
+export function constructPaymentProviderCaveat(provider?: string): string[] {
+  if (!provider) return [];
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(provider)) {
+    throw new Error("Cannot bind an invalid settlement provider");
+  }
+  return [`payment_provider=${provider}`];
+}
+
+export function parsePaymentProviderCaveat(
+  values: ReadonlyMap<string, string>,
+): string | null | undefined {
+  const value = values.get("payment_provider");
+  if (value === undefined) return undefined;
+  return /^[a-z0-9][a-z0-9-]{0,63}$/.test(value) ? value : null;
+}
+
+export function parsePaymentAssetCaveat(
+  values: ReadonlyMap<string, string>,
+): SettlementAsset | null | undefined {
+  const value = values.get("payment_asset");
+  if (value === undefined) return undefined;
+  return PAYMENT_ASSETS.has(value as SettlementAsset)
+    ? (value as SettlementAsset)
+    : null;
 }

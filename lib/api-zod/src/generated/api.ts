@@ -83,6 +83,12 @@ export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).mi
  * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization. Clients may send a NIP-98 event as `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted prices.
  * @summary Inspect dataset access costs and schemas
  */
+export const GetStratigraphyCostHeader = zod.object({
+  "X-Settlement-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Preferred settlement asset. Accept-Asset is supported as an alias.'),
+  "Accept-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Alias for X-Settlement-Asset.')
+})
+
+
 export const getStratigraphyCostResponseAccessTiersMin = 2;
 export const getStratigraphyCostResponseAccessTiersMax = 2;
 
@@ -100,6 +106,9 @@ export const getStratigraphyCostResponseDatasetLastDayMin = 422;
 
 export const GetStratigraphyCostResponse = zod.object({
   "protocol": zod.literal("L402"),
+  "settlement_asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']),
+  "supported_assets": zod.array(zod.enum(['btc-lightning', 'l-btc', 'taproot-assets'])).min(1),
+  "available_assets": zod.array(zod.enum(['btc-lightning', 'l-btc', 'taproot-assets'])),
   "access_tiers": zod.array(zod.object({
   "id": zod.enum(['1-day', '30-day']),
   "duration_days": zod.number().int(),
@@ -259,7 +268,9 @@ export const GetPaidStratigraphyQueryParams = zod.object({
 })
 
 export const GetPaidStratigraphyHeader = zod.object({
-  "X-Nostr-Authorization": zod.string().optional().describe('Required NIP-98 identity when presenting an agent-bound L402 macaroon because Authorization carries the L402 credential.')
+  "X-Nostr-Authorization": zod.string().optional().describe('Required NIP-98 identity when presenting an agent-bound L402 macaroon because Authorization carries the L402 credential.'),
+  "X-Settlement-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Preferred settlement asset for a new challenge. Accept-Asset is supported as an alias.'),
+  "Accept-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Alias for X-Settlement-Asset.')
 })
 
 export const getPaidStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
@@ -298,11 +309,13 @@ export const GetPaidStratigraphyResponse = zod.array(GetPaidStratigraphyResponse
 
 
 /**
- * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its Lightning payment preimage. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+ * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
  * @summary Stream live Bitcoin stratigraphy telemetry
  */
 export const StreamStratigraphyTelemetryHeader = zod.object({
-  "X-Nostr-Authorization": zod.string().optional().describe('Required NIP-98 identity when presenting an agent-bound L402 macaroon.')
+  "X-Nostr-Authorization": zod.string().optional().describe('Required NIP-98 identity when presenting an agent-bound L402 macaroon.'),
+  "X-Settlement-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Preferred settlement asset for a new challenge.'),
+  "Accept-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Alias for X-Settlement-Asset.')
 })
 
 export const StreamStratigraphyTelemetryResponse = zod.unknown()

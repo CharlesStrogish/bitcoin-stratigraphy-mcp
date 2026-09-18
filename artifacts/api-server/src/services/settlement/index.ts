@@ -5,6 +5,7 @@ import {
   SettlementProviderError,
   type SettlementInvoice,
   type SettlementInvoiceInput,
+  type SettlementAsset,
   type SettlementProvider,
   type SettlementVerification,
   type SettlementVerificationInput,
@@ -20,8 +21,8 @@ class SettlementRequestAbortedError extends Error {
 }
 
 export interface SettlementRouter {
-  isConfigured(): boolean;
-  activeProvider(): string;
+  isConfigured(asset?: SettlementAsset): boolean;
+  activeProvider(asset?: SettlementAsset): string;
   circuitState(): SettlementCircuitState;
   createInvoice(input: SettlementInvoiceInput): Promise<SettlementInvoice>;
   verifyPayment(
@@ -198,8 +199,11 @@ export function createSettlementRouter(input: {
         activeProviderName() === input.primary.name
           ? [input.primary, input.fallback]
           : [input.fallback, input.primary];
+      const eligibleProviders = request.expectedProvider
+        ? providers.filter((provider) => provider.name === request.expectedProvider)
+        : providers;
       let unavailable = false;
-      for (const provider of providers) {
+      for (const provider of eligibleProviders) {
         if (!provider.isConfigured()) continue;
         if (
           provider === input.primary &&
@@ -225,7 +229,13 @@ export function createSettlementRouter(input: {
             request.signal,
           );
           if (provider === input.primary) primarySucceeded();
-          if (result !== "invalid") return result;
+          if (
+            result !== "invalid" &&
+            result.provider === provider.name &&
+            (!request.asset || !result.asset || result.asset === request.asset)
+          ) {
+            return result;
+          }
         } catch (error) {
           if (error instanceof SettlementRequestAbortedError) throw error;
           unavailable = true;
@@ -263,8 +273,10 @@ export { createNwcClient } from "./nwc-provider";
 export type {
   SettlementInvoice,
   SettlementInvoiceInput,
+  SettlementAsset,
   SettlementProvider,
   SettlementVerification,
   SettlementVerificationInput,
 } from "./types";
 export { SettlementProviderError } from "./types";
+export { SETTLEMENT_ASSETS } from "./types";

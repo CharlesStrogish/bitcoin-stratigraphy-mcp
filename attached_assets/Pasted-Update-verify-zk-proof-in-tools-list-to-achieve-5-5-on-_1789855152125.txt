@@ -1,0 +1,13 @@
+Update verify_zk_proof in tools/list to achieve 5/5 on Behavior, Completeness, and Parameters on Glama:
+​Tool Description Update (Behavior & Completeness):
+Update the description to include an explicit behavior disclosure and return payload summary at the end:
+"Execute active, stateless Groth16/Poseidon cryptographic math verification on an incoming proof payload. Use this tool strictly for instant computational verification. Do NOT use for status lookups (use get_proof_status instead) or browsing attestation logs (use list_proof_attestations instead). Behavior: Pure read-only, stateless, and idempotent computational verification with zero server-side state modification or persistence; evaluates pairings over BN254 elliptic curve. Output: Returns a JSON object containing a boolean 'valid' verification status, execution latency milliseconds, and optional verification error message string."
+​Root Schema Description:
+Attach an explicit description to the root Zod input schema object:
+.describe("Input arguments containing Groth16 proof coordinates and public signals for stateless elliptic curve verification.")
+​Parameter .describe() Strings:
+Ensure every parameter's .describe() method includes explicit data types, structural formatting, field bounds, defaults (if applicable), and concrete realistic example values:
+​proof: "Groth16/Poseidon zk-SNARK proof payload object containing pi_a (3 BN254 projective coordinate string elements), pi_b (three pairs of 2 coordinate strings), and pi_c (3 projective coordinate strings). Example: {"pi_a":["10823...","49102...","1"],"pi_b":[["112...","331..."],["981...","771..."]],"pi_c":["554...","882...","1"]}"
+​publicSignals: "Array of exactly 5 scalar field element strings in BN254 curve modulo space representing public statement inputs. Example: ["186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e", "1", "0", "0", "0"]"
+​If any optional parameters exist (e.g., snapshotDigest), include explicit string formatting, length/field bounds, and realistic examples.
+​Run npm test and pnpm typecheck to verify 100% test passing.

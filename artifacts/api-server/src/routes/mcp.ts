@@ -70,37 +70,39 @@ const entrySchema = z.object({
 const publicInputsSchema = z.object({
   blockHeight: documented(
     z.number().int().nonnegative(),
-    "Bitcoin block height committed into the proof.",
+    "Non-negative integer Bitcoin block height committed into the proof. Minimum 0. Example: 920000.",
     [920000],
   ),
   snapshotDigest: documented(
     z.string(),
-    "Poseidon field digest of the canonical snapshot payload.",
+    "Required decimal string Poseidon field digest of the canonical snapshot payload. Example: '1534979302823651498736582947365829473658294736582947365829473658294'.",
     ["1534979302823651498736582947365829473658294736582947365829473658294"],
   ),
   thermodynamicHash: documented(
     z.string(),
-    "Poseidon field hash of the thermodynamic telemetry values.",
+    "Required decimal string Poseidon field hash of the thermodynamic telemetry values. Example: '782365829473658294736582947365829473658294736582947365829473658294'.",
     ["782365829473658294736582947365829473658294736582947365829473658294"],
   ),
   timestamp: documented(
     z.number().int().nonnegative(),
-    "Unix timestamp in milliseconds committed into the proof.",
+    "Non-negative integer Unix timestamp in milliseconds committed into the proof. Minimum 0. Example: 1789776000000.",
     [1789776000000],
   ),
   valuationSat: documented(
     z.number().int().nonnegative(),
-    "Integer satoshi valuation committed into the proof.",
+    "Non-negative integer satoshi valuation committed into the proof. Minimum 0. Example: 12583.",
     [12583],
   ),
-}).describe("Public Groth16/Poseidon inputs committed by the SNARK");
+}).strict().describe(
+  "Required object containing exactly five typed public statement inputs committed by the Groth16/Poseidon proof.",
+);
 
 const snapshotSchema = documented(
   z.union([
     z.record(z.string(), z.unknown()),
     z.array(z.record(z.string(), z.unknown())),
   ]),
-  "Snapshot payload whose canonical digest and semantic fields must match the proof.",
+  "Required telemetry snapshot object or array of objects whose canonical digest and semantic fields must match the proof. Example: [{'block':{'height':920000},'observed_at':'2026-09-19T00:00:00.000Z','thermodynamic':{'target_multiplier':125.83}}].",
   [[{
     block: { height: 920000 },
     observed_at: "2026-09-19T00:00:00.000Z",
@@ -221,15 +223,15 @@ const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
 
 const verifyProofInputSchema = z.object({
   proof: z.string().describe(
-    "Base64url-encoded Groth16 proof emitted by this API.",
+    "Required base64url-encoded Groth16/Poseidon BN254 proof string emitted by this API, without padding. Example: 'eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0'.",
   ),
   publicInputs: publicInputsSchema,
   verificationKeyId: z.string().describe(
-    "SHA-256 identifier of the expected verification key.",
+    "Required SHA-256 verification-key identifier string using the 'sha256:' prefix. Example: 'sha256:4c095e183ea45a9d'.",
   ),
   data: snapshotSchema,
 }).strict().describe(
-  "Proof, public inputs, verification key, and bound snapshot for a stateless dry run.",
+  "Input arguments containing Groth16 proof coordinates and public signals for stateless elliptic curve verification.",
 );
 
 const proofStatusInputSchema = z.object({
@@ -389,7 +391,8 @@ const entryJsonSchema = {
 
 const publicInputsJsonSchema = {
   type: "object",
-  description: "Public Groth16/Poseidon inputs committed by the SNARK.",
+  description:
+    "Required object containing exactly five typed public statement inputs committed by the Groth16/Poseidon proof.",
   examples: [{
     blockHeight: 920000,
     snapshotDigest: "1534979302823651498736582947365829473658294736582947365829473658294",
@@ -401,29 +404,29 @@ const publicInputsJsonSchema = {
   properties: {
     blockHeight: field(
       "integer",
-      "Bitcoin block height committed into the proof.",
+      "Non-negative integer Bitcoin block height committed into the proof. Minimum 0. Example: 920000.",
       [920000],
       { minimum: 0 },
     ),
     snapshotDigest: field(
       "string",
-      "Poseidon field digest of the canonical snapshot payload.",
+      "Required decimal string Poseidon field digest of the canonical snapshot payload. Example: '1534979302823651498736582947365829473658294736582947365829473658294'.",
       ["1534979302823651498736582947365829473658294736582947365829473658294"],
     ),
     thermodynamicHash: field(
       "string",
-      "Poseidon field hash of thermodynamic telemetry values.",
+      "Required decimal string Poseidon field hash of the thermodynamic telemetry values. Example: '782365829473658294736582947365829473658294736582947365829473658294'.",
       ["782365829473658294736582947365829473658294736582947365829473658294"],
     ),
     timestamp: field(
       "integer",
-      "Unix timestamp in milliseconds committed into the proof.",
+      "Non-negative integer Unix timestamp in milliseconds committed into the proof. Minimum 0. Example: 1789776000000.",
       [1789776000000],
       { minimum: 0 },
     ),
     valuationSat: field(
       "integer",
-      "Integer satoshi valuation committed into the proof.",
+      "Non-negative integer satoshi valuation committed into the proof. Minimum 0. Example: 12583.",
       [12583],
       { minimum: 0 },
     ),
@@ -789,11 +792,12 @@ const mcpToolDefinitions = [
     name: "verify_zk_proof",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Execute active, stateless Groth16/Poseidon cryptographic math verification on an incoming proof payload. Use this tool strictly for instant computational verification. Do NOT use for status lookups (use get_proof_status instead) or browsing attestation logs (use list_proof_attestations instead).",
+      "Execute active, stateless Groth16/Poseidon cryptographic math verification on an incoming proof payload. Use this tool strictly for instant computational verification. Do NOT use for status lookups (use get_proof_status instead) or browsing attestation logs (use list_proof_attestations instead). Behavior: Pure read-only, stateless, and idempotent computational verification with zero server-side state modification or persistence; evaluates pairings over BN254 elliptic curve. Output: Returns a JSON object containing a boolean 'valid' verification status, execution latency milliseconds, and optional verification error message string.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Proof, public inputs, verification key, and bound snapshot.",
+      description:
+        "Input arguments containing Groth16 proof coordinates and public signals for stateless elliptic curve verification.",
       examples: [{
         proof: "eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0",
         publicInputs: publicInputsJsonSchema.examples[0],
@@ -808,18 +812,18 @@ const mcpToolDefinitions = [
       properties: {
         proof: field(
           "string",
-          "Base64url-encoded Groth16 proof emitted by this API.",
+          "Required base64url-encoded Groth16/Poseidon BN254 proof string emitted by this API, without padding. Example: 'eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0'.",
           ["eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0"],
         ),
         publicInputs: publicInputsJsonSchema,
         verificationKeyId: field(
           "string",
-          "SHA-256 identifier of the expected verification key.",
+          "Required SHA-256 verification-key identifier string using the 'sha256:' prefix. Example: 'sha256:4c095e183ea45a9d'.",
           ["sha256:4c095e183ea45a9d"],
         ),
         data: field(
           ["object", "array"],
-          "Snapshot payload whose digest and semantic fields must match the proof.",
+          "Required telemetry snapshot object or array of objects whose canonical digest and semantic fields must match the proof. Example: [{'block':{'height':920000},'observed_at':'2026-09-19T00:00:00.000Z','thermodynamic':{'target_multiplier':125.83}}].",
           [[{
             block: { height: 920000 },
             observed_at: "2026-09-19T00:00:00.000Z",
@@ -836,6 +840,7 @@ const mcpToolDefinitions = [
         valid: true,
         verifiedAt: "2026-09-19T01:41:36.458Z",
         computationTimeMs: 3.284,
+        error: "Verification key identifier does not match the proof.",
       }],
       additionalProperties: false,
       properties: {
@@ -854,6 +859,11 @@ const mcpToolDefinitions = [
           "Server-side proof verification duration in milliseconds.",
           [3.284],
           { minimum: 0 },
+        ),
+        error: field(
+          "string",
+          "Optional human-readable verification error message string when verification cannot validate the proof. Example: 'Verification key identifier does not match the proof.'.",
+          ["Verification key identifier does not match the proof."],
         ),
       },
       required: ["valid", "verifiedAt", "computationTimeMs"],

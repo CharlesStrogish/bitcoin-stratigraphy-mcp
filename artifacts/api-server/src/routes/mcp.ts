@@ -230,16 +230,16 @@ const verifyProofInputSchema = z.object({
 
 const proofStatusInputSchema = z.object({
   proofHash: z.string().min(1).optional().describe(
-    "Lowercase 0x-prefixed SHA-256 fingerprint of a previously submitted proof.",
+    "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
   ),
   snapshotDigest: z.string().min(1).optional().describe(
-    "Snapshot CID or decimal Poseidon digest indexed with a submitted proof.",
+    "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
   ),
 }).strict().refine(
   (input) =>
     (input.proofHash === undefined) !== (input.snapshotDigest === undefined),
   "Provide exactly one of proofHash or snapshotDigest",
-).describe("Exactly one lifecycle lookup identifier: proofHash or snapshotDigest.");
+).describe("Input arguments for querying single proof attestation lifecycle status.");
 
 const proofLifecycleStates = [
   "verified",
@@ -850,24 +850,31 @@ const mcpToolDefinitions = [
     name: "get_proof_status",
     title: "Get Proof Status",
     description:
-      "Query the detailed attestation lifecycle and Nostr publication state of ONE specific known proof hash or snapshot digest. Use this tool when you already hold a proof hash or CID. Do NOT use for listing multiple proofs (use list_proof_attestations instead) or performing math verification (use verify_zk_proof instead).",
+      "Query the detailed attestation lifecycle and Nostr publication state of ONE specific known proof hash or snapshot digest. Use this tool when you already hold a proof hash or CID. Do NOT use for listing multiple proofs (use list_proof_attestations instead) or performing math verification (use verify_zk_proof instead). Behavior: Pure read-only and idempotent lookup with zero server-side state modification; queries indexed attestation memory and Nostr event log.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
       description:
-        "Exactly one proof hash or snapshot digest identifying a previously submitted proof.",
-      examples: [{ proofHash: "0x1a2b3c..." }],
+        "Input arguments for querying single proof attestation lifecycle status.",
+      examples: [{
+        proofHash:
+          "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
+      }],
       additionalProperties: false,
       properties: {
         proofHash: field(
           "string",
-          "SHA-256 digest of the submitted proof string, formatted with a 0x prefix. Provide this or snapshotDigest, but not both.",
-          ["0x1a2b3c..."],
+          "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
+          [
+            "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
+          ],
         ),
         snapshotDigest: field(
           "string",
-          "Snapshot content identifier or decimal Poseidon-bound snapshot digest recorded in the proof public inputs. Provide this or proofHash, but not both.",
-          ["0x1a2b3c..."],
+          "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
+          [
+            "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
+          ],
         ),
       },
       oneOf: [

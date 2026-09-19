@@ -1,0 +1,28 @@
+{
+  "project": "Bitcoin Stratigraphy Data Engine MCP",
+  "version": "1.0.0-production",
+  "timestamp_utc": "2026-09-19T20:45:00Z",
+  "author": "Charles R. Strogish",
+  "benchmarks": {
+    "smithery_quality_score": "100/100",
+    "glama_tdqs_score": "4.7/5.0",
+    "active_mcp_tools": 7
+  },
+  "architecture_stack": {
+    "runtime": "Node.js / TypeScript / Express",
+    "protocol": "Model Context Protocol (MCP) Streamable HTTP / MCP 2024-11-25",
+    "micropayments": "L402 / LSAT protocol header settlement",
+    "cryptography": "Groth16 zk-SNARKs / Poseidon hash functions over BN254",
+    "attestation": "Nostr NIP-78 event publishing & P2P gossip mesh",
+    "validation": "Zod recursive schema contract assertions"
+  },
+  "mcp_tool_registry": [
+    "list_stratigraphy_catalog",
+    "get_bitcoin_stratigraphy",
+    "list_proof_attestations",
+    "get_proof_status",
+    "verify_zk_proof",
+    "submit_zk_proof",
+    "get_mesh_status"
+  ]
+}

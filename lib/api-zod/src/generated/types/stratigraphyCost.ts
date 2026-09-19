@@ -15,6 +15,7 @@ import type { StratigraphyCostDataset } from './stratigraphyCostDataset';
 import type { StratigraphyCostDynamicPricing } from './stratigraphyCostDynamicPricing';
 import type { StratigraphyCostLegacyQueryPricing } from './stratigraphyCostLegacyQueryPricing';
 import type { StratigraphyCostMcpTool } from './stratigraphyCostMcpTool';
+import type { SubmitZkProofMcpTool } from './submitZkProofMcpTool';
 
 export interface StratigraphyCost {
   protocol: 'L402';
@@ -34,5 +35,6 @@ export interface StratigraphyCost {
   mcp_tool: StratigraphyCostMcpTool;
   catalog_tool: StratigraphyCatalogMcpTool;
   proof_status_tool: ProofStatusMcpTool;
+  submit_proof_tool: SubmitZkProofMcpTool;
   response_schema: JsonSchema;
 }

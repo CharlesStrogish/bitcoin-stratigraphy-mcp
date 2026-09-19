@@ -1068,6 +1068,20 @@ export function registerStratigraphyRoutes(
           meshQuorum: false,
         },
       },
+      submit_proof_tool: {
+        name: "submit_zk_proof",
+        description:
+          "Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine for verification, lifecycle indexing, and Nostr NIP-78 attestation broadcast.",
+        requiredInputs: ["proof", "publicSignals"],
+        optionalInputs: ["snapshotDigest"],
+        exampleResult: {
+          proofHash:
+            "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+          status: "verified",
+          submittedAt: new Date(calculatedAt).toISOString(),
+          attestationStatus: "broadcast_confirmed",
+        },
+      },
       response_schema: RESPONSE_SCHEMA,
     });
   });

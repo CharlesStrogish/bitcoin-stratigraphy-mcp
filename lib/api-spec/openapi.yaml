@@ -979,6 +979,8 @@ components:
           $ref: "#/components/schemas/StratigraphyCatalogMcpTool"
         proof_status_tool:
           $ref: "#/components/schemas/ProofStatusMcpTool"
+        submit_proof_tool:
+          $ref: "#/components/schemas/SubmitZkProofMcpTool"
         response_schema:
           $ref: "#/components/schemas/JsonSchema"
       required:
@@ -993,7 +995,65 @@ components:
         - mcp_tool
         - catalog_tool
         - proof_status_tool
+        - submit_proof_tool
         - response_schema
+    SubmitZkProofMcpTool:
+      type: object
+      description: MCP proof ingestion tool registered as submit_zk_proof.
+      properties:
+        name:
+          type: string
+          const: submit_zk_proof
+          description: Stable MCP tool name used with tools/call.
+          examples: [submit_zk_proof]
+        description:
+          type: string
+          description: Human-readable purpose of the proof ingestion tool.
+          examples:
+            - Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine for verification, lifecycle indexing, and Nostr NIP-78 attestation broadcast.
+        requiredInputs:
+          type: array
+          description: Input property names required for every submission.
+          examples:
+            - [proof, publicSignals]
+          items:
+            type: string
+            enum: [proof, publicSignals]
+        optionalInputs:
+          type: array
+          description: Optional input property names accepted by the submission.
+          examples:
+            - [snapshotDigest]
+          items:
+            type: string
+            enum: [snapshotDigest]
+        exampleResult:
+          $ref: "#/components/schemas/SubmitZkProofResult"
+      required: [name, description, requiredInputs, optionalInputs, exampleResult]
+    SubmitZkProofResult:
+      type: object
+      description: Immediate proof ingestion and Nostr publication result.
+      properties:
+        proofHash:
+          type: string
+          description: Lowercase 0x-prefixed SHA-256 fingerprint of the canonical proof.
+          examples:
+            - "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd"
+        status:
+          type: string
+          enum: [verified, invalid]
+          description: Immediate Groth16 verification result.
+          examples: [verified]
+        submittedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 proof submission timestamp.
+          examples: ["2026-09-19T06:20:00.000Z"]
+        attestationStatus:
+          type: string
+          description: Nostr NIP-78 broadcast confirmation state.
+          examples: [broadcast_confirmed]
+      required: [proofHash, status, submittedAt, attestationStatus]
     ProofStatusMcpTool:
       type: object
       description: MCP lifecycle query tool registered as get_proof_status.

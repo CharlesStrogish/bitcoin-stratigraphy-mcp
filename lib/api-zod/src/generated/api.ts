@@ -268,6 +268,18 @@ export const GetStratigraphyCostResponse = zod.object({
   "meshQuorum": zod.boolean().describe('Whether attestationCount meets the current mesh quorum threshold.')
 }).describe('Cryptographic verification and publication lifecycle state.')
 }).describe('MCP lifecycle query tool registered as get_proof_status.'),
+  "submit_proof_tool": zod.object({
+  "name": zod.literal("submit_zk_proof").describe('Stable MCP tool name used with tools\/call.'),
+  "description": zod.string().describe('Human-readable purpose of the proof ingestion tool.'),
+  "requiredInputs": zod.array(zod.enum(['proof', 'publicSignals'])).describe('Input property names required for every submission.'),
+  "optionalInputs": zod.array(zod.enum(['snapshotDigest'])).describe('Optional input property names accepted by the submission.'),
+  "exampleResult": zod.object({
+  "proofHash": zod.string().describe('Lowercase 0x-prefixed SHA-256 fingerprint of the canonical proof.'),
+  "status": zod.enum(['verified', 'invalid']).describe('Immediate Groth16 verification result.'),
+  "submittedAt": zod.coerce.date().describe('ISO 8601 proof submission timestamp.'),
+  "attestationStatus": zod.string().describe('Nostr NIP-78 broadcast confirmation state.')
+}).describe('Immediate proof ingestion and Nostr publication result.')
+}).describe('MCP proof ingestion tool registered as submit_zk_proof.'),
   "response_schema": zod.object({
   "type": zod.string(),
   "items": zod.record(zod.string(), zod.unknown()).optional(),

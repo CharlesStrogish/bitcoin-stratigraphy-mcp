@@ -13,6 +13,7 @@ import { z } from "zod";
 import { createMeshGossipService } from "../services/meshGossipService";
 import {
   getZkProofStatus,
+  submitZkProof,
   verifyZkProofForSnapshot,
 } from "../services/zkProofService";
 import { getStratigraphyData } from "./stratigraphy";
@@ -160,6 +161,16 @@ const readOnlyToolAnnotations = {
   },
 };
 
+const submissionToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: true,
+  readOnly: false,
+  audience: ["assistant"],
+  priority: 1,
+};
+
 const thermodynamicMetricNames = [
   "target_multiplier",
   "difficulty_epoch_progress",
@@ -196,6 +207,16 @@ const proofStatusInputSchema = z.object({
     (input.proofHash === undefined) !== (input.snapshotDigest === undefined),
   "Provide exactly one of proofHash or snapshotDigest",
 );
+
+const submitProofInputSchema = z.object({
+  proof: z.object({
+    pi_a: z.array(z.string()).length(3),
+    pi_b: z.array(z.array(z.string()).length(2)).length(3),
+    pi_c: z.array(z.string()).length(3),
+  }).strict(),
+  publicSignals: z.array(z.string()).length(5),
+  snapshotDigest: z.string().min(1).optional(),
+}).strict();
 
 const field = (
   type: string | string[],
@@ -813,6 +834,165 @@ const mcpToolDefinitions = [
     },
   },
   {
+    name: "submit_zk_proof",
+    title: "Submit ZK Proof",
+    description:
+      "Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine for verification, lifecycle indexing, and Nostr NIP-78 attestation broadcast.",
+    annotations: submissionToolAnnotations,
+    inputSchema: {
+      type: "object",
+      description:
+        "Groth16 BN254 proof coordinates, five ordered public signals, and an optional matching snapshot digest.",
+      examples: [{
+        proof: {
+          pi_a: ["1", "2", "1"],
+          pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+          pi_c: ["5", "6", "1"],
+        },
+        publicSignals: ["920000", "1", "1789776000000", "12583", "1"],
+        snapshotDigest: "1",
+      }],
+      additionalProperties: false,
+      properties: {
+        proof: {
+          type: "object",
+          description:
+            "Groth16 BN254 proof object containing pi_a, pi_b, and pi_c curve-point coordinates as decimal strings.",
+          example: {
+            pi_a: ["1", "2", "1"],
+            pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+            pi_c: ["5", "6", "1"],
+          },
+          examples: [{
+            pi_a: ["1", "2", "1"],
+            pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+            pi_c: ["5", "6", "1"],
+          }],
+          additionalProperties: false,
+          properties: {
+            pi_a: field(
+              "array",
+              "Three decimal-string projective coordinates for the Groth16 proof A point.",
+              [["1", "2", "1"]],
+              {
+                minItems: 3,
+                maxItems: 3,
+                items: field(
+                  "string",
+                  "Decimal BN254 field coordinate in the A point.",
+                  ["1"],
+                ),
+              },
+            ),
+            pi_b: field(
+              "array",
+              "Three pairs of decimal-string extension-field coordinates for the Groth16 proof B point.",
+              [[["1", "2"], ["3", "4"], ["1", "0"]]],
+              {
+                minItems: 3,
+                maxItems: 3,
+                items: field(
+                  "array",
+                  "Pair of decimal BN254 extension-field coordinates.",
+                  [["1", "2"]],
+                  {
+                    minItems: 2,
+                    maxItems: 2,
+                    items: field(
+                      "string",
+                      "Decimal BN254 field coordinate in the B point.",
+                      ["1"],
+                    ),
+                  },
+                ),
+              },
+            ),
+            pi_c: field(
+              "array",
+              "Three decimal-string projective coordinates for the Groth16 proof C point.",
+              [["5", "6", "1"]],
+              {
+                minItems: 3,
+                maxItems: 3,
+                items: field(
+                  "string",
+                  "Decimal BN254 field coordinate in the C point.",
+                  ["5"],
+                ),
+              },
+            ),
+          },
+          required: ["pi_a", "pi_b", "pi_c"],
+        },
+        publicSignals: field(
+          "array",
+          "Exactly five decimal strings ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
+          [["920000", "1", "1789776000000", "12583", "1"]],
+          {
+            minItems: 5,
+            maxItems: 5,
+            items: field(
+              "string",
+              "Decimal public signal committed by the Groth16 proof.",
+              ["920000"],
+            ),
+          },
+        ),
+        snapshotDigest: field(
+          "string",
+          "Optional telemetry snapshot CID or digest to index with the proof; when provided it must equal the fifth public signal.",
+          ["1"],
+        ),
+      },
+      required: ["proof", "publicSignals"],
+    },
+    outputSchema: {
+      type: "object",
+      description:
+        "Immediate proof verification, lifecycle ingestion, and Nostr broadcast result.",
+      examples: [{
+        proofHash:
+          "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+        status: "verified",
+        submittedAt: "2026-09-19T06:20:00.000Z",
+        attestationStatus: "broadcast_confirmed",
+      }],
+      additionalProperties: false,
+      properties: {
+        proofHash: field(
+          "string",
+          "Lowercase 0x-prefixed SHA-256 fingerprint of the canonical submitted proof object.",
+          [
+            "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+          ],
+        ),
+        status: field(
+          "string",
+          "Immediate Groth16 verification result for the submitted proof and public signals.",
+          ["verified"],
+          { enum: ["verified", "invalid"] },
+        ),
+        submittedAt: field(
+          "string",
+          "ISO 8601 timestamp when the data engine accepted the submission.",
+          ["2026-09-19T06:20:00.000Z"],
+          { format: "date-time" },
+        ),
+        attestationStatus: field(
+          "string",
+          "Nostr NIP-78 publication result: broadcast_confirmed, broadcast_failed, not_configured, or not_broadcast_invalid_proof.",
+          ["broadcast_confirmed"],
+        ),
+      },
+      required: [
+        "proofHash",
+        "status",
+        "submittedAt",
+        "attestationStatus",
+      ],
+    },
+  },
+  {
     name: "get_mesh_status",
     title: "Get Mesh Status",
     description:
@@ -966,6 +1146,17 @@ function createBitcoinStratigraphyMcpServer() {
         attestationCount,
         meshQuorum: attestationCount >= mesh.status().quorumThreshold,
       };
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    }
+    if (request.params.name === "submit_zk_proof") {
+      const parsed = submitProofInputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid zk proof submission");
+      }
+      const structuredContent = await submitZkProof(parsed.data);
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,

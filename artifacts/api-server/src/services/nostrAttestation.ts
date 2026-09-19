@@ -2,9 +2,16 @@ import { createHash } from "node:crypto";
 import {
   finalizeEvent,
   nip19,
+  SimplePool,
   type Event,
   type EventTemplate,
 } from "nostr-tools";
+
+const NIP78_RELAYS = [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.nostr.band",
+] as const;
 
 export type NostrAttestation = {
   protocol: "nostr";
@@ -46,6 +53,24 @@ export function signTelemetryPayload(
     parsePrivateKey(privateKey),
     options.createdAt,
   );
+}
+
+export async function publishNip78Attestation(
+  payload: unknown,
+): Promise<"broadcast_confirmed" | "broadcast_failed" | "not_configured"> {
+  if (!process.env.NOSTR_PRIVATE_KEY) return "not_configured";
+  const attestation = signTelemetryPayload(payload);
+  const pool = new SimplePool();
+  try {
+    const results = await Promise.allSettled(
+      pool.publish([...NIP78_RELAYS], attestation.event, { maxWait: 3_000 }),
+    );
+    return results.some((result) => result.status === "fulfilled")
+      ? "broadcast_confirmed"
+      : "broadcast_failed";
+  } finally {
+    pool.destroy();
+  }
 }
 
 function signWithKey(

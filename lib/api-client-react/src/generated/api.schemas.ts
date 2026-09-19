@@ -494,6 +494,61 @@ export interface ProofStatusMcpTool {
   exampleStatus: ProofStatus;
 }
 
+export type SubmitZkProofMcpToolRequiredInputsItem = typeof SubmitZkProofMcpToolRequiredInputsItem[keyof typeof SubmitZkProofMcpToolRequiredInputsItem];
+
+
+export const SubmitZkProofMcpToolRequiredInputsItem = {
+  proof: 'proof',
+  publicSignals: 'publicSignals',
+} as const;
+
+export type SubmitZkProofMcpToolOptionalInputsItem = typeof SubmitZkProofMcpToolOptionalInputsItem[keyof typeof SubmitZkProofMcpToolOptionalInputsItem];
+
+
+export const SubmitZkProofMcpToolOptionalInputsItem = {
+  snapshotDigest: 'snapshotDigest',
+} as const;
+
+/**
+ * Immediate Groth16 verification result.
+ */
+export type SubmitZkProofResultStatus = typeof SubmitZkProofResultStatus[keyof typeof SubmitZkProofResultStatus];
+
+
+export const SubmitZkProofResultStatus = {
+  verified: 'verified',
+  invalid: 'invalid',
+} as const;
+
+/**
+ * Immediate proof ingestion and Nostr publication result.
+ */
+export interface SubmitZkProofResult {
+  /** Lowercase 0x-prefixed SHA-256 fingerprint of the canonical proof. */
+  proofHash: string;
+  /** Immediate Groth16 verification result. */
+  status: SubmitZkProofResultStatus;
+  /** ISO 8601 proof submission timestamp. */
+  submittedAt: string;
+  /** Nostr NIP-78 broadcast confirmation state. */
+  attestationStatus: string;
+}
+
+/**
+ * MCP proof ingestion tool registered as submit_zk_proof.
+ */
+export interface SubmitZkProofMcpTool {
+  /** Stable MCP tool name used with tools/call. */
+  name: 'submit_zk_proof';
+  /** Human-readable purpose of the proof ingestion tool. */
+  description: string;
+  /** Input property names required for every submission. */
+  requiredInputs: SubmitZkProofMcpToolRequiredInputsItem[];
+  /** Optional input property names accepted by the submission. */
+  optionalInputs: SubmitZkProofMcpToolOptionalInputsItem[];
+  exampleResult: SubmitZkProofResult;
+}
+
 export type JsonSchemaItems = { [key: string]: unknown };
 
 export type JsonSchemaProperties = { [key: string]: unknown };
@@ -523,6 +578,7 @@ export interface StratigraphyCost {
   mcp_tool: StratigraphyCostMcpTool;
   catalog_tool: StratigraphyCatalogMcpTool;
   proof_status_tool: ProofStatusMcpTool;
+  submit_proof_tool: SubmitZkProofMcpTool;
   response_schema: JsonSchema;
 }
 

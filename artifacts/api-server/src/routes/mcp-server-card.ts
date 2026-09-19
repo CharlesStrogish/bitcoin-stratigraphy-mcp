@@ -67,6 +67,15 @@ export const mcpServerCard = {
         },
       },
       {
+        name: "submit_zk_proof",
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
+      {
         name: "get_mesh_status",
         annotations: {
           readOnlyHint: true,

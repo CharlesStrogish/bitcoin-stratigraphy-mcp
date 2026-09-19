@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { groth16 } from "snarkjs";
 import { poseidon5 } from "poseidon-lite";
+import { publishNip78Attestation } from "./nostrAttestation";
 
 export type ZkPublicInputs = {
   blockHeight: number;
@@ -129,6 +130,78 @@ export function getZkProofStatus(
   proofStatusByIdentifier.delete(identifier);
   proofStatusByIdentifier.set(identifier, status);
   return { ...status };
+}
+
+export async function submitZkProof(input: {
+  proof: unknown;
+  publicSignals: string[];
+  snapshotDigest?: string;
+}): Promise<{
+  proofHash: string;
+  status: "verified" | "invalid";
+  submittedAt: string;
+  attestationStatus: string;
+}> {
+  const submittedAt = new Date().toISOString();
+  const canonicalProof = canonicalize(input.proof);
+  const fingerprint = `0x${createHash("sha256")
+    .update(canonicalProof)
+    .digest("hex")}`;
+  const signalDigest = input.publicSignals[4];
+  const identifiers = [
+    fingerprint,
+    ...(typeof signalDigest === "string" ? [signalDigest] : []),
+    ...(input.snapshotDigest ? [input.snapshotDigest] : []),
+  ];
+  cacheProofStatus(identifiers, {
+    status: "pending",
+    verifiedAt: submittedAt,
+    attestationCount: 0,
+  });
+
+  const [blockHeight, thermodynamicHash, timestamp, valuationSat, snapshot] =
+    input.publicSignals;
+  const normalizedProof = {
+    ...(input.proof as Record<string, unknown>),
+    protocol: "groth16",
+    curve: "bn128",
+  };
+  const payload = {
+    proof: base64UrlEncode(JSON.stringify(normalizedProof)),
+    publicInputs: {
+      blockHeight: Number(blockHeight),
+      thermodynamicHash,
+      timestamp: Number(timestamp),
+      valuationSat: Number(valuationSat),
+      snapshotDigest: snapshot,
+    },
+  };
+  const valid =
+    input.publicSignals.length === 5 &&
+    (input.snapshotDigest === undefined || input.snapshotDigest === snapshot) &&
+    await verifyZkProof(payload);
+  let attestationStatus = "not_broadcast_invalid_proof";
+  let attestationCount = 0;
+  if (valid) {
+    attestationStatus = await publishNip78Attestation({
+      proofHash: fingerprint,
+      publicSignals: input.publicSignals,
+      snapshotDigest: input.snapshotDigest ?? snapshot,
+      submittedAt,
+    });
+    attestationCount = attestationStatus === "broadcast_confirmed" ? 1 : 0;
+  }
+  cacheProofStatus(identifiers, {
+    status: valid ? "verified" : "invalid",
+    verifiedAt: submittedAt,
+    attestationCount,
+  });
+  return {
+    proofHash: fingerprint,
+    status: valid ? "verified" : "invalid",
+    submittedAt,
+    attestationStatus,
+  };
 }
 
 function canonicalize(value: unknown): string {

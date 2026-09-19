@@ -585,6 +585,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "list_stratigraphy_catalog",
       "verify_zk_proof",
       "get_proof_status",
+      "submit_zk_proof",
       "get_mesh_status",
     ],
   );
@@ -822,6 +823,36 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     proofStatusCalled.result?.structuredContent.verifiedAt,
     /^\d{4}-\d{2}-\d{2}T/,
   );
+
+  const submitted = await mcpRequest("tools/call", {
+    name: "submit_zk_proof",
+    arguments: {
+      proof: {
+        pi_a: ["1", "2", "1"],
+        pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+        pi_c: ["5", "6", "1"],
+      },
+      publicSignals: ["920000", "1", "1789776000000", "12583", "1"],
+      snapshotDigest: "1",
+    },
+  });
+  assert.equal(submitted.result?.structuredContent.status, "invalid");
+  assert.equal(
+    submitted.result?.structuredContent.attestationStatus,
+    "not_broadcast_invalid_proof",
+  );
+  assert.match(
+    submitted.result?.structuredContent.proofHash,
+    /^0x[0-9a-f]{64}$/,
+  );
+
+  const submittedStatus = await mcpRequest("tools/call", {
+    name: "get_proof_status",
+    arguments: {
+      proofHash: submitted.result?.structuredContent.proofHash,
+    },
+  });
+  assert.equal(submittedStatus.result?.structuredContent.status, "invalid");
 });
 
 test("offers SSE transport without changing the public OpenAPI route", async () => {
@@ -905,6 +936,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
     mcp_tool: { name: string; parameters: Record<string, unknown> };
     catalog_tool: { name: string; description: string };
     proof_status_tool: { name: string; identifiers: string[] };
+    submit_proof_tool: { name: string; requiredInputs: string[] };
     response_schema: { type: string };
   };
   assert.deepEqual(
@@ -933,6 +965,11 @@ test("serves public pre-flight cost and schema metadata", async () => {
   assert.deepEqual(body.proof_status_tool.identifiers, [
     "proofHash",
     "snapshotDigest",
+  ]);
+  assert.equal(body.submit_proof_tool.name, "submit_zk_proof");
+  assert.deepEqual(body.submit_proof_tool.requiredInputs, [
+    "proof",
+    "publicSignals",
   ]);
   assert.equal(body.response_schema.type, "array");
   assert.equal(invoiceRequestCount, requestsBefore);

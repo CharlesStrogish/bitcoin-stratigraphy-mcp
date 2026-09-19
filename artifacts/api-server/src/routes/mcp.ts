@@ -11,7 +11,10 @@ import {
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { createMeshGossipService } from "../services/meshGossipService";
-import { verifyZkProofForSnapshot } from "../services/zkProofService";
+import {
+  getZkProofStatus,
+  verifyZkProofForSnapshot,
+} from "../services/zkProofService";
 import { getStratigraphyData } from "./stratigraphy";
 
 const documented = <T extends z.ZodType>(
@@ -184,6 +187,15 @@ const verifyProofInputSchema = z.object({
   verificationKeyId: z.string(),
   data: snapshotSchema,
 }).strict();
+
+const proofStatusInputSchema = z.object({
+  proofHash: z.string().min(1).optional(),
+  snapshotDigest: z.string().min(1).optional(),
+}).strict().refine(
+  (input) =>
+    (input.proofHash === undefined) !== (input.snapshotDigest === undefined),
+  "Provide exactly one of proofHash or snapshotDigest",
+);
 
 const field = (
   type: string | string[],
@@ -733,6 +745,74 @@ const mcpToolDefinitions = [
     },
   },
   {
+    name: "get_proof_status",
+    title: "Get Proof Status",
+    description:
+      "Query the cryptographic attestation status, verification cache history, and Nostr NIP-78 publication state of a previously submitted zk-SNARK proof digest or snapshot CID.",
+    annotations: readOnlyToolAnnotations,
+    inputSchema: {
+      type: "object",
+      description:
+        "Exactly one proof hash or snapshot digest identifying a previously submitted proof.",
+      examples: [{ proofHash: "0x1a2b3c..." }],
+      additionalProperties: false,
+      properties: {
+        proofHash: field(
+          "string",
+          "SHA-256 digest of the submitted proof string, formatted with a 0x prefix. Provide this or snapshotDigest, but not both.",
+          ["0x1a2b3c..."],
+        ),
+        snapshotDigest: field(
+          "string",
+          "Snapshot content identifier or decimal Poseidon-bound snapshot digest recorded in the proof public inputs. Provide this or proofHash, but not both.",
+          ["0x1a2b3c..."],
+        ),
+      },
+      oneOf: [
+        { required: ["proofHash"] },
+        { required: ["snapshotDigest"] },
+      ],
+    },
+    outputSchema: {
+      type: "object",
+      description:
+        "Current verification, cache, Nostr attestation, and mesh quorum state.",
+      examples: [{
+        status: "verified",
+        verifiedAt: "2026-09-19T05:54:39.835Z",
+        attestationCount: 3,
+        meshQuorum: true,
+      }],
+      additionalProperties: false,
+      properties: {
+        status: field(
+          "string",
+          "Lifecycle state: verified after cryptographic validation, cached on a repeated valid verification, pending while unverified or in progress, or invalid after rejection.",
+          ["verified"],
+          { enum: ["verified", "cached", "pending", "invalid"] },
+        ),
+        verifiedAt: field(
+          "string",
+          "ISO 8601 timestamp of the latest verification-state observation.",
+          ["2026-09-19T05:54:39.835Z"],
+          { format: "date-time" },
+        ),
+        attestationCount: field(
+          "integer",
+          "Number of Nostr NIP-78 attestations observed on the submitted snapshot.",
+          [3],
+          { minimum: 0 },
+        ),
+        meshQuorum: field(
+          "boolean",
+          "Whether the observed attestation count meets the current mesh quorum threshold.",
+          [true],
+        ),
+      },
+      required: ["status", "verifiedAt", "attestationCount", "meshQuorum"],
+    },
+  },
+  {
     name: "get_mesh_status",
     title: "Get Mesh Status",
     description:
@@ -863,6 +943,28 @@ function createBitcoinStratigraphyMcpServer() {
         valid,
         verifiedAt: new Date().toISOString(),
         computationTimeMs: Number((performance.now() - startedAt).toFixed(3)),
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    }
+    if (request.params.name === "get_proof_status") {
+      const parsed = proofStatusInputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Provide exactly one proofHash or snapshotDigest",
+        );
+      }
+      const identifier = parsed.data.proofHash ?? parsed.data.snapshotDigest!;
+      const history = getZkProofStatus(identifier);
+      const attestationCount = history?.attestationCount ?? 0;
+      const structuredContent = {
+        status: history?.status ?? "pending",
+        verifiedAt: history?.verifiedAt ?? new Date().toISOString(),
+        attestationCount,
+        meshQuorum: attestationCount >= mesh.status().quorumThreshold,
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],

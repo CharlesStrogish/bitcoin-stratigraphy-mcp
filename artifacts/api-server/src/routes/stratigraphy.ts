@@ -1056,6 +1056,18 @@ export function registerStratigraphyRoutes(
           },
         },
       },
+      proof_status_tool: {
+        name: "get_proof_status",
+        description:
+          "Query the cryptographic attestation status, verification cache history, and Nostr NIP-78 publication state of a previously submitted zk-SNARK proof digest or snapshot CID.",
+        identifiers: ["proofHash", "snapshotDigest"],
+        exampleStatus: {
+          status: "pending",
+          verifiedAt: new Date(calculatedAt).toISOString(),
+          attestationCount: 0,
+          meshQuorum: false,
+        },
+      },
       response_schema: RESPONSE_SCHEMA,
     });
   });

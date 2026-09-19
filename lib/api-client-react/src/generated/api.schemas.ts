@@ -443,6 +443,57 @@ export interface StratigraphyCatalogMcpTool {
   catalog: StratigraphyCatalog;
 }
 
+export type ProofStatusMcpToolIdentifiersItem = typeof ProofStatusMcpToolIdentifiersItem[keyof typeof ProofStatusMcpToolIdentifiersItem];
+
+
+export const ProofStatusMcpToolIdentifiersItem = {
+  proofHash: 'proofHash',
+  snapshotDigest: 'snapshotDigest',
+} as const;
+
+/**
+ * Current proof verification lifecycle state.
+ */
+export type ProofStatusStatus = typeof ProofStatusStatus[keyof typeof ProofStatusStatus];
+
+
+export const ProofStatusStatus = {
+  verified: 'verified',
+  cached: 'cached',
+  pending: 'pending',
+  invalid: 'invalid',
+} as const;
+
+/**
+ * Cryptographic verification and publication lifecycle state.
+ */
+export interface ProofStatus {
+  /** Current proof verification lifecycle state. */
+  status: ProofStatusStatus;
+  /** ISO 8601 timestamp of the latest verification-state observation. */
+  verifiedAt: string;
+  /**
+     * Number of Nostr NIP-78 attestations observed on the snapshot.
+     * @minimum 0
+     */
+  attestationCount: number;
+  /** Whether attestationCount meets the current mesh quorum threshold. */
+  meshQuorum: boolean;
+}
+
+/**
+ * MCP lifecycle query tool registered as get_proof_status.
+ */
+export interface ProofStatusMcpTool {
+  /** Stable MCP tool name used with tools/call. */
+  name: 'get_proof_status';
+  /** Human-readable purpose of the proof lifecycle query. */
+  description: string;
+  /** Alternative identifiers accepted by the tool; callers provide exactly one. */
+  identifiers: ProofStatusMcpToolIdentifiersItem[];
+  exampleStatus: ProofStatus;
+}
+
 export type JsonSchemaItems = { [key: string]: unknown };
 
 export type JsonSchemaProperties = { [key: string]: unknown };
@@ -471,6 +522,7 @@ export interface StratigraphyCost {
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;
   catalog_tool: StratigraphyCatalogMcpTool;
+  proof_status_tool: ProofStatusMcpTool;
   response_schema: JsonSchema;
 }
 

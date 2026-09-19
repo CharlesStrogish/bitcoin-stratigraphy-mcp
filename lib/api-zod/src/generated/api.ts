@@ -107,6 +107,8 @@ export const getStratigraphyCostResponseCatalogToolCatalogOldestBlockMin = 0;
 
 export const getStratigraphyCostResponseCatalogToolCatalogNewestBlockMin = 0;
 
+export const getStratigraphyCostResponseProofStatusToolExampleStatusAttestationCountMin = 0;
+
 
 
 export const GetStratigraphyCostResponse = zod.object({
@@ -255,6 +257,17 @@ export const GetStratigraphyCostResponse = zod.object({
 }).describe('Inclusive ISO date bounds of the available snapshots.')
 }).describe('Discoverable bounds and metric inventory for the stratigraphy dataset.')
 }).describe('MCP dataset discovery tool registered as list_stratigraphy_catalog.'),
+  "proof_status_tool": zod.object({
+  "name": zod.literal("get_proof_status").describe('Stable MCP tool name used with tools\/call.'),
+  "description": zod.string().describe('Human-readable purpose of the proof lifecycle query.'),
+  "identifiers": zod.array(zod.enum(['proofHash', 'snapshotDigest'])).describe('Alternative identifiers accepted by the tool; callers provide exactly one.'),
+  "exampleStatus": zod.object({
+  "status": zod.enum(['verified', 'cached', 'pending', 'invalid']).describe('Current proof verification lifecycle state.'),
+  "verifiedAt": zod.coerce.date().describe('ISO 8601 timestamp of the latest verification-state observation.'),
+  "attestationCount": zod.number().int().min(getStratigraphyCostResponseProofStatusToolExampleStatusAttestationCountMin).describe('Number of Nostr NIP-78 attestations observed on the snapshot.'),
+  "meshQuorum": zod.boolean().describe('Whether attestationCount meets the current mesh quorum threshold.')
+}).describe('Cryptographic verification and publication lifecycle state.')
+}).describe('MCP lifecycle query tool registered as get_proof_status.'),
   "response_schema": zod.object({
   "type": zod.string(),
   "items": zod.record(zod.string(), zod.unknown()).optional(),

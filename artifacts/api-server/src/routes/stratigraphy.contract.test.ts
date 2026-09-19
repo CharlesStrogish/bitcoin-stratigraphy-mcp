@@ -584,6 +584,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "get_bitcoin_stratigraphy",
       "list_stratigraphy_catalog",
       "verify_zk_proof",
+      "get_proof_status",
       "get_mesh_status",
     ],
   );
@@ -803,6 +804,24 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     typeof proofCalled.result?.structuredContent.computationTimeMs,
     "number",
   );
+
+  const proofStatusCalled = await mcpRequest("tools/call", {
+    name: "get_proof_status",
+    arguments: { snapshotDigest: "1" },
+  });
+  assert.deepEqual(
+    {
+      status: proofStatusCalled.result?.structuredContent.status,
+      attestationCount:
+        proofStatusCalled.result?.structuredContent.attestationCount,
+      meshQuorum: proofStatusCalled.result?.structuredContent.meshQuorum,
+    },
+    { status: "invalid", attestationCount: 0, meshQuorum: false },
+  );
+  assert.match(
+    proofStatusCalled.result?.structuredContent.verifiedAt,
+    /^\d{4}-\d{2}-\d{2}T/,
+  );
 });
 
 test("offers SSE transport without changing the public OpenAPI route", async () => {
@@ -885,6 +904,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
     dataset: { days: number; grows_over_time: boolean };
     mcp_tool: { name: string; parameters: Record<string, unknown> };
     catalog_tool: { name: string; description: string };
+    proof_status_tool: { name: string; identifiers: string[] };
     response_schema: { type: string };
   };
   assert.deepEqual(
@@ -909,6 +929,11 @@ test("serves public pre-flight cost and schema metadata", async () => {
     "limit",
   ]);
   assert.equal(body.catalog_tool.name, "list_stratigraphy_catalog");
+  assert.equal(body.proof_status_tool.name, "get_proof_status");
+  assert.deepEqual(body.proof_status_tool.identifiers, [
+    "proofHash",
+    "snapshotDigest",
+  ]);
   assert.equal(body.response_schema.type, "array");
   assert.equal(invoiceRequestCount, requestsBefore);
 });

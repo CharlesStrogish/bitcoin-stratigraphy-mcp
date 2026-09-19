@@ -977,6 +977,8 @@ components:
           required: [name, parameters]
         catalog_tool:
           $ref: "#/components/schemas/StratigraphyCatalogMcpTool"
+        proof_status_tool:
+          $ref: "#/components/schemas/ProofStatusMcpTool"
         response_schema:
           $ref: "#/components/schemas/JsonSchema"
       required:
@@ -990,7 +992,57 @@ components:
         - dataset
         - mcp_tool
         - catalog_tool
+        - proof_status_tool
         - response_schema
+    ProofStatusMcpTool:
+      type: object
+      description: MCP lifecycle query tool registered as get_proof_status.
+      properties:
+        name:
+          type: string
+          const: get_proof_status
+          description: Stable MCP tool name used with tools/call.
+          examples: [get_proof_status]
+        description:
+          type: string
+          description: Human-readable purpose of the proof lifecycle query.
+          examples:
+            - Query the cryptographic attestation status, verification cache history, and Nostr NIP-78 publication state of a previously submitted zk-SNARK proof digest or snapshot CID.
+        identifiers:
+          type: array
+          description: Alternative identifiers accepted by the tool; callers provide exactly one.
+          examples:
+            - [proofHash, snapshotDigest]
+          items:
+            type: string
+            enum: [proofHash, snapshotDigest]
+        exampleStatus:
+          $ref: "#/components/schemas/ProofStatus"
+      required: [name, description, identifiers, exampleStatus]
+    ProofStatus:
+      type: object
+      description: Cryptographic verification and publication lifecycle state.
+      properties:
+        status:
+          type: string
+          enum: [verified, cached, pending, invalid]
+          description: Current proof verification lifecycle state.
+          examples: [verified]
+        verifiedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the latest verification-state observation.
+          examples: ["2026-09-19T05:54:39.835Z"]
+        attestationCount:
+          type: integer
+          minimum: 0
+          description: Number of Nostr NIP-78 attestations observed on the snapshot.
+          examples: [3]
+        meshQuorum:
+          type: boolean
+          description: Whether attestationCount meets the current mesh quorum threshold.
+          examples: [true]
+      required: [status, verifiedAt, attestationCount, meshQuorum]
     StratigraphyCatalogMcpTool:
       type: object
       description: MCP dataset discovery tool registered as list_stratigraphy_catalog.

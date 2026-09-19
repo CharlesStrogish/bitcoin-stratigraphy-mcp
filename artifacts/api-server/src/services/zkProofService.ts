@@ -54,6 +54,13 @@ let verificationKeyIdPromise: Promise<string> | undefined;
 let verifierWarmupPromise: Promise<void> | undefined;
 const verificationCache = new Map<string, boolean>();
 const MAX_VERIFICATION_CACHE_ENTRIES = 1_000;
+export type ZkProofLifecycleStatus = {
+  status: "verified" | "cached" | "pending" | "invalid";
+  verifiedAt: string;
+  attestationCount: number;
+};
+const proofStatusByIdentifier = new Map<string, ZkProofLifecycleStatus>();
+const MAX_PROOF_STATUS_ENTRIES = 1_000;
 const generatedProofCache = new Map<string, Promise<ZkProofPayload>>();
 const MAX_GENERATED_PROOF_CACHE_ENTRIES = 256;
 const proofLanes = {
@@ -95,6 +102,33 @@ function cacheVerification(key: string, valid: boolean) {
   if (verificationCache.size > MAX_VERIFICATION_CACHE_ENTRIES) {
     verificationCache.delete(verificationCache.keys().next().value!);
   }
+}
+
+function proofHash(proof: string): string {
+  return `0x${createHash("sha256").update(proof).digest("hex")}`;
+}
+
+function cacheProofStatus(
+  identifiers: string[],
+  status: ZkProofLifecycleStatus,
+): void {
+  for (const identifier of identifiers) {
+    proofStatusByIdentifier.delete(identifier);
+    proofStatusByIdentifier.set(identifier, status);
+  }
+  while (proofStatusByIdentifier.size > MAX_PROOF_STATUS_ENTRIES) {
+    proofStatusByIdentifier.delete(proofStatusByIdentifier.keys().next().value!);
+  }
+}
+
+export function getZkProofStatus(
+  identifier: string,
+): ZkProofLifecycleStatus | undefined {
+  const status = proofStatusByIdentifier.get(identifier);
+  if (!status) return undefined;
+  proofStatusByIdentifier.delete(identifier);
+  proofStatusByIdentifier.set(identifier, status);
+  return { ...status };
 }
 
 function canonicalize(value: unknown): string {
@@ -537,17 +571,54 @@ export async function verifyZkProofForSnapshot(
   if (!payload || typeof payload !== "object") return false;
   const candidate = payload as Record<string, unknown>;
   if (!validPublicInputs(candidate.publicInputs)) return false;
+  const proof = typeof candidate.proof === "string" ? candidate.proof : "";
+  const identifiers = [
+    candidate.publicInputs.snapshotDigest,
+    ...(proof ? [proofHash(proof)] : []),
+  ];
+  const wasPreviouslyVerified = identifiers.some((identifier) => {
+    const prior = proofStatusByIdentifier.get(identifier);
+    return prior?.status === "verified" || prior?.status === "cached";
+  });
+  const attestationCount = Array.isArray(snapshot)
+    ? snapshot.filter((entry) =>
+      Boolean(
+        entry &&
+          typeof entry === "object" &&
+          (entry as Record<string, unknown>).attestation,
+      )
+    ).length
+    : snapshot &&
+        typeof snapshot === "object" &&
+        (snapshot as Record<string, unknown>).attestation
+    ? 1
+    : 0;
+  cacheProofStatus(identifiers, {
+    status: "pending",
+    verifiedAt: new Date().toISOString(),
+    attestationCount,
+  });
+  const finish = (valid: boolean): boolean => {
+    cacheProofStatus(identifiers, {
+      status: valid ? (wasPreviouslyVerified ? "cached" : "verified") : "invalid",
+      verifiedAt: new Date().toISOString(),
+      attestationCount,
+    });
+    return valid;
+  };
   try {
     if (
       zkSnapshotDigest(snapshot) !== candidate.publicInputs.snapshotDigest
     ) {
-      return false;
+      return finish(false);
     }
-    if (!semanticInputsMatch(candidate.publicInputs, snapshot)) return false;
+    if (!semanticInputsMatch(candidate.publicInputs, snapshot)) {
+      return finish(false);
+    }
   } catch {
-    return false;
+    return finish(false);
   }
-  return verifyZkProof(payload);
+  return finish(await verifyZkProof(payload));
 }
 
 export function isZkProofPayload(value: unknown): value is ZkProofPayload {

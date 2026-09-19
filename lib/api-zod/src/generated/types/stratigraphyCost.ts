@@ -7,6 +7,7 @@
  */
 import type { AgentReputationMetadata } from './agentReputationMetadata';
 import type { JsonSchema } from './jsonSchema';
+import type { ProofStatusMcpTool } from './proofStatusMcpTool';
 import type { SettlementAsset } from './settlementAsset';
 import type { StratigraphyCatalogMcpTool } from './stratigraphyCatalogMcpTool';
 import type { StratigraphyCostAccessTiersItem } from './stratigraphyCostAccessTiersItem';
@@ -32,5 +33,6 @@ export interface StratigraphyCost {
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;
   catalog_tool: StratigraphyCatalogMcpTool;
+  proof_status_tool: ProofStatusMcpTool;
   response_schema: JsonSchema;
 }

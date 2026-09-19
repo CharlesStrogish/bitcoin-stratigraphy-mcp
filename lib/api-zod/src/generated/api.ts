@@ -154,6 +154,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
   "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
   "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
   "required": zod.boolean().describe('Whether callers must provide this parameter.')
 }),
   "date": zod.object({
@@ -161,6 +164,29 @@ export const GetStratigraphyCostResponse = zod.object({
   "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
   "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
   "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+}),
+  "blockHeight": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+}),
+  "metrics": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
   "required": zod.boolean().describe('Whether callers must provide this parameter.')
 }),
   "startDate": zod.object({
@@ -168,6 +194,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
   "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
   "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
   "required": zod.boolean().describe('Whether callers must provide this parameter.')
 }),
   "endDate": zod.object({
@@ -175,6 +204,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
   "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
   "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
   "required": zod.boolean().describe('Whether callers must provide this parameter.')
 }),
   "startBlock": zod.object({
@@ -182,6 +214,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
   "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
   "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
   "required": zod.boolean().describe('Whether callers must provide this parameter.')
 }),
   "endBlock": zod.object({
@@ -189,6 +224,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
   "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
   "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
   "required": zod.boolean().describe('Whether callers must provide this parameter.')
 }),
   "limit": zod.object({
@@ -196,6 +234,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
   "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
   "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
   "required": zod.boolean().describe('Whether callers must provide this parameter.')
 })
 })

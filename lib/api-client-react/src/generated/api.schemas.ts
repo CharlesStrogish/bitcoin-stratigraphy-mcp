@@ -353,6 +353,12 @@ export interface McpToolParameter {
   maximum?: number;
   /** JSON Schema string format when applicable. */
   format?: string;
+  /** Detailed formatting and behavioral contract for the parameter. */
+  description: string;
+  /** Concrete accepted parameter value. */
+  example: unknown;
+  /** Allowed string values for an enum or array parameter. */
+  allowedValues?: string[];
   /** Whether callers must provide this parameter. */
   required: boolean;
 }
@@ -360,6 +366,8 @@ export interface McpToolParameter {
 export type StratigraphyCostMcpToolParameters = {
   days: McpToolParameter;
   date: McpToolParameter;
+  blockHeight: McpToolParameter;
+  metrics: McpToolParameter;
   startDate: McpToolParameter;
   endDate: McpToolParameter;
   startBlock: McpToolParameter;

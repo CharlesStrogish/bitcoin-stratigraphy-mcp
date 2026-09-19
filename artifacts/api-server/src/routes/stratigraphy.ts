@@ -953,37 +953,78 @@ export function registerStratigraphyRoutes(
         parameters: {
           days: {
             type: "integer",
+            description:
+              "Legacy selector for the number of most recent daily snapshots; cannot be combined with other selectors.",
+            example: 10,
             minimum: 1,
             maximum: dataset.length,
             required: false,
           },
           date: {
             type: "string",
+            description:
+              "Legacy exact dataset date formatted as YYYY-MM-DD in UTC; cannot be combined with other selectors.",
+            example: "2026-09-18",
             format: "date",
+            required: false,
+          },
+          blockHeight: {
+            type: "integer",
+            description:
+              "Legacy exact non-negative deterministic daily block-index height; cannot be combined with other selectors.",
+            example: 920000,
+            minimum: 0,
+            required: false,
+          },
+          metrics: {
+            type: "array",
+            description:
+              "Optional thermodynamic metric projection; omitted metrics are excluded from quantitative_alpha.",
+            example: ["target_multiplier"],
+            allowedValues: [
+              "target_multiplier",
+              "difficulty_epoch_progress",
+              "thermodynamic_signal",
+            ],
             required: false,
           },
           startDate: {
             type: "string",
+            description:
+              "Inclusive UTC lower date bound formatted as YYYY-MM-DD.",
+            example: "2026-09-01",
             format: "date",
             required: false,
           },
           endDate: {
             type: "string",
+            description:
+              "Inclusive UTC upper date bound formatted as YYYY-MM-DD.",
+            example: "2026-09-18",
             format: "date",
             required: false,
           },
           startBlock: {
             type: "integer",
+            description:
+              "Inclusive non-negative lower bound in the deterministic daily block index.",
+            example: 910000,
             minimum: 0,
             required: false,
           },
           endBlock: {
             type: "integer",
+            description:
+              "Inclusive non-negative upper bound in the deterministic daily block index.",
+            example: 920000,
             minimum: 0,
             required: false,
           },
           limit: {
             type: "integer",
+            description:
+              "Maximum matching snapshots returned; defaults to 10 and cannot exceed 100.",
+            example: 10,
             minimum: 1,
             maximum: 100,
             required: false,

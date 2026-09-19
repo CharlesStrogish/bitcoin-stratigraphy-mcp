@@ -157,9 +157,20 @@ const readOnlyToolAnnotations = {
   },
 };
 
+const thermodynamicMetricNames = [
+  "target_multiplier",
+  "difficulty_epoch_progress",
+  "thermodynamic_signal",
+] as const;
+
 const stratigraphyInputSchema = z.object({
   days: z.number().int().min(1).max(422).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  blockHeight: z.number().int().nonnegative().optional(),
+  metrics: z.array(z.enum(thermodynamicMetricNames)).min(1).refine(
+    (values) => new Set(values).size === values.length,
+    "metrics must contain unique values",
+  ).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   startBlock: z.number().int().nonnegative().optional(),
@@ -179,7 +190,7 @@ const field = (
   description: string,
   examples: unknown[],
   extra: Record<string, unknown> = {},
-) => ({ type, description, examples, ...extra });
+) => ({ type, description, example: examples[0], examples, ...extra });
 
 const quantitativeAlphaJsonSchema = {
   type: "object",
@@ -207,11 +218,6 @@ const quantitativeAlphaJsonSchema = {
       ["accumulation"],
     ),
   },
-  required: [
-    "target_multiplier",
-    "difficulty_epoch_progress",
-    "thermodynamic_signal",
-  ],
 };
 
 const entryJsonSchema = {
@@ -392,7 +398,12 @@ async function stratigraphyCatalog() {
 async function queryStratigraphy(
   input: z.infer<typeof stratigraphyInputSchema>,
 ) {
-  const hasLegacySelector = input.days !== undefined || input.date !== undefined;
+  const legacySelectors = [
+    input.days !== undefined,
+    input.date !== undefined,
+    input.blockHeight !== undefined,
+  ].filter(Boolean).length;
+  const hasLegacySelector = legacySelectors > 0;
   const hasRangeSelector =
     input.startDate !== undefined ||
     input.endDate !== undefined ||
@@ -400,8 +411,11 @@ async function queryStratigraphy(
     input.endBlock !== undefined;
   if (hasLegacySelector && hasRangeSelector) {
     throw new RangeError(
-      "days or date cannot be combined with date or block ranges",
+      "days, date, or blockHeight cannot be combined with date or block ranges",
     );
+  }
+  if (legacySelectors > 1) {
+    throw new RangeError("Provide only one of days, date, or blockHeight");
   }
   if (
     input.startDate !== undefined &&
@@ -417,26 +431,39 @@ async function queryStratigraphy(
   ) {
     throw new RangeError("startBlock must not be greater than endBlock");
   }
-  if (hasLegacySelector) {
-    const records = await getStratigraphyData({
-      days: input.days,
-      date: input.date,
-    });
-    return records.slice(-input.limit);
-  }
-  const records = await getStratigraphyData();
-  return records
-    .filter((_record, index) => {
-      const date = snapshotDate(index, records.length);
-      const block = snapshotBlock(index, records.length);
+  const allRecords = await getStratigraphyData();
+  let records = hasLegacySelector
+    ? input.blockHeight === undefined
+      ? (await getStratigraphyData({
+          days: input.days,
+          date: input.date,
+        })).slice(-input.limit)
+      : allRecords.filter((_record, index) =>
+          snapshotBlock(index, allRecords.length) === input.blockHeight
+        ).slice(0, input.limit)
+    : allRecords.filter((_record, index) => {
+      const date = snapshotDate(index, allRecords.length);
+      const block = snapshotBlock(index, allRecords.length);
       return (
         (input.startDate === undefined || date >= input.startDate) &&
         (input.endDate === undefined || date <= input.endDate) &&
         (input.startBlock === undefined || block >= input.startBlock) &&
         (input.endBlock === undefined || block <= input.endBlock)
       );
-    })
-    .slice(0, input.limit);
+    }).slice(0, input.limit);
+
+  if (input.metrics !== undefined) {
+    const selected = new Set(input.metrics);
+    records = records.map((record) => ({
+      ...record,
+      quantitative_alpha: Object.fromEntries(
+        Object.entries(record.quantitative_alpha).filter(([name]) =>
+          selected.has(name as typeof thermodynamicMetricNames[number])
+        ),
+      ) as typeof record.quantitative_alpha,
+    }));
+  }
+  return records;
 }
 
 const mcpToolDefinitions = [
@@ -444,7 +471,7 @@ const mcpToolDefinitions = [
     name: "get_bitcoin_stratigraphy",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count or exact dataset date.",
+      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -452,6 +479,7 @@ const mcpToolDefinitions = [
       examples: [
         { days: 7, limit: 7 },
         { date: "2026-09-09", limit: 1 },
+        { blockHeight: 920000, metrics: ["target_multiplier"], limit: 1 },
         { startDate: "2026-08-01", endDate: "2026-08-31", limit: 10 },
         { startBlock: 910000, endBlock: 920000, limit: 25 },
       ],
@@ -459,43 +487,64 @@ const mcpToolDefinitions = [
       properties: {
         days: field(
           "integer",
-          "Number of most recent day entries to return.",
-          [7],
+          "Legacy selector for the number of most recent daily snapshots to return. Must be an integer from 1 through 422 and cannot be combined with date, blockHeight, or range selectors.",
+          [10],
           { minimum: 1, maximum: 422 },
         ),
         date: field(
           "string",
-          "Exact dataset date in YYYY-MM-DD format.",
-          ["2026-09-09"],
-          { pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+          "Legacy selector for one exact dataset date formatted as YYYY-MM-DD in UTC. It cannot be combined with days, blockHeight, or range selectors.",
+          ["2026-09-18"],
+          { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+        ),
+        blockHeight: field(
+          "integer",
+          "Legacy selector for one exact non-negative height in the deterministic daily block index. It cannot be combined with days, date, or range selectors; an unindexed height returns no records.",
+          [920000],
+          { minimum: 0 },
+        ),
+        metrics: field(
+          "array",
+          "Optional projection of thermodynamic fields returned inside quantitative_alpha. Supply one or more unique metric names; omitted metrics are excluded, while omitting this parameter returns all thermodynamic metrics.",
+          [["target_multiplier"]],
+          {
+            minItems: 1,
+            uniqueItems: true,
+            items: field(
+              "string",
+              "Allowed thermodynamic metric name to include in each returned quantitative_alpha object.",
+              ["target_multiplier"],
+              { enum: [...thermodynamicMetricNames] },
+            ),
+          },
         ),
         startDate: field(
           "string",
-          "Inclusive ISO 8601 start date for a snapshot range query.",
-          ["2026-08-01"],
+          "Inclusive lower date bound formatted as YYYY-MM-DD in UTC. May be combined with endDate and block bounds, but not with days, date, or blockHeight.",
+          ["2026-09-01"],
           { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
         ),
         endDate: field(
           "string",
-          "Inclusive ISO 8601 end date for a snapshot range query.",
-          ["2026-08-31"],
+          "Inclusive upper date bound formatted as YYYY-MM-DD in UTC. Must not precede startDate and may not be combined with legacy selectors.",
+          ["2026-09-18"],
           { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
         ),
         startBlock: field(
           "integer",
-          "Inclusive lower bound of the deterministic daily block-height index.",
+          "Inclusive non-negative lower bound of the deterministic daily block-height index. May be combined with endBlock and date bounds, but not with legacy selectors.",
           [910000],
           { minimum: 0 },
         ),
         endBlock: field(
           "integer",
-          "Inclusive upper bound of the deterministic daily block-height index.",
+          "Inclusive non-negative upper bound of the deterministic daily block-height index. Must be at least startBlock and may not be combined with legacy selectors.",
           [920000],
           { minimum: 0 },
         ),
         limit: field(
           "integer",
-          "Maximum snapshots returned; defaults to 10 and cannot exceed 100.",
+          "Maximum number of matching snapshots returned after filtering. It defaults to 10 when omitted and must be an integer from 1 through 100.",
           [10],
           { minimum: 1, maximum: 100, default: 10 },
         ),

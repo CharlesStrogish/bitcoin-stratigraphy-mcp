@@ -959,6 +959,10 @@ components:
                   $ref: "#/components/schemas/McpToolParameter"
                 date:
                   $ref: "#/components/schemas/McpToolParameter"
+                blockHeight:
+                  $ref: "#/components/schemas/McpToolParameter"
+                metrics:
+                  $ref: "#/components/schemas/McpToolParameter"
                 startDate:
                   $ref: "#/components/schemas/McpToolParameter"
                 endDate:
@@ -969,7 +973,7 @@ components:
                   $ref: "#/components/schemas/McpToolParameter"
                 limit:
                   $ref: "#/components/schemas/McpToolParameter"
-              required: [days, date, startDate, endDate, startBlock, endBlock, limit]
+              required: [days, date, blockHeight, metrics, startDate, endDate, startBlock, endBlock, limit]
           required: [name, parameters]
         catalog_tool:
           $ref: "#/components/schemas/StratigraphyCatalogMcpTool"
@@ -1063,10 +1067,20 @@ components:
         format:
           type: string
           description: JSON Schema string format when applicable.
+        description:
+          type: string
+          description: Detailed formatting and behavioral contract for the parameter.
+        example:
+          description: Concrete accepted parameter value.
+        allowedValues:
+          type: array
+          description: Allowed string values for an enum or array parameter.
+          items:
+            type: string
         required:
           type: boolean
           description: Whether callers must provide this parameter.
-      required: [type, required]
+      required: [type, description, example, required]
     JsonSchema:
       type: object
       properties:

@@ -10,6 +10,8 @@ import type { McpToolParameter } from './mcpToolParameter';
 export type StratigraphyCostMcpToolParameters = {
   days: McpToolParameter;
   date: McpToolParameter;
+  blockHeight: McpToolParameter;
+  metrics: McpToolParameter;
   startDate: McpToolParameter;
   endDate: McpToolParameter;
   startBlock: McpToolParameter;

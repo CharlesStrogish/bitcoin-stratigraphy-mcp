@@ -632,6 +632,50 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       candidate.name === "get_bitcoin_stratigraphy",
   );
   assert.ok(tool);
+  const queryProperties = tool.inputSchema.properties as Record<
+    string,
+    { type?: unknown; description?: unknown; example?: unknown }
+  >;
+  assert.deepEqual(Object.keys(queryProperties), [
+    "days",
+    "date",
+    "blockHeight",
+    "metrics",
+    "startDate",
+    "endDate",
+    "startBlock",
+    "endBlock",
+    "limit",
+  ]);
+  for (const [name, property] of Object.entries(queryProperties)) {
+    assert.ok(property.type, `${name} must define type`);
+    assert.equal(
+      typeof property.description,
+      "string",
+      `${name} must define description`,
+    );
+    assert.ok(
+      Object.hasOwn(property, "example"),
+      `${name} must define a concrete example`,
+    );
+  }
+  assert.deepEqual(
+    (queryProperties.metrics as {
+      items: { type: string; enum: string[] };
+    }).items,
+    {
+      type: "string",
+      description:
+        "Allowed thermodynamic metric name to include in each returned quantitative_alpha object.",
+      example: "target_multiplier",
+      examples: ["target_multiplier"],
+      enum: [
+        "target_multiplier",
+        "difficulty_epoch_progress",
+        "thermodynamic_signal",
+      ],
+    },
+  );
   assert.deepEqual(tool.annotations, {
     readOnlyHint: true,
     destructiveHint: false,
@@ -697,6 +741,19 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
   });
   assert.equal(blockRangeCalled.result?.structuredContent.records.length, 4);
+
+  const exactBlockCalled = await mcpRequest("tools/call", {
+    name: "get_bitcoin_stratigraphy",
+    arguments: {
+      blockHeight: 920000,
+      metrics: ["target_multiplier"],
+    },
+  });
+  assert.equal(exactBlockCalled.result?.structuredContent.records.length, 1);
+  assert.deepEqual(
+    exactBlockCalled.result?.structuredContent.records[0].quantitative_alpha,
+    { target_multiplier: 125.83 },
+  );
 
   const catalogCalled = await mcpRequest("tools/call", {
     name: "list_stratigraphy_catalog",
@@ -843,6 +900,8 @@ test("serves public pre-flight cost and schema metadata", async () => {
   assert.deepEqual(Object.keys(body.mcp_tool.parameters), [
     "days",
     "date",
+    "blockHeight",
+    "metrics",
     "startDate",
     "endDate",
     "startBlock",

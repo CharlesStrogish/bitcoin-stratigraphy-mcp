@@ -1,0 +1,20 @@
+Add a 7th dedicated MCP tool `list_proof_attestations` to satisfy Glama TDQS listing requirements and eliminate tool disambiguation overlap:
+
+1. Implement `list_proof_attestations` in `tools/list`:
+   - Name: `list_proof_attestations`
+   - Description: "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest. Use this tool during discovery to list historical attestations. Do NOT use for querying a specific proof hash (use get_proof_status instead) or executing stateless verification (use verify_zk_proof instead)."
+   - Input schema parameters:
+     * `limit` (integer, optional, default 10, max 100): "Maximum number of attestation records to return."
+     * `status` (string enum: ["verified", "cached", "pending", "invalid"], optional): "Filter attestations by lifecycle verification state."
+   - Output schema properties:
+     * `attestations` (array of objects): Each item containing `proofHash`, `snapshotDigest`, `status`, `submittedAt`, `attestationCount`, and `meshQuorum`.
+     * `total` (integer): Total count of indexed attestations in memory/cache.
+
+2. Refine `verify_zk_proof` description for zero disambiguation overlap:
+   - Description: "Execute active, stateless Groth16/Poseidon cryptographic math verification on an incoming proof payload. Use this tool strictly for instant computational verification. Do NOT use for status lookups (use get_proof_status instead) or browsing attestation logs (use list_proof_attestations instead)."
+
+3. Refine `get_proof_status` description:
+   - Description: "Query the detailed attestation lifecycle and Nostr publication state of ONE specific known proof hash or snapshot digest. Use this tool when you already hold a proof hash or CID. Do NOT use for listing multiple proofs (use list_proof_attestations instead) or performing math verification (use verify_zk_proof instead)."
+
+4. Export `list_proof_attestations` across OpenAPI, Zod schemas, MCP server card, and SDK contracts.
+5. Run `npm test` and `pnpm typecheck` to verify 100% test pass rate across all 7 tools.

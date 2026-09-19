@@ -13,6 +13,7 @@ import { z } from "zod";
 import { createMeshGossipService } from "../services/meshGossipService";
 import {
   getZkProofStatus,
+  listZkProofAttestations,
   submitZkProof,
   verifyZkProofForSnapshot,
 } from "../services/zkProofService";
@@ -239,6 +240,24 @@ const proofStatusInputSchema = z.object({
     (input.proofHash === undefined) !== (input.snapshotDigest === undefined),
   "Provide exactly one of proofHash or snapshotDigest",
 ).describe("Exactly one lifecycle lookup identifier: proofHash or snapshotDigest.");
+
+const proofLifecycleStates = [
+  "verified",
+  "cached",
+  "pending",
+  "invalid",
+] as const;
+
+const listProofAttestationsInputSchema = z.object({
+  limit: z.number().int().min(1).max(100).default(10).describe(
+    "Maximum number of attestation records to return.",
+  ),
+  status: z.enum(proofLifecycleStates).optional().describe(
+    "Filter attestations by lifecycle verification state.",
+  ),
+}).strict().describe(
+  "Optional pagination limit and lifecycle-state filter for proof attestation discovery.",
+);
 
 const submitProofInputSchema = z.object({
   proof: z.object({
@@ -753,7 +772,7 @@ const mcpToolDefinitions = [
     name: "verify_zk_proof",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Verify a Groth16/Poseidon BN254 proof and its binding to a supplied snapshot payload. Use this tool when you need stateless, sub-ms dry-run SNARK proof verification. Do NOT use for Nostr NIP-78 publication or lifecycle tracking; use submit_zk_proof for publication and get_proof_status for lifecycle tracking.",
+      "Execute active, stateless Groth16/Poseidon cryptographic math verification on an incoming proof payload. Use this tool strictly for instant computational verification. Do NOT use for status lookups (use get_proof_status instead) or browsing attestation logs (use list_proof_attestations instead).",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -827,7 +846,7 @@ const mcpToolDefinitions = [
     name: "get_proof_status",
     title: "Get Proof Status",
     description:
-      "Query the cryptographic attestation status, verification cache history, Nostr NIP-78 publication state, and mesh quorum of a previously submitted zk-SNARK proof hash or snapshot CID. Use this tool when you need to inspect attestation history, publication state, or quorum for a proof hash or CID. Do NOT use for active verification; use verify_zk_proof for a dry run or submit_zk_proof for indexed verification.",
+      "Query the detailed attestation lifecycle and Nostr publication state of ONE specific known proof hash or snapshot digest. Use this tool when you already hold a proof hash or CID. Do NOT use for listing multiple proofs (use list_proof_attestations instead) or performing math verification (use verify_zk_proof instead).",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -889,6 +908,137 @@ const mcpToolDefinitions = [
         ),
       },
       required: ["status", "verifiedAt", "attestationCount", "meshQuorum"],
+    },
+  },
+  {
+    name: "list_proof_attestations",
+    title: "List Proof Attestations",
+    description:
+      "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest. Use this tool during discovery to list historical attestations. Do NOT use for querying a specific proof hash (use get_proof_status instead) or executing stateless verification (use verify_zk_proof instead).",
+    annotations: readOnlyToolAnnotations,
+    inputSchema: {
+      type: "object",
+      description:
+        "Optional result limit and lifecycle-state filter for recent indexed proof attestations.",
+      examples: [{ limit: 10, status: "verified" }],
+      additionalProperties: false,
+      properties: {
+        limit: field(
+          "integer",
+          "Maximum number of attestation records to return.",
+          [10],
+          { minimum: 1, maximum: 100, default: 10 },
+        ),
+        status: field(
+          "string",
+          "Filter attestations by lifecycle verification state.",
+          ["verified"],
+          { enum: [...proofLifecycleStates] },
+        ),
+      },
+    },
+    outputSchema: {
+      type: "object",
+      description:
+        "Recent proof attestation records and the total number matching the optional status filter.",
+      examples: [{
+        attestations: [{
+          proofHash:
+            "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+          snapshotDigest: "1534979302823651498736582947365829473658294",
+          status: "verified",
+          submittedAt: "2026-09-19T06:20:00.000Z",
+          attestationCount: 1,
+          meshQuorum: true,
+        }],
+        total: 1,
+      }],
+      additionalProperties: false,
+      properties: {
+        attestations: field(
+          "array",
+          "Recent indexed proof attestations ordered from newest to oldest.",
+          [[{
+            proofHash:
+              "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+            snapshotDigest: "1534979302823651498736582947365829473658294",
+            status: "verified",
+            submittedAt: "2026-09-19T06:20:00.000Z",
+            attestationCount: 1,
+            meshQuorum: true,
+          }]],
+          {
+            items: {
+              type: "object",
+              description:
+                "One indexed zk-SNARK proof verification and Nostr attestation record.",
+              examples: [{
+                proofHash:
+                  "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+                snapshotDigest:
+                  "1534979302823651498736582947365829473658294",
+                status: "verified",
+                submittedAt: "2026-09-19T06:20:00.000Z",
+                attestationCount: 1,
+                meshQuorum: true,
+              }],
+              additionalProperties: false,
+              properties: {
+                proofHash: field(
+                  "string",
+                  "Lowercase 0x-prefixed SHA-256 fingerprint of the indexed proof.",
+                  [
+                    "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+                  ],
+                ),
+                snapshotDigest: field(
+                  "string",
+                  "Snapshot CID or decimal Poseidon digest bound to the indexed proof.",
+                  ["1534979302823651498736582947365829473658294"],
+                ),
+                status: field(
+                  "string",
+                  "Current lifecycle verification state of the indexed proof.",
+                  ["verified"],
+                  { enum: [...proofLifecycleStates] },
+                ),
+                submittedAt: field(
+                  "string",
+                  "ISO 8601 timestamp when this proof entered the lifecycle index.",
+                  ["2026-09-19T06:20:00.000Z"],
+                  { format: "date-time" },
+                ),
+                attestationCount: field(
+                  "integer",
+                  "Number of Nostr NIP-78 attestations recorded for this proof.",
+                  [1],
+                  { minimum: 0 },
+                ),
+                meshQuorum: field(
+                  "boolean",
+                  "Whether this proof's attestation count meets the current mesh quorum threshold.",
+                  [true],
+                ),
+              },
+              required: [
+                "proofHash",
+                "snapshotDigest",
+                "status",
+                "submittedAt",
+                "attestationCount",
+                "meshQuorum",
+              ],
+            },
+          },
+        ),
+        total: field(
+          "integer",
+          "Total number of indexed attestation records matching the optional status filter before the limit is applied.",
+          [1],
+          { minimum: 0 },
+        ),
+      },
+      required: ["attestations", "total"],
     },
   },
   {
@@ -1203,6 +1353,28 @@ function createBitcoinStratigraphyMcpServer() {
         verifiedAt: history?.verifiedAt ?? new Date().toISOString(),
         attestationCount,
         meshQuorum: attestationCount >= mesh.status().quorumThreshold,
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    }
+    if (request.params.name === "list_proof_attestations") {
+      const parsed = listProofAttestationsInputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid proof attestation listing parameters",
+        );
+      }
+      const listed = listZkProofAttestations(parsed.data);
+      const quorumThreshold = mesh.status().quorumThreshold;
+      const structuredContent = {
+        attestations: listed.attestations.map((record) => ({
+          ...record,
+          meshQuorum: record.attestationCount >= quorumThreshold,
+        })),
+        total: listed.total,
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],

@@ -979,6 +979,8 @@ components:
           $ref: "#/components/schemas/StratigraphyCatalogMcpTool"
         proof_status_tool:
           $ref: "#/components/schemas/ProofStatusMcpTool"
+        proof_attestations_tool:
+          $ref: "#/components/schemas/ListProofAttestationsMcpTool"
         submit_proof_tool:
           $ref: "#/components/schemas/SubmitZkProofMcpTool"
         response_schema:
@@ -995,8 +997,89 @@ components:
         - mcp_tool
         - catalog_tool
         - proof_status_tool
+        - proof_attestations_tool
         - submit_proof_tool
         - response_schema
+    ListProofAttestationsMcpTool:
+      type: object
+      description: MCP proof-attestation discovery tool registered as list_proof_attestations.
+      properties:
+        name:
+          type: string
+          const: list_proof_attestations
+          description: Stable MCP tool name used with tools/call.
+          examples: [list_proof_attestations]
+        description:
+          type: string
+          description: Human-readable purpose of the attestation listing tool.
+          examples:
+            - Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest.
+        parameters:
+          type: object
+          description: Optional filters accepted by the attestation listing tool.
+          properties:
+            limit:
+              $ref: "#/components/schemas/McpToolParameter"
+            status:
+              $ref: "#/components/schemas/McpToolParameter"
+          required: [limit, status]
+        exampleResult:
+          $ref: "#/components/schemas/ListProofAttestationsResult"
+      required: [name, description, parameters, exampleResult]
+    ListProofAttestationsResult:
+      type: object
+      description: Recent indexed proof attestations and the total matching count.
+      properties:
+        attestations:
+          type: array
+          description: Indexed proof attestations ordered from newest to oldest.
+          items:
+            $ref: "#/components/schemas/ProofAttestationRecord"
+        total:
+          type: integer
+          minimum: 0
+          description: Total matching records before the result limit is applied.
+          examples: [1]
+      required: [attestations, total]
+    ProofAttestationRecord:
+      type: object
+      description: One indexed zk-SNARK verification and Nostr attestation record.
+      properties:
+        proofHash:
+          type: string
+          description: Lowercase 0x-prefixed SHA-256 proof fingerprint.
+          examples:
+            - "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd"
+        snapshotDigest:
+          type: string
+          description: Snapshot CID or decimal Poseidon digest bound to the proof.
+          examples: ["1534979302823651498736582947365829473658294"]
+        status:
+          type: string
+          enum: [verified, cached, pending, invalid]
+          description: Current lifecycle verification state.
+          examples: [verified]
+        submittedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the proof entered the lifecycle index.
+          examples: ["2026-09-19T06:20:00.000Z"]
+        attestationCount:
+          type: integer
+          minimum: 0
+          description: Number of recorded Nostr NIP-78 attestations.
+          examples: [1]
+        meshQuorum:
+          type: boolean
+          description: Whether the attestation count meets the current mesh quorum.
+          examples: [true]
+      required:
+        - proofHash
+        - snapshotDigest
+        - status
+        - submittedAt
+        - attestationCount
+        - meshQuorum
     SubmitZkProofMcpTool:
       type: object
       description: MCP proof ingestion tool registered as submit_zk_proof.

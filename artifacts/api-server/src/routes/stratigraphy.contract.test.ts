@@ -585,6 +585,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "list_stratigraphy_catalog",
       "verify_zk_proof",
       "get_proof_status",
+      "list_proof_attestations",
       "submit_zk_proof",
       "get_mesh_status",
     ],
@@ -625,7 +626,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   for (const candidate of listed.result?.tools ?? []) {
     assert.match(
       candidate.description,
-      /Use this tool (?:first )?when/,
+      /Use this tool (?:first )?(?:when|during|strictly)/,
       `${candidate.name} must explain when to use it`,
     );
     assert.match(
@@ -863,6 +864,31 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
   });
   assert.equal(submittedStatus.result?.structuredContent.status, "invalid");
+
+  const listedAttestations = await mcpRequest("tools/call", {
+    name: "list_proof_attestations",
+    arguments: { limit: 10, status: "invalid" },
+  });
+  assert.ok(listedAttestations.result?.structuredContent.total >= 1);
+  const submittedAttestation =
+    listedAttestations.result?.structuredContent.attestations.find(
+      (record: { proofHash: string }) =>
+        record.proofHash === submitted.result?.structuredContent.proofHash,
+    );
+  assert.deepEqual(
+    {
+      snapshotDigest: submittedAttestation?.snapshotDigest,
+      status: submittedAttestation?.status,
+      attestationCount: submittedAttestation?.attestationCount,
+      meshQuorum: submittedAttestation?.meshQuorum,
+    },
+    {
+      snapshotDigest: "1",
+      status: "invalid",
+      attestationCount: 0,
+      meshQuorum: false,
+    },
+  );
 });
 
 test("offers SSE transport without changing the public OpenAPI route", async () => {
@@ -946,6 +972,11 @@ test("serves public pre-flight cost and schema metadata", async () => {
     mcp_tool: { name: string; parameters: Record<string, unknown> };
     catalog_tool: { name: string; description: string };
     proof_status_tool: { name: string; identifiers: string[] };
+    proof_attestations_tool: {
+      name: string;
+      parameters: Record<string, unknown>;
+      exampleResult: { attestations: unknown[]; total: number };
+    };
     submit_proof_tool: { name: string; requiredInputs: string[] };
     response_schema: { type: string };
   };
@@ -976,6 +1007,18 @@ test("serves public pre-flight cost and schema metadata", async () => {
     "proofHash",
     "snapshotDigest",
   ]);
+  assert.equal(
+    body.proof_attestations_tool.name,
+    "list_proof_attestations",
+  );
+  assert.deepEqual(
+    Object.keys(body.proof_attestations_tool.parameters),
+    ["limit", "status"],
+  );
+  assert.equal(
+    body.proof_attestations_tool.exampleResult.attestations.length,
+    1,
+  );
   assert.equal(body.submit_proof_tool.name, "submit_zk_proof");
   assert.deepEqual(body.submit_proof_tool.requiredInputs, [
     "proof",

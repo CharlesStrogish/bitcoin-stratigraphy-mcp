@@ -60,8 +60,16 @@ export type ZkProofLifecycleStatus = {
   verifiedAt: string;
   attestationCount: number;
 };
+export type ZkProofAttestationRecord = {
+  proofHash: string;
+  snapshotDigest: string;
+  status: ZkProofLifecycleStatus["status"];
+  submittedAt: string;
+  attestationCount: number;
+};
 const proofStatusByIdentifier = new Map<string, ZkProofLifecycleStatus>();
 const MAX_PROOF_STATUS_ENTRIES = 1_000;
+const proofAttestationsByHash = new Map<string, ZkProofAttestationRecord>();
 const generatedProofCache = new Map<string, Promise<ZkProofPayload>>();
 const MAX_GENERATED_PROOF_CACHE_ENTRIES = 256;
 const proofLanes = {
@@ -132,6 +140,29 @@ export function getZkProofStatus(
   return { ...status };
 }
 
+function indexProofAttestation(record: ZkProofAttestationRecord): void {
+  proofAttestationsByHash.delete(record.proofHash);
+  proofAttestationsByHash.set(record.proofHash, record);
+  while (proofAttestationsByHash.size > MAX_PROOF_STATUS_ENTRIES) {
+    proofAttestationsByHash.delete(
+      proofAttestationsByHash.keys().next().value!,
+    );
+  }
+}
+
+export function listZkProofAttestations(input: {
+  limit: number;
+  status?: ZkProofLifecycleStatus["status"];
+}): { attestations: ZkProofAttestationRecord[]; total: number } {
+  const matching = [...proofAttestationsByHash.values()]
+    .filter((record) => input.status === undefined || record.status === input.status)
+    .reverse();
+  return {
+    attestations: matching.slice(0, input.limit).map((record) => ({ ...record })),
+    total: matching.length,
+  };
+}
+
 export async function submitZkProof(input: {
   proof: unknown;
   publicSignals: string[];
@@ -156,6 +187,13 @@ export async function submitZkProof(input: {
   cacheProofStatus(identifiers, {
     status: "pending",
     verifiedAt: submittedAt,
+    attestationCount: 0,
+  });
+  indexProofAttestation({
+    proofHash: fingerprint,
+    snapshotDigest: input.snapshotDigest ?? signalDigest ?? "",
+    status: "pending",
+    submittedAt,
     attestationCount: 0,
   });
 
@@ -194,6 +232,13 @@ export async function submitZkProof(input: {
   cacheProofStatus(identifiers, {
     status: valid ? "verified" : "invalid",
     verifiedAt: submittedAt,
+    attestationCount,
+  });
+  indexProofAttestation({
+    proofHash: fingerprint,
+    snapshotDigest: input.snapshotDigest ?? snapshot ?? "",
+    status: valid ? "verified" : "invalid",
+    submittedAt,
     attestationCount,
   });
   return {
@@ -644,10 +689,13 @@ export async function verifyZkProofForSnapshot(
   if (!payload || typeof payload !== "object") return false;
   const candidate = payload as Record<string, unknown>;
   if (!validPublicInputs(candidate.publicInputs)) return false;
+  const snapshotDigest = candidate.publicInputs.snapshotDigest;
   const proof = typeof candidate.proof === "string" ? candidate.proof : "";
+  const fingerprint = proofHash(proof);
+  const submittedAt = new Date().toISOString();
   const identifiers = [
-    candidate.publicInputs.snapshotDigest,
-    ...(proof ? [proofHash(proof)] : []),
+    snapshotDigest,
+    fingerprint,
   ];
   const wasPreviouslyVerified = identifiers.some((identifier) => {
     const prior = proofStatusByIdentifier.get(identifier);
@@ -668,20 +716,37 @@ export async function verifyZkProofForSnapshot(
     : 0;
   cacheProofStatus(identifiers, {
     status: "pending",
-    verifiedAt: new Date().toISOString(),
+    verifiedAt: submittedAt,
+    attestationCount,
+  });
+  indexProofAttestation({
+    proofHash: fingerprint,
+    snapshotDigest,
+    status: "pending",
+    submittedAt,
     attestationCount,
   });
   const finish = (valid: boolean): boolean => {
+    const status = valid
+      ? (wasPreviouslyVerified ? "cached" : "verified")
+      : "invalid";
     cacheProofStatus(identifiers, {
-      status: valid ? (wasPreviouslyVerified ? "cached" : "verified") : "invalid",
+      status,
       verifiedAt: new Date().toISOString(),
+      attestationCount,
+    });
+    indexProofAttestation({
+      proofHash: fingerprint,
+      snapshotDigest,
+      status,
+      submittedAt,
       attestationCount,
     });
     return valid;
   };
   try {
     if (
-      zkSnapshotDigest(snapshot) !== candidate.publicInputs.snapshotDigest
+      zkSnapshotDigest(snapshot) !== snapshotDigest
     ) {
       return finish(false);
     }

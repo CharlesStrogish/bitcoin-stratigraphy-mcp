@@ -67,6 +67,15 @@ export const mcpServerCard = {
         },
       },
       {
+        name: "list_proof_attestations",
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
         name: "submit_zk_proof",
         annotations: {
           readOnlyHint: false,

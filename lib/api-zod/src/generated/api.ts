@@ -109,6 +109,10 @@ export const getStratigraphyCostResponseCatalogToolCatalogNewestBlockMin = 0;
 
 export const getStratigraphyCostResponseProofStatusToolExampleStatusAttestationCountMin = 0;
 
+export const getStratigraphyCostResponseProofAttestationsToolExampleResultAttestationsItemAttestationCountMin = 0;
+
+export const getStratigraphyCostResponseProofAttestationsToolExampleResultTotalMin = 0;
+
 
 
 export const GetStratigraphyCostResponse = zod.object({
@@ -268,6 +272,43 @@ export const GetStratigraphyCostResponse = zod.object({
   "meshQuorum": zod.boolean().describe('Whether attestationCount meets the current mesh quorum threshold.')
 }).describe('Cryptographic verification and publication lifecycle state.')
 }).describe('MCP lifecycle query tool registered as get_proof_status.'),
+  "proof_attestations_tool": zod.object({
+  "name": zod.literal("list_proof_attestations").describe('Stable MCP tool name used with tools\/call.'),
+  "description": zod.string().describe('Human-readable purpose of the attestation listing tool.'),
+  "parameters": zod.object({
+  "limit": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+}),
+  "status": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "description": zod.string().describe('Detailed formatting and behavioral contract for the parameter.'),
+  "example": zod.unknown().describe('Concrete accepted parameter value.'),
+  "allowedValues": zod.array(zod.string()).optional().describe('Allowed string values for an enum or array parameter.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+})
+}).describe('Optional filters accepted by the attestation listing tool.'),
+  "exampleResult": zod.object({
+  "attestations": zod.array(zod.object({
+  "proofHash": zod.string().describe('Lowercase 0x-prefixed SHA-256 proof fingerprint.'),
+  "snapshotDigest": zod.string().describe('Snapshot CID or decimal Poseidon digest bound to the proof.'),
+  "status": zod.enum(['verified', 'cached', 'pending', 'invalid']).describe('Current lifecycle verification state.'),
+  "submittedAt": zod.coerce.date().describe('ISO 8601 timestamp when the proof entered the lifecycle index.'),
+  "attestationCount": zod.number().int().min(getStratigraphyCostResponseProofAttestationsToolExampleResultAttestationsItemAttestationCountMin).describe('Number of recorded Nostr NIP-78 attestations.'),
+  "meshQuorum": zod.boolean().describe('Whether the attestation count meets the current mesh quorum.')
+}).describe('One indexed zk-SNARK verification and Nostr attestation record.')).describe('Indexed proof attestations ordered from newest to oldest.'),
+  "total": zod.number().int().min(getStratigraphyCostResponseProofAttestationsToolExampleResultTotalMin).describe('Total matching records before the result limit is applied.')
+}).describe('Recent indexed proof attestations and the total matching count.')
+}).describe('MCP proof-attestation discovery tool registered as list_proof_attestations.'),
   "submit_proof_tool": zod.object({
   "name": zod.literal("submit_zk_proof").describe('Stable MCP tool name used with tools\/call.'),
   "description": zod.string().describe('Human-readable purpose of the proof ingestion tool.'),

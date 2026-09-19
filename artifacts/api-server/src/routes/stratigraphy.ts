@@ -1068,6 +1068,41 @@ export function registerStratigraphyRoutes(
           meshQuorum: false,
         },
       },
+      proof_attestations_tool: {
+        name: "list_proof_attestations",
+        description:
+          "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest.",
+        parameters: {
+          limit: {
+            type: "integer",
+            description: "Maximum number of attestation records to return.",
+            example: 10,
+            minimum: 1,
+            maximum: 100,
+            required: false,
+          },
+          status: {
+            type: "string",
+            description:
+              "Filter attestations by lifecycle verification state.",
+            example: "verified",
+            allowedValues: ["verified", "cached", "pending", "invalid"],
+            required: false,
+          },
+        },
+        exampleResult: {
+          attestations: [{
+            proofHash:
+              "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+            snapshotDigest: "1534979302823651498736582947365829473658294",
+            status: "verified",
+            submittedAt: new Date(calculatedAt).toISOString(),
+            attestationCount: 1,
+            meshQuorum: true,
+          }],
+          total: 1,
+        },
+      },
       submit_proof_tool: {
         name: "submit_zk_proof",
         description:

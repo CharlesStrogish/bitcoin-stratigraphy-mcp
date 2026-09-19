@@ -494,6 +494,74 @@ export interface ProofStatusMcpTool {
   exampleStatus: ProofStatus;
 }
 
+/**
+ * Current lifecycle verification state.
+ */
+export type ProofAttestationRecordStatus = typeof ProofAttestationRecordStatus[keyof typeof ProofAttestationRecordStatus];
+
+
+export const ProofAttestationRecordStatus = {
+  verified: 'verified',
+  cached: 'cached',
+  pending: 'pending',
+  invalid: 'invalid',
+} as const;
+
+/**
+ * One indexed zk-SNARK verification and Nostr attestation record.
+ */
+export interface ProofAttestationRecord {
+  /** Lowercase 0x-prefixed SHA-256 proof fingerprint. */
+  proofHash: string;
+  /** Snapshot CID or decimal Poseidon digest bound to the proof. */
+  snapshotDigest: string;
+  /** Current lifecycle verification state. */
+  status: ProofAttestationRecordStatus;
+  /** ISO 8601 timestamp when the proof entered the lifecycle index. */
+  submittedAt: string;
+  /**
+     * Number of recorded Nostr NIP-78 attestations.
+     * @minimum 0
+     */
+  attestationCount: number;
+  /** Whether the attestation count meets the current mesh quorum. */
+  meshQuorum: boolean;
+}
+
+/**
+ * Recent indexed proof attestations and the total matching count.
+ */
+export interface ListProofAttestationsResult {
+  /** Indexed proof attestations ordered from newest to oldest. */
+  attestations: ProofAttestationRecord[];
+  /**
+     * Total matching records before the result limit is applied.
+     * @minimum 0
+     */
+  total: number;
+}
+
+/**
+ * Optional filters accepted by the attestation listing tool.
+ */
+export type ListProofAttestationsMcpToolParameters = {
+  limit: McpToolParameter;
+  status: McpToolParameter;
+};
+
+/**
+ * MCP proof-attestation discovery tool registered as list_proof_attestations.
+ */
+export interface ListProofAttestationsMcpTool {
+  /** Stable MCP tool name used with tools/call. */
+  name: 'list_proof_attestations';
+  /** Human-readable purpose of the attestation listing tool. */
+  description: string;
+  /** Optional filters accepted by the attestation listing tool. */
+  parameters: ListProofAttestationsMcpToolParameters;
+  exampleResult: ListProofAttestationsResult;
+}
+
 export type SubmitZkProofMcpToolRequiredInputsItem = typeof SubmitZkProofMcpToolRequiredInputsItem[keyof typeof SubmitZkProofMcpToolRequiredInputsItem];
 
 
@@ -578,6 +646,7 @@ export interface StratigraphyCost {
   mcp_tool: StratigraphyCostMcpTool;
   catalog_tool: StratigraphyCatalogMcpTool;
   proof_status_tool: ProofStatusMcpTool;
+  proof_attestations_tool: ListProofAttestationsMcpTool;
   submit_proof_tool: SubmitZkProofMcpTool;
   response_schema: JsonSchema;
 }

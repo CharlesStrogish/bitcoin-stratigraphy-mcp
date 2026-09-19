@@ -266,37 +266,45 @@ const listProofAttestationsInputSchema = z.object({
 const submitProofInputSchema = z.object({
   proof: z.object({
     pi_a: z.array(
-      z.string().describe("Decimal BN254 field coordinate in the proof A point."),
+      z.string().describe(
+        "Decimal string BN254 scalar-field coordinate in proof point A. Example: '10823'.",
+      ),
     ).length(3).describe(
-      "Three projective coordinates for the Groth16 proof A point.",
+      "Required 3-element array of decimal string field elements representing the Groth16 BN254 proof A projective point. Example: ['10823', '49102', '1'].",
     ),
     pi_b: z.array(
       z.array(
         z.string().describe(
-          "Decimal BN254 field coordinate in the proof B point.",
+          "Decimal string BN254 extension-field coordinate in proof point B. Example: '331'.",
         ),
-      ).length(2).describe("Pair of BN254 extension-field coordinates."),
+      ).length(2).describe(
+        "Required 2-element array of decimal string BN254 extension-field coordinates. Example: ['112', '331'].",
+      ),
     ).length(3).describe(
-      "Three extension-field coordinate pairs for the Groth16 proof B point.",
+      "Required 3x2 nested array of decimal string field elements representing the Groth16 BN254 proof B projective point. Example: [['112', '331'], ['981', '771'], ['1', '0']].",
     ),
     pi_c: z.array(
-      z.string().describe("Decimal BN254 field coordinate in the proof C point."),
+      z.string().describe(
+        "Decimal string BN254 scalar-field coordinate in proof point C. Example: '554'.",
+      ),
     ).length(3).describe(
-      "Three projective coordinates for the Groth16 proof C point.",
+      "Required 3-element array of decimal string field elements representing the Groth16 BN254 proof C projective point. Example: ['554', '882', '1'].",
     ),
   }).strict().describe(
-    "Groth16 BN254 proof object containing pi_a, pi_b, and pi_c.",
+    `Groth16/Poseidon zk-SNARK proof object containing pi_a (3-element array), pi_b (3x2 nested array), and pi_c (3-element array) BN254 elliptic curve projective points as decimal string field elements. Example: {"pi_a":["10823","49102","1"],"pi_b":[["112","331"],["981","771"],["1","0"]],"pi_c":["554","882","1"]}.`,
   ),
   publicSignals: z.array(
-    z.string().describe("Decimal public signal committed by the proof."),
+    z.string().describe(
+      "Decimal string scalar field element in the BN254 curve modulo space. Example: '920000'.",
+    ),
   ).length(5).describe(
-    "Five public signals ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
+    "Required array of exactly 5 public signal strings representing scalar field elements in BN254 curve modulo space, ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest. Example: ['920000', '1', '1789776000000', '12583', '1'].",
   ),
   snapshotDigest: z.string().min(1).optional().describe(
-    "Optional snapshot CID or digest that must equal the fifth public signal.",
+    "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. No default. Example: '1'.",
   ),
 }).strict().describe(
-  "Fresh Groth16 proof coordinates and public signals for verification, indexing, and publication.",
+  "Input payload containing Groth16 proof object and public signals for ingestion and Nostr NIP-78 attestation broadcast.",
 );
 
 const meshStatusInputSchema = z.object({}).strict().describe(
@@ -1066,7 +1074,7 @@ const mcpToolDefinitions = [
     inputSchema: {
       type: "object",
       description:
-        "Groth16 BN254 proof coordinates, five ordered public signals, and an optional matching snapshot digest.",
+        "Input payload containing Groth16 proof object and public signals for ingestion and Nostr NIP-78 attestation broadcast.",
       examples: [{
         proof: {
           pi_a: ["1", "2", "1"],
@@ -1081,7 +1089,7 @@ const mcpToolDefinitions = [
         proof: {
           type: "object",
           description:
-            "Groth16 BN254 proof object containing pi_a, pi_b, and pi_c curve-point coordinates as decimal strings.",
+            `Groth16/Poseidon zk-SNARK proof object containing pi_a (3-element array), pi_b (3x2 nested array), and pi_c (3-element array) BN254 elliptic curve projective points as decimal string field elements. Example: {"pi_a":["10823","49102","1"],"pi_b":[["112","331"],["981","771"],["1","0"]],"pi_c":["554","882","1"]}.`,
           example: {
             pi_a: ["1", "2", "1"],
             pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
@@ -1096,36 +1104,36 @@ const mcpToolDefinitions = [
           properties: {
             pi_a: field(
               "array",
-              "Three decimal-string projective coordinates for the Groth16 proof A point.",
+              "Required 3-element array of decimal string field elements representing the Groth16 BN254 proof A projective point. Example: ['10823', '49102', '1'].",
               [["1", "2", "1"]],
               {
                 minItems: 3,
                 maxItems: 3,
                 items: field(
                   "string",
-                  "Decimal BN254 field coordinate in the A point.",
-                  ["1"],
+                  "Decimal string BN254 scalar-field coordinate in proof point A. Example: '10823'.",
+                  ["10823"],
                 ),
               },
             ),
             pi_b: field(
               "array",
-              "Three pairs of decimal-string extension-field coordinates for the Groth16 proof B point.",
+              "Required 3x2 nested array of decimal string field elements representing the Groth16 BN254 proof B projective point. Example: [['112', '331'], ['981', '771'], ['1', '0']].",
               [[["1", "2"], ["3", "4"], ["1", "0"]]],
               {
                 minItems: 3,
                 maxItems: 3,
                 items: field(
                   "array",
-                  "Pair of decimal BN254 extension-field coordinates.",
-                  [["1", "2"]],
+                  "Required 2-element array of decimal string BN254 extension-field coordinates. Example: ['112', '331'].",
+                  [["112", "331"]],
                   {
                     minItems: 2,
                     maxItems: 2,
                     items: field(
                       "string",
-                      "Decimal BN254 field coordinate in the B point.",
-                      ["1"],
+                      "Decimal string BN254 extension-field coordinate in proof point B. Example: '331'.",
+                      ["331"],
                     ),
                   },
                 ),
@@ -1133,15 +1141,15 @@ const mcpToolDefinitions = [
             ),
             pi_c: field(
               "array",
-              "Three decimal-string projective coordinates for the Groth16 proof C point.",
+              "Required 3-element array of decimal string field elements representing the Groth16 BN254 proof C projective point. Example: ['554', '882', '1'].",
               [["5", "6", "1"]],
               {
                 minItems: 3,
                 maxItems: 3,
                 items: field(
                   "string",
-                  "Decimal BN254 field coordinate in the C point.",
-                  ["5"],
+                  "Decimal string BN254 scalar-field coordinate in proof point C. Example: '554'.",
+                  ["554"],
                 ),
               },
             ),
@@ -1150,21 +1158,21 @@ const mcpToolDefinitions = [
         },
         publicSignals: field(
           "array",
-          "Exactly five decimal strings ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
+          "Required array of exactly 5 public signal strings representing scalar field elements in BN254 curve modulo space, ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest. Example: ['920000', '1', '1789776000000', '12583', '1'].",
           [["920000", "1", "1789776000000", "12583", "1"]],
           {
             minItems: 5,
             maxItems: 5,
             items: field(
               "string",
-              "Decimal public signal committed by the Groth16 proof.",
+              "Decimal string scalar field element in the BN254 curve modulo space. Example: '920000'.",
               ["920000"],
             ),
           },
         ),
         snapshotDigest: field(
           "string",
-          "Optional telemetry snapshot CID or digest to index with the proof; when provided it must equal the fifth public signal.",
+          "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. No default. Example: '1'.",
           ["1"],
         ),
       },

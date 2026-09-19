@@ -1,0 +1,27 @@
+Optimize all 6 MCP tool definitions in `tools/list` to achieve a 5/5 score across every individual tool dimension in Glama's TDQS specification:
+
+1. Update Tool Descriptions with Explicit Usage Guidelines & Behavioral Disclosures:
+   
+   - `get_bitcoin_stratigraphy`:
+     "Query historical Bitcoin telemetry, daily valuation milestones, and time-series range records. Use this tool when fetching raw telemetry or daily stratigraphy metrics for a block/date range. Do NOT use for dataset catalog discovery (use `list_stratigraphy_catalog` instead), active proof verification (use `verify_zk_proof`), or submitting new proofs (use `submit_zk_proof`). Operation is read-only, idempotent, and cached."
+
+   - `list_stratigraphy_catalog`:
+     "Discover available dataset epochs, snapshot CIDs, and metadata bounds across the stratigraphy repository. Use this tool first during discovery to inspect valid query parameters and bounds. Do NOT use to fetch actual time-series records (use `get_bitcoin_stratigraphy` instead). Operation is read-only, idempotent, and context-light."
+
+   - `verify_zk_proof`:
+     "Perform active, sub-millisecond cryptographic verification of a Groth16/Poseidon SNARK proof and public signals. Use this tool for stateless, dry-run proof verification without modifying server state. Do NOT use to register proofs for Nostr NIP-78 broadcast (use `submit_zk_proof` instead) or to query historical attestation lifecycle (use `get_proof_status` instead)."
+
+   - `submit_zk_proof`:
+     "Ingest a new Groth16/Poseidon zk-SNARK proof payload for verification, lifecycle indexing, and Nostr NIP-78 attestation broadcast. Use this tool when submitting fresh proofs to be recorded and broadcast to the mesh. Do NOT use for simple dry-run evaluation without registration (use `verify_zk_proof` instead). Valid proofs trigger NIP-78 relay broadcasts; invalid proofs are indexed as rejected and not broadcast."
+
+   - `get_proof_status`:
+     "Query the cryptographic attestation status, verification history, and NIP-78 publication state of a previously submitted proof fingerprint or snapshot CID. Use this tool to inspect lifecycle progress (verified, cached, pending, invalid) or mesh quorum counts. Do NOT use for active cryptographic proof evaluation (use `verify_zk_proof` instead)."
+
+   - `get_mesh_status`:
+     "Query live P2P gossip mesh topology, connected peer counts, L402 payment channel health, and consensus quorum metrics. Use this tool for infrastructure health monitoring and peer verification. Do NOT use for telemetry or proof queries. Operation is read-only and idempotent."
+
+2. Ensure 100% Parameter Semantics & Output Schema Documentation:
+   - Verify every input parameter (including nested Zod properties for Groth16 `pi_a`, `pi_b`, `pi_c` and `publicSignals`) has an explicit `.describe()` string documenting valid formats, constraints, and non-obvious defaults.
+   - Verify all return schemas and output properties include clear `.describe()` strings.
+
+3. Run `npm test` and `pnpm typecheck` to confirm 100% test passing across all 6 tools.

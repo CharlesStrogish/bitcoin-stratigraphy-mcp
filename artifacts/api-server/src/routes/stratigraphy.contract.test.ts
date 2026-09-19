@@ -623,6 +623,16 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
+    assert.match(
+      candidate.description,
+      /Use this tool (?:first )?when/,
+      `${candidate.name} must explain when to use it`,
+    );
+    assert.match(
+      candidate.description,
+      /Do NOT use for/,
+      `${candidate.name} must explain when not to use it`,
+    );
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertDocumentedSchema(
       candidate.outputSchema,

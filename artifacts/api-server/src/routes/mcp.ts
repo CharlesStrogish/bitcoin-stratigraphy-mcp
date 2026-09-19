@@ -178,45 +178,103 @@ const thermodynamicMetricNames = [
 ] as const;
 
 const stratigraphyInputSchema = z.object({
-  days: z.number().int().min(1).max(422).optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  blockHeight: z.number().int().nonnegative().optional(),
-  metrics: z.array(z.enum(thermodynamicMetricNames)).min(1).refine(
+  days: z.number().int().min(1).max(422).optional().describe(
+    "Number of the most recent daily snapshots to return, from 1 through 422.",
+  ),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
+    "Exact UTC dataset date formatted as YYYY-MM-DD.",
+  ),
+  blockHeight: z.number().int().nonnegative().optional().describe(
+    "Exact non-negative height in the deterministic daily block index.",
+  ),
+  metrics: z.array(
+    z.enum(thermodynamicMetricNames).describe(
+      "Thermodynamic metric name to include in each returned record.",
+    ),
+  ).min(1).refine(
     (values) => new Set(values).size === values.length,
     "metrics must contain unique values",
-  ).optional(),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  startBlock: z.number().int().nonnegative().optional(),
-  endBlock: z.number().int().nonnegative().optional(),
-  limit: z.number().int().min(1).max(100).default(10),
-}).strict();
+  ).optional().describe(
+    "Unique thermodynamic fields to return inside quantitative_alpha.",
+  ),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
+    "Inclusive UTC lower date bound formatted as YYYY-MM-DD.",
+  ),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
+    "Inclusive UTC upper date bound formatted as YYYY-MM-DD.",
+  ),
+  startBlock: z.number().int().nonnegative().optional().describe(
+    "Inclusive non-negative lower bound of the daily block-height index.",
+  ),
+  endBlock: z.number().int().nonnegative().optional().describe(
+    "Inclusive non-negative upper bound of the daily block-height index.",
+  ),
+  limit: z.number().int().min(1).max(100).default(10).describe(
+    "Maximum number of matching snapshots to return, from 1 through 100.",
+  ),
+}).strict().describe("Validated raw stratigraphy telemetry query parameters.");
 
 const verifyProofInputSchema = z.object({
-  proof: z.string(),
+  proof: z.string().describe(
+    "Base64url-encoded Groth16 proof emitted by this API.",
+  ),
   publicInputs: publicInputsSchema,
-  verificationKeyId: z.string(),
+  verificationKeyId: z.string().describe(
+    "SHA-256 identifier of the expected verification key.",
+  ),
   data: snapshotSchema,
-}).strict();
+}).strict().describe(
+  "Proof, public inputs, verification key, and bound snapshot for a stateless dry run.",
+);
 
 const proofStatusInputSchema = z.object({
-  proofHash: z.string().min(1).optional(),
-  snapshotDigest: z.string().min(1).optional(),
+  proofHash: z.string().min(1).optional().describe(
+    "Lowercase 0x-prefixed SHA-256 fingerprint of a previously submitted proof.",
+  ),
+  snapshotDigest: z.string().min(1).optional().describe(
+    "Snapshot CID or decimal Poseidon digest indexed with a submitted proof.",
+  ),
 }).strict().refine(
   (input) =>
     (input.proofHash === undefined) !== (input.snapshotDigest === undefined),
   "Provide exactly one of proofHash or snapshotDigest",
-);
+).describe("Exactly one lifecycle lookup identifier: proofHash or snapshotDigest.");
 
 const submitProofInputSchema = z.object({
   proof: z.object({
-    pi_a: z.array(z.string()).length(3),
-    pi_b: z.array(z.array(z.string()).length(2)).length(3),
-    pi_c: z.array(z.string()).length(3),
-  }).strict(),
-  publicSignals: z.array(z.string()).length(5),
-  snapshotDigest: z.string().min(1).optional(),
-}).strict();
+    pi_a: z.array(
+      z.string().describe("Decimal BN254 field coordinate in the proof A point."),
+    ).length(3).describe(
+      "Three projective coordinates for the Groth16 proof A point.",
+    ),
+    pi_b: z.array(
+      z.array(
+        z.string().describe(
+          "Decimal BN254 field coordinate in the proof B point.",
+        ),
+      ).length(2).describe("Pair of BN254 extension-field coordinates."),
+    ).length(3).describe(
+      "Three extension-field coordinate pairs for the Groth16 proof B point.",
+    ),
+    pi_c: z.array(
+      z.string().describe("Decimal BN254 field coordinate in the proof C point."),
+    ).length(3).describe(
+      "Three projective coordinates for the Groth16 proof C point.",
+    ),
+  }).strict().describe(
+    "Groth16 BN254 proof object containing pi_a, pi_b, and pi_c.",
+  ),
+  publicSignals: z.array(
+    z.string().describe("Decimal public signal committed by the proof."),
+  ).length(5).describe(
+    "Five public signals ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
+  ),
+  snapshotDigest: z.string().min(1).optional().describe(
+    "Optional snapshot CID or digest that must equal the fifth public signal.",
+  ),
+}).strict().describe(
+  "Fresh Groth16 proof coordinates and public signals for verification, indexing, and publication.",
+);
 
 const field = (
   type: string | string[],
@@ -504,7 +562,7 @@ const mcpToolDefinitions = [
     name: "get_bitcoin_stratigraphy",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection.",
+      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection. Use this tool when you need raw historical telemetry or time-series ranges. Do NOT use for catalog discovery; use list_stratigraphy_catalog instead. Do NOT use for proof verification, submission, or lifecycle operations; use verify_zk_proof, submit_zk_proof, or get_proof_status instead.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -603,7 +661,7 @@ const mcpToolDefinitions = [
     name: "list_stratigraphy_catalog",
     title: "List Stratigraphy Catalog",
     description:
-      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, and available telemetry metrics without requiring prior knowledge of exact snapshot parameters.",
+      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, snapshot CIDs, and available telemetry metrics. Use this tool first when you need to discover available dataset bounds and snapshot CIDs. Do NOT use for fetching raw time-series records; use get_bitcoin_stratigraphy instead.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -695,7 +753,7 @@ const mcpToolDefinitions = [
     name: "verify_zk_proof",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Verify a Groth16/Poseidon BN254 proof and its binding to a supplied snapshot payload.",
+      "Verify a Groth16/Poseidon BN254 proof and its binding to a supplied snapshot payload. Use this tool when you need stateless, sub-ms dry-run SNARK proof verification. Do NOT use for Nostr NIP-78 publication or lifecycle tracking; use submit_zk_proof for publication and get_proof_status for lifecycle tracking.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -769,7 +827,7 @@ const mcpToolDefinitions = [
     name: "get_proof_status",
     title: "Get Proof Status",
     description:
-      "Query the cryptographic attestation status, verification cache history, and Nostr NIP-78 publication state of a previously submitted zk-SNARK proof digest or snapshot CID.",
+      "Query the cryptographic attestation status, verification cache history, Nostr NIP-78 publication state, and mesh quorum of a previously submitted zk-SNARK proof hash or snapshot CID. Use this tool when you need to inspect attestation history, publication state, or quorum for a proof hash or CID. Do NOT use for active verification; use verify_zk_proof for a dry run or submit_zk_proof for indexed verification.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -837,7 +895,7 @@ const mcpToolDefinitions = [
     name: "submit_zk_proof",
     title: "Submit ZK Proof",
     description:
-      "Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine for verification, lifecycle indexing, and Nostr NIP-78 attestation broadcast.",
+      "Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine. Use this tool when you need to submit fresh proofs for verification, lifecycle indexing, and Nostr NIP-78 relay broadcast. Do NOT use for dry-run verification; use verify_zk_proof instead.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -996,7 +1054,7 @@ const mcpToolDefinitions = [
     name: "get_mesh_status",
     title: "Get Mesh Status",
     description:
-      "Retrieve P2P peer discovery, cross-validation, quorum, and consensus topology health.",
+      "Retrieve P2P peer discovery, cross-validation, quorum, consensus topology, and L402 health. Use this tool when you need P2P topology, peer count, or L402 health checks. Do NOT use for telemetry or proofs; use get_bitcoin_stratigraphy, list_stratigraphy_catalog, verify_zk_proof, submit_zk_proof, or get_proof_status instead.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

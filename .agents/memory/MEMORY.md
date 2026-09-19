@@ -14,3 +14,4 @@
 - [SNARK worker bundling](snark-worker-bundling.md) — keep worker-spawning cryptography external to server/test bundles and tear workers down only in test processes.
 - [Telemetry proof semantics](telemetry-proof-semantics.md) — require exact payload binding and derive public fields from emitted snapshot semantics, not independent request state.
 - [Mesh consensus trust](mesh-consensus-trust.md) — peer certificates require pinned reciprocal membership, canonical snapshots, fresh source signatures, and external quorum policy.
+- [MCP schema metadata](mcp-schema-metadata.md) — Zod 3 conversion drops examples; publish explicit JSON Schemas while retaining separate runtime validation.

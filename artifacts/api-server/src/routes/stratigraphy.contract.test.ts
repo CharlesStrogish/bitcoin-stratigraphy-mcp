@@ -578,6 +578,54 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.equal(initialized.result?.serverInfo.name, "bitcoin-stratigraphy");
 
   const listed = await mcpRequest("tools/list");
+  assert.deepEqual(
+    listed.result?.tools.map((candidate: { name: string }) => candidate.name),
+    [
+      "get_bitcoin_stratigraphy",
+      "verify_zk_proof",
+      "get_mesh_status",
+    ],
+  );
+  const assertDocumentedSchema = (
+    schema: {
+      type?: unknown;
+      description?: unknown;
+      examples?: unknown;
+      properties?: Record<string, unknown>;
+      items?: unknown;
+    },
+    path: string,
+  ): void => {
+    assert.ok(schema.type, `${path} must define type`);
+    assert.equal(
+      typeof schema.description,
+      "string",
+      `${path} must define description`,
+    );
+    assert.ok(
+      Array.isArray(schema.examples) && schema.examples.length > 0,
+      `${path} must define examples`,
+    );
+    for (const [name, property] of Object.entries(schema.properties ?? {})) {
+      assertDocumentedSchema(
+        property as Parameters<typeof assertDocumentedSchema>[0],
+        `${path}.properties.${name}`,
+      );
+    }
+    if (schema.items) {
+      assertDocumentedSchema(
+        schema.items as Parameters<typeof assertDocumentedSchema>[0],
+        `${path}.items`,
+      );
+    }
+  };
+  for (const candidate of listed.result?.tools ?? []) {
+    assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
+    assertDocumentedSchema(
+      candidate.outputSchema,
+      `${candidate.name}.outputSchema`,
+    );
+  }
   const tool = listed.result?.tools.find(
     (candidate: { name: string }) =>
       candidate.name === "get_bitcoin_stratigraphy",
@@ -627,6 +675,38 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.equal(
     typeof records[0].quantitative_alpha.thermodynamic_signal,
     "string",
+  );
+
+  const meshCalled = await mcpRequest("tools/call", {
+    name: "get_mesh_status",
+    arguments: {},
+  });
+  assert.equal(meshCalled.result?.structuredContent.topologyHealth, "isolated");
+  assert.equal(meshCalled.result?.structuredContent.quorumThreshold, 1);
+
+  const proofCalled = await mcpRequest("tools/call", {
+    name: "verify_zk_proof",
+    arguments: {
+      proof: "invalid-proof",
+      publicInputs: {
+        blockHeight: 920000,
+        snapshotDigest: "1",
+        thermodynamicHash: "1",
+        timestamp: 1789776000000,
+        valuationSat: 12583,
+      },
+      verificationKeyId: "sha256:unknown",
+      data: [{
+        block: { height: 920000 },
+        observed_at: "2026-09-19T00:00:00.000Z",
+        thermodynamic: { target_multiplier: 125.83 },
+      }],
+    },
+  });
+  assert.equal(proofCalled.result?.structuredContent.valid, false);
+  assert.equal(
+    typeof proofCalled.result?.structuredContent.computationTimeMs,
+    "number",
   );
 });
 

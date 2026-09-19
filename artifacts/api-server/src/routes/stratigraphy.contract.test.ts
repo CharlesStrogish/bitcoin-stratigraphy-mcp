@@ -547,6 +547,28 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
   });
 });
 
+test("reports public peer mesh status without payment", async () => {
+  const response = await fetch(`${baseUrl}/api/v1/mesh/status`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.has("www-authenticate"), false);
+  const body = (await response.json()) as {
+    nodePubkey: string;
+    activePeerCount: number;
+    configuredPeerCount: number;
+    topologyHealth: string;
+    crossValidationSuccessRate: number;
+    averagePropagationLatencyMs: number;
+    quorumThreshold: number;
+  };
+  assert.match(body.nodePubkey, /^[0-9a-f]{64}$/);
+  assert.equal(body.activePeerCount, 1);
+  assert.equal(body.configuredPeerCount, 0);
+  assert.equal(body.topologyHealth, "isolated");
+  assert.equal(body.crossValidationSuccessRate, 1);
+  assert.equal(body.averagePropagationLatencyMs, 0);
+  assert.equal(body.quorumThreshold, 1);
+});
+
 test("exposes the stratigraphy MCP tool with structured quantitative data", async () => {
   const initialized = await mcpRequest("initialize", {
     protocolVersion: "2025-03-26",
@@ -2512,9 +2534,21 @@ test("returns the full dataset for a suitable payment", async () => {
       }
     >;
     zkProof: Record<string, unknown>;
+    meshConsensus: {
+      quorumScore: number;
+      peerAttestations: Array<{ pubkey: string; signature: string }>;
+      merkleRoot: string;
+      isolationMode: boolean;
+    };
   };
   assert.ok(body.data.length > 5);
   assert.ok(body.zkProof);
+  assert.equal(body.meshConsensus.quorumScore, 1);
+  assert.equal(body.meshConsensus.isolationMode, true);
+  assert.equal(body.meshConsensus.peerAttestations.length, 1);
+  assert.match(body.meshConsensus.peerAttestations[0]!.pubkey, /^[0-9a-f]{64}$/);
+  assert.match(body.meshConsensus.peerAttestations[0]!.signature, /^[0-9a-f]{128}$/);
+  assert.match(body.meshConsensus.merkleRoot, /^[0-9a-f]{64}$/);
   const { attestation, ...unsignedRecord } = body.data[0];
   assert.deepEqual(JSON.parse(attestation.event.content), unsignedRecord);
   assert.equal(
@@ -2528,10 +2562,11 @@ test("returns the full dataset for a suitable payment", async () => {
   });
   assert.equal(repeatedResponse.status, 200);
   const repeatedBody = (await repeatedResponse.json()) as typeof body;
-  assert.equal(
-    repeatedBody.data[0].attestation.event.id,
-    attestation.event.id,
+  assert.ok(
+    repeatedBody.data[0].attestation.event.created_at >=
+      attestation.event.created_at,
   );
+  assert.equal(verifyEvent(repeatedBody.data[0].attestation.event), true);
 });
 
 test("prices recent-day ranges at one sat per day with a five-sat minimum", async () => {

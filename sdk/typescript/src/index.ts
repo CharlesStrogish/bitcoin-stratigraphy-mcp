@@ -47,6 +47,59 @@ export type ZkVerifyResponse = {
   computationTimeMs: number;
 };
 
+export type MeshPeerAttestation = {
+  pubkey: string;
+  signature: string;
+  eventId: string;
+  createdAt: number;
+  roundTripLatencyMs: number;
+};
+
+export type MeshConsensus = {
+  quorumScore: number;
+  peerAttestations: MeshPeerAttestation[];
+  merkleRoot: string;
+  snapshotDigest: string;
+  threshold: number;
+  isolationMode: boolean;
+  networkId: string;
+};
+
+export type MeshStatus = {
+  nodePubkey: string;
+  activePeerCount: number;
+  configuredPeerCount: number;
+  topologyHealth: "healthy" | "degraded" | "isolated";
+  crossValidationSuccessRate: number;
+  averagePropagationLatencyMs: number;
+  quorumThreshold: number;
+};
+
+export type MeshSchnorrVerifier = (event: {
+  id: string;
+  pubkey: string;
+  created_at: number;
+  kind: 20078;
+  tags: string[][];
+  content: string;
+  sig: string;
+}) => boolean | Promise<boolean>;
+
+export type MeshConsensusValidation = {
+  valid: boolean;
+  quorumReached: boolean;
+  validAttestationCount: number;
+};
+
+export type MeshValidationPolicy = {
+  trustedPubkeys: ReadonlySet<string> | readonly string[];
+  threshold: number;
+  networkId: string;
+  allowIsolation?: boolean;
+  nowMs?: number;
+  maxAgeSeconds?: number;
+};
+
 export type StratigraphyEntry = {
   day: number;
   title: string;
@@ -63,6 +116,7 @@ export type StratigraphyEntry = {
 export type PaidStratigraphyResponse = {
   data: StratigraphyEntry[];
   zkProof: ZkProof;
+  meshConsensus: MeshConsensus;
 };
 
 export type StratigraphyTelemetry = {
@@ -86,6 +140,7 @@ export type StratigraphyTelemetry = {
 export type StratigraphyTelemetryEnvelope = {
   data: StratigraphyTelemetry;
   zkProof: ZkProof;
+  meshConsensus: MeshConsensus;
 };
 
 export type CostDiscovery = {
@@ -274,6 +329,10 @@ export class BitcoinStratigraphyClient {
   async getLatest(): Promise<PaidStratigraphyResponse> {
     await this.getCost();
     return this.authorizedJson<PaidStratigraphyResponse>("/api/v1/stratigraphy");
+  }
+
+  async getMeshStatus(): Promise<MeshStatus> {
+    return this.fetchJson<MeshStatus>("/api/v1/mesh/status");
   }
 
   async verifyZkProof(
@@ -629,4 +688,133 @@ async function sha256Hex(hexValue: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
+}
+
+async function sha256Text(value: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+function canonicalMeshValue(value: unknown): unknown {
+  if (value === null) return ["null"];
+  if (typeof value === "boolean") return ["bool", value ? 1 : 0];
+  if (typeof value === "string") return ["str", value];
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError("Non-finite mesh number");
+    const bytes = new ArrayBuffer(8);
+    new DataView(bytes).setFloat64(0, value, false);
+    return [
+      "f64",
+      Array.from(new Uint8Array(bytes), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join(""),
+    ];
+  }
+  if (Array.isArray(value)) {
+    return ["array", value.map(canonicalMeshValue)];
+  }
+  if (typeof value === "object") {
+    return [
+      "object",
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, item]) => item !== undefined)
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, item]) => [key, canonicalMeshValue(item)]),
+    ];
+  }
+  throw new TypeError("Mesh snapshot must be JSON serializable");
+}
+
+export function canonicalMeshJson(value: unknown): string {
+  return JSON.stringify(canonicalMeshValue(value));
+}
+
+async function meshMerkleRoot(eventIds: string[]): Promise<string> {
+  if (eventIds.length === 0) return sha256Text("");
+  let level = [...eventIds].sort();
+  while (level.length > 1) {
+    const next: string[] = [];
+    for (let index = 0; index < level.length; index += 2) {
+      next.push(
+        await sha256Text(level[index]! + (level[index + 1] ?? level[index]!)),
+      );
+    }
+    level = next;
+  }
+  return level[0]!;
+}
+
+export async function validateMeshConsensus(
+  consensus: MeshConsensus,
+  snapshot: unknown,
+  verifySchnorr: MeshSchnorrVerifier,
+  policy: MeshValidationPolicy,
+): Promise<MeshConsensusValidation> {
+  let serialized: string;
+  try {
+    serialized = canonicalMeshJson(snapshot);
+  } catch {
+    return { valid: false, quorumReached: false, validAttestationCount: 0 };
+  }
+  const snapshotDigest = await sha256Text(serialized);
+  const trustedPubkeys = new Set(policy.trustedPubkeys);
+  const effectiveThreshold =
+    consensus.isolationMode && policy.allowIsolation ? 1 : policy.threshold;
+  const nowSeconds = Math.floor((policy.nowMs ?? Date.now()) / 1_000);
+  const maxAgeSeconds = policy.maxAgeSeconds ?? 300;
+  const uniquePubkeys = new Set<string>();
+  let validAttestationCount = 0;
+  for (const attestation of consensus.peerAttestations) {
+    if (
+      uniquePubkeys.has(attestation.pubkey) ||
+      !trustedPubkeys.has(attestation.pubkey) ||
+      !/^[0-9a-f]{64}$/.test(attestation.pubkey) ||
+      !/^[0-9a-f]{64}$/.test(attestation.eventId) ||
+      !/^[0-9a-f]{128}$/.test(attestation.signature) ||
+      Math.abs(nowSeconds - attestation.createdAt) > maxAgeSeconds
+    ) {
+      continue;
+    }
+    uniquePubkeys.add(attestation.pubkey);
+    const event = {
+      id: attestation.eventId,
+      pubkey: attestation.pubkey,
+      created_at: attestation.createdAt,
+      kind: 20078 as const,
+      tags: [
+        ["d", `bitcoin-stratigraphy-mesh:${snapshotDigest}`],
+        ["t", "bitcoin-stratigraphy"],
+        ["t", "mesh-cross-validation"],
+        ["x", snapshotDigest],
+        ["n", policy.networkId],
+      ],
+      content: canonicalMeshJson({
+        networkId: policy.networkId,
+        snapshotDigest,
+      }),
+      sig: attestation.signature,
+    };
+    if (await verifySchnorr(event)) validAttestationCount += 1;
+  }
+  const quorumReached = validAttestationCount >= effectiveThreshold;
+  const root =
+    await meshMerkleRoot(consensus.peerAttestations.map((item) => item.eventId));
+  const score = Math.min(1, validAttestationCount / effectiveThreshold);
+  return {
+    valid:
+      snapshotDigest === consensus.snapshotDigest &&
+      consensus.networkId === policy.networkId &&
+      consensus.threshold === effectiveThreshold &&
+      (!consensus.isolationMode || policy.allowIsolation === true) &&
+      root === consensus.merkleRoot &&
+      Math.abs(score - consensus.quorumScore) < Number.EPSILON &&
+      quorumReached,
+    quorumReached,
+    validAttestationCount,
+  };
 }

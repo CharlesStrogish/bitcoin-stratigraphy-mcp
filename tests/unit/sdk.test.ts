@@ -1,14 +1,19 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
+import { finalizeEvent, verifyEvent } from "nostr-tools";
+import { canonicalMeshJson } from "../../artifacts/api-server/src/services/meshGossipService";
 import {
   BitcoinStratigraphyClient,
+  canonicalMeshJson as sdkCanonicalMeshJson,
   MemoryCredentialStore,
+  validateMeshConsensus,
   type CostDiscovery,
   type PaidStratigraphyResponse,
   type StratigraphyTelemetry,
   type StratigraphyTelemetryEnvelope,
   type ZkProof,
+  type MeshConsensus,
 } from "../../sdk/typescript/src/index";
 
 const preimage = "ab".repeat(32);
@@ -86,7 +91,49 @@ const zkProof: ZkProof = {
   },
   verificationKeyId: "telemetry-v1",
 };
-const paidResponse: PaidStratigraphyResponse = { data: records, zkProof };
+const snapshotDigest = createHash("sha256")
+  .update(canonicalMeshJson(records))
+  .digest("hex");
+const meshEvent = finalizeEvent(
+  {
+    kind: 20078,
+    created_at: 1_758_024_000,
+    tags: [
+      ["d", `bitcoin-stratigraphy-mesh:${snapshotDigest}`],
+      ["t", "bitcoin-stratigraphy"],
+      ["t", "mesh-cross-validation"],
+      ["x", snapshotDigest],
+      ["n", "bitcoin-stratigraphy-mainnet-v1"],
+    ],
+    content: canonicalMeshJson({
+      networkId: "bitcoin-stratigraphy-mainnet-v1",
+      snapshotDigest,
+    }),
+  },
+  Uint8Array.from(Buffer.from("01".padStart(64, "0"), "hex")),
+);
+const meshConsensus: MeshConsensus = {
+  quorumScore: 1,
+  peerAttestations: [
+    {
+      pubkey: meshEvent.pubkey,
+      signature: meshEvent.sig,
+      eventId: meshEvent.id,
+      createdAt: meshEvent.created_at,
+      roundTripLatencyMs: 0,
+    },
+  ],
+  merkleRoot: meshEvent.id,
+  snapshotDigest,
+  threshold: 1,
+  isolationMode: true,
+  networkId: "bitcoin-stratigraphy-mainnet-v1",
+};
+const paidResponse: PaidStratigraphyResponse = {
+  data: records,
+  zkProof,
+  meshConsensus,
+};
 
 test("resolves public pre-flight cost and MCP metadata", async () => {
   const urls: string[] = [];
@@ -130,6 +177,46 @@ test("verifies a ZK proof through the public verification endpoint", async () =>
     verificationKeyId: zkProof.verificationKeyId,
     data,
   });
+});
+
+test("cryptographically validates a mesh consensus certificate", async () => {
+  assert.deepEqual(
+    await validateMeshConsensus(meshConsensus, records, verifyEvent, {
+      trustedPubkeys: [meshEvent.pubkey],
+      threshold: 1,
+      networkId: "bitcoin-stratigraphy-mainnet-v1",
+      allowIsolation: true,
+      nowMs: meshEvent.created_at * 1_000,
+    }),
+    { valid: true, quorumReached: true, validAttestationCount: 1 },
+  );
+  assert.equal(
+    (
+      await validateMeshConsensus(
+        { ...meshConsensus, snapshotDigest: "ff".repeat(32) },
+        records,
+        verifyEvent,
+        {
+          trustedPubkeys: [meshEvent.pubkey],
+          threshold: 1,
+          networkId: "bitcoin-stratigraphy-mainnet-v1",
+          allowIsolation: true,
+          nowMs: meshEvent.created_at * 1_000,
+        },
+      )
+    ).valid,
+    false,
+  );
+});
+
+test("uses the same typed canonical mesh encoding for edge-case numbers", () => {
+  const vector = {
+    tiny: 1e-7,
+    fixed: 0.000001,
+    large: 100000000000000000000,
+    nested: [true, null, "value", -0],
+  };
+  assert.equal(sdkCanonicalMeshJson(vector), canonicalMeshJson(vector));
 });
 
 test("intercepts an L402 challenge, pays it, and retries automatically", async () => {

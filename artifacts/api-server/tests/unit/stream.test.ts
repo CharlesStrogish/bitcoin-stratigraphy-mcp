@@ -284,6 +284,10 @@ test("opens an authenticated SSE stream and sends telemetry JSON", async () => {
     assert.deepEqual(JSON.parse(attestation.event.content), telemetry);
     assert.equal(verifyEvent(attestation.event), true);
     assert.ok(payload.zkProof);
+    assert.equal(payload.meshConsensus.quorumScore, 1);
+    assert.equal(payload.meshConsensus.isolationMode, true);
+    assert.equal(payload.meshConsensus.peerAttestations.length, 1);
+    assert.match(payload.meshConsensus.merkleRoot, /^[0-9a-f]{64}$/);
     await reader.cancel();
     controller.abort();
   });

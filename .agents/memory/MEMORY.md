@@ -13,3 +13,4 @@
 - [Multi-asset settlement ownership](multi-asset-settlement-ownership.md) — bind every payment to asset, issuer, caller, and the full invoice redemption window.
 - [SNARK worker bundling](snark-worker-bundling.md) — keep worker-spawning cryptography external to server/test bundles and tear workers down only in test processes.
 - [Telemetry proof semantics](telemetry-proof-semantics.md) — require exact payload binding and derive public fields from emitted snapshot semantics, not independent request state.
+- [Mesh consensus trust](mesh-consensus-trust.md) — peer certificates require pinned reciprocal membership, canonical snapshots, fresh source signatures, and external quorum policy.

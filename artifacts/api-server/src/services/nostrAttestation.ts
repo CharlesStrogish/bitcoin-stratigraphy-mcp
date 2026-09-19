@@ -103,19 +103,32 @@ export function createNostrAttestor(
 export function createCachedNostrAttestor(
   attest: NostrAttestor,
 ): NostrAttestor {
-  const cache = new Map<string, object>();
+  const cache = new Map<
+    string,
+    { createdAt: number | undefined; signed: object }
+  >();
+  const maxEntries = 2_048;
   return <T extends object>(payload: T, createdAt?: number) => {
     const { attestation: _previous, ...unsigned } = payload as T & {
       attestation?: unknown;
     };
-    const cacheKey = JSON.stringify(unsigned);
-    if (cacheKey === undefined) {
+    const serialized = JSON.stringify(unsigned);
+    if (serialized === undefined) {
       throw new TypeError("Nostr attestation payload must be JSON serializable");
     }
-    const cached = cache.get(cacheKey);
-    if (cached) return cached as T & { attestation: NostrAttestation };
+    const cached = cache.get(serialized);
+    if (cached && cached.createdAt === createdAt) {
+      cache.delete(serialized);
+      cache.set(serialized, cached);
+      return cached.signed as T & { attestation: NostrAttestation };
+    }
     const signed = attest(unsigned, createdAt);
-    cache.set(cacheKey, signed);
+    cache.delete(serialized);
+    cache.set(serialized, { createdAt, signed });
+    if (cache.size > maxEntries) {
+      const oldest = cache.keys().next();
+      if (!oldest.done) cache.delete(oldest.value);
+    }
     return signed as T & { attestation: NostrAttestation };
   };
 }

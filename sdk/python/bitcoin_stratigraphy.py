@@ -6,6 +6,7 @@ import json
 import hashlib
 import threading
 import time
+import struct
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -32,6 +33,34 @@ class ZkVerifyResponse(TypedDict):
     valid: bool
     verifiedAt: str
     computationTimeMs: float
+
+
+class MeshPeerAttestation(TypedDict):
+    pubkey: str
+    signature: str
+    eventId: str
+    createdAt: int
+    roundTripLatencyMs: float
+
+
+class MeshConsensus(TypedDict):
+    quorumScore: float
+    peerAttestations: list[MeshPeerAttestation]
+    merkleRoot: str
+    snapshotDigest: str
+    threshold: int
+    isolationMode: bool
+    networkId: str
+
+
+class MeshStatus(TypedDict):
+    nodePubkey: str
+    activePeerCount: int
+    configuredPeerCount: int
+    topologyHealth: Literal["healthy", "degraded", "isolated"]
+    crossValidationSuccessRate: float
+    averagePropagationLatencyMs: float
+    quorumThreshold: int
 
 
 PaidStratigraphyResponse = dict[str, Any]
@@ -85,6 +114,9 @@ class BitcoinStratigraphyClient:
     def get_latest(self) -> PaidStratigraphyResponse:
         self.get_cost()
         return self._authorized_json("/api/v1/stratigraphy")
+
+    def get_mesh_status(self) -> MeshStatus:
+        return self._json_request("/api/v1/mesh/status")  # type: ignore[return-value]
 
     def verify_zk_proof(
         self,
@@ -284,6 +316,116 @@ class BitcoinStratigraphyClient:
         return urllib.request.urlopen(request, timeout=self.timeout)
 
 
+def _mesh_merkle_root(event_ids: list[str]) -> str:
+    if not event_ids:
+        return hashlib.sha256(b"").hexdigest()
+    level = sorted(event_ids)
+    while len(level) > 1:
+        next_level: list[str] = []
+        for index in range(0, len(level), 2):
+            left = level[index]
+            right = level[index + 1] if index + 1 < len(level) else left
+            next_level.append(
+                hashlib.sha256((left + right).encode("utf-8")).hexdigest()
+            )
+        level = next_level
+    return level[0]
+
+
+def _canonical_mesh_value(value: Any) -> Any:
+    if value is None:
+        return ["null"]
+    if isinstance(value, bool):
+        return ["bool", 1 if value else 0]
+    if isinstance(value, str):
+        return ["str", value]
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if number != number or number in (float("inf"), float("-inf")):
+            raise ValueError("Mesh snapshot numbers must be finite")
+        return ["f64", struct.pack(">d", number).hex()]
+    if isinstance(value, list):
+        return ["array", [_canonical_mesh_value(item) for item in value]]
+    if isinstance(value, dict):
+        return [
+            "object",
+            [
+                [key, _canonical_mesh_value(value[key])]
+                for key in sorted(value)
+            ],
+        ]
+    raise TypeError("Mesh snapshot must be JSON serializable")
+
+
+def _canonical_mesh_json(value: Any) -> str:
+    return json.dumps(
+        _canonical_mesh_value(value),
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+
+
+def validate_mesh_consensus(
+    consensus: MeshConsensus,
+    snapshot: Any,
+    verify_schnorr: Callable[[Mapping[str, Any]], bool],
+    trusted_pubkeys: set[str],
+    threshold: int,
+    network_id: str,
+    allow_isolation: bool = False,
+    now_seconds: int | None = None,
+    max_age_seconds: int = 300,
+) -> bool:
+    serialized = _canonical_mesh_json(snapshot)
+    snapshot_digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    unique_pubkeys: set[str] = set()
+    valid_count = 0
+    for attestation in consensus["peerAttestations"]:
+        pubkey = attestation["pubkey"]
+        if pubkey in unique_pubkeys or pubkey not in trusted_pubkeys:
+            continue
+        if abs((now_seconds or int(time.time())) - attestation["createdAt"]) > max_age_seconds:
+            continue
+        unique_pubkeys.add(pubkey)
+        event = {
+            "id": attestation["eventId"],
+            "pubkey": pubkey,
+            "created_at": attestation["createdAt"],
+            "kind": 20078,
+            "tags": [
+                ["d", f"bitcoin-stratigraphy-mesh:{snapshot_digest}"],
+                ["t", "bitcoin-stratigraphy"],
+                ["t", "mesh-cross-validation"],
+                ["x", snapshot_digest],
+                ["n", network_id],
+            ],
+            "content": _canonical_mesh_json(
+                {
+                    "networkId": network_id,
+                    "snapshotDigest": snapshot_digest,
+                }
+            ),
+            "sig": attestation["signature"],
+        }
+        if verify_schnorr(event):
+            valid_count += 1
+    effective_threshold = (
+        1 if consensus["isolationMode"] and allow_isolation else threshold
+    )
+    expected_score = min(1.0, valid_count / effective_threshold)
+    return (
+        valid_count >= effective_threshold
+        and consensus["threshold"] == effective_threshold
+        and consensus["networkId"] == network_id
+        and (not consensus["isolationMode"] or allow_isolation)
+        and snapshot_digest == consensus["snapshotDigest"]
+        and _mesh_merkle_root(
+            [item["eventId"] for item in consensus["peerAttestations"]]
+        ) == consensus["merkleRoot"]
+        and abs(expected_score - consensus["quorumScore"]) < 1e-12
+    )
+
+
 __all__ = [
     "BitcoinStratigraphyClient",
     "StreamSubscription",
@@ -292,6 +434,10 @@ __all__ = [
     "ZkPublicInputs",
     "ZkProof",
     "ZkVerifyResponse",
+    "MeshPeerAttestation",
+    "MeshConsensus",
+    "MeshStatus",
+    "validate_mesh_consensus",
     "PaidStratigraphyResponse",
     "StratigraphyTelemetryEnvelope",
 ]

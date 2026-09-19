@@ -102,6 +102,19 @@ test("content cache re-signs mutations without changing prior payloads", () => {
   assert.equal(verifyEvent(second.attestation.event), true);
 });
 
+test("content cache rotates one payload in place when freshness changes", () => {
+  const cachedAttest = createCachedNostrAttestor(
+    createNostrAttestor(privateKeyHex),
+  );
+  const first = cachedAttest(payload, 1_789_646_400);
+  const refreshed = cachedAttest(payload, 1_789_646_401);
+  const reused = cachedAttest(payload, 1_789_646_401);
+
+  assert.notEqual(first.attestation.event.id, refreshed.attestation.event.id);
+  assert.equal(refreshed.attestation.event.id, reused.attestation.event.id);
+  assert.equal(verifyEvent(refreshed.attestation.event), true);
+});
+
 test("fails closed when NOSTR_PRIVATE_KEY is unavailable", () => {
   const configured = process.env.NOSTR_PRIVATE_KEY;
   delete process.env.NOSTR_PRIVATE_KEY;

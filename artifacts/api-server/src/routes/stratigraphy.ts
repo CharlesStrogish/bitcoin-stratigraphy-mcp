@@ -71,6 +71,11 @@ import {
   verifyZkProofForSnapshot,
   ZkVerifierOverloadedError,
 } from "../services/zkProofService";
+import {
+  createMeshGossipService,
+  MeshQuorumError,
+  type MeshGossipService,
+} from "../services/meshGossipService";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -474,6 +479,7 @@ async function sendPaidDataset(
   paymentHash: string,
   timestampMs: number,
   attest: NostrAttestor,
+  mesh: MeshGossipService,
 ): Promise<void> {
   const secret = process.env.SESSION_SECRET;
   if (!secret) {
@@ -501,7 +507,17 @@ async function sendPaidDataset(
     res.status(500).json({ error: "Unable to generate zk telemetry proof" });
     return;
   }
-  const body = JSON.stringify({ data: attestedRecords, zkProof });
+  let meshConsensus;
+  try {
+    meshConsensus = await mesh.createConsensus(attestedRecords);
+  } catch (error) {
+    if (error instanceof MeshQuorumError) {
+      res.status(503).json({ error: "Mesh consensus quorum unavailable" });
+      return;
+    }
+    throw error;
+  }
+  const body = JSON.stringify({ data: attestedRecords, zkProof, meshConsensus });
   const payloadSha256 = createHash("sha256").update(body).digest("hex");
   const timestamp = new Date(timestampMs).toISOString();
   const signature = createHmac("sha256", secret)
@@ -722,6 +738,7 @@ export function registerStratigraphyRoutes(
     telemetryHub?: StratigraphyTelemetryHub;
     heartbeatScheduler?: IntervalScheduler;
     agentReputation?: AgentReputationService;
+    meshService?: MeshGossipService;
   } = {},
 ): void {
   const attest = createNostrAttestor();
@@ -749,6 +766,7 @@ export function registerStratigraphyRoutes(
     streamOptions.heartbeatScheduler ?? nodeIntervalScheduler;
   const agentReputation =
     streamOptions.agentReputation ?? createAgentReputationService();
+  const mesh = streamOptions.meshService ?? createMeshGossipService();
   app.use("/api/v1", (_req, _res, next) => {
     pricingEngine.recordRequest(policy.now());
     next();
@@ -783,6 +801,39 @@ export function registerStratigraphyRoutes(
       }));
     },
   );
+
+  app.get("/api/v1/mesh/status", (_req, res): void => {
+    res.status(200).json(mesh.status());
+  });
+
+  app.post("/api/v1/mesh/attest", (req, res): void => {
+    const body = req.body as Record<string, unknown> | null;
+    if (
+      !body ||
+      Object.keys(body).length !== 4 ||
+      typeof body.snapshotDigest !== "string" ||
+      !/^[0-9a-f]{64}$/.test(body.snapshotDigest) ||
+      typeof body.networkId !== "string" ||
+      typeof body.originPubkey !== "string" ||
+      !/^[0-9a-f]{64}$/.test(body.originPubkey) ||
+      !("snapshot" in body)
+    ) {
+      res.status(400).json({ error: "Invalid mesh attestation request" });
+      return;
+    }
+    try {
+      res.status(200).json({
+        event: mesh.attestSnapshot({
+          snapshot: body.snapshot,
+          snapshotDigest: body.snapshotDigest,
+          networkId: body.networkId,
+          originPubkey: body.originPubkey,
+        }),
+      });
+    } catch {
+      res.status(422).json({ error: "Mesh snapshot validation failed" });
+    }
+  });
 
   app.get("/api", (_req, res): void => {
     res.status(200).json({
@@ -1372,6 +1423,15 @@ export function registerStratigraphyRoutes(
           if (!res.writableEnded) res.end();
           return;
         }
+        let meshConsensus;
+        try {
+          meshConsensus = await mesh.createConsensus(attested);
+        } catch (error) {
+          req.log.error({ err: error }, "mesh SSE consensus failed");
+          close();
+          if (!res.writableEnded) res.end();
+          return;
+        }
         if (
           disconnected ||
           waitingForDrain ||
@@ -1382,7 +1442,7 @@ export function registerStratigraphyRoutes(
         }
         if (
           !res.write(
-            `event: ${event}\ndata: ${JSON.stringify({ data: attested, zkProof })}\n\n`,
+            `event: ${event}\ndata: ${JSON.stringify({ data: attested, zkProof, meshConsensus })}\n\n`,
           )
         ) {
           waitingForDrain = true;
@@ -1543,6 +1603,7 @@ export function registerStratigraphyRoutes(
                 pass.paymentHash,
                 policy.now(),
                 attestDataset,
+                mesh,
               );
               return;
             }
@@ -1595,6 +1656,7 @@ export function registerStratigraphyRoutes(
             authorization.paymentHash,
             policy.now(),
             attestDataset,
+            mesh,
           );
           return;
         }

@@ -20,6 +20,8 @@ tags:
     description: Bitcoin stratigraphy dataset with zkProof payloads, L402 multi-asset payments, and Nostr NIP-78 attestations
   - name: zero-knowledge
     description: Groth16/Poseidon BN254 zk-SNARK verification for zkProof payloads
+  - name: mesh
+    description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
 security:
   - L402: []
 paths:
@@ -468,6 +470,44 @@ paths:
                     type: string
                     const: Zero-knowledge verifier overloaded
                 required: [error]
+  /v1/mesh/status:
+    get:
+      operationId: getMeshStatus
+      tags: [mesh]
+      summary: Inspect peer mesh health
+      description: Returns active and configured peer counts, topology health, cryptographic cross-validation success rate, propagation latency, and the local Nostr node pubkey.
+      security: []
+      responses:
+        "200":
+          description: Current mesh status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeshStatus"
+  /v1/mesh/attest:
+    post:
+      operationId: attestMeshSnapshot
+      tags: [mesh]
+      summary: Cross-attest a gossiped snapshot digest
+      description: Node-to-node protocol endpoint that returns a Nostr Schnorr event bound to the exact SHA-256 snapshot digest.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeshAttestRequest"
+      responses:
+        "200":
+          description: Signed snapshot-digest attestation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeshAttestResponse"
+        "400":
+          description: Malformed snapshot digest
+        "422":
+          description: Snapshot digest, source signatures, freshness, or mesh network binding failed validation
 components:
   securitySchemes:
     L402:
@@ -533,7 +573,9 @@ components:
           description: Telemetry payload
         zkProof:
           $ref: "#/components/schemas/ZkProof"
-      required: [data, zkProof]
+        meshConsensus:
+          $ref: "#/components/schemas/MeshConsensus"
+      required: [data, zkProof, meshConsensus]
     PaidStratigraphyResponse:
       type: object
       additionalProperties: false
@@ -544,7 +586,9 @@ components:
             $ref: "#/components/schemas/StratigraphyEntry"
         zkProof:
           $ref: "#/components/schemas/ZkProof"
-      required: [data, zkProof]
+        meshConsensus:
+          $ref: "#/components/schemas/MeshConsensus"
+      required: [data, zkProof, meshConsensus]
     ZkVerifyRequest:
       type: object
       additionalProperties: false
@@ -577,6 +621,140 @@ components:
           type: number
           minimum: 0
       required: [valid, verifiedAt, computationTimeMs]
+    MeshPeerAttestation:
+      type: object
+      additionalProperties: false
+      properties:
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        signature:
+          type: string
+          pattern: "^[0-9a-f]{128}$"
+        eventId:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        createdAt:
+          type: integer
+          minimum: 0
+        roundTripLatencyMs:
+          type: number
+          minimum: 0
+      required: [pubkey, signature, eventId, createdAt, roundTripLatencyMs]
+    MeshConsensus:
+      type: object
+      additionalProperties: false
+      description: Multi-node certificate over the exact emitted data snapshot. In isolation mode the certificate contains only the local node attestation.
+      properties:
+        quorumScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        peerAttestations:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/MeshPeerAttestation"
+        merkleRoot:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        snapshotDigest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        threshold:
+          type: integer
+          minimum: 1
+        isolationMode:
+          type: boolean
+        networkId:
+          type: string
+          minLength: 1
+      required: [quorumScore, peerAttestations, merkleRoot, snapshotDigest, threshold, isolationMode, networkId]
+    MeshStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        nodePubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        activePeerCount:
+          type: integer
+          minimum: 1
+        configuredPeerCount:
+          type: integer
+          minimum: 0
+        topologyHealth:
+          type: string
+          enum: [healthy, degraded, isolated]
+        crossValidationSuccessRate:
+          type: number
+          minimum: 0
+          maximum: 1
+        averagePropagationLatencyMs:
+          type: number
+          minimum: 0
+        quorumThreshold:
+          type: integer
+          minimum: 1
+      required: [nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, quorumThreshold]
+    MeshAttestRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        snapshotDigest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        networkId:
+          type: string
+          minLength: 1
+        originPubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        snapshot:
+          description: Complete Nostr-attested snapshot. The peer recomputes its canonical digest and verifies source attestations before signing.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              minItems: 1
+              items:
+                type: object
+                additionalProperties: true
+      required: [snapshotDigest, networkId, originPubkey, snapshot]
+    MeshSignedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        created_at:
+          type: integer
+        kind:
+          type: integer
+          const: 20078
+        tags:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        content:
+          type: string
+        sig:
+          type: string
+          pattern: "^[0-9a-f]{128}$"
+      required: [id, pubkey, created_at, kind, tags, content, sig]
+    MeshAttestResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        event:
+          $ref: "#/components/schemas/MeshSignedEvent"
+      required: [event]
     SettlementAsset:
       type: string
       enum: [btc-lightning, l-btc, taproot-assets]

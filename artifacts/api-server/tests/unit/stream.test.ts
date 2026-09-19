@@ -279,10 +279,11 @@ test("opens an authenticated SSE stream and sends telemetry JSON", async () => {
     const payload = JSON.parse(
       content.split("data: ")[1].split("\n\n")[0],
     );
-    const { attestation, ...unsignedTelemetry } = payload;
+    const { attestation, ...unsignedTelemetry } = payload.data;
     assert.deepEqual(unsignedTelemetry, telemetry);
     assert.deepEqual(JSON.parse(attestation.event.content), telemetry);
     assert.equal(verifyEvent(attestation.event), true);
+    assert.ok(payload.zkProof);
     await reader.cancel();
     controller.abort();
   });
@@ -320,7 +321,7 @@ test("rejects a macaroon paired with the wrong payment preimage", async () => {
   });
 });
 
-test("emits JSON ping heartbeats every 15 seconds", async () => {
+test("emits lightweight SSE comment heartbeats every 15 seconds", async () => {
   await withStreamServer(async ({ url, schedulerState }) => {
     const response = await fetch(url, {
       headers: { Authorization: streamAuthorization() },
@@ -331,19 +332,7 @@ test("emits JSON ping heartbeats every 15 seconds", async () => {
     assert.equal(heartbeat.delayMs, 15_000);
     heartbeat.callback();
     const content = await readUntil(reader, "\n\n");
-    assert.match(content, /event: ping/);
-    const payload = JSON.parse(content.split("data: ")[1].split("\n\n")[0]);
-    assert.equal(typeof payload.observed_at, "string");
-    const { attestation, ...unsignedPing } = payload;
-    assert.deepEqual(JSON.parse(attestation.event.content), unsignedPing);
-    assert.equal(
-      createHash("sha256")
-        .update(attestation.event.content)
-        .digest("hex"),
-      attestation.payload_sha256,
-    );
-    assert.equal(attestation.event.kind, 30078);
-    assert.equal(verifyEvent(attestation.event), true);
+    assert.equal(content, ": ping\n\n");
     await reader.cancel();
   });
 });

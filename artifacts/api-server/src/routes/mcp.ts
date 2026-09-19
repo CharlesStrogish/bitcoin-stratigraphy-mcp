@@ -22,6 +22,16 @@ const entrySchema = z.object({
   quantitative_alpha: quantitativeAlphaSchema,
 });
 
+const readOnlyToolAnnotations = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+  readOnly: true,
+  audience: ["assistant"],
+  priority: 1,
+};
+
 function createBitcoinStratigraphyMcpServer() {
   const server = new McpServer(
     {
@@ -49,15 +59,7 @@ function createBitcoinStratigraphyMcpServer() {
       title: "Get Bitcoin Stratigraphy",
       description:
         "Return validated Bitcoin Stratigraphy day entries. Use days for the most recent N entries or date for one exact YYYY-MM-DD entry.",
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-        readOnly: true,
-        audience: ["assistant"],
-        priority: 1,
-      },
+      annotations: readOnlyToolAnnotations,
       inputSchema: {
         days: z
           .number()

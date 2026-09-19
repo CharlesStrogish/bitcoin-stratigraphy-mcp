@@ -293,9 +293,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/StratigraphyEntry"
+                $ref: "#/components/schemas/PaidStratigraphyResponse"
         "402":
           description: Payment in the selected settlement asset is required
           headers:
@@ -354,7 +352,7 @@ paths:
       operationId: streamStratigraphyTelemetry
       tags: [stratigraphy]
       summary: Stream live Bitcoin stratigraphy telemetry
-      description: Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+      description: Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Each telemetry SSE event's JSON envelope has `data` and `zkProof` fields and is described by ZkTelemetryEventEnvelope. Lightweight SSE comment heartbeats are emitted every 15 seconds.
       parameters:
         - name: X-Nostr-Authorization
           in: header
@@ -388,8 +386,8 @@ paths:
           content:
             text/event-stream:
               schema:
-                type: string
-                description: SSE messages with telemetry and ping event types and JSON data payloads.
+                $ref: "#/components/schemas/ZkTelemetryEventEnvelope"
+                description: SSE telemetry messages plus lightweight comment heartbeats. Each telemetry event is a JSON ZkTelemetryEventEnvelope.
         "402":
           description: Payment in the selected settlement asset is required
           headers:
@@ -419,6 +417,49 @@ paths:
           description: Wallet payment verification is unavailable
         "503":
           description: Payment challenge coordination or token revocation lookup is unavailable
+  /v1/zk/verify:
+    post:
+      operationId: verifyZkProof
+      tags: [stratigraphy]
+      summary: Verify a zero-knowledge telemetry proof
+      description: Publicly verifies both the cryptographic zero-knowledge proof and the binding of the supplied payload to its semantic public inputs.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZkVerifyRequest"
+      responses:
+        "200":
+          description: Proof verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZkVerifyResponse"
+        "400":
+          description: Malformed proof verification request
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  error:
+                    type: string
+                required: [error]
+        "503":
+          description: Zero-knowledge verifier is overloaded and temporarily unable to process the request
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  error:
+                    type: string
+                    const: Zero-knowledge verifier overloaded
+                required: [error]
 components:
   securitySchemes:
     L402:
@@ -436,6 +477,98 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    ZkPublicInputs:
+      type: object
+      additionalProperties: false
+      properties:
+        blockHeight:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+        thermodynamicHash:
+          type: string
+          pattern: "^[0-9]+$"
+          maxLength: 77
+        snapshotDigest:
+          type: string
+          pattern: "^[0-9]+$"
+          maxLength: 77
+          description: Decimal BN254 field element digest for the bound telemetry snapshot (0 through the BN254 field modulus)
+        timestamp:
+          type: integer
+          minimum: 0
+          maximum: 281474976710655
+        valuationSat:
+          type: integer
+          minimum: 0
+          maximum: 281474976710655
+      required: [blockHeight, thermodynamicHash, snapshotDigest, timestamp, valuationSat]
+    ZkProof:
+      type: object
+      additionalProperties: false
+      properties:
+        proof:
+          type: string
+          description: Serialized zero-knowledge proof
+        publicInputs:
+          $ref: "#/components/schemas/ZkPublicInputs"
+        verificationKeyId:
+          type: string
+      required: [proof, publicInputs, verificationKeyId]
+    ZkTelemetryEventEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+          description: Telemetry payload
+        zkProof:
+          $ref: "#/components/schemas/ZkProof"
+      required: [data, zkProof]
+    PaidStratigraphyResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/StratigraphyEntry"
+        zkProof:
+          $ref: "#/components/schemas/ZkProof"
+      required: [data, zkProof]
+    ZkVerifyRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        proof:
+          type: string
+        publicInputs:
+          $ref: "#/components/schemas/ZkPublicInputs"
+        verificationKeyId:
+          type: string
+          description: Verification-key identifier used by the verifier
+        data:
+          description: Telemetry data to bind to the proof. Supplying this required payload enables binding verification; proof and publicInputs provide the cryptographic verification inputs.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+      required: [proof, publicInputs, verificationKeyId, data]
+    ZkVerifyResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        valid:
+          type: boolean
+        verifiedAt:
+          type: string
+          format: date-time
+        computationTimeMs:
+          type: number
+          minimum: 0
+      required: [valid, verifiedAt, computationTimeMs]
     SettlementAsset:
       type: string
       enum: [btc-lightning, l-btc, taproot-assets]

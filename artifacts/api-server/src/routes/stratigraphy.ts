@@ -1,6 +1,8 @@
 import {
   GetPaidStratigraphyResponse,
   ReadinessCheckResponse,
+  VerifyZkProofBody,
+  VerifyZkProofResponse,
 } from "@workspace/api-zod";
 import {
   type Express,
@@ -63,6 +65,12 @@ import {
   type AgentIdentity,
   type AgentReputationService,
 } from "../services/agentReputation";
+import {
+  generateZkProof,
+  verifyZkProof,
+  verifyZkProofForSnapshot,
+  ZkVerifierOverloadedError,
+} from "../services/zkProofService";
 
 const MIN_INVOICE_SATS = 5;
 const LATEST_DATASET_DATE_MS = Date.UTC(2026, 8, 9);
@@ -182,7 +190,7 @@ async function readValidatedDataset() {
         return suppliedEntry;
       })
     : parsed;
-  return GetPaidStratigraphyResponse.parse(supplied);
+  return GetPaidStratigraphyResponse.shape.data.parse(supplied);
 }
 
 let datasetPromise: ReturnType<typeof readValidatedDataset> | undefined;
@@ -460,13 +468,13 @@ async function rejectRevokedMacaroon(
   }
 }
 
-function sendPaidDataset(
+async function sendPaidDataset(
   res: Response,
   records: Dataset,
   paymentHash: string,
   timestampMs: number,
   attest: NostrAttestor,
-): void {
+): Promise<void> {
   const secret = process.env.SESSION_SECRET;
   if (!secret) {
     res.status(500).json({ error: "SESSION_SECRET is not configured" });
@@ -474,7 +482,26 @@ function sendPaidDataset(
   }
   const createdAt = Math.floor(timestampMs / 1_000);
   const attestedRecords = records.map((record) => attest(record, createdAt));
-  const body = JSON.stringify(attestedRecords);
+  const proofTimestamp =
+    Math.max(
+      ...attestedRecords.map(
+        (record) => record.attestation.event.created_at,
+      ),
+    ) * 1_000;
+  let zkProof;
+  try {
+    zkProof = await generateZkProof({
+      snapshot: attestedRecords,
+      blockHeight: 0,
+      timestamp: proofTimestamp,
+      valuationMultiplier:
+        records.at(-1)?.quantitative_alpha.target_multiplier ?? 0,
+    });
+  } catch {
+    res.status(500).json({ error: "Unable to generate zk telemetry proof" });
+    return;
+  }
+  const body = JSON.stringify({ data: attestedRecords, zkProof });
   const payloadSha256 = createHash("sha256").update(body).digest("hex");
   const timestamp = new Date(timestampMs).toISOString();
   const signature = createHmac("sha256", secret)
@@ -717,6 +744,7 @@ export function registerStratigraphyRoutes(
         });
       },
     });
+  const activeStreamEntitlements = new Set<string>();
   const heartbeatScheduler =
     streamOptions.heartbeatScheduler ?? nodeIntervalScheduler;
   const agentReputation =
@@ -725,6 +753,36 @@ export function registerStratigraphyRoutes(
     pricingEngine.recordRequest(policy.now());
     next();
   });
+
+  app.post(
+    "/api/v1/zk/verify",
+    async (req: Request, res: Response): Promise<void> => {
+      const parsed = VerifyZkProofBody.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid zk proof payload" });
+        return;
+      }
+      const startedAt = performance.now();
+      let valid: boolean;
+      try {
+        valid = await verifyZkProofForSnapshot(
+          parsed.data,
+          parsed.data.data,
+        );
+      } catch (error) {
+        if (error instanceof ZkVerifierOverloadedError) {
+          res.status(503).json({ error: "zk verifier is busy" });
+          return;
+        }
+        throw error;
+      }
+      res.status(200).json(VerifyZkProofResponse.parse({
+        valid,
+        verifiedAt: new Date().toISOString(),
+        computationTimeMs: Number((performance.now() - startedAt).toFixed(3)),
+      }));
+    },
+  );
 
   app.get("/api", (_req, res): void => {
     res.status(200).json({
@@ -1071,6 +1129,8 @@ export function registerStratigraphyRoutes(
       let unsubscribe: (() => void) | undefined;
       let heartbeat: unknown;
       let waitingForDrain = false;
+      let eventQueue: Promise<void> = Promise.resolve();
+      let activeStreamEntitlement: string | undefined;
       const drained = () => {
         waitingForDrain = false;
       };
@@ -1087,6 +1147,10 @@ export function registerStratigraphyRoutes(
         }
         unsubscribe?.();
         unsubscribe = undefined;
+        if (activeStreamEntitlement) {
+          activeStreamEntitlements.delete(activeStreamEntitlement);
+          activeStreamEntitlement = undefined;
+        }
       };
       req.once("aborted", close);
       res.once("close", close);
@@ -1244,6 +1308,14 @@ export function registerStratigraphyRoutes(
       }
 
       if (disconnected || res.destroyed) return;
+      if (activeStreamEntitlements.has(paymentHash)) {
+        res.status(429).json({
+          error: "A stream is already active for this paid entitlement",
+        });
+        return;
+      }
+      activeStreamEntitlement = paymentHash;
+      activeStreamEntitlements.add(paymentHash);
       res.status(200);
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -1251,10 +1323,10 @@ export function registerStratigraphyRoutes(
       res.setHeader("X-Accel-Buffering", "no");
       res.flushHeaders();
 
-      const writeEvent = (
-        event: "telemetry" | "ping",
+      const writeEvent = async (
+        event: "telemetry",
         data: Record<string, unknown>,
-      ) => {
+      ): Promise<void> => {
         if (
           disconnected ||
           waitingForDrain ||
@@ -1272,26 +1344,83 @@ export function registerStratigraphyRoutes(
           if (!res.writableEnded) res.end();
           return;
         }
+        let zkProof;
+        try {
+          const telemetry = data as {
+            block?: { height?: number | null };
+            thermodynamic?: { target_multiplier?: number };
+          };
+          const height = telemetry.block?.height;
+          zkProof = await generateZkProof({
+            snapshot: attested,
+            blockHeight:
+              typeof height === "number" && Number.isSafeInteger(height)
+                ? height
+                : 0,
+            timestamp:
+              typeof data.observed_at === "string" &&
+              Number.isSafeInteger(Date.parse(data.observed_at))
+                ? Date.parse(data.observed_at)
+                : policy.now(),
+            valuationMultiplier:
+              telemetry.thermodynamic?.target_multiplier ?? 0,
+            lane: "stream",
+          });
+        } catch (error) {
+          req.log.error({ err: error }, "zk SSE proof generation failed");
+          close();
+          if (!res.writableEnded) res.end();
+          return;
+        }
+        if (
+          disconnected ||
+          waitingForDrain ||
+          res.destroyed ||
+          res.writableEnded
+        ) {
+          return;
+        }
         if (
           !res.write(
-            `event: ${event}\ndata: ${JSON.stringify(attested)}\n\n`,
+            `event: ${event}\ndata: ${JSON.stringify({ data: attested, zkProof })}\n\n`,
           )
         ) {
           waitingForDrain = true;
           res.once("drain", drained);
         }
       };
+      const enqueueEvent = (
+        event: "telemetry",
+        data: Record<string, unknown>,
+      ) => {
+        eventQueue = eventQueue
+          .then(() => writeEvent(event, data))
+          .catch((error) => {
+            req.log.error({ err: error }, "zk SSE event queue failed");
+            close();
+            if (!res.writableEnded) res.end();
+          });
+      };
       unsubscribe = telemetryHub.subscribe((telemetry) => {
-        writeEvent("telemetry", telemetry);
+        enqueueEvent("telemetry", telemetry);
       });
       if (disconnected) {
         close();
         return;
       }
       heartbeat = heartbeatScheduler.setInterval(() => {
-        writeEvent("ping", {
-          observed_at: new Date(policy.now()).toISOString(),
-        });
+        if (
+          disconnected ||
+          waitingForDrain ||
+          res.destroyed ||
+          res.writableEnded
+        ) {
+          return;
+        }
+        if (!res.write(": ping\n\n")) {
+          waitingForDrain = true;
+          res.once("drain", drained);
+        }
       }, 15_000);
       if (disconnected) close();
     },
@@ -1408,7 +1537,7 @@ export function registerStratigraphyRoutes(
                 });
                 return;
               }
-              sendPaidDataset(
+              await sendPaidDataset(
                 res,
                 selectedRange.records,
                 pass.paymentHash,
@@ -1460,7 +1589,7 @@ export function registerStratigraphyRoutes(
               "Unable to remove consumed payment challenge",
             );
           }
-          sendPaidDataset(
+          await sendPaidDataset(
             res,
             selectedRange.records,
             authorization.paymentHash,

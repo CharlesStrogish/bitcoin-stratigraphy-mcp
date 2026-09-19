@@ -27,6 +27,26 @@ export type NostrAttestation = {
   };
 };
 
+export type ZkPublicInputs = {
+  blockHeight: number;
+  snapshotDigest: string;
+  thermodynamicHash: string;
+  timestamp: number;
+  valuationSat: number;
+};
+
+export type ZkProof = {
+  proof: string;
+  publicInputs: ZkPublicInputs;
+  verificationKeyId: string;
+};
+
+export type ZkVerifyResponse = {
+  valid: boolean;
+  verifiedAt: string;
+  computationTimeMs: number;
+};
+
 export type StratigraphyEntry = {
   day: number;
   title: string;
@@ -38,6 +58,11 @@ export type StratigraphyEntry = {
     thermodynamic_signal: string;
   };
   attestation?: NostrAttestation;
+};
+
+export type PaidStratigraphyResponse = {
+  data: StratigraphyEntry[];
+  zkProof: ZkProof;
 };
 
 export type StratigraphyTelemetry = {
@@ -56,6 +81,11 @@ export type StratigraphyTelemetry = {
     target_multiplier: number;
   };
   attestation?: NostrAttestation;
+};
+
+export type StratigraphyTelemetryEnvelope = {
+  data: StratigraphyTelemetry;
+  zkProof: ZkProof;
 };
 
 export type CostDiscovery = {
@@ -241,13 +271,37 @@ export class BitcoinStratigraphyClient {
     return this.fetchJson<CostDiscovery>("/api/v1/cost");
   }
 
-  async getLatest(): Promise<StratigraphyEntry[]> {
+  async getLatest(): Promise<PaidStratigraphyResponse> {
     await this.getCost();
-    return this.authorizedJson<StratigraphyEntry[]>("/api/v1/stratigraphy");
+    return this.authorizedJson<PaidStratigraphyResponse>("/api/v1/stratigraphy");
+  }
+
+  async verifyZkProof(
+    input: ZkProof,
+    data: unknown,
+  ): Promise<ZkVerifyResponse> {
+    const payload: {
+      proof: string;
+      publicInputs: ZkPublicInputs;
+      verificationKeyId: string;
+      data: unknown;
+    } = {
+      proof: input.proof,
+      publicInputs: input.publicInputs,
+      verificationKeyId: input.verificationKeyId,
+      data,
+    };
+    const response = await this.fetcher(`${this.baseUrl}/api/v1/zk/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw await httpError(response);
+    return parseJson<ZkVerifyResponse>(response);
   }
 
   subscribeStream(
-    onTelemetry: (telemetry: StratigraphyTelemetry) => void,
+    onTelemetry: (telemetry: StratigraphyTelemetryEnvelope) => void,
     onError: (error: unknown) => void = () => undefined,
   ): StreamSubscription {
     const controller = new AbortController();
@@ -491,7 +545,7 @@ async function httpError(response: Response): Promise<Error> {
 
 async function consumeSse(
   response: Response,
-  onTelemetry: (telemetry: StratigraphyTelemetry) => void,
+  onTelemetry: (telemetry: StratigraphyTelemetryEnvelope) => void,
   signal: AbortSignal,
 ): Promise<void> {
   if (!response.body) throw new Error("SSE response did not include a body");
@@ -515,7 +569,7 @@ async function consumeSse(
       buffer = buffer.slice(boundary + 2);
       const event = parseSseFrame(frame);
       if (event.type === "telemetry" && event.data) {
-        onTelemetry(JSON.parse(event.data) as StratigraphyTelemetry);
+        onTelemetry(JSON.parse(event.data) as StratigraphyTelemetryEnvelope);
       }
       boundary = buffer.indexOf("\n\n");
     }

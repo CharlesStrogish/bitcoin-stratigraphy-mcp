@@ -273,43 +273,72 @@ export const GetPaidStratigraphyHeader = zod.object({
   "Accept-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Alias for X-Settlement-Asset.')
 })
 
-export const getPaidStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
-export const getPaidStratigraphyResponseAttestationPayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
-export const getPaidStratigraphyResponseAttestationEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
-export const getPaidStratigraphyResponseAttestationEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
-export const getPaidStratigraphyResponseAttestationEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+export const getPaidStratigraphyResponseDataItemQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
+export const getPaidStratigraphyResponseDataItemAttestationPayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const getPaidStratigraphyResponseDataItemAttestationEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getPaidStratigraphyResponseDataItemAttestationEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getPaidStratigraphyResponseDataItemAttestationEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+export const getPaidStratigraphyResponseZkProofPublicInputsBlockHeightMin = 0;
+export const getPaidStratigraphyResponseZkProofPublicInputsBlockHeightMax = 4294967295;
+
+export const getPaidStratigraphyResponseZkProofPublicInputsThermodynamicHashMax = 77;
 
 
-export const GetPaidStratigraphyResponseItem = zod.object({
+export const getPaidStratigraphyResponseZkProofPublicInputsThermodynamicHashRegExp = new RegExp('^[0-9]+$');
+export const getPaidStratigraphyResponseZkProofPublicInputsSnapshotDigestMax = 77;
+
+
+export const getPaidStratigraphyResponseZkProofPublicInputsSnapshotDigestRegExp = new RegExp('^[0-9]+$');
+export const getPaidStratigraphyResponseZkProofPublicInputsTimestampMin = 0;
+export const getPaidStratigraphyResponseZkProofPublicInputsTimestampMax = 281474976710655;
+
+export const getPaidStratigraphyResponseZkProofPublicInputsValuationSatMin = 0;
+export const getPaidStratigraphyResponseZkProofPublicInputsValuationSatMax = 281474976710655;
+
+
+
+export const GetPaidStratigraphyResponse = zod.object({
+  "data": zod.array(zod.object({
   "day": zod.number().int(),
   "title": zod.string(),
   "video_id": zod.string(),
   "transcript_summary": zod.string(),
   "quantitative_alpha": zod.object({
   "target_multiplier": zod.number().describe('Numeric distance multiplier parsed from the day\'s title'),
-  "difficulty_epoch_progress": zod.string().regex(getPaidStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp).describe('Estimated progress through the current 14-day difficulty epoch'),
+  "difficulty_epoch_progress": zod.string().regex(getPaidStratigraphyResponseDataItemQuantitativeAlphaDifficultyEpochProgressRegExp).describe('Estimated progress through the current 14-day difficulty epoch'),
   "thermodynamic_signal": zod.string().describe('Qualitative target-distance band derived from the multiplier')
 }),
   "attestation": zod.object({
   "protocol": zod.literal("nostr"),
   "nip": zod.literal(78),
-  "payload_sha256": zod.string().regex(getPaidStratigraphyResponseAttestationPayloadSha256RegExp),
+  "payload_sha256": zod.string().regex(getPaidStratigraphyResponseDataItemAttestationPayloadSha256RegExp),
   "event": zod.object({
-  "id": zod.string().regex(getPaidStratigraphyResponseAttestationEventIdRegExp),
-  "pubkey": zod.string().regex(getPaidStratigraphyResponseAttestationEventPubkeyRegExp),
+  "id": zod.string().regex(getPaidStratigraphyResponseDataItemAttestationEventIdRegExp),
+  "pubkey": zod.string().regex(getPaidStratigraphyResponseDataItemAttestationEventPubkeyRegExp),
   "created_at": zod.number().int(),
   "kind": zod.literal(30078),
   "tags": zod.array(zod.array(zod.string())),
   "content": zod.string(),
-  "sig": zod.string().regex(getPaidStratigraphyResponseAttestationEventSigRegExp)
+  "sig": zod.string().regex(getPaidStratigraphyResponseDataItemAttestationEventSigRegExp)
 })
 }).optional().describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached')
+})),
+  "zkProof": zod.object({
+  "proof": zod.string().describe('Serialized zero-knowledge proof'),
+  "publicInputs": zod.object({
+  "blockHeight": zod.number().int().min(getPaidStratigraphyResponseZkProofPublicInputsBlockHeightMin).max(getPaidStratigraphyResponseZkProofPublicInputsBlockHeightMax),
+  "thermodynamicHash": zod.string().max(getPaidStratigraphyResponseZkProofPublicInputsThermodynamicHashMax).regex(getPaidStratigraphyResponseZkProofPublicInputsThermodynamicHashRegExp),
+  "snapshotDigest": zod.string().max(getPaidStratigraphyResponseZkProofPublicInputsSnapshotDigestMax).regex(getPaidStratigraphyResponseZkProofPublicInputsSnapshotDigestRegExp).describe('Decimal BN254 field element digest for the bound telemetry snapshot (0 through the BN254 field modulus)'),
+  "timestamp": zod.number().int().min(getPaidStratigraphyResponseZkProofPublicInputsTimestampMin).max(getPaidStratigraphyResponseZkProofPublicInputsTimestampMax),
+  "valuationSat": zod.number().int().min(getPaidStratigraphyResponseZkProofPublicInputsValuationSatMin).max(getPaidStratigraphyResponseZkProofPublicInputsValuationSatMax)
+}),
+  "verificationKeyId": zod.string()
 })
-export const GetPaidStratigraphyResponse = zod.array(GetPaidStratigraphyResponseItem)
+})
 
 
 /**
- * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+ * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Each telemetry SSE event's JSON envelope has `data` and `zkProof` fields and is described by ZkTelemetryEventEnvelope. Lightweight SSE comment heartbeats are emitted every 15 seconds.
  * @summary Stream live Bitcoin stratigraphy telemetry
  */
 export const StreamStratigraphyTelemetryHeader = zod.object({
@@ -319,5 +348,52 @@ export const StreamStratigraphyTelemetryHeader = zod.object({
 })
 
 export const StreamStratigraphyTelemetryResponse = zod.unknown()
+
+
+/**
+ * Publicly verifies both the cryptographic zero-knowledge proof and the binding of the supplied payload to its semantic public inputs.
+ * @summary Verify a zero-knowledge telemetry proof
+ */
+export const verifyZkProofBodyPublicInputsBlockHeightMin = 0;
+export const verifyZkProofBodyPublicInputsBlockHeightMax = 4294967295;
+
+export const verifyZkProofBodyPublicInputsThermodynamicHashMax = 77;
+
+
+export const verifyZkProofBodyPublicInputsThermodynamicHashRegExp = new RegExp('^[0-9]+$');
+export const verifyZkProofBodyPublicInputsSnapshotDigestMax = 77;
+
+
+export const verifyZkProofBodyPublicInputsSnapshotDigestRegExp = new RegExp('^[0-9]+$');
+export const verifyZkProofBodyPublicInputsTimestampMin = 0;
+export const verifyZkProofBodyPublicInputsTimestampMax = 281474976710655;
+
+export const verifyZkProofBodyPublicInputsValuationSatMin = 0;
+export const verifyZkProofBodyPublicInputsValuationSatMax = 281474976710655;
+
+
+
+export const VerifyZkProofBody = zod.object({
+  "proof": zod.string(),
+  "publicInputs": zod.object({
+  "blockHeight": zod.number().int().min(verifyZkProofBodyPublicInputsBlockHeightMin).max(verifyZkProofBodyPublicInputsBlockHeightMax),
+  "thermodynamicHash": zod.string().max(verifyZkProofBodyPublicInputsThermodynamicHashMax).regex(verifyZkProofBodyPublicInputsThermodynamicHashRegExp),
+  "snapshotDigest": zod.string().max(verifyZkProofBodyPublicInputsSnapshotDigestMax).regex(verifyZkProofBodyPublicInputsSnapshotDigestRegExp).describe('Decimal BN254 field element digest for the bound telemetry snapshot (0 through the BN254 field modulus)'),
+  "timestamp": zod.number().int().min(verifyZkProofBodyPublicInputsTimestampMin).max(verifyZkProofBodyPublicInputsTimestampMax),
+  "valuationSat": zod.number().int().min(verifyZkProofBodyPublicInputsValuationSatMin).max(verifyZkProofBodyPublicInputsValuationSatMax)
+}),
+  "verificationKeyId": zod.string().describe('Verification-key identifier used by the verifier'),
+  "data": zod.union([zod.record(zod.string(), zod.unknown()),zod.array(zod.unknown())]).describe('Telemetry data to bind to the proof. Supplying this required payload enables binding verification; proof and publicInputs provide the cryptographic verification inputs.')
+})
+
+export const verifyZkProofResponseComputationTimeMsMin = 0;
+
+
+
+export const VerifyZkProofResponse = zod.object({
+  "valid": zod.boolean(),
+  "verifiedAt": zod.coerce.date(),
+  "computationTimeMs": zod.number().min(verifyZkProofResponseComputationTimeMsMin)
+})
 
 

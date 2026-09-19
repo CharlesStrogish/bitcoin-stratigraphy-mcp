@@ -22,7 +22,11 @@
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
-    "@replit/connectors-sdk": "^0.4.1"
+    "@replit/connectors-sdk": "^0.4.1",
+    "circom2": "0.2.23",
+    "circomlib": "2.0.5",
+    "poseidon-lite": "0.3.0",
+    "snarkjs": "0.7.6"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

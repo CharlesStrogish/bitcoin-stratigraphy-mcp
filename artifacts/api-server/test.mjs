@@ -1,7 +1,8 @@
 import { build } from "esbuild";
-import { rm } from "node:fs/promises";
+import { cp, rm } from "node:fs/promises";
 
 process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
+process.env.NODE_ENV = "test";
 
 const outputs = [
   "./dist/stratigraphy.contract.test.js",
@@ -11,6 +12,7 @@ const outputs = [
   "./dist/nostrAttestation.test.js",
   "./dist/agentReputation.test.js",
   "./dist/multiSettlement.test.js",
+  "./dist/zkProof.test.js",
 ];
 
 await build({
@@ -23,17 +25,33 @@ await build({
     "nostrAttestation.test": "../../tests/nostrAttestation.test.ts",
     "agentReputation.test": "../../tests/agentReputation.test.ts",
     "multiSettlement.test": "../../tests/multiSettlement.test.ts",
+    "zkProof.test": "../../tests/zkProof.test.ts",
   },
   outdir: "./dist",
   bundle: true,
   platform: "node",
   format: "esm",
   loader: { ".yaml": "text" },
-  external: ["express", "@getalby/sdk", "nostr-tools", "yaml"],
+  external: [
+    "express",
+    "@getalby/sdk",
+    "nostr-tools",
+    "yaml",
+    "snarkjs",
+    "poseidon-lite",
+  ],
   banner: {
-    js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+    js: `import { createRequire as __testCreateRequire } from "node:module";
+import __testPath from "node:path";
+import { fileURLToPath as __testFileURLToPath } from "node:url";
+const require = __testCreateRequire(import.meta.url);
+globalThis.__filename = __testFileURLToPath(import.meta.url);
+globalThis.__dirname = __testPath.dirname(globalThis.__filename);`,
   },
   sourcemap: "inline",
+});
+await cp("./src/services/zk/artifacts", "./dist/zk/artifacts", {
+  recursive: true,
 });
 
 const { spawnSync } = await import("node:child_process");
@@ -43,5 +61,8 @@ const results = outputs.map((output) =>
   }),
 );
 
-await Promise.all(outputs.map((output) => rm(output, { force: true })));
+await Promise.all([
+  ...outputs.map((output) => rm(output, { force: true })),
+  rm("./dist/zk", { recursive: true, force: true }),
+]);
 process.exitCode = results.some((result) => result.status !== 0) ? 1 : 0;

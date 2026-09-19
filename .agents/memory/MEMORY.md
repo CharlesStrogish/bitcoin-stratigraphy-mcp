@@ -11,3 +11,5 @@
 - [L402 SDK payment coordination](l402-sdk-payment-coordination.md) — bind preimages to challenge hashes and never let delayed 402 responses replace or repay newer credentials.
 - [Agent-bound L402 identity](agent-bound-l402-identity.md) — discounted passes bind NIP-98 pubkey and tier; every use must present the same fresh identity.
 - [Multi-asset settlement ownership](multi-asset-settlement-ownership.md) — bind every payment to asset, issuer, caller, and the full invoice redemption window.
+- [SNARK worker bundling](snark-worker-bundling.md) — keep worker-spawning cryptography external to server/test bundles and tear workers down only in test processes.
+- [Telemetry proof semantics](telemetry-proof-semantics.md) — require exact payload binding and derive public fields from emitted snapshot semantics, not independent request state.

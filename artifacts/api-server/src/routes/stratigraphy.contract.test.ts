@@ -789,8 +789,8 @@ test("applies NIP-98 agent discounts and binds issued pass caveats", async () =>
       },
     });
     assert.equal(accepted.status, 200);
-    const body = (await accepted.json()) as unknown[];
-    assert.ok(body.length > 5);
+    const body = (await accepted.json()) as { data: unknown[] };
+    assert.ok(body.data.length > 5);
 
     const attenuationUrl = `${baseUrl}/api/v1/macaroon/attenuate`;
     const attenuationBody = JSON.stringify({
@@ -2496,16 +2496,20 @@ test("returns the full dataset for a suitable payment", async () => {
     headers: { Authorization: `L402 ${paymentHash}:${preimage}` },
   });
   assert.equal(response.status, 200);
-  const body = (await assertValidReceipt(response, paymentHash)) as Array<
-    Record<string, unknown> & {
-      attestation: {
-        payload_sha256: string;
-        event: Parameters<typeof verifyEvent>[0];
-      };
-    }
-  >;
-  assert.ok(body.length > 5);
-  const { attestation, ...unsignedRecord } = body[0];
+  const body = (await assertValidReceipt(response, paymentHash)) as {
+    data: Array<
+      Record<string, unknown> & {
+        attestation: {
+          payload_sha256: string;
+          event: Parameters<typeof verifyEvent>[0];
+        };
+      }
+    >;
+    zkProof: Record<string, unknown>;
+  };
+  assert.ok(body.data.length > 5);
+  assert.ok(body.zkProof);
+  const { attestation, ...unsignedRecord } = body.data[0];
   assert.deepEqual(JSON.parse(attestation.event.content), unsignedRecord);
   assert.equal(
     createHash("sha256").update(attestation.event.content).digest("hex"),
@@ -2519,7 +2523,7 @@ test("returns the full dataset for a suitable payment", async () => {
   assert.equal(repeatedResponse.status, 200);
   const repeatedBody = (await repeatedResponse.json()) as typeof body;
   assert.equal(
-    repeatedBody[0].attestation.event.id,
+    repeatedBody.data[0].attestation.event.id,
     attestation.event.id,
   );
 });
@@ -2566,10 +2570,10 @@ test("returns only the paid range and rejects a cheaper range proof", async () =
     { headers: { Authorization: `L402 ${paymentHash}:${preimage}` } },
   );
   assert.equal(paidResponse.status, 200);
-  const paidBody = (await paidResponse.json()) as Array<{ day: number }>;
-  assert.equal(paidBody.length, 10);
-  assert.equal(paidBody[0].day, 413);
-  assert.equal(paidBody.at(-1)?.day, 422);
+  const paidBody = (await paidResponse.json()) as { data: Array<{ day: number }> };
+  assert.equal(paidBody.data.length, 10);
+  assert.equal(paidBody.data[0].day, 413);
+  assert.equal(paidBody.data.at(-1)?.day, 422);
 
   transaction = {
     ...validTransaction,

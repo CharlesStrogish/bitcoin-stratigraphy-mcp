@@ -31,6 +31,7 @@ import type {
   MacaroonRevocationRequest,
   MacaroonRevocationResponse,
   NostrHeartbeatStatus,
+  PaidStratigraphyResponse,
   PaymentChallengeRateLimitError,
   PaymentChallengeServiceUnavailableError,
   PaymentConfigurationError,
@@ -39,7 +40,12 @@ import type {
   StratigraphyCost,
   StratigraphyEntry,
   TokenRevocationServiceUnavailableError,
-  WalletGatewayError
+  VerifyZkProof400,
+  VerifyZkProof503,
+  WalletGatewayError,
+  ZkTelemetryEventEnvelope,
+  ZkVerifyRequest,
+  ZkVerifyResponse
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -777,9 +783,9 @@ export const getGetPaidStratigraphyUrl = (params?: GetPaidStratigraphyParams,) =
  * Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable 24-hour passes are dynamically priced from 5 to 15 sats and 30-day passes from 100 to 250 sats; inspect /v1/cost or the issued L402 challenge for the current exact price.
  * @summary Get the complete L402-protected dataset
  */
-export const getPaidStratigraphy = async (params?: GetPaidStratigraphyParams, options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyEntry[]> => {
+export const getPaidStratigraphy = async (params?: GetPaidStratigraphyParams, options?: Parameters<typeof customFetch>[1]): Promise<PaidStratigraphyResponse> => {
 
-  return customFetch<StratigraphyEntry[]>(getGetPaidStratigraphyUrl(params),
+  return customFetch<PaidStratigraphyResponse>(getGetPaidStratigraphyUrl(params),
   {
     ...options,
     method: 'GET'
@@ -852,12 +858,12 @@ export const getStreamStratigraphyTelemetryUrl = () => {
 }
 
 /**
- * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Ping events are emitted every 15 seconds.
+ * Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Each telemetry SSE event's JSON envelope has `data` and `zkProof` fields and is described by ZkTelemetryEventEnvelope. Lightweight SSE comment heartbeats are emitted every 15 seconds.
  * @summary Stream live Bitcoin stratigraphy telemetry
  */
-export const streamStratigraphyTelemetry = async ( options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+export const streamStratigraphyTelemetry = async ( options?: Parameters<typeof customFetch>[1]): Promise<ZkTelemetryEventEnvelope> => {
 
-  return customFetch<string>(getStreamStratigraphyTelemetryUrl(),
+  return customFetch<ZkTelemetryEventEnvelope>(getStreamStratigraphyTelemetryUrl(),
   {
     ...options,
     method: 'GET'
@@ -920,4 +926,76 @@ export function useStreamStratigraphyTelemetry<TData = Awaited<ReturnType<typeof
 
 
 
+
+export const getVerifyZkProofUrl = () => {
+
+
+
+
+  return `/api/v1/zk/verify`
+}
+
+/**
+ * Publicly verifies both the cryptographic zero-knowledge proof and the binding of the supplied payload to its semantic public inputs.
+ * @summary Verify a zero-knowledge telemetry proof
+ */
+export const verifyZkProof = async (zkVerifyRequest: ZkVerifyRequest, options?: Parameters<typeof customFetch>[1]): Promise<ZkVerifyResponse> => {
+
+  return customFetch<ZkVerifyResponse>(getVerifyZkProofUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(zkVerifyRequest)
+  }
+);}
+
+
+
+
+
+export const getVerifyZkProofMutationOptions = <TError = ErrorType<VerifyZkProof400 | VerifyZkProof503>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyRequest>}, TContext> => {
+
+const mutationKey = ['verifyZkProof'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyZkProof>>, {data: BodyType<ZkVerifyRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyZkProof(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyZkProofMutationResult = NonNullable<Awaited<ReturnType<typeof verifyZkProof>>>
+    export type VerifyZkProofMutationBody = BodyType<ZkVerifyRequest>
+    export type VerifyZkProofMutationError = ErrorType<VerifyZkProof400 | VerifyZkProof503>
+
+    /**
+ * @summary Verify a zero-knowledge telemetry proof
+ */
+export const useVerifyZkProof = <TError = ErrorType<VerifyZkProof400 | VerifyZkProof503>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyZkProof>>,
+        TError,
+        {data: BodyType<ZkVerifyRequest>},
+        TContext
+      > => {
+      return useMutation(getVerifyZkProofMutationOptions(options));
+    }
 

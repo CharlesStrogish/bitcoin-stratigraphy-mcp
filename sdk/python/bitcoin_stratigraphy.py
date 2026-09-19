@@ -9,10 +9,33 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Mapping, Protocol
+from typing import Any, Callable, Literal, Mapping, Protocol, TypedDict
 
 
 SettlementAsset = Literal["btc-lightning", "l-btc", "taproot-assets"]
+
+class ZkPublicInputs(TypedDict):
+    blockHeight: int
+    snapshotDigest: str
+    thermodynamicHash: str
+    timestamp: int
+    valuationSat: int
+
+
+class ZkProof(TypedDict):
+    proof: str
+    publicInputs: ZkPublicInputs
+    verificationKeyId: str
+
+
+class ZkVerifyResponse(TypedDict):
+    valid: bool
+    verifiedAt: str
+    computationTimeMs: float
+
+
+PaidStratigraphyResponse = dict[str, Any]
+StratigraphyTelemetryEnvelope = dict[str, Any]
 
 
 class WalletAdapter(Protocol):
@@ -59,9 +82,29 @@ class BitcoinStratigraphyClient:
     def get_cost(self) -> dict[str, Any]:
         return self._json_request("/api/v1/cost")
 
-    def get_latest(self) -> list[dict[str, Any]]:
+    def get_latest(self) -> PaidStratigraphyResponse:
         self.get_cost()
         return self._authorized_json("/api/v1/stratigraphy")
+
+    def verify_zk_proof(
+        self,
+        zk_proof: ZkProof,
+        data: Any,
+    ) -> ZkVerifyResponse:
+        payload = {
+            "proof": zk_proof["proof"],
+            "publicInputs": zk_proof["publicInputs"],
+            "verificationKeyId": zk_proof["verificationKeyId"],
+            "data": data,
+        }
+        request = urllib.request.Request(
+            f"{self.base_url}/api/v1/zk/verify",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            return json.load(response)
 
     def subscribe_stream(
         self,
@@ -246,4 +289,9 @@ __all__ = [
     "StreamSubscription",
     "WalletAdapter",
     "SettlementAsset",
+    "ZkPublicInputs",
+    "ZkProof",
+    "ZkVerifyResponse",
+    "PaidStratigraphyResponse",
+    "StratigraphyTelemetryEnvelope",
 ]

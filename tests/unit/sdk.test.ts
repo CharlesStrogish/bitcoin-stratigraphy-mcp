@@ -5,7 +5,10 @@ import {
   BitcoinStratigraphyClient,
   MemoryCredentialStore,
   type CostDiscovery,
+  type PaidStratigraphyResponse,
   type StratigraphyTelemetry,
+  type StratigraphyTelemetryEnvelope,
+  type ZkProof,
 } from "../../sdk/typescript/src/index";
 
 const preimage = "ab".repeat(32);
@@ -72,6 +75,18 @@ const records = [
     },
   },
 ];
+const zkProof: ZkProof = {
+  proof: "proof",
+  publicInputs: {
+    blockHeight: 920_000,
+    snapshotDigest: "snapshot-digest",
+    thermodynamicHash: "123",
+    timestamp: 1_758_024_000_000,
+    valuationSat: 10_000,
+  },
+  verificationKeyId: "telemetry-v1",
+};
+const paidResponse: PaidStratigraphyResponse = { data: records, zkProof };
 
 test("resolves public pre-flight cost and MCP metadata", async () => {
   const urls: string[] = [];
@@ -86,6 +101,35 @@ test("resolves public pre-flight cost and MCP metadata", async () => {
 
   assert.deepEqual(await client.getCost(), cost);
   assert.deepEqual(urls, ["https://node.example/api/v1/cost"]);
+});
+
+test("verifies a ZK proof through the public verification endpoint", async () => {
+  let request: RequestInit | undefined;
+  const result = {
+    valid: true,
+    verifiedAt: "2026-09-16T12:00:00.000Z",
+    computationTimeMs: 2,
+  };
+  const client = new BitcoinStratigraphyClient({
+    baseUrl: "https://node.example/",
+    wallet: { payInvoice: async () => preimage },
+    fetch: async (input, init) => {
+      assert.equal(String(input), "https://node.example/api/v1/zk/verify");
+      request = init;
+      return Response.json(result);
+    },
+  });
+
+  const data = { records: ["snapshot"] };
+  assert.deepEqual(await client.verifyZkProof(zkProof, data), result);
+  assert.equal(request?.method, "POST");
+  assert.equal(new Headers(request?.headers).get("Authorization"), null);
+  assert.deepEqual(JSON.parse(String(request?.body)), {
+    proof: zkProof.proof,
+    publicInputs: zkProof.publicInputs,
+    verificationKeyId: zkProof.verificationKeyId,
+    data,
+  });
 });
 
 test("intercepts an L402 challenge, pays it, and retries automatically", async () => {
@@ -108,11 +152,11 @@ test("intercepts an L402 challenge, pays it, and retries automatically", async (
       });
       if (String(input).endsWith("/cost")) return Response.json(cost);
       if (!authorization) return Response.json(challenge, { status: 402 });
-      return Response.json(records);
+       return Response.json(paidResponse);
     },
   });
 
-  assert.deepEqual(await client.getLatest(), records);
+  assert.deepEqual(await client.getLatest(), paidResponse);
   assert.equal(paymentCalls, 1);
   assert.equal(requests.length, 3);
   assert.equal(
@@ -141,11 +185,11 @@ test("sends NIP-98 identity while acquiring and redeeming a bound pass", async (
       if (!requestHeaders.has("X-Nostr-Authorization")) {
         return Response.json(challenge, { status: 402 });
       }
-      return Response.json(records);
+       return Response.json(paidResponse);
     },
   });
 
-  assert.deepEqual(await client.getLatest(), records);
+  assert.deepEqual(await client.getLatest(), paidResponse);
   assert.equal(headers[0].get("Authorization"), "Nostr signed-1");
   assert.equal(headers[1].get("Authorization"), "Nostr signed-2");
   assert.equal(
@@ -178,7 +222,7 @@ test("reuses cached macaroons without paying another invoice", async () => {
         challengeCalls += 1;
         return Response.json(challenge, { status: 402 });
       }
-      return Response.json(records);
+      return Response.json(paidResponse);
     },
   });
 
@@ -218,7 +262,7 @@ test("reconnects a closed SSE stream and continues telemetry delivery", async ()
     fetch: async () => {
       streamCalls += 1;
       return new Response(
-        `event: telemetry\ndata: ${JSON.stringify(telemetry)}\n\n`,
+        `event: telemetry\ndata: ${JSON.stringify({ data: telemetry, zkProof })}\n\n`,
         { headers: { "Content-Type": "text/event-stream" } },
       );
     },
@@ -228,7 +272,7 @@ test("reconnects a closed SSE stream and continues telemetry delivery", async ()
     reconnect: { initialDelayMs: 5, maxDelayMs: 20 },
   });
 
-  const received: StratigraphyTelemetry[] = [];
+  const received: StratigraphyTelemetryEnvelope[] = [];
   let subscription!: ReturnType<typeof client.subscribeStream>;
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(
@@ -249,7 +293,10 @@ test("reconnects a closed SSE stream and continues telemetry delivery", async ()
   });
 
   assert.equal(streamCalls, 2);
-  assert.deepEqual(received, [telemetry, telemetry]);
+  assert.deepEqual(received, [
+    { data: telemetry, zkProof },
+    { data: telemetry, zkProof },
+  ]);
   assert.deepEqual(reconnectDelays, [5]);
   assert.equal(subscription.closed, true);
 });
@@ -292,7 +339,7 @@ test("parses SSE frames when CRLF separators span transport chunks", async () =>
     },
   };
   const encoder = new TextEncoder();
-  const payload = `event: telemetry\r\ndata: ${JSON.stringify(telemetry)}\r\n\r\n`;
+  const payload = `event: telemetry\r\ndata: ${JSON.stringify({ data: telemetry, zkProof })}\r\n\r\n`;
   const split = payload.lastIndexOf("\n");
   const chunks = [payload.slice(0, split - 1), payload.slice(split - 1)];
   const client = new BitcoinStratigraphyClient({
@@ -318,7 +365,7 @@ test("parses SSE frames when CRLF separators span transport chunks", async () =>
   });
 
   let subscription!: ReturnType<typeof client.subscribeStream>;
-  const received = await new Promise<StratigraphyTelemetry>((resolve, reject) => {
+  const received = await new Promise<StratigraphyTelemetryEnvelope>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("No telemetry")), 1_000);
     subscription = client.subscribeStream((value) => {
       clearTimeout(timeout);
@@ -326,7 +373,7 @@ test("parses SSE frames when CRLF separators span transport chunks", async () =>
       resolve(value);
     }, reject);
   });
-  assert.deepEqual(received, telemetry);
+  assert.deepEqual(received, { data: telemetry, zkProof });
 });
 
 test("reuses a concurrently refreshed credential instead of paying twice", async () => {
@@ -348,7 +395,7 @@ test("reuses a concurrently refreshed credential instead of paying twice", async
     fetch: async (input, init) => {
       if (String(input).endsWith("/cost")) return Response.json(cost);
       const authorization = new Headers(init?.headers).get("Authorization");
-      if (authorization) return Response.json(records);
+      if (authorization) return Response.json(paidResponse);
       unauthenticatedRequests += 1;
       if (unauthenticatedRequests === 2) await delayedChallenge;
       return Response.json(challenge, { status: 402 });
@@ -359,8 +406,8 @@ test("reuses a concurrently refreshed credential instead of paying twice", async
     client.getLatest(),
     client.getLatest(),
   ]);
-  assert.deepEqual(first, records);
-  assert.deepEqual(second, records);
+  assert.deepEqual(first, paidResponse);
+  assert.deepEqual(second, paidResponse);
   assert.equal(paymentCalls, 1);
 });
 
@@ -391,7 +438,7 @@ test("dispatches a lone-CR-terminated SSE frame at EOF", async () => {
     credentialStore: store,
     fetch: async () =>
       new Response(
-        `event: telemetry\rdata: ${JSON.stringify(telemetry)}\r\r`,
+        `event: telemetry\rdata: ${JSON.stringify({ data: telemetry, zkProof })}\r\r`,
       ),
     sleep: async (_delay, signal) => {
       await new Promise<void>((_resolve, reject) => {
@@ -403,7 +450,7 @@ test("dispatches a lone-CR-terminated SSE frame at EOF", async () => {
   });
 
   let subscription!: ReturnType<typeof client.subscribeStream>;
-  const received = await new Promise<StratigraphyTelemetry>((resolve, reject) => {
+  const received = await new Promise<StratigraphyTelemetryEnvelope>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("No telemetry")), 1_000);
     subscription = client.subscribeStream((value) => {
       clearTimeout(timeout);
@@ -411,5 +458,5 @@ test("dispatches a lone-CR-terminated SSE frame at EOF", async () => {
       resolve(value);
     }, reject);
   });
-  assert.deepEqual(received, telemetry);
+  assert.deepEqual(received, { data: telemetry, zkProof });
 });

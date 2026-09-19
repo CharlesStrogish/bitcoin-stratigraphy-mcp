@@ -5,6 +5,124 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ZkPublicInputs {
+  /**
+     * @minimum 0
+     * @maximum 4294967295
+     */
+  blockHeight: number;
+  /**
+     * @maxLength 77
+     * @pattern ^[0-9]+$
+     */
+  thermodynamicHash: string;
+  /**
+     * Decimal BN254 field element digest for the bound telemetry snapshot (0 through the BN254 field modulus)
+     * @maxLength 77
+     * @pattern ^[0-9]+$
+     */
+  snapshotDigest: string;
+  /**
+     * @minimum 0
+     * @maximum 281474976710655
+     */
+  timestamp: number;
+  /**
+     * @minimum 0
+     * @maximum 281474976710655
+     */
+  valuationSat: number;
+}
+
+export interface ZkProof {
+  /** Serialized zero-knowledge proof */
+  proof: string;
+  publicInputs: ZkPublicInputs;
+  verificationKeyId: string;
+}
+
+/**
+ * Telemetry payload
+ */
+export type ZkTelemetryEventEnvelopeData = { [key: string]: unknown };
+
+export interface ZkTelemetryEventEnvelope {
+  /** Telemetry payload */
+  data: ZkTelemetryEventEnvelopeData;
+  zkProof: ZkProof;
+}
+
+export interface QuantitativeAlpha {
+  /** Numeric distance multiplier parsed from the day's title */
+  target_multiplier: number;
+  /**
+     * Estimated progress through the current 14-day difficulty epoch
+     * @pattern ^(100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)%$
+     */
+  difficulty_epoch_progress: string;
+  /** Qualitative target-distance band derived from the multiplier */
+  thermodynamic_signal: string;
+}
+
+export interface NostrSignedEvent {
+  /** @pattern ^[0-9a-f]{64}$ */
+  id: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  pubkey: string;
+  created_at: number;
+  kind: 30078;
+  tags: string[][];
+  content: string;
+  /** @pattern ^[0-9a-f]{128}$ */
+  sig: string;
+}
+
+/**
+ * NIP-01 signed NIP-78 attestation over the payload before this block was attached
+ */
+export interface NostrAttestation {
+  protocol: 'nostr';
+  nip: 78;
+  /** @pattern ^[0-9a-f]{64}$ */
+  payload_sha256: string;
+  event: NostrSignedEvent;
+}
+
+export interface StratigraphyEntry {
+  day: number;
+  title: string;
+  video_id: string;
+  transcript_summary: string;
+  quantitative_alpha: QuantitativeAlpha;
+  attestation?: NostrAttestation;
+}
+
+export interface PaidStratigraphyResponse {
+  data: StratigraphyEntry[];
+  zkProof: ZkProof;
+}
+
+/**
+ * Telemetry data to bind to the proof. Supplying this required payload enables binding verification; proof and publicInputs provide the cryptographic verification inputs.
+ */
+export type ZkVerifyRequestData = { [key: string]: unknown } | unknown[];
+
+export interface ZkVerifyRequest {
+  proof: string;
+  publicInputs: ZkPublicInputs;
+  /** Verification-key identifier used by the verifier */
+  verificationKeyId: string;
+  /** Telemetry data to bind to the proof. Supplying this required payload enables binding verification; proof and publicInputs provide the cryptographic verification inputs. */
+  data: ZkVerifyRequestData;
+}
+
+export interface ZkVerifyResponse {
+  valid: boolean;
+  verifiedAt: string;
+  /** @minimum 0 */
+  computationTimeMs: number;
+}
+
 export type SettlementAsset = typeof SettlementAsset[keyof typeof SettlementAsset];
 
 
@@ -238,51 +356,6 @@ export interface NostrHeartbeatStatus {
   relays: NostrHeartbeatStatusRelaysItem[];
 }
 
-export interface QuantitativeAlpha {
-  /** Numeric distance multiplier parsed from the day's title */
-  target_multiplier: number;
-  /**
-     * Estimated progress through the current 14-day difficulty epoch
-     * @pattern ^(100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)%$
-     */
-  difficulty_epoch_progress: string;
-  /** Qualitative target-distance band derived from the multiplier */
-  thermodynamic_signal: string;
-}
-
-export interface NostrSignedEvent {
-  /** @pattern ^[0-9a-f]{64}$ */
-  id: string;
-  /** @pattern ^[0-9a-f]{64}$ */
-  pubkey: string;
-  created_at: number;
-  kind: 30078;
-  tags: string[][];
-  content: string;
-  /** @pattern ^[0-9a-f]{128}$ */
-  sig: string;
-}
-
-/**
- * NIP-01 signed NIP-78 attestation over the payload before this block was attached
- */
-export interface NostrAttestation {
-  protocol: 'nostr';
-  nip: 78;
-  /** @pattern ^[0-9a-f]{64}$ */
-  payload_sha256: string;
-  event: NostrSignedEvent;
-}
-
-export interface StratigraphyEntry {
-  day: number;
-  title: string;
-  video_id: string;
-  transcript_summary: string;
-  quantitative_alpha: QuantitativeAlpha;
-  attestation?: NostrAttestation;
-}
-
 export type L402SubscriptionPassTier = typeof L402SubscriptionPassTier[keyof typeof L402SubscriptionPassTier];
 
 
@@ -413,5 +486,13 @@ days?: number;
  * First date to include, using the daily series anchored at day 422 on 2026-09-09. Cannot be combined with days.
  */
 from?: string;
+};
+
+export type VerifyZkProof400 = {
+  error: string;
+};
+
+export type VerifyZkProof503 = {
+  error: 'Zero-knowledge verifier overloaded';
 };
 

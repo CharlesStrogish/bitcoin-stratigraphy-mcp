@@ -250,13 +250,13 @@ const proofLifecycleStates = [
 
 const listProofAttestationsInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(10).describe(
-    "Maximum number of attestation records to return.",
+    "Optional integer maximum number of attestation records to return (integer, 1 to 100). Defaults to 10. Example: 20.",
   ),
   status: z.enum(proofLifecycleStates).optional().describe(
-    "Filter attestations by lifecycle verification state.",
+    "Optional attestation lifecycle status filter string (e.g., 'verified', 'pending', 'rejected'). Defaults to returning records of all statuses. Example: 'verified'.",
   ),
 }).strict().describe(
-  "Optional pagination limit and lifecycle-state filter for proof attestation discovery.",
+  "Input options for listing and discovering historical zk-SNARK proof attestations.",
 );
 
 const submitProofInputSchema = z.object({
@@ -925,24 +925,24 @@ const mcpToolDefinitions = [
     name: "list_proof_attestations",
     title: "List Proof Attestations",
     description:
-      "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest. Use this tool during discovery to list historical attestations. Do NOT use for querying a specific proof hash (use get_proof_status instead) or executing stateless verification (use verify_zk_proof instead).",
+      "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest. Use this tool during discovery to list historical attestations. Do NOT use for querying a specific proof hash (use get_proof_status instead) or executing stateless verification (use verify_zk_proof instead). Behavior: Pure read-only and idempotent listing with zero server-side state modification; returns newest-first deduplicated records bounded to 1,000 entries.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
       description:
-        "Optional result limit and lifecycle-state filter for recent indexed proof attestations.",
-      examples: [{ limit: 10, status: "verified" }],
+        "Input options for listing and discovering historical zk-SNARK proof attestations.",
+      examples: [{ limit: 20, status: "verified" }],
       additionalProperties: false,
       properties: {
         limit: field(
           "integer",
-          "Maximum number of attestation records to return.",
-          [10],
+          "Optional integer maximum number of attestation records to return (integer, 1 to 100). Defaults to 10. Example: 20.",
+          [20],
           { minimum: 1, maximum: 100, default: 10 },
         ),
         status: field(
           "string",
-          "Filter attestations by lifecycle verification state.",
+          "Optional attestation lifecycle status filter string (e.g., 'verified', 'pending', 'rejected'). Defaults to returning records of all statuses. Example: 'verified'.",
           ["verified"],
           { enum: [...proofLifecycleStates] },
         ),

@@ -179,14 +179,14 @@ const thermodynamicMetricNames = [
 ] as const;
 
 const stratigraphyInputSchema = z.object({
-  days: z.number().int().min(1).max(422).optional().describe(
-    "Number of the most recent daily snapshots to return, from 1 through 422.",
+  days: z.number().int().min(1).max(365).optional().describe(
+    "Number of recent days of telemetry to fetch (integer, 1 to 365). Defaults to 30. Example: 7.",
   ),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
-    "Exact UTC dataset date formatted as YYYY-MM-DD.",
+    "Exact ISO calendar date string formatted as YYYY-MM-DD. Example: '2026-09-19'.",
   ),
-  blockHeight: z.number().int().nonnegative().optional().describe(
-    "Exact non-negative height in the deterministic daily block index.",
+  blockHeight: z.number().int().positive().optional().describe(
+    "Exact indexed Bitcoin block height (integer > 0). Example: 850000.",
   ),
   metrics: z.array(
     z.enum(thermodynamicMetricNames).describe(
@@ -196,7 +196,7 @@ const stratigraphyInputSchema = z.object({
     (values) => new Set(values).size === values.length,
     "metrics must contain unique values",
   ).optional().describe(
-    "Unique thermodynamic fields to return inside quantitative_alpha.",
+    "Optional array of telemetry metric key strings to project. Defaults to all fields. Example: ['hashrate', 'energy_joules'].",
   ),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
     "Inclusive UTC lower date bound formatted as YYYY-MM-DD.",
@@ -581,7 +581,7 @@ const mcpToolDefinitions = [
     name: "get_bitcoin_stratigraphy",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection. Use this tool when you need raw historical telemetry or time-series ranges. Do NOT use for catalog discovery; use list_stratigraphy_catalog instead. Do NOT use for proof verification, submission, or lifecycle operations; use verify_zk_proof, submit_zk_proof, or get_proof_status instead.",
+      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection. Use this tool when you need raw historical telemetry or time-series ranges. Do NOT use for catalog discovery; use list_stratigraphy_catalog instead. Do NOT use for proof verification, submission, or lifecycle operations; use verify_zk_proof, submit_zk_proof, or get_proof_status instead. Behavior: Pure read-only and idempotent query with zero server-side state modification; responses are deterministically cached.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -597,25 +597,25 @@ const mcpToolDefinitions = [
       properties: {
         days: field(
           "integer",
-          "Legacy selector for the number of most recent daily snapshots to return. Must be an integer from 1 through 422 and cannot be combined with date, blockHeight, or range selectors.",
-          [10],
-          { minimum: 1, maximum: 422 },
+          "Number of recent days of telemetry to fetch (integer, 1 to 365). Defaults to 30. Example: 7.",
+          [7],
+          { minimum: 1, maximum: 365, default: 30 },
         ),
         date: field(
           "string",
-          "Legacy selector for one exact dataset date formatted as YYYY-MM-DD in UTC. It cannot be combined with days, blockHeight, or range selectors.",
-          ["2026-09-18"],
+          "Exact ISO calendar date string formatted as YYYY-MM-DD. Example: '2026-09-19'.",
+          ["2026-09-19"],
           { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
         ),
         blockHeight: field(
           "integer",
-          "Legacy selector for one exact non-negative height in the deterministic daily block index. It cannot be combined with days, date, or range selectors; an unindexed height returns no records.",
-          [920000],
-          { minimum: 0 },
+          "Exact indexed Bitcoin block height (integer > 0). Example: 850000.",
+          [850000],
+          { minimum: 1 },
         ),
         metrics: field(
           "array",
-          "Optional projection of thermodynamic fields returned inside quantitative_alpha. Supply one or more unique metric names; omitted metrics are excluded, while omitting this parameter returns all thermodynamic metrics.",
+          "Optional array of telemetry metric key strings to project. Defaults to all fields. Example: ['hashrate', 'energy_joules'].",
           [["target_multiplier"]],
           {
             minItems: 1,

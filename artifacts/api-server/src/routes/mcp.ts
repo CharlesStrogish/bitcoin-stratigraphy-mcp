@@ -215,6 +215,10 @@ const stratigraphyInputSchema = z.object({
   ),
 }).strict().describe("Validated raw stratigraphy telemetry query parameters.");
 
+const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
+  "Input options for discovering available stratigraphy dataset bounds, epochs, and snapshot CIDs.",
+);
+
 const verifyProofInputSchema = z.object({
   proof: z.string().describe(
     "Base64url-encoded Groth16 proof emitted by this API.",
@@ -684,11 +688,12 @@ const mcpToolDefinitions = [
     name: "list_stratigraphy_catalog",
     title: "List Stratigraphy Catalog",
     description:
-      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, snapshot CIDs, and available telemetry metrics. Use this tool first when you need to discover available dataset bounds and snapshot CIDs. Do NOT use for fetching raw time-series records; use get_bitcoin_stratigraphy instead.",
+      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, snapshot CIDs, and available telemetry metrics. Use this tool first when you need to discover available dataset bounds and snapshot CIDs. Do NOT use for fetching raw time-series records; use get_bitcoin_stratigraphy instead. Behavior: Pure read-only and idempotent catalog discovery query with zero server-side state modification; returns global catalog metadata bounds.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "No parameters are required to discover the catalog.",
+      description:
+        "Input options for discovering available stratigraphy dataset bounds, epochs, and snapshot CIDs.",
       examples: [{}],
       additionalProperties: false,
       properties: {},
@@ -1318,7 +1323,7 @@ function createBitcoinStratigraphyMcpServer() {
       }
     }
     if (request.params.name === "list_stratigraphy_catalog") {
-      if (!z.object({}).strict().safeParse(args).success) {
+      if (!stratigraphyCatalogInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Catalog takes no arguments");
       }
       const structuredContent = await stratigraphyCatalog();

@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
 import { albySettlementMode } from "./services/settlement/alby";
+import { prewarmZkVerifier } from "./services/zkProofService";
 
 const rawPort = process.env["PORT"];
 
@@ -16,6 +17,13 @@ const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+
+const warmupStartedAt = performance.now();
+await prewarmZkVerifier();
+logger.info(
+  { durationMs: Number((performance.now() - warmupStartedAt).toFixed(3)) },
+  "zk verifier pre-warmed",
+);
 
 app.listen(port, (err) => {
   if (err) {

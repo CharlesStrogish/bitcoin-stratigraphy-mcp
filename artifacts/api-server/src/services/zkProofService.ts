@@ -36,6 +36,10 @@ const verificationKeyUrl = new URL(
   "./zk/artifacts/verification_key.json",
   import.meta.url,
 );
+const warmupProofUrl = new URL(
+  "./zk/artifacts/warmup_proof.json",
+  import.meta.url,
+);
 
 type Groth16Proof = {
   pi_a: string[];
@@ -47,6 +51,7 @@ type Groth16Proof = {
 
 let verificationKeyPromise: Promise<unknown> | undefined;
 let verificationKeyIdPromise: Promise<string> | undefined;
+let verifierWarmupPromise: Promise<void> | undefined;
 const verificationCache = new Map<string, boolean>();
 const MAX_VERIFICATION_CACHE_ENTRIES = 1_000;
 const generatedProofCache = new Map<string, Promise<ZkProofPayload>>();
@@ -234,12 +239,7 @@ async function verifyCryptographically(
       );
     } finally {
       if (process.env.NODE_ENV === "test") {
-        const globals = globalThis as typeof globalThis & {
-          curve_bn128?: { terminate(): Promise<void> } | null;
-        };
-        const curve = globals.curve_bn128;
-        globals.curve_bn128 = null;
-        await curve?.terminate();
+        await shutdownZkVerifier();
       }
     }
   });
@@ -249,6 +249,15 @@ async function verifyCryptographically(
   } finally {
     queuedVerifications -= 1;
   }
+}
+
+export async function shutdownZkVerifier(): Promise<void> {
+  const globals = globalThis as typeof globalThis & {
+    curve_bn128?: { terminate(): Promise<void> } | null;
+  };
+  const curve = globals.curve_bn128;
+  globals.curve_bn128 = null;
+  await curve?.terminate();
 }
 
 async function verificationKey(): Promise<unknown> {
@@ -316,6 +325,20 @@ async function generateZkProofUncached(input: {
     publicInputs,
     verificationKeyId: await verificationKeyId(),
   };
+  const verified = await verifyCryptographically(
+    [
+      String(publicInputs.blockHeight),
+      publicInputs.thermodynamicHash,
+      String(publicInputs.timestamp),
+      String(publicInputs.valuationSat),
+      publicInputs.snapshotDigest,
+    ],
+    result.proof,
+  );
+  if (!verified) {
+    throw new Error("generated zk telemetry proof failed self-verification");
+  }
+  cacheVerification(verificationCacheKey(payload), true);
   return payload;
 }
 
@@ -401,6 +424,47 @@ export async function verifyZkProof(payload: unknown): Promise<boolean> {
     if (error instanceof ZkVerifierOverloadedError) throw error;
     return false;
   }
+}
+
+export function prewarmZkVerifier(): Promise<void> {
+  verifierWarmupPromise ??= readFile(warmupProofUrl, "utf8")
+    .then((raw) => JSON.parse(raw) as unknown)
+    .then(async (payload) => {
+      if (!payload || typeof payload !== "object") {
+        throw new Error("zk verifier warm-up proof is malformed");
+      }
+      const candidate = payload as Record<string, unknown>;
+      if (
+        typeof candidate.proof !== "string" ||
+        !validPublicInputs(candidate.publicInputs) ||
+        candidate.verificationKeyId !== (await verificationKeyId())
+      ) {
+        throw new Error("zk verifier warm-up proof metadata is invalid");
+      }
+      const decoded = base64UrlDecode(candidate.proof);
+      if (!decoded) throw new Error("zk verifier warm-up proof is malformed");
+      const proof = JSON.parse(decoded) as unknown;
+      if (!validGroth16Proof(proof)) {
+        throw new Error("zk verifier warm-up proof coordinates are invalid");
+      }
+      const signals = [
+        String(candidate.publicInputs.blockHeight),
+        candidate.publicInputs.thermodynamicHash,
+        String(candidate.publicInputs.timestamp),
+        String(candidate.publicInputs.valuationSat),
+        candidate.publicInputs.snapshotDigest,
+      ];
+      for (let pass = 0; pass < 5; pass += 1) {
+        if (!(await verifyCryptographically(signals, proof))) {
+          throw new Error("zk verifier warm-up proof was rejected");
+        }
+      }
+    })
+    .catch((error) => {
+      verifierWarmupPromise = undefined;
+      throw error;
+    });
+  return verifierWarmupPromise;
 }
 
 function semanticInputsMatch(

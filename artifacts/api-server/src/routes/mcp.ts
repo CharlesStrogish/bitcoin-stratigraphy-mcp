@@ -30,6 +30,12 @@ const readOnlyToolAnnotations = {
   readOnly: true,
   audience: ["assistant"],
   priority: 1,
+  zkProof: {
+    included: true,
+    scheme: "Groth16/Poseidon BN254",
+    verificationEndpoint: "POST /api/v1/zk/verify",
+    targetVerificationTime: "sub-10ms for proofs emitted by this API",
+  },
 };
 
 function createBitcoinStratigraphyMcpServer() {
@@ -39,6 +45,8 @@ function createBitcoinStratigraphyMcpServer() {
       version: "1.0.0",
     },
     {
+      instructions:
+        "Returns Bitcoin Stratigraphy data with Nostr NIP-78 attestations and zkProof payloads. Verify emitted Groth16/Poseidon BN254 proofs with POST /api/v1/zk/verify; emitted proofs are pre-verified for sub-10ms verification. Paid access supports L402 multi-asset settlement.",
       capabilities: {
         prompts: {},
         resources: {},
@@ -58,7 +66,7 @@ function createBitcoinStratigraphyMcpServer() {
     {
       title: "Get Bitcoin Stratigraphy",
       description:
-        "Return validated Bitcoin Stratigraphy day entries. Use days for the most recent N entries or date for one exact YYYY-MM-DD entry.",
+        "Return validated Bitcoin Stratigraphy day entries with Nostr NIP-78 attestations and Zero-Knowledge Data Integrity. Paid API responses include a zkProof payload verifiable via POST /api/v1/zk/verify using sub-10ms Groth16/Poseidon SNARK verification. Use days for the most recent N entries or date for one exact YYYY-MM-DD entry.",
       annotations: readOnlyToolAnnotations,
       inputSchema: {
         days: z

@@ -569,6 +569,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     readOnly: true,
     audience: ["assistant"],
     priority: 1,
+    zkProof: {
+      included: true,
+      scheme: "Groth16/Poseidon BN254",
+      verificationEndpoint: "POST /api/v1/zk/verify",
+      targetVerificationTime: "sub-10ms for proofs emitted by this API",
+    },
   });
   assert.deepEqual((await mcpRequest("resources/list")).result, {
     resources: [],

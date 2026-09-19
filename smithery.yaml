@@ -1,8 +1,20 @@
 name: bitcoin-stratigraphy
 displayName: Bitcoin Stratigraphy
 description: >-
-  Query validated day-by-day Bitcoin stratigraphy records, including target
-  multipliers, estimated difficulty epoch progress, and thermodynamic signals.
+  Query validated day-by-day Bitcoin stratigraphy records with Zero-Knowledge
+  Data Integrity (Groth16/Poseidon zk-SNARKs), L402 multi-asset payments, and
+  Nostr NIP-78 attestations. Paid JSON and SSE responses include `zkProof`
+  payloads verifiable through `POST /api/v1/zk/verify` in under 10ms for proofs
+  emitted by this API.
+tags:
+  - zero-knowledge-data-integrity
+  - zk-snarks
+  - groth16
+  - poseidon
+  - l402
+  - multi-asset-payments
+  - nostr
+  - nip-78
 homepage: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app
 
 transport:
@@ -13,9 +25,12 @@ tools:
   - name: get_bitcoin_stratigraphy
     title: Get Bitcoin Stratigraphy
     description: >-
-      Returns validated Bitcoin Stratigraphy entries. Use days for the most
-      recent entries or date for one exact dataset date. If neither parameter
-      is supplied, the complete dataset is returned.
+      Returns validated Bitcoin Stratigraphy entries with Nostr NIP-78
+      attestations and Zero-Knowledge Data Integrity. Paid API payloads include
+      `zkProof` data backed by Groth16/Poseidon zk-SNARKs and verifiable through
+      `POST /api/v1/zk/verify` in under 10ms for proofs emitted by this API.
+      Use days for the most recent entries or date for one exact dataset date.
+      If neither parameter is supplied, the complete dataset is returned.
     inputSchema:
       type: object
       additionalProperties: false

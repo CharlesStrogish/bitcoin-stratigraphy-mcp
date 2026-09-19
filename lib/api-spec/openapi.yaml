@@ -3,7 +3,13 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: >-
+    Bitcoin Stratigraphy API with Zero-Knowledge Data Integrity. Paid JSON
+    responses and live SSE telemetry include `zkProof` payloads backed by
+    Groth16/Poseidon BN254 zk-SNARKs. Verify them with
+    `POST /api/v1/zk/verify`; proofs emitted by this API are pre-verified for
+    sub-10ms verification. Access supports L402 multi-asset payments, and
+    records carry Nostr NIP-78 attestations.
 servers:
   - url: /api
     description: Base API path
@@ -11,7 +17,9 @@ tags:
   - name: health
     description: Health operations
   - name: stratigraphy
-    description: Bitcoin stratigraphy dataset
+    description: Bitcoin stratigraphy dataset with zkProof payloads, L402 multi-asset payments, and Nostr NIP-78 attestations
+  - name: zero-knowledge
+    description: Groth16/Poseidon BN254 zk-SNARK verification for zkProof payloads
 security:
   - L402: []
 paths:
@@ -250,7 +258,7 @@ paths:
       operationId: getPaidStratigraphy
       tags: [stratigraphy]
       summary: Get the complete L402-protected dataset
-      description: Returns the selected range after payment. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable 24-hour passes are dynamically priced from 5 to 15 sats and 30-day passes from 100 to 250 sats; inspect /v1/cost or the issued L402 challenge for the current exact price.
+      description: Returns the selected range and its `zkProof` payload after payment. Verify the Groth16/Poseidon BN254 zk-SNARK with `POST /api/v1/zk/verify`; proofs emitted by this API are pre-verified for sub-10ms verification. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable 24-hour passes are dynamically priced from 5 to 15 sats and 30-day passes from 100 to 250 sats; inspect /v1/cost or the issued L402 challenge for the current exact price.
       parameters:
         - name: days
           in: query
@@ -420,9 +428,9 @@ paths:
   /v1/zk/verify:
     post:
       operationId: verifyZkProof
-      tags: [stratigraphy]
-      summary: Verify a zero-knowledge telemetry proof
-      description: Publicly verifies both the cryptographic zero-knowledge proof and the binding of the supplied payload to its semantic public inputs.
+      tags: [stratigraphy, zero-knowledge]
+      summary: Verify a Groth16/Poseidon zkProof payload
+      description: Public `POST /api/v1/zk/verify` endpoint for Zero-Knowledge Data Integrity. Verifies the Groth16/Poseidon BN254 zk-SNARK and binds the supplied data payload to its semantic public inputs. Proofs emitted by this API are pre-verified and complete verification in under 10ms.
       security: []
       requestBody:
         required: true

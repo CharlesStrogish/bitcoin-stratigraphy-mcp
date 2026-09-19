@@ -345,16 +345,26 @@ export type StratigraphyCostDataset = {
 };
 
 export interface McpToolParameter {
+  /** JSON Schema primitive type accepted by the tool parameter. */
   type: string;
+  /** Inclusive minimum integer value when applicable. */
   minimum?: number;
+  /** Inclusive maximum integer value when applicable. */
   maximum?: number;
+  /** JSON Schema string format when applicable. */
   format?: string;
+  /** Whether callers must provide this parameter. */
   required: boolean;
 }
 
 export type StratigraphyCostMcpToolParameters = {
   days: McpToolParameter;
   date: McpToolParameter;
+  startDate: McpToolParameter;
+  endDate: McpToolParameter;
+  startBlock: McpToolParameter;
+  endBlock: McpToolParameter;
+  limit: McpToolParameter;
 };
 
 export type StratigraphyCostMcpTool = {
@@ -377,6 +387,52 @@ export interface AgentReputationMetadata {
   tier: AgentReputationMetadataTier;
   discount_percent: number;
   rate_limit_multiplier: number;
+}
+
+/**
+ * Inclusive ISO date bounds of the available snapshots.
+ */
+export type StratigraphyCatalogDateBounds = {
+  /** ISO 8601 date of the oldest available snapshot. */
+  startDate: string;
+  /** ISO 8601 date of the newest available snapshot. */
+  endDate: string;
+};
+
+/**
+ * Discoverable bounds and metric inventory for the stratigraphy dataset.
+ */
+export interface StratigraphyCatalog {
+  /**
+     * Total number of daily stratigraphy snapshots currently available.
+     * @minimum 1
+     */
+  totalSnapshots: number;
+  /**
+     * Lowest block height in the deterministic daily snapshot index.
+     * @minimum 0
+     */
+  oldestBlock: number;
+  /**
+     * Highest block height in the deterministic daily snapshot index.
+     * @minimum 0
+     */
+  newestBlock: number;
+  /** Dot-delimited telemetry metric paths available in each snapshot. */
+  availableMetrics: string[];
+  /** Inclusive ISO date bounds of the available snapshots. */
+  dateBounds: StratigraphyCatalogDateBounds;
+}
+
+/**
+ * MCP dataset discovery tool registered as list_stratigraphy_catalog.
+ */
+export interface StratigraphyCatalogMcpTool {
+  /** Stable MCP tool name used with tools/call. */
+  name: 'list_stratigraphy_catalog';
+  /** Human-readable purpose of the catalog discovery tool. */
+  description: string;
+  catalog: StratigraphyCatalog;
 }
 
 export type JsonSchemaItems = { [key: string]: unknown };
@@ -406,6 +462,7 @@ export interface StratigraphyCost {
   legacy_query_pricing: StratigraphyCostLegacyQueryPricing;
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;
+  catalog_tool: StratigraphyCatalogMcpTool;
   response_schema: JsonSchema;
 }
 

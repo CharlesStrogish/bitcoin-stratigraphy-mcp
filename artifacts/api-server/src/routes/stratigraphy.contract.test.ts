@@ -582,6 +582,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
     [
       "get_bitcoin_stratigraphy",
+      "list_stratigraphy_catalog",
       "verify_zk_proof",
       "get_mesh_status",
     ],
@@ -675,6 +676,43 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.equal(
     typeof records[0].quantitative_alpha.thermodynamic_signal,
     "string",
+  );
+
+  const dateRangeCalled = await mcpRequest("tools/call", {
+    name: "get_bitcoin_stratigraphy",
+    arguments: {
+      startDate: "2026-08-01",
+      endDate: "2026-08-31",
+      limit: 5,
+    },
+  });
+  assert.equal(dateRangeCalled.result?.structuredContent.records.length, 5);
+
+  const blockRangeCalled = await mcpRequest("tools/call", {
+    name: "get_bitcoin_stratigraphy",
+    arguments: {
+      startBlock: 919000,
+      endBlock: 920000,
+      limit: 4,
+    },
+  });
+  assert.equal(blockRangeCalled.result?.structuredContent.records.length, 4);
+
+  const catalogCalled = await mcpRequest("tools/call", {
+    name: "list_stratigraphy_catalog",
+    arguments: {},
+  });
+  assert.deepEqual(catalogCalled.result?.structuredContent.dateBounds, {
+    startDate: "2025-07-15",
+    endDate: "2026-09-09",
+  });
+  assert.equal(catalogCalled.result?.structuredContent.totalSnapshots, 422);
+  assert.equal(catalogCalled.result?.structuredContent.oldestBlock, 859376);
+  assert.equal(catalogCalled.result?.structuredContent.newestBlock, 920000);
+  assert.ok(
+    catalogCalled.result?.structuredContent.availableMetrics.includes(
+      "quantitative_alpha.target_multiplier",
+    ),
   );
 
   const meshCalled = await mcpRequest("tools/call", {
@@ -789,6 +827,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
     access_tiers: Array<{ id: string; price_sats: number }>;
     dataset: { days: number; grows_over_time: boolean };
     mcp_tool: { name: string; parameters: Record<string, unknown> };
+    catalog_tool: { name: string; description: string };
     response_schema: { type: string };
   };
   assert.deepEqual(
@@ -801,7 +840,16 @@ test("serves public pre-flight cost and schema metadata", async () => {
   assert.equal(body.dataset.days, 422);
   assert.equal(body.dataset.grows_over_time, true);
   assert.equal(body.mcp_tool.name, "get_bitcoin_stratigraphy");
-  assert.deepEqual(Object.keys(body.mcp_tool.parameters), ["days", "date"]);
+  assert.deepEqual(Object.keys(body.mcp_tool.parameters), [
+    "days",
+    "date",
+    "startDate",
+    "endDate",
+    "startBlock",
+    "endBlock",
+    "limit",
+  ]);
+  assert.equal(body.catalog_tool.name, "list_stratigraphy_catalog");
   assert.equal(body.response_schema.type, "array");
   assert.equal(invoiceRequestCount, requestsBefore);
 });

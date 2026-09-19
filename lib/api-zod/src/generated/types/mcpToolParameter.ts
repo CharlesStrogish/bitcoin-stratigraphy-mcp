@@ -7,9 +7,14 @@
  */
 
 export interface McpToolParameter {
+  /** JSON Schema primitive type accepted by the tool parameter. */
   type: string;
+  /** Inclusive minimum integer value when applicable. */
   minimum?: number;
+  /** Inclusive maximum integer value when applicable. */
   maximum?: number;
+  /** JSON Schema string format when applicable. */
   format?: string;
+  /** Whether callers must provide this parameter. */
   required: boolean;
 }

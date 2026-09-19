@@ -959,8 +959,20 @@ components:
                   $ref: "#/components/schemas/McpToolParameter"
                 date:
                   $ref: "#/components/schemas/McpToolParameter"
-              required: [days, date]
+                startDate:
+                  $ref: "#/components/schemas/McpToolParameter"
+                endDate:
+                  $ref: "#/components/schemas/McpToolParameter"
+                startBlock:
+                  $ref: "#/components/schemas/McpToolParameter"
+                endBlock:
+                  $ref: "#/components/schemas/McpToolParameter"
+                limit:
+                  $ref: "#/components/schemas/McpToolParameter"
+              required: [days, date, startDate, endDate, startBlock, endBlock, limit]
           required: [name, parameters]
+        catalog_tool:
+          $ref: "#/components/schemas/StratigraphyCatalogMcpTool"
         response_schema:
           $ref: "#/components/schemas/JsonSchema"
       required:
@@ -973,20 +985,87 @@ components:
         - legacy_query_pricing
         - dataset
         - mcp_tool
+        - catalog_tool
         - response_schema
+    StratigraphyCatalogMcpTool:
+      type: object
+      description: MCP dataset discovery tool registered as list_stratigraphy_catalog.
+      properties:
+        name:
+          type: string
+          description: Stable MCP tool name used with tools/call.
+          const: list_stratigraphy_catalog
+          examples: [list_stratigraphy_catalog]
+        description:
+          type: string
+          description: Human-readable purpose of the catalog discovery tool.
+          examples:
+            - Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, and available telemetry metrics without requiring prior knowledge of exact snapshot parameters.
+        catalog:
+          $ref: "#/components/schemas/StratigraphyCatalog"
+      required: [name, description, catalog]
+    StratigraphyCatalog:
+      type: object
+      description: Discoverable bounds and metric inventory for the stratigraphy dataset.
+      properties:
+        totalSnapshots:
+          type: integer
+          minimum: 1
+          description: Total number of daily stratigraphy snapshots currently available.
+          examples: [422]
+        oldestBlock:
+          type: integer
+          minimum: 0
+          description: Lowest block height in the deterministic daily snapshot index.
+          examples: [859376]
+        newestBlock:
+          type: integer
+          minimum: 0
+          description: Highest block height in the deterministic daily snapshot index.
+          examples: [920000]
+        availableMetrics:
+          type: array
+          description: Dot-delimited telemetry metric paths available in each snapshot.
+          examples:
+            - [day, title, video_id, transcript_summary, quantitative_alpha.target_multiplier]
+          items:
+            type: string
+            description: Dot-delimited path of an available telemetry metric.
+            examples: [quantitative_alpha.target_multiplier]
+        dateBounds:
+          type: object
+          description: Inclusive ISO date bounds of the available snapshots.
+          properties:
+            startDate:
+              type: string
+              format: date
+              description: ISO 8601 date of the oldest available snapshot.
+              examples: ["2025-07-15"]
+            endDate:
+              type: string
+              format: date
+              description: ISO 8601 date of the newest available snapshot.
+              examples: ["2026-09-09"]
+          required: [startDate, endDate]
+      required: [totalSnapshots, oldestBlock, newestBlock, availableMetrics, dateBounds]
     McpToolParameter:
       type: object
       properties:
         type:
           type: string
+          description: JSON Schema primitive type accepted by the tool parameter.
         minimum:
           type: integer
+          description: Inclusive minimum integer value when applicable.
         maximum:
           type: integer
+          description: Inclusive maximum integer value when applicable.
         format:
           type: string
+          description: JSON Schema string format when applicable.
         required:
           type: boolean
+          description: Whether callers must provide this parameter.
       required: [type, required]
     JsonSchema:
       type: object

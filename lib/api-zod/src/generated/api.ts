@@ -103,6 +103,11 @@ export const getStratigraphyCostResponseDatasetDaysMin = 422;
 export const getStratigraphyCostResponseDatasetLastDayMin = 422;
 
 
+export const getStratigraphyCostResponseCatalogToolCatalogOldestBlockMin = 0;
+
+export const getStratigraphyCostResponseCatalogToolCatalogNewestBlockMin = 0;
+
+
 
 export const GetStratigraphyCostResponse = zod.object({
   "protocol": zod.literal("L402"),
@@ -145,21 +150,70 @@ export const GetStratigraphyCostResponse = zod.object({
   "name": zod.literal("get_bitcoin_stratigraphy"),
   "parameters": zod.object({
   "days": zod.object({
-  "type": zod.string(),
-  "minimum": zod.number().int().optional(),
-  "maximum": zod.number().int().optional(),
-  "format": zod.string().optional(),
-  "required": zod.boolean()
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
 }),
   "date": zod.object({
-  "type": zod.string(),
-  "minimum": zod.number().int().optional(),
-  "maximum": zod.number().int().optional(),
-  "format": zod.string().optional(),
-  "required": zod.boolean()
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+}),
+  "startDate": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+}),
+  "endDate": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+}),
+  "startBlock": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+}),
+  "endBlock": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
+}),
+  "limit": zod.object({
+  "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
+  "minimum": zod.number().int().optional().describe('Inclusive minimum integer value when applicable.'),
+  "maximum": zod.number().int().optional().describe('Inclusive maximum integer value when applicable.'),
+  "format": zod.string().optional().describe('JSON Schema string format when applicable.'),
+  "required": zod.boolean().describe('Whether callers must provide this parameter.')
 })
 })
 }),
+  "catalog_tool": zod.object({
+  "name": zod.literal("list_stratigraphy_catalog").describe('Stable MCP tool name used with tools\/call.'),
+  "description": zod.string().describe('Human-readable purpose of the catalog discovery tool.'),
+  "catalog": zod.object({
+  "totalSnapshots": zod.number().int().min(1).describe('Total number of daily stratigraphy snapshots currently available.'),
+  "oldestBlock": zod.number().int().min(getStratigraphyCostResponseCatalogToolCatalogOldestBlockMin).describe('Lowest block height in the deterministic daily snapshot index.'),
+  "newestBlock": zod.number().int().min(getStratigraphyCostResponseCatalogToolCatalogNewestBlockMin).describe('Highest block height in the deterministic daily snapshot index.'),
+  "availableMetrics": zod.array(zod.string().describe('Dot-delimited path of an available telemetry metric.')).describe('Dot-delimited telemetry metric paths available in each snapshot.'),
+  "dateBounds": zod.object({
+  "startDate": zod.coerce.date().describe('ISO 8601 date of the oldest available snapshot.'),
+  "endDate": zod.coerce.date().describe('ISO 8601 date of the newest available snapshot.')
+}).describe('Inclusive ISO date bounds of the available snapshots.')
+}).describe('Discoverable bounds and metric inventory for the stratigraphy dataset.')
+}).describe('MCP dataset discovery tool registered as list_stratigraphy_catalog.'),
   "response_schema": zod.object({
   "type": zod.string(),
   "items": zod.record(zod.string(), zod.unknown()).optional(),

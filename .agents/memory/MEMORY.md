@@ -15,3 +15,4 @@
 - [Telemetry proof semantics](telemetry-proof-semantics.md) — require exact payload binding and derive public fields from emitted snapshot semantics, not independent request state.
 - [Mesh consensus trust](mesh-consensus-trust.md) — peer certificates require pinned reciprocal membership, canonical snapshots, fresh source signatures, and external quorum policy.
 - [MCP schema metadata](mcp-schema-metadata.md) — Zod 3 conversion drops examples; publish explicit JSON Schemas while retaining separate runtime validation.
+- [Catalog block index](catalog-block-index.md) — historical daily snapshots lack native heights, so block-range discovery uses a documented deterministic 144-block/day index.

@@ -962,6 +962,57 @@ export function registerStratigraphyRoutes(
             format: "date",
             required: false,
           },
+          startDate: {
+            type: "string",
+            format: "date",
+            required: false,
+          },
+          endDate: {
+            type: "string",
+            format: "date",
+            required: false,
+          },
+          startBlock: {
+            type: "integer",
+            minimum: 0,
+            required: false,
+          },
+          endBlock: {
+            type: "integer",
+            minimum: 0,
+            required: false,
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 100,
+            required: false,
+          },
+        },
+      },
+      catalog_tool: {
+        name: "list_stratigraphy_catalog",
+        description:
+          "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, and available telemetry metrics without requiring prior knowledge of exact snapshot parameters.",
+        catalog: {
+          totalSnapshots: dataset.length,
+          oldestBlock: 920_000 - (dataset.length - 1) * 144,
+          newestBlock: 920_000,
+          availableMetrics: [
+            "day",
+            "title",
+            "video_id",
+            "transcript_summary",
+            "quantitative_alpha.target_multiplier",
+            "quantitative_alpha.difficulty_epoch_progress",
+            "quantitative_alpha.thermodynamic_signal",
+          ],
+          dateBounds: {
+            startDate: new Date(
+              LATEST_DATASET_DATE_MS - (dataset.length - 1) * DAY_MS,
+            ).toISOString().slice(0, 10),
+            endDate: "2026-09-09",
+          },
         },
       },
       response_schema: RESPONSE_SCHEMA,

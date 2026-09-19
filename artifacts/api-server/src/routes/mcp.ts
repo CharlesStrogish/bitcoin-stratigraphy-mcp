@@ -160,6 +160,11 @@ const readOnlyToolAnnotations = {
 const stratigraphyInputSchema = z.object({
   days: z.number().int().min(1).max(422).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  startBlock: z.number().int().nonnegative().optional(),
+  endBlock: z.number().int().nonnegative().optional(),
+  limit: z.number().int().min(1).max(100).default(10),
 }).strict();
 
 const verifyProofInputSchema = z.object({
@@ -344,6 +349,96 @@ const meshStatusJsonProperties = {
   ),
 };
 
+const LATEST_DATASET_DATE = "2026-09-09";
+const LATEST_DATASET_BLOCK = 920_000;
+const BLOCKS_PER_RECORDED_EPOCH = 144;
+const DAY_MS = 86_400_000;
+const catalogMetricNames = [
+  "day",
+  "title",
+  "video_id",
+  "transcript_summary",
+  "quantitative_alpha.target_multiplier",
+  "quantitative_alpha.difficulty_epoch_progress",
+  "quantitative_alpha.thermodynamic_signal",
+] as const;
+
+function snapshotDate(index: number, total: number): string {
+  return new Date(
+    Date.parse(`${LATEST_DATASET_DATE}T00:00:00.000Z`) -
+      (total - index - 1) * DAY_MS,
+  ).toISOString().slice(0, 10);
+}
+
+function snapshotBlock(index: number, total: number): number {
+  return LATEST_DATASET_BLOCK -
+    (total - index - 1) * BLOCKS_PER_RECORDED_EPOCH;
+}
+
+async function stratigraphyCatalog() {
+  const records = await getStratigraphyData();
+  return {
+    totalSnapshots: records.length,
+    oldestBlock: snapshotBlock(0, records.length),
+    newestBlock: snapshotBlock(records.length - 1, records.length),
+    availableMetrics: [...catalogMetricNames],
+    dateBounds: {
+      startDate: snapshotDate(0, records.length),
+      endDate: snapshotDate(records.length - 1, records.length),
+    },
+  };
+}
+
+async function queryStratigraphy(
+  input: z.infer<typeof stratigraphyInputSchema>,
+) {
+  const hasLegacySelector = input.days !== undefined || input.date !== undefined;
+  const hasRangeSelector =
+    input.startDate !== undefined ||
+    input.endDate !== undefined ||
+    input.startBlock !== undefined ||
+    input.endBlock !== undefined;
+  if (hasLegacySelector && hasRangeSelector) {
+    throw new RangeError(
+      "days or date cannot be combined with date or block ranges",
+    );
+  }
+  if (
+    input.startDate !== undefined &&
+    input.endDate !== undefined &&
+    input.startDate > input.endDate
+  ) {
+    throw new RangeError("startDate must not be later than endDate");
+  }
+  if (
+    input.startBlock !== undefined &&
+    input.endBlock !== undefined &&
+    input.startBlock > input.endBlock
+  ) {
+    throw new RangeError("startBlock must not be greater than endBlock");
+  }
+  if (hasLegacySelector) {
+    const records = await getStratigraphyData({
+      days: input.days,
+      date: input.date,
+    });
+    return records.slice(-input.limit);
+  }
+  const records = await getStratigraphyData();
+  return records
+    .filter((_record, index) => {
+      const date = snapshotDate(index, records.length);
+      const block = snapshotBlock(index, records.length);
+      return (
+        (input.startDate === undefined || date >= input.startDate) &&
+        (input.endDate === undefined || date <= input.endDate) &&
+        (input.startBlock === undefined || block >= input.startBlock) &&
+        (input.endBlock === undefined || block <= input.endBlock)
+      );
+    })
+    .slice(0, input.limit);
+}
+
 const mcpToolDefinitions = [
   {
     name: "get_bitcoin_stratigraphy",
@@ -354,7 +449,12 @@ const mcpToolDefinitions = [
     inputSchema: {
       type: "object",
       description: "Stratigraphy telemetry query parameters.",
-      examples: [{ days: 7 }, { date: "2026-09-09" }],
+      examples: [
+        { days: 7, limit: 7 },
+        { date: "2026-09-09", limit: 1 },
+        { startDate: "2026-08-01", endDate: "2026-08-31", limit: 10 },
+        { startBlock: 910000, endBlock: 920000, limit: 25 },
+      ],
       additionalProperties: false,
       properties: {
         days: field(
@@ -368,6 +468,36 @@ const mcpToolDefinitions = [
           "Exact dataset date in YYYY-MM-DD format.",
           ["2026-09-09"],
           { pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+        ),
+        startDate: field(
+          "string",
+          "Inclusive ISO 8601 start date for a snapshot range query.",
+          ["2026-08-01"],
+          { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+        ),
+        endDate: field(
+          "string",
+          "Inclusive ISO 8601 end date for a snapshot range query.",
+          ["2026-08-31"],
+          { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+        ),
+        startBlock: field(
+          "integer",
+          "Inclusive lower bound of the deterministic daily block-height index.",
+          [910000],
+          { minimum: 0 },
+        ),
+        endBlock: field(
+          "integer",
+          "Inclusive upper bound of the deterministic daily block-height index.",
+          [920000],
+          { minimum: 0 },
+        ),
+        limit: field(
+          "integer",
+          "Maximum snapshots returned; defaults to 10 and cannot exceed 100.",
+          [10],
+          { minimum: 1, maximum: 100, default: 10 },
         ),
       },
     },
@@ -385,6 +515,98 @@ const mcpToolDefinitions = [
         ),
       },
       required: ["records"],
+    },
+  },
+  {
+    name: "list_stratigraphy_catalog",
+    title: "List Stratigraphy Catalog",
+    description:
+      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, and available telemetry metrics without requiring prior knowledge of exact snapshot parameters.",
+    annotations: readOnlyToolAnnotations,
+    inputSchema: {
+      type: "object",
+      description: "No parameters are required to discover the catalog.",
+      examples: [{}],
+      additionalProperties: false,
+      properties: {},
+    },
+    outputSchema: {
+      type: "object",
+      description: "Discoverable bounds and metrics for the stratigraphy dataset.",
+      examples: [{
+        totalSnapshots: 422,
+        oldestBlock: 859376,
+        newestBlock: 920000,
+        availableMetrics: [...catalogMetricNames],
+        dateBounds: {
+          startDate: "2025-07-15",
+          endDate: "2026-09-09",
+        },
+      }],
+      additionalProperties: false,
+      properties: {
+        totalSnapshots: field(
+          "integer",
+          "Total number of daily stratigraphy snapshots currently available.",
+          [422],
+          { minimum: 1 },
+        ),
+        oldestBlock: field(
+          "integer",
+          "Lowest block height in the deterministic daily snapshot index.",
+          [859376],
+          { minimum: 0 },
+        ),
+        newestBlock: field(
+          "integer",
+          "Highest block height in the deterministic daily snapshot index.",
+          [920000],
+          { minimum: 0 },
+        ),
+        availableMetrics: field(
+          "array",
+          "Telemetry metric paths available in each stratigraphy snapshot.",
+          [[...catalogMetricNames]],
+          {
+            items: field(
+              "string",
+              "Dot-delimited path of an available telemetry metric.",
+              ["quantitative_alpha.target_multiplier"],
+            ),
+          },
+        ),
+        dateBounds: {
+          type: "object",
+          description: "Inclusive ISO date bounds of the available snapshots.",
+          examples: [{
+            startDate: "2025-07-15",
+            endDate: "2026-09-09",
+          }],
+          additionalProperties: false,
+          properties: {
+            startDate: field(
+              "string",
+              "ISO 8601 date of the oldest available snapshot.",
+              ["2025-07-15"],
+              { format: "date" },
+            ),
+            endDate: field(
+              "string",
+              "ISO 8601 date of the newest available snapshot.",
+              ["2026-09-09"],
+              { format: "date" },
+            ),
+          },
+          required: ["startDate", "endDate"],
+        },
+      },
+      required: [
+        "totalSnapshots",
+        "oldestBlock",
+        "newestBlock",
+        "availableMetrics",
+        "dateBounds",
+      ],
     },
   },
   {
@@ -541,7 +763,7 @@ function createBitcoinStratigraphyMcpServer() {
         };
       }
       try {
-        const records = await getStratigraphyData({ days, date });
+        const records = await queryStratigraphy(parsed.data);
         const structuredContent = { records };
         return {
           content: [
@@ -566,6 +788,16 @@ function createBitcoinStratigraphyMcpServer() {
           ],
         };
       }
+    }
+    if (request.params.name === "list_stratigraphy_catalog") {
+      if (!z.object({}).strict().safeParse(args).success) {
+        throw new McpError(ErrorCode.InvalidParams, "Catalog takes no arguments");
+      }
+      const structuredContent = await stratigraphyCatalog();
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
     }
     if (request.params.name === "verify_zk_proof") {
       const parsed = verifyProofInputSchema.safeParse(args);

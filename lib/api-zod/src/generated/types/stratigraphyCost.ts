@@ -8,6 +8,7 @@
 import type { AgentReputationMetadata } from './agentReputationMetadata';
 import type { JsonSchema } from './jsonSchema';
 import type { SettlementAsset } from './settlementAsset';
+import type { StratigraphyCatalogMcpTool } from './stratigraphyCatalogMcpTool';
 import type { StratigraphyCostAccessTiersItem } from './stratigraphyCostAccessTiersItem';
 import type { StratigraphyCostDataset } from './stratigraphyCostDataset';
 import type { StratigraphyCostDynamicPricing } from './stratigraphyCostDynamicPricing';
@@ -30,5 +31,6 @@ export interface StratigraphyCost {
   legacy_query_pricing: StratigraphyCostLegacyQueryPricing;
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;
+  catalog_tool: StratigraphyCatalogMcpTool;
   response_schema: JsonSchema;
 }

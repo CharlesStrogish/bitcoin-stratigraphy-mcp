@@ -295,6 +295,10 @@ const submitProofInputSchema = z.object({
   "Fresh Groth16 proof coordinates and public signals for verification, indexing, and publication.",
 );
 
+const meshStatusInputSchema = z.object({}).strict().describe(
+  "Input options for querying P2P mesh status and node health.",
+);
+
 const field = (
   type: string | string[],
   description: string,
@@ -1204,11 +1208,11 @@ const mcpToolDefinitions = [
     name: "get_mesh_status",
     title: "Get Mesh Status",
     description:
-      "Retrieve P2P peer discovery, cross-validation, quorum, consensus topology, and L402 health. Use this tool when you need P2P topology, peer count, or L402 health checks. Do NOT use for telemetry or proofs; use get_bitcoin_stratigraphy, list_stratigraphy_catalog, verify_zk_proof, submit_zk_proof, or get_proof_status instead.",
+      "Retrieve P2P peer discovery, cross-validation, quorum, consensus topology, and L402 health. Use this tool when you need P2P topology, peer count, or L402 health checks. Do NOT use for telemetry or proofs; use get_bitcoin_stratigraphy, list_stratigraphy_catalog, verify_zk_proof, submit_zk_proof, or get_proof_status instead. Behavior: Pure read-only and idempotent system health query with zero server-side state modification; reflects live P2P node mesh telemetry.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "No parameters are required for the mesh status query.",
+      description: "Input options for querying P2P mesh status and node health.",
       examples: [{}],
       additionalProperties: false,
       properties: {},
@@ -1393,7 +1397,7 @@ function createBitcoinStratigraphyMcpServer() {
       };
     }
     if (request.params.name === "get_mesh_status") {
-      if (!z.object({}).strict().safeParse(args).success) {
+      if (!meshStatusInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Mesh status takes no arguments");
       }
       const structuredContent = mesh.status();

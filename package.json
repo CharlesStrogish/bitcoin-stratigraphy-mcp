@@ -7,6 +7,7 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "release:check": "node scripts/check-published-assets.mjs",
     "test": "node --test test/*.test.mjs && pnpm -r --if-present run test",
+    "test:l402": "tsx scripts/test-l402.ts",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },

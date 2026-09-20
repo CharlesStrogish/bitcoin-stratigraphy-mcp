@@ -5,5 +5,5 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["src", "broadcast-nostr.ts", "test-l402.ts"]
+  "include": ["src", "broadcast-nostr.ts", "test-l402.ts", "test-nostr.ts"]
 }

@@ -4,6 +4,72 @@ settings:
   autoInstallPeers: false
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@replit/vite-plugin-cartographer':
+      specifier: ^0.5.21
+      version: 0.5.21
+    '@replit/vite-plugin-dev-banner':
+      specifier: ^0.1.1
+      version: 0.1.2
+    '@replit/vite-plugin-runtime-error-modal':
+      specifier: ^0.0.6
+      version: 0.0.6
+    '@tailwindcss/vite':
+      specifier: ^4.1.14
+      version: 4.3.3
+    '@tanstack/react-query':
+      specifier: ^5.90.21
+      version: 5.101.4
+    '@types/node':
+      specifier: ^25.3.3
+      version: 25.9.5
+    '@types/react':
+      specifier: ^19.2.0
+      version: 19.2.18
+    '@types/react-dom':
+      specifier: ^19.2.0
+      version: 19.2.4
+    '@vitejs/plugin-react':
+      specifier: ^5.0.4
+      version: 5.2.0
+    class-variance-authority:
+      specifier: ^0.7.1
+      version: 0.7.1
+    clsx:
+      specifier: ^2.1.1
+      version: 2.1.1
+    drizzle-orm:
+      specifier: ^0.45.2
+      version: 0.45.2
+    framer-motion:
+      specifier: ^12.23.24
+      version: 12.43.0
+    lucide-react:
+      specifier: ^0.545.0
+      version: 0.545.0
+    react:
+      specifier: 19.1.0
+      version: 19.1.0
+    react-dom:
+      specifier: 19.1.0
+      version: 19.1.0
+    tailwind-merge:
+      specifier: ^3.3.1
+      version: 3.6.0
+    tailwindcss:
+      specifier: ^4.1.14
+      version: 4.3.3
+    tsx:
+      specifier: ^4.23.4
+      version: 4.23.4
+    vite:
+      specifier: ^7.3.2
+      version: 7.3.6
+    zod:
+      specifier: ^3.25.76
+      version: 3.25.76
+
 overrides:
   esbuild: 0.28.2
   fast-uri: 3.1.6
@@ -37,6 +103,9 @@ importers:
       prettier:
         specifier: ^3.9.6
         version: 3.9.6
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.4
       typescript:
         specifier: ~5.9.3
         version: 5.9.3

@@ -581,7 +581,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.deepEqual(
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
     [
-      "get_bitcoin_stratigraphy",
+      "get_stratigraphy",
       "list_stratigraphy_catalog",
       "verify_zk_proof",
       "get_proof_status",
@@ -642,7 +642,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   }
   const tool = listed.result?.tools.find(
     (candidate: { name: string }) =>
-      candidate.name === "get_bitcoin_stratigraphy",
+      candidate.name === "get_stratigraphy",
   );
   assert.ok(tool);
   const queryProperties = tool.inputSchema.properties as Record<
@@ -712,7 +712,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   });
 
   const called = await mcpRequest("tools/call", {
-    name: "get_bitcoin_stratigraphy",
+    name: "get_stratigraphy",
     arguments: { date: "2026-09-09" },
   });
   const records = called.result?.structuredContent.records as Array<{
@@ -736,7 +736,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const dateRangeCalled = await mcpRequest("tools/call", {
-    name: "get_bitcoin_stratigraphy",
+    name: "get_stratigraphy",
     arguments: {
       startDate: "2026-08-01",
       endDate: "2026-08-31",
@@ -746,7 +746,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.equal(dateRangeCalled.result?.structuredContent.records.length, 5);
 
   const blockRangeCalled = await mcpRequest("tools/call", {
-    name: "get_bitcoin_stratigraphy",
+    name: "get_stratigraphy",
     arguments: {
       startBlock: 919000,
       endBlock: 920000,
@@ -756,7 +756,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.equal(blockRangeCalled.result?.structuredContent.records.length, 4);
 
   const exactBlockCalled = await mcpRequest("tools/call", {
-    name: "get_bitcoin_stratigraphy",
+    name: "get_stratigraphy",
     arguments: {
       blockHeight: 920000,
       metrics: ["target_multiplier"],
@@ -989,7 +989,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
   );
   assert.equal(body.dataset.days, 422);
   assert.equal(body.dataset.grows_over_time, true);
-  assert.equal(body.mcp_tool.name, "get_bitcoin_stratigraphy");
+  assert.equal(body.mcp_tool.name, "get_stratigraphy");
   assert.deepEqual(Object.keys(body.mcp_tool.parameters), [
     "days",
     "date",

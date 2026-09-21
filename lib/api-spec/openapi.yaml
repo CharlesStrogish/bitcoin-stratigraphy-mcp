@@ -951,7 +951,7 @@ components:
           properties:
             name:
               type: string
-              const: get_bitcoin_stratigraphy
+              const: get_stratigraphy
             parameters:
               type: object
               properties:

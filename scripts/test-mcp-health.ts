@@ -5,7 +5,7 @@ const DEFAULT_BASE_URL =
 const MCP_PROTOCOL_VERSION = "2025-03-26";
 const REQUEST_TIMEOUT_MS = 30_000;
 const EXPECTED_TOOLS = [
-  "get_bitcoin_stratigraphy",
+  "get_stratigraphy",
   "list_stratigraphy_catalog",
   "verify_zk_proof",
   "get_proof_status",

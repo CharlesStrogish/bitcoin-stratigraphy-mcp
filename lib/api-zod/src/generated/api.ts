@@ -153,7 +153,7 @@ export const GetStratigraphyCostResponse = zod.object({
   "grows_over_time": zod.literal(true)
 }),
   "mcp_tool": zod.object({
-  "name": zod.literal("get_bitcoin_stratigraphy"),
+  "name": zod.literal("get_stratigraphy"),
   "parameters": zod.object({
   "days": zod.object({
   "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),

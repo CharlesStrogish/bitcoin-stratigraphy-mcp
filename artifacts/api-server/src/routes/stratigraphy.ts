@@ -949,7 +949,7 @@ export function registerStratigraphyRoutes(
         grows_over_time: true,
       },
       mcp_tool: {
-        name: "get_bitcoin_stratigraphy",
+        name: "get_stratigraphy",
         parameters: {
           days: {
             type: "integer",

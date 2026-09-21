@@ -376,7 +376,7 @@ export type StratigraphyCostMcpToolParameters = {
 };
 
 export type StratigraphyCostMcpTool = {
-  name: 'get_bitcoin_stratigraphy';
+  name: 'get_stratigraphy';
   parameters: StratigraphyCostMcpToolParameters;
 };
 

@@ -18,7 +18,7 @@
   },
   "mcp_tool_registry": [
     "list_stratigraphy_catalog",
-    "get_bitcoin_stratigraphy",
+    "get_stratigraphy",
     "list_proof_attestations",
     "get_proof_status",
     "verify_zk_proof",

@@ -597,7 +597,7 @@ async function queryStratigraphy(
 
 const mcpToolDefinitions = [
   {
-    name: "get_bitcoin_stratigraphy",
+    name: "get_stratigraphy",
     title: "Get Bitcoin Stratigraphy",
     description:
       "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection. Use this tool when you need raw historical telemetry or time-series ranges. Do NOT use for catalog discovery; use list_stratigraphy_catalog instead. Do NOT use for proof verification, submission, or lifecycle operations; use verify_zk_proof, submit_zk_proof, or get_proof_status instead. Behavior: Pure read-only and idempotent query with zero server-side state modification; responses are deterministically cached.",
@@ -699,7 +699,7 @@ const mcpToolDefinitions = [
     name: "list_stratigraphy_catalog",
     title: "List Stratigraphy Catalog",
     description:
-      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, snapshot CIDs, and available telemetry metrics. Use this tool first when you need to discover available dataset bounds and snapshot CIDs. Do NOT use for fetching raw time-series records; use get_bitcoin_stratigraphy instead. Behavior: Pure read-only and idempotent catalog discovery query with zero server-side state modification; returns global catalog metadata bounds.",
+      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, snapshot CIDs, and available telemetry metrics. Use this tool first when you need to discover available dataset bounds and snapshot CIDs. Do NOT use for fetching raw time-series records; use get_stratigraphy instead. Behavior: Pure read-only and idempotent catalog discovery query with zero server-side state modification; returns global catalog metadata bounds.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1238,7 +1238,7 @@ const mcpToolDefinitions = [
     name: "get_mesh_status",
     title: "Get Mesh Status",
     description:
-      "Retrieve P2P peer discovery, cross-validation, quorum, consensus topology, and L402 health. Use this tool when you need P2P topology, peer count, or L402 health checks. Do NOT use for telemetry or proofs; use get_bitcoin_stratigraphy, list_stratigraphy_catalog, verify_zk_proof, submit_zk_proof, or get_proof_status instead. Behavior: Pure read-only and idempotent system health query with zero server-side state modification; reflects live P2P node mesh telemetry.",
+      "Retrieve P2P peer discovery, cross-validation, quorum, consensus topology, and L402 health. Use this tool when you need P2P topology, peer count, or L402 health checks. Do NOT use for telemetry or proofs; use get_stratigraphy, list_stratigraphy_catalog, verify_zk_proof, submit_zk_proof, or get_proof_status instead. Behavior: Pure read-only and idempotent system health query with zero server-side state modification; reflects live P2P node mesh telemetry.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1296,7 +1296,7 @@ function createBitcoinStratigraphyMcpServer() {
   }));
   server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const args = request.params.arguments ?? {};
-    if (request.params.name === "get_bitcoin_stratigraphy") {
+    if (request.params.name === "get_stratigraphy") {
       const parsed = stratigraphyInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid stratigraphy query");

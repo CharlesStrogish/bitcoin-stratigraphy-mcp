@@ -10,11 +10,11 @@ import type { SubmitZkProofMcpToolRequiredInputsItem } from './submitZkProofMcpT
 import type { SubmitZkProofResult } from './submitZkProofResult';
 
 /**
- * MCP proof ingestion tool registered as submit_zk_proof.
+ * MCP proof ingestion tool registered as proof.submit.
  */
 export interface SubmitZkProofMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'submit_zk_proof';
+  name: 'proof.submit';
   /** Human-readable purpose of the proof ingestion tool. */
   description: string;
   /** Input property names required for every submission. */

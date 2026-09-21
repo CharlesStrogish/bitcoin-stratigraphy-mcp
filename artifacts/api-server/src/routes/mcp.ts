@@ -597,10 +597,10 @@ async function queryStratigraphy(
 
 const mcpToolDefinitions = [
   {
-    name: "get_stratigraphy",
+    name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection. Use this tool when you need raw historical telemetry or time-series ranges. Do NOT use for catalog discovery; use list_stratigraphy_catalog instead. Do NOT use for proof verification, submission, or lifecycle operations; use verify_zk_proof, submit_zk_proof, or get_proof_status instead. Behavior: Pure read-only and idempotent query with zero server-side state modification; responses are deterministically cached.",
+      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection. Use this tool when you need raw historical telemetry or time-series ranges. Do NOT use for catalog discovery; use stratigraphy.list instead. Do NOT use for proof verification, submission, or lifecycle operations; use proof.verify, proof.submit, or proof.status instead. Behavior: Pure read-only and idempotent query with zero server-side state modification; responses are deterministically cached.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -696,10 +696,10 @@ const mcpToolDefinitions = [
     },
   },
   {
-    name: "list_stratigraphy_catalog",
+    name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, snapshot CIDs, and available telemetry metrics. Use this tool first when you need to discover available dataset bounds and snapshot CIDs. Do NOT use for fetching raw time-series records; use get_stratigraphy instead. Behavior: Pure read-only and idempotent catalog discovery query with zero server-side state modification; returns global catalog metadata bounds.",
+      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, snapshot CIDs, and available telemetry metrics. Use this tool first when you need to discover available dataset bounds and snapshot CIDs. Do NOT use for fetching raw time-series records; use stratigraphy.get instead. Behavior: Pure read-only and idempotent catalog discovery query with zero server-side state modification; returns global catalog metadata bounds.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -789,10 +789,10 @@ const mcpToolDefinitions = [
     },
   },
   {
-    name: "verify_zk_proof",
+    name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Execute active, stateless Groth16/Poseidon cryptographic math verification on an incoming proof payload. Use this tool strictly for instant computational verification. Do NOT use for status lookups (use get_proof_status instead) or browsing attestation logs (use list_proof_attestations instead). Behavior: Pure read-only, stateless, and idempotent computational verification with zero server-side state modification or persistence; evaluates pairings over BN254 elliptic curve. Output: Returns a JSON object containing a boolean 'valid' verification status, execution latency milliseconds, and optional verification error message string.",
+      "Execute active, stateless Groth16/Poseidon cryptographic math verification on an incoming proof payload. Use this tool strictly for instant computational verification. Do NOT use for status lookups (use proof.status instead) or browsing attestation logs (use proof.list instead). Behavior: Pure read-only, stateless, and idempotent computational verification with zero server-side state modification or persistence; evaluates pairings over BN254 elliptic curve. Output: Returns a JSON object containing a boolean 'valid' verification status, execution latency milliseconds, and optional verification error message string.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -870,10 +870,10 @@ const mcpToolDefinitions = [
     },
   },
   {
-    name: "get_proof_status",
+    name: "proof.status",
     title: "Get Proof Status",
     description:
-      "Query the detailed attestation lifecycle and Nostr publication state of ONE specific known proof hash or snapshot digest. Use this tool when you already hold a proof hash or CID. Do NOT use for listing multiple proofs (use list_proof_attestations instead) or performing math verification (use verify_zk_proof instead). Behavior: Pure read-only and idempotent lookup with zero server-side state modification; queries indexed attestation memory and Nostr event log.",
+      "Query the detailed attestation lifecycle and Nostr publication state of ONE specific known proof hash or snapshot digest. Use this tool when you already hold a proof hash or CID. Do NOT use for listing multiple proofs (use proof.list instead) or performing math verification (use proof.verify instead). Behavior: Pure read-only and idempotent lookup with zero server-side state modification; queries indexed attestation memory and Nostr event log.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -945,10 +945,10 @@ const mcpToolDefinitions = [
     },
   },
   {
-    name: "list_proof_attestations",
+    name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest. Use this tool during discovery to list historical attestations. Do NOT use for querying a specific proof hash (use get_proof_status instead) or executing stateless verification (use verify_zk_proof instead). Behavior: Pure read-only and idempotent listing with zero server-side state modification; returns newest-first deduplicated records bounded to 1,000 entries.",
+      "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest. Use this tool during discovery to list historical attestations. Do NOT use for querying a specific proof hash (use proof.status instead) or executing stateless verification (use proof.verify instead). Behavior: Pure read-only and idempotent listing with zero server-side state modification; returns newest-first deduplicated records bounded to 1,000 entries.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1076,10 +1076,10 @@ const mcpToolDefinitions = [
     },
   },
   {
-    name: "submit_zk_proof",
+    name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine. Use this tool when you need to submit fresh proofs for verification, lifecycle indexing, and Nostr NIP-78 relay broadcast. Do NOT use for dry-run verification; use verify_zk_proof instead.",
+      "Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine. Use this tool when you need to submit fresh proofs for verification, lifecycle indexing, and Nostr NIP-78 relay broadcast. Do NOT use for dry-run verification; use proof.verify instead.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1235,10 +1235,10 @@ const mcpToolDefinitions = [
     },
   },
   {
-    name: "get_mesh_status",
+    name: "mesh.status",
     title: "Get Mesh Status",
     description:
-      "Retrieve P2P peer discovery, cross-validation, quorum, consensus topology, and L402 health. Use this tool when you need P2P topology, peer count, or L402 health checks. Do NOT use for telemetry or proofs; use get_stratigraphy, list_stratigraphy_catalog, verify_zk_proof, submit_zk_proof, or get_proof_status instead. Behavior: Pure read-only and idempotent system health query with zero server-side state modification; reflects live P2P node mesh telemetry.",
+      "Retrieve P2P peer discovery, cross-validation, quorum, consensus topology, and L402 health. Use this tool when you need P2P topology, peer count, or L402 health checks. Do NOT use for telemetry or proofs; use stratigraphy.get, stratigraphy.list, proof.verify, proof.submit, or proof.status instead. Behavior: Pure read-only and idempotent system health query with zero server-side state modification; reflects live P2P node mesh telemetry.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1296,7 +1296,7 @@ function createBitcoinStratigraphyMcpServer() {
   }));
   server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const args = request.params.arguments ?? {};
-    if (request.params.name === "get_stratigraphy") {
+    if (request.params.name === "stratigraphy.get") {
       const parsed = stratigraphyInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid stratigraphy query");
@@ -1340,7 +1340,7 @@ function createBitcoinStratigraphyMcpServer() {
         };
       }
     }
-    if (request.params.name === "list_stratigraphy_catalog") {
+    if (request.params.name === "stratigraphy.list") {
       if (!stratigraphyCatalogInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Catalog takes no arguments");
       }
@@ -1350,7 +1350,7 @@ function createBitcoinStratigraphyMcpServer() {
         structuredContent,
       };
     }
-    if (request.params.name === "verify_zk_proof") {
+    if (request.params.name === "proof.verify") {
       const parsed = verifyProofInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid proof payload");
@@ -1371,7 +1371,7 @@ function createBitcoinStratigraphyMcpServer() {
         structuredContent,
       };
     }
-    if (request.params.name === "get_proof_status") {
+    if (request.params.name === "proof.status") {
       const parsed = proofStatusInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(
@@ -1393,7 +1393,7 @@ function createBitcoinStratigraphyMcpServer() {
         structuredContent,
       };
     }
-    if (request.params.name === "list_proof_attestations") {
+    if (request.params.name === "proof.list") {
       const parsed = listProofAttestationsInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(
@@ -1415,7 +1415,7 @@ function createBitcoinStratigraphyMcpServer() {
         structuredContent,
       };
     }
-    if (request.params.name === "submit_zk_proof") {
+    if (request.params.name === "proof.submit") {
       const parsed = submitProofInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid zk proof submission");
@@ -1426,7 +1426,7 @@ function createBitcoinStratigraphyMcpServer() {
         structuredContent,
       };
     }
-    if (request.params.name === "get_mesh_status") {
+    if (request.params.name === "mesh.status") {
       if (!meshStatusInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Mesh status takes no arguments");
       }

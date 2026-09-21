@@ -581,13 +581,13 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.deepEqual(
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
     [
-      "get_stratigraphy",
-      "list_stratigraphy_catalog",
-      "verify_zk_proof",
-      "get_proof_status",
-      "list_proof_attestations",
-      "submit_zk_proof",
-      "get_mesh_status",
+      "stratigraphy.get",
+      "stratigraphy.list",
+      "proof.verify",
+      "proof.status",
+      "proof.list",
+      "proof.submit",
+      "mesh.status",
     ],
   );
   const assertDocumentedSchema = (
@@ -642,7 +642,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   }
   const tool = listed.result?.tools.find(
     (candidate: { name: string }) =>
-      candidate.name === "get_stratigraphy",
+      candidate.name === "stratigraphy.get",
   );
   assert.ok(tool);
   const queryProperties = tool.inputSchema.properties as Record<
@@ -712,7 +712,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   });
 
   const called = await mcpRequest("tools/call", {
-    name: "get_stratigraphy",
+    name: "stratigraphy.get",
     arguments: { date: "2026-09-09" },
   });
   const records = called.result?.structuredContent.records as Array<{
@@ -736,7 +736,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const dateRangeCalled = await mcpRequest("tools/call", {
-    name: "get_stratigraphy",
+    name: "stratigraphy.get",
     arguments: {
       startDate: "2026-08-01",
       endDate: "2026-08-31",
@@ -746,7 +746,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.equal(dateRangeCalled.result?.structuredContent.records.length, 5);
 
   const blockRangeCalled = await mcpRequest("tools/call", {
-    name: "get_stratigraphy",
+    name: "stratigraphy.get",
     arguments: {
       startBlock: 919000,
       endBlock: 920000,
@@ -756,7 +756,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.equal(blockRangeCalled.result?.structuredContent.records.length, 4);
 
   const exactBlockCalled = await mcpRequest("tools/call", {
-    name: "get_stratigraphy",
+    name: "stratigraphy.get",
     arguments: {
       blockHeight: 920000,
       metrics: ["target_multiplier"],
@@ -769,7 +769,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const catalogCalled = await mcpRequest("tools/call", {
-    name: "list_stratigraphy_catalog",
+    name: "stratigraphy.list",
     arguments: {},
   });
   assert.deepEqual(catalogCalled.result?.structuredContent.dateBounds, {
@@ -786,14 +786,14 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const meshCalled = await mcpRequest("tools/call", {
-    name: "get_mesh_status",
+    name: "mesh.status",
     arguments: {},
   });
   assert.equal(meshCalled.result?.structuredContent.topologyHealth, "isolated");
   assert.equal(meshCalled.result?.structuredContent.quorumThreshold, 1);
 
   const proofCalled = await mcpRequest("tools/call", {
-    name: "verify_zk_proof",
+    name: "proof.verify",
     arguments: {
       proof: "invalid-proof",
       publicInputs: {
@@ -818,7 +818,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const proofStatusCalled = await mcpRequest("tools/call", {
-    name: "get_proof_status",
+    name: "proof.status",
     arguments: { snapshotDigest: "1" },
   });
   assert.deepEqual(
@@ -836,7 +836,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const submitted = await mcpRequest("tools/call", {
-    name: "submit_zk_proof",
+    name: "proof.submit",
     arguments: {
       proof: {
         pi_a: ["1", "2", "1"],
@@ -858,7 +858,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const submittedStatus = await mcpRequest("tools/call", {
-    name: "get_proof_status",
+    name: "proof.status",
     arguments: {
       proofHash: submitted.result?.structuredContent.proofHash,
     },
@@ -866,7 +866,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   assert.equal(submittedStatus.result?.structuredContent.status, "invalid");
 
   const listedAttestations = await mcpRequest("tools/call", {
-    name: "list_proof_attestations",
+    name: "proof.list",
     arguments: { limit: 10, status: "invalid" },
   });
   assert.ok(listedAttestations.result?.structuredContent.total >= 1);
@@ -989,7 +989,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
   );
   assert.equal(body.dataset.days, 422);
   assert.equal(body.dataset.grows_over_time, true);
-  assert.equal(body.mcp_tool.name, "get_stratigraphy");
+  assert.equal(body.mcp_tool.name, "stratigraphy.get");
   assert.deepEqual(Object.keys(body.mcp_tool.parameters), [
     "days",
     "date",
@@ -1001,15 +1001,15 @@ test("serves public pre-flight cost and schema metadata", async () => {
     "endBlock",
     "limit",
   ]);
-  assert.equal(body.catalog_tool.name, "list_stratigraphy_catalog");
-  assert.equal(body.proof_status_tool.name, "get_proof_status");
+  assert.equal(body.catalog_tool.name, "stratigraphy.list");
+  assert.equal(body.proof_status_tool.name, "proof.status");
   assert.deepEqual(body.proof_status_tool.identifiers, [
     "proofHash",
     "snapshotDigest",
   ]);
   assert.equal(
     body.proof_attestations_tool.name,
-    "list_proof_attestations",
+    "proof.list",
   );
   assert.deepEqual(
     Object.keys(body.proof_attestations_tool.parameters),
@@ -1019,7 +1019,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
     body.proof_attestations_tool.exampleResult.attestations.length,
     1,
   );
-  assert.equal(body.submit_proof_tool.name, "submit_zk_proof");
+  assert.equal(body.submit_proof_tool.name, "proof.submit");
   assert.deepEqual(body.submit_proof_tool.requiredInputs, [
     "proof",
     "publicSignals",

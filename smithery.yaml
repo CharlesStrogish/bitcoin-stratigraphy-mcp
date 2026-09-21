@@ -22,7 +22,7 @@ transport:
   url: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp
 
 tools:
-  - name: get_stratigraphy
+  - name: stratigraphy.get
     title: Get Bitcoin Stratigraphy
     description: >-
       Returns validated Bitcoin Stratigraphy entries with Nostr NIP-78

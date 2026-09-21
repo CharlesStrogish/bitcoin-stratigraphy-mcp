@@ -376,7 +376,7 @@ export type StratigraphyCostMcpToolParameters = {
 };
 
 export type StratigraphyCostMcpTool = {
-  name: 'get_stratigraphy';
+  name: 'stratigraphy.get';
   parameters: StratigraphyCostMcpToolParameters;
 };
 
@@ -433,11 +433,11 @@ export interface StratigraphyCatalog {
 }
 
 /**
- * MCP dataset discovery tool registered as list_stratigraphy_catalog.
+ * MCP dataset discovery tool registered as stratigraphy.list.
  */
 export interface StratigraphyCatalogMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'list_stratigraphy_catalog';
+  name: 'stratigraphy.list';
   /** Human-readable purpose of the catalog discovery tool. */
   description: string;
   catalog: StratigraphyCatalog;
@@ -482,11 +482,11 @@ export interface ProofStatus {
 }
 
 /**
- * MCP lifecycle query tool registered as get_proof_status.
+ * MCP lifecycle query tool registered as proof.status.
  */
 export interface ProofStatusMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'get_proof_status';
+  name: 'proof.status';
   /** Human-readable purpose of the proof lifecycle query. */
   description: string;
   /** Alternative identifiers accepted by the tool; callers provide exactly one. */
@@ -550,11 +550,11 @@ export type ListProofAttestationsMcpToolParameters = {
 };
 
 /**
- * MCP proof-attestation discovery tool registered as list_proof_attestations.
+ * MCP proof-attestation discovery tool registered as proof.list.
  */
 export interface ListProofAttestationsMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'list_proof_attestations';
+  name: 'proof.list';
   /** Human-readable purpose of the attestation listing tool. */
   description: string;
   /** Optional filters accepted by the attestation listing tool. */
@@ -603,11 +603,11 @@ export interface SubmitZkProofResult {
 }
 
 /**
- * MCP proof ingestion tool registered as submit_zk_proof.
+ * MCP proof ingestion tool registered as proof.submit.
  */
 export interface SubmitZkProofMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'submit_zk_proof';
+  name: 'proof.submit';
   /** Human-readable purpose of the proof ingestion tool. */
   description: string;
   /** Input property names required for every submission. */

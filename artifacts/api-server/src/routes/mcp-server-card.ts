@@ -21,7 +21,7 @@ export const mcpServerCard = {
     ],
     tools: [
       {
-        name: "get_stratigraphy",
+        name: "stratigraphy.get",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -40,7 +40,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "list_stratigraphy_catalog",
+        name: "stratigraphy.list",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -49,7 +49,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "verify_zk_proof",
+        name: "proof.verify",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -58,7 +58,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "get_proof_status",
+        name: "proof.status",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -67,7 +67,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "list_proof_attestations",
+        name: "proof.list",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -76,7 +76,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "submit_zk_proof",
+        name: "proof.submit",
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,
@@ -85,7 +85,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "get_mesh_status",
+        name: "mesh.status",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,

@@ -45,7 +45,7 @@ const cost: CostDiscovery = {
   },
   legacy_query_pricing: { sats_per_day: 1, minimum_sats: 5 },
   dataset: { days: 422, first_day: 1, last_day: 422, grows_over_time: true },
-  mcp_tool: { name: "get_stratigraphy", parameters: {} },
+  mcp_tool: { name: "stratigraphy.get", parameters: {} },
   response_schema: {},
 };
 const challenge = {

@@ -8,11 +8,11 @@
 import type { StratigraphyCatalog } from './stratigraphyCatalog';
 
 /**
- * MCP dataset discovery tool registered as list_stratigraphy_catalog.
+ * MCP dataset discovery tool registered as stratigraphy.list.
  */
 export interface StratigraphyCatalogMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'list_stratigraphy_catalog';
+  name: 'stratigraphy.list';
   /** Human-readable purpose of the catalog discovery tool. */
   description: string;
   catalog: StratigraphyCatalog;

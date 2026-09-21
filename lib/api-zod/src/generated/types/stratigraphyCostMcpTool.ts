@@ -8,6 +8,6 @@
 import type { StratigraphyCostMcpToolParameters } from './stratigraphyCostMcpToolParameters';
 
 export type StratigraphyCostMcpTool = {
-  name: 'get_stratigraphy';
+  name: 'stratigraphy.get';
   parameters: StratigraphyCostMcpToolParameters;
 };

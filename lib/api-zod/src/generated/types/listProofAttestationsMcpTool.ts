@@ -9,11 +9,11 @@ import type { ListProofAttestationsMcpToolParameters } from './listProofAttestat
 import type { ListProofAttestationsResult } from './listProofAttestationsResult';
 
 /**
- * MCP proof-attestation discovery tool registered as list_proof_attestations.
+ * MCP proof-attestation discovery tool registered as proof.list.
  */
 export interface ListProofAttestationsMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'list_proof_attestations';
+  name: 'proof.list';
   /** Human-readable purpose of the attestation listing tool. */
   description: string;
   /** Optional filters accepted by the attestation listing tool. */

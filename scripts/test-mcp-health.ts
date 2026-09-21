@@ -5,13 +5,13 @@ const DEFAULT_BASE_URL =
 const MCP_PROTOCOL_VERSION = "2025-03-26";
 const REQUEST_TIMEOUT_MS = 30_000;
 const EXPECTED_TOOLS = [
-  "get_stratigraphy",
-  "list_stratigraphy_catalog",
-  "verify_zk_proof",
-  "get_proof_status",
-  "list_proof_attestations",
-  "submit_zk_proof",
-  "get_mesh_status",
+  "stratigraphy.get",
+  "stratigraphy.list",
+  "proof.verify",
+  "proof.status",
+  "proof.list",
+  "proof.submit",
+  "mesh.status",
 ] as const;
 
 type JsonRpcResponse = {
@@ -199,7 +199,7 @@ function sampleBn254Proof(): string {
 
 async function assertZkVerificationCall(baseUrl: URL) {
   const response = await mcpRequest(baseUrl, 2, "tools/call", {
-    name: "verify_zk_proof",
+    name: "proof.verify",
     arguments: {
       proof: sampleBn254Proof(),
       publicInputs: {
@@ -223,11 +223,11 @@ async function assertZkVerificationCall(baseUrl: URL) {
   assert.notEqual(
     response.result.isError,
     true,
-    "verify_zk_proof returned an MCP tool execution error",
+    "proof.verify returned an MCP tool execution error",
   );
   assert.ok(
     isRecord(response.result.structuredContent),
-    "verify_zk_proof must return structuredContent",
+    "proof.verify must return structuredContent",
   );
   const output = response.result.structuredContent;
   assert.equal(typeof output.valid, "boolean", "valid must be a boolean");
@@ -253,7 +253,7 @@ async function assertZkVerificationCall(baseUrl: URL) {
     assert.equal(typeof output.error, "string", "error must be a string");
   }
   console.log(
-    `Direct verify_zk_proof call verified: valid=${String(output.valid)}, computationTimeMs=${String(output.computationTimeMs)}.`,
+    `Direct proof.verify call verified: valid=${String(output.valid)}, computationTimeMs=${String(output.computationTimeMs)}.`,
   );
 }
 

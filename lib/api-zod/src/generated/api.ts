@@ -153,7 +153,7 @@ export const GetStratigraphyCostResponse = zod.object({
   "grows_over_time": zod.literal(true)
 }),
   "mcp_tool": zod.object({
-  "name": zod.literal("get_stratigraphy"),
+  "name": zod.literal("stratigraphy.get"),
   "parameters": zod.object({
   "days": zod.object({
   "type": zod.string().describe('JSON Schema primitive type accepted by the tool parameter.'),
@@ -248,7 +248,7 @@ export const GetStratigraphyCostResponse = zod.object({
 })
 }),
   "catalog_tool": zod.object({
-  "name": zod.literal("list_stratigraphy_catalog").describe('Stable MCP tool name used with tools\/call.'),
+  "name": zod.literal("stratigraphy.list").describe('Stable MCP tool name used with tools\/call.'),
   "description": zod.string().describe('Human-readable purpose of the catalog discovery tool.'),
   "catalog": zod.object({
   "totalSnapshots": zod.number().int().min(1).describe('Total number of daily stratigraphy snapshots currently available.'),
@@ -260,9 +260,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "endDate": zod.coerce.date().describe('ISO 8601 date of the newest available snapshot.')
 }).describe('Inclusive ISO date bounds of the available snapshots.')
 }).describe('Discoverable bounds and metric inventory for the stratigraphy dataset.')
-}).describe('MCP dataset discovery tool registered as list_stratigraphy_catalog.'),
+}).describe('MCP dataset discovery tool registered as stratigraphy.list.'),
   "proof_status_tool": zod.object({
-  "name": zod.literal("get_proof_status").describe('Stable MCP tool name used with tools\/call.'),
+  "name": zod.literal("proof.status").describe('Stable MCP tool name used with tools\/call.'),
   "description": zod.string().describe('Human-readable purpose of the proof lifecycle query.'),
   "identifiers": zod.array(zod.enum(['proofHash', 'snapshotDigest'])).describe('Alternative identifiers accepted by the tool; callers provide exactly one.'),
   "exampleStatus": zod.object({
@@ -271,9 +271,9 @@ export const GetStratigraphyCostResponse = zod.object({
   "attestationCount": zod.number().int().min(getStratigraphyCostResponseProofStatusToolExampleStatusAttestationCountMin).describe('Number of Nostr NIP-78 attestations observed on the snapshot.'),
   "meshQuorum": zod.boolean().describe('Whether attestationCount meets the current mesh quorum threshold.')
 }).describe('Cryptographic verification and publication lifecycle state.')
-}).describe('MCP lifecycle query tool registered as get_proof_status.'),
+}).describe('MCP lifecycle query tool registered as proof.status.'),
   "proof_attestations_tool": zod.object({
-  "name": zod.literal("list_proof_attestations").describe('Stable MCP tool name used with tools\/call.'),
+  "name": zod.literal("proof.list").describe('Stable MCP tool name used with tools\/call.'),
   "description": zod.string().describe('Human-readable purpose of the attestation listing tool.'),
   "parameters": zod.object({
   "limit": zod.object({
@@ -308,9 +308,9 @@ export const GetStratigraphyCostResponse = zod.object({
 }).describe('One indexed zk-SNARK verification and Nostr attestation record.')).describe('Indexed proof attestations ordered from newest to oldest.'),
   "total": zod.number().int().min(getStratigraphyCostResponseProofAttestationsToolExampleResultTotalMin).describe('Total matching records before the result limit is applied.')
 }).describe('Recent indexed proof attestations and the total matching count.')
-}).describe('MCP proof-attestation discovery tool registered as list_proof_attestations.'),
+}).describe('MCP proof-attestation discovery tool registered as proof.list.'),
   "submit_proof_tool": zod.object({
-  "name": zod.literal("submit_zk_proof").describe('Stable MCP tool name used with tools\/call.'),
+  "name": zod.literal("proof.submit").describe('Stable MCP tool name used with tools\/call.'),
   "description": zod.string().describe('Human-readable purpose of the proof ingestion tool.'),
   "requiredInputs": zod.array(zod.enum(['proof', 'publicSignals'])).describe('Input property names required for every submission.'),
   "optionalInputs": zod.array(zod.enum(['snapshotDigest'])).describe('Optional input property names accepted by the submission.'),
@@ -320,7 +320,7 @@ export const GetStratigraphyCostResponse = zod.object({
   "submittedAt": zod.coerce.date().describe('ISO 8601 proof submission timestamp.'),
   "attestationStatus": zod.string().describe('Nostr NIP-78 broadcast confirmation state.')
 }).describe('Immediate proof ingestion and Nostr publication result.')
-}).describe('MCP proof ingestion tool registered as submit_zk_proof.'),
+}).describe('MCP proof ingestion tool registered as proof.submit.'),
   "response_schema": zod.object({
   "type": zod.string(),
   "items": zod.record(zod.string(), zod.unknown()).optional(),

@@ -949,7 +949,7 @@ export function registerStratigraphyRoutes(
         grows_over_time: true,
       },
       mcp_tool: {
-        name: "get_stratigraphy",
+        name: "stratigraphy.get",
         parameters: {
           days: {
             type: "integer",
@@ -1032,7 +1032,7 @@ export function registerStratigraphyRoutes(
         },
       },
       catalog_tool: {
-        name: "list_stratigraphy_catalog",
+        name: "stratigraphy.list",
         description:
           "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, and available telemetry metrics without requiring prior knowledge of exact snapshot parameters.",
         catalog: {
@@ -1057,7 +1057,7 @@ export function registerStratigraphyRoutes(
         },
       },
       proof_status_tool: {
-        name: "get_proof_status",
+        name: "proof.status",
         description:
           "Query the cryptographic attestation status, verification cache history, and Nostr NIP-78 publication state of a previously submitted zk-SNARK proof digest or snapshot CID.",
         identifiers: ["proofHash", "snapshotDigest"],
@@ -1069,7 +1069,7 @@ export function registerStratigraphyRoutes(
         },
       },
       proof_attestations_tool: {
-        name: "list_proof_attestations",
+        name: "proof.list",
         description:
           "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest.",
         parameters: {
@@ -1104,7 +1104,7 @@ export function registerStratigraphyRoutes(
         },
       },
       submit_proof_tool: {
-        name: "submit_zk_proof",
+        name: "proof.submit",
         description:
           "Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine for verification, lifecycle indexing, and Nostr NIP-78 attestation broadcast.",
         requiredInputs: ["proof", "publicSignals"],

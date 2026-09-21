@@ -951,7 +951,7 @@ components:
           properties:
             name:
               type: string
-              const: get_stratigraphy
+              const: stratigraphy.get
             parameters:
               type: object
               properties:
@@ -1002,13 +1002,13 @@ components:
         - response_schema
     ListProofAttestationsMcpTool:
       type: object
-      description: MCP proof-attestation discovery tool registered as list_proof_attestations.
+      description: MCP proof-attestation discovery tool registered as proof.list.
       properties:
         name:
           type: string
-          const: list_proof_attestations
+          const: proof.list
           description: Stable MCP tool name used with tools/call.
-          examples: [list_proof_attestations]
+          examples: [proof.list]
         description:
           type: string
           description: Human-readable purpose of the attestation listing tool.
@@ -1082,13 +1082,13 @@ components:
         - meshQuorum
     SubmitZkProofMcpTool:
       type: object
-      description: MCP proof ingestion tool registered as submit_zk_proof.
+      description: MCP proof ingestion tool registered as proof.submit.
       properties:
         name:
           type: string
-          const: submit_zk_proof
+          const: proof.submit
           description: Stable MCP tool name used with tools/call.
-          examples: [submit_zk_proof]
+          examples: [proof.submit]
         description:
           type: string
           description: Human-readable purpose of the proof ingestion tool.
@@ -1139,13 +1139,13 @@ components:
       required: [proofHash, status, submittedAt, attestationStatus]
     ProofStatusMcpTool:
       type: object
-      description: MCP lifecycle query tool registered as get_proof_status.
+      description: MCP lifecycle query tool registered as proof.status.
       properties:
         name:
           type: string
-          const: get_proof_status
+          const: proof.status
           description: Stable MCP tool name used with tools/call.
-          examples: [get_proof_status]
+          examples: [proof.status]
         description:
           type: string
           description: Human-readable purpose of the proof lifecycle query.
@@ -1188,13 +1188,13 @@ components:
       required: [status, verifiedAt, attestationCount, meshQuorum]
     StratigraphyCatalogMcpTool:
       type: object
-      description: MCP dataset discovery tool registered as list_stratigraphy_catalog.
+      description: MCP dataset discovery tool registered as stratigraphy.list.
       properties:
         name:
           type: string
           description: Stable MCP tool name used with tools/call.
-          const: list_stratigraphy_catalog
-          examples: [list_stratigraphy_catalog]
+          const: stratigraphy.list
+          examples: [stratigraphy.list]
         description:
           type: string
           description: Human-readable purpose of the catalog discovery tool.

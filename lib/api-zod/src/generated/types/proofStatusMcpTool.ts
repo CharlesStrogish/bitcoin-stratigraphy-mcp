@@ -9,11 +9,11 @@ import type { ProofStatus } from './proofStatus';
 import type { ProofStatusMcpToolIdentifiersItem } from './proofStatusMcpToolIdentifiersItem';
 
 /**
- * MCP lifecycle query tool registered as get_proof_status.
+ * MCP lifecycle query tool registered as proof.status.
  */
 export interface ProofStatusMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'get_proof_status';
+  name: 'proof.status';
   /** Human-readable purpose of the proof lifecycle query. */
   description: string;
   /** Alternative identifiers accepted by the tool; callers provide exactly one. */

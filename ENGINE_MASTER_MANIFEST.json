@@ -17,12 +17,12 @@
     "validation": "Zod recursive schema contract assertions"
   },
   "mcp_tool_registry": [
-    "list_stratigraphy_catalog",
-    "get_stratigraphy",
-    "list_proof_attestations",
-    "get_proof_status",
-    "verify_zk_proof",
-    "submit_zk_proof",
-    "get_mesh_status"
+    "stratigraphy.list",
+    "stratigraphy.get",
+    "proof.list",
+    "proof.status",
+    "proof.verify",
+    "proof.submit",
+    "mesh.status"
   ]
 }

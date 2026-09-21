@@ -8,6 +8,7 @@
     "release:check": "node scripts/check-published-assets.mjs",
     "test": "node --test test/*.test.mjs && pnpm -r --if-present run test",
     "test:l402": "pnpm exec tsx scripts/test-l402.ts",
+    "test:dvm": "tsx scripts/test-dvm-client.ts",
     "test:mcp": "pnpm exec tsx scripts/test-mcp-health.ts",
     "test:nostr": "pnpm exec tsx scripts/test-nostr.ts",
     "typecheck:libs": "tsc --build",

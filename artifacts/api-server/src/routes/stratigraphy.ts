@@ -9,6 +9,7 @@ import {
   type Request,
   type Response,
 } from "express";
+import { createL402Middleware } from "../middleware/l402";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -71,6 +72,10 @@ import {
   verifyZkProofForSnapshot,
   ZkVerifierOverloadedError,
 } from "../services/zkProofService";
+import {
+  generateCryptographicAttestation,
+  verifyCryptographicAttestation,
+} from "../services/attestation";
 import {
   createMeshGossipService,
   MeshQuorumError,
@@ -775,6 +780,23 @@ export function registerStratigraphyRoutes(
   app.post(
     "/api/v1/zk/verify",
     async (req: Request, res: Response): Promise<void> => {
+      const attestation = (req.body as { attestation?: unknown } | null)
+        ?.attestation ?? req.body;
+      if (
+        req.body &&
+        typeof req.body === "object" &&
+        ("attestation" in req.body ||
+          ("schema" in req.body &&
+            "signature" in req.body &&
+            "proof" in req.body))
+      ) {
+        res.status(200).json({
+          valid: verifyCryptographicAttestation(attestation),
+          verifiedAt: new Date().toISOString(),
+          computationTimeMs: 0,
+        });
+        return;
+      }
       const parsed = VerifyZkProofBody.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({ error: "Invalid zk proof payload" });
@@ -799,6 +821,64 @@ export function registerStratigraphyRoutes(
         verifiedAt: new Date().toISOString(),
         computationTimeMs: Number((performance.now() - startedAt).toFixed(3)),
       }));
+    },
+  );
+
+  app.get(
+    "/api/v1/stratigraphy/l402",
+    async (req: Request, res: Response, next): Promise<void> => {
+      const dataset = await readDataset();
+      const selectedRange = selectRange(req, dataset);
+      if (typeof selectedRange === "string") {
+        res.status(400).json({
+          error: "Invalid stratigraphy range",
+          detail: selectedRange,
+        });
+        return;
+      }
+      res.locals.stratigraphyRecords = selectedRange.records;
+      next();
+    },
+    createL402Middleware({
+      amountSats: 5,
+      description: "Bitcoin Stratigraphy L402 telemetry access",
+      settlementRouter,
+      now: policy.now,
+      usageStore: macaroonUsageStore,
+    }),
+    (_req: Request, res: Response): void => {
+      res.status(200).json({ data: res.locals.stratigraphyRecords });
+    },
+  );
+
+  app.post(
+    "/api/v1/zk/attest",
+    createL402Middleware({
+      amountSats: 21,
+      description: "Bitcoin Stratigraphy cryptographic attestation",
+      settlementRouter,
+      now: policy.now,
+      usageStore: macaroonUsageStore,
+    }),
+    (req: Request, res: Response): void => {
+      const body = req.body as { payload?: unknown } | null;
+      const payload = body &&
+        Object.prototype.hasOwnProperty.call(body, "payload")
+        ? body.payload
+        : req.body;
+      if (payload === undefined) {
+        res.status(400).json({ error: "Attestation payload is required" });
+        return;
+      }
+      try {
+        res.status(200).json({
+          attestation: generateCryptographicAttestation(payload, {
+            timestamp: policy.now(),
+          }),
+        });
+      } catch {
+        res.status(400).json({ error: "Payload is not JSON serializable" });
+      }
     },
   );
 

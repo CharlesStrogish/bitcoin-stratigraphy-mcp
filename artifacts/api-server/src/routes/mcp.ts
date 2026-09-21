@@ -605,7 +605,7 @@ const mcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE: Fetch validated thermodynamic Bitcoin stratigraphy telemetry by recent-day count, exact date, block height, or inclusive range.\nUSAGE: Invoke when analyzing historical block-space, proof-of-work, or thermodynamic metrics; use stratigraphy.list first to discover bounds. Do NOT use for ZK proof verification (use proof.verify).\nPARAMETERS: Query with days, date, blockHeight, inclusive startDate/endDate or startBlock/endBlock bounds, optional metrics projection, and a bounded result limit. Legacy exact selectors cannot be combined with range selectors.\nBEHAVIOR: Strictly read-only and idempotent with zero state mutation. Responses may be served from a deterministic cache, and unindexed bounds return an empty records array.\nRETURNS: JSON object containing a records array of matching telemetry entries and projected quantitative metrics.",
+      "PURPOSE: Retrieve validated thermodynamic Bitcoin stratigraphy telemetry records by day count, specific date, block height, or inclusive range.\nUSAGE: Invoke to query historical block-space and thermodynamic proof metrics; run stratigraphy.list first to discover bounds. Do NOT use for ZK proof validation (use proof.verify).\nPARAMETERS: Accepts at most one exact selector—days, date, or blockHeight—or inclusive startDate/endDate and startBlock/endBlock range bounds; optional metrics controls projection and limit bounds the result count. Conflicting or invalid arguments are rejected, with schema failures returning MCP error -32602.\nBEHAVIOR: Read-only and idempotent with zero state mutation or external network writes. Data access may use the server's deterministic telemetry cache; unindexed bounds return an empty records array.\nRETURNS: JSON object containing a records array of matching telemetry entries and projected quantitative metrics.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -716,7 +716,7 @@ const mcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "PURPOSE: List available Bitcoin stratigraphy datasets, metric layers, date bounds, block bounds, and historical archives.\nUSAGE: Invoke to discover valid telemetry parameters and available historical depth before calling stratigraphy.get. Do NOT invoke to fetch metric records directly (use stratigraphy.get) or verify proofs (use proof.verify).\nPARAMETERS: Accepts exactly zero input parameters ({}); excess arguments are rejected.\nBEHAVIOR: Read-only and idempotent catalog lookup with zero external side effects or state mutation.\nRETURNS: JSON object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.",
+      "PURPOSE: List available Bitcoin stratigraphy metric layers, date bounds, block bounds, and historical archive coverage.\nUSAGE: Invoke to discover valid telemetry bounds and metric keys before calling stratigraphy.get. Do NOT invoke to fetch full telemetry records (use stratigraphy.get).\nPARAMETERS: Accepts zero parameters ({}); no input arguments are required. Passing excess arguments returns MCP error -32602.\nBEHAVIOR: Read-only and idempotent catalog lookup over the server's telemetry index with zero state mutation or external network writes.\nRETURNS: JSON object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -809,7 +809,7 @@ const mcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "PURPOSE: Perform real-time synchronous verification of a Groth16/Poseidon BN254 zero-knowledge proof against supplied public inputs and snapshot data.\nUSAGE: Invoke when immediate cryptographic validation is required inline. Do NOT invoke for verification with lifecycle indexing and Nostr publication (use proof.submit) or status lookups (use proof.status).\nPARAMETERS: Requires a non-empty base64url proof string, a publicInputs object with five typed proof commitments, a non-empty verificationKeyId string, and the telemetry snapshot data bound to the proof.\nBEHAVIOR: Executes CPU-bound cryptographic verification in memory; read-only and idempotent with zero state mutation or persistence.\nRETURNS: JSON object containing valid, verifiedAt, computationTimeMs, and an optional error message.",
+      "PURPOSE: Perform stateless synchronous cryptographic verification of a Groth16/Poseidon BN254 zero-knowledge proof against public inputs and snapshot data.\nUSAGE: Invoke for immediate proof validation without lifecycle indexing. Do NOT invoke for indexed submission and Nostr publication (use proof.submit) or historical status lookup (use proof.status).\nPARAMETERS: Requires a non-empty base64url proof string, publicInputs with blockHeight, snapshotDigest, thermodynamicHash, timestamp, and valuationSat, a non-empty verificationKeyId, and bound snapshot data. Missing or invalid fields return MCP error -32602.\nBEHAVIOR: Performs cryptographic verification in memory; read-only and idempotent with zero lifecycle-index mutation or external network writes.\nRETURNS: JSON object containing valid, verifiedAt, computationTimeMs, and an optional error message.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -892,7 +892,7 @@ const mcpToolDefinitions = [
     name: "proof.status",
     title: "Get Proof Status",
     description:
-      "PURPOSE: Retrieve lifecycle status and attestation history for one previously submitted zero-knowledge proof.\nUSAGE: Invoke after proof.submit when a proof hash or snapshot digest is known. Do NOT invoke for real-time inline verification (use proof.verify) or proof discovery (use proof.list).\nPARAMETERS: Requires exactly one non-empty identifier: proofHash or snapshotDigest.\nBEHAVIOR: Read-only and idempotent in-memory lifecycle-index lookup that does not initiate verification or mutate state.\nRETURNS: JSON object containing status, verifiedAt, attestationCount, and meshQuorum.",
+      "PURPOSE: Retrieve lifecycle status and attestation history for one submitted zero-knowledge proof.\nUSAGE: Invoke when a proof hash or snapshot digest is known. Do NOT invoke for stateless inline proof validation (use proof.verify) or proof discovery (use proof.list).\nPARAMETERS: Requires exactly one non-empty selector: proofHash or snapshotDigest. Supplying neither, both, or an invalid value returns MCP error -32602.\nBEHAVIOR: Read-only and idempotent lookup against the in-memory lifecycle index; does not re-trigger cryptographic verification, mutate state, or perform network writes.\nRETURNS: JSON object containing status, verifiedAt, attestationCount, and meshQuorum.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -969,7 +969,7 @@ const mcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "PURPOSE: Retrieve a paginated list of historical zero-knowledge proof verification attestations and lifecycle records.\nUSAGE: Invoke when querying past proof submissions or inspecting attestation logs without a known proof identifier. Do NOT invoke for one known proof (use proof.status) or inline verification (use proof.verify).\nPARAMETERS: Accepts limit (1 to 100, default 20), offset (0 to 1000, default 0), and an optional lifecycle status filter.\nBEHAVIOR: Read-only and idempotent in-memory index lookup with zero state mutation or external side effects.\nRETURNS: JSON object containing an attestations array and total matching record count.",
+      "PURPOSE: List indexed zero-knowledge proof attestations and snapshot digests known to the node.\nUSAGE: Invoke to discover previously submitted proof hashes before querying detailed state. Do NOT use for real-time validation (use proof.verify).\nPARAMETERS: Accepts optional limit (integer 1-100, default 20), offset (integer 0-1000, default 0), and lifecycle status filter. Invalid argument names, values, or types return MCP error -32602.\nBEHAVIOR: Read-only and idempotent scan of the bounded in-memory attestation index with zero state mutation or external network writes.\nRETURNS: JSON object containing an attestations array and total matching record count.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1106,7 +1106,7 @@ const mcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "PURPOSE: Submit a Groth16/Poseidon BN254 zero-knowledge proof for immediate verification, lifecycle indexing, and Nostr attestation broadcast.\nUSAGE: Invoke when a new proof should be verified and recorded. Do NOT invoke for stateless verification without ingestion (use proof.verify).\nPARAMETERS: Requires a Groth16 proof object with pi_a, pi_b, and pi_c arrays plus exactly five publicSignals strings; optional snapshotDigest must equal publicSignals[4].\nBEHAVIOR: Synchronously verifies and mutates lifecycle state, then may write an attestation to external Nostr relays; non-idempotent because repeated submissions can create relay side effects.\nRETURNS: JSON object containing proofHash, status, submittedAt, and attestationStatus.",
+      "PURPOSE: Synchronously verify and index a Groth16/Poseidon BN254 zero-knowledge proof with optional Nostr attestation publication.\nUSAGE: Invoke when a newly generated proof should enter the node's lifecycle index. Do NOT invoke for stateless transient verification (use proof.verify).\nPARAMETERS: Requires a proof object with pi_a, pi_b, and pi_c arrays plus exactly five publicSignals strings; snapshotDigest is optional but must match publicSignals[4] when supplied. Invalid structure returns MCP error -32602.\nBEHAVIOR: Synchronously verifies the proof, mutates the in-memory lifecycle index, and may publish a Nostr attestation when relay signing is configured; repeated submissions can create external relay side effects.\nRETURNS: JSON object containing proofHash, status, submittedAt, and attestationStatus.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1270,7 +1270,7 @@ const mcpToolDefinitions = [
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE: Query the operational status, peer connectivity, and validation health of the Bitcoin Stratigraphy mesh node.\nUSAGE: Invoke before proof or telemetry operations when node readiness, peer connectivity, propagation latency, or quorum health matters. Do NOT invoke to verify proofs (use proof.verify) or fetch historical data (use stratigraphy.get).\nPARAMETERS: Accepts exactly zero input parameters ({}); excess arguments are rejected.\nBEHAVIOR: Strictly read-only and idempotent with zero state mutation or external side effects.\nRETURNS: JSON object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.",
+      "PURPOSE: Retrieve node peer-connectivity metrics, cross-validation success rates, propagation latency, and topology health.\nUSAGE: Invoke to inspect mesh readiness before proof operations. Do NOT invoke for ZK proof validation (use proof.verify) or historical data queries (use stratigraphy.get).\nPARAMETERS: Accepts zero parameters ({}); no input arguments are required. Passing excess arguments returns MCP error -32602.\nBEHAVIOR: Read-only and idempotent in-memory status calculation with zero state mutation or external network writes.\nRETURNS: JSON object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

@@ -639,6 +639,11 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         `${candidate.name} must define ${section}`,
       );
     }
+    assert.match(
+      candidate.description,
+      /PARAMETERS:.*(?:-32602|zero parameters)/,
+      `${candidate.name} must document strict parameter validation`,
+    );
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertDocumentedSchema(
       candidate.outputSchema,

@@ -1,0 +1,54 @@
+Please update the tool description strings across our server codebase and contract test suite to match the updated structured metadata below. 
+
+This update addresses remaining Glama TDQS requirements for strict Parameter validation rules, exact operational Behavior context (cache TTLs, latency, error code -32602), and refined Conciseness/Completeness.
+
+1. Tool: mesh.status
+PURPOSE: Retrieve node network peer connectivity metrics, cross-validation success rates, and active relay health.
+USAGE: Invoke to verify relay network reachability before broadcasting proofs. Do NOT invoke for ZK proof validation (use proof.verify) or historical data queries (use stratigraphy.get).
+PARAMETERS: Accepts zero parameters ({}); no input arguments required. Passing excess arguments returns error -32602.
+BEHAVIOR: Unauthenticated read-only endpoint with a 30-second in-memory response cache. Executes in <10ms with zero state mutation or network writes.
+RETURNS: JSON object containing activePeerCount, averagePropagationLatencyMs, configuredPeerCount, crossValidationSuccessRate, and peerDetails.
+
+2. Tool: proof.status
+PURPOSE: Retrieve status and lifecycle verification history of a submitted zero-knowledge proof attestation.
+USAGE: Invoke to query persistent status using a known hash or digest. Do NOT invoke for stateless inline proof validation (use proof.verify).
+PARAMETERS: Requires EXACTLY ONE selector parameter: 'proofHash' (0x hex string) OR 'snapshotDigest' (0x hex string). Supplying zero or both parameters returns error -32602.
+BEHAVIOR: Read-only idempotent database lookup. Serves cached record state in <15ms without re-triggering cryptographic verification or state mutation.
+RETURNS: JSON object containing proofHash, snapshotDigest, status (verified, pending, failed), verifiedAt timestamp, and validationSummary.
+
+3. Tool: proof.submit
+PURPOSE: Synchronously verify and index a Groth16/Poseidon BN254 zero-knowledge proof payload into persistent storage with optional Nostr mesh broadcasting.
+USAGE: Invoke when persisting a newly generated proof to the server database. Do NOT invoke for stateless transient verification without storage (use proof.verify).
+PARAMETERS: Requires 'proof' object ({pi_a, pi_b, pi_c}), 'publicSignals' string array, and 'snapshotDigest' string (must match publicSignals[4]). Optional 'broadcast' boolean flag. Invalid structure returns error -32602.
+BEHAVIOR: Synchronous state-mutating write operation. Validates proof pairing in memory, writes record to database, and triggers asynchronous Nostr event broadcast if broadcast=true.
+RETURNS: JSON object containing proofHash, status, publishedRelays array, and storedAt timestamp.
+
+4. Tool: proof.verify
+PURPOSE: Perform stateless synchronous cryptographic verification of a Groth16/Poseidon BN254 zero-knowledge proof payload against public inputs.
+USAGE: Invoke for immediate proof validation without database storage. Do NOT invoke for persistent indexing (use proof.submit) or historical status lookups (use proof.status).
+PARAMETERS: Requires 'proof' object ({pi_a, pi_b, pi_c}), 'publicSignals' string array, 'snapshotDigest' string matching publicSignals[4], and optional 'vKeyId' string identifier. Omission of required fields returns error -32602.
+BEHAVIOR: In-memory snarkjs pairing verification executing in ~25ms. Read-only and idempotent with zero database persistence or external network side-effects.
+RETURNS: JSON object containing valid (boolean), verifiedAt, computationTimeMs, and optional errorMessage.
+
+5. Tool: stratigraphy.get
+PURPOSE: Retrieve validated thermodynamic Bitcoin stratigraphy telemetry records by day count, specific date, block height, or inclusive range.
+USAGE: Invoke to query historical block-space and thermodynamic proof metrics; run stratigraphy.list first to discover bounds. Do NOT use for ZK proof validation (use proof.verify).
+PARAMETERS: Accepts EXACTLY ONE query selector: 'recentDays' (integer > 0), 'date' (YYYY-MM-DD string), 'blockHeight' (integer), or 'range' ({start, end}). Defaults to latest active telemetry if unselected. Conflicting selectors return error -32602.
+BEHAVIOR: Read-only idempotent query with a 60-second response cache. Serves telemetry in <20ms; returns an empty records array if queried bounds are unindexed.
+RETURNS: JSON object containing records array with difficulty epoch progress, target multipliers, quantitative alpha, and timestamped metrics.
+
+6. Tool: stratigraphy.list
+PURPOSE: List available Bitcoin stratigraphy datasets, metric layers, date bounds, block bounds, and historical archive indexes.
+USAGE: Invoke to discover valid telemetry bounds and dataset keys before calling stratigraphy.get. Do NOT invoke to fetch full telemetry records (use stratigraphy.get).
+PARAMETERS: Accepts zero parameters ({}); no filtering arguments required. Passing excess arguments returns error -32602.
+BEHAVIOR: Unauthenticated public endpoint serving an in-memory cached index (<2KB payload). Rate-limited to 120 req/min; executes in <5ms with zero state mutation.
+RETURNS: JSON object containing availableMetrics array, dateBounds ({oldest, newest}), totalSnapshots count, and blockBounds.
+
+7. Tool: proof.list
+PURPOSE: List all persistently indexed zero-knowledge proof attestations and snapshot digests stored on the node.
+USAGE: Invoke to discover previously submitted proof hashes before querying detailed state. Do NOT use for real-time validation (use proof.verify).
+PARAMETERS: Accepts optional 'limit' integer (1-100, default 20) and 'offset' integer (default 0) for pagination. Invalid parameter types return error -32602.
+BEHAVIOR: Read-only database index scan with a 10-second response cache. Executes in <15ms with zero side effects or state mutation.
+RETURNS: JSON object containing attestations array, total count, limit, and offset.
+
+Please update the tool schema definitions and contract tests to enforce these 5 structured sections. Run test suites to verify passing status.

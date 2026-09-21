@@ -152,13 +152,16 @@ function indexProofAttestation(record: ZkProofAttestationRecord): void {
 
 export function listZkProofAttestations(input: {
   limit: number;
+  offset?: number;
   status?: ZkProofLifecycleStatus["status"];
 }): { attestations: ZkProofAttestationRecord[]; total: number } {
   const matching = [...proofAttestationsByHash.values()]
     .filter((record) => input.status === undefined || record.status === input.status)
     .reverse();
   return {
-    attestations: matching.slice(0, input.limit).map((record) => ({ ...record })),
+    attestations: matching
+      .slice(input.offset ?? 0, (input.offset ?? 0) + input.limit)
+      .map((record) => ({ ...record })),
     total: matching.length,
   };
 }

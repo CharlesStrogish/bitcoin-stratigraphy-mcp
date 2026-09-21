@@ -624,16 +624,13 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    assert.match(
-      candidate.description,
-      /Use this tool (?:first )?(?:when|during|strictly)/,
-      `${candidate.name} must explain when to use it`,
-    );
-    assert.match(
-      candidate.description,
-      /Do NOT use for/,
-      `${candidate.name} must explain when not to use it`,
-    );
+    for (const section of ["PURPOSE:", "USAGE:", "BEHAVIOR:", "RETURNS:"]) {
+      assert.match(
+        candidate.description,
+        new RegExp(`(?:^|\\n)${section}`),
+        `${candidate.name} must define ${section}`,
+      );
+    }
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertDocumentedSchema(
       candidate.outputSchema,

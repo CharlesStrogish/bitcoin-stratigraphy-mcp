@@ -32,12 +32,12 @@ const quantitativeAlphaSchema = z.object({
     [125.83],
   ),
   difficulty_epoch_progress: documented(
-    z.string(),
+    z.string().min(1),
     "Bitcoin mining difficulty epoch progress formatted as a percentage.",
     ["73.42%"],
   ),
   thermodynamic_signal: documented(
-    z.string(),
+    z.string().min(1),
     "Human-readable thermodynamic market signal.",
     ["accumulation"],
   ),
@@ -74,12 +74,12 @@ const publicInputsSchema = z.object({
     [920000],
   ),
   snapshotDigest: documented(
-    z.string(),
+    z.string().min(1),
     "Required decimal string Poseidon field digest of the canonical snapshot payload. Example: '1534979302823651498736582947365829473658294736582947365829473658294'.",
     ["1534979302823651498736582947365829473658294736582947365829473658294"],
   ),
   thermodynamicHash: documented(
-    z.string(),
+    z.string().min(1),
     "Required decimal string Poseidon field hash of the thermodynamic telemetry values. Example: '782365829473658294736582947365829473658294736582947365829473658294'.",
     ["782365829473658294736582947365829473658294736582947365829473658294"],
   ),
@@ -184,11 +184,11 @@ const stratigraphyInputSchema = z.object({
   days: z.number().int().min(1).max(365).optional().describe(
     "Number of recent days of telemetry to fetch (integer, 1 to 365). Defaults to 30. Example: 7.",
   ),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
+  date: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
     "Exact ISO calendar date string formatted as YYYY-MM-DD. Example: '2026-09-19'.",
   ),
-  blockHeight: z.number().int().positive().optional().describe(
-    "Exact indexed Bitcoin block height (integer > 0). Example: 850000.",
+  blockHeight: z.number().int().min(0).optional().describe(
+    "Exact indexed Bitcoin block height (non-negative integer). Example: 850000.",
   ),
   metrics: z.array(
     z.enum(thermodynamicMetricNames).describe(
@@ -200,10 +200,10 @@ const stratigraphyInputSchema = z.object({
   ).optional().describe(
     "Optional array of telemetry metric key strings to project. Defaults to all fields. Example: ['hashrate', 'energy_joules'].",
   ),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
+  startDate: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
     "Inclusive UTC lower date bound formatted as YYYY-MM-DD.",
   ),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
+  endDate: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
     "Inclusive UTC upper date bound formatted as YYYY-MM-DD.",
   ),
   startBlock: z.number().int().nonnegative().optional().describe(
@@ -218,15 +218,15 @@ const stratigraphyInputSchema = z.object({
 }).strict().describe("Validated raw stratigraphy telemetry query parameters.");
 
 const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
-  "Input options for discovering available stratigraphy dataset bounds, epochs, and snapshot CIDs.",
+  "No input parameters required.",
 );
 
 const verifyProofInputSchema = z.object({
-  proof: z.string().describe(
+  proof: z.string().min(1).describe(
     "Required base64url-encoded Groth16/Poseidon BN254 proof string emitted by this API, without padding. Example: 'eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0'.",
   ),
   publicInputs: publicInputsSchema,
-  verificationKeyId: z.string().describe(
+  verificationKeyId: z.string().min(1).describe(
     "Required SHA-256 verification-key identifier string using the 'sha256:' prefix. Example: 'sha256:4c095e183ea45a9d'.",
   ),
   data: snapshotSchema,
@@ -255,8 +255,11 @@ const proofLifecycleStates = [
 ] as const;
 
 const listProofAttestationsInputSchema = z.object({
-  limit: z.number().int().min(1).max(100).default(10).describe(
-    "Optional integer maximum number of attestation records to return (integer, 1 to 100). Defaults to 10. Example: 20.",
+  limit: z.number().int().min(1).max(100).default(20).describe(
+    "Maximum number of attestation records to return (integer, 1 to 100). Defaults to 20.",
+  ),
+  offset: z.number().int().min(0).max(1_000).default(0).describe(
+    "Zero-based number of matching attestation records to skip before returning the page (integer, 0 to 1000). Defaults to 0.",
   ),
   status: z.enum(proofLifecycleStates).optional().describe(
     "Optional attestation lifecycle status filter string (e.g., 'verified', 'pending', 'rejected'). Defaults to returning records of all statuses. Example: 'verified'.",
@@ -268,7 +271,7 @@ const listProofAttestationsInputSchema = z.object({
 const submitProofInputSchema = z.object({
   proof: z.object({
     pi_a: z.array(
-      z.string().describe(
+      z.string().min(1).describe(
         "Decimal string BN254 scalar-field coordinate in proof point A. Example: '10823'.",
       ),
     ).length(3).describe(
@@ -276,7 +279,7 @@ const submitProofInputSchema = z.object({
     ),
     pi_b: z.array(
       z.array(
-        z.string().describe(
+        z.string().min(1).describe(
           "Decimal string BN254 extension-field coordinate in proof point B. Example: '331'.",
         ),
       ).length(2).describe(
@@ -286,7 +289,7 @@ const submitProofInputSchema = z.object({
       "Required 3x2 nested array of decimal string field elements representing the Groth16 BN254 proof B projective point. Example: [['112', '331'], ['981', '771'], ['1', '0']].",
     ),
     pi_c: z.array(
-      z.string().describe(
+      z.string().min(1).describe(
         "Decimal string BN254 scalar-field coordinate in proof point C. Example: '554'.",
       ),
     ).length(3).describe(
@@ -296,7 +299,7 @@ const submitProofInputSchema = z.object({
     `Groth16/Poseidon zk-SNARK proof object containing pi_a (3-element array), pi_b (3x2 nested array), and pi_c (3-element array) BN254 elliptic curve projective points as decimal string field elements. Example: {"pi_a":["10823","49102","1"],"pi_b":[["112","331"],["981","771"],["1","0"]],"pi_c":["554","882","1"]}.`,
   ),
   publicSignals: z.array(
-    z.string().describe(
+    z.string().min(1).describe(
       "Decimal string scalar field element in the BN254 curve modulo space. Example: '920000'.",
     ),
   ).length(5).describe(
@@ -310,7 +313,7 @@ const submitProofInputSchema = z.object({
 );
 
 const meshStatusInputSchema = z.object({}).strict().describe(
-  "Input options for querying P2P mesh status and node health.",
+  "No input parameters required.",
 );
 
 const field = (
@@ -412,11 +415,13 @@ const publicInputsJsonSchema = {
       "string",
       "Required decimal string Poseidon field digest of the canonical snapshot payload. Example: '1534979302823651498736582947365829473658294736582947365829473658294'.",
       ["1534979302823651498736582947365829473658294736582947365829473658294"],
+      { minLength: 1 },
     ),
     thermodynamicHash: field(
       "string",
       "Required decimal string Poseidon field hash of the thermodynamic telemetry values. Example: '782365829473658294736582947365829473658294736582947365829473658294'.",
       ["782365829473658294736582947365829473658294736582947365829473658294"],
+      { minLength: 1 },
     ),
     timestamp: field(
       "integer",
@@ -600,7 +605,7 @@ const mcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Query validated thermodynamic Bitcoin Stratigraphy telemetry by recent-day count, exact date, exact indexed block height, or inclusive date/block range, with optional metric projection. Use this tool when you need raw historical telemetry or time-series ranges. Do NOT use for catalog discovery; use stratigraphy.list instead. Do NOT use for proof verification, submission, or lifecycle operations; use proof.verify, proof.submit, or proof.status instead. Behavior: Pure read-only and idempotent query with zero server-side state modification; responses are deterministically cached.",
+      "PURPOSE: Fetch validated thermodynamic Bitcoin stratigraphy telemetry by recent-day count, exact date, block height, or inclusive range.\nUSAGE: Invoke when analyzing historical block-space, proof-of-work, or thermodynamic metrics; use stratigraphy.list first to discover available bounds.\nBEHAVIOR: Strictly read-only and idempotent with zero state mutation; responses may be served from a deterministic cache.\nRETURNS: JSON object containing a records array of matching telemetry entries and their projected quantitative metrics.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -624,13 +629,17 @@ const mcpToolDefinitions = [
           "string",
           "Exact ISO calendar date string formatted as YYYY-MM-DD. Example: '2026-09-19'.",
           ["2026-09-19"],
-          { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+          {
+            format: "date",
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+            minLength: 1,
+          },
         ),
         blockHeight: field(
           "integer",
-          "Exact indexed Bitcoin block height (integer > 0). Example: 850000.",
+          "Exact indexed Bitcoin block height (non-negative integer). Example: 850000.",
           [850000],
-          { minimum: 1 },
+          { minimum: 0 },
         ),
         metrics: field(
           "array",
@@ -651,13 +660,21 @@ const mcpToolDefinitions = [
           "string",
           "Inclusive lower date bound formatted as YYYY-MM-DD in UTC. May be combined with endDate and block bounds, but not with days, date, or blockHeight.",
           ["2026-09-01"],
-          { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+          {
+            format: "date",
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+            minLength: 1,
+          },
         ),
         endDate: field(
           "string",
           "Inclusive upper date bound formatted as YYYY-MM-DD in UTC. Must not precede startDate and may not be combined with legacy selectors.",
           ["2026-09-18"],
-          { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+          {
+            format: "date",
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+            minLength: 1,
+          },
         ),
         startBlock: field(
           "integer",
@@ -699,12 +716,12 @@ const mcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, snapshot CIDs, and available telemetry metrics. Use this tool first when you need to discover available dataset bounds and snapshot CIDs. Do NOT use for fetching raw time-series records; use stratigraphy.get instead. Behavior: Pure read-only and idempotent catalog discovery query with zero server-side state modification; returns global catalog metadata bounds.",
+      "PURPOSE: List available Bitcoin stratigraphy datasets, metric layers, date bounds, block bounds, and historical archives.\nUSAGE: Invoke to discover valid telemetry parameters and available historical depth before calling stratigraphy.get.\nBEHAVIOR: Strictly read-only and idempotent with zero state mutation or side effects.\nRETURNS: JSON object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
       description:
-        "Input options for discovering available stratigraphy dataset bounds, epochs, and snapshot CIDs.",
+        "No input parameters required.",
       examples: [{}],
       additionalProperties: false,
       properties: {},
@@ -792,7 +809,7 @@ const mcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Execute active, stateless Groth16/Poseidon cryptographic math verification on an incoming proof payload. Use this tool strictly for instant computational verification. Do NOT use for status lookups (use proof.status instead) or browsing attestation logs (use proof.list instead). Behavior: Pure read-only, stateless, and idempotent computational verification with zero server-side state modification or persistence; evaluates pairings over BN254 elliptic curve. Output: Returns a JSON object containing a boolean 'valid' verification status, execution latency milliseconds, and optional verification error message string.",
+      "PURPOSE: Perform real-time synchronous verification of a Groth16/Poseidon BN254 zero-knowledge proof against supplied public inputs and snapshot data.\nUSAGE: Invoke when immediate cryptographic validation is required inline; use proof.status for previously submitted proofs.\nBEHAVIOR: Read-only and idempotent verification calculation with zero state mutation or persistence.\nRETURNS: JSON object containing valid, verifiedAt, computationTimeMs, and an optional error message.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -814,12 +831,14 @@ const mcpToolDefinitions = [
           "string",
           "Required base64url-encoded Groth16/Poseidon BN254 proof string emitted by this API, without padding. Example: 'eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0'.",
           ["eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0"],
+          { minLength: 1 },
         ),
         publicInputs: publicInputsJsonSchema,
         verificationKeyId: field(
           "string",
           "Required SHA-256 verification-key identifier string using the 'sha256:' prefix. Example: 'sha256:4c095e183ea45a9d'.",
           ["sha256:4c095e183ea45a9d"],
+          { minLength: 1 },
         ),
         data: field(
           ["object", "array"],
@@ -873,7 +892,7 @@ const mcpToolDefinitions = [
     name: "proof.status",
     title: "Get Proof Status",
     description:
-      "Query the detailed attestation lifecycle and Nostr publication state of ONE specific known proof hash or snapshot digest. Use this tool when you already hold a proof hash or CID. Do NOT use for listing multiple proofs (use proof.list instead) or performing math verification (use proof.verify instead). Behavior: Pure read-only and idempotent lookup with zero server-side state modification; queries indexed attestation memory and Nostr event log.",
+      "PURPOSE: Check the current lifecycle and attestation status of one proof identified by proof hash or snapshot digest.\nUSAGE: Invoke after proof.submit or when polling a known proof identifier; use proof.list for discovery.\nBEHAVIOR: Strictly read-only and idempotent with zero state mutation or side effects.\nRETURNS: JSON object containing status, verifiedAt, attestationCount, and meshQuorum.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -891,6 +910,7 @@ const mcpToolDefinitions = [
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
+          { minLength: 1 },
         ),
         snapshotDigest: field(
           "string",
@@ -898,6 +918,7 @@ const mcpToolDefinitions = [
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
+          { minLength: 1 },
         ),
       },
       oneOf: [
@@ -948,20 +969,26 @@ const mcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "Browse and discover recent zk-SNARK proof CIDs, NIP-78 attestation records, and indexed verification logs without needing prior knowledge of a proof hash or digest. Use this tool during discovery to list historical attestations. Do NOT use for querying a specific proof hash (use proof.status instead) or executing stateless verification (use proof.verify instead). Behavior: Pure read-only and idempotent listing with zero server-side state modification; returns newest-first deduplicated records bounded to 1,000 entries.",
+      "PURPOSE: Retrieve a bounded list of historical ZK proof verification attestations and lifecycle records.\nUSAGE: Invoke when querying past proof submissions or inspecting attestation logs without a known proof identifier.\nBEHAVIOR: Strictly read-only and idempotent with zero state mutation or side effects.\nRETURNS: JSON object containing an attestations array and total matching record count.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
       description:
         "Input options for listing and discovering historical zk-SNARK proof attestations.",
-      examples: [{ limit: 20, status: "verified" }],
+      examples: [{ limit: 20, offset: 0, status: "verified" }],
       additionalProperties: false,
       properties: {
         limit: field(
           "integer",
-          "Optional integer maximum number of attestation records to return (integer, 1 to 100). Defaults to 10. Example: 20.",
+          "Maximum number of attestation records to return (integer, 1 to 100). Defaults to 20.",
           [20],
-          { minimum: 1, maximum: 100, default: 10 },
+          { minimum: 1, maximum: 100, default: 20 },
+        ),
+        offset: field(
+          "integer",
+          "Zero-based number of matching attestation records to skip before returning the page (integer, 0 to 1000). Defaults to 0.",
+          [0],
+          { minimum: 0, maximum: 1_000, default: 0 },
         ),
         status: field(
           "string",
@@ -1079,7 +1106,7 @@ const mcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine. Use this tool when you need to submit fresh proofs for verification, lifecycle indexing, and Nostr NIP-78 relay broadcast. Do NOT use for dry-run verification; use proof.verify instead.",
+      "PURPOSE: Submit a Groth16/Poseidon BN254 proof and public signals for immediate verification, lifecycle indexing, and Nostr attestation broadcast.\nUSAGE: Invoke for a new proof that should be verified and recorded; use proof.verify for stateless verification without ingestion.\nBEHAVIOR: Mutates lifecycle state and may broadcast an attestation; non-idempotent because repeated submissions can create external relay side effects.\nRETURNS: JSON object containing proofHash, status, submittedAt, and attestationStatus.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1123,6 +1150,7 @@ const mcpToolDefinitions = [
                   "string",
                   "Decimal string BN254 scalar-field coordinate in proof point A. Example: '10823'.",
                   ["10823"],
+                  { minLength: 1 },
                 ),
               },
             ),
@@ -1144,6 +1172,7 @@ const mcpToolDefinitions = [
                       "string",
                       "Decimal string BN254 extension-field coordinate in proof point B. Example: '331'.",
                       ["331"],
+                      { minLength: 1 },
                     ),
                   },
                 ),
@@ -1160,6 +1189,7 @@ const mcpToolDefinitions = [
                   "string",
                   "Decimal string BN254 scalar-field coordinate in proof point C. Example: '554'.",
                   ["554"],
+                  { minLength: 1 },
                 ),
               },
             ),
@@ -1177,6 +1207,7 @@ const mcpToolDefinitions = [
               "string",
               "Decimal string scalar field element in the BN254 curve modulo space. Example: '920000'.",
               ["920000"],
+              { minLength: 1 },
             ),
           },
         ),
@@ -1184,6 +1215,7 @@ const mcpToolDefinitions = [
           "string",
           "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. No default. Example: '1'.",
           ["1"],
+          { minLength: 1 },
         ),
       },
       required: ["proof", "publicSignals"],
@@ -1238,11 +1270,11 @@ const mcpToolDefinitions = [
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
-      "Retrieve P2P peer discovery, cross-validation, quorum, consensus topology, and L402 health. Use this tool when you need P2P topology, peer count, or L402 health checks. Do NOT use for telemetry or proofs; use stratigraphy.get, stratigraphy.list, proof.verify, proof.submit, or proof.status instead. Behavior: Pure read-only and idempotent system health query with zero server-side state modification; reflects live P2P node mesh telemetry.",
+      "PURPOSE: Query the operational status and network health of the Bitcoin Stratigraphy mesh node.\nUSAGE: Invoke before proof or telemetry operations when node readiness, peer connectivity, or quorum health matters.\nBEHAVIOR: Strictly read-only and idempotent with zero state mutation or side effects.\nRETURNS: JSON object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Input options for querying P2P mesh status and node health.",
+      description: "No input parameters required.",
       examples: [{}],
       additionalProperties: false,
       properties: {},

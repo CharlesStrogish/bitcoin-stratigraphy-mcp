@@ -1,0 +1,77 @@
+Please refactor the MCP tool definitions across the server codebase to achieve a perfect 5.0/5.0 TDQS score on Glama while maintaining our 100/100 Smithery score and keeping all 70 unit tests passing.
+
+Do not alter the dot-notation namespaces (mesh.status, proof.list, proof.status, proof.submit, proof.verify, stratigraphy.get, stratigraphy.list) or return payload structure.
+
+### 1. Description Formatting Standard
+Update every tool description to follow this structured format string in its metadata:
+
+PURPOSE: [One concise sentence describing exact utility]
+USAGE: [When and under what conditions an AI agent should invoke this tool]
+BEHAVIOR: [Explicit statement on state mutation, side effects, and idempotency]
+RETURNS: [Summary of the JSON return payload keys]
+
+### 2. Parameter Schema Strictness Guidelines (Zod)
+- Every input property across all 7 tools MUST have an explicit `.describe("...")` string.
+- All numbers MUST include explicit `.min()`, `.max()`, and `.default()` constraints where applicable.
+- All strings MUST include `.min(1)` bounds and explicit parameter descriptions.
+- Empty input parameters (e.g., mesh.status) MUST be explicitly declared as z.object({}).describe("No input parameters required.").
+
+### 3. Tool-by-Tool Specific Schema Refactoring
+
+1. mesh.status:
+   - Description:
+     "PURPOSE: Query the operational status and network health of the Bitcoin Stratigraphy mesh node.
+      USAGE: Call before submitting proof or telemetry jobs to ensure node readiness.
+      BEHAVIOR: Strictly read-only and idempotent with zero state mutation or side effects.
+      RETURNS: JSON object containing node health, uptime, active peer count, and protocol version."
+   - Schema: z.object({}).describe("No input parameters required.")
+
+2. proof.list:
+   - Description:
+     "PURPOSE: Retrieve a paginated list of historical ZK proof verification attestations.
+      USAGE: Use when querying past proof submissions or inspecting attestation logs.
+      BEHAVIOR: Strictly read-only and idempotent with zero state mutation.
+      RETURNS: Array of proof attestation summary objects with pagination metadata."
+   - Schema: Ensure all pagination arguments (limit, offset, status) have z.number().int().min(1).max(100).default(20) and detailed .describe() strings.
+
+3. proof.status:
+   - Description:
+     "PURPOSE: Check the current execution status and result of a specific ZK proof submission.
+      USAGE: Invoke after submitting a proof job via proof.submit to poll for completion.
+      BEHAVIOR: Strictly read-only and idempotent with zero side effects.
+      RETURNS: Object containing execution state (pending, verified, failed), timestamp, and verification hash."
+   - Schema: Ensure proof_id / job_id parameter is z.string().min(1).describe("The unique hexadecimal or alphanumeric identifier of the target proof job.").
+
+4. proof.submit:
+   - Description:
+     "PURPOSE: Submit a Groth16 BN254 ZK-SNARK proof payload for asynchronous verification offloading.
+      USAGE: Call when submitting new cryptographic zero-knowledge proofs for node verification.
+      BEHAVIOR: Mutates state by queuing a verification job in the engine engine; non-idempotent execution.
+      RETURNS: Object containing the generated proof_id, job status, and verification queuing metadata."
+   - Schema: Add detailed field-level .describe() strings to proof array parameters, public signal arrays, and circuit identifier strings. Add length constraints where appropriate.
+
+5. proof.verify:
+   - Description:
+     "PURPOSE: Perform real-time synchronous verification of a Groth16 BN254 zero-knowledge proof payload.
+      USAGE: Invoke when instant cryptographic verification confirmation is required inline.
+      BEHAVIOR: Read-only verification calculation; idempotent with zero side-effects on state.
+      RETURNS: Object with boolean valid status, evaluation latency, and verification commitment."
+   - Schema: Ensure all proof components (pi_a, pi_b, pi_c, publicSignals) have explicit item-level Zod schemas, array size constraints, and .describe() strings.
+
+6. stratigraphy.get:
+   - Description:
+     "PURPOSE: Fetch high-density thermodynamic Bitcoin stratigraphy telemetry for a given block or height range.
+      USAGE: Call when analyzing block-space density, proof-of-work metrics, or stratigraphy historical layers.
+      BEHAVIOR: Strictly read-only and idempotent with zero state mutation.
+      RETURNS: Telemetry payload object containing stratum metrics, thermodynamic density values, and block timestamps."
+   - Schema: Ensure block height / metric parameters have z.number().int().min(0).describe(...) and default value annotations.
+
+7. stratigraphy.list:
+   - Description:
+     "PURPOSE: List available Bitcoin stratigraphy datasets, metric layers, and historical archives.
+      USAGE: Use to discover valid telemetry parameters and available historical data depths.
+      BEHAVIOR: Strictly read-only and idempotent with zero state mutation.
+      RETURNS: Array of available stratigraphy dataset objects with layer metadata."
+   - Schema: Ensure filter and limit arguments include explicit Zod ranges, default values, and field descriptions.
+
+After applying these changes, run the full test suite (`npm test`) to confirm all 70 unit and SDK tests pass cleanly.

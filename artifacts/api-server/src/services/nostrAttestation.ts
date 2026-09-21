@@ -7,7 +7,7 @@ import {
   type EventTemplate,
 } from "nostr-tools";
 
-const NIP78_RELAYS = [
+export const DEFAULT_NOSTR_RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",
   "wss://relay.nostr.band",
@@ -25,7 +25,7 @@ export type NostrAttestor = <T extends object>(
   createdAt?: number,
 ) => T & { attestation: NostrAttestation };
 
-function parsePrivateKey(value: string): Uint8Array {
+export function parsePrivateKey(value: string): Uint8Array {
   const trimmed = value.trim();
   if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
     return Uint8Array.from(Buffer.from(trimmed, "hex"));
@@ -63,7 +63,9 @@ export async function publishNip78Attestation(
   const pool = new SimplePool();
   try {
     const results = await Promise.allSettled(
-      pool.publish([...NIP78_RELAYS], attestation.event, { maxWait: 3_000 }),
+      pool.publish([...DEFAULT_NOSTR_RELAYS], attestation.event, {
+        maxWait: 3_000,
+      }),
     );
     return results.some((result) => result.status === "fulfilled")
       ? "broadcast_confirmed"

@@ -14,6 +14,7 @@ const outputs = [
   "./dist/multiSettlement.test.js",
   "./dist/zkProof.test.js",
   "./dist/meshGossip.test.js",
+  "./dist/dvm.test.js",
 ];
 
 await build({
@@ -28,6 +29,7 @@ await build({
     "multiSettlement.test": "../../tests/multiSettlement.test.ts",
     "zkProof.test": "../../tests/zkProof.test.ts",
     "meshGossip.test": "../../tests/meshGossip.test.ts",
+    "dvm.test": "./tests/unit/dvm.test.ts",
   },
   outdir: "./dist",
   bundle: true,

@@ -1,8 +1,12 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
+import { startNip90Dvm } from "./services/dvm";
 import { albySettlementMode } from "./services/settlement/alby";
-import { prewarmZkVerifier } from "./services/zkProofService";
+import {
+  prewarmZkVerifier,
+  shutdownZkVerifier,
+} from "./services/zkProofService";
 
 const rawPort = process.env["PORT"];
 
@@ -25,7 +29,9 @@ logger.info(
   "zk verifier pre-warmed",
 );
 
-app.listen(port, (err) => {
+let stopDvm: (() => Promise<void>) | undefined;
+let dvmStartup: Promise<void> | undefined;
+const server = app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -41,4 +47,37 @@ app.listen(port, (err) => {
   void startNostrHeartbeat().catch((error) => {
     logger.warn({ err: error }, "Nostr heartbeat startup failed");
   });
+  dvmStartup = startNip90Dvm()
+    .then(async (stop) => {
+      if (stopping) {
+        await stop();
+        return;
+      }
+      stopDvm = stop;
+    })
+    .catch((error) => {
+      logger.error({ err: error }, "NIP-90 DVM startup failed");
+    });
 });
+
+let stopping = false;
+async function stopServer(signal: string) {
+  if (stopping) return;
+  stopping = true;
+  logger.info({ signal }, "Stopping server");
+  await dvmStartup;
+  await stopDvm?.();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await shutdownZkVerifier();
+}
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    void stopServer(signal)
+      .then(() => process.exit(0))
+      .catch((error) => {
+        logger.error({ err: error }, "Server shutdown failed");
+        process.exit(1);
+      });
+  });
+}

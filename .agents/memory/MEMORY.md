@@ -19,3 +19,4 @@
 - [Proof lifecycle lookup](proof-lifecycle-lookup.md) — index verifier outcomes by proof hash and snapshot digest, with NIP-78 counts captured from the verified payload.
 - [MCP optional response fields](mcp-optional-response-fields.md) — accept omitted JSON Schema required arrays and omitted isError on successful MCP results.
 - [MCP metadata fidelity](mcp-metadata-fidelity.md) — TDQS descriptions and schemas must match executable inputs, outputs, and side effects rather than generic rubric examples.
+- [NIP-90 paid job lifecycle](nip90-paid-job-lifecycle.md) — bind DVM settlement to exact incoming invoices and preserve standard feedback/result semantics.

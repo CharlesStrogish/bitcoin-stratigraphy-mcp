@@ -624,7 +624,15 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    for (const section of ["PURPOSE:", "USAGE:", "BEHAVIOR:", "RETURNS:"]) {
+    for (
+      const section of [
+        "PURPOSE:",
+        "USAGE:",
+        "PARAMETERS:",
+        "BEHAVIOR:",
+        "RETURNS:",
+      ]
+    ) {
       assert.match(
         candidate.description,
         new RegExp(`(?:^|\\n)${section}`),

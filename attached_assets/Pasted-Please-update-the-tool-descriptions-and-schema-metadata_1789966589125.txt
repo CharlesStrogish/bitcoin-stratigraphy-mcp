@@ -1,0 +1,50 @@
+Please update the tool descriptions and schema metadata for all 7 MCP tools in our server codebase to satisfy Glama's Tool Description Quality Score (TDQS) standards. 
+
+Ensure each tool's top-level description string is updated to match the exact consolidated text below:
+
+1. Tool: mesh.broadcast
+PURPOSE: Broadcast signed Nostr event attestations and telemetry events across configured Nostr relays.
+USAGE: Invoke to publish signed proof events or telemetry records. Do NOT invoke for verifying local proofs (use proof.verify) or fetching historical data (use stratigraphy.get).
+PARAMETERS: Requires a valid Nostr event object (kind, content, tags, pubkey, sig, created_at). 'relays' array optional.
+BEHAVIOR: Non-blocking asynchronous network write to external Nostr relays. Returns success count and relay statuses without mutating local state.
+RETURNS: JSON object with success status, publishedRelays array, and failedRelays array.
+
+2. Tool: proof.status
+PURPOSE: Retrieve processing status and verification history of previously submitted zero-knowledge proofs.
+USAGE: Invoke to query the lifecycle state of a submitted job ID. Do NOT invoke for real-time inline verification (use proof.verify).
+PARAMETERS: Requires 'jobId' string parameter (UUIDv4 format).
+BEHAVIOR: Read-only, idempotent database lookup. Returnscached job state without initiating new computation.
+RETURNS: JSON object with status (pending, verified, failed), verifiedAt timestamp, and result summary.
+
+3. Tool: proof.submit
+PURPOSE: Submit a Groth16/Poseidon BN254 zero-knowledge proof payload for background verification and database indexing.
+USAGE: Invoke when submitting a proof job for async processing and persistent indexing. Do NOT invoke for real-time synchronous verification (use proof.verify).
+PARAMETERS: Accepts Groth16 JSON proof ({pi_a, pi_b, pi_c}), publicSignals array, and snapshotDigest (0x hex string). Note: snapshotDigest MUST equal publicSignals[4].
+BEHAVIOR: Asynchronous state-mutating operation. Persists proof job into queue, triggers worker processing, and returns job tracking metadata.
+RETURNS: JSON object containing jobId, initialStatus, and statusUrl.
+
+4. Tool: proof.verify
+PURPOSE: Perform real-time synchronous verification of a Groth16/Poseidon BN254 zero-knowledge proof against supplied public inputs and snapshot data.
+USAGE: Invoke when immediate cryptographic validation is required inline. Do NOT invoke for async processing/storage (use proof.submit) or status lookups (use proof.status).
+PARAMETERS: Requires 'proof' object with BN254 curve points (pi_a, pi_b, pi_c), 'publicSignals' array of field element strings, and 'snapshotDigest' string matching publicSignals[4].
+BEHAVIOR: Executes CPU-bound synchronous snarkjs pairing verification in memory; read-only and idempotent with zero state mutation or persistence.
+RETURNS: JSON object containing valid, verifiedAt, computationTimeMs, and optional errorMessage.
+
+5. Tool: stratigraphy.get
+PURPOSE: Fetch validated thermodynamic Bitcoin stratigraphy telemetry by recent-day count, exact date, block height, or inclusive range.
+USAGE: Invoke when analyzing historical block-space, proof-of-work, or thermodynamic metrics; use stratigraphy.list first to discover bounds. Do NOT use for ZK proof verification (use proof.verify) or relay broadcasts (use mesh.broadcast).
+PARAMETERS: Query using EXACTLY ONE selector: recentDays (integer), date (YYYY-MM-DD), blockHeight (integer), or range ({start, end}). If multiple are provided, recentDays takes priority.
+BEHAVIOR: Strictly read-only and idempotent with zero state mutation. Serves data from deterministic cache; returns empty records array if bounds are unindexed.
+RETURNS: JSON object containing records array of matching telemetry entries and projected quantitative metrics.
+
+6. Tool: stratigraphy.list
+PURPOSE: List available Bitcoin stratigraphy datasets, metric layers, date bounds, block bounds, and historical archives.
+USAGE: Invoke to discover valid telemetry parameters and available historical depth before calling stratigraphy.get. Do NOT invoke to fetch metric records directly (use stratigraphy.get) or verify proofs (use proof.verify).
+PARAMETERS: Accepts zero input parameters ({}); no filtering arguments required. Calling with excess arguments ignores extra fields.
+BEHAVIOR: Unauthenticated public endpoint serving an in-memory cached index (<2KB). Rate-limited to 120 requests/min with zero external side effects or state mutation.
+RETURNS: JSON object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.
+
+7. Tool: [Insert Name of Tool 1/Sibling Tool if applicable or audit remaining tool code]
+[Apply matching structure: PURPOSE, USAGE, PARAMETERS, BEHAVIOR, RETURNS]
+
+Please search the codebase for tool schema declarations/objects and update the description field for each tool to match these exact structured strings.

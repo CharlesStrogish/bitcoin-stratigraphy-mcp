@@ -12,6 +12,7 @@ import {
   createNip90Dvm,
   createNwcSettlementWaiter,
   loadDvmConfig,
+  parseDvmRequest,
   type DvmConfig,
   type DvmTransport,
 } from "../../src/services/dvm";
@@ -82,6 +83,35 @@ test("loads DVM configuration with validated key and fallback relays", () => {
       }),
     /non-WebSocket URL/,
   );
+});
+
+test("accepts standard NIP-90 text, URL, and parameter inputs", () => {
+  const textAndParams = request(
+    5_000,
+    "Fetch latest stratigraphy telemetry",
+    [
+      ["i", "latest", "text"],
+      ["param", "recentDays", "1"],
+    ],
+  );
+  assert.deepEqual(parseDvmRequest(textAndParams), {
+    recentDays: 1,
+    input: "latest",
+  });
+
+  const urlAndParams = request(5_002, "", [
+    ["i", "https://example.com/proof.json", "url"],
+    ["param", "verificationKeyId", "zk-telemetry-v1"],
+  ]);
+  assert.deepEqual(parseDvmRequest(urlAndParams), {
+    verificationKeyId: "zk-telemetry-v1",
+    url: "https://example.com/proof.json",
+  });
+
+  const paramsOnly = request(5_000, "", [
+    ["param", "recentDays", "1"],
+  ]);
+  assert.deepEqual(parseDvmRequest(paramsOnly), { recentDays: 1 });
 });
 
 test("requires settlement before publishing a signed NIP-90 result", async () => {

@@ -40,6 +40,7 @@ function buildRequest(secretKey: Uint8Array): Event {
     kind: 5_000,
     created_at: Math.floor(Date.now() / 1_000),
     tags: [
+      ["i", "latest", "text"],
       ["param", "recentDays", "1"],
       ["output", "application/json"],
     ],
@@ -75,6 +76,7 @@ async function main() {
 
   let subscription: ReturnType<SimplePool["subscribeMany"]> | undefined;
   let timeout: NodeJS.Timeout | undefined;
+  let selectedProvider: string | undefined;
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -107,6 +109,15 @@ async function main() {
           onevent(event) {
             if (event.kind === 7_000) {
               const feedback = feedbackDetails(event);
+              if (
+                selectedProvider !== undefined &&
+                event.pubkey !== selectedProvider
+              ) {
+                console.log(
+                  `Ignoring ${feedback.status} feedback from unrelated provider ${event.pubkey}`,
+                );
+                return;
+              }
               console.log(`DVM feedback: ${feedback.status}`);
               if (feedback.detail) {
                 console.log(`  Detail: ${feedback.detail}`);
@@ -117,7 +128,20 @@ async function main() {
               if (feedback.invoice) {
                 console.log(`  Lightning invoice: ${feedback.invoice}`);
               }
+              if (
+                feedback.status === "payment-required" &&
+                feedback.invoice
+              ) {
+                selectedProvider = event.pubkey;
+                console.log(`  Selected DVM provider: ${selectedProvider}`);
+              }
               if (feedback.status === "error") {
+                if (selectedProvider === undefined) {
+                  console.log(
+                    `  Ignoring unsolicited error from provider ${event.pubkey}`,
+                  );
+                  return;
+                }
                 finish(
                   new Error(
                     feedback.detail
@@ -129,6 +153,15 @@ async function main() {
               return;
             }
 
+            if (
+              selectedProvider !== undefined &&
+              event.pubkey !== selectedProvider
+            ) {
+              console.log(
+                `Ignoring result from unrelated provider ${event.pubkey}`,
+              );
+              return;
+            }
             if (!verifyEvent(event)) {
               finish(new Error("Received Kind 6000 result has an invalid signature"));
               return;

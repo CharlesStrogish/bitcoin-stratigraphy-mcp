@@ -298,9 +298,13 @@ export function parseDvmRequest(event: Event): Record<string, unknown> {
       payload[tag[1]] = parseValue(tag[2]);
     }
   }
-  const textInputs = event.tags.filter(
-    (tag) => tag[0] === "i" && tag[1] !== undefined && tag[2] === "text",
+  const inputTags = event.tags.filter(
+    (tag) =>
+      tag[0] === "i" &&
+      tag[1] !== undefined &&
+      (tag[2] === "text" || tag[2] === "url"),
   );
+  const textInputs = inputTags.filter((tag) => tag[2] === "text");
   if (textInputs.length === 1) {
     const parsed = parseValue(textInputs[0]![1]!);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -310,6 +314,12 @@ export function parseDvmRequest(event: Event): Record<string, unknown> {
     }
   } else if (textInputs.length > 1) {
     payload.inputs = textInputs.map((tag) => parseValue(tag[1]!));
+  }
+  const urlInputs = inputTags.filter((tag) => tag[2] === "url");
+  if (urlInputs.length === 1) {
+    payload.url = urlInputs[0]![1]!;
+  } else if (urlInputs.length > 1) {
+    payload.urls = urlInputs.map((tag) => tag[1]!);
   }
   return payload;
 }

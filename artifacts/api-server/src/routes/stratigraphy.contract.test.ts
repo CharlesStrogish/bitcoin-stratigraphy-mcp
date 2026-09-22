@@ -595,7 +595,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "proof.status",
       "proof.list",
       "proof.submit",
-      "zk.ground",
+      "proof.ground",
       "mesh.status",
     ],
   );
@@ -654,6 +654,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         "PARAMETERS:",
         "BEHAVIOR:",
         "RETURNS:",
+        "ERRORS:",
       ]
     ) {
       assert.match(
@@ -664,9 +665,13 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
     assert.match(
       candidate.description,
-      /PARAMETERS:.*(?:-32602|zero parameters)/,
-      `${candidate.name} must document strict parameter validation`,
+      /ERRORS:.*-32602/,
+      `${candidate.name} must document MCP parameter validation errors`,
     );
+    assert.equal(candidate.description.split("\n").length, 6);
+    assert.match(candidate.description, /USAGE: Use this tool when .*Do NOT use this tool for /);
+    assert.match(candidate.description, /BEHAVIOR: (Read-only|Mutating), (Idempotent|Non-idempotent)/);
+    assert.match(candidate.description, /Rate limit: 60 req\/min per IP/);
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertDocumentedSchema(
       candidate.outputSchema,
@@ -674,11 +679,11 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     );
   }
   const groundingTool = listed.result?.tools.find(
-    (candidate: { name: string }) => candidate.name === "zk.ground",
+    (candidate: { name: string }) => candidate.name === "proof.ground",
   );
   assert.ok(groundingTool);
   const groundingCalled = await mcpRequest("tools/call", {
-    name: "zk.ground",
+    name: "proof.ground",
     arguments: {
       contextHash:
         "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",

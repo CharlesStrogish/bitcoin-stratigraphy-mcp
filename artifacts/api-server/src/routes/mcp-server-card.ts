@@ -85,12 +85,12 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "zk.ground",
+        name: "proof.ground",
         annotations: {
-          readOnlyHint: false,
+          readOnlyHint: true,
           destructiveHint: false,
-          idempotentHint: false,
-          openWorldHint: true,
+          idempotentHint: true,
+          openWorldHint: false,
           l402: {
             endpoint: "POST /api/v1/zk/ground",
             amountSats: 5,

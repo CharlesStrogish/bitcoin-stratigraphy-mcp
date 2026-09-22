@@ -1369,7 +1369,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Generates an L402 Lightning challenge requiring 5 sats settlement to anchor agent context to Bitcoin state as an indexed attestation record.\nUSAGE: Use this tool when you need a signed context anchor. Created anchors are indexed in state and can be listed or managed using proof.list and proof.status. Do NOT use this tool for validating Groth16 proofs; use proof.verify instead.\nPARAMETERS: Accepts contextHash (SHA-256 digest string) and agentId string; optional metadata object.\nBEHAVIOR: Creates an L402 challenge endpoint; 5-sat settlement yields a persistent context anchor. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing HTTP 402 challenge metadata or signed receipt upon payment.\nERRORS: 400 (Invalid Request), 402 (Payment Required), 429 (Rate Limit), 500 (Grounding Unavailable).",
+      "PURPOSE: Generates an L402 Lightning challenge requiring 5 sats settlement to anchor agent context to Bitcoin state as an indexed attestation record.\nUSAGE: Use this tool when you need a signed context anchor. Created anchors are indexed in state and can be listed or managed using proof.list and proof.status. Do NOT use this tool for validating Groth16 proofs; use proof.verify instead.\nPARAMETERS: Context hash digest and agent identifier required; optional metadata object.\nBEHAVIOR: Creates an L402 challenge endpoint; 5-sat settlement yields a persistent context anchor. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing HTTP 402 challenge metadata or signed receipt upon payment.\nERRORS: 400 (Invalid Request), 402 (Payment Required), 429 (Rate Limit), 500 (Grounding Unavailable).",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1384,19 +1384,19 @@ const baseMcpToolDefinitions = [
       properties: {
         contextHash: field(
           "string",
-          "64-character lowercase hexadecimal SHA-256 digest string.",
+          "SHA-256 hash string formatted as exactly 64 lowercase hexadecimal characters.",
           ["4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f"],
           { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 },
         ),
         agentId: field(
           "string",
-          "Stable caller-controlled identifier.",
+          "Unique client or agent string identifier (1-128 characters).",
           ["research-agent-7"],
           { minLength: 1, maxLength: 256 },
         ),
         metadata: field(
           "object",
-          "Non-secret caller metadata bound into the context anchor.",
+          "Optional key-value JSON object containing arbitrary metadata to bind to anchor.",
           [{ topic: "difficulty-adjustment" }],
           { additionalProperties: true },
         ),

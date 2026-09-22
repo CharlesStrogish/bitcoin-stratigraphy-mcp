@@ -439,7 +439,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ZkVerifyRequest"
+              oneOf:
+                - $ref: "#/components/schemas/ZkVerifyRequest"
+                - $ref: "#/components/schemas/EpistemicAnchorReceipt"
+                - type: object
+                  additionalProperties: false
+                  properties:
+                    attestation:
+                      $ref: "#/components/schemas/EpistemicAnchorReceipt"
+                  required: [attestation]
       responses:
         "200":
           description: Proof verification result
@@ -470,6 +478,50 @@ paths:
                     type: string
                     const: Zero-knowledge verifier overloaded
                 required: [error]
+  /v1/zk/ground:
+    post:
+      operationId: groundEpistemicContext
+      tags: [stratigraphy, zero-knowledge, payments]
+      summary: Anchor an agent context to the current Bitcoin tip
+      description: Paid `POST /api/v1/zk/ground` endpoint. After a fixed 5-sat L402 settlement, fetches the current Bitcoin block height and hash, binds them to the canonical context hash, caller identifier, optional metadata, and server timestamp, then returns a Nostr-signed Epistemic Anchor Receipt. Submit the returned receipt unchanged to `POST /api/v1/zk/verify`.
+      security:
+        - L402: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EpistemicGroundingRequest"
+      responses:
+        "200":
+          description: Context anchored to current Bitcoin state
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  receipt:
+                    $ref: "#/components/schemas/EpistemicAnchorReceipt"
+                required: [receipt]
+        "400":
+          description: Invalid context hash, agent identifier, metadata, or unsupported field
+        "402":
+          description: Fixed 5-sat L402 settlement required
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/L402Challenge"
+        "429":
+          description: Grounding request rate limit exceeded
+        "502":
+          description: Settlement provider could not create or verify the payment
+        "503":
+          description: Current Bitcoin tip lookup or server signing is unavailable
   /v1/mesh/status:
     get:
       operationId: getMeshStatus
@@ -621,6 +673,74 @@ components:
           type: number
           minimum: 0
       required: [valid, verifiedAt, computationTimeMs]
+    EpistemicGroundingRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        contextHash:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          description: SHA-256 digest of the agent context
+        agentId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable caller-controlled agent identifier
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Optional non-secret JSON metadata included in the signed anchor
+      required: [contextHash, agentId]
+    EpistemicAnchorReceipt:
+      type: object
+      description: Canonical SHA-256/Merkle attestation signed as a Nostr NIP-78 event and bound to the current Bitcoin tip
+      additionalProperties: true
+      properties:
+        schema:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        proof:
+          type: object
+          additionalProperties: true
+        signature:
+          $ref: "#/components/schemas/NostrAttestation"
+        receiptSchema:
+          type: string
+          const: bitcoin-stratigraphy/epistemic-anchor/v1
+        contextHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        agentId:
+          type: string
+        blockHeight:
+          type: integer
+          minimum: 1
+        blockHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        merkleRoot:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        timestamp:
+          type: integer
+          minimum: 0
+        nostrSignature:
+          $ref: "#/components/schemas/NostrAttestation"
+      required:
+        - schema
+        - payload
+        - proof
+        - signature
+        - receiptSchema
+        - contextHash
+        - agentId
+        - blockHeight
+        - blockHash
+        - merkleRoot
+        - timestamp
+        - nostrSignature
     MeshPeerAttestation:
       type: object
       additionalProperties: false

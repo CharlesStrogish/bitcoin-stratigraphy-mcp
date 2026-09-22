@@ -82,6 +82,11 @@ import {
   verifyCryptographicAttestation,
 } from "../services/attestation";
 import {
+  groundEpistemicContext,
+  verifyEpistemicAnchorReceipt,
+  type BitcoinTip,
+} from "../services/epistemicGrounding";
+import {
   createMemoryRevenueLedger,
   paymentReference,
   recordRevenueWithRetry,
@@ -763,6 +768,7 @@ export function registerStratigraphyRoutes(
     meshService?: MeshGossipService;
     revenueLedger?: RevenueLedger;
     l402RateLimiter?: SlidingWindowRateLimiter;
+    readBitcoinTip?: () => Promise<BitcoinTip>;
   } = {},
 ): void {
   const attest = createNostrAttestor();
@@ -836,7 +842,8 @@ export function registerStratigraphyRoutes(
     if (
       req.path === "/api/v1/stratigraphy" ||
       req.path === "/api/v1/stratigraphy/l402" ||
-      req.path === "/api/v1/zk/attest"
+      req.path === "/api/v1/zk/attest" ||
+      req.path === "/api/v1/zk/ground"
     ) {
       l402RateLimitMiddleware(req, res, next);
       return;
@@ -857,8 +864,14 @@ export function registerStratigraphyRoutes(
             "signature" in req.body &&
             "proof" in req.body))
       ) {
+        const isEpistemicReceipt =
+          Boolean(attestation) &&
+          typeof attestation === "object" &&
+          "receiptSchema" in attestation;
         res.status(200).json({
-          valid: verifyCryptographicAttestation(attestation),
+          valid: isEpistemicReceipt
+            ? verifyEpistemicAnchorReceipt(attestation)
+            : verifyCryptographicAttestation(attestation),
           verifiedAt: new Date().toISOString(),
           computationTimeMs: 0,
         });
@@ -923,7 +936,104 @@ export function registerStratigraphyRoutes(
   );
 
   app.post(
+    "/api/v1/zk/ground",
+    async (req: Request, res: Response, next): Promise<void> => {
+      const body = req.body as Record<string, unknown> | null;
+      if (
+        !body ||
+        Object.keys(body).some(
+          (key) => !["contextHash", "agentId", "metadata"].includes(key),
+        ) ||
+        typeof body.contextHash !== "string" ||
+        !/^[0-9a-fA-F]{64}$/.test(body.contextHash) ||
+        typeof body.agentId !== "string" ||
+        body.agentId.trim().length < 1 ||
+        body.agentId.length > 256 ||
+        (body.metadata !== undefined &&
+          (!body.metadata ||
+            typeof body.metadata !== "object" ||
+            Array.isArray(body.metadata)))
+      ) {
+        res.status(400).json({ error: "Invalid epistemic grounding payload" });
+        return;
+      }
+      if (
+        body.metadata !== undefined &&
+        Buffer.byteLength(JSON.stringify(body.metadata)) > 16_384
+      ) {
+        res.status(400).json({ error: "Grounding metadata exceeds 16 KiB" });
+        return;
+      }
+      try {
+        res.locals.epistemicAnchorReceipt = await groundEpistemicContext(
+          {
+            contextHash: body.contextHash,
+            agentId: body.agentId,
+            ...(body.metadata === undefined
+              ? {}
+              : { metadata: body.metadata as Record<string, unknown> }),
+          },
+          {
+            now: policy.now,
+            readBitcoinTip: streamOptions.readBitcoinTip,
+          },
+        );
+        next();
+      } catch (error) {
+        req.log.warn({ err: error }, "Epistemic grounding preflight failed");
+        res.status(503).json({
+          error: "Bitcoin chain state or receipt signing is unavailable",
+        });
+      }
+    },
+    createL402Middleware({
+      amountSats: 5,
+      description: "Bitcoin Stratigraphy epistemic context grounding",
+      settlementRouter,
+      now: policy.now,
+      usageStore: macaroonUsageStore,
+      ledger: revenueLedger,
+      requestKind: "zk-proof",
+    }),
+    (_req: Request, res: Response): void => {
+      res.status(200).json({ receipt: res.locals.epistemicAnchorReceipt });
+    },
+  );
+
+  app.post(
     "/api/v1/zk/attest",
+    (req: Request, res: Response, next): void => {
+      const body = req.body as { payload?: unknown } | null;
+      const payload = body &&
+          Object.prototype.hasOwnProperty.call(body, "payload")
+        ? body.payload
+        : req.body;
+      if (payload === undefined) {
+        res.status(400).json({ error: "Attestation payload is required" });
+        return;
+      }
+      if (
+        payload &&
+        typeof payload === "object" &&
+        (payload as { schema?: unknown }).schema ===
+          "bitcoin-stratigraphy/epistemic-anchor/v1"
+      ) {
+        res.status(400).json({
+          error:
+            "Epistemic anchor payloads must use POST /api/v1/zk/ground",
+        });
+        return;
+      }
+      try {
+        res.locals.cryptographicAttestation =
+          generateCryptographicAttestation(payload, {
+            timestamp: policy.now(),
+          });
+        next();
+      } catch {
+        res.status(400).json({ error: "Payload is not JSON serializable" });
+      }
+    },
     createL402Middleware({
       amountSats: () =>
         pricingEngine.jobQuote?.("zk-proof", runtimePricingLoad()).priceSats ??
@@ -935,25 +1045,10 @@ export function registerStratigraphyRoutes(
       ledger: revenueLedger,
       requestKind: "zk-proof",
     }),
-    (req: Request, res: Response): void => {
-      const body = req.body as { payload?: unknown } | null;
-      const payload = body &&
-        Object.prototype.hasOwnProperty.call(body, "payload")
-        ? body.payload
-        : req.body;
-      if (payload === undefined) {
-        res.status(400).json({ error: "Attestation payload is required" });
-        return;
-      }
-      try {
-        res.status(200).json({
-          attestation: generateCryptographicAttestation(payload, {
-            timestamp: policy.now(),
-          }),
-        });
-      } catch {
-        res.status(400).json({ error: "Payload is not JSON serializable" });
-      }
+    (_req: Request, res: Response): void => {
+      res.status(200).json({
+        attestation: res.locals.cryptographicAttestation,
+      });
     },
   );
 

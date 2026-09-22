@@ -21,3 +21,4 @@
 - [MCP metadata fidelity](mcp-metadata-fidelity.md) — TDQS descriptions and schemas must match executable inputs, outputs, and side effects rather than generic rubric examples.
 - [NIP-90 paid job lifecycle](nip90-paid-job-lifecycle.md) — bind DVM settlement to exact incoming invoices and preserve standard feedback/result semantics.
 - [Fixed-fee L402 attestations](fixed-fee-l402-attestations.md) — paid route macaroons are path-bound and single-use; signed attestations trust only the configured server issuer.
+- [Epistemic grounding provenance](epistemic-grounding-provenance.md) — reserve the epistemic schema for tip-grounded signing and verify every receipt alias against signed content.

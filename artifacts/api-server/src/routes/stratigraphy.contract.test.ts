@@ -41,6 +41,7 @@ import {
   createPricingEngine,
 } from "../services/pricing";
 import { createAgentReputationService } from "../services/agentReputation";
+import { createMemoryRevenueLedger } from "../services/ledger";
 
 const preimage = "11".repeat(32);
 const paymentHash = createHash("sha256")
@@ -166,6 +167,7 @@ const staticPricingEngine = {
   requestVelocity: () => 0,
   quote: (tier: "1-day" | "30-day") => calculateTierCost(tier),
 };
+const groundingLedger = createMemoryRevenueLedger();
 
 function agentAuthorization(
   key: Uint8Array,
@@ -217,7 +219,7 @@ registerStratigraphyRoutes(app, () => ({
     invoiceRequest = request;
     invoiceRequestCount += 1;
     await invoiceGate;
-    return validTransaction as never;
+    return transaction as never;
   },
   close: () => undefined,
 }), {
@@ -235,6 +237,12 @@ undefined,
 {
   agentReputation: createAgentReputationService({
     tiers: { [vipAgentPubkey]: "VIP" },
+  }),
+  revenueLedger: groundingLedger,
+  readBitcoinTip: async () => ({
+    height: 920001,
+    hash: "ab".repeat(32),
+    source: "contract-test",
   }),
 });
 
@@ -587,6 +595,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "proof.status",
       "proof.list",
       "proof.submit",
+      "zk_ground_context",
       "mesh.status",
     ],
   );
@@ -597,6 +606,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       examples?: unknown;
       properties?: Record<string, unknown>;
       items?: unknown;
+      default?: unknown;
     },
     path: string,
   ): void => {
@@ -611,6 +621,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${path} must define examples`,
     );
     for (const [name, property] of Object.entries(schema.properties ?? {})) {
+      if (path.includes(".inputSchema")) {
+        assert.ok(
+          Object.hasOwn(property as object, "default"),
+          `${path}.properties.${name} must define default`,
+        );
+      }
       assertDocumentedSchema(
         property as Parameters<typeof assertDocumentedSchema>[0],
         `${path}.properties.${name}`,
@@ -650,6 +666,37 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${candidate.name}.outputSchema`,
     );
   }
+  const groundingTool = listed.result?.tools.find(
+    (candidate: { name: string }) => candidate.name === "zk_ground_context",
+  );
+  assert.ok(groundingTool);
+  const groundingCalled = await mcpRequest("tools/call", {
+    name: "zk_ground_context",
+    arguments: {
+      contextHash:
+        "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+      agentId: "contract-agent",
+      metadata: { purpose: "contract-test" },
+    },
+  });
+  assert.equal(
+    groundingCalled.result?.isError,
+    true,
+    JSON.stringify(groundingCalled),
+  );
+  assert.deepEqual(groundingCalled.result?.structuredContent, {
+    status: 402,
+    error: "payment_required",
+    endpoint: "/api/v1/zk/ground",
+    amountSats: 5,
+    verificationEndpoint: "/api/v1/zk/verify",
+    request: {
+      contextHash:
+        "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+      agentId: "contract-agent",
+      metadata: { purpose: "contract-test" },
+    },
+  });
   const tool = listed.result?.tools.find(
     (candidate: { name: string }) =>
       candidate.name === "stratigraphy.get",
@@ -692,6 +739,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         "Allowed thermodynamic metric name to include in each returned quantitative_alpha object.",
       example: "target_multiplier",
       examples: ["target_multiplier"],
+      default: "target_multiplier",
       enum: [
         "target_multiplier",
         "difficulty_epoch_progress",
@@ -899,6 +947,117 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       meshQuorum: false,
     },
   );
+});
+
+test("settles and verifies a paid epistemic grounding receipt", async () => {
+  const previousTransaction = transaction;
+  transaction = {
+    ...validTransaction,
+    amount: 5_000,
+    description: "Bitcoin Stratigraphy epistemic context grounding",
+    settled_at: Math.floor(Date.now() / 1_000),
+  };
+  const requestBody = {
+    contextHash: "CD".repeat(32),
+    agentId: "  contract-grounding-agent  ",
+    metadata: { purpose: "paid-route-integration" },
+  };
+  try {
+    const challenge = await fetch(`${baseUrl}/api/v1/zk/ground`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+    assert.equal(challenge.status, 402);
+    const challengeBody = await challenge.json() as {
+      amount_sats: number;
+      payment_hash: string;
+      macaroon: string;
+    };
+    assert.equal(challengeBody.amount_sats, 5);
+    assert.equal(challengeBody.payment_hash, paymentHash);
+
+    const paid = await fetch(`${baseUrl}/api/v1/zk/ground`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `L402 ${challengeBody.macaroon}:${preimage}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+    assert.equal(paid.status, 200);
+    const paidBody = await paid.json() as {
+      receipt: Record<string, unknown> & {
+        contextHash: string;
+        agentId: string;
+        blockHeight: number;
+        blockHash: string;
+      };
+    };
+    assert.equal(paidBody.receipt.contextHash, "cd".repeat(32));
+    assert.equal(paidBody.receipt.agentId, "contract-grounding-agent");
+    assert.equal(paidBody.receipt.blockHeight, 920001);
+    assert.equal(paidBody.receipt.blockHash, "ab".repeat(32));
+
+    const verified = await fetch(`${baseUrl}/api/v1/zk/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attestation: paidBody.receipt }),
+    });
+    assert.equal(verified.status, 200);
+    assert.equal(((await verified.json()) as { valid: boolean }).valid, true);
+
+    const tampered = await fetch(`${baseUrl}/api/v1/zk/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        attestation: {
+          ...paidBody.receipt,
+          blockHeight: paidBody.receipt.blockHeight + 1,
+        },
+      }),
+    });
+    assert.equal(tampered.status, 200);
+    assert.equal(((await tampered.json()) as { valid: boolean }).valid, false);
+
+    const ledgerEntries = await groundingLedger.getRecent(100);
+    assert.ok(
+      ledgerEntries.some(
+        (entry) =>
+          entry.channel === "L402" &&
+          entry.requestKind === "zk-proof" &&
+          entry.satsReceived === 5,
+      ),
+      "grounding settlement must be recorded as 5 sats in the revenue ledger",
+    );
+  } finally {
+    transaction = previousTransaction;
+  }
+});
+
+test("reserves epistemic anchor signing for the grounding route", async () => {
+  const response = await fetch(`${baseUrl}/api/v1/zk/attest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      payload: {
+        schema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+        contextHash: "ab".repeat(32),
+        agentId: "forgery-attempt",
+        bitcoin: {
+          blockHeight: 1,
+          blockHash: "cd".repeat(32),
+          source: "caller-controlled",
+        },
+        timestamp: Date.now(),
+      },
+    }),
+  });
+  assert.equal(response.status, 400);
+  assert.equal(response.headers.has("www-authenticate"), false);
+  assert.deepEqual(await response.json(), {
+    error: "Epistemic anchor payloads must use POST /api/v1/zk/ground",
+  });
 });
 
 test("offers SSE transport without changing the public OpenAPI route", async () => {

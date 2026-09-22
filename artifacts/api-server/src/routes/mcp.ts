@@ -316,12 +316,31 @@ const meshStatusInputSchema = z.object({}).strict().describe(
   "No input parameters required.",
 );
 
+const groundContextInputSchema = z.object({
+  contextHash: z.string().regex(/^[0-9a-fA-F]{64}$/).describe(
+    "SHA-256 context digest as exactly 64 hexadecimal characters.",
+  ),
+  agentId: z.string().trim().min(1).max(256).describe(
+    "Stable identifier of the agent requesting the epistemic anchor.",
+  ),
+  metadata: z.record(z.string(), z.unknown()).optional().describe(
+    "Optional JSON object with caller-supplied context metadata.",
+  ),
+}).strict().describe("Paid epistemic context grounding request.");
+
 const field = (
   type: string | string[],
   description: string,
   examples: unknown[],
   extra: Record<string, unknown> = {},
-) => ({ type, description, example: examples[0], examples, ...extra });
+) => ({
+  type,
+  description,
+  example: examples[0],
+  examples,
+  default: examples[0],
+  ...extra,
+});
 
 const quantitativeAlphaJsonSchema = {
   type: "object",
@@ -403,6 +422,13 @@ const publicInputsJsonSchema = {
     timestamp: 1789776000000,
     valuationSat: 12583,
   }],
+  default: {
+    blockHeight: 920000,
+    snapshotDigest: "1534979302823651498736582947365829473658294736582947365829473658294",
+    thermodynamicHash: "782365829473658294736582947365829473658294736582947365829473658294",
+    timestamp: 1789776000000,
+    valuationSat: 12583,
+  },
   additionalProperties: false,
   properties: {
     blockHeight: field(
@@ -600,7 +626,7 @@ async function queryStratigraphy(
   return records;
 }
 
-const mcpToolDefinitions = [
+const baseMcpToolDefinitions = [
   {
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
@@ -633,6 +659,7 @@ const mcpToolDefinitions = [
             format: "date",
             pattern: "^\\d{4}-\\d{2}-\\d{2}$",
             minLength: 1,
+            default: "2026-09-09",
           },
         ),
         blockHeight: field(
@@ -1137,6 +1164,11 @@ const mcpToolDefinitions = [
             pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
             pi_c: ["5", "6", "1"],
           }],
+          default: {
+            pi_a: ["1", "2", "1"],
+            pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+            pi_c: ["5", "6", "1"],
+          },
           additionalProperties: false,
           properties: {
             pi_a: field(
@@ -1213,7 +1245,7 @@ const mcpToolDefinitions = [
         ),
         snapshotDigest: field(
           "string",
-          "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. No default. Example: '1'.",
+          "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. The schema default is '1'.",
           ["1"],
           { minLength: 1 },
         ),
@@ -1267,6 +1299,101 @@ const mcpToolDefinitions = [
     },
   },
   {
+    name: "zk_ground_context",
+    title: "Ground Agent Context in Bitcoin State",
+    description:
+      "PURPOSE: Initiate a paid epistemic-context grounding request anchored to the current Bitcoin tip and signed by the server's Nostr identity.\nUSAGE: Use this tool when an agent needs a context hash bound to current Bitcoin height/hash. Use proof.verify for existing Groth16 proofs, proof.submit for lifecycle indexing, and stratigraphy.get for historical telemetry. Grounding is not performed for free through MCP; complete the 5-sat L402 flow at POST /api/v1/zk/ground with the same request.\nPARAMETERS: contextHash is a 64-character SHA-256 hex digest, agentId is a non-empty identifier up to 256 characters, and metadata is an optional JSON object. Invalid parameters return MCP -32602.\nBEHAVIOR: This MCP call is a side-effect-free payment router and never fabricates an unpaid anchor. The HTTP endpoint validates input, fetches current Bitcoin height/hash, canonicalizes the state with a server timestamp, computes SHA-256 block commitments and a Merkle root, and signs with NIP-78 before issuing or redeeming the L402 challenge; successful settlement records revenue.\nRETURNS: JSON {status:402,error:'payment_required',endpoint:'/api/v1/zk/ground',amountSats:5,verificationEndpoint:'/api/v1/zk/verify',request:{contextHash,agentId,metadata}}. The paid HTTP response instead returns {receipt}, whose attestation-shaped receipt includes contextHash, blockHeight, blockHash, merkleRoot, timestamp, and nostrSignature.\nERRORS: Invalid MCP arguments return -32602. The HTTP route returns 400 for invalid payloads, 503 when Bitcoin-tip lookup or signing preflight fails before any challenge, 402 after successful preflight until paid, 429 with Retry-After when rate limited, 500 for missing server settlement/signing configuration, and 502 when invoice creation or payment verification fails.",
+    annotations: submissionToolAnnotations,
+    inputSchema: {
+      type: "object",
+      description: "Epistemic context grounding request routed to the paid HTTP boundary.",
+      examples: [{
+        contextHash:
+          "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+        agentId: "research-agent-7",
+        metadata: { topic: "difficulty-adjustment" },
+      }],
+      additionalProperties: false,
+      properties: {
+        contextHash: field(
+          "string",
+          "Required SHA-256 digest of the agent context, encoded as exactly 64 hexadecimal characters.",
+          ["4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f"],
+          { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 },
+        ),
+        agentId: field(
+          "string",
+          "Required stable caller-controlled agent identifier from 1 through 256 characters.",
+          ["research-agent-7"],
+          { minLength: 1, maxLength: 256 },
+        ),
+        metadata: field(
+          "object",
+          "Optional JSON object carrying non-secret caller metadata to bind into the signed anchor.",
+          [{ topic: "difficulty-adjustment" }],
+          { additionalProperties: true },
+        ),
+      },
+      required: ["contextHash", "agentId"],
+    },
+    outputSchema: {
+      type: "object",
+      description: "L402 payment routing response for epistemic grounding.",
+      examples: [{
+        status: 402,
+        error: "payment_required",
+        endpoint: "/api/v1/zk/ground",
+        amountSats: 5,
+        verificationEndpoint: "/api/v1/zk/verify",
+        request: {
+          contextHash:
+            "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+          agentId: "research-agent-7",
+          metadata: { topic: "difficulty-adjustment" },
+        },
+      }],
+      additionalProperties: false,
+      properties: {
+        status: field("integer", "HTTP-equivalent payment-required status.", [402], {
+          const: 402,
+        }),
+        error: field("string", "Stable payment-required error code.", [
+          "payment_required",
+        ], { const: "payment_required" }),
+        endpoint: field("string", "Paid HTTP endpoint that performs grounding.", [
+          "/api/v1/zk/ground",
+        ]),
+        amountSats: field("integer", "Fixed grounding price in satoshis.", [5], {
+          const: 5,
+        }),
+        verificationEndpoint: field(
+          "string",
+          "Public endpoint that verifies the returned receipt unchanged.",
+          ["/api/v1/zk/verify"],
+        ),
+        request: field(
+          "object",
+          "Validated request to submit to the paid HTTP endpoint.",
+          [{
+            contextHash:
+              "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+            agentId: "research-agent-7",
+            metadata: { topic: "difficulty-adjustment" },
+          }],
+          { additionalProperties: true },
+        ),
+      },
+      required: [
+        "status",
+        "error",
+        "endpoint",
+        "amountSats",
+        "verificationEndpoint",
+        "request",
+      ],
+    },
+  },
+  {
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
@@ -1297,6 +1424,29 @@ const mcpToolDefinitions = [
     },
   },
 ];
+
+const toolDescriptionAdditions: Record<string, string> = {
+  "stratigraphy.get":
+    "ROUTING DETAIL: Prefer this tool only for actual telemetry rows; use stratigraphy.list for bounds and metric discovery. RETURN SHAPE: {records:Array<{day:number,title:string,video_id:string,transcript_summary:string,quantitative_alpha:object}>}. ERROR BOUNDARIES: invalid/conflicting selectors and reversed ranges return MCP invalid-params/errors; negative or unindexed block heights never fabricate records; this MCP query itself does not issue an L402 challenge.",
+  "stratigraphy.list":
+    "ROUTING DETAIL: Prefer this tool before stratigraphy.get when valid date/block bounds or metric names are unknown. RETURN SHAPE: {totalSnapshots:number,oldestBlock:number,newestBlock:number,availableMetrics:string[],dateBounds:{startDate:string,endDate:string}}. ERROR BOUNDARIES: any supplied parameter returns MCP -32602; an unavailable catalog produces a tool error and never a partial paid response or 402 challenge.",
+  "proof.verify":
+    "ROUTING DETAIL: Prefer this tool for stateless validation of an existing Groth16 proof; use zk_ground_context for SHA-256/Nostr epistemic receipts. RETURN SHAPE: {valid:boolean,verifiedAt:string,computationTimeMs:number,error?:string}. ERROR BOUNDARIES: malformed proof/public inputs return MCP -32602; wrong keys, altered data, or semantic mismatches return valid:false; verifier saturation may fail the operation; no 402 challenge is issued.",
+  "proof.status":
+    "ROUTING DETAIL: Prefer this tool only after a proof hash or snapshot digest is known; use proof.list to discover identifiers. RETURN SHAPE: {status:'verified'|'cached'|'pending'|'invalid',verifiedAt:string,attestationCount:number,meshQuorum:boolean}. ERROR BOUNDARIES: both/neither selectors return MCP -32602; unknown identifiers return pending with zero attestations; no 402 challenge is issued.",
+  "proof.list":
+    "ROUTING DETAIL: Prefer this tool to discover indexed proof identifiers; use proof.status for one record and proof.verify for cryptographic validation. RETURN SHAPE: {attestations:Array<{proofHash:string,snapshotDigest:string,status:string,submittedAt:string,attestationCount:number,meshQuorum:boolean}>,total:number}. ERROR BOUNDARIES: out-of-range pagination or unsupported status returns MCP -32602; empty indexes return an empty array; no 402 challenge is issued.",
+  "proof.submit":
+    "ROUTING DETAIL: Prefer this tool only when a proof must be verified, indexed, and optionally broadcast; use proof.verify for side-effect-free checks. RETURN SHAPE: {proofHash:string,status:'verified'|'invalid',submittedAt:string,attestationStatus:string}. ERROR BOUNDARIES: malformed coordinates/signals return MCP -32602; invalid proofs are never marked verified; relay publication can report broadcast_failed/not_configured; no HTTP 402 challenge is issued.",
+  "mesh.status":
+    "ROUTING DETAIL: Prefer this tool for peer/quorum readiness, not relay circuit health (use GET /api/v1/system/health) or proof validity. RETURN SHAPE: {nodePubkey:string,activePeerCount:number,configuredPeerCount:number,topologyHealth:string,crossValidationSuccessRate:number,averagePropagationLatencyMs:number,quorumThreshold:number}. ERROR BOUNDARIES: any supplied parameter returns MCP -32602; isolated topology is returned explicitly rather than hidden; no 402 challenge is issued.",
+};
+
+const mcpToolDefinitions = baseMcpToolDefinitions.map((tool) => ({
+  ...tool,
+  description:
+    `${tool.description}${toolDescriptionAdditions[tool.name] ? `\n${toolDescriptionAdditions[tool.name]}` : ""}`,
+}));
 
 function createBitcoinStratigraphyMcpServer() {
   const mesh = createMeshGossipService();
@@ -1454,6 +1604,31 @@ function createBitcoinStratigraphyMcpServer() {
       }
       const structuredContent = await submitZkProof(parsed.data);
       return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    }
+    if (request.params.name === "zk_ground_context") {
+      const parsed = groundContextInputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid epistemic grounding request",
+        );
+      }
+      const structuredContent = {
+        status: 402,
+        error: "payment_required",
+        endpoint: "/api/v1/zk/ground",
+        amountSats: 5,
+        verificationEndpoint: "/api/v1/zk/verify",
+        request: {
+          ...parsed.data,
+          contextHash: parsed.data.contextHash.toLowerCase(),
+        },
+      };
+      return {
+        isError: true,
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
       };

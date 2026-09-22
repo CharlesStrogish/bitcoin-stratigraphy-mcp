@@ -104,6 +104,28 @@ async function requestJson(
   return { response, body };
 }
 
+async function mcpRequest(
+  method: string,
+  params?: Record<string, unknown>,
+): Promise<JsonRecord> {
+  const { response, body } = await requestJson("/mcp", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2025-03-26",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method,
+      ...(params ? { params } : {}),
+    }),
+  });
+  assert.equal(response.status, 200, `MCP ${method} must return HTTP 200`);
+  return asRecord(body, `MCP ${method} response`);
+}
+
 async function runCheck(
   pillar: string,
   name: string,
@@ -452,7 +474,17 @@ await runCheck("Pillar 2", "L402 challenges and macaroon signatures", async () =
     method: "POST",
     body: { payload: { e2e: "master-integration-test" } },
   });
-  return `valid ${stratigraphy.amountSats}-sat and ${proof.amountSats}-sat challenges; rate-limit remaining ${stratigraphy.rateLimitRemaining}/${proof.rateLimitRemaining}`;
+  const grounding = await verifyL402Challenge({
+    path: "/api/v1/zk/ground",
+    method: "POST",
+    body: {
+      contextHash: "ab".repeat(32),
+      agentId: "master-e2e-agent",
+      metadata: { suite: "master-e2e" },
+    },
+  });
+  assert.equal(grounding.amountSats, 5, "Grounding price must remain fixed at 5 sats");
+  return `valid ${stratigraphy.amountSats}-sat dataset, ${proof.amountSats}-sat proof, and fixed 5-sat grounding challenges; rate-limit remaining ${grounding.rateLimitRemaining}`;
 });
 
 await runCheck("Pillar 2", "Attestation signature verification route", async () => {
@@ -486,6 +518,107 @@ await runCheck("Pillar 2", "Attestation signature verification route", async () 
   assert.equal(tampered.response.status, 200);
   assert.equal(asRecord(tampered.body, "tampered verification").valid, false);
   return "valid signature accepted and payload tampering rejected";
+});
+
+await runCheck("Pillar 2", "Epistemic grounding discovery and verification", async () => {
+  const listed = await mcpRequest("tools/list");
+  const result = asRecord(listed.result, "MCP tools/list result");
+  assert.ok(Array.isArray(result.tools), "MCP tools/list must return tools");
+  const groundingTool = result.tools.find((value) => {
+    const tool = asRecord(value, "MCP tool");
+    return tool.name === "zk_ground_context";
+  });
+  const tool = asRecord(groundingTool, "zk_ground_context tool");
+  const inputSchema = asRecord(tool.inputSchema, "grounding input schema");
+  const properties = asRecord(inputSchema.properties, "grounding properties");
+  for (const parameterName of ["contextHash", "agentId", "metadata"]) {
+    const parameter = asRecord(
+      properties[parameterName],
+      `grounding parameter ${parameterName}`,
+    );
+    assert.ok(parameter.type, `${parameterName} must define type`);
+    assert.equal(typeof parameter.description, "string");
+    assert.ok(
+      Array.isArray(parameter.examples) && parameter.examples.length > 0,
+      `${parameterName} must define examples`,
+    );
+    assert.ok(
+      Object.hasOwn(parameter, "default"),
+      `${parameterName} must define default`,
+    );
+  }
+
+  const contextHash = "ab".repeat(32);
+  const routed = await mcpRequest("tools/call", {
+    name: "zk_ground_context",
+    arguments: {
+      contextHash,
+      agentId: "master-e2e-agent",
+      metadata: { suite: "master-e2e" },
+    },
+  });
+  const routedResult = asRecord(routed.result, "grounding tool result");
+  assert.equal(routedResult.isError, true);
+  const routing = asRecord(
+    routedResult.structuredContent,
+    "grounding routing response",
+  );
+  assert.equal(routing.status, 402);
+  assert.equal(routing.endpoint, "/api/v1/zk/ground");
+  assert.equal(routing.amountSats, 5);
+  assert.equal(routing.verificationEndpoint, "/api/v1/zk/verify");
+
+  const privateKey = process.env.NOSTR_PRIVATE_KEY;
+  assert.ok(privateKey, "NOSTR_PRIVATE_KEY is required for grounding E2E");
+  const timestamp = Date.now();
+  const payload = {
+    schema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+    contextHash,
+    agentId: "master-e2e-agent",
+    metadata: { suite: "master-e2e" },
+    bitcoin: {
+      blockHeight: 920001,
+      blockHash: "cd".repeat(32),
+      source: "master-e2e-fixture",
+    },
+    timestamp,
+  };
+  const attestation = generateAttestation(payload, privateKey);
+  const receipt = {
+    ...attestation,
+    receiptSchema: payload.schema,
+    contextHash,
+    agentId: payload.agentId,
+    blockHeight: payload.bitcoin.blockHeight,
+    blockHash: payload.bitcoin.blockHash,
+    merkleRoot: attestation.proof.merkleRoot,
+    timestamp,
+    nostrSignature: attestation.signature,
+  };
+  const verified = await requestJson("/api/v1/zk/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attestation: receipt }),
+  });
+  assert.equal(verified.response.status, 200);
+  assert.equal(asRecord(verified.body, "grounding verification").valid, true);
+
+  const tampered = await requestJson("/api/v1/zk/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      attestation: {
+        ...receipt,
+        payload: { ...payload, contextHash: "ef".repeat(32) },
+      },
+    }),
+  });
+  assert.equal(tampered.response.status, 200);
+  assert.equal(
+    asRecord(tampered.body, "tampered grounding verification").valid,
+    false,
+  );
+  return "tool routed exact 5-sat payment; signed receipt verified and tampering rejected";
 });
 
 await runCheck("Pillar 4", "Revenue metrics and sanitized audit ledger", async () => {

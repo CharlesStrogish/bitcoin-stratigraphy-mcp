@@ -19,6 +19,7 @@ const outputs = [
   "./dist/announcer.test.js",
   "./dist/ledger.test.js",
   "./dist/orchestrator.test.js",
+  "./dist/epistemicGrounding.test.js",
 ];
 
 await build({
@@ -38,6 +39,7 @@ await build({
     "announcer.test": "../../tests/announcer.test.ts",
     "ledger.test": "../../tests/ledger.test.ts",
     "orchestrator.test": "../../tests/orchestrator.test.ts",
+    "epistemicGrounding.test": "../../tests/epistemicGrounding.test.ts",
   },
   outdir: "./dist",
   bundle: true,

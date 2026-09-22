@@ -85,6 +85,20 @@ export const mcpServerCard = {
         },
       },
       {
+        name: "zk_ground_context",
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+          l402: {
+            endpoint: "POST /api/v1/zk/ground",
+            amountSats: 5,
+          },
+          verificationEndpoint: "POST /api/v1/zk/verify",
+        },
+      },
+      {
         name: "mesh.status",
         annotations: {
           readOnlyHint: true,

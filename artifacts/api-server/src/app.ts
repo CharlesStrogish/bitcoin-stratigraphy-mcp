@@ -13,9 +13,23 @@ import { createPostgresMacaroonUsageStore } from "./lib/postgres-macaroon-usage-
 import { createPostgresMacaroonRevocationStore } from "./lib/postgres-macaroon-revocation-store";
 import { createPostgresRevenueLedger } from "./services/postgres-ledger";
 import { registerRevenueAnalyticsRoutes } from "./routes/analytics";
+import { createPricingEngine } from "./services/pricing";
+import { runtimePricingLoad } from "./services/orchestrator";
+import {
+  createSlidingWindowRateLimiter,
+} from "./middleware/rateLimiter";
+import { registerSystemHealthRoute } from "./routes/system-health";
 
 const app: Express = express();
 const revenueLedger = createPostgresRevenueLedger();
+const pricingEngine = createPricingEngine({
+  loadProvider: runtimePricingLoad,
+  maxLoadMultiplier: Number(process.env.DYNAMIC_FEE_MAX_MULTIPLIER) || 3,
+});
+const l402RateLimiter = createSlidingWindowRateLimiter({
+  limit: Number(process.env.L402_RATE_LIMIT_PER_MINUTE) || 60,
+  windowMs: 60_000,
+});
 
 app.set("trust proxy", 1);
 
@@ -67,6 +81,7 @@ registerMcpServerCardRoute(app);
 registerMcpRoute(app);
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
+registerSystemHealthRoute(app, pricingEngine);
 app.use("/api", router);
 registerStratigraphyRoutes(
   app,
@@ -75,9 +90,9 @@ registerStratigraphyRoutes(
   createPostgresPaymentChallengeStore(),
   createPostgresMacaroonUsageStore(),
   createPostgresMacaroonRevocationStore(),
+  pricingEngine,
   undefined,
-  undefined,
-  { revenueLedger },
+  { revenueLedger, l402RateLimiter },
 );
 
 export default app;

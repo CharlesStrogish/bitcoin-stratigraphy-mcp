@@ -1,4 +1,26 @@
 export type PricingTier = "1-day" | "30-day";
+export type JobKind = "stratigraphy" | "zk-proof";
+
+export const BASE_JOB_FEES = {
+  stratigraphy: 5,
+  "zk-proof": 21,
+} as const;
+
+export type SystemLoad = {
+  queueLength: number;
+  queueCapacity: number;
+  cpuUtilization: number;
+};
+
+export type JobPricingQuote = {
+  jobKind: JobKind;
+  priceSats: number;
+  basePriceSats: number;
+  multiplier: number;
+  queueSaturation: number;
+  cpuUtilization: number;
+  load: number;
+};
 
 export const STATIC_TIER_PRICING = {
   "1-day": { baseSats: 5, maxSats: 15 },
@@ -23,10 +45,42 @@ export type PricingEngine = {
     difficultyEpochProgress: number,
     atMs?: number,
   ): PricingQuote;
+  jobQuote?(jobKind: JobKind, load?: SystemLoad): JobPricingQuote;
 };
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value));
+
+export function calculateJobPrice(
+  jobKind: JobKind,
+  load: SystemLoad,
+  maxLoadMultiplier = 3,
+): JobPricingQuote {
+  const basePriceSats = BASE_JOB_FEES[jobKind];
+  const queueLength = Math.max(0, Math.trunc(load.queueLength));
+  const queueCapacity = Math.max(1, Math.trunc(load.queueCapacity));
+  const queueSaturation = clamp(queueLength / queueCapacity, 0, 1);
+  const cpuUtilization = clamp(
+    Number.isFinite(load.cpuUtilization) ? load.cpuUtilization : 0,
+    0,
+    1,
+  );
+  const pressure = Math.max(queueSaturation, cpuUtilization);
+  const ceiling = Math.max(1, maxLoadMultiplier);
+  const multiplier = pressure <= 0.7
+    ? 1
+    : 1 + ((pressure - 0.7) / 0.3) * (ceiling - 1);
+  const roundedMultiplier = Number(clamp(multiplier, 1, ceiling).toFixed(4));
+  return {
+    jobKind,
+    priceSats: Math.ceil(basePriceSats * roundedMultiplier),
+    basePriceSats,
+    multiplier: roundedMultiplier,
+    queueSaturation: Number(queueSaturation.toFixed(4)),
+    cpuUtilization: Number(cpuUtilization.toFixed(4)),
+    load: Number(pressure.toFixed(4)),
+  };
+}
 
 export function calculateTierCost(
   tier: PricingTier,
@@ -77,6 +131,8 @@ export function calculateTierCost(
 export function createPricingEngine(input?: {
   now?: () => number;
   windowMs?: number;
+  loadProvider?: () => SystemLoad;
+  maxLoadMultiplier?: number;
 }): PricingEngine {
   const now = input?.now ?? Date.now;
   const windowMs = input?.windowMs ?? 60_000;
@@ -107,6 +163,17 @@ export function createPricingEngine(input?: {
         tier,
         difficultyEpochProgress,
         requestVelocity(atMs),
+      );
+    },
+    jobQuote(jobKind, load = input?.loadProvider?.() ?? {
+      queueLength: 0,
+      queueCapacity: 1,
+      cpuUtilization: 0,
+    }) {
+      return calculateJobPrice(
+        jobKind,
+        load,
+        input?.maxLoadMultiplier,
       );
     },
   };

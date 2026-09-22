@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   finalizeEvent,
   getPublicKey,
-  SimplePool,
   verifyEvent,
   type Event,
   type EventTemplate,
@@ -29,6 +28,19 @@ import {
   recordRevenueWithRetry,
   type RevenueLedger,
 } from "./ledger";
+import {
+  createPricingEngine,
+  type PricingEngine,
+} from "./pricing";
+import {
+  createSlidingWindowRateLimiter,
+  type SlidingWindowRateLimiter,
+} from "../middleware/rateLimiter";
+import {
+  runtimePricingLoad,
+  updateDvmRuntime,
+} from "./orchestrator";
+import { createNostrRelayPool } from "./relayPool";
 
 const JOB_REQUEST_KINDS = Array.from({ length: 991 }, (_, index) => 5_000 + index);
 const DEFAULT_INVOICE_EXPIRY_SECONDS = 3_600;
@@ -84,6 +96,8 @@ export type DvmDependencies = {
   verifyProof?: (input: Record<string, unknown>) => Promise<unknown>;
   now?: () => number;
   ledger?: RevenueLedger;
+  pricingEngine?: PricingEngine;
+  rateLimiter?: SlidingWindowRateLimiter;
 };
 
 export type DvmSettlementConfirmation = {
@@ -173,55 +187,8 @@ export function loadDvmConfig(
 
 export function createNostrDvmTransport(
   relays: string[],
-  pool = new SimplePool({ enableReconnect: true }),
 ): DvmTransport {
-  const abortController = new AbortController();
-  const relayStatus = new Map<string, RelayConnectionStatus>(
-    relays.map((relay) => [relay, { relay, status: "pending" }]),
-  );
-  return {
-    subscribe(filter, onEvent) {
-      const subscription = pool.subscribeMany(relays, filter, {
-        onevent: onEvent,
-        abort: abortController.signal,
-      });
-      return () => subscription.close("DVM stopped");
-    },
-    async publish(event) {
-      const outcomes = await Promise.allSettled(
-        pool.publish(relays, event, {
-          maxWait: 5_000,
-          abort: abortController.signal,
-        }),
-      );
-      outcomes.forEach((outcome, index) => {
-        const relay = relays[index]!;
-        relayStatus.set(
-          relay,
-          outcome.status === "fulfilled"
-            ? { relay, status: "connected" }
-            : {
-                relay,
-                status: "failed",
-                message:
-                  outcome.reason instanceof Error
-                    ? outcome.reason.message
-                    : String(outcome.reason),
-              },
-        );
-      });
-      if (!outcomes.some((outcome) => outcome.status === "fulfilled")) {
-        throw new Error("No configured Nostr relay accepted the DVM event");
-      }
-    },
-    relayStatuses() {
-      return relays.map((relay) => ({ ...relayStatus.get(relay)! }));
-    },
-    close() {
-      abortController.abort();
-      pool.destroy();
-    },
-  };
+  return createNostrRelayPool(relays);
 }
 
 function walletUri(provider: string): string | undefined {
@@ -429,13 +396,39 @@ export function createNip90Dvm(
   const verifyProof = dependencies.verifyProof ?? defaultProofVerification;
   const now = dependencies.now ?? Date.now;
   const ledger = dependencies.ledger;
+  const pricingEngine = dependencies.pricingEngine ?? createPricingEngine({
+    loadProvider: runtimePricingLoad,
+    maxLoadMultiplier: Number(process.env.DYNAMIC_FEE_MAX_MULTIPLIER) || 3,
+  });
+  const rateLimiter =
+    dependencies.rateLimiter ??
+    createSlidingWindowRateLimiter({
+      limit: positiveInteger(
+        process.env.NIP90_RATE_LIMIT_PER_MINUTE,
+        30,
+        "NIP90_RATE_LIMIT_PER_MINUTE",
+      ),
+      windowMs: 60_000,
+      now,
+    });
   const abortController = new AbortController();
   const seen = new Map<string, number>();
   const activeJobs = new Set<Promise<void>>();
   let executingJobs = 0;
   let pendingPayments = 0;
+  let waitingExecutions = 0;
+  let admittedJobs = 0;
   let closeSubscription: (() => void) | undefined;
   let running = false;
+  const updateRuntime = () =>
+    updateDvmRuntime({
+      activeWorkers: executingJobs,
+      queuedJobs: Math.max(0, admittedJobs - executingJobs),
+      maxWorkers: config.maxConcurrentJobs,
+      maxQueue: config.maxPendingPayments,
+      running,
+    });
+  updateRuntime();
 
   const signedEvent = (
     kind: number,
@@ -488,9 +481,12 @@ export function createNip90Dvm(
     request: Event,
     capability: DvmCapability,
   ) => {
-    const feeSats = capability === "stratigraphy"
+    const baseFeeSats = capability === "stratigraphy"
       ? config.stratigraphyFeeSats
       : config.proofFeeSats;
+    const loadMultiplier =
+      pricingEngine.jobQuote?.(capability, runtimePricingLoad()).multiplier ?? 1;
+    const feeSats = Math.ceil(baseFeeSats * loadMultiplier);
     const amountMsats = feeSats * 1_000;
     const bid = requestedBid(request);
     if (bid !== undefined && bid < amountMsats) {
@@ -503,6 +499,7 @@ export function createNip90Dvm(
     }
     const description = `Bitcoin Stratigraphy NIP-90 ${capability} job ${request.id}`;
     pendingPayments += 1;
+    updateRuntime();
     let invoice: DvmInvoice;
     let settlement: DvmSettlementConfirmation | false;
     try {
@@ -520,6 +517,7 @@ export function createNip90Dvm(
       });
     } finally {
       pendingPayments -= 1;
+      updateRuntime();
     }
     if (!settlement) {
       await publishFeedback(
@@ -555,10 +553,20 @@ export function createNip90Dvm(
         );
       }
     }
-    while (executingJobs >= config.maxConcurrentJobs) {
-      await delay(25, abortController.signal);
+    if (executingJobs >= config.maxConcurrentJobs) {
+      waitingExecutions += 1;
+      updateRuntime();
+      try {
+        while (executingJobs >= config.maxConcurrentJobs) {
+          await delay(25, abortController.signal);
+        }
+      } finally {
+        waitingExecutions -= 1;
+        updateRuntime();
+      }
     }
     executingJobs += 1;
+    updateRuntime();
     await publishFeedback(request, "processing");
     try {
       const input = parseDvmRequest(request);
@@ -569,6 +577,7 @@ export function createNip90Dvm(
       await publishFeedback(request, "success");
     } finally {
       executingJobs -= 1;
+      updateRuntime();
     }
   };
 
@@ -603,8 +612,19 @@ export function createNip90Dvm(
     }
     const capability = capabilityFor(event);
     if (!capability) return;
+    const rateLimit = rateLimiter.check(event.pubkey, currentTime);
+    if (!rateLimit.allowed) {
+      await publishFeedback(
+        event,
+        "error",
+        `Rate limit exceeded; retry after ${rateLimit.retryAfterSeconds} seconds`,
+      );
+      return;
+    }
     rememberRequest(event.id);
-    if (pendingPayments >= config.maxPendingPayments) {
+    if (
+      admittedJobs >= config.maxPendingPayments + config.maxConcurrentJobs
+    ) {
       await publishFeedback(
         event,
         "error",
@@ -612,6 +632,8 @@ export function createNip90Dvm(
       );
       return;
     }
+    admittedJobs += 1;
+    updateRuntime();
     try {
       await processRequest(event, capability);
     } catch (error) {
@@ -629,6 +651,9 @@ export function createNip90Dvm(
           );
         }
       }
+    } finally {
+      admittedJobs -= 1;
+      updateRuntime();
     }
   };
 
@@ -649,6 +674,7 @@ export function createNip90Dvm(
     start() {
       if (running) return;
       running = true;
+      updateRuntime();
       closeSubscription = transport.subscribe(
         {
           kinds: JOB_REQUEST_KINDS,
@@ -671,6 +697,13 @@ export function createNip90Dvm(
     async stop() {
       if (!running) return;
       running = false;
+      updateDvmRuntime({
+        activeWorkers: 0,
+        queuedJobs: 0,
+        maxWorkers: config.maxConcurrentJobs,
+        maxQueue: config.maxPendingPayments,
+        running: false,
+      });
       abortController.abort(new Error("NIP-90 DVM stopped"));
       closeSubscription?.();
       transport.close();

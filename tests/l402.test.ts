@@ -50,10 +50,11 @@ function fakeSettlementRouter(): SettlementRouter {
 test("issues an L402 challenge and accepts a hash-bound settled preimage", async () => {
   const app = express();
   const ledger = createMemoryRevenueLedger();
+  let dynamicAmountSats = 5;
   app.get(
     "/paid",
     createL402Middleware({
-      amountSats: 5,
+      amountSats: () => dynamicAmountSats,
       description: "test paid route",
       settlementRouter: fakeSettlementRouter(),
       sessionSecret: "test-session-secret",
@@ -78,7 +79,9 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     );
     assert.ok(match);
     assert.match(match[2]!, /^lnbc/);
+    assert.equal((await challenge.json() as { amount_sats: number }).amount_sats, 5);
 
+    dynamicAmountSats = 9;
     const paid = await fetch(`${baseUrl}/paid`, {
       headers: { Authorization: `L402 ${match[1]}:${PREIMAGE}` },
     });

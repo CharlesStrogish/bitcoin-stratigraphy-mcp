@@ -25,7 +25,7 @@ export type L402Authorization = {
 };
 
 export type L402MiddlewareOptions = {
-  amountSats: number;
+  amountSats: number | (() => number);
   description: string;
   settlementRouter: SettlementRouter;
   sessionSecret?: string;
@@ -51,10 +51,17 @@ export function parseL402Header(
 export function createL402Middleware(
   options: L402MiddlewareOptions,
 ): RequestHandler {
-  if (!Number.isSafeInteger(options.amountSats) || options.amountSats <= 0) {
-    throw new RangeError("L402 amountSats must be a positive integer");
-  }
-  const amountMsats = options.amountSats * 1_000;
+  const resolveAmountSats = () => {
+    const amount =
+      typeof options.amountSats === "function"
+        ? options.amountSats()
+        : options.amountSats;
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      throw new RangeError("L402 amountSats must be a positive integer");
+    }
+    return amount;
+  };
+  if (typeof options.amountSats === "number") resolveAmountSats();
   const invoiceExpirySeconds = options.invoiceExpirySeconds ?? 3_600;
   const now = options.now ?? Date.now;
   const usageStore = options.usageStore ?? createMemoryMacaroonUsageStore();
@@ -89,6 +96,8 @@ export function createL402Middleware(
       return;
     }
     try {
+      const amountSats = resolveAmountSats();
+      const amountMsats = amountSats * 1_000;
       const invoice = await options.settlementRouter.createInvoice({
         amountMsats,
         description: options.description,
@@ -119,7 +128,7 @@ export function createL402Middleware(
         macaroon,
         invoice: invoice.invoice,
         payment_hash: invoice.paymentHash,
-        amount_sats: options.amountSats,
+        amount_sats: amountSats,
       });
     } catch (error) {
       req.log?.error({ err: error }, "L402 invoice creation failed");
@@ -142,7 +151,8 @@ export function createL402Middleware(
       if (
         pass &&
         pass.paymentHash === preimageHash &&
-        pass.amountMsats === amountMsats &&
+        pass.amountMsats !== undefined &&
+        pass.amountMsats > 0 &&
         pass.paymentAsset === "btc-lightning" &&
         pass.paymentProvider &&
         !pass.allowedPaths.some((path) => path !== req.path)
@@ -150,7 +160,7 @@ export function createL402Middleware(
         const verification = await options.settlementRouter.verifyPayment({
           paymentHash: pass.paymentHash,
           preimage: authorization.preimage,
-          expectedAmountMsats: amountMsats,
+          expectedAmountMsats: pass.amountMsats,
           expectedDescription: options.description,
           expectedProvider: pass.paymentProvider,
           asset: "btc-lightning",
@@ -171,7 +181,7 @@ export function createL402Middleware(
                 ).toISOString(),
                 channel: "L402",
                 requestKind: options.requestKind ?? "stratigraphy",
-                satsReceived: options.amountSats,
+                satsReceived: Math.ceil(pass.amountMsats / 1_000),
                 paymentHash: pass.paymentHash,
                 preimage: authorization.preimage,
                 clientIdentifier:

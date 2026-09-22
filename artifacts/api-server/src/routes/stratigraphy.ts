@@ -88,6 +88,12 @@ import {
   type RevenueLedger,
 } from "../services/ledger";
 import {
+  createHttpRateLimitMiddleware,
+  createSlidingWindowRateLimiter,
+  type SlidingWindowRateLimiter,
+} from "../middleware/rateLimiter";
+import { runtimePricingLoad } from "../services/orchestrator";
+import {
   createMeshGossipService,
   MeshQuorumError,
   type MeshGossipService,
@@ -756,6 +762,7 @@ export function registerStratigraphyRoutes(
     agentReputation?: AgentReputationService;
     meshService?: MeshGossipService;
     revenueLedger?: RevenueLedger;
+    l402RateLimiter?: SlidingWindowRateLimiter;
   } = {},
 ): void {
   const attest = createNostrAttestor();
@@ -786,6 +793,11 @@ export function registerStratigraphyRoutes(
   const mesh = streamOptions.meshService ?? createMeshGossipService();
   const revenueLedger =
     streamOptions.revenueLedger ?? createMemoryRevenueLedger();
+  const l402RateLimiter =
+    streamOptions.l402RateLimiter ??
+    createSlidingWindowRateLimiter({ limit: 10_000, windowMs: 60_000 });
+  const l402RateLimitMiddleware =
+    createHttpRateLimitMiddleware(l402RateLimiter);
   const recordL402Revenue = async (input: {
     req: Request;
     paymentHash: string;
@@ -818,6 +830,17 @@ export function registerStratigraphyRoutes(
   };
   app.use("/api/v1", (_req, _res, next) => {
     pricingEngine.recordRequest(policy.now());
+    next();
+  });
+  app.use((req, res, next) => {
+    if (
+      req.path === "/api/v1/stratigraphy" ||
+      req.path === "/api/v1/stratigraphy/l402" ||
+      req.path === "/api/v1/zk/attest"
+    ) {
+      l402RateLimitMiddleware(req, res, next);
+      return;
+    }
     next();
   });
 
@@ -884,7 +907,9 @@ export function registerStratigraphyRoutes(
       next();
     },
     createL402Middleware({
-      amountSats: 5,
+      amountSats: () =>
+        pricingEngine.jobQuote?.("stratigraphy", runtimePricingLoad())
+          .priceSats ?? 5,
       description: "Bitcoin Stratigraphy L402 telemetry access",
       settlementRouter,
       now: policy.now,
@@ -900,7 +925,9 @@ export function registerStratigraphyRoutes(
   app.post(
     "/api/v1/zk/attest",
     createL402Middleware({
-      amountSats: 21,
+      amountSats: () =>
+        pricingEngine.jobQuote?.("zk-proof", runtimePricingLoad()).priceSats ??
+        21,
       description: "Bitcoin Stratigraphy cryptographic attestation",
       settlementRouter,
       now: policy.now,

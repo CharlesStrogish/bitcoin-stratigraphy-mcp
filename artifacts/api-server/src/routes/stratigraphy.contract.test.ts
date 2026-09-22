@@ -768,7 +768,11 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     );
     assert.equal(candidate.description.split("\n").length, 6);
     assert.match(candidate.description, /USAGE: Use this tool when .*Do NOT use this tool for /);
-    assert.match(candidate.description, /BEHAVIOR: (Read-only|Mutating), (Idempotent|Non-idempotent)/);
+    assert.match(candidate.description, /BEHAVIOR: .+ Rate limit:/);
+    assert.doesNotMatch(
+      candidate.description,
+      /BEHAVIOR:.*\b(?:Read-only|Idempotent|Mutating|Non-idempotent)\b/,
+    );
     assert.match(candidate.description, /Rate limit: 60 req\/min per IP/);
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);

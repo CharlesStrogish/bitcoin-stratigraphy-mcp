@@ -74,31 +74,31 @@ const entrySchema = z.object({
 const publicInputsSchema = z.object({
   blockHeight: documented(
     z.number().int().nonnegative(),
-    "Non-negative integer Bitcoin block height committed into the proof. Minimum 0. Example: 920000.",
+    "Bitcoin block height committed into the proof.",
     [920000],
   ),
   snapshotDigest: documented(
     z.string().min(1),
-    "Required decimal string Poseidon field digest of the canonical snapshot payload. Example: '1534979302823651498736582947365829473658294736582947365829473658294'.",
+    "Poseidon field digest of the canonical snapshot payload.",
     ["1534979302823651498736582947365829473658294736582947365829473658294"],
   ),
   thermodynamicHash: documented(
     z.string().min(1),
-    "Required decimal string Poseidon field hash of the thermodynamic telemetry values. Example: '782365829473658294736582947365829473658294736582947365829473658294'.",
+    "Poseidon field hash of the thermodynamic telemetry values.",
     ["782365829473658294736582947365829473658294736582947365829473658294"],
   ),
   timestamp: documented(
     z.number().int().nonnegative(),
-    "Non-negative integer Unix timestamp in milliseconds committed into the proof. Minimum 0. Example: 1789776000000.",
+    "Unix timestamp in milliseconds committed into the proof.",
     [1789776000000],
   ),
   valuationSat: documented(
     z.number().int().nonnegative(),
-    "Non-negative integer satoshi valuation committed into the proof. Minimum 0. Example: 12583.",
+    "Satoshi valuation committed into the proof.",
     [12583],
   ),
 }).strict().describe(
-  "Required object containing exactly five typed public statement inputs committed by the Groth16/Poseidon proof.",
+  "Public statement inputs committed by the Groth16/Poseidon proof.",
 );
 
 const snapshotSchema = documented(
@@ -106,7 +106,7 @@ const snapshotSchema = documented(
     z.record(z.string(), z.unknown()),
     z.array(z.record(z.string(), z.unknown())),
   ]),
-  "Required telemetry snapshot object or array of objects whose canonical digest and semantic fields must match the proof. Example: [{'block':{'height':920000},'observed_at':'2026-09-19T00:00:00.000Z','thermodynamic':{'target_multiplier':125.83}}].",
+  "Telemetry snapshot payload whose canonical digest and semantic fields must match the proof.",
   [[{
     block: { height: 920000 },
     observed_at: "2026-09-19T00:00:00.000Z",
@@ -186,13 +186,13 @@ const thermodynamicMetricNames = [
 
 const stratigraphyInputSchema = z.object({
   days: z.number().int().min(1).max(365).optional().describe(
-    "Number of recent days of telemetry to fetch (integer, 1 to 365). Defaults to 30. Example: 7.",
+    "Count of recent days of telemetry to fetch.",
   ),
   date: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
-    "Exact ISO calendar date string formatted as YYYY-MM-DD. Example: '2026-09-19'.",
+    "Calendar date selecting one telemetry day, formatted as YYYY-MM-DD.",
   ),
   blockHeight: z.number().int().min(0).optional().describe(
-    "Exact indexed Bitcoin block height (non-negative integer). Example: 850000.",
+    "Indexed Bitcoin block height selecting one telemetry record.",
   ),
   metrics: z.array(
     z.enum(thermodynamicMetricNames).describe(
@@ -202,7 +202,7 @@ const stratigraphyInputSchema = z.object({
     (values) => new Set(values).size === values.length,
     "metrics must contain unique values",
   ).optional().describe(
-    "Optional array of telemetry metric key strings to project. Defaults to all fields. Example: ['hashrate', 'energy_joules'].",
+    "Telemetry metrics projected into each returned record.",
   ),
   startDate: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
     "Inclusive UTC lower date bound formatted as YYYY-MM-DD.",
@@ -211,13 +211,13 @@ const stratigraphyInputSchema = z.object({
     "Inclusive UTC upper date bound formatted as YYYY-MM-DD.",
   ),
   startBlock: z.number().int().nonnegative().optional().describe(
-    "Inclusive non-negative lower bound of the daily block-height index.",
+    "Inclusive lower bound of the daily block-height index.",
   ),
   endBlock: z.number().int().nonnegative().optional().describe(
-    "Inclusive non-negative upper bound of the daily block-height index.",
+    "Inclusive upper bound of the daily block-height index.",
   ),
   limit: z.number().int().min(1).max(100).default(10).describe(
-    "Maximum number of matching snapshots to return, from 1 through 100.",
+    "Maximum number of matching snapshots to return.",
   ),
 }).strict().superRefine((input, context) => {
   const legacySelectors = [
@@ -270,11 +270,11 @@ const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
 
 const verifyProofInputSchema = z.object({
   proof: z.string().min(1).describe(
-    "Required base64url-encoded Groth16/Poseidon BN254 proof string emitted by this API, without padding. Example: 'eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0'.",
+    "Base64url-encoded Groth16/Poseidon BN254 proof emitted by this API, without padding.",
   ),
   publicInputs: publicInputsSchema,
   verificationKeyId: z.string().min(1).describe(
-    "Required SHA-256 verification-key identifier string using the 'sha256:' prefix. Example: 'sha256:4c095e183ea45a9d'.",
+    "SHA-256 verification-key identifier using the sha256: prefix.",
   ),
   data: snapshotSchema,
 }).strict().describe(
@@ -283,10 +283,10 @@ const verifyProofInputSchema = z.object({
 
 const proofStatusInputSchema = z.object({
   proofHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$|^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[a-z2-7]{20,}$/).optional().describe(
-    "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
+    "SHA-256 digest or IPFS CID identifying a proof attestation.",
   ),
   snapshotDigest: z.string().regex(/^(?:\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
-    "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
+    "Snapshot commitment or IPFS CID identifying its proof attestation.",
   ),
 }).strict().refine(
   (input) =>
@@ -303,13 +303,13 @@ const proofLifecycleStates = [
 
 const listProofAttestationsInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20).describe(
-    "Maximum number of attestation records to return (integer, 1 to 100). Defaults to 20.",
+    "Maximum number of attestation records to return.",
   ),
   offset: z.number().int().min(0).max(1_000).default(0).describe(
-    "Zero-based number of matching attestation records to skip before returning the page (integer, 0 to 1000). Defaults to 0.",
+    "Zero-based pagination skip index.",
   ),
   status: z.enum(proofLifecycleStates).optional().describe(
-    "Optional attestation lifecycle status filter string (e.g., 'verified', 'pending', 'rejected'). Defaults to returning records of all statuses. Example: 'verified'.",
+    "Filter records by attestation lifecycle state.",
   ),
 }).strict().describe(
   "Input options for listing and discovering historical zk-SNARK proof attestations.",
@@ -319,41 +319,41 @@ const submitProofInputSchema = z.object({
   proof: z.object({
     pi_a: z.array(
       z.string().regex(/^\d+$/).describe(
-        "Decimal string BN254 scalar-field coordinate in proof point A. Example: '10823'.",
+        "Decimal-encoded BN254 scalar-field coordinate in proof point A.",
       ),
     ).length(3).describe(
-      "Required 3-element array of decimal string field elements representing the Groth16 BN254 proof A projective point. Example: ['10823', '49102', '1'].",
+      "Groth16 BN254 proof A projective coordinates.",
     ),
     pi_b: z.array(
       z.array(
         z.string().regex(/^\d+$/).describe(
-          "Decimal string BN254 extension-field coordinate in proof point B. Example: '331'.",
+          "Decimal-encoded BN254 extension-field coordinate in proof point B.",
         ),
       ).length(2).describe(
-        "Required 2-element array of decimal string BN254 extension-field coordinates. Example: ['112', '331'].",
+        "BN254 extension-field coordinate pair in proof point B.",
       ),
     ).length(3).describe(
-      "Required 3x2 nested array of decimal string field elements representing the Groth16 BN254 proof B projective point. Example: [['112', '331'], ['981', '771'], ['1', '0']].",
+      "Groth16 BN254 proof B projective coordinates.",
     ),
     pi_c: z.array(
       z.string().regex(/^\d+$/).describe(
-        "Decimal string BN254 scalar-field coordinate in proof point C. Example: '554'.",
+        "Decimal-encoded BN254 scalar-field coordinate in proof point C.",
       ),
     ).length(3).describe(
-      "Required 3-element array of decimal string field elements representing the Groth16 BN254 proof C projective point. Example: ['554', '882', '1'].",
+      "Groth16 BN254 proof C projective coordinates.",
     ),
   }).strict().describe(
-    `Groth16/Poseidon zk-SNARK proof object containing pi_a (3-element array), pi_b (3x2 nested array), and pi_c (3-element array) BN254 elliptic curve projective points as decimal string field elements. Example: {"pi_a":["10823","49102","1"],"pi_b":[["112","331"],["981","771"],["1","0"]],"pi_c":["554","882","1"]}.`,
+    "Groth16/Poseidon zk-SNARK proof coordinates over the BN254 curve.",
   ),
   publicSignals: z.array(
     z.string().regex(/^\d+$/).describe(
-      "Decimal string scalar field element in the BN254 curve modulo space. Example: '920000'.",
+      "Decimal-encoded BN254 scalar-field element.",
     ),
   ).length(5).describe(
-    "Required array of exactly 5 public signal strings representing scalar field elements in BN254 curve modulo space, ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest. Example: ['920000', '1', '1789776000000', '12583', '1'].",
+    "Public signals ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
   ),
   snapshotDigest: z.string().regex(/^(?:\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
-    "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. No default. Example: '1'.",
+    "Telemetry snapshot CID or Poseidon digest matching the snapshot commitment signal.",
   ),
 }).strict().superRefine((input, context) => {
   if (
@@ -376,13 +376,13 @@ const meshStatusInputSchema = z.object({}).strict().describe(
 
 const groundContextInputSchema = z.object({
   contextHash: z.string().regex(/^[0-9a-fA-F]{64}$/).describe(
-    "SHA-256 context digest as exactly 64 hexadecimal characters.",
+    "SHA-256 digest of caller context.",
   ),
   agentId: z.string().trim().min(1).max(256).describe(
-    "Stable identifier of the agent requesting the epistemic anchor.",
+    "Stable caller-controlled identifier.",
   ),
   metadata: z.record(z.string(), z.unknown()).optional().describe(
-    "Optional JSON object with caller-supplied context metadata.",
+    "Non-secret caller metadata bound into the context anchor.",
   ),
 }).strict().describe("Paid epistemic context grounding request.");
 
@@ -491,31 +491,31 @@ const publicInputsJsonSchema = {
   properties: {
     blockHeight: field(
       "integer",
-      "Non-negative integer Bitcoin block height committed into the proof. Minimum 0. Example: 920000.",
+      "Bitcoin block height committed into the proof.",
       [920000],
       { minimum: 0 },
     ),
     snapshotDigest: field(
       "string",
-      "Required decimal string Poseidon field digest of the canonical snapshot payload. Example: '1534979302823651498736582947365829473658294736582947365829473658294'.",
+      "Poseidon field digest of the canonical snapshot payload.",
       ["1534979302823651498736582947365829473658294736582947365829473658294"],
       { minLength: 1 },
     ),
     thermodynamicHash: field(
       "string",
-      "Required decimal string Poseidon field hash of the thermodynamic telemetry values. Example: '782365829473658294736582947365829473658294736582947365829473658294'.",
+      "Poseidon field hash of the thermodynamic telemetry values.",
       ["782365829473658294736582947365829473658294736582947365829473658294"],
       { minLength: 1 },
     ),
     timestamp: field(
       "integer",
-      "Non-negative integer Unix timestamp in milliseconds committed into the proof. Minimum 0. Example: 1789776000000.",
+      "Unix timestamp in milliseconds committed into the proof.",
       [1789776000000],
       { minimum: 0 },
     ),
     valuationSat: field(
       "integer",
-      "Non-negative integer satoshi valuation committed into the proof. Minimum 0. Example: 12583.",
+      "Satoshi valuation committed into the proof.",
       [12583],
       { minimum: 0 },
     ),
@@ -689,7 +689,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE: Retrieve historical Bitcoin stratigraphy telemetry.\nUSAGE: Use this tool when you need selected telemetry records. Do NOT use this tool for discovering coverage; use stratigraphy.list instead.\nPARAMETERS: days, date, or blockHeight selects one lookup mode; date and block ranges use ordered inclusive bounds. metrics projects requested signals before limit truncates the ordered result set.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing records with source details and projected quantitative metrics.\nERRORS: 400 (Invalid Request), -32602 (invalid selectors), 429 (Rate Limit); tool error on query failure. No 402 payment required.",
+      "PURPOSE: Retrieve historical Bitcoin stratigraphy telemetry.\nUSAGE: Use this tool when you need selected telemetry records. Do NOT use this tool for discovering coverage; use stratigraphy.list instead.\nPARAMETERS: days, date, or blockHeight selects one lookup mode; date and block ranges use ordered inclusive bounds. metrics projects requested signals before limit truncates the ordered result set.\nBEHAVIOR: Executes state lookups against the local telemetry index without modifying records. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing records with source details and projected quantitative metrics.\nERRORS: 400 (Invalid Request), -32602 (invalid selectors), 429 (Rate Limit); tool error on query failure. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -705,13 +705,13 @@ const baseMcpToolDefinitions = [
       properties: {
         days: field(
           "integer",
-          "Number of recent days of telemetry to fetch (integer, 1 to 365). Defaults to 30. Example: 7.",
+          "Count of recent days of telemetry to fetch.",
           [7],
           { minimum: 1, maximum: 365, default: 30 },
         ),
         date: field(
           "string",
-          "Exact ISO calendar date string formatted as YYYY-MM-DD. Example: '2026-09-19'.",
+          "Calendar date selecting one telemetry day, formatted as YYYY-MM-DD.",
           ["2026-09-19"],
           {
             format: "date",
@@ -722,13 +722,13 @@ const baseMcpToolDefinitions = [
         ),
         blockHeight: field(
           "integer",
-          "Exact indexed Bitcoin block height (non-negative integer). Example: 850000.",
+          "Indexed Bitcoin block height selecting one telemetry record.",
           [850000],
           { minimum: 0 },
         ),
         metrics: field(
           "array",
-          "Optional array of telemetry metric key strings to project. Defaults to all fields. Example: ['hashrate', 'energy_joules'].",
+          "Telemetry metrics projected into each returned record.",
           [["target_multiplier"]],
           {
             minItems: 1,
@@ -763,19 +763,19 @@ const baseMcpToolDefinitions = [
         ),
         startBlock: field(
           "integer",
-          "Inclusive non-negative lower bound of the deterministic daily block-height index. May be combined with endBlock and date bounds, but not with legacy selectors.",
+          "Inclusive lower block bound combined with range selectors.",
           [910000],
           { minimum: 0 },
         ),
         endBlock: field(
           "integer",
-          "Inclusive non-negative upper bound of the deterministic daily block-height index. Must be at least startBlock and may not be combined with legacy selectors.",
+          "Inclusive upper block bound that must not precede startBlock.",
           [920000],
           { minimum: 0 },
         ),
         limit: field(
           "integer",
-          "Maximum number of matching snapshots returned after filtering. It defaults to 10 when omitted and must be an integer from 1 through 100.",
+          "Maximum number of matching snapshots to return.",
           [10],
           { minimum: 1, maximum: 100, default: 10 },
         ),
@@ -801,7 +801,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "PURPOSE: Discover stratigraphy coverage and metric names.\nUSAGE: Use this tool when you need valid bounds before querying telemetry. Do NOT use this tool for fetching records; use stratigraphy.get instead.\nPARAMETERS: No selectors are accepted because coverage and metrics describe the complete catalog rather than a filtered page.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit); tool error if the catalog is unavailable. No 402 payment required.",
+      "PURPOSE: Discover stratigraphy coverage and metric names.\nUSAGE: Use this tool when you need valid bounds before querying telemetry. Do NOT use this tool for fetching records; use stratigraphy.get instead.\nPARAMETERS: No selectors are accepted because coverage and metrics describe the complete catalog rather than a filtered page.\nBEHAVIOR: Summarizes local catalog coverage without modifying records. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit); tool error if the catalog is unavailable. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -894,7 +894,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "PURPOSE: Verify a Groth16/Poseidon proof against snapshot claims.\nUSAGE: Use this tool when you need stateless proof validation. Do NOT use this tool for indexing proofs; use proof.submit instead. For context anchoring, use proof.ground.\nPARAMETERS: proof, publicInputs, and data must encode the same snapshot claims in circuit order; verificationKeyId selects the corresponding server circuit key.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing valid, verifiedAt, computationTimeMs, and optional error.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); valid:false for proof/key/binding mismatch. No 402 payment required.",
+      "PURPOSE: Verify a Groth16/Poseidon proof against snapshot claims.\nUSAGE: Use this tool when you need stateless proof validation. Do NOT use this tool for indexing proofs; use proof.submit instead. For context anchoring, use proof.ground.\nPARAMETERS: proof, publicInputs, and data must encode the same snapshot claims in circuit order; verificationKeyId selects the corresponding server circuit key.\nBEHAVIOR: Performs stateless cryptographic verification without indexing or publishing the proof. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing valid, verifiedAt, computationTimeMs, and optional error.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); valid:false for proof/key/binding mismatch. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -914,20 +914,20 @@ const baseMcpToolDefinitions = [
       properties: {
         proof: field(
           "string",
-          "Required base64url-encoded Groth16/Poseidon BN254 proof string emitted by this API, without padding. Example: 'eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0'.",
+          "Base64url-encoded Groth16/Poseidon BN254 proof emitted by this API, without padding.",
           ["eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0"],
           { minLength: 1 },
         ),
         publicInputs: publicInputsJsonSchema,
         verificationKeyId: field(
           "string",
-          "Required SHA-256 verification-key identifier string using the 'sha256:' prefix. Example: 'sha256:4c095e183ea45a9d'.",
+          "SHA-256 verification-key identifier using the sha256: prefix.",
           ["sha256:4c095e183ea45a9d"],
           { minLength: 1 },
         ),
         data: field(
           ["object", "array"],
-          "Required telemetry snapshot object or array of objects whose canonical digest and semantic fields must match the proof. Example: [{'block':{'height':920000},'observed_at':'2026-09-19T00:00:00.000Z','thermodynamic':{'target_multiplier':125.83}}].",
+          "Telemetry snapshot payload whose canonical digest and semantic fields must match the proof.",
           [[{
             block: { height: 920000 },
             observed_at: "2026-09-19T00:00:00.000Z",
@@ -977,7 +977,7 @@ const baseMcpToolDefinitions = [
     name: "proof.status",
     title: "Get Proof Status",
     description:
-      "PURPOSE: Retrieve one proof's indexed lifecycle state.\nUSAGE: Use this tool when you know a proof or snapshot identifier. Do NOT use this tool for fresh validation; use proof.verify instead.\nPARAMETERS: proofHash and snapshotDigest are mutually exclusive selectors for the proof artifact or its committed dataset; unknown identifiers report pending rather than verified.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing status, verifiedAt, attestationCount, and meshQuorum.\nERRORS: 400 (Invalid Request), -32602 (invalid selector combination), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Retrieve one proof's indexed lifecycle state.\nUSAGE: Use this tool when you know a proof or snapshot identifier. Do NOT use this tool for fresh validation; use proof.verify instead.\nPARAMETERS: proofHash and snapshotDigest are mutually exclusive selectors for the proof artifact or its committed dataset; unknown identifiers report pending rather than verified.\nBEHAVIOR: Looks up indexed verification and quorum state without modifying it. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Current indexed lifecycle and quorum state.\nERRORS: Invalid selectors return -32602; rate excess returns HTTP 429. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -991,7 +991,7 @@ const baseMcpToolDefinitions = [
       properties: {
         proofHash: field(
           "string",
-          "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
+          "SHA-256 digest or IPFS CID identifying a proof attestation.",
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
@@ -1002,7 +1002,7 @@ const baseMcpToolDefinitions = [
         ),
         snapshotDigest: field(
           "string",
-          "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
+          "Snapshot commitment or IPFS CID identifying its proof attestation.",
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
@@ -1060,7 +1060,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "PURPOSE: Discover indexed proof attestations.\nUSAGE: Use this tool when you need proof identifiers or a lifecycle overview. Do NOT use this tool for one known proof's state; use proof.status instead.\nPARAMETERS: status filters attestation records by lifecycle state before pagination; offset skips preceding matching items, and limit determines page size for ordered result sets.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing attestations and total matching count.\nERRORS: 400 (Invalid Request), -32602 (invalid pagination or status), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Discover indexed proof attestations.\nUSAGE: Use this tool when you need proof identifiers or a lifecycle overview. Do NOT use this tool for one known proof's state; use proof.status instead.\nPARAMETERS: status filters attestation records by lifecycle state before pagination; offset skips preceding matching items, and limit determines page size for ordered result sets.\nBEHAVIOR: Filters and paginates the local attestation index without modifying records. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing attestations and total matching count.\nERRORS: 400 (Invalid Request), -32602 (invalid pagination or status), 429 (Rate Limit). No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1071,19 +1071,19 @@ const baseMcpToolDefinitions = [
       properties: {
         limit: field(
           "integer",
-          "Maximum number of attestation records to return (integer, 1 to 100). Defaults to 20.",
+          "Maximum number of attestation records to return.",
           [20],
           { minimum: 1, maximum: 100, default: 20 },
         ),
         offset: field(
           "integer",
-          "Zero-based number of matching attestation records to skip before returning the page (integer, 0 to 1000). Defaults to 0.",
+          "Zero-based pagination skip index.",
           [0],
           { minimum: 0, maximum: 1_000, default: 0 },
         ),
         status: field(
           "string",
-          "Optional attestation lifecycle status filter string (e.g., 'verified', 'pending', 'rejected'). Defaults to returning records of all statuses. Example: 'verified'.",
+          "Filter records by attestation lifecycle state.",
           ["verified"],
           { enum: [...proofLifecycleStates] },
         ),
@@ -1197,7 +1197,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "PURPOSE: Verify and index a proof with optional Nostr publication.\nUSAGE: Use this tool when a proof should enter the node's lifecycle. Do NOT use this tool for stateless validation; use proof.verify instead.\nPARAMETERS: proof must correspond to publicSignals in circuit-defined order; optional snapshotDigest must equal the snapshot commitment signal to bind the indexed dataset to the proof.\nBEHAVIOR: Mutating, Non-idempotent; may repeat relay publication. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing proofHash, status, submittedAt, and attestationStatus.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); status reports invalid proofs and attestationStatus reports publication failures. No 402 payment required.",
+      "PURPOSE: Verify and index a proof with optional Nostr publication.\nUSAGE: Use this tool when a proof should enter the node's lifecycle. Do NOT use this tool for stateless validation; use proof.verify instead.\nPARAMETERS: proof must correspond to publicSignals in circuit-defined order; optional snapshotDigest must equal the snapshot commitment signal to bind the indexed dataset to the proof.\nBEHAVIOR: Verifies and persists proof lifecycle state and may publish a Nostr attestation. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing proofHash, status, submittedAt, and attestationStatus.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); status reports invalid proofs and attestationStatus reports publication failures. No 402 payment required.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1217,7 +1217,7 @@ const baseMcpToolDefinitions = [
         proof: {
           type: "object",
           description:
-            `Groth16/Poseidon zk-SNARK proof object containing pi_a (3-element array), pi_b (3x2 nested array), and pi_c (3-element array) BN254 elliptic curve projective points as decimal string field elements. Example: {"pi_a":["10823","49102","1"],"pi_b":[["112","331"],["981","771"],["1","0"]],"pi_c":["554","882","1"]}.`,
+            "Groth16/Poseidon zk-SNARK proof coordinates over the BN254 curve.",
           example: {
             pi_a: ["1", "2", "1"],
             pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
@@ -1237,14 +1237,14 @@ const baseMcpToolDefinitions = [
           properties: {
             pi_a: field(
               "array",
-              "Required 3-element array of decimal string field elements representing the Groth16 BN254 proof A projective point. Example: ['10823', '49102', '1'].",
+              "Groth16 BN254 proof A projective coordinates.",
               [["1", "2", "1"]],
               {
                 minItems: 3,
                 maxItems: 3,
                 items: field(
                   "string",
-                  "Decimal string BN254 scalar-field coordinate in proof point A. Example: '10823'.",
+                  "Decimal-encoded BN254 scalar-field coordinate in proof point A.",
                   ["10823"],
                   { pattern: "^\\d+$" },
                 ),
@@ -1252,21 +1252,21 @@ const baseMcpToolDefinitions = [
             ),
             pi_b: field(
               "array",
-              "Required 3x2 nested array of decimal string field elements representing the Groth16 BN254 proof B projective point. Example: [['112', '331'], ['981', '771'], ['1', '0']].",
+              "Groth16 BN254 proof B projective coordinates.",
               [[["1", "2"], ["3", "4"], ["1", "0"]]],
               {
                 minItems: 3,
                 maxItems: 3,
                 items: field(
                   "array",
-                  "Required 2-element array of decimal string BN254 extension-field coordinates. Example: ['112', '331'].",
+                  "BN254 extension-field coordinate pair in proof point B.",
                   [["112", "331"]],
                   {
                     minItems: 2,
                     maxItems: 2,
                     items: field(
                       "string",
-                      "Decimal string BN254 extension-field coordinate in proof point B. Example: '331'.",
+                      "Decimal-encoded BN254 extension-field coordinate in proof point B.",
                       ["331"],
                       { pattern: "^\\d+$" },
                     ),
@@ -1276,14 +1276,14 @@ const baseMcpToolDefinitions = [
             ),
             pi_c: field(
               "array",
-              "Required 3-element array of decimal string field elements representing the Groth16 BN254 proof C projective point. Example: ['554', '882', '1'].",
+              "Groth16 BN254 proof C projective coordinates.",
               [["5", "6", "1"]],
               {
                 minItems: 3,
                 maxItems: 3,
                 items: field(
                   "string",
-                  "Decimal string BN254 scalar-field coordinate in proof point C. Example: '554'.",
+                  "Decimal-encoded BN254 scalar-field coordinate in proof point C.",
                   ["554"],
                   { pattern: "^\\d+$" },
                 ),
@@ -1294,14 +1294,14 @@ const baseMcpToolDefinitions = [
         },
         publicSignals: field(
           "array",
-          "Required array of exactly 5 public signal strings representing scalar field elements in BN254 curve modulo space, ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest. Example: ['920000', '1', '1789776000000', '12583', '1'].",
+          "Public signals ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
           [["920000", "1", "1789776000000", "12583", "1"]],
           {
             minItems: 5,
             maxItems: 5,
             items: field(
               "string",
-              "Decimal string scalar field element in the BN254 curve modulo space. Example: '920000'.",
+              "Decimal-encoded BN254 scalar-field element.",
               ["920000"],
               { pattern: "^\\d+$" },
             ),
@@ -1309,7 +1309,7 @@ const baseMcpToolDefinitions = [
         ),
         snapshotDigest: field(
           "string",
-          "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. The schema default is '1'.",
+          "Telemetry snapshot CID or Poseidon digest matching the snapshot commitment signal.",
           ["1"],
           {
             pattern:
@@ -1369,7 +1369,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Generates an L402 Lightning challenge requiring 5 sats settlement to anchor agent context to Bitcoin state.\nUSAGE: Use this tool when you need a signed context anchor. Do NOT use this tool for validating Groth16 proofs; use proof.verify instead.\nPARAMETERS: contextHash (64-character hexadecimal SHA-256 string) and agentId pair state with caller-declared identity. Optional metadata binds non-secret JSON audit key-values.\nBEHAVIOR: Generates an L402 invoice challenge; settling the 5-sat payment creates a persistent context anchor bound to Bitcoin block state. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing HTTP 402 challenge metadata (amountSats, endpoint, verificationEndpoint, request) or signed receipt upon payment.\nERRORS: -32602 (invalid MCP arguments); HTTP 400 (Invalid Request), 402 (Payment Required, 5 sats at /api/v1/zk/ground), 429 (Rate Limit), 500/502/503 (grounding unavailable).",
+      "PURPOSE: Generates an L402 Lightning challenge requiring 5 sats settlement to anchor agent context to Bitcoin state.\nUSAGE: Use this tool when you need a signed context anchor. Do NOT use this tool for validating Groth16 proofs; use proof.verify instead.\nPARAMETERS: contextHash (64-character hexadecimal SHA-256 string) and agentId pair state with caller-declared identity. Optional metadata binds non-secret JSON audit key-values.\nBEHAVIOR: Generates an L402 invoice challenge; settling the 5-sat payment creates a persistent context anchor bound to Bitcoin block state. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Payment challenge or signed grounding receipt.\nERRORS: Invalid arguments return -32602; payment, rate, or service failures return the corresponding HTTP error.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1384,19 +1384,19 @@ const baseMcpToolDefinitions = [
       properties: {
         contextHash: field(
           "string",
-          "Required SHA-256 digest of the agent context, encoded as exactly 64 hexadecimal characters.",
+          "SHA-256 digest of caller context.",
           ["4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f"],
           { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 },
         ),
         agentId: field(
           "string",
-          "Required stable caller-controlled agent identifier from 1 through 256 characters.",
+          "Stable caller-controlled identifier.",
           ["research-agent-7"],
           { minLength: 1, maxLength: 256 },
         ),
         metadata: field(
           "object",
-          "Optional JSON object carrying non-secret caller metadata to bind into the signed anchor.",
+          "Non-secret caller metadata bound into the context anchor.",
           [{ topic: "difficulty-adjustment" }],
           { additionalProperties: true },
         ),
@@ -1464,7 +1464,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE: Report mesh connectivity and quorum readiness.\nUSAGE: Use this tool when you need peer topology health. Do NOT use this tool for proof validity; use proof.verify instead.\nPARAMETERS: No selectors are accepted because status aggregates the current node and all configured peers rather than one proof or peer.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing nodePubkey, peer counts, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Report mesh connectivity and quorum readiness.\nUSAGE: Use this tool when you need peer topology health. Do NOT use this tool for proof validity; use proof.verify instead.\nPARAMETERS: No selectors are accepted because status aggregates the current node and all configured peers rather than one proof or peer.\nBEHAVIOR: Observes current peer and quorum health without changing mesh state. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing nodePubkey, peer counts, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit). No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

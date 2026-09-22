@@ -689,7 +689,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE: Retrieve historical Bitcoin stratigraphy telemetry.\nUSAGE: Use this tool when you need selected telemetry records. Do NOT use this tool for discovering coverage; use stratigraphy.list instead.\nPARAMETERS: Choose days (1-365), date, or blockHeight exclusively, or combine ordered date/block ranges; metrics selects signals and limit caps results at 1-100. Block bounds must be non-negative.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing records with source details and projected quantitative metrics.\nERRORS: 400 (Invalid Request), -32602 (invalid selectors), 429 (Rate Limit); tool error on query failure. No 402 payment required.",
+      "PURPOSE: Retrieve historical Bitcoin stratigraphy telemetry.\nUSAGE: Use this tool when you need selected telemetry records. Do NOT use this tool for discovering coverage; use stratigraphy.list instead.\nPARAMETERS: days, date, or blockHeight selects one lookup mode; date and block ranges use ordered inclusive bounds. metrics projects requested signals before limit truncates the ordered result set.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing records with source details and projected quantitative metrics.\nERRORS: 400 (Invalid Request), -32602 (invalid selectors), 429 (Rate Limit); tool error on query failure. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -801,7 +801,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "PURPOSE: Discover stratigraphy coverage and metric names.\nUSAGE: Use this tool when you need valid bounds before querying telemetry. Do NOT use this tool for fetching records; use stratigraphy.get instead.\nPARAMETERS: Accepts zero parameters; coverage and metrics describe the complete catalog rather than a selected page.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit); tool error if the catalog is unavailable. No 402 payment required.",
+      "PURPOSE: Discover stratigraphy coverage and metric names.\nUSAGE: Use this tool when you need valid bounds before querying telemetry. Do NOT use this tool for fetching records; use stratigraphy.get instead.\nPARAMETERS: No selectors are accepted because coverage and metrics describe the complete catalog rather than a filtered page.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit); tool error if the catalog is unavailable. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -894,7 +894,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "PURPOSE: Verify a Groth16/Poseidon proof against snapshot claims.\nUSAGE: Use this tool when you need stateless proof validation. Do NOT use this tool for indexing proofs; use proof.submit instead. For context anchoring, use proof.ground.\nPARAMETERS: proof, publicInputs, and data must bind the same snapshot; verificationKeyId must match the server circuit key. Height, timestamp, and valuation must be non-negative.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing valid, verifiedAt, computationTimeMs, and optional error.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); valid:false for proof/key/binding mismatch. No 402 payment required.",
+      "PURPOSE: Verify a Groth16/Poseidon proof against snapshot claims.\nUSAGE: Use this tool when you need stateless proof validation. Do NOT use this tool for indexing proofs; use proof.submit instead. For context anchoring, use proof.ground.\nPARAMETERS: proof, publicInputs, and data must encode the same snapshot claims in circuit order; verificationKeyId selects the corresponding server circuit key.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing valid, verifiedAt, computationTimeMs, and optional error.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); valid:false for proof/key/binding mismatch. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -977,7 +977,7 @@ const baseMcpToolDefinitions = [
     name: "proof.status",
     title: "Get Proof Status",
     description:
-      "PURPOSE: Retrieve one proof's indexed lifecycle state.\nUSAGE: Use this tool when you know a proof or snapshot identifier. Do NOT use this tool for fresh validation; use proof.verify instead.\nPARAMETERS: Supply exactly one non-empty proofHash or snapshotDigest to select the proof artifact or its committed dataset; unknown identifiers report pending, not verified.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing status, verifiedAt, attestationCount, and meshQuorum.\nERRORS: 400 (Invalid Request), -32602 (invalid selector combination), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Retrieve one proof's indexed lifecycle state.\nUSAGE: Use this tool when you know a proof or snapshot identifier. Do NOT use this tool for fresh validation; use proof.verify instead.\nPARAMETERS: proofHash and snapshotDigest are mutually exclusive selectors for the proof artifact or its committed dataset; unknown identifiers report pending rather than verified.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing status, verifiedAt, attestationCount, and meshQuorum.\nERRORS: 400 (Invalid Request), -32602 (invalid selector combination), 429 (Rate Limit). No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1060,7 +1060,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "PURPOSE: Discover indexed proof attestations.\nUSAGE: Use this tool when you need proof identifiers or a lifecycle overview. Do NOT use this tool for one known proof's state; use proof.status instead.\nPARAMETERS: status filters before pagination; limit (1-100, default 20) and offset (0-1000, default 0) select a page of matching records.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing attestations and total matching count.\nERRORS: 400 (Invalid Request), -32602 (invalid pagination or status), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Discover indexed proof attestations.\nUSAGE: Use this tool when you need proof identifiers or a lifecycle overview. Do NOT use this tool for one known proof's state; use proof.status instead.\nPARAMETERS: status filters attestation records by lifecycle state before pagination; offset skips preceding matching items, and limit determines page size for ordered result sets.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing attestations and total matching count.\nERRORS: 400 (Invalid Request), -32602 (invalid pagination or status), 429 (Rate Limit). No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1197,7 +1197,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "PURPOSE: Verify and index a proof with optional Nostr publication.\nUSAGE: Use this tool when a proof should enter the node's lifecycle. Do NOT use this tool for stateless validation; use proof.verify instead.\nPARAMETERS: proof must match five ordered publicSignals; optional snapshotDigest must equal publicSignals[4] to bind the indexed dataset to the proof.\nBEHAVIOR: Mutating, Non-idempotent; may repeat relay publication. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing proofHash, status, submittedAt, and attestationStatus.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); status reports invalid proofs and attestationStatus reports publication failures. No 402 payment required.",
+      "PURPOSE: Verify and index a proof with optional Nostr publication.\nUSAGE: Use this tool when a proof should enter the node's lifecycle. Do NOT use this tool for stateless validation; use proof.verify instead.\nPARAMETERS: proof must correspond to publicSignals in circuit-defined order; optional snapshotDigest must equal the snapshot commitment signal to bind the indexed dataset to the proof.\nBEHAVIOR: Mutating, Non-idempotent; may repeat relay publication. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing proofHash, status, submittedAt, and attestationStatus.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); status reports invalid proofs and attestationStatus reports publication failures. No 402 payment required.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1464,7 +1464,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE: Report mesh connectivity and quorum readiness.\nUSAGE: Use this tool when you need peer topology health. Do NOT use this tool for proof validity; use proof.verify instead.\nPARAMETERS: Accepts zero parameters; status covers the current node and configured peers, not a selected proof.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing nodePubkey, peer counts, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Report mesh connectivity and quorum readiness.\nUSAGE: Use this tool when you need peer topology health. Do NOT use this tool for proof validity; use proof.verify instead.\nPARAMETERS: No selectors are accepted because status aggregates the current node and all configured peers rather than one proof or peer.\nBEHAVIOR: Read-only, Idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing nodePubkey, peer counts, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit). No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

@@ -1369,8 +1369,8 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Route context grounding to the paid Bitcoin-tip attestation endpoint.\nUSAGE: Use this tool when you need a signed context anchor. Do NOT use this tool for validating Groth16 proofs; use proof.verify instead.\nPARAMETERS: contextHash and agentId pair context state with caller-declared identity, not authenticated identity; agentId is limited to 256 characters. Optional metadata binds non-secret JSON audit values.\nBEHAVIOR: Read-only, Idempotent MCP routing; paid HTTP grounding is mutating and non-idempotent. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing status, error, amountSats, endpoint, verificationEndpoint, and request.\nERRORS: -32602 (invalid MCP arguments); HTTP 400 (Invalid Request), 402 (Payment Required, 5 sats at /api/v1/zk/ground), 429 (Rate Limit), 500/502/503 (grounding unavailable).",
-    annotations: readOnlyToolAnnotations,
+      "PURPOSE: Generates an L402 Lightning challenge requiring 5 sats settlement to anchor agent context to Bitcoin state.\nUSAGE: Use this tool when you need a signed context anchor. Do NOT use this tool for validating Groth16 proofs; use proof.verify instead.\nPARAMETERS: contextHash and agentId pair context state with caller-declared identity, not authenticated identity; agentId is limited to 256 characters. Optional metadata binds non-secret JSON audit values.\nBEHAVIOR: Mutating, non-idempotent L402 challenge issuance. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing HTTP 402 challenge metadata (amountSats, endpoint, verificationEndpoint, request) or signed receipt upon payment.\nERRORS: -32602 (invalid MCP arguments); HTTP 400 (Invalid Request), 402 (Payment Required, 5 sats at /api/v1/zk/ground), 429 (Rate Limit), 500/502/503 (grounding unavailable).",
+    annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
       description: "Epistemic context grounding request routed to the paid HTTP boundary.",

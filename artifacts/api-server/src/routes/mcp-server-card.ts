@@ -85,7 +85,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "zk_ground_context",
+        name: "zk.ground",
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,

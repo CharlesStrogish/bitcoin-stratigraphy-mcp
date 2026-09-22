@@ -1299,7 +1299,7 @@ const baseMcpToolDefinitions = [
     },
   },
   {
-    name: "zk_ground_context",
+    name: "zk.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
       "PURPOSE: Initiate a paid epistemic-context grounding request anchored to the current Bitcoin tip and signed by the server's Nostr identity.\nUSAGE: Use this tool when an agent needs a context hash bound to current Bitcoin height/hash. Use proof.verify for existing Groth16 proofs, proof.submit for lifecycle indexing, and stratigraphy.get for historical telemetry. Grounding is not performed for free through MCP; complete the 5-sat L402 flow at POST /api/v1/zk/ground with the same request.\nPARAMETERS: contextHash is a 64-character SHA-256 hex digest, agentId is a non-empty identifier up to 256 characters, and metadata is an optional JSON object. Invalid parameters return MCP -32602.\nBEHAVIOR: This MCP call is a side-effect-free payment router and never fabricates an unpaid anchor. The HTTP endpoint validates input, fetches current Bitcoin height/hash, canonicalizes the state with a server timestamp, computes SHA-256 block commitments and a Merkle root, and signs with NIP-78 before issuing or redeeming the L402 challenge; successful settlement records revenue.\nRETURNS: JSON {status:402,error:'payment_required',endpoint:'/api/v1/zk/ground',amountSats:5,verificationEndpoint:'/api/v1/zk/verify',request:{contextHash,agentId,metadata}}. The paid HTTP response instead returns {receipt}, whose attestation-shaped receipt includes contextHash, blockHeight, blockHash, merkleRoot, timestamp, and nostrSignature.\nERRORS: Invalid MCP arguments return -32602. The HTTP route returns 400 for invalid payloads, 503 when Bitcoin-tip lookup or signing preflight fails before any challenge, 402 after successful preflight until paid, 429 with Retry-After when rate limited, 500 for missing server settlement/signing configuration, and 502 when invoice creation or payment verification fails.",
@@ -1431,7 +1431,7 @@ const toolDescriptionAdditions: Record<string, string> = {
   "stratigraphy.list":
     "ROUTING DETAIL: Prefer this tool before stratigraphy.get when valid date/block bounds or metric names are unknown. RETURN SHAPE: {totalSnapshots:number,oldestBlock:number,newestBlock:number,availableMetrics:string[],dateBounds:{startDate:string,endDate:string}}. ERROR BOUNDARIES: any supplied parameter returns MCP -32602; an unavailable catalog produces a tool error and never a partial paid response or 402 challenge.",
   "proof.verify":
-    "ROUTING DETAIL: Prefer this tool for stateless validation of an existing Groth16 proof; use zk_ground_context for SHA-256/Nostr epistemic receipts. RETURN SHAPE: {valid:boolean,verifiedAt:string,computationTimeMs:number,error?:string}. ERROR BOUNDARIES: malformed proof/public inputs return MCP -32602; wrong keys, altered data, or semantic mismatches return valid:false; verifier saturation may fail the operation; no 402 challenge is issued.",
+    "ROUTING DETAIL: Prefer this tool for stateless validation of an existing Groth16 proof; use zk.ground for SHA-256/Nostr epistemic receipts. RETURN SHAPE: {valid:boolean,verifiedAt:string,computationTimeMs:number,error?:string}. ERROR BOUNDARIES: malformed proof/public inputs return MCP -32602; wrong keys, altered data, or semantic mismatches return valid:false; verifier saturation may fail the operation; no 402 challenge is issued.",
   "proof.status":
     "ROUTING DETAIL: Prefer this tool only after a proof hash or snapshot digest is known; use proof.list to discover identifiers. RETURN SHAPE: {status:'verified'|'cached'|'pending'|'invalid',verifiedAt:string,attestationCount:number,meshQuorum:boolean}. ERROR BOUNDARIES: both/neither selectors return MCP -32602; unknown identifiers return pending with zero attestations; no 402 challenge is issued.",
   "proof.list":
@@ -1608,7 +1608,7 @@ function createBitcoinStratigraphyMcpServer() {
         structuredContent,
       };
     }
-    if (request.params.name === "zk_ground_context") {
+    if (request.params.name === "zk.ground") {
       const parsed = groundContextInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(

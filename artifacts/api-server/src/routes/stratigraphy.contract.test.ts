@@ -595,10 +595,17 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "proof.status",
       "proof.list",
       "proof.submit",
-      "zk_ground_context",
+      "zk.ground",
       "mesh.status",
     ],
   );
+  for (const candidate of listed.result?.tools ?? []) {
+    assert.match(
+      candidate.name,
+      /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*$/,
+      `${candidate.name} must use namespace.action dot notation`,
+    );
+  }
   const assertDocumentedSchema = (
     schema: {
       type?: unknown;
@@ -667,11 +674,11 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     );
   }
   const groundingTool = listed.result?.tools.find(
-    (candidate: { name: string }) => candidate.name === "zk_ground_context",
+    (candidate: { name: string }) => candidate.name === "zk.ground",
   );
   assert.ok(groundingTool);
   const groundingCalled = await mcpRequest("tools/call", {
-    name: "zk_ground_context",
+    name: "zk.ground",
     arguments: {
       contextHash:
         "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",

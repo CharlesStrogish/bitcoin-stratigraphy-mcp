@@ -526,9 +526,9 @@ await runCheck("Pillar 2", "Epistemic grounding discovery and verification", asy
   assert.ok(Array.isArray(result.tools), "MCP tools/list must return tools");
   const groundingTool = result.tools.find((value) => {
     const tool = asRecord(value, "MCP tool");
-    return tool.name === "zk_ground_context";
+    return tool.name === "zk.ground";
   });
-  const tool = asRecord(groundingTool, "zk_ground_context tool");
+  const tool = asRecord(groundingTool, "zk.ground tool");
   const inputSchema = asRecord(tool.inputSchema, "grounding input schema");
   const properties = asRecord(inputSchema.properties, "grounding properties");
   for (const parameterName of ["contextHash", "agentId", "metadata"]) {
@@ -550,7 +550,7 @@ await runCheck("Pillar 2", "Epistemic grounding discovery and verification", asy
 
   const contextHash = "ab".repeat(32);
   const routed = await mcpRequest("tools/call", {
-    name: "zk_ground_context",
+    name: "zk.ground",
     arguments: {
       contextHash,
       agentId: "master-e2e-agent",

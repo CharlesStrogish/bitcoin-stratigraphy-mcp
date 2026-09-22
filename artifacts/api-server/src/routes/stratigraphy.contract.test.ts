@@ -652,10 +652,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     path: string,
   ): void => {
     assert.ok(schema.type, `${path} must define type`);
-    assert.equal(
-      typeof schema.description,
-      "string",
-      `${path} must define description`,
+    assert.ok(
+      typeof schema.description === "string" &&
+        schema.description.trim().length > 0,
+      `${path} must define a non-empty description`,
     );
     assert.ok(
       Array.isArray(schema.examples) && schema.examples.length > 0,
@@ -744,29 +744,32 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       );
     }
   };
+  const requiredDescriptionSections = [
+    "PURPOSE:",
+    "USAGE:",
+    "PARAMETERS:",
+    "BEHAVIOR:",
+    "RETURNS:",
+    "ERRORS:",
+  ] as const;
   for (const candidate of listed.result?.tools ?? []) {
-    for (
-      const section of [
-        "PURPOSE:",
-        "USAGE:",
-        "PARAMETERS:",
-        "BEHAVIOR:",
-        "RETURNS:",
-        "ERRORS:",
-      ]
-    ) {
-      assert.match(
-        candidate.description,
-        new RegExp(`(?:^|\\n)${section}`),
-        `${candidate.name} must define ${section}`,
+    const descriptionLines = candidate.description.split("\n");
+    assert.equal(descriptionLines.length, requiredDescriptionSections.length);
+    requiredDescriptionSections.forEach((section, index) => {
+      assert.ok(
+        descriptionLines[index]?.startsWith(section),
+        `${candidate.name} description line ${index + 1} must start with ${section}`,
       );
-    }
+      assert.ok(
+        descriptionLines[index].slice(section.length).trim().length > 0,
+        `${candidate.name} must provide content after ${section}`,
+      );
+    });
     assert.match(
       candidate.description,
       /ERRORS:.*-32602/,
       `${candidate.name} must document MCP parameter validation errors`,
     );
-    assert.equal(candidate.description.split("\n").length, 6);
     assert.match(
       candidate.description,
       /USAGE: Use .+ Do NOT use .+; use .+ instead\./,

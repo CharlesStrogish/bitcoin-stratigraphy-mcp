@@ -7,6 +7,7 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "release:check": "node scripts/check-published-assets.mjs",
     "test": "node --test test/*.test.mjs && pnpm -r --if-present run test",
+    "test:e2e": "tsx scripts/test-e2e-master.ts",
     "test:l402": "pnpm exec tsx scripts/test-l402.ts",
     "test:dvm": "tsx scripts/test-dvm-client.ts",
     "test:mcp": "pnpm exec tsx scripts/test-mcp-health.ts",

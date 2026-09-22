@@ -1060,7 +1060,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "PURPOSE: Discover indexed proof attestations.\nUSAGE: Use to discover indexed attestations. Do NOT use for single proof state; use proof.status instead.\nPARAMETERS: status filters attestation records by lifecycle state before pagination; offset skips preceding matching items, and limit determines page size for ordered result sets.\nBEHAVIOR: Filters and paginates the local attestation index without modifying records. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing attestations and total matching count.\nERRORS: 400 (Invalid Request), -32602 (invalid pagination or status), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Retrieves indexed proof attestation records and matching state totals.\nUSAGE: Use to filter and paginate indexed attestations by lifecycle state. Do NOT use for single proof state; use proof.status instead.\nPARAMETERS: Optional status filter, result limit, and offset parameters.\nBEHAVIOR: Filters local attestation index without modifying records. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing matching attestations array and total count.\nERRORS: 400 (Invalid Request), 429 (Rate Limit). No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1071,19 +1071,19 @@ const baseMcpToolDefinitions = [
       properties: {
         limit: field(
           "integer",
-          "Maximum number of records to return.",
+          "Maximum number of records to return (integer, 1-100).",
           [20],
           { minimum: 1, maximum: 100, default: 20 },
         ),
         offset: field(
           "integer",
-          "Zero-based pagination skip offset.",
+          "Zero-based pagination skip offset count.",
           [0],
           { minimum: 0, maximum: 1_000, default: 0 },
         ),
         status: field(
           "string",
-          "Filter records by attestation lifecycle state.",
+          "Filter records by attestation lifecycle state ('verified' | 'pending' | 'failed').",
           ["verified"],
           { enum: [...proofLifecycleStates] },
         ),

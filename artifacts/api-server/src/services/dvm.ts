@@ -18,6 +18,11 @@ import {
   type NwcClientFactory,
   type SettlementInvoice,
 } from "./settlement";
+import {
+  createServiceAnnouncer,
+  parseNip05Identifier,
+  type RelayConnectionStatus,
+} from "./announcer";
 
 const JOB_REQUEST_KINDS = Array.from({ length: 991 }, (_, index) => 5_000 + index);
 const DEFAULT_INVOICE_EXPIRY_SECONDS = 3_600;
@@ -48,6 +53,7 @@ export type DvmConfig = {
 export type DvmTransport = {
   subscribe(filter: Filter, onEvent: (event: Event) => void): () => void;
   publish(event: Event): Promise<void>;
+  relayStatuses?(): RelayConnectionStatus[];
   close(): void;
 };
 
@@ -158,6 +164,9 @@ export function createNostrDvmTransport(
   pool = new SimplePool({ enableReconnect: true }),
 ): DvmTransport {
   const abortController = new AbortController();
+  const relayStatus = new Map<string, RelayConnectionStatus>(
+    relays.map((relay) => [relay, { relay, status: "pending" }]),
+  );
   return {
     subscribe(filter, onEvent) {
       const subscription = pool.subscribeMany(relays, filter, {
@@ -173,9 +182,28 @@ export function createNostrDvmTransport(
           abort: abortController.signal,
         }),
       );
+      outcomes.forEach((outcome, index) => {
+        const relay = relays[index]!;
+        relayStatus.set(
+          relay,
+          outcome.status === "fulfilled"
+            ? { relay, status: "connected" }
+            : {
+                relay,
+                status: "failed",
+                message:
+                  outcome.reason instanceof Error
+                    ? outcome.reason.message
+                    : String(outcome.reason),
+              },
+        );
+      });
       if (!outcomes.some((outcome) => outcome.status === "fulfilled")) {
         throw new Error("No configured Nostr relay accepted the DVM event");
       }
+    },
+    relayStatuses() {
+      return relays.map((relay) => ({ ...relayStatus.get(relay)! }));
     },
     close() {
       abortController.abort();
@@ -607,7 +635,33 @@ export function createNip90Dvm(
 }
 
 export async function startNip90Dvm(): Promise<() => Promise<void>> {
-  const dvm = createNip90Dvm();
-  dvm.start();
-  return () => dvm.stop();
+  const config = loadDvmConfig();
+  const transport = createNostrDvmTransport(config.relays);
+  const announcer = createServiceAnnouncer(
+    {
+      ...config,
+      nip05: parseNip05Identifier(
+        process.env.NIP05_IDENTIFIER?.trim() ||
+          process.env.NOSTR_NIP05?.trim() ||
+          undefined,
+      )?.identifier,
+      picture: process.env.DVM_PICTURE_URL?.trim() || undefined,
+      banner: process.env.DVM_BANNER_URL?.trim() || undefined,
+    },
+    transport,
+  );
+  let dvm: Nip90Dvm;
+  try {
+    await announcer.start();
+    dvm = createNip90Dvm(config, { transport });
+    dvm.start();
+  } catch (error) {
+    await announcer.stop();
+    transport.close();
+    throw error;
+  }
+  return async () => {
+    await announcer.stop();
+    await dvm.stop();
+  };
 }

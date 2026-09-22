@@ -16,6 +16,7 @@ const outputs = [
   "./dist/meshGossip.test.js",
   "./dist/dvm.test.js",
   "./dist/l402.test.js",
+  "./dist/announcer.test.js",
 ];
 
 await build({
@@ -32,6 +33,7 @@ await build({
     "meshGossip.test": "../../tests/meshGossip.test.ts",
     "dvm.test": "./tests/unit/dvm.test.ts",
     "l402.test": "../../tests/l402.test.ts",
+    "announcer.test": "../../tests/announcer.test.ts",
   },
   outdir: "./dist",
   bundle: true,

@@ -11,8 +11,11 @@ import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-chal
 import { registerNostrStatusRoute } from "./routes/nostr-status";
 import { createPostgresMacaroonUsageStore } from "./lib/postgres-macaroon-usage-store";
 import { createPostgresMacaroonRevocationStore } from "./lib/postgres-macaroon-revocation-store";
+import { createPostgresRevenueLedger } from "./services/postgres-ledger";
+import { registerRevenueAnalyticsRoutes } from "./routes/analytics";
 
 const app: Express = express();
+const revenueLedger = createPostgresRevenueLedger();
 
 app.set("trust proxy", 1);
 
@@ -63,6 +66,7 @@ registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
 registerMcpRoute(app);
 registerNostrStatusRoute(app);
+registerRevenueAnalyticsRoutes(app, revenueLedger);
 app.use("/api", router);
 registerStratigraphyRoutes(
   app,
@@ -71,6 +75,9 @@ registerStratigraphyRoutes(
   createPostgresPaymentChallengeStore(),
   createPostgresMacaroonUsageStore(),
   createPostgresMacaroonRevocationStore(),
+  undefined,
+  undefined,
+  { revenueLedger },
 );
 
 export default app;

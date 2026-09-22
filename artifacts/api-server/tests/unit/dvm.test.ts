@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   finalizeEvent,
@@ -16,6 +17,7 @@ import {
   type DvmConfig,
   type DvmTransport,
 } from "../../src/services/dvm";
+import { createMemoryRevenueLedger } from "../../src/services/ledger";
 
 function config(privateKey = generateSecretKey()): DvmConfig {
   return {
@@ -58,6 +60,11 @@ function fakeTransport(published: Event[]): DvmTransport {
     close() {},
   };
 }
+
+const SETTLED_PREIMAGE = "01".repeat(32);
+const SETTLED_PAYMENT_HASH = createHash("sha256")
+  .update(Buffer.from(SETTLED_PREIMAGE, "hex"))
+  .digest("hex");
 
 test("loads DVM configuration with validated key and fallback relays", () => {
   const privateKey = generateSecretKey();
@@ -116,18 +123,23 @@ test("accepts standard NIP-90 text, URL, and parameter inputs", () => {
 
 test("requires settlement before publishing a signed NIP-90 result", async () => {
   const published: Event[] = [];
+  const ledger = createMemoryRevenueLedger();
   const dvm = createNip90Dvm(config(), {
     transport: fakeTransport(published),
     createInvoice: async () => ({
       invoice: "lnbc5n1test",
-      paymentHash: "ab".repeat(32),
+      paymentHash: SETTLED_PAYMENT_HASH,
       provider: "coinos",
     }),
-    waitForSettlement: async () => true,
+    waitForSettlement: async () => ({
+      settledAt: 1_789_963_200,
+      preimage: SETTLED_PREIMAGE,
+    }),
     queryStratigraphy: async (input) => ({
       records: [{ day: input.days }],
     }),
     now: () => 1_789_963_200_000,
+    ledger,
   });
   dvm.start();
   const event = request(5_000, { days: 7 }, [["t", "stratigraphy"]]);
@@ -160,6 +172,8 @@ test("requires settlement before publishing a signed NIP-90 result", async () =>
   assert.deepEqual(JSON.parse(result.content), {
     records: [{ day: 7 }],
   });
+  assert.equal(await ledger.getTotalVolume(), 5);
+  assert.equal((await ledger.getRecent())[0]?.channel, "NIP-90");
 
   await dvm.handleEvent(event);
   assert.equal(published.length, 4, "duplicate requests must be ignored");
@@ -225,12 +239,12 @@ test("polls the issuing NWC wallet until the DVM invoice settles", async () => {
           state: lookups === 1 ? "pending" : "settled",
           amount: 5_000,
           description: "DVM job",
-          payment_hash: "ef".repeat(32),
+          payment_hash: SETTLED_PAYMENT_HASH,
           invoice: "lnbc5n1test",
           created_at: 1,
           expires_at: 2,
           settled_at: 3,
-          preimage: "01".repeat(32),
+          preimage: SETTLED_PREIMAGE,
           fees_paid: 0,
         };
       },
@@ -246,14 +260,17 @@ test("polls the issuing NWC wallet until the DVM invoice settles", async () => {
     const settled = await waiter(
       {
         invoice: "lnbc5n1test",
-        paymentHash: "ef".repeat(32),
+        paymentHash: SETTLED_PAYMENT_HASH,
         provider: "coinos",
         amountMsats: 5_000,
         description: "DVM job",
       },
       { signal: new AbortController().signal, timeoutMs: 100 },
     );
-    assert.equal(settled, true);
+    assert.deepEqual(settled, {
+      settledAt: 3,
+      preimage: SETTLED_PREIMAGE,
+    });
     assert.equal(lookups, 2);
     assert.equal(closes, 2);
   } finally {

@@ -19,3 +19,4 @@
 
 export * from "./payment-challenges";
 export * from "./revoked-macaroons";
+export * from "./revenue-ledger";

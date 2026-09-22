@@ -10,6 +10,7 @@ import {
   verifyCryptographicAttestation,
 } from "../artifacts/api-server/src/services/attestation";
 import type { SettlementRouter } from "../artifacts/api-server/src/services/settlement";
+import { createMemoryRevenueLedger } from "../artifacts/api-server/src/services/ledger";
 
 const PREIMAGE = "01".repeat(32);
 const TEST_NOSTR_PRIVATE_KEY = "01".padStart(64, "0");
@@ -48,6 +49,7 @@ function fakeSettlementRouter(): SettlementRouter {
 
 test("issues an L402 challenge and accepts a hash-bound settled preimage", async () => {
   const app = express();
+  const ledger = createMemoryRevenueLedger();
   app.get(
     "/paid",
     createL402Middleware({
@@ -56,6 +58,8 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
       settlementRouter: fakeSettlementRouter(),
       sessionSecret: "test-session-secret",
       now: () => 1_789_963_200_000,
+      ledger,
+      requestKind: "stratigraphy",
     }),
     (_req, res) => res.status(200).json({ paid: true }),
   );
@@ -80,11 +84,13 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     });
     assert.equal(paid.status, 200);
     assert.deepEqual(await paid.json(), { paid: true });
+    assert.equal(await ledger.getTotalVolume(), 5);
 
     const replay = await fetch(`${baseUrl}/paid`, {
       headers: { Authorization: `L402 ${match[1]}:${PREIMAGE}` },
     });
     assert.equal(replay.status, 429);
+    assert.equal(await ledger.getTotalVolume(), 5);
 
     const wrongPreimage = await fetch(`${baseUrl}/paid`, {
       headers: { Authorization: `L402 ${match[1]}:${"02".repeat(32)}` },

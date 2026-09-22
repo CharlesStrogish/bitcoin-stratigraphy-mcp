@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import {
   finalizeEvent,
   getPublicKey,
@@ -23,6 +24,11 @@ import {
   parseNip05Identifier,
   type RelayConnectionStatus,
 } from "./announcer";
+import {
+  paymentReference,
+  recordRevenueWithRetry,
+  type RevenueLedger,
+} from "./ledger";
 
 const JOB_REQUEST_KINDS = Array.from({ length: 991 }, (_, index) => 5_000 + index);
 const DEFAULT_INVOICE_EXPIRY_SECONDS = 3_600;
@@ -73,10 +79,16 @@ export type DvmDependencies = {
   waitForSettlement?: (
     invoice: DvmInvoice,
     options: { signal: AbortSignal; timeoutMs: number },
-  ) => Promise<boolean>;
+  ) => Promise<DvmSettlementConfirmation | false>;
   queryStratigraphy?: (input: Record<string, unknown>) => Promise<unknown>;
   verifyProof?: (input: Record<string, unknown>) => Promise<unknown>;
   now?: () => number;
+  ledger?: RevenueLedger;
+};
+
+export type DvmSettlementConfirmation = {
+  settledAt: number;
+  preimage: string;
 };
 
 export type Nip90Dvm = {
@@ -251,7 +263,7 @@ export function createNwcSettlementWaiter(
   return async (
     invoice: DvmInvoice,
     options: { signal: AbortSignal; timeoutMs: number },
-  ): Promise<boolean> => {
+  ): Promise<DvmSettlementConfirmation | false> => {
     const uri = walletUri(invoice.provider);
     if (!uri) {
       throw new Error(
@@ -273,7 +285,15 @@ export function createNwcSettlementWaiter(
           transaction.description === invoice.description &&
           transaction.payment_hash.toLowerCase() === invoice.paymentHash
         ) {
-          return true;
+          if (!/^[0-9a-f]{64}$/i.test(transaction.preimage)) return false;
+          const preimageHash = createHash("sha256")
+            .update(Buffer.from(transaction.preimage, "hex"))
+            .digest("hex");
+          if (preimageHash !== invoice.paymentHash) return false;
+          return {
+            settledAt: transaction.settled_at,
+            preimage: transaction.preimage.toLowerCase(),
+          };
         }
         if (transaction.state === "failed") {
           return false;
@@ -408,6 +428,7 @@ export function createNip90Dvm(
     dependencies.queryStratigraphy ?? defaultStratigraphyQuery;
   const verifyProof = dependencies.verifyProof ?? defaultProofVerification;
   const now = dependencies.now ?? Date.now;
+  const ledger = dependencies.ledger;
   const abortController = new AbortController();
   const seen = new Map<string, number>();
   const activeJobs = new Set<Promise<void>>();
@@ -483,7 +504,7 @@ export function createNip90Dvm(
     const description = `Bitcoin Stratigraphy NIP-90 ${capability} job ${request.id}`;
     pendingPayments += 1;
     let invoice: DvmInvoice;
-    let settled: boolean;
+    let settlement: DvmSettlementConfirmation | false;
     try {
       const created = await createInvoice({
         amountMsats,
@@ -493,20 +514,46 @@ export function createNip90Dvm(
       });
       invoice = { ...created, amountMsats, description };
       await publishFeedback(request, "payment-required", "", invoice);
-      settled = await waitForSettlement(invoice, {
+      settlement = await waitForSettlement(invoice, {
         signal: abortController.signal,
         timeoutMs: config.invoiceExpirySeconds * 1_000,
       });
     } finally {
       pendingPayments -= 1;
     }
-    if (!settled) {
+    if (!settlement) {
       await publishFeedback(
         request,
         "error",
         "Lightning invoice expired or was not settled",
       );
       return;
+    }
+    if (ledger) {
+      try {
+        await recordRevenueWithRetry(ledger, {
+          id: randomUUID(),
+          timestamp: new Date(
+            settlement.settledAt < 10_000_000_000
+              ? settlement.settledAt * 1_000
+              : settlement.settledAt,
+          ).toISOString(),
+          channel: "NIP-90",
+          requestKind: capability,
+          satsReceived: feeSats,
+          paymentHash: invoice.paymentHash,
+          preimage: settlement.preimage,
+          clientIdentifier: request.pubkey,
+        });
+      } catch (error) {
+        logger.error(
+          {
+            err: error,
+            paymentReference: paymentReference(invoice.paymentHash),
+          },
+          "NIP-90 settlement ledger failed",
+        );
+      }
     }
     while (executingJobs >= config.maxConcurrentJobs) {
       await delay(25, abortController.signal);
@@ -653,7 +700,11 @@ export async function startNip90Dvm(): Promise<() => Promise<void>> {
   let dvm: Nip90Dvm;
   try {
     await announcer.start();
-    dvm = createNip90Dvm(config, { transport });
+    const { createPostgresRevenueLedger } = await import("./postgres-ledger");
+    dvm = createNip90Dvm(config, {
+      transport,
+      ledger: createPostgresRevenueLedger(),
+    });
     dvm.start();
   } catch (error) {
     await announcer.stop();

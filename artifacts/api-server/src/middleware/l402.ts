@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { RequestHandler } from "express";
 import {
   attenuateSubscriptionMacaroon,
@@ -10,6 +10,14 @@ import {
   type MacaroonUsageStore,
 } from "../lib/macaroon-usage-store";
 import type { SettlementRouter } from "../services/settlement";
+import type {
+  RevenueLedger,
+  RevenueRequestKind,
+} from "../services/ledger";
+import {
+  paymentReference,
+  recordRevenueWithRetry,
+} from "../services/ledger";
 
 export type L402Authorization = {
   macaroon: string;
@@ -25,6 +33,8 @@ export type L402MiddlewareOptions = {
   now?: () => number;
   usageStore?: MacaroonUsageStore;
   maxChallengesPerMinute?: number;
+  ledger?: RevenueLedger;
+  requestKind?: RevenueRequestKind;
 };
 
 export function parseL402Header(
@@ -150,6 +160,33 @@ export function createL402Middleware(
           return;
         }
         if (typeof verification === "object") {
+          if (options.ledger) {
+            try {
+              await recordRevenueWithRetry(options.ledger, {
+                id: randomUUID(),
+                timestamp: new Date(
+                  verification.settledAt < 10_000_000_000
+                    ? verification.settledAt * 1_000
+                    : verification.settledAt,
+                ).toISOString(),
+                channel: "L402",
+                requestKind: options.requestKind ?? "stratigraphy",
+                satsReceived: options.amountSats,
+                paymentHash: pass.paymentHash,
+                preimage: authorization.preimage,
+                clientIdentifier:
+                  req.ip || req.socket.remoteAddress || "unknown",
+              });
+            } catch (error) {
+              req.log?.error(
+                {
+                  err: error,
+                  paymentReference: paymentReference(pass.paymentHash),
+                },
+                "L402 settlement ledger failed",
+              );
+            }
+          }
           if (
             pass.maxRequests !== undefined &&
             !(await usageStore.consume(pass.requestLimits, pass.validUntil))

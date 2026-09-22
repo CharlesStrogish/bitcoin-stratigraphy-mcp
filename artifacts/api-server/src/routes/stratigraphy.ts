@@ -10,7 +10,12 @@ import {
   type Response,
 } from "express";
 import { createL402Middleware } from "../middleware/l402";
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
@@ -76,6 +81,12 @@ import {
   generateCryptographicAttestation,
   verifyCryptographicAttestation,
 } from "../services/attestation";
+import {
+  createMemoryRevenueLedger,
+  paymentReference,
+  recordRevenueWithRetry,
+  type RevenueLedger,
+} from "../services/ledger";
 import {
   createMeshGossipService,
   MeshQuorumError,
@@ -744,6 +755,7 @@ export function registerStratigraphyRoutes(
     heartbeatScheduler?: IntervalScheduler;
     agentReputation?: AgentReputationService;
     meshService?: MeshGossipService;
+    revenueLedger?: RevenueLedger;
   } = {},
 ): void {
   const attest = createNostrAttestor();
@@ -772,6 +784,38 @@ export function registerStratigraphyRoutes(
   const agentReputation =
     streamOptions.agentReputation ?? createAgentReputationService();
   const mesh = streamOptions.meshService ?? createMeshGossipService();
+  const revenueLedger =
+    streamOptions.revenueLedger ?? createMemoryRevenueLedger();
+  const recordL402Revenue = async (input: {
+    req: Request;
+    paymentHash: string;
+    preimage: string;
+    amountMsats: number;
+    settledAt: number;
+    clientIdentifier: string;
+  }) => {
+    try {
+      await recordRevenueWithRetry(revenueLedger, {
+        id: randomUUID(),
+        timestamp: new Date(
+          input.settledAt < 10_000_000_000
+            ? input.settledAt * 1_000
+            : input.settledAt,
+        ).toISOString(),
+        channel: "L402",
+        requestKind: "stratigraphy",
+        satsReceived: Math.ceil(input.amountMsats / 1_000),
+        paymentHash: input.paymentHash,
+        preimage: input.preimage,
+        clientIdentifier: input.clientIdentifier,
+      });
+    } catch (error) {
+      input.req.log.error(
+        { err: error, paymentReference: paymentReference(input.paymentHash) },
+        "L402 settlement ledger failed",
+      );
+    }
+  };
   app.use("/api/v1", (_req, _res, next) => {
     pricingEngine.recordRequest(policy.now());
     next();
@@ -845,6 +889,8 @@ export function registerStratigraphyRoutes(
       settlementRouter,
       now: policy.now,
       usageStore: macaroonUsageStore,
+      ledger: revenueLedger,
+      requestKind: "stratigraphy",
     }),
     (_req: Request, res: Response): void => {
       res.status(200).json({ data: res.locals.stratigraphyRecords });
@@ -859,6 +905,8 @@ export function registerStratigraphyRoutes(
       settlementRouter,
       now: policy.now,
       usageStore: macaroonUsageStore,
+      ledger: revenueLedger,
+      requestKind: "zk-proof",
     }),
     (req: Request, res: Response): void => {
       const body = req.body as { payload?: unknown } | null;
@@ -1545,6 +1593,14 @@ export function registerStratigraphyRoutes(
             Math.floor(policy.now() / 1000) <
               verification.settledAt + definition.durationSeconds
           ) {
+            await recordL402Revenue({
+              req,
+              paymentHash: pass.paymentHash,
+              preimage: authorization.preimage,
+              amountMsats: pass.amountMsats ?? definition.amountMsats,
+              settledAt: verification.settledAt,
+              clientIdentifier: challengeCaller,
+            });
             if (
               pass.maxRequests !== undefined &&
               !(await macaroonUsageStore.consume(
@@ -1818,6 +1874,14 @@ export function registerStratigraphyRoutes(
               Math.floor(policy.now() / 1000) <
                 verification.settledAt + definition.durationSeconds
             ) {
+              await recordL402Revenue({
+                req,
+                paymentHash: pass.paymentHash,
+                preimage: authorization.preimage,
+                amountMsats: pass.amountMsats ?? definition.amountMsats,
+                settledAt: verification.settledAt,
+                clientIdentifier: challengeCaller,
+              });
               if (
                 pass.maxRequests !== undefined &&
                 !(await macaroonUsageStore.consume(
@@ -1871,6 +1935,14 @@ export function registerStratigraphyRoutes(
           return;
         }
         if (typeof verification === "object") {
+          await recordL402Revenue({
+            req,
+            paymentHash: authorization.paymentHash,
+            preimage: authorization.preimage,
+            amountMsats: selectedRange.amountMsats,
+            settledAt: verification.settledAt,
+            clientIdentifier: challengeCaller,
+          });
           try {
             await challengeStore.consume(
               caller,

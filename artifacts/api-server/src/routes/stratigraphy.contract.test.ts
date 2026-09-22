@@ -767,7 +767,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${candidate.name} must document MCP parameter validation errors`,
     );
     assert.equal(candidate.description.split("\n").length, 6);
-    assert.match(candidate.description, /USAGE: Use this tool when .*Do NOT use this tool for /);
+    assert.match(
+      candidate.description,
+      /USAGE: Use .+ Do NOT use .+; use .+ instead\./,
+    );
     assert.match(candidate.description, /BEHAVIOR: .+ Rate limit:/);
     assert.doesNotMatch(
       candidate.description,

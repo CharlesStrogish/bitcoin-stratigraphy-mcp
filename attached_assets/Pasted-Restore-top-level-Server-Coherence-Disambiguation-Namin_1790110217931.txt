@@ -1,0 +1,27 @@
+Restore top-level Server Coherence (Disambiguation, Naming Consistency, Completeness) across all 8 tools in `artifacts/api-server/src/routes/mcp.ts`:
+
+1. ENSURE EVERY TOOL HAS ALL 6 MANDATORY SECTION HEADERS (Fixes Completeness):
+   Every tool's main description string MUST explicitly include all six uppercase headers in order:
+   PURPOSE: [1 sentence] USAGE: [1-2 sentences including negative routing] PARAMETERS: [1 sentence summarizing key inputs] BEHAVIOR: [1 sentence describing execution] RETURNS: [1 sentence describing output structure] ERRORS: [1 sentence listing error codes/conditions]. No payment required (or 5 sats required for proof.ground).
+
+2. RESTORE NEGATIVE ROUTING / DISAMBIGUATION IN USAGE (Fixes Disambiguation):
+   Ensure EVERY tool's USAGE section explicitly states what NOT to use the tool for:
+   - mesh.status: "USAGE: Use when you need peer topology health. Do NOT use for individual proof validation; use proof.verify instead."
+   - proof.ground: "USAGE: Use when anchoring context to Bitcoin state via L402. Do NOT use for Groth16 proof verification; use proof.verify instead."
+   - proof.list: "USAGE: Use to discover indexed attestations. Do NOT use for single proof state; use proof.status instead."
+   - proof.status: "USAGE: Use when querying known proof/snapshot state. Do NOT use for stateless validation; use proof.verify instead."
+   - proof.submit: "USAGE: Use to verify and index proofs into node lifecycle. Do NOT use for read-only validation; use proof.verify instead."
+   - proof.verify: "USAGE: Use for stateless Groth16 proof validation against snapshots. Do NOT use for lifecycle indexing; use proof.submit instead."
+   - stratigraphy.get: "USAGE: Use to retrieve selected historical telemetry records. Do NOT use for catalog coverage discovery; use stratigraphy.list instead."
+   - stratigraphy.list: "USAGE: Use to discover catalog coverage and metric bounds. Do NOT use for fetching telemetry records; use stratigraphy.get instead."
+
+3. STANDARDIZE PARAMETER NAMING & PHRASING ACROSS ALL SCHEMAS (Fixes Naming Consistency):
+   Use identical, standardized description strings across all tools for shared concept types:
+   - Hex Hashes: "64-character lowercase hexadecimal SHA-256 digest string."
+   - CIDs / Digests: "Canonical IPFS CID or hex digest identifier string."
+   - Timestamps: "ISO 8601 UTC date string format."
+   - Limits: "Maximum number of records to return."
+   - Offsets: "Zero-based pagination skip offset."
+
+4. VERIFY:
+   Run `pnpm typecheck` and `pnpm test:e2e` to confirm all tests pass cleanly.

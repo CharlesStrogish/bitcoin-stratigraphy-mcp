@@ -8,6 +8,7 @@
   "include": [
     "src",
     "broadcast-nostr.ts",
+    "simulate-settlement.ts",
     "test-l402.ts",
     "test-dvm-client.ts",
     "test-mcp-health.ts",

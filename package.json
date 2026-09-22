@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "build": "pnpm run typecheck && node scripts/build-workspace.mjs",
     "release:check": "node scripts/check-published-assets.mjs",
     "test": "node --test test/*.test.mjs && pnpm -r --if-present run test",
     "test:e2e": "tsx scripts/test-e2e-master.ts",

@@ -5,6 +5,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { listWorkspaceBuildPackages } from "../scripts/build-workspace.mjs";
+
 const workspaceRoot = path.resolve(
   fileURLToPath(new URL("..", import.meta.url)),
 );
@@ -68,8 +70,9 @@ function rootBuildRunsAllPackageBuilds(buildCommand) {
     .split(/&&|\|\||[;|]/)
     .some(
       (command) =>
-        /\bpnpm\s+(?:-r|--recursive)\b[^;|]*\brun\s+build\b/.test(command) &&
-        !/(?:^|\s)(?:--filter|-F)(?:\s|=)/.test(command),
+        (/\bpnpm\s+(?:-r|--recursive)\b[^;|]*\brun\s+build\b/.test(command) &&
+          !/(?:^|\s)(?:--filter|-F)(?:\s|=)/.test(command)) ||
+        /\bnode\s+(?:\.\/)?scripts\/build-workspace\.mjs(?:\s|$)/.test(command),
     );
 }
 
@@ -200,6 +203,25 @@ test("a filtered recursive build reports an excluded package with a build script
   assert.deepEqual(missingBuildPaths, ["@workspace/scripts"]);
 });
 
+test("the workspace build runner enumerates every package build script", () => {
+  const packages = listWorkspacePackages();
+  const expectedPackagePaths = packages
+    .filter(
+      ({ path: packagePath }) => path.resolve(packagePath) !== workspaceRoot,
+    )
+    .filter(({ path: packagePath }) => {
+      const packageJson = readJson(path.join(packagePath, "package.json"));
+      return typeof packageJson.scripts?.build === "string";
+    })
+    .map(({ path: packagePath }) => path.resolve(packagePath))
+    .sort();
+  const enumeratedPackagePaths = listWorkspaceBuildPackages(packages)
+    .map(({ packageDirectory }) => packageDirectory)
+    .sort();
+
+  assert.deepEqual(enumeratedPackagePaths, expectedPackagePaths);
+});
+
 test("source nested beneath src makes a package buildable", () => {
   assert.equal(
     fileMakesPackageBuildable(path.join("src", "components", "App.tsx")),
@@ -221,7 +243,7 @@ test("root build covers every buildable workspace package", () => {
   assert.equal(
     recursiveBuildCoversAllPackages,
     true,
-    "The root build command must recursively run workspace build scripts",
+    "The root build command must run every workspace build script",
   );
 
   const rootTsconfig = readJson(path.join(workspaceRoot, "tsconfig.json"));

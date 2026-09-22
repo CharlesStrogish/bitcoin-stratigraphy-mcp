@@ -93,3 +93,34 @@ test("grounds context into a publicly verifiable epistemic anchor", async () => 
     );
   }
 });
+
+test("rejects invalid grounding inputs and injected Bitcoin tips", async () => {
+  await assert.rejects(
+    groundEpistemicContext(
+      { contextHash: "not-hex", agentId: "agent" },
+      {
+        privateKey: PRIVATE_KEY,
+        readBitcoinTip: async () => ({
+          height: 920001,
+          hash: BLOCK_HASH,
+          source: "https://bitcoin.example/api",
+        }),
+      },
+    ),
+    /contextHash/,
+  );
+  await assert.rejects(
+    groundEpistemicContext(
+      { contextHash: "cd".repeat(32), agentId: "agent" },
+      {
+        privateKey: PRIVATE_KEY,
+        readBitcoinTip: async () => ({
+          height: 0,
+          hash: BLOCK_HASH,
+          source: "injected",
+        }),
+      },
+    ),
+    /invalid grounding data/,
+  );
+});

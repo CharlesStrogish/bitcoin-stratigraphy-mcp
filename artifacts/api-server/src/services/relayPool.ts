@@ -18,6 +18,7 @@ export type RelayHealth = RelayConnectionStatus & {
 export type RelayPoolHealth = {
   healthyRelays: number;
   totalRelays: number;
+  queuedEvents: number;
   relays: RelayHealth[];
 };
 
@@ -41,6 +42,7 @@ type RelayState = {
 let latestHealth: RelayPoolHealth = {
   healthyRelays: 0,
   totalRelays: 0,
+  queuedEvents: 0,
   relays: [],
 };
 
@@ -63,12 +65,24 @@ export function createAutoHealingRelayPool(options: {
   baseBackoffMs?: number;
   maxBackoffMs?: number;
   monitorIntervalMs?: number;
+  maxQueuedEventsPerRelay?: number;
+  scheduler?: {
+    setInterval(callback: () => void, milliseconds: number): unknown;
+    clearInterval(handle: unknown): void;
+  };
 }): AutoHealingRelayPool {
   const relays = [...new Set(options.relays)];
   const now = options.now ?? Date.now;
   const failureThreshold = options.failureThreshold ?? 3;
   const baseBackoffMs = options.baseBackoffMs ?? 1_000;
   const maxBackoffMs = options.maxBackoffMs ?? 60_000;
+  const maxQueuedEventsPerRelay = options.maxQueuedEventsPerRelay ?? 100;
+  const scheduler = options.scheduler ?? {
+    setInterval: (callback: () => void, milliseconds: number) =>
+      setInterval(callback, milliseconds),
+    clearInterval: (handle: unknown) =>
+      clearInterval(handle as ReturnType<typeof setInterval>),
+  };
   const states = new Map<string, RelayState>(
     relays.map((relay) => [
       relay,
@@ -81,6 +95,9 @@ export function createAutoHealingRelayPool(options: {
   );
   let closed = false;
   const operationLocks = new Map<string, Promise<void>>();
+  const retryQueues = new Map<string, Map<string, Event>>(
+    relays.map((relay) => [relay, new Map()]),
+  );
 
   const runExclusive = <Value>(
     relay: string,
@@ -132,6 +149,10 @@ export function createAutoHealingRelayPool(options: {
     const health: RelayPoolHealth = {
       healthyRelays,
       totalRelays: relays.length,
+      queuedEvents: [...retryQueues.values()].reduce(
+        (total, queue) => total + queue.size,
+        0,
+      ),
       relays: relayHealth,
     };
     latestHealth = structuredClone(health);
@@ -168,31 +189,66 @@ export function createAutoHealingRelayPool(options: {
     snapshot();
   };
 
+  const enqueue = (relay: string, event: Event) => {
+    const queue = retryQueues.get(relay)!;
+    queue.delete(event.id);
+    queue.set(event.id, event);
+    while (queue.size > maxQueuedEventsPerRelay) {
+      const oldest = queue.keys().next();
+      if (oldest.done) break;
+      queue.delete(oldest.value);
+    }
+    snapshot();
+  };
+
+  const flushQueue = async (relay: string) => {
+    const queue = retryQueues.get(relay)!;
+    for (const [eventId, event] of queue) {
+      if (closed) return;
+      try {
+        await options.publishRelay(relay, event);
+        queue.delete(eventId);
+        markSuccess(relay);
+      } catch (error) {
+        markFailure(relay, error);
+        return;
+      }
+    }
+    snapshot();
+  };
+
   const attempt = (relay: string, event: Event) =>
     runExclusive(relay, async () => {
+      if (closed) return false;
       const state = states.get(relay)!;
       if (state.circuitState === "OPEN") {
-        if (now() < state.nextRetryAt) return false;
+        if (now() < state.nextRetryAt) {
+          enqueue(relay, event);
+          return false;
+        }
         state.circuitState = "HALF-OPEN";
         snapshot();
         try {
           await options.reconnectRelay?.(relay);
         } catch (error) {
           markFailure(relay, error);
+          enqueue(relay, event);
           return false;
         }
       }
       try {
         await options.publishRelay(relay, event);
+        retryQueues.get(relay)!.delete(event.id);
         markSuccess(relay);
         return true;
       } catch (error) {
         markFailure(relay, error);
+        enqueue(relay, event);
         return false;
       }
     });
 
-  const monitor = setInterval(() => {
+  const monitor = scheduler.setInterval(() => {
     if (closed || !options.reconnectRelay) return;
     for (const relay of relays) {
       const state = states.get(relay)!;
@@ -207,13 +263,21 @@ export function createAutoHealingRelayPool(options: {
         try {
           await options.reconnectRelay!(relay);
           markSuccess(relay);
+          await flushQueue(relay);
         } catch (error) {
           markFailure(relay, error);
         }
       });
     }
   }, options.monitorIntervalMs ?? 5_000);
-  monitor.unref?.();
+  if (
+    monitor &&
+    typeof monitor === "object" &&
+    "unref" in monitor &&
+    typeof monitor.unref === "function"
+  ) {
+    monitor.unref();
+  }
   snapshot();
 
   return {
@@ -238,7 +302,9 @@ export function createAutoHealingRelayPool(options: {
     close() {
       if (closed) return;
       closed = true;
-      clearInterval(monitor);
+      scheduler.clearInterval(monitor);
+      for (const queue of retryQueues.values()) queue.clear();
+      snapshot();
       options.closeTransport?.();
     },
   };

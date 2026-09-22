@@ -5,6 +5,23 @@ import {
 
 const DEFAULT_MEMPOOL_API = "https://mempool.space/api";
 const MAX_RESPONSE_BYTES = 4_096;
+const HEX_32 = /^[0-9a-f]{64}$/;
+const RECEIPT_SCHEMA = "bitcoin-stratigraphy/epistemic-anchor/v1";
+
+function validateBitcoinTip(tip: BitcoinTip): BitcoinTip {
+  if (
+    !tip ||
+    typeof tip !== "object" ||
+    !Number.isSafeInteger(tip.height) ||
+    tip.height <= 0 ||
+    !HEX_32.test(tip.hash) ||
+    typeof tip.source !== "string" ||
+    tip.source.trim() === ""
+  ) {
+    throw new Error("Bitcoin tip service returned invalid grounding data");
+  }
+  return tip;
+}
 
 export type EpistemicGroundingInput = {
   contextHash: string;
@@ -60,7 +77,7 @@ export async function fetchCurrentBitcoinTip(options: {
     if (!/^[0-9a-f]{64}$/.test(hash)) {
       throw new Error("Bitcoin tip service returned an invalid block hash");
     }
-    return { height, hash, source: baseUrl };
+    return validateBitcoinTip({ height, hash, source: baseUrl });
   } finally {
     clearTimeout(timeout);
   }
@@ -75,11 +92,28 @@ export async function groundEpistemicContext(
   } = {},
 ) {
   const timestamp = (options.now ?? Date.now)();
-  const tip = await (options.readBitcoinTip ?? fetchCurrentBitcoinTip)();
+  if (!Number.isSafeInteger(timestamp) || timestamp <= 0) {
+    throw new RangeError("Grounding timestamp must be a positive integer");
+  }
+  if (
+    typeof input.contextHash !== "string" ||
+    typeof input.agentId !== "string"
+  ) {
+    throw new TypeError("Grounding contextHash and agentId must be strings");
+  }
   const contextHash = input.contextHash.toLowerCase();
   const agentId = input.agentId.trim();
+  if (!HEX_32.test(contextHash)) {
+    throw new TypeError("Grounding contextHash must be 32-byte hexadecimal");
+  }
+  if (agentId.length === 0 || agentId.length > 256) {
+    throw new TypeError("Grounding agentId must be between 1 and 256 characters");
+  }
+  const tip = validateBitcoinTip(
+    await (options.readBitcoinTip ?? fetchCurrentBitcoinTip)(),
+  );
   const payload = {
-    schema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+    schema: RECEIPT_SCHEMA,
     contextHash,
     agentId,
     ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
@@ -134,8 +168,19 @@ export function verifyEpistemicAnchorReceipt(
   if (!bitcoin || typeof bitcoin !== "object") return false;
   const bitcoinState = bitcoin as Record<string, unknown>;
   return (
-    receipt.receiptSchema === "bitcoin-stratigraphy/epistemic-anchor/v1" &&
+    receipt.receiptSchema === RECEIPT_SCHEMA &&
     anchor.schema === receipt.receiptSchema &&
+    typeof anchor.contextHash === "string" &&
+    HEX_32.test(anchor.contextHash) &&
+    typeof anchor.agentId === "string" &&
+    anchor.agentId.length > 0 &&
+    anchor.agentId.length <= 256 &&
+    Number.isSafeInteger(bitcoinState.blockHeight) &&
+    (bitcoinState.blockHeight as number) > 0 &&
+    typeof bitcoinState.blockHash === "string" &&
+    HEX_32.test(bitcoinState.blockHash) &&
+    typeof bitcoinState.source === "string" &&
+    bitcoinState.source.length > 0 &&
     receipt.contextHash === anchor.contextHash &&
     receipt.agentId === anchor.agentId &&
     receipt.blockHeight === bitcoinState.blockHeight &&

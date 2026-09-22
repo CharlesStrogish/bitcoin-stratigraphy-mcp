@@ -69,6 +69,20 @@ export function createNwcSettlementProvider(input: {
     name: input.name,
     isConfigured: () => configuredUri() !== undefined,
     async createInvoice(request: SettlementInvoiceInput) {
+      if (
+        request.asset && request.asset !== "btc-lightning" ||
+        !Number.isSafeInteger(request.amountMsats) ||
+        request.amountMsats <= 0 ||
+        !Number.isSafeInteger(request.expirySeconds) ||
+        request.expirySeconds <= 0 ||
+        typeof request.description !== "string" ||
+        request.description.length === 0
+      ) {
+        throw new SettlementProviderError(
+          `${input.name} received an invalid Lightning invoice request`,
+          false,
+        );
+      }
       const uri = configuredUri();
       if (!uri) {
         throw new SettlementProviderError(
@@ -110,6 +124,7 @@ export function createNwcSettlementProvider(input: {
           invoice: transaction.invoice,
           paymentHash: transaction.payment_hash.toLowerCase(),
           provider: input.name,
+          asset: "btc-lightning",
         };
       } catch (error) {
         if (error instanceof SettlementProviderError) throw error;
@@ -124,6 +139,15 @@ export function createNwcSettlementProvider(input: {
       }
     },
     async verifyPayment(request: SettlementVerificationInput) {
+      if (
+        !/^[0-9a-f]{64}$/.test(request.paymentHash) ||
+        !/^[0-9a-f]{64}$/.test(request.preimage) ||
+        request.asset && request.asset !== "btc-lightning" ||
+        !Number.isSafeInteger(request.expectedAmountMsats) ||
+        request.expectedAmountMsats <= 0
+      ) {
+        return "invalid";
+      }
       const computedHash = createHash("sha256")
         .update(Buffer.from(request.preimage, "hex"))
         .digest("hex");
@@ -154,14 +178,27 @@ export function createNwcSettlementProvider(input: {
         const transaction = await client.lookupInvoice({
           payment_hash: request.paymentHash,
         });
+        const transactionPaymentHash =
+          typeof transaction.payment_hash === "string"
+            ? transaction.payment_hash.toLowerCase()
+            : "";
+        const transactionPreimage =
+          typeof transaction.preimage === "string"
+            ? transaction.preimage.toLowerCase()
+            : undefined;
         const valid =
           transaction.type === "incoming" &&
           transaction.state === "settled" &&
           transaction.amount === request.expectedAmountMsats &&
           transaction.description === request.expectedDescription &&
-          transaction.payment_hash.toLowerCase() === request.paymentHash &&
-          (!transaction.preimage ||
-            transaction.preimage.toLowerCase() === request.preimage);
+          transactionPaymentHash === request.paymentHash &&
+          (!transactionPreimage || transactionPreimage === request.preimage) &&
+          (transactionPreimage === undefined ||
+            /^[0-9a-f]{64}$/.test(transactionPreimage)) &&
+          (transaction.settled_at === undefined ||
+            (typeof transaction.settled_at === "number" &&
+              Number.isSafeInteger(transaction.settled_at) &&
+              transaction.settled_at > 0));
         return valid
           ? {
               settledAt:
@@ -169,6 +206,7 @@ export function createNwcSettlementProvider(input: {
                   ? transaction.settled_at
                   : 0,
               provider: input.name,
+              asset: "btc-lightning",
             }
           : "invalid";
       } catch (error) {

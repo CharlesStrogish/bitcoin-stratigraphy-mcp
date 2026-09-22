@@ -124,9 +124,7 @@ export function buildHeartbeatEvent(
 async function publishHeartbeat(key: Uint8Array): Promise<string> {
   const dataset = await readDataset();
   const event = buildHeartbeatEvent(key, dataset.length);
-  status.event_id = event.id;
   status.pubkey = getPublicKey(key);
-  status.published_at = new Date(event.created_at * 1000).toISOString();
   status.relays = RELAYS.map((relay) => ({ relay, status: "pending" }));
   const pool = new SimplePool();
   try {
@@ -143,6 +141,10 @@ async function publishHeartbeat(key: Uint8Array): Promise<string> {
             ? result.reason.message
             : String(result.reason),
     }));
+    if (results.some((result) => result.status === "fulfilled")) {
+      status.event_id = event.id;
+      status.published_at = new Date(event.created_at * 1000).toISOString();
+    }
   } finally {
     pool.destroy();
   }
@@ -151,19 +153,34 @@ async function publishHeartbeat(key: Uint8Array): Promise<string> {
     .digest("hex");
 }
 
-export async function startNostrHeartbeat(): Promise<void> {
+export async function startNostrHeartbeat(): Promise<() => Promise<void>> {
   const key = await secretKey();
   let datasetHash = await publishHeartbeat(key);
+  let stopped = false;
+  let activeUpdate: Promise<void> | undefined;
   const timer = setInterval(() => {
-    void (async () => {
+    if (stopped || activeUpdate) return;
+    const update = (async () => {
       const dataset = await refreshDataset();
       const nextHash = createHash("sha256")
         .update(JSON.stringify(dataset))
         .digest("hex");
       if (nextHash !== datasetHash) datasetHash = await publishHeartbeat(key);
-    })().catch((error) => {
-      console.warn("Nostr heartbeat update failed", error);
-    });
+    })();
+    activeUpdate = update;
+    void update
+      .catch((error) => {
+        console.warn("Nostr heartbeat update failed", error);
+      })
+      .finally(() => {
+        if (activeUpdate === update) activeUpdate = undefined;
+      });
   }, 60_000);
   timer.unref();
+  return async () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(timer);
+    await activeUpdate?.catch(() => {});
+  };
 }

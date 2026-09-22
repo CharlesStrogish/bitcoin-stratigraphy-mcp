@@ -42,6 +42,10 @@ import {
 } from "../services/pricing";
 import { createAgentReputationService } from "../services/agentReputation";
 import { createMemoryRevenueLedger } from "../services/ledger";
+import {
+  createHttpRateLimitMiddleware,
+  createSlidingWindowRateLimiter,
+} from "../middleware/rateLimiter";
 
 const preimage = "11".repeat(32);
 const paymentHash = createHash("sha256")
@@ -283,6 +287,36 @@ async function mcpRequest(method: string, params?: Record<string, unknown>) {
     result?: Record<string, any>;
     error?: { message: string };
   };
+}
+
+async function mcpRequestAt(
+  targetBaseUrl: string,
+  method: string,
+  params?: Record<string, unknown>,
+  forwardedFor?: string,
+) {
+  const response = await fetch(`${targetBaseUrl}/mcp`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2025-03-26",
+      ...(forwardedFor ? { "X-Forwarded-For": forwardedFor } : {}),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method,
+      ...(params ? { params } : {}),
+    }),
+  });
+  const body = await response.json() as {
+    result?: Record<string, any>;
+    error?: { code: number; message: string };
+    code?: string;
+    retry_after?: number;
+  };
+  return { response, body };
 }
 
 async function assertValidReceipt(response: Response, expectedPaymentHash: string) {
@@ -646,6 +680,70 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       );
     }
   };
+  const assertValidDefault = (
+    schema: {
+      type?: string | string[];
+      default?: unknown;
+      enum?: unknown[];
+      const?: unknown;
+      minimum?: number;
+      maximum?: number;
+      minLength?: number;
+      maxLength?: number;
+      pattern?: string;
+      minItems?: number;
+      maxItems?: number;
+      uniqueItems?: boolean;
+      properties?: Record<string, unknown>;
+      items?: unknown;
+    },
+    path: string,
+  ): void => {
+    if (Object.hasOwn(schema, "default")) {
+      const value = schema.default;
+      const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+      const matchesType = types.some((type) => {
+        if (type === "integer") return Number.isSafeInteger(value);
+        if (type === "number") return typeof value === "number" && Number.isFinite(value);
+        if (type === "string") return typeof value === "string";
+        if (type === "boolean") return typeof value === "boolean";
+        if (type === "array") return Array.isArray(value);
+        if (type === "object") {
+          return value !== null && typeof value === "object" && !Array.isArray(value);
+        }
+        return false;
+      });
+      assert.ok(matchesType, `${path}.default must match its declared type`);
+      if (typeof value === "number") {
+        if (schema.minimum !== undefined) assert.ok(value >= schema.minimum, `${path}.default is below minimum`);
+        if (schema.maximum !== undefined) assert.ok(value <= schema.maximum, `${path}.default exceeds maximum`);
+      }
+      if (typeof value === "string") {
+        if (schema.minLength !== undefined) assert.ok(value.length >= schema.minLength, `${path}.default is too short`);
+        if (schema.maxLength !== undefined) assert.ok(value.length <= schema.maxLength, `${path}.default is too long`);
+        if (schema.pattern !== undefined) assert.match(value, new RegExp(schema.pattern), `${path}.default does not match pattern`);
+      }
+      if (Array.isArray(value)) {
+        if (schema.minItems !== undefined) assert.ok(value.length >= schema.minItems, `${path}.default has too few items`);
+        if (schema.maxItems !== undefined) assert.ok(value.length <= schema.maxItems, `${path}.default has too many items`);
+        if (schema.uniqueItems) assert.equal(new Set(value.map((item) => JSON.stringify(item))).size, value.length, `${path}.default items must be unique`);
+      }
+      if (schema.enum) assert.ok(schema.enum.some((item) => Object.is(item, value)), `${path}.default must be in enum`);
+      if (Object.hasOwn(schema, "const")) assert.deepEqual(value, schema.const, `${path}.default must equal const`);
+    }
+    for (const [name, property] of Object.entries(schema.properties ?? {})) {
+      assertValidDefault(
+        property as Parameters<typeof assertValidDefault>[0],
+        `${path}.properties.${name}`,
+      );
+    }
+    if (schema.items) {
+      assertValidDefault(
+        schema.items as Parameters<typeof assertValidDefault>[0],
+        `${path}.items`,
+      );
+    }
+  };
   for (const candidate of listed.result?.tools ?? []) {
     for (
       const section of [
@@ -673,6 +771,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     assert.match(candidate.description, /BEHAVIOR: (Read-only|Mutating), (Idempotent|Non-idempotent)/);
     assert.match(candidate.description, /Rate limit: 60 req\/min per IP/);
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
+    assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertDocumentedSchema(
       candidate.outputSchema,
       `${candidate.name}.outputSchema`,
@@ -959,6 +1058,171 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       meshQuorum: false,
     },
   );
+});
+
+test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async () => {
+  const invalidApp = express();
+  invalidApp.set("trust proxy", 1);
+  invalidApp.use(express.json());
+  invalidApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerMcpRoute(invalidApp);
+  const invalidServer = invalidApp.listen(0);
+  await new Promise<void>((resolve) => invalidServer.once("listening", resolve));
+  const address = invalidServer.address() as AddressInfo;
+  const invalidBaseUrl = `http://127.0.0.1:${address.port}`;
+  const cases: Array<[string, Record<string, unknown>]> = [
+    ["stratigraphy.get", { days: 0 }],
+    ["stratigraphy.list", { unexpected: true }],
+    ["proof.verify", {}],
+    ["proof.status", { proofHash: "<script>alert(1)</script>" }],
+    ["proof.list", { limit: 0 }],
+    ["proof.submit", {
+      proof: {
+        pi_a: ["1", "2", "1"],
+        pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+        pi_c: ["5", "6", "1"],
+      },
+      publicSignals: ["920000", "1", "1789776000000", "12583", "1"],
+      snapshotDigest: "2",
+    }],
+    ["proof.ground", { contextHash: "not-hex", agentId: "agent" }],
+    ["mesh.status", { unexpected: true }],
+  ];
+
+  try {
+    for (const [name, args] of cases) {
+      const { response, body } = await mcpRequestAt(
+        invalidBaseUrl,
+        "tools/call",
+        { name, arguments: args },
+      );
+      assert.equal(response.status, 200, name);
+      assert.equal(body.error?.code, -32602, `${name}: ${JSON.stringify(body)}`);
+    }
+
+    for (const name of ["stratigraphy.list", "mesh.status"]) {
+      const { response, body } = await mcpRequestAt(
+        invalidBaseUrl,
+        "tools/call",
+        { name, arguments: {} },
+      );
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.has("www-authenticate"), false);
+      assert.ok(body.result?.structuredContent);
+    }
+    const listed = await mcpRequestAt(invalidBaseUrl, "tools/list");
+    assert.equal(listed.response.headers.has("www-authenticate"), false);
+    for (const tool of listed.body.result?.tools ?? []) {
+      if (tool.name !== "proof.ground") {
+        assert.match(
+          tool.description,
+          /No 402 payment required\.$/,
+          `${tool.name} must remain payment-free`,
+        );
+      }
+    }
+  } finally {
+    invalidServer.close();
+  }
+});
+
+test("enforces independent 60-per-minute per-IP limits for MCP and REST", async () => {
+  const mcpRateApp = express();
+  mcpRateApp.set("trust proxy", 1);
+  mcpRateApp.use(express.json());
+  mcpRateApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerMcpRoute(mcpRateApp);
+  const mcpRateServer = mcpRateApp.listen(0);
+
+  const restRateApp = express();
+  restRateApp.set("trust proxy", 1);
+  const restMiddleware = createHttpRateLimitMiddleware(
+    createSlidingWindowRateLimiter({ limit: 60, windowMs: 60_000 }),
+  );
+  restRateApp.get("/limited", restMiddleware, (_req, res) => {
+    res.json({ ok: true });
+  });
+  restRateApp.get("/public", (_req, res) => {
+    res.json({ ok: true });
+  });
+  const restRateServer = restRateApp.listen(0);
+
+  await Promise.all([
+    new Promise<void>((resolve) => mcpRateServer.once("listening", resolve)),
+    new Promise<void>((resolve) => restRateServer.once("listening", resolve)),
+  ]);
+  const mcpAddress = mcpRateServer.address() as AddressInfo;
+  const restAddress = restRateServer.address() as AddressInfo;
+  const mcpRateBaseUrl = `http://127.0.0.1:${mcpAddress.port}`;
+  const restRateBaseUrl = `http://127.0.0.1:${restAddress.port}`;
+
+  try {
+    for (let index = 0; index < 60; index += 1) {
+      const { response } = await mcpRequestAt(
+        mcpRateBaseUrl,
+        "tools/list",
+        undefined,
+        "198.51.100.10",
+      );
+      assert.equal(response.status, 200, `MCP request ${index + 1}`);
+    }
+    const mcpLimited = await mcpRequestAt(
+      mcpRateBaseUrl,
+      "tools/list",
+      undefined,
+      "198.51.100.10",
+    );
+    assert.equal(mcpLimited.response.status, 429);
+    assert.equal(mcpLimited.response.headers.get("retry-after"), "60");
+    assert.deepEqual(mcpLimited.body, {
+      error: "Too many requests",
+      code: "rate_limit_exceeded",
+      retry_after: 60,
+    });
+    assert.equal(
+      (await mcpRequestAt(
+        mcpRateBaseUrl,
+        "tools/list",
+        undefined,
+        "198.51.100.11",
+      )).response.status,
+      200,
+    );
+
+    for (let index = 0; index < 60; index += 1) {
+      const response = await fetch(`${restRateBaseUrl}/limited`, {
+        headers: { "X-Forwarded-For": "203.0.113.10" },
+      });
+      assert.equal(response.status, 200, `REST request ${index + 1}`);
+    }
+    const restLimited = await fetch(`${restRateBaseUrl}/limited`, {
+      headers: { "X-Forwarded-For": "203.0.113.10" },
+    });
+    assert.equal(restLimited.status, 429);
+    assert.deepEqual(await restLimited.json(), {
+      error: "Too many requests",
+      code: "rate_limit_exceeded",
+      retry_after: 60,
+    });
+    assert.equal(
+      (await fetch(`${restRateBaseUrl}/limited`, {
+        headers: { "X-Forwarded-For": "203.0.113.11" },
+      })).status,
+      200,
+    );
+    for (let index = 0; index < 61; index += 1) {
+      assert.equal((await fetch(`${restRateBaseUrl}/public`)).status, 200);
+    }
+  } finally {
+    mcpRateServer.close();
+    restRateServer.close();
+  }
 });
 
 test("settles and verifies a paid epistemic grounding receipt", async () => {

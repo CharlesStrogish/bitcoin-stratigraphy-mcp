@@ -31,6 +31,8 @@ logger.info(
 
 let stopDvm: (() => Promise<void>) | undefined;
 let dvmStartup: Promise<void> | undefined;
+let stopHeartbeat: (() => Promise<void>) | undefined;
+let heartbeatStartup: Promise<void> | undefined;
 const server = app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -44,9 +46,17 @@ const server = app.listen(port, (err) => {
       "Alby settlement fallback is in standby mode; set ALBY_NWC_URI to enable live failover",
     );
   }
-  void startNostrHeartbeat().catch((error) => {
-    logger.warn({ err: error }, "Nostr heartbeat startup failed");
-  });
+  heartbeatStartup = startNostrHeartbeat()
+    .then(async (stop) => {
+      if (stopping) {
+        await stop();
+        return;
+      }
+      stopHeartbeat = stop;
+    })
+    .catch((error) => {
+      logger.warn({ err: error }, "Nostr heartbeat startup failed");
+    });
   dvmStartup = startNip90Dvm()
     .then(async (stop) => {
       if (stopping) {
@@ -65,7 +75,8 @@ async function stopServer(signal: string) {
   if (stopping) return;
   stopping = true;
   logger.info({ signal }, "Stopping server");
-  await dvmStartup;
+  await Promise.all([dvmStartup, heartbeatStartup]);
+  await stopHeartbeat?.();
   await stopDvm?.();
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await shutdownZkVerifier();

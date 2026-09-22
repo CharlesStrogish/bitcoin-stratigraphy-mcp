@@ -38,7 +38,11 @@ test("sliding-window limiter rejects excess HTTP requests with Retry-After", asy
     const rejected = await fetch(url);
     assert.equal(rejected.status, 429);
     assert.equal(rejected.headers.get("Retry-After"), "10");
-    assert.deepEqual(await rejected.json(), { error: "Too many requests" });
+    assert.deepEqual(await rejected.json(), {
+      error: "Too many requests",
+      code: "rate_limit_exceeded",
+      retry_after: 10,
+    });
     now += 10_001;
     assert.equal((await fetch(url)).status, 200);
   } finally {
@@ -124,6 +128,80 @@ test("relay pool fails over, opens the circuit, and heals after backoff", async 
     assert.equal(failing?.circuitState, "CLOSED");
     assert.equal(failing?.consecutiveFailures, 0);
     assert.equal(pool.health().healthyRelays, 2);
+  } finally {
+    pool.close();
+  }
+});
+
+test("relay pool retries accepted events on a relay after it heals", async () => {
+  let now = 1_000;
+  let relayHealthy = false;
+  let monitor: (() => void) | undefined;
+  const delivered: string[] = [];
+  const pool = createAutoHealingRelayPool({
+    relays: ["wss://recovering.example", "wss://healthy.example"],
+    now: () => now,
+    failureThreshold: 1,
+    baseBackoffMs: 1_000,
+    async publishRelay(relay, event) {
+      if (relay.includes("recovering") && !relayHealthy) {
+        throw new Error("relay unavailable");
+      }
+      delivered.push(`${relay}:${event.id}`);
+    },
+    subscribeRelays: () => () => undefined,
+    async reconnectRelay(relay) {
+      if (relay.includes("recovering") && !relayHealthy) {
+        throw new Error("reconnect failed");
+      }
+    },
+    scheduler: {
+      setInterval(callback) {
+        monitor = callback;
+        return 1;
+      },
+      clearInterval() {},
+    },
+  });
+  const event = {
+    id: "retry-me",
+    pubkey: "pubkey",
+    created_at: 1,
+    kind: 1,
+    tags: [],
+    content: "",
+    sig: "sig",
+  } as Event;
+  try {
+    await pool.publish(event);
+    assert.equal(pool.health().queuedEvents, 1);
+    assert.deepEqual(delivered, ["wss://healthy.example:retry-me"]);
+
+    relayHealthy = true;
+    now += 1_001;
+    monitor?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(pool.health().queuedEvents, 0);
+    assert.ok(delivered.includes("wss://recovering.example:retry-me"));
+
+    relayHealthy = false;
+    await pool.publish({ ...event, id: "discard-on-close" });
+    assert.equal(pool.health().queuedEvents, 1);
+    pool.close();
+    assert.equal(pool.health().queuedEvents, 0);
+    relayHealthy = true;
+    monitor?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(
+      delivered.some((entry) => entry.endsWith(":discard-on-close")),
+      true,
+      "the healthy relay should receive the event before shutdown",
+    );
+    assert.equal(
+      delivered.filter((entry) => entry.endsWith(":discard-on-close")).length,
+      1,
+      "shutdown must not flush queued work to the recovering relay",
+    );
   } finally {
     pool.close();
   }

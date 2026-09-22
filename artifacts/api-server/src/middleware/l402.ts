@@ -51,12 +51,28 @@ export function parseL402Header(
 export function createL402Middleware(
   options: L402MiddlewareOptions,
 ): RequestHandler {
+  if (
+    !Number.isSafeInteger(options.invoiceExpirySeconds ?? 3_600) ||
+    (options.invoiceExpirySeconds ?? 3_600) <= 0
+  ) {
+    throw new RangeError("L402 invoiceExpirySeconds must be a positive integer");
+  }
+  if (
+    !Number.isSafeInteger(options.maxChallengesPerMinute ?? 10) ||
+    (options.maxChallengesPerMinute ?? 10) <= 0
+  ) {
+    throw new RangeError("L402 maxChallengesPerMinute must be a positive integer");
+  }
   const resolveAmountSats = () => {
     const amount =
       typeof options.amountSats === "function"
         ? options.amountSats()
         : options.amountSats;
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
+    if (
+      !Number.isSafeInteger(amount) ||
+      amount <= 0 ||
+      amount > Math.floor(Number.MAX_SAFE_INTEGER / 1_000)
+    ) {
       throw new RangeError("L402 amountSats must be a positive integer");
     }
     return amount;
@@ -64,9 +80,11 @@ export function createL402Middleware(
   if (typeof options.amountSats === "number") resolveAmountSats();
   const invoiceExpirySeconds = options.invoiceExpirySeconds ?? 3_600;
   const now = options.now ?? Date.now;
-  const usageStore = options.usageStore ?? createMemoryMacaroonUsageStore();
+  const usageStore = options.usageStore ?? createMemoryMacaroonUsageStore(now);
   const maxChallengesPerMinute = options.maxChallengesPerMinute ?? 10;
   const challengeWindows = new Map<string, { startedAt: number; count: number }>();
+  const maxChallengeCallers = 10_000;
+  let challengeWindowsCleanedAt = 0;
 
   const sendChallenge: RequestHandler = async (req, res) => {
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
@@ -80,6 +98,22 @@ export function createL402Middleware(
     }
     const caller = req.ip || req.socket.remoteAddress || "unknown";
     const currentTime = now();
+    if (
+      currentTime - challengeWindowsCleanedAt >= 60_000 ||
+      challengeWindows.size >= maxChallengeCallers
+    ) {
+      for (const [key, candidate] of challengeWindows) {
+        if (currentTime - candidate.startedAt >= 60_000) {
+          challengeWindows.delete(key);
+        }
+      }
+      challengeWindowsCleanedAt = currentTime;
+    }
+    if (!challengeWindows.has(caller) && challengeWindows.size >= maxChallengeCallers) {
+      res.setHeader("Retry-After", "60");
+      res.status(429).json({ error: "Too many payment challenges requested" });
+      return;
+    }
     const currentWindow = challengeWindows.get(caller);
     const window =
       !currentWindow || currentTime - currentWindow.startedAt >= 60_000
@@ -104,6 +138,14 @@ export function createL402Middleware(
         expirySeconds: invoiceExpirySeconds,
         asset: "btc-lightning",
       });
+      if (
+        typeof invoice.invoice !== "string" ||
+        !invoice.invoice.startsWith("ln") ||
+        !/^[0-9a-f]{64}$/.test(invoice.paymentHash) ||
+        !/^[a-z0-9][a-z0-9-]{0,63}$/.test(invoice.provider)
+      ) {
+        throw new Error("Settlement provider returned an invalid invoice");
+      }
       const rootMacaroon = createSubscriptionMacaroon({
         secret,
         paymentHash: invoice.paymentHash,
@@ -155,21 +197,36 @@ export function createL402Middleware(
         pass.amountMsats > 0 &&
         pass.paymentAsset === "btc-lightning" &&
         pass.paymentProvider &&
-        !pass.allowedPaths.some((path) => path !== req.path)
+        pass.allowedPaths.length > 0 &&
+        pass.allowedPaths.every((path) => path === req.path)
       ) {
-        const verification = await options.settlementRouter.verifyPayment({
-          paymentHash: pass.paymentHash,
-          preimage: authorization.preimage,
-          expectedAmountMsats: pass.amountMsats,
-          expectedDescription: options.description,
-          expectedProvider: pass.paymentProvider,
-          asset: "btc-lightning",
-        });
+        let verification;
+        try {
+          verification = await options.settlementRouter.verifyPayment({
+            paymentHash: pass.paymentHash,
+            preimage: authorization.preimage,
+            expectedAmountMsats: pass.amountMsats,
+            expectedDescription: options.description,
+            expectedProvider: pass.paymentProvider,
+            asset: "btc-lightning",
+          });
+        } catch (error) {
+          req.log?.error({ err: error }, "L402 payment verification failed");
+          res.status(502).json({ error: "Unable to verify payment" });
+          return;
+        }
         if (verification === "unavailable") {
           res.status(502).json({ error: "Unable to verify payment" });
           return;
         }
         if (typeof verification === "object") {
+          if (
+            pass.maxRequests !== undefined &&
+            !(await usageStore.consume(pass.requestLimits, pass.validUntil))
+          ) {
+            res.status(429).json({ error: "L402 macaroon has already been used" });
+            return;
+          }
           if (options.ledger) {
             try {
               await recordRevenueWithRetry(options.ledger, {
@@ -196,13 +253,6 @@ export function createL402Middleware(
                 "L402 settlement ledger failed",
               );
             }
-          }
-          if (
-            pass.maxRequests !== undefined &&
-            !(await usageStore.consume(pass.requestLimits, pass.validUntil))
-          ) {
-            res.status(429).json({ error: "L402 macaroon has already been used" });
-            return;
           }
           res.locals.l402 = {
             paymentHash: pass.paymentHash,

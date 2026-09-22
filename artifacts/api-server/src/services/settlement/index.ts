@@ -232,7 +232,7 @@ export function createSettlementRouter(input: {
           if (
             result !== "invalid" &&
             result.provider === provider.name &&
-            (!request.asset || !result.asset || result.asset === request.asset)
+            (!request.asset || result.asset === request.asset)
           ) {
             return result;
           }

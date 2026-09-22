@@ -23,6 +23,12 @@ export function createSlidingWindowRateLimiter(options: {
   if (!Number.isSafeInteger(options.windowMs) || options.windowMs <= 0) {
     throw new RangeError("Rate-limit window must be a positive integer");
   }
+  if (
+    options.maxKeys !== undefined &&
+    (!Number.isSafeInteger(options.maxKeys) || options.maxKeys <= 0)
+  ) {
+    throw new RangeError("Rate-limit key capacity must be a positive integer");
+  }
   const now = options.now ?? Date.now;
   const maxKeys = options.maxKeys ?? 10_000;
   const windows = new Map<string, number[]>();
@@ -84,7 +90,11 @@ export function createHttpRateLimitMiddleware(
     res.setHeader("X-RateLimit-Remaining", String(result.remaining));
     if (!result.allowed) {
       res.setHeader("Retry-After", String(result.retryAfterSeconds));
-      res.status(429).json({ error: "Too many requests" });
+      res.status(429).json({
+        error: "Too many requests",
+        code: "rate_limit_exceeded",
+        retry_after: result.retryAfterSeconds,
+      });
       return;
     }
     next();

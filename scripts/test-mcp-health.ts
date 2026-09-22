@@ -11,6 +11,7 @@ const EXPECTED_TOOLS = [
   "proof.status",
   "proof.list",
   "proof.submit",
+  "proof.ground",
   "mesh.status",
 ] as const;
 
@@ -158,13 +159,13 @@ async function assertToolList(baseUrl: URL) {
     "tools/list result must contain a tools array",
   );
   const tools = response.result.tools as McpTool[];
-  assert.equal(tools.length, EXPECTED_TOOLS.length, "Expected exactly 7 MCP tools");
+  assert.equal(tools.length, EXPECTED_TOOLS.length, "Expected exactly 8 MCP tools");
 
   const names = tools.map((tool) => tool.name);
   assert.deepEqual(
     [...names].sort(),
     [...EXPECTED_TOOLS].sort(),
-    "MCP tool names do not match the expected seven tools",
+    "MCP tool names do not match the expected eight tools",
   );
   for (const tool of tools) {
     const toolName = tool.name;

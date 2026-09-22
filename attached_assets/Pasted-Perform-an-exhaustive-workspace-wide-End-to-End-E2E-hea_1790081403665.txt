@@ -1,0 +1,25 @@
+Perform an exhaustive, workspace-wide End-to-End (E2E) health and performance audit across all packages, endpoints, and protocol adapters in Max Mode. Verify, fix, and optimize the following five core subsystems:
+
+1. MCP TOOL REGISTRY & SCHEMA INTEGRITY
+   - Audit all 8 standardized MCP tools (`stratigraphy.get`, `stratigraphy.list`, `proof.verify`, `proof.status`, `proof.list`, `proof.submit`, `proof.ground`, `mesh.status`).
+   - Confirm strict JSON Schema compliance: every input property must have `type`, `description`, non-empty `examples`, and a valid `default`.
+   - Ensure input validation error bounds gracefully yield MCP error code -32602 for invalid arguments.
+
+2. L402 MONETIZATION & LIGHTNING SETTLEMENT LIFECYCLE
+   - Verify the 402 Payment Required challenge generation for `proof.ground` (5-sat requirement).
+   - Ensure NWC / CoinOS settlement verification correctly handles LSAT/macaroon issuance, payment preimages, and ZK-anchor binding upon settlement.
+   - Confirm non-paid endpoints (`stratigraphy.*`, `mesh.status`) remain cleanly accessible without authentication or payment headers.
+
+3. NOSTR MESH & NIP-89 DISCOVERY
+   - Audit NIP-89 discovery event construction and Nostr relay broadcasting on startup.
+   - Verify profile metadata publishing, cryptographic key handling, and asynchronous event retry queues so relay latency never blocks API routes.
+
+4. SECURITY, RATE LIMITING & ERROR TAXONOMY
+   - Confirm the 60 requests/minute per IP rate limiter operates cleanly across `/mcp` and REST endpoints, returning structured HTTP 429 JSON payloads upon breach.
+   - Audit input sanitization across hex string inputs (`contextHash`, signatures, Merkle roots) to prevent injection or malformed state processing.
+
+5. BUILD, TYPECHECK & SUITE PASS
+   - Execute a full TypeScript build (`pnpm typecheck` and `pnpm build`) to verify zero compiler errors or missing package exports across all workspace modules.
+   - Execute `pnpm test:e2e` to verify 6/6 master test suite checks pass cleanly.
+
+Fix any subtle type mismatches, dead exports, or silent async handle leaks discovered during the audit. Report back with a breakdown of verified subsystems.

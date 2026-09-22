@@ -429,9 +429,19 @@ async function verifyL402Challenge(input: {
 }
 
 await runCheck("Pillars 1 & 3", "NIP-89 announcements and relay pool", async () => {
-  const { response, body } = await requestJson("/api/v1/nostr/info");
-  assert.equal(response.status, 200);
-  const info = asRecord(body, "Nostr info");
+  // HTTP readiness precedes asynchronous relay publication; wait only for missing
+  // startup state, never hide malformed IDs or request failures with retries.
+  let info: Record<string, unknown> = {};
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const { response, body } = await requestJson("/api/v1/nostr/info");
+    assert.equal(response.status, 200);
+    info = asRecord(body, "Nostr info");
+    const events = asRecord(info.announcement_event_ids, "announcement_event_ids");
+    if ((events.profile && Array.isArray(events.nip89) && events.nip89.length > 0) ||
+        Date.now() >= deadline) break;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
   const publicKey = asRecord(info.public_key, "Nostr public_key");
   assertHex64(publicKey.hex, "Nostr public key");
   nostrPublicKey = publicKey.hex;

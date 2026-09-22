@@ -219,7 +219,50 @@ const stratigraphyInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(10).describe(
     "Maximum number of matching snapshots to return, from 1 through 100.",
   ),
-}).strict().describe("Validated raw stratigraphy telemetry query parameters.");
+}).strict().superRefine((input, context) => {
+  const legacySelectors = [
+    input.days !== undefined,
+    input.date !== undefined,
+    input.blockHeight !== undefined,
+  ].filter(Boolean).length;
+  const hasRangeSelector =
+    input.startDate !== undefined ||
+    input.endDate !== undefined ||
+    input.startBlock !== undefined ||
+    input.endBlock !== undefined;
+  if (legacySelectors > 1) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Provide only one of days, date, or blockHeight",
+    });
+  }
+  if (legacySelectors > 0 && hasRangeSelector) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Legacy selectors cannot be combined with range selectors",
+    });
+  }
+  if (
+    input.startDate !== undefined &&
+    input.endDate !== undefined &&
+    input.startDate > input.endDate
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "startDate must not be later than endDate",
+    });
+  }
+  if (
+    input.startBlock !== undefined &&
+    input.endBlock !== undefined &&
+    input.startBlock > input.endBlock
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "startBlock must not be greater than endBlock",
+    });
+  }
+}).describe("Validated raw stratigraphy telemetry query parameters.");
 
 const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
   "No input parameters required.",
@@ -239,10 +282,10 @@ const verifyProofInputSchema = z.object({
 );
 
 const proofStatusInputSchema = z.object({
-  proofHash: z.string().min(1).optional().describe(
+  proofHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$|^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[a-z2-7]{20,}$/).optional().describe(
     "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
   ),
-  snapshotDigest: z.string().min(1).optional().describe(
+  snapshotDigest: z.string().regex(/^(?:\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
     "64-character hexadecimal SHA-256 digest string or IPFS CID of the targeted zk-SNARK proof attestation. Example: '186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e'.",
   ),
 }).strict().refine(
@@ -275,7 +318,7 @@ const listProofAttestationsInputSchema = z.object({
 const submitProofInputSchema = z.object({
   proof: z.object({
     pi_a: z.array(
-      z.string().min(1).describe(
+      z.string().regex(/^\d+$/).describe(
         "Decimal string BN254 scalar-field coordinate in proof point A. Example: '10823'.",
       ),
     ).length(3).describe(
@@ -283,7 +326,7 @@ const submitProofInputSchema = z.object({
     ),
     pi_b: z.array(
       z.array(
-        z.string().min(1).describe(
+        z.string().regex(/^\d+$/).describe(
           "Decimal string BN254 extension-field coordinate in proof point B. Example: '331'.",
         ),
       ).length(2).describe(
@@ -293,7 +336,7 @@ const submitProofInputSchema = z.object({
       "Required 3x2 nested array of decimal string field elements representing the Groth16 BN254 proof B projective point. Example: [['112', '331'], ['981', '771'], ['1', '0']].",
     ),
     pi_c: z.array(
-      z.string().min(1).describe(
+      z.string().regex(/^\d+$/).describe(
         "Decimal string BN254 scalar-field coordinate in proof point C. Example: '554'.",
       ),
     ).length(3).describe(
@@ -303,16 +346,27 @@ const submitProofInputSchema = z.object({
     `Groth16/Poseidon zk-SNARK proof object containing pi_a (3-element array), pi_b (3x2 nested array), and pi_c (3-element array) BN254 elliptic curve projective points as decimal string field elements. Example: {"pi_a":["10823","49102","1"],"pi_b":[["112","331"],["981","771"],["1","0"]],"pi_c":["554","882","1"]}.`,
   ),
   publicSignals: z.array(
-    z.string().min(1).describe(
+    z.string().regex(/^\d+$/).describe(
       "Decimal string scalar field element in the BN254 curve modulo space. Example: '920000'.",
     ),
   ).length(5).describe(
     "Required array of exactly 5 public signal strings representing scalar field elements in BN254 curve modulo space, ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest. Example: ['920000', '1', '1789776000000', '12583', '1'].",
   ),
-  snapshotDigest: z.string().min(1).optional().describe(
+  snapshotDigest: z.string().regex(/^(?:\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
     "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. No default. Example: '1'.",
   ),
-}).strict().describe(
+}).strict().superRefine((input, context) => {
+  if (
+    input.snapshotDigest !== undefined &&
+    input.snapshotDigest !== input.publicSignals[4]
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["snapshotDigest"],
+      message: "snapshotDigest must equal publicSignals[4]",
+    });
+  }
+}).describe(
   "Input payload containing Groth16 proof object and public signals for ingestion and Nostr NIP-78 attestation broadcast.",
 );
 
@@ -941,7 +995,10 @@ const baseMcpToolDefinitions = [
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
-          { minLength: 1 },
+          {
+            pattern:
+              "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
+          },
         ),
         snapshotDigest: field(
           "string",
@@ -949,7 +1006,10 @@ const baseMcpToolDefinitions = [
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
-          { minLength: 1 },
+          {
+            pattern:
+              "^(?:\\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
+          },
         ),
       },
       oneOf: [
@@ -1186,7 +1246,7 @@ const baseMcpToolDefinitions = [
                   "string",
                   "Decimal string BN254 scalar-field coordinate in proof point A. Example: '10823'.",
                   ["10823"],
-                  { minLength: 1 },
+                  { pattern: "^\\d+$" },
                 ),
               },
             ),
@@ -1208,7 +1268,7 @@ const baseMcpToolDefinitions = [
                       "string",
                       "Decimal string BN254 extension-field coordinate in proof point B. Example: '331'.",
                       ["331"],
-                      { minLength: 1 },
+                      { pattern: "^\\d+$" },
                     ),
                   },
                 ),
@@ -1225,7 +1285,7 @@ const baseMcpToolDefinitions = [
                   "string",
                   "Decimal string BN254 scalar-field coordinate in proof point C. Example: '554'.",
                   ["554"],
-                  { minLength: 1 },
+                  { pattern: "^\\d+$" },
                 ),
               },
             ),
@@ -1243,7 +1303,7 @@ const baseMcpToolDefinitions = [
               "string",
               "Decimal string scalar field element in the BN254 curve modulo space. Example: '920000'.",
               ["920000"],
-              { minLength: 1 },
+              { pattern: "^\\d+$" },
             ),
           },
         ),
@@ -1251,7 +1311,10 @@ const baseMcpToolDefinitions = [
           "string",
           "Optional non-empty telemetry snapshot CID or decimal Poseidon digest string that must equal the fifth public signal. The schema default is '1'.",
           ["1"],
-          { minLength: 1 },
+          {
+            pattern:
+              "^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
+          },
         ),
       },
       required: ["proof", "publicSignals"],
@@ -1466,18 +1529,6 @@ function createBitcoinStratigraphyMcpServer() {
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid stratigraphy query");
       }
-      const { days, date } = parsed.data;
-      if (days !== undefined && date !== undefined) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: "Provide either days or date, not both.",
-            },
-          ],
-        };
-      }
       try {
         const records = await queryStratigraphy(parsed.data);
         const structuredContent = { records };
@@ -1491,6 +1542,9 @@ function createBitcoinStratigraphyMcpServer() {
           structuredContent,
         };
       } catch (error) {
+        if (error instanceof RangeError) {
+          throw new McpError(ErrorCode.InvalidParams, error.message);
+        }
         return {
           isError: true,
           content: [

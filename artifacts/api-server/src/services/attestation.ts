@@ -97,9 +97,13 @@ export function verifyCryptographicAttestation(
     !/^[0-9a-f]{64}$/.test(proof.merkleRoot) ||
     !signature ||
     signature.protocol !== "nostr" ||
-    signature.nip !== 78 ||
-    !verifyEvent(signature.event)
+    signature.nip !== 78
   ) {
+    return false;
+  }
+  try {
+    if (!verifyEvent(signature.event)) return false;
+  } catch {
     return false;
   }
   let issuerPublicKey = options.issuerPublicKey;
@@ -112,6 +116,7 @@ export function verifyCryptographicAttestation(
       return false;
     }
   }
+  if (!/^[0-9a-f]{64}$/.test(issuerPublicKey)) return false;
   let expected;
   try {
     expected = payloadCommitment(candidate.payload, proof.timestamp);
@@ -128,6 +133,13 @@ export function verifyCryptographicAttestation(
     timestamp: proof.timestamp,
   };
   const signedContent = JSON.stringify(signedCommitment);
+  const expectedPayloadDigest = sha256(signedContent);
+  const expectedTags = [
+    ["d", `bitcoin-stratigraphy:${expectedPayloadDigest}`],
+    ["t", "bitcoin-stratigraphy"],
+    ["t", "telemetry"],
+    ["x", expectedPayloadDigest],
+  ];
   return (
     expected.payloadSha256 === proof.payloadSha256 &&
     expected.merkleRoot === proof.merkleRoot &&
@@ -139,17 +151,7 @@ export function verifyCryptographicAttestation(
     signature.event.pubkey === issuerPublicKey &&
     signature.event.created_at === Math.floor(proof.timestamp / 1_000) &&
     signature.event.content === signedContent &&
-    signature.payload_sha256 === sha256(signedContent) &&
-    signature.event.tags.some(
-      (tag) =>
-        tag[0] === "d" &&
-        tag[1] === `bitcoin-stratigraphy:${signature.payload_sha256}`,
-    ) &&
-    signature.event.tags.some(
-      (tag) => tag[0] === "x" && tag[1] === signature.payload_sha256,
-    ) &&
-    signature.event.tags.some(
-      (tag) => tag[0] === "t" && tag[1] === "telemetry",
-    )
+    signature.payload_sha256 === expectedPayloadDigest &&
+    JSON.stringify(signature.event.tags) === JSON.stringify(expectedTags)
   );
 }

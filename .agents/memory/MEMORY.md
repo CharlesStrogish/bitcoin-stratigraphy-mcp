@@ -23,3 +23,4 @@
 - [Fixed-fee L402 attestations](fixed-fee-l402-attestations.md) — paid route macaroons are path-bound and single-use; signed attestations trust only the configured server issuer.
 - [Epistemic grounding provenance](epistemic-grounding-provenance.md) — reserve the epistemic schema for tip-grounded signing and verify every receipt alias against signed content.
 - [NWC self-payment proofs](nwc-self-payment-proofs.md) — same-wallet NWC transfers can replace Lightning hashes and preimages with UUIDs, making secure L402 redemption impossible.
+- [Audit readiness](audit-readiness.md) — HTTP readiness precedes relay announcements; challenge issuance is not evidence of live paid settlement.

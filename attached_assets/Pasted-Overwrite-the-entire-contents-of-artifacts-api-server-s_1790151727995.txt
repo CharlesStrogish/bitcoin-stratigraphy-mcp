@@ -1,0 +1,160 @@
+Overwrite the entire contents of `artifacts/api-server/src/routes/mcp.ts` with the exact TypeScript code below. Do not modify any strings, parameter schemas, or error descriptions.
+
+import { Router } from "express";
+
+export const mcpRouter = Router();
+
+export const MCP_TOOLS = [
+  {
+    name: "mesh.status",
+    description: "PURPOSE: Retrieves current peer-to-peer mesh consensus network status and health metrics.\nUSAGE: Use to check P2P network health, peer connections, and mesh state. Do NOT use for individual proof validation or stratigraphy data; use proof.verify or stratigraphy.get instead.\nPARAMETERS: Takes no input parameters.\nBEHAVIOR: Read-only state query. Pure, idempotent operation with zero database writes or side effects. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing active peers, block height, synchronization status, and network latency metrics.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). No 402 payment required.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "proof.ground",
+    description: "PURPOSE: Returns L402 payment routing metadata for anchoring agent context to Bitcoin state.\nUSAGE: Use to prepare context grounding requests and obtain L402 routing details. Do NOT use for raw ZK proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash SHA-256 digest, agentId identifier string (1-256 chars), and optional metadata object.\nBEHAVIOR: Generates L402 Lightning context-grounding metadata requiring 5 sats settlement. Non-destructive operation that returns grounding challenge details. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing HTTP status code, L402 payment metadata, grounding price in satoshis, and verification endpoint URL.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 402 (Payment Required), 429 (Rate Limit).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        contextHash: {
+          type: "string",
+          description: "64-character lowercase hexadecimal SHA-256 digest string."
+        },
+        agentId: {
+          type: "string",
+          description: "Unique client or agent identifier string (1-256 characters)."
+        },
+        metadata: {
+          type: "object",
+          description: "Key-value JSON object containing arbitrary metadata."
+        }
+      },
+      required: ["contextHash", "agentId"]
+    }
+  },
+  {
+    name: "proof.list",
+    description: "PURPOSE: Lists and filters indexed proof attestations by verification status.\nUSAGE: Use to query proof attestation history and status records. Do NOT use for raw proof verification; use proof.verify instead.\nPARAMETERS: Accepts limit integer (1-100), offset integer, and optional status filter string.\nBEHAVIOR: Read-only state index query. Pure, idempotent operation with zero side effects or database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing matching indexed proof attestation records array.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). No 402 payment required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "number",
+          description: "Maximum number of attestation records to return (1-100)."
+        },
+        offset: {
+          type: "number",
+          description: "Number of records to skip for pagination."
+        },
+        status: {
+          type: "string",
+          description: "Filter attestations by verification status string."
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: "proof.status",
+    description: "PURPOSE: Retrieves verification status and details for a specific proof attestation by ID.\nUSAGE: Use to check status of a specific attestation record. Do NOT use for bulk queries; use proof.list instead.\nPARAMETERS: Accepts proofId string identifier.\nBEHAVIOR: Read-only index query. Pure, idempotent operation with zero side effects or database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing attestation status, timestamp, and verification details.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 404 (Proof Not Found), 429 (Rate Limit). No 402 payment required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proofId: {
+          type: "string",
+          description: "Unique proof attestation identifier string."
+        }
+      },
+      required: ["proofId"]
+    }
+  },
+  {
+    name: "proof.submit",
+    description: "PURPOSE: Submits a Groth16 ZK proof and public inputs to be verified and indexed into state.\nUSAGE: Use to submit new ZK proofs for verification and state attestation. Do NOT use for stateless inspection; use proof.verify instead.\nPARAMETERS: Accepts proof object or string payload, publicInputs array, and telemetry metadata object.\nBEHAVIOR: Validates and indexes ZK proof attestation into persistent state. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing unique proof ID, status, and verification receipt.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 422 (Unprocessable Proof), 429 (Rate Limit), 500 (Submission Failed).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proof: {
+          type: "string",
+          description: "Groth16 cryptographic proof object or string payload."
+        },
+        publicInputs: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of public input signal strings or numbers."
+        },
+        telemetry: {
+          type: "object",
+          description: "Associated telemetry metadata object for proof binding."
+        }
+      },
+      required: ["proof", "publicInputs"]
+    }
+  },
+  {
+    name: "proof.verify",
+    description: "PURPOSE: Verifies a Groth16/Poseidon ZK proof against telemetry snapshot claims.\nUSAGE: Use for stateless Groth16 proof validation against snapshots. Do NOT use for lifecycle indexing; use proof.submit instead.\nPARAMETERS: Accepts proof object or string, publicInputs map or array, telemetry payload, and verificationKey identifier or object.\nBEHAVIOR: Read-only stateless verification query. Pure, idempotent BN254 curve verification in memory with zero database writes or state persistence. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing boolean validity status, ISO timestamp, execution latency in milliseconds, and optional error string.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). Returns valid: false on cryptographic proof or key mismatch. No 402 payment required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        proof: {
+          type: "string",
+          description: "Groth16 proof object or encoded string payload."
+        },
+        publicInputs: {
+          type: "object",
+          description: "Key-value map or array of public signals."
+        },
+        telemetry: {
+          type: "object",
+          description: "Telemetry snapshot payload to verify against proof."
+        },
+        verificationKey: {
+          type: "string",
+          description: "Verification key identifier or JSON object."
+        }
+      },
+      required: ["proof", "publicInputs"]
+    }
+  },
+  {
+    name: "stratigraphy.get",
+    description: "PURPOSE: Retrieves historical Bitcoin stratigraphy telemetry records by date, range, or block height.\nUSAGE: Use to fetch specific telemetry records or ranges. Do NOT use for catalog coverage discovery; use stratigraphy.list instead.\nPARAMETERS: Accepts optional date ISO string, startDate, endDate, blockHeight integer, startBlock, endBlock, recentDays (1-365), metrics array, and limit integer (1-1000).\nBEHAVIOR: Read-only telemetry index query. Pure, idempotent operation with zero side effects or database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing matching historical telemetry records array.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). Returns empty records array when query matches no data. No 402 payment required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "ISO 8601 date string (YYYY-MM-DD)." },
+        startDate: { type: "string", description: "Start date string for range query (YYYY-MM-DD)." },
+        endDate: { type: "string", description: "End date string for range query (YYYY-MM-DD)." },
+        blockHeight: { type: "number", description: "Target Bitcoin block height integer." },
+        startBlock: { type: "number", description: "Starting Bitcoin block height integer for range query." },
+        endBlock: { type: "number", description: "Ending Bitcoin block height integer for range query." },
+        recentDays: { type: "number", description: "Number of recent days to retrieve (1-365)." },
+        metrics: { type: "array", items: { type: "string" }, description: "Array of metric keys to project in output records." },
+        limit: { type: "number", description: "Maximum number of telemetry records to return (1-1000)." }
+      },
+      required: []
+    }
+  },
+  {
+    name: "stratigraphy.list",
+    description: "PURPOSE: Lists available Bitcoin stratigraphy catalog series, available dates, and block height ranges.\nUSAGE: Use to discover dataset coverage, available metric series, and available date ranges. Do NOT use for retrieving full telemetry records; use stratigraphy.get instead.\nPARAMETERS: Accepts optional category filter string.\nBEHAVIOR: Read-only catalog query. Pure, idempotent operation with zero side effects or database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing available catalog series, date ranges, and metric keys.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). No 402 payment required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: { type: "string", description: "Metric category filter string." }
+      },
+      required: []
+    }
+  }
+];
+
+mcpRouter.get("/tools", (req, res) => {
+  res.json({ tools: MCP_TOOLS });
+});
+
+Run `pnpm test` and `pnpm typecheck` to confirm the build passes before completing.

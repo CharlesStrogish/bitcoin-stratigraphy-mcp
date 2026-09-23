@@ -278,7 +278,7 @@ const verifyProofInputSchema = z.object({
   ),
   data: snapshotSchema,
 }).strict().describe(
-  "Input arguments containing Groth16 proof coordinates and public signals for stateless elliptic curve verification.",
+  "Input arguments containing an encoded Groth16 proof, typed public inputs, a verification-key identifier, and telemetry data.",
 );
 
 const proofStatusInputSchema = z.object({
@@ -286,7 +286,7 @@ const proofStatusInputSchema = z.object({
     "Canonical IPFS CID or hex digest identifier string.",
   ),
   snapshotDigest: z.string().regex(/^(?:\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
-    "Canonical IPFS CID or hex digest identifier string.",
+    "Decimal field digest, 64-digit hexadecimal digest, or IPFS CID identifier string.",
   ),
 }).strict().refine(
   (input) =>
@@ -353,7 +353,7 @@ const submitProofInputSchema = z.object({
     "Public signals ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
   ),
   snapshotDigest: z.string().regex(/^(?:\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
-    "Canonical IPFS CID or hex digest identifier string.",
+    "Decimal field digest or IPFS CID that must equal publicSignals[4] when supplied.",
   ),
 }).strict().superRefine((input, context) => {
   if (
@@ -376,10 +376,10 @@ const meshStatusInputSchema = z.object({}).strict().describe(
 
 const groundContextInputSchema = z.object({
   contextHash: z.string().regex(/^[0-9a-fA-F]{64}$/).describe(
-    "64-character lowercase hexadecimal SHA-256 digest string.",
+    "64-character case-insensitive hexadecimal SHA-256 digest string.",
   ),
   agentId: z.string().trim().min(1).max(256).describe(
-    "Stable caller-controlled identifier.",
+    "Trimmed caller-controlled identifier string from 1 to 256 characters.",
   ),
   metadata: z.record(z.string(), z.unknown()).optional().describe(
     "Non-secret caller metadata bound into the context anchor.",
@@ -472,7 +472,7 @@ const entryJsonSchema = {
 const publicInputsJsonSchema = {
   type: "object",
   description:
-    "Required object containing exactly five typed public statement inputs committed by the Groth16/Poseidon proof.",
+    "Object containing exactly five typed public statement inputs committed by the Groth16/Poseidon proof.",
   examples: [{
     blockHeight: 920000,
     snapshotDigest: "1534979302823651498736582947365829473658294736582947365829473658294",
@@ -689,7 +689,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE: Retrieves historical Bitcoin stratigraphy telemetry records by date, range, or block height.\nUSAGE: Use to fetch specific telemetry records or ranges. Do NOT use for catalog coverage discovery; use stratigraphy.list instead.\nPARAMETERS: Selectors for date, date ranges, block height, block ranges, recent days, metric projections, and record count limits.\nBEHAVIOR: Executes read-only indexed queries against local stratigraphy telemetry store. Pure, idempotent operation with zero side effects or database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing matching historical telemetry records array.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). Returns empty records array when query matches no data. No 402 payment required.",
+      "PURPOSE: Retrieves Bitcoin Stratigraphy telemetry records by recent-day count, date, block height, or inclusive date and block ranges.\nUSAGE: Use to fetch telemetry records and selected thermodynamic metrics. Do NOT use for catalog coverage discovery; use stratigraphy.list instead.\nPARAMETERS: days is an integer from 1 to 365; date is YYYY-MM-DD; blockHeight is a non-negative integer; metrics is a unique non-empty array containing target_multiplier, difficulty_epoch_progress, or thermodynamic_signal; startDate and endDate are inclusive YYYY-MM-DD bounds; startBlock and endBlock are inclusive non-negative integer bounds; limit is an integer from 1 to 100 with default 10.\nBEHAVIOR: Reads the local telemetry dataset without database writes. Only one of days, date, or blockHeight may be supplied, and none may be combined with range selectors; lower bounds cannot exceed upper bounds. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing records, an array of matching telemetry entries, limited and optionally projected by metrics; an unmatched query returns an empty array.\nERRORS: -32602 (Invalid Parameters) for invalid fields, selector combinations, bounds, or ranges; HTTP 429 (Rate Limit) when the shared limit is exceeded; dataset retrieval failures return an MCP tool error. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -775,7 +775,7 @@ const baseMcpToolDefinitions = [
         ),
         limit: field(
           "integer",
-          "Maximum number of records to return (integer, 1-1000).",
+          "Maximum number of records to return (integer, 1-100).",
           [10],
           { minimum: 1, maximum: 100, default: 10 },
         ),
@@ -801,7 +801,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "PURPOSE: Discover stratigraphy coverage and metric names.\nUSAGE: Use to discover catalog coverage and metric bounds. Do NOT use for fetching telemetry records; use stratigraphy.get instead.\nPARAMETERS: No selectors are accepted because coverage and metrics describe the complete catalog rather than a filtered page.\nBEHAVIOR: Summarizes local catalog coverage without modifying records. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit); tool error if the catalog is unavailable. No 402 payment required.",
+      "PURPOSE: Lists complete Bitcoin Stratigraphy catalog coverage and available metric paths.\nUSAGE: Use to discover snapshot, date, block, and metric coverage. Do NOT use for fetching telemetry records; use stratigraphy.get instead.\nPARAMETERS: No input properties are accepted.\nBEHAVIOR: Summarizes the local catalog without modifying records. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds with startDate and endDate.\nERRORS: -32602 (Invalid Parameters) when any input property is supplied; HTTP 429 (Rate Limit) when the shared limit is exceeded; catalog retrieval failures return an MCP error. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -894,12 +894,12 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "PURPOSE: Verifies a Groth16/Poseidon ZK proof against telemetry snapshot claims.\nUSAGE: Use for stateless Groth16 proof validation against snapshots. Do NOT use for lifecycle indexing; use proof.submit instead.\nPARAMETERS: Cryptographic proof payload, public input statements object, telemetry data payload, and verification key identifier.\nBEHAVIOR: Executes pure, idempotent cryptographic BN254 curve verification in-memory. Zero database writes, zero side effects, and no state persistence. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing boolean validity status, ISO timestamp, execution latency in milliseconds, and optional error string.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). Returns valid: false on cryptographic proof or key mismatch. No 402 payment required.",
+      "PURPOSE: Verifies a base64url-encoded Groth16/Poseidon BN254 proof against typed public claims and a telemetry snapshot.\nUSAGE: Use to validate a proof against snapshot data. Do NOT use to submit proof coordinates for optional Nostr publication; use proof.submit instead.\nPARAMETERS: proof is a non-empty base64url proof string; publicInputs is an object with non-negative integer blockHeight, non-empty string snapshotDigest, non-empty string thermodynamicHash, non-negative integer timestamp, and non-negative integer valuationSat; verificationKeyId is a non-empty string; data is a telemetry object or an array of telemetry objects.\nBEHAVIOR: Checks the snapshot digest, semantic claims, verification-key identifier, and Groth16 proof in memory, and updates bounded process-memory verification and lifecycle indexes without durable database storage. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing valid, verifiedAt, and computationTimeMs; proof, snapshot, semantic, or key mismatches produce valid false.\nERRORS: -32602 (Invalid Parameters) for malformed or missing input properties; HTTP 429 (Rate Limit) when the shared limit is exceeded. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
       description:
-        "Input arguments containing Groth16 proof coordinates and public signals for stateless elliptic curve verification.",
+        "Input arguments containing an encoded Groth16 proof, typed public inputs, a verification-key identifier, and telemetry data.",
       examples: [{
         proof: "eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0",
         publicInputs: publicInputsJsonSchema.examples[0],
@@ -931,7 +931,7 @@ const baseMcpToolDefinitions = [
         ),
         data: field(
           ["object", "array"],
-          "Telemetry snapshot payload object containing canonical state values.",
+          "Telemetry snapshot payload object or array of objects containing canonical state values.",
           [[{
             block: { height: 920000 },
             observed_at: "2026-09-19T00:00:00.000Z",
@@ -970,7 +970,7 @@ const baseMcpToolDefinitions = [
         ),
         error: field(
           "string",
-          "Optional human-readable verification error message string when verification cannot validate the proof. Example: 'Verification key identifier does not match the proof.'.",
+          "Human-readable verification error message when verification cannot validate the proof. Example: 'Verification key identifier does not match the proof.'.",
           ["Verification key identifier does not match the proof."],
         ),
       },
@@ -981,7 +981,7 @@ const baseMcpToolDefinitions = [
     name: "proof.status",
     title: "Get Proof Status",
     description:
-      "PURPOSE: Retrieve one proof's indexed lifecycle state.\nUSAGE: Use when querying known proof/snapshot state. Do NOT use for stateless validation; use proof.verify instead.\nPARAMETERS: proofHash and snapshotDigest are mutually exclusive selectors for the proof artifact or its committed dataset; unknown identifiers report pending rather than verified.\nBEHAVIOR: Looks up indexed verification and quorum state without modifying it. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Current indexed lifecycle and quorum state.\nERRORS: Invalid selectors return -32602; rate excess returns HTTP 429. No 402 payment required.",
+      "PURPOSE: Retrieves process-memory lifecycle and mesh-quorum status for one proof or snapshot identifier.\nUSAGE: Use to query a known proof or snapshot status. Do NOT use for bulk lifecycle queries; use proof.list instead.\nPARAMETERS: Exactly one of proofHash or snapshotDigest must be supplied; proofHash accepts a 64-digit hexadecimal digest with optional 0x prefix or an IPFS CID, while snapshotDigest accepts a decimal field digest, 64-digit hexadecimal digest, or IPFS CID.\nBEHAVIOR: Looks up bounded process-memory status and compares its attestation count with the current mesh quorum threshold; an unknown identifier is reported as pending rather than as not found. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing status as verified, cached, pending, or invalid, plus verifiedAt, attestationCount, and meshQuorum.\nERRORS: -32602 (Invalid Parameters) unless exactly one valid selector is supplied; HTTP 429 (Rate Limit) when the shared limit is exceeded. Unknown identifiers do not produce 404. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1006,7 +1006,7 @@ const baseMcpToolDefinitions = [
         ),
         snapshotDigest: field(
           "string",
-          "Canonical IPFS CID or hex digest identifier string.",
+          "Decimal field digest, 64-digit hexadecimal digest, or IPFS CID identifier string.",
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
@@ -1064,7 +1064,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "PURPOSE: Lists and filters indexed proof attestations by status.\nUSAGE: Use to query proof attestation history and status records. Do NOT use for raw proof verification; use proof.verify instead.\nPARAMETERS: Selectors for result count limit, pagination offset, and verification status string.\nBEHAVIOR: Executes read-only state index lookups. Pure, idempotent operation with zero side effects or database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing matching indexed proof attestation records array.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Lists and filters proof attestations held in the node's bounded process-memory index.\nUSAGE: Use to query recent proof lifecycle records with pagination. Do NOT use for cryptographic proof validation; use proof.verify instead.\nPARAMETERS: limit is an integer from 1 to 100 with default 20; offset is an integer from 0 to 1000 with default 0; status is one of verified, cached, pending, or invalid.\nBEHAVIOR: Filters the process-memory index, orders matches newest first, applies offset and limit, and calculates mesh quorum without durable database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing attestations with proofHash, snapshotDigest, status, submittedAt, attestationCount, and meshQuorum, plus total before pagination.\nERRORS: -32602 (Invalid Parameters) for invalid fields, ranges, or status values; HTTP 429 (Rate Limit) when the shared limit is exceeded. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1087,7 +1087,7 @@ const baseMcpToolDefinitions = [
         ),
         status: field(
           "string",
-          "Filter records by attestation lifecycle state ('verified' | 'pending' | 'failed').",
+          "Filter records by attestation lifecycle state: verified, cached, pending, or invalid.",
           ["verified"],
           { enum: [...proofLifecycleStates] },
         ),
@@ -1142,7 +1142,7 @@ const baseMcpToolDefinitions = [
               properties: {
                 proofHash: field(
                   "string",
-                  "64-character lowercase hexadecimal SHA-256 digest string.",
+                  "0x-prefixed lowercase hexadecimal SHA-256 digest of the canonical proof.",
                   [
                     "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
                   ],
@@ -1201,7 +1201,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "PURPOSE: Verify and index a proof with optional Nostr publication.\nUSAGE: Use to verify and index proofs into node lifecycle. Do NOT use for read-only validation; use proof.verify instead.\nPARAMETERS: proof must correspond to publicSignals in circuit-defined order; optional snapshotDigest must equal the snapshot commitment signal to bind the indexed dataset to the proof.\nBEHAVIOR: Verifies and persists proof lifecycle state and may publish a Nostr attestation. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing proofHash, status, submittedAt, and attestationStatus.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); status reports invalid proofs and attestationStatus reports publication failures. No 402 payment required.",
+      "PURPOSE: Verifies Groth16/Poseidon BN254 coordinates, indexes their lifecycle in process memory, and attempts Nostr NIP-78 publication for a valid proof.\nUSAGE: Use to submit proof coordinates for lifecycle lookup and optional Nostr publication. Do NOT use when only validating an encoded proof against telemetry data; use proof.verify instead.\nPARAMETERS: proof is an object containing pi_a as three decimal strings, pi_b as three pairs of decimal strings, and pi_c as three decimal strings; publicSignals is exactly five decimal strings ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest; snapshotDigest accepts a decimal field digest or IPFS CID and, when supplied, must equal publicSignals[4].\nBEHAVIOR: Verifies the proof, stores bounded process-memory status and attestation indexes rather than persistent database records, and attempts Nostr publication only for valid proofs. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing proofHash, status as verified or invalid, submittedAt, and attestationStatus describing Nostr publication or why it was not attempted.\nERRORS: -32602 (Invalid Parameters) for malformed coordinates, signals, fields, or a snapshotDigest mismatch; HTTP 429 (Rate Limit) when the shared limit is exceeded; cryptographic rejection is returned as status invalid and publication failure is reported by attestationStatus. No 402 payment required.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1313,7 +1313,7 @@ const baseMcpToolDefinitions = [
         ),
         snapshotDigest: field(
           "string",
-          "Canonical IPFS CID or hex digest identifier string.",
+          "Decimal field digest or IPFS CID that must equal publicSignals[4] when supplied.",
           ["1"],
           {
             pattern:
@@ -1338,7 +1338,7 @@ const baseMcpToolDefinitions = [
       properties: {
         proofHash: field(
           "string",
-          "64-character lowercase hexadecimal SHA-256 digest string.",
+          "0x-prefixed lowercase hexadecimal SHA-256 digest of the canonical proof.",
           [
             "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
           ],
@@ -1373,7 +1373,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Generates an L402 Lightning challenge requiring 5 sats settlement to anchor agent context to Bitcoin state as an indexed attestation record.\nUSAGE: Use this tool when you need a signed context anchor. Created anchors are indexed in state and can be listed or managed using proof.list and proof.status. Do NOT use this tool for validating Groth16 proofs; use proof.verify instead.\nPARAMETERS: Accepts contextHash digest, agentId identifier, and metadata object.\nBEHAVIOR: Creates an L402 challenge endpoint; 5-sat settlement yields a persistent context anchor. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing HTTP 402 challenge metadata or signed receipt upon payment.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 402 (Payment Required), 429 (Rate Limit), 500 (Grounding Unavailable).",
+      "PURPOSE: Returns payment-required routing metadata for the paid epistemic grounding HTTP endpoint.\nUSAGE: Use to prepare a validated request for paid context grounding. Do NOT use to obtain an invoice, index an anchor, or receive a signed receipt directly; use POST /api/v1/zk/ground instead.\nPARAMETERS: contextHash is a case-insensitive 64-character hexadecimal SHA-256 digest; agentId is a trimmed string from 1 to 256 characters; metadata is a string-keyed JSON object with arbitrary values.\nBEHAVIOR: Validates and echoes the request with contextHash lowercased, but does not issue an invoice, collect payment, ground context, index an anchor, or sign a receipt. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: An MCP tool-error result containing status 402, error payment_required, endpoint /api/v1/zk/ground, amountSats 5, verificationEndpoint, and the normalized request.\nERRORS: -32602 (Invalid Parameters) for malformed or missing input properties; HTTP 429 (Rate Limit) when the shared limit is exceeded. The returned 402 is routing metadata, not an HTTP error response.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1388,13 +1388,13 @@ const baseMcpToolDefinitions = [
       properties: {
         contextHash: field(
           "string",
-          "64-character lowercase hexadecimal SHA-256 digest string.",
+          "64-character case-insensitive hexadecimal SHA-256 digest string; the tool normalizes it to lowercase.",
           ["4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f"],
           { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 },
         ),
         agentId: field(
           "string",
-          "Unique client or agent identifier string (1-128 characters).",
+          "Trimmed client or agent identifier string (1-256 characters).",
           ["research-agent-7"],
           { minLength: 1, maxLength: 256 },
         ),
@@ -1468,7 +1468,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE: Report mesh connectivity and quorum readiness.\nUSAGE: Use when you need peer topology health. Do NOT use for individual proof validation; use proof.verify instead.\nPARAMETERS: No selectors are accepted because status aggregates the current node and all configured peers rather than one proof or peer.\nBEHAVIOR: Observes current peer and quorum health without changing mesh state. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing nodePubkey, peer counts, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.\nERRORS: 400 (Invalid Request), -32602 (unexpected parameters), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Retrieves current peer topology, propagation, cross-validation, and quorum health for the mesh node.\nUSAGE: Use to inspect peer connectivity and consensus readiness. Do NOT use for individual proof validation or telemetry retrieval; use proof.verify or stratigraphy.get instead.\nPARAMETERS: No input properties are accepted.\nBEHAVIOR: Observes current in-process mesh service metrics without changing proof or telemetry state. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.\nERRORS: -32602 (Invalid Parameters) when any input property is supplied; HTTP 429 (Rate Limit) when the shared limit is exceeded. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

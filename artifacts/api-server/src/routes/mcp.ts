@@ -1373,7 +1373,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Returns routing metadata and prepares parameters for context grounding.\nUSAGE: Use to validate context hashes and prepare grounding requests. Do NOT use for raw proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash SHA-256 digest, agentId identifier string, and optional metadata object.\nBEHAVIOR: read-only validation query. Validates input format and returns endpoint parameters. Pure, idempotent operation with zero database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing grounding status, endpoint route, required sats amount, and normalized parameters.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). No 402 payment required for metadata query.",
+      "PURPOSE: Prepares parameters and returns L402 routing metadata for anchoring agent context.\nUSAGE: Use to prepare context grounding requests and retrieve payment routing parameters. Do NOT use for raw ZK proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash (64-char hex digest), agentId string (1-128 chars), and optional metadata object.\nBEHAVIOR: Generates L402 Lightning context-grounding metadata requiring 5 sats settlement. Non-destructive operation that returns grounding challenge details. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing HTTP status code, L402 payment metadata, grounding price in satoshis, and verification endpoint URL.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 402 (Payment Required), 429 (Rate Limit).",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1394,7 +1394,7 @@ const baseMcpToolDefinitions = [
         ),
         agentId: field(
           "string",
-          "Unique client or agent identifier string.",
+          "Unique client or agent identifier string from 1 to 128 characters.",
           ["research-agent-7"],
           { minLength: 1, maxLength: 256 },
         ),

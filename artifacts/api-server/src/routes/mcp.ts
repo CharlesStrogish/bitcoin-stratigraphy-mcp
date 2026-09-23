@@ -1373,7 +1373,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Returns payment-required routing metadata for the paid epistemic grounding HTTP endpoint.\nUSAGE: Use to prepare a validated request for paid context grounding. Do NOT use to obtain an invoice, index an anchor, or receive a signed receipt directly; use POST /api/v1/zk/ground instead.\nPARAMETERS: contextHash is a case-insensitive 64-character hexadecimal SHA-256 digest; agentId is a trimmed string from 1 to 256 characters; metadata is a string-keyed JSON object with arbitrary values.\nBEHAVIOR: Validates and echoes the request with contextHash lowercased, but does not issue an invoice, collect payment, ground context, index an anchor, or sign a receipt. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: An MCP tool-error result containing status 402, error payment_required, endpoint /api/v1/zk/ground, amountSats 5, verificationEndpoint, and the normalized request.\nERRORS: -32602 (Invalid Parameters) for malformed or missing input properties; HTTP 429 (Rate Limit) when the shared limit is exceeded. The returned 402 is routing metadata, not an HTTP error response.",
+      "PURPOSE: Returns routing metadata and prepares parameters for context grounding.\nUSAGE: Use to validate context hashes and prepare grounding requests. Do NOT use for raw proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash SHA-256 digest, agentId identifier string, and optional metadata object.\nBEHAVIOR: read-only validation query. Validates input format and returns endpoint parameters. Pure, idempotent operation with zero database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing grounding status, endpoint route, required sats amount, and normalized parameters.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). No 402 payment required for metadata query.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1388,19 +1388,19 @@ const baseMcpToolDefinitions = [
       properties: {
         contextHash: field(
           "string",
-          "64-character case-insensitive hexadecimal SHA-256 digest string; the tool normalizes it to lowercase.",
+          "64-character lowercase hexadecimal SHA-256 digest string.",
           ["4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f"],
           { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 },
         ),
         agentId: field(
           "string",
-          "Trimmed client or agent identifier string (1-256 characters).",
+          "Unique client or agent identifier string.",
           ["research-agent-7"],
           { minLength: 1, maxLength: 256 },
         ),
         metadata: field(
           "object",
-          "Key-value JSON object containing arbitrary metadata to bind to anchor.",
+          "Key-value JSON object containing arbitrary metadata.",
           [{ topic: "difficulty-adjustment" }],
           { additionalProperties: true },
         ),

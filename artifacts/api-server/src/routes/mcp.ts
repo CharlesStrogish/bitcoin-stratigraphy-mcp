@@ -689,7 +689,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE: Retrieve historical Bitcoin stratigraphy telemetry.\nUSAGE: Use to retrieve selected historical telemetry records. Do NOT use for catalog coverage discovery; use stratigraphy.list instead.\nPARAMETERS: days, date, or blockHeight selects one lookup mode; date and block ranges use ordered inclusive bounds. metrics projects requested signals before limit truncates the ordered result set.\nBEHAVIOR: Executes state lookups against the local telemetry index without modifying records. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing records with source details and projected quantitative metrics.\nERRORS: 400 (Invalid Request), -32602 (invalid selectors), 429 (Rate Limit); tool error on query failure. No 402 payment required.",
+      "PURPOSE: Retrieves historical Bitcoin stratigraphy telemetry records by date, range, or block height.\nUSAGE: Use to fetch specific telemetry records or ranges. Do NOT use for catalog coverage discovery; use stratigraphy.list instead.\nPARAMETERS: Selectors for date, date ranges, block height, block ranges, recent days, metric projections, and record count limits.\nBEHAVIOR: Executes read-only indexed queries against local stratigraphy telemetry store. Pure, idempotent operation with zero side effects or database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing matching historical telemetry records array.\nERRORS: 400 (Invalid Request), 429 (Rate Limit). Returns empty records array when query matches no data. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -705,13 +705,13 @@ const baseMcpToolDefinitions = [
       properties: {
         days: field(
           "integer",
-          "Count of recent days of telemetry to fetch.",
+          "Count of recent days of telemetry to fetch (integer, 1-365).",
           [7],
           { minimum: 1, maximum: 365, default: 30 },
         ),
         date: field(
           "string",
-          "Calendar date selecting one telemetry day, formatted as YYYY-MM-DD.",
+          "Calendar date selecting one telemetry day, formatted as YYYY-MM-DD in UTC.",
           ["2026-09-19"],
           {
             format: "date",
@@ -722,13 +722,13 @@ const baseMcpToolDefinitions = [
         ),
         blockHeight: field(
           "integer",
-          "Indexed Bitcoin block height selecting one telemetry record.",
+          "Indexed Bitcoin block height selecting one telemetry record (non-negative integer).",
           [850000],
           { minimum: 0 },
         ),
         metrics: field(
           "array",
-          "Telemetry metrics projected into each returned record.",
+          "Array of specific telemetry metric key strings to project into returned records.",
           [["target_multiplier"]],
           {
             minItems: 1,
@@ -743,7 +743,7 @@ const baseMcpToolDefinitions = [
         ),
         startDate: field(
           "string",
-          "Inclusive lower date bound formatted as YYYY-MM-DD in UTC. May be combined with endDate and block bounds, but not with days, date, or blockHeight.",
+          "Inclusive lower date bound formatted as YYYY-MM-DD in UTC.",
           ["2026-09-01"],
           {
             format: "date",
@@ -753,7 +753,7 @@ const baseMcpToolDefinitions = [
         ),
         endDate: field(
           "string",
-          "Inclusive upper date bound formatted as YYYY-MM-DD in UTC. Must not precede startDate and may not be combined with legacy selectors.",
+          "Inclusive upper date bound formatted as YYYY-MM-DD in UTC (must be >= startDate).",
           ["2026-09-18"],
           {
             format: "date",
@@ -763,19 +763,19 @@ const baseMcpToolDefinitions = [
         ),
         startBlock: field(
           "integer",
-          "Inclusive lower block bound combined with range selectors.",
+          "Inclusive lower block height bound (non-negative integer).",
           [910000],
           { minimum: 0 },
         ),
         endBlock: field(
           "integer",
-          "Inclusive upper block bound that must not precede startBlock.",
+          "Inclusive upper block height bound (non-negative integer, must be >= startBlock).",
           [920000],
           { minimum: 0 },
         ),
         limit: field(
           "integer",
-          "Maximum number of records to return.",
+          "Maximum number of records to return (integer, 1-1000).",
           [10],
           { minimum: 1, maximum: 100, default: 10 },
         ),

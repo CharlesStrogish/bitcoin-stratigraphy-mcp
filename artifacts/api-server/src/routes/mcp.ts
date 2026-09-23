@@ -1064,7 +1064,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "PURPOSE: Retrieves indexed proof attestation records and matching state totals.\nUSAGE: Use to filter and paginate indexed attestations by lifecycle state. Do NOT use for single proof state; use proof.status instead.\nPARAMETERS: Optional status filter, result limit, and offset parameters.\nBEHAVIOR: Filters local attestation index without modifying records. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing matching attestations array and total count.\nERRORS: 400 (Invalid Request), 429 (Rate Limit). No 402 payment required.",
+      "PURPOSE: Lists and filters indexed agent context anchors and attestations.\nUSAGE: Use to retrieve anchor history or query status across agents. Do NOT use for raw proof verification; use proof.verify instead.\nPARAMETERS: Selectors for agent identifier, limit, offset, and status filters.\nBEHAVIOR: Executes read-only state index lookups. Pure, idempotent operation with zero side effects or database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing matching indexed proof and anchor records array.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 429 (Rate Limit). No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

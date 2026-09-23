@@ -894,7 +894,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "PURPOSE: Verify a Groth16/Poseidon proof against snapshot claims.\nUSAGE: Use for stateless Groth16 proof validation against snapshots. Do NOT use for lifecycle indexing; use proof.submit instead.\nPARAMETERS: proof, publicInputs, and data must encode the same snapshot claims in circuit order; verificationKeyId selects the corresponding server circuit key.\nBEHAVIOR: Performs stateless cryptographic verification without indexing or publishing the proof. Rate limit: 60 req/min per IP shared across /mcp (returns HTTP 429 on breach).\nRETURNS: Object containing valid, verifiedAt, computationTimeMs, and optional error.\nERRORS: 400 (Invalid Request), -32602 (invalid arguments), 429 (Rate Limit); valid:false for proof/key/binding mismatch. No 402 payment required.",
+      "PURPOSE: Verifies a Groth16/Poseidon ZK proof against telemetry snapshot claims.\nUSAGE: Use for stateless Groth16 proof validation against snapshots. Do NOT use for lifecycle indexing; use proof.submit instead.\nPARAMETERS: Cryptographic proof payload, public input statements object, telemetry data payload, and verification key identifier.\nBEHAVIOR: Executes pure, idempotent cryptographic BN254 curve verification in-memory. Zero database writes, zero side effects, and no state persistence. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing boolean validity status, ISO timestamp, execution latency in milliseconds, and optional error string.\nERRORS: 400 (Invalid Request), 429 (Rate Limit). Returns valid: false on cryptographic proof or key mismatch. No 402 payment required.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -914,20 +914,24 @@ const baseMcpToolDefinitions = [
       properties: {
         proof: field(
           "string",
-          "Base64url-encoded Groth16/Poseidon BN254 proof emitted by this API, without padding.",
+          "Base64url-encoded Groth16/Poseidon BN254 proof string without padding.",
           ["eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0"],
           { minLength: 1 },
         ),
-        publicInputs: publicInputsJsonSchema,
+        publicInputs: {
+          ...publicInputsJsonSchema,
+          description:
+            "Object containing five typed public statement inputs committed by the proof.",
+        },
         verificationKeyId: field(
           "string",
-          "SHA-256 verification-key identifier using the sha256: prefix.",
+          "SHA-256 verification-key identifier string formatted with 'sha256:' prefix.",
           ["sha256:4c095e183ea45a9d"],
           { minLength: 1 },
         ),
         data: field(
           ["object", "array"],
-          "Telemetry snapshot payload whose canonical digest and semantic fields must match the proof.",
+          "Telemetry snapshot payload object containing canonical state values.",
           [[{
             block: { height: 920000 },
             observed_at: "2026-09-19T00:00:00.000Z",

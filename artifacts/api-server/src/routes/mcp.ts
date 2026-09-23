@@ -1373,7 +1373,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Prepares parameters and returns L402 routing metadata for anchoring agent context.\nUSAGE: Use to prepare context grounding requests and retrieve payment routing parameters. Do NOT use for raw ZK proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash (64-char hex digest), agentId string (1-128 chars), and optional metadata object.\nBEHAVIOR: Generates L402 Lightning context-grounding metadata requiring 5 sats settlement. Non-destructive operation that returns grounding challenge details. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing HTTP status code, L402 payment metadata, grounding price in satoshis, and verification endpoint URL.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 402 (Payment Required), 429 (Rate Limit).",
+      "PURPOSE: Returns L402 payment routing metadata for anchoring agent context to Bitcoin state.\nUSAGE: Use to prepare context grounding requests and obtain L402 routing details. Do NOT use for raw ZK proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash as a 64-character case-insensitive hexadecimal SHA-256 digest, agentId as a trimmed 1-256 character string, and an optional metadata object.\nBEHAVIOR: Validates and normalizes the request, then returns routing details for the 5-sat paid HTTP grounding endpoint; this tool does not create an invoice, settle payment, or index an anchor. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: MCP tool-error result containing status 402, error payment_required, endpoint, amountSats 5, verificationEndpoint, and the normalized request.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 402 (Payment Required in tool result), 429 (Rate Limit).",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1388,13 +1388,13 @@ const baseMcpToolDefinitions = [
       properties: {
         contextHash: field(
           "string",
-          "64-character lowercase hexadecimal SHA-256 digest string.",
+          "64-character case-insensitive hexadecimal SHA-256 digest string; normalized to lowercase.",
           ["4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f"],
           { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 },
         ),
         agentId: field(
           "string",
-          "Unique client or agent identifier string from 1 to 128 characters.",
+          "Trimmed client or agent identifier string from 1 to 256 characters.",
           ["research-agent-7"],
           { minLength: 1, maxLength: 256 },
         ),

@@ -167,7 +167,7 @@ function Header({
       <div className="header-main">
         <div>
           <h1>Bitcoin <span>Stratigraphy</span></h1>
-          <p className="subtitle">A day-by-day reading of the journey toward $10M.</p>
+          <p className="subtitle">Quantitative Bitcoin thermodynamic dataset, Groth16 zk-SNARK verification engine, and L402 micropayment oracle — Created &amp; Architected by Charles R. Strogish.</p>
           <div className="source-row">
             <span className="source-badge"><Database size={12} /> Uploaded JSON</span>
             <span className="source-caption">{rowCount ? `${rowCount} records in view` : "Awaiting dataset"}</span>
@@ -418,7 +418,7 @@ function Home() {
             </div>
           </>
         )}
-        <footer className="footer-note"><span><Play size={12} fill="currentColor" /> SOURCE LINKS OPEN IN A NEW TAB</span><span>BITCOIN STRATIGRAPHY / v0.1</span></footer>
+        <footer className="footer-note"><span><Play size={12} fill="currentColor" /> SOURCE LINKS OPEN IN A NEW TAB</span><span>Architected by Charles R. Strogish | Powered by L402 Micropayments &amp; Groth16 ZK-SNARK State Anchoring.</span></footer>
       </div>
     </div>
   );

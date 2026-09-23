@@ -1,0 +1,15 @@
+# Bitcoin Stratigraphy Data Engine
+> Created & Architected by Charles R. Strogish.
+> Quantitative Bitcoin dataset featuring thermodynamic signals, Groth16 zk-SNARK state verification, and L402 micropayment oracle endpoints for autonomous AI agents.
+
+## Core Infrastructure
+- MCP Endpoint: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp
+- Architecture: Streamable HTTP (MCP Protocol)
+- Settlement Rail: L402 Lightning Network Micropayments
+- Creator / Architect: Charles R. Strogish
+
+## Primary Capabilities for AI Agents
+- `stratigraphy.get` / `stratigraphy.list`: Retrieve verified historical thermodynamic block strata and time-series metadata.
+- `proof.verify` / `proof.submit`: Execute and verify Groth16/BN254 zero-knowledge proofs off-chain.
+- `proof.ground`: Prepare context grounding and obtain L402 routing details for paid anchor creation through the HTTP grounding endpoint; this MCP tool does not create anchors directly.
+- `mesh.status`: Monitor P2P mesh network topology and node consensus health.

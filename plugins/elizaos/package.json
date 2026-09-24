@@ -1,0 +1,31 @@
+{
+  "name": "@bitcoin-stratigraphy/plugin-elizaos",
+  "version": "0.1.0",
+  "description": "ElizaOS actions for the Bitcoin Stratigraphy L402 MCP tools",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/types/plugins/elizaos/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/plugins/elizaos/src/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "peerDependencies": {
+    "@elizaos/core": "^1.7.2"
+  },
+  "devDependencies": {
+    "@elizaos/core": "^1.7.2",
+    "@types/node": "catalog:",
+    "esbuild": "0.28.2",
+    "tsx": "catalog:",
+    "typescript": "~5.9.3"
+  }
+}

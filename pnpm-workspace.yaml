@@ -3,6 +3,7 @@ packages:
   - lib/*
   - lib/integrations/*
   - sdk/*
+  - plugins/*
   - scripts
 
 autoInstallPeers: false

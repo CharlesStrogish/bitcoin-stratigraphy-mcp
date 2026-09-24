@@ -8,7 +8,7 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { Express, Request, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import cors from "cors";
 import { z } from "zod";
 import { createL402Middleware } from "../middleware/l402";
@@ -1718,6 +1718,13 @@ async function handleMcpRequest(
   try {
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
+    if (!res.headersSent && !res.writableEnded) {
+      res.status(502).json({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: "MCP transport did not respond" },
+        id: null,
+      });
+    }
   } catch (error) {
     req.log.error({ err: error }, "MCP request failed");
     if (!res.headersSent) {
@@ -1738,6 +1745,19 @@ async function handleMcpRequest(
       });
     }
   }
+}
+
+export function registerMcpRequestGuard(app: Express): void {
+  app.use("/mcp", (req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    // Never log Authorization, cookies, or session identifiers.
+    console.log("[MCP Request]", req.method, {
+      accept: req.headers.accept,
+      "content-type": req.headers["content-type"],
+      origin: req.headers.origin,
+    }, req.url);
+    next();
+  });
 }
 
 export function registerMcpRoute(
@@ -1837,5 +1857,28 @@ export function registerMcpRoute(
       }
     }
     gates[name](req, res, next);
-  }, handleMcpRequest);
+  }, handleMcpRequest, (_req, res) => {
+    if (!res.headersSent) {
+      res.status(404).json({ error: "MCP request was not handled" });
+    }
+  });
+  // JSON body-parser errors happen before the transport; do not send Express's HTML error page.
+  app.use("/mcp", (error: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) return next(error);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const incomingStatus = (error as { status?: unknown }).status;
+    const status = typeof incomingStatus === "number" &&
+        incomingStatus >= 400 && incomingStatus < 500
+      ? incomingStatus
+      : 500;
+    req.log?.warn({ status }, "MCP request rejected");
+    res.status(status).json({
+      jsonrpc: "2.0",
+      error: {
+        code: status === 400 ? -32700 : -32603,
+        message: status === 400 ? "Invalid JSON request" : "Internal server error",
+      },
+      id: null,
+    });
+  });
 }

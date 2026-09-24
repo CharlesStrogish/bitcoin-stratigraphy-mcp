@@ -4,7 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { registerStratigraphyRoutes } from "./routes/stratigraphy";
 import { registerOpenApiRoute } from "./routes/openapi";
-import { registerMcpRoute } from "./routes/mcp";
+import { registerMcpRequestGuard, registerMcpRoute } from "./routes/mcp";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
 import { logger } from "./lib/logger";
 import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
@@ -34,6 +34,24 @@ const l402RateLimiter = createSlidingWindowRateLimiter({
 app.set("trust proxy", 1);
 
 app.use(
+  cors({
+    origin: "*",
+    methods: "*",
+    allowedHeaders: "*",
+    preflightContinue: true,
+    exposedHeaders: [
+      "WWW-Authenticate",
+      "X-L402-Receipt",
+      "X-Stratigraphy-Records",
+      "X-Stratigraphy-First-Day",
+      "X-Stratigraphy-Last-Day",
+      "X-L402-Cost-Sats",
+      "X-L402-Minimum-Cost-Sats",
+      "X-L402-Subscription-Tiers",
+    ],
+  }),
+);
+app.use(
   pinoHttp({
     logger,
     serializers: {
@@ -52,23 +70,7 @@ app.use(
     },
   }),
 );
-const globalCors = cors({
-  exposedHeaders: [
-    "WWW-Authenticate",
-    "X-L402-Receipt",
-    "X-Stratigraphy-Records",
-    "X-Stratigraphy-First-Day",
-    "X-Stratigraphy-Last-Day",
-    "X-L402-Cost-Sats",
-    "X-L402-Minimum-Cost-Sats",
-    "X-L402-Subscription-Tiers",
-  ],
-});
-app.use((req, res, next) => {
-  // Let /mcp answer its own preflight with its explicit method/header policy.
-  if (req.path === "/mcp" && req.method === "OPTIONS") return next();
-  globalCors(req, res, next);
-});
+registerMcpRequestGuard(app);
 app.use(
   express.json({
     limit: "1mb",
@@ -84,6 +86,8 @@ const macaroonUsageStore = createPostgresMacaroonUsageStore();
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
 registerMcpRoute(app, { usageStore: macaroonUsageStore, ledger: revenueLedger });
+// Express 5 rejects the string "*" route; this regex is its catch-all equivalent.
+app.options(/.*/, cors({ origin: "*", methods: "*", allowedHeaders: "*" }));
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);

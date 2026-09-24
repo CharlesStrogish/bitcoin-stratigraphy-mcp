@@ -1504,6 +1504,16 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
   assert.equal(list.headers.get("access-control-allow-origin"), "*");
   assert.match(list.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.ok(Array.isArray((await list.json() as { result: { tools: unknown[] } }).result.tools));
+
+  const malformed = await fetch(`${baseUrl}/mcp`, {
+    method: "POST",
+    headers: { Origin: "https://glama.ai", "Content-Type": "application/json" },
+    body: "{",
+  });
+  assert.equal(malformed.status, 400);
+  assert.equal(malformed.headers.get("access-control-allow-origin"), "*");
+  assert.match(malformed.headers.get("content-type") ?? "", /^application\/json\b/);
+  assert.equal((await malformed.json() as { error: { code: number } }).error.code, -32700);
 });
 
 test("offers SSE transport without changing the public OpenAPI route", async () => {

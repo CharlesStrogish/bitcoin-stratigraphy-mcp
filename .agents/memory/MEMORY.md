@@ -16,7 +16,7 @@
 - [Mesh consensus trust](mesh-consensus-trust.md) — peer certificates require pinned reciprocal membership, canonical snapshots, fresh source signatures, and external quorum policy.
 - [MCP schema metadata](mcp-schema-metadata.md) — Zod 3 conversion drops examples; publish explicit JSON Schemas while retaining separate runtime validation.
 - [Catalog block index](catalog-block-index.md) — historical daily snapshots lack native heights, so block-range discovery uses a documented deterministic 144-block/day index.
-- [Proof lifecycle lookup](proof-lifecycle-lookup.md) — index verifier outcomes by proof hash and snapshot digest, with NIP-78 counts captured from the verified payload.
+- [Proof lifecycle lookup](proof-lifecycle-lookup.md) — status indexes are not proof archives; verify against the exact signed payload, never a reconstructed snapshot.
 - [MCP optional response fields](mcp-optional-response-fields.md) — accept omitted JSON Schema required arrays and omitted isError on successful MCP results.
 - [MCP metadata fidelity](mcp-metadata-fidelity.md) — TDQS descriptions and schemas must match executable inputs, outputs, and side effects rather than generic rubric examples.
 - [NIP-90 paid job lifecycle](nip90-paid-job-lifecycle.md) — bind DVM settlement to exact incoming invoices and preserve standard feedback/result semantics.

@@ -1,0 +1,25 @@
+{
+  "name": "@bitcoin-stratigraphy/autonomous-agent-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "pnpm --filter @bitcoin-stratigraphy/sdk build && tsc -p tsconfig.json",
+    "typecheck": "pnpm --filter @bitcoin-stratigraphy/sdk typecheck && tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js",
+    "dev": "pnpm build && pnpm start",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@bitcoin-stratigraphy/sdk": "workspace:*",
+    "@getalby/sdk": "8.0.3",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.15.5",
+    "tsx": "catalog:",
+    "typescript": "~5.9.3"
+  }
+}

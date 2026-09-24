@@ -9,6 +9,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Express, Request, Response } from "express";
+import cors from "cors";
 import { z } from "zod";
 import { createL402Middleware } from "../middleware/l402";
 import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
@@ -1777,7 +1778,17 @@ export function registerMcpRoute(
       }),
     ]),
   ) as Record<string, ReturnType<typeof createL402Middleware>>;
-  app.all("/mcp", rateLimit, async (req, res, next) => {
+  app.all("/mcp", cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "mcp-session-id"],
+  }), rateLimit, (req, res, next) => {
+    if (req.method === "GET" && !req.get("Accept")?.toLowerCase().includes("text/event-stream")) {
+      res.status(200).json({ status: "ok", service: "MCP Server" });
+      return;
+    }
+    next();
+  }, async (req, res, next) => {
     if (Array.isArray(req.body)) {
       if (req.body.some((item: unknown) =>
         item !== null && typeof item === "object" &&

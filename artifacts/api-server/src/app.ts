@@ -52,20 +52,23 @@ app.use(
     },
   }),
 );
-app.use(
-  cors({
-    exposedHeaders: [
-      "WWW-Authenticate",
-      "X-L402-Receipt",
-      "X-Stratigraphy-Records",
-      "X-Stratigraphy-First-Day",
-      "X-Stratigraphy-Last-Day",
-      "X-L402-Cost-Sats",
-      "X-L402-Minimum-Cost-Sats",
-      "X-L402-Subscription-Tiers",
-    ],
-  }),
-);
+const globalCors = cors({
+  exposedHeaders: [
+    "WWW-Authenticate",
+    "X-L402-Receipt",
+    "X-Stratigraphy-Records",
+    "X-Stratigraphy-First-Day",
+    "X-Stratigraphy-Last-Day",
+    "X-L402-Cost-Sats",
+    "X-L402-Minimum-Cost-Sats",
+    "X-L402-Subscription-Tiers",
+  ],
+});
+app.use((req, res, next) => {
+  // Let /mcp answer its own preflight with its explicit method/header policy.
+  if (req.path === "/mcp" && req.method === "OPTIONS") return next();
+  globalCors(req, res, next);
+});
 app.use(
   express.json({
     limit: "1mb",

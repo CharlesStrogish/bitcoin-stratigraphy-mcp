@@ -1466,6 +1466,46 @@ test("reserves epistemic anchor signing for the grounding route", async () => {
   });
 });
 
+test("serves MCP health, explicit CORS preflight, and JSON POST responses", async () => {
+  for (const headers of [{}, { Accept: "application/json" }]) {
+    const health = await fetch(`${baseUrl}/mcp`, { headers });
+    assert.equal(health.status, 200);
+    assert.match(health.headers.get("content-type") ?? "", /^application\/json\b/);
+    assert.deepEqual(await health.json(), { status: "ok", service: "MCP Server" });
+  }
+
+  const preflight = await fetch(`${baseUrl}/mcp`, {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://glama.ai",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "Content-Type, Authorization, mcp-session-id",
+    },
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
+  assert.equal(preflight.headers.get("access-control-allow-methods"), "GET,POST,OPTIONS");
+  assert.equal(
+    preflight.headers.get("access-control-allow-headers"),
+    "Content-Type,Authorization,mcp-session-id",
+  );
+
+  const list = await fetch(`${baseUrl}/mcp`, {
+    method: "POST",
+    headers: {
+      Origin: "https://glama.ai",
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2025-03-26",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+  });
+  assert.equal(list.status, 200);
+  assert.equal(list.headers.get("access-control-allow-origin"), "*");
+  assert.match(list.headers.get("content-type") ?? "", /^application\/json\b/);
+  assert.ok(Array.isArray((await list.json() as { result: { tools: unknown[] } }).result.tools));
+});
+
 test("offers SSE transport without changing the public OpenAPI route", async () => {
   const abortController = new AbortController();
   const sseResponse = await fetch(`${baseUrl}/mcp`, {

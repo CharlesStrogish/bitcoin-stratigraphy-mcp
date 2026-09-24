@@ -13,14 +13,19 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/client.d.ts",
+      "import": "./dist/mcp/client.js",
+      "default": "./dist/mcp/client.js"
     }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -b",
-    "test": "tsx --test ../../tests/unit/sdk.test.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "tsc -b && tsc -p tsconfig.mcp.json",
+    "test": "tsx --test ../../tests/unit/sdk.test.ts client.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.mcp.json --noEmit"
   },
   "devDependencies": {
     "@types/node": "catalog:",

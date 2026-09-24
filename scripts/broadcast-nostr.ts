@@ -7,7 +7,7 @@ import {
 } from "nostr-tools";
 
 const DEFAULT_API_BASE_URL =
-  "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app";
+  "https://bitcoin-stratigraphy-dashboard.replit.app";
 const DEFAULT_RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",

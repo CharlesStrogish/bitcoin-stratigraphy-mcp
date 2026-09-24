@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 const DEFAULT_BASE_URL =
-  "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app";
+  "https://bitcoin-stratigraphy-dashboard.replit.app";
 const MCP_PROTOCOL_VERSION = "2025-03-26";
 const REQUEST_TIMEOUT_MS = 30_000;
 const EXPECTED_TOOLS = [

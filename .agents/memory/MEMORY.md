@@ -25,3 +25,4 @@
 - [NWC self-payment proofs](nwc-self-payment-proofs.md) — same-wallet NWC transfers can replace Lightning hashes and preimages with UUIDs, making secure L402 redemption impossible.
 - [Audit readiness](audit-readiness.md) — HTTP readiness precedes relay announcements; challenge issuance is not evidence of live paid settlement.
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
+- [Published domain changes](published-domain-changes.md) — a target change can leave the former .replit.app address at “isn't live yet”; verify the current primary URL before advertising endpoints.

@@ -6,7 +6,7 @@ export const mcpServerCard = {
     "Bitcoin Stratigraphy data with Zero-Knowledge Data Integrity (Groth16/Poseidon zk-SNARKs), L402 multi-asset payments, and Nostr NIP-78 attestations. Paid payloads include zkProof data verifiable at POST /api/v1/zk/verify in sub-10ms for proofs emitted by this API.",
   transport: {
     type: "sse",
-    url: "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp",
+    url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
   },
   capabilities: {
     tags: [

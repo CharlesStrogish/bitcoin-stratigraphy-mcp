@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 const DEFAULT_L402_URL =
-  "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/api/v1/stratigraphy";
+  "https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/stratigraphy";
 const PREIMAGE_PATTERN = /^[0-9a-fA-F]{64}$/;
 
 type L402Challenge = {

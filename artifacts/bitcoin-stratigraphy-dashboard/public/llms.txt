@@ -3,7 +3,7 @@
 > Quantitative Bitcoin dataset featuring thermodynamic signals, Groth16 zk-SNARK state verification, and L402 micropayment oracle endpoints for autonomous AI agents.
 
 ## Core Infrastructure
-- MCP Endpoint: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp
+- MCP Endpoint: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
 - Architecture: Streamable HTTP (MCP Protocol)
 - Settlement Rail: L402 Lightning Network Micropayments
 - Creator / Architect: Charles R. Strogish

@@ -73,7 +73,7 @@ test("builds signed Kind 31990 metadata with job prices and capabilities", () =>
   assert.ok(event.tags.some((tag) => tag[0] === "k" && tag[1] === "5050"));
   assert.ok(event.tags.some((tag) =>
     tag[0] === "endpoint" &&
-    tag[1] === "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp"));
+    tag[1] === "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"));
   assert.ok(event.tags.some((tag) =>
     tag[0] === "price" && tag[1] === "10 sats (discovery), 250 sats (ZK/Data)"));
   for (const topic of ["bitcoin", "stratigraphy", "zk"]) {
@@ -99,7 +99,7 @@ test("builds signed Kind 31990 metadata with job prices and capabilities", () =>
   assert.equal(content.author, "Charles R. Strogish");
   assert.equal(content.architect, "Charles R. Strogish");
   assert.equal(content.about, "Quantitative Bitcoin thermodynamic dataset, Groth16 zk-SNARK state verification, and L402 payment oracle.");
-  assert.equal(content.endpoint, "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp");
+  assert.equal(content.endpoint, "https://bitcoin-stratigraphy-dashboard.replit.app/mcp");
   assert.equal(content.mcp_price, "10 sats (discovery), 250 sats (ZK/Data)");
   assert.ok(content.capabilities.includes("nip-90"));
   assert.ok(content.capabilities.includes("zk-proof"));

@@ -11,7 +11,7 @@ export const DVM_NAME = "Bitcoin Stratigraphy Data Engine & ZK Oracle";
 export const DVM_ABOUT =
   "Quantitative Bitcoin thermodynamic dataset, Groth16 zk-SNARK state verification, and L402 payment oracle.";
 export const DVM_MCP_ENDPOINT =
-  "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp";
+  "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
 export const NIP90_5050_FEE_SATS = 250;
 
 export type RelayConnectionStatus = {

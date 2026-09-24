@@ -18,7 +18,7 @@ const RELAYS = [
   "wss://relay.nostr.band",
 ] as const;
 const DEFAULT_BASE_URL =
-  "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app";
+  "https://bitcoin-stratigraphy-dashboard.replit.app";
 const KEY_PATH = resolve(
   process.env.NOSTR_EPHEMERAL_KEY_PATH ?? ".data/nostr-heartbeat-private-key",
 );

@@ -33,7 +33,7 @@ let stopDvm: (() => Promise<void>) | undefined;
 let dvmStartup: Promise<void> | undefined;
 let stopHeartbeat: (() => Promise<void>) | undefined;
 let heartbeatStartup: Promise<void> | undefined;
-const server = app.listen(port, (err) => {
+const server = app.listen(port, "0.0.0.0", (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);

@@ -4,7 +4,7 @@ import type { BitcoinStratigraphyClient as McpClient } from "@bitcoin-stratigrap
 import type { Checkpoint, StateStore } from "./state.js";
 
 export type AgentEvent =
-  | { type: "telemetry"; day: number; signal: string }
+  | { type: "telemetry"; day: number; signal: string; telemetryHash: string }
   | { type: "verified"; snapshotKey: string }
   | { type: "broadcast"; date: string; peerAttestations: number }
   | { type: "isolated"; reason: string }
@@ -35,6 +35,10 @@ export async function runCycle({ rest, mcp, store, emit }: AgentDependencies): P
   emit({
     type: "telemetry", day: latest.day,
     signal: latest.quantitative_alpha.thermodynamic_signal,
+    telemetryHash: createHash("sha256").update(JSON.stringify({
+      day: latest.day,
+      quantitative_alpha: latest.quantitative_alpha,
+    })).digest("hex"),
   });
 
   const snapshotKey = fingerprint(snapshot);

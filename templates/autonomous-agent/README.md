@@ -21,8 +21,9 @@ worker sends to `proof.verify`.
    the repo. If the payer and invoice issuer are the same wallet, some
    providers return a UUID instead of a Lightning preimage; the SDK correctly
    refuses that payment proof.
-3. Click **Run**. The command installs packages, builds the SDK and worker,
-   and starts polling. A development run without a database keeps its
+3. Click **Run**. The provided `.replit.example` command installs packages,
+   builds the worker, and starts `pnpm start:seeder` with a 15-minute pause
+   between completed cycles. A development run without a database keeps its
    checkpoint in `.autonomous-agent-state.json`. It is not a durable production
    store.
 4. For 24/7 operation, add a Replit PostgreSQL database, then choose
@@ -39,8 +40,16 @@ The `.env.example` lists `REPLIT_DB` because older Replit projects may have a
 PostgreSQL connection URL under that name. It is an optional fallback; **new
 Replit databases use `DATABASE_URL`**. Never set `REPLIT_DB` to an unrelated
 key-value URL. `STRATIGRAPHY_SERVER_URL` defaults to the REST origin without
-`/mcp`; `POLL_INTERVAL_MS` defaults to 3,600,000 (one hour, minimum 15 minutes).
-Set optional values in Replit Secrets/settings rather than committing `.env`.
+`/mcp`. The seeder always waits 900,000 ms (15 minutes) after each cycle;
+`POLL_INTERVAL_MS` only controls the older `pnpm start` entry point. Set
+optional values in Replit Secrets/settings rather than committing `.env`.
+
+`LNURL_PAYMENT_KEY` can mean an LNbits Admin API key or an Alby wallet token.
+Neither specifies the required provider endpoint or guarantees that an
+invoice payment returns the preimage needed for L402. This reference worker
+**requires `NWC_PAIRING_SECRET`**; if only `LNURL_PAYMENT_KEY` is set it fails
+before making a payment. If both are set, NWC takes priority. Do not treat a
+receiving-only LNURL-pay key as an invoice payer.
 
 ## What each cycle does
 
@@ -57,6 +66,11 @@ Set optional values in Replit Secrets/settings rather than committing `.env`.
    checkpoint the date only after a matching peer receipt. If the server has
    no configured peers, log `isolated` and leave broadcasting pending. The
    worker does not claim a successful broadcast in that case.
+
+Seeder logs include a SHA-256 hash of each paid invoice after the wallet
+reports a valid preimage, the stable latest telemetry hash on every cycle,
+and a verification event after proof verification succeeds. They deliberately
+exclude invoice text, wallet credentials, preimages, and raw upstream errors.
 
 The wallet must return a real 32-byte hex payment preimage; each SDK verifies
 it against its challenge before sending it. `src/wallet.ts` includes an

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { BitcoinStratigraphyClient as RestClient } from "@bitcoin-stratigraphy/sdk";
 import type { BitcoinStratigraphyClient as McpClient } from "@bitcoin-stratigraphy/sdk/mcp";
 import { runCycle, type AgentDependencies, type AgentEvent } from "../src/agentLoop.js";
+import { requireNwcPairingSecret } from "../src/runner.js";
 import type { Checkpoint, StateStore } from "../src/state.js";
 import { createLnurlCapableWallet, createNwcWallet } from "../src/wallet.js";
 
@@ -88,6 +89,9 @@ test("verifies new dataset proof once; isolated mesh remains pending", async () 
   assert.equal(calls.broadcast, 0);
   assert.equal(getCheckpoint()?.verified, true);
   assert.equal(events.filter((event) => event.type === "isolated").length, 2);
+  const telemetry = events.find((event) => event.type === "telemetry");
+  assert.ok(telemetry?.type === "telemetry");
+  assert.match(telemetry.telemetryHash, /^[0-9a-f]{64}$/);
 });
 
 test("broadcasts only after verification and checkpoints the peer receipt", async () => {
@@ -112,4 +116,19 @@ test("wallet adapters refuse non-preimage payments", async () => {
   assert.throws(() => createNwcWallet("not-a-pairing-uri"), /pairing URI/);
   const wallet = createLnurlCapableWallet(async () => ({ payment_preimage: "uuid" }));
   await assert.rejects(wallet.payInvoice("lnbc1..."), /32-byte hex/);
+});
+
+test("the seeder prioritizes NWC and fails closed on provider-ambiguous keys", () => {
+  assert.equal(
+    requireNwcPairingSecret({
+      NWC_PAIRING_SECRET: "nostr+walletconnect://example",
+      LNURL_PAYMENT_KEY: "not-a-wallet-protocol",
+    }),
+    "nostr+walletconnect://example",
+  );
+  assert.throws(
+    () => requireNwcPairingSecret({ LNURL_PAYMENT_KEY: "lnbits-or-alby" }),
+    /LNURL_PAYMENT_KEY alone cannot safely settle L402 invoices/,
+  );
+  assert.throws(() => requireNwcPairingSecret({}), /Set NWC_PAIRING_SECRET/);
 });

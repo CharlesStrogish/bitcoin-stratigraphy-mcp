@@ -29,7 +29,10 @@ function requirePreimage(value: WalletPayment): string {
 }
 
 /** An NWC pairing URI is a secret; only pass it to the wallet client. */
-export function createNwcWallet(pairingSecret: string): AgentWallet {
+export function createNwcWallet(
+  pairingSecret: string,
+  onPayment?: (invoice: string) => void,
+): AgentWallet {
   if (!pairingSecret.startsWith("nostr+walletconnect://")) {
     throw new Error("NWC_PAIRING_SECRET must be a nostr+walletconnect:// pairing URI");
   }
@@ -38,8 +41,11 @@ export function createNwcWallet(pairingSecret: string): AgentWallet {
     logger: silentLogger,
   });
   const adapter = new NwcWalletAdapter(client);
-  const payInvoice = async (invoice: string): Promise<string> =>
-    requirePreimage(await adapter.payInvoice(invoice));
+  const payInvoice = async (invoice: string): Promise<string> => {
+    const preimage = requirePreimage(await adapter.payInvoice(invoice));
+    onPayment?.(invoice);
+    return preimage;
+  };
   return {
     payInvoice,
     payMcpInvoice: payInvoice,

@@ -324,34 +324,23 @@ const listProofAttestationsInputSchema = z.object({
   "Input options for listing and discovering historical zk-SNARK proof attestations.",
 );
 
+const proofPointASchema = z.array(
+  z.string().regex(/^\d+$/).describe("Decimal-encoded BN254 scalar-field coordinate in proof point A."),
+).length(3).describe("Groth16 BN254 proof A projective coordinates.");
+const proofPointBSchema = z.array(
+  z.array(
+    z.string().regex(/^\d+$/).describe("Decimal-encoded BN254 extension-field coordinate in proof point B."),
+  ).length(2),
+).length(3).describe("Groth16 BN254 proof B projective coordinates.");
+const proofPointCSchema = z.array(
+  z.string().regex(/^\d+$/).describe("Decimal-encoded BN254 scalar-field coordinate in proof point C."),
+).length(3).describe("Groth16 BN254 proof C projective coordinates.");
+
 const submitProofInputSchema = z.object({
-  proof: z.object({
-    pi_a: z.array(
-      z.string().regex(/^\d+$/).describe(
-        "Decimal-encoded BN254 scalar-field coordinate in proof point A.",
-      ),
-    ).length(3).describe(
-      "Groth16 BN254 proof A projective coordinates.",
-    ),
-    pi_b: z.array(
-      z.array(
-        z.string().regex(/^\d+$/).describe(
-          "Decimal-encoded BN254 extension-field coordinate in proof point B.",
-        ),
-      ).length(2).describe(
-        "BN254 extension-field coordinate pair in proof point B.",
-      ),
-    ).length(3).describe(
-      "Groth16 BN254 proof B projective coordinates.",
-    ),
-    pi_c: z.array(
-      z.string().regex(/^\d+$/).describe(
-        "Decimal-encoded BN254 scalar-field coordinate in proof point C.",
-      ),
-    ).length(3).describe(
-      "Groth16 BN254 proof C projective coordinates.",
-    ),
-  }).strict().describe(
+  proof: z.union([
+    z.object({ piA: proofPointASchema, piB: proofPointBSchema, piC: proofPointCSchema }).strict(),
+    z.object({ pi_a: proofPointASchema, pi_b: proofPointBSchema, pi_c: proofPointCSchema }).strict(),
+  ]).describe(
     "Groth16/Poseidon zk-SNARK proof coordinates over the BN254 curve.",
   ),
   publicSignals: z.array(
@@ -400,14 +389,21 @@ const field = (
   description: string,
   examples: unknown[],
   extra: Record<string, unknown> = {},
-) => ({
-  type,
-  description,
-  example: examples[0],
-  examples,
-  default: examples[0],
-  ...extra,
-});
+) => {
+  const constraints = [
+    ...(["minimum", "maximum", "minLength", "maxLength", "minItems", "maxItems", "format", "pattern"] as const)
+      .filter((key) => extra[key] !== undefined)
+      .map((key) => `${key}: ${extra[key]}`),
+    ...(Array.isArray(extra.enum) ? [`allowed values: ${extra.enum.join(", ")}`] : []),
+  ];
+  return {
+    type,
+    description: `${description}${constraints.length ? ` Constraints: ${constraints.join("; ")}.` : ""} Example: ${JSON.stringify(examples[0])}.`,
+    example: examples[0],
+    examples,
+    ...extra,
+  };
+};
 
 const quantitativeAlphaJsonSchema = {
   type: "object",
@@ -481,7 +477,7 @@ const entryJsonSchema = {
 const publicInputsJsonSchema = {
   type: "object",
   description:
-    "Object containing exactly five typed public statement inputs committed by the Groth16/Poseidon proof.",
+    "Exactly five public statement inputs committed by the Groth16/Poseidon proof: non-negative integer blockHeight, non-empty Poseidon snapshotDigest and thermodynamicHash strings, non-negative Unix-millisecond timestamp, and non-negative integer valuationSat. Example: blockHeight 920000 and valuationSat 12583.",
   examples: [{
     blockHeight: 920000,
     snapshotDigest: "1534979302823651498736582947365829473658294736582947365829473658294",
@@ -489,13 +485,6 @@ const publicInputsJsonSchema = {
     timestamp: 1789776000000,
     valuationSat: 12583,
   }],
-  default: {
-    blockHeight: 920000,
-    snapshotDigest: "1534979302823651498736582947365829473658294736582947365829473658294",
-    thermodynamicHash: "782365829473658294736582947365829473658294736582947365829473658294",
-    timestamp: 1789776000000,
-    valuationSat: 12583,
-  },
   additionalProperties: false,
   properties: {
     blockHeight: field(
@@ -698,7 +687,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE: Retrieves Bitcoin Stratigraphy telemetry records by recent-day count, date, block height, or inclusive date and block ranges.\nUSAGE: Use to fetch telemetry records and selected thermodynamic metrics. Do NOT use for catalog coverage discovery; use stratigraphy.list instead.\nPARAMETERS: days is an integer from 1 to 365; date is YYYY-MM-DD; blockHeight is a non-negative integer; metrics is a unique non-empty array containing target_multiplier, difficulty_epoch_progress, or thermodynamic_signal; startDate and endDate are inclusive YYYY-MM-DD bounds; startBlock and endBlock are inclusive non-negative integer bounds; limit is an integer from 1 to 100 with default 10.\nBEHAVIOR: Reads the local telemetry dataset without database writes. Only one of days, date, or blockHeight may be supplied, and none may be combined with range selectors; lower bounds cannot exceed upper bounds. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing records, an array of matching telemetry entries, limited and optionally projected by metrics; an unmatched query returns an empty array.\nERRORS: -32602 (Invalid Parameters) for invalid fields, selector combinations, bounds, or ranges; HTTP 429 (Rate Limit) when the shared limit is exceeded; dataset retrieval failures return an MCP tool error. No 402 payment required.",
+      "Fetch Bitcoin Stratigraphy telemetry by optional days (1-365), date (YYYY-MM-DD), blockHeight, or inclusive startDate/endDate and startBlock/endBlock ranges, with optional metrics projection and limit (1-100); legacy selectors cannot be combined with ranges. Returns a JSON object containing records, an array of matching daily snapshots with quantitative_alpha metrics, or an empty array when none match. This read-only call costs 250 sats through L402, shares a 60-requests-per-minute IP limit, and rejects invalid selectors with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -716,7 +705,7 @@ const baseMcpToolDefinitions = [
           "integer",
           "Count of recent days of telemetry to fetch (integer, 1-365).",
           [7],
-          { minimum: 1, maximum: 365, default: 30 },
+          { minimum: 1, maximum: 365 },
         ),
         date: field(
           "string",
@@ -726,7 +715,6 @@ const baseMcpToolDefinitions = [
             format: "date",
             pattern: "^\\d{4}-\\d{2}-\\d{2}$",
             minLength: 1,
-            default: "2026-09-09",
           },
         ),
         blockHeight: field(
@@ -789,6 +777,7 @@ const baseMcpToolDefinitions = [
           { minimum: 1, maximum: 100, default: 10 },
         ),
       },
+      required: [],
     },
     outputSchema: {
       type: "object",
@@ -810,7 +799,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "PURPOSE: Lists complete Bitcoin Stratigraphy catalog coverage and available metric paths.\nUSAGE: Use to discover snapshot, date, block, and metric coverage. Do NOT use for fetching telemetry records; use stratigraphy.get instead.\nPARAMETERS: No input properties are accepted.\nBEHAVIOR: Summarizes the local catalog without modifying records. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing totalSnapshots, oldestBlock, newestBlock, availableMetrics, and dateBounds with startDate and endDate.\nERRORS: -32602 (Invalid Parameters) when any input property is supplied; HTTP 429 (Rate Limit) when the shared limit is exceeded; catalog retrieval failures return an MCP error. No 402 payment required.",
+      "Discover available Bitcoin Stratigraphy coverage without input parameters; pass an empty object rather than requesting actual telemetry records. Returns a JSON object with totalSnapshots, oldestBlock, newestBlock, availableMetrics, and inclusive dateBounds containing startDate and endDate. This read-only catalog call costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects unexpected input with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -819,6 +808,7 @@ const baseMcpToolDefinitions = [
       examples: [{}],
       additionalProperties: false,
       properties: {},
+      required: [],
     },
     outputSchema: {
       type: "object",
@@ -903,7 +893,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "PURPOSE: Verifies a base64url-encoded Groth16/Poseidon BN254 proof against typed public claims and a telemetry snapshot.\nUSAGE: Use to validate a proof against snapshot data. Do NOT use to submit proof coordinates for optional Nostr publication; use proof.submit instead.\nPARAMETERS: proof is a non-empty base64url proof string; publicInputs is an object with non-negative integer blockHeight, non-empty string snapshotDigest, non-empty string thermodynamicHash, non-negative integer timestamp, and non-negative integer valuationSat; verificationKeyId is a non-empty string; data is a telemetry object or an array of telemetry objects.\nBEHAVIOR: Checks the snapshot digest, semantic claims, verification-key identifier, and Groth16 proof in memory, and updates bounded process-memory verification and lifecycle indexes without durable database storage. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing valid, verifiedAt, and computationTimeMs; proof, snapshot, semantic, or key mismatches produce valid false.\nERRORS: -32602 (Invalid Parameters) for malformed or missing input properties; HTTP 429 (Rate Limit) when the shared limit is exceeded. No 402 payment required.",
+      "Verify a base64url Groth16/Poseidon BN254 proof against required publicInputs (blockHeight, snapshotDigest, thermodynamicHash, timestamp, valuationSat), verificationKeyId, and a data snapshot object or array. Returns a JSON object with boolean valid, ISO verifiedAt, and computationTimeMs; a cryptographic or snapshot mismatch returns valid false rather than publishing a proof. This 250-sat L402 call updates only bounded process-memory verification indexes, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -930,7 +920,7 @@ const baseMcpToolDefinitions = [
         publicInputs: {
           ...publicInputsJsonSchema,
           description:
-            "Object containing five typed public statement inputs committed by the proof.",
+            "Object containing five typed public statement inputs committed by the proof: non-negative blockHeight, non-empty snapshotDigest and thermodynamicHash, non-negative Unix-millisecond timestamp, and non-negative valuationSat. Example: blockHeight 920000 and valuationSat 12583.",
         },
         verificationKeyId: field(
           "string",
@@ -990,7 +980,7 @@ const baseMcpToolDefinitions = [
     name: "proof.status",
     title: "Get Proof Status",
     description:
-      "PURPOSE: Retrieves process-memory lifecycle and mesh-quorum status for one proof or snapshot identifier.\nUSAGE: Use exclusively to fetch a single attestation's status by its proofHash or snapshotDigest. Do NOT use to search, filter, or list multiple attestations; use proof.list instead.\nPARAMETERS: Exactly one of proofHash or snapshotDigest must be supplied; proofHash accepts a 64-digit hexadecimal digest with optional 0x prefix or an IPFS CID, while snapshotDigest accepts a decimal field digest, 64-digit hexadecimal digest, or IPFS CID.\nBEHAVIOR: Looks up bounded process-memory status and compares its attestation count with the current mesh quorum threshold; an unknown identifier is reported as pending rather than as not found. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing status as verified, cached, pending, or invalid, plus verifiedAt, attestationCount, and meshQuorum.\nERRORS: -32602 (Invalid Parameters) unless exactly one valid selector is supplied; HTTP 429 (Rate Limit) when the shared limit is exceeded. Unknown identifiers do not produce 404. No 402 payment required.",
+      "Look up one process-memory proof lifecycle record using exactly one of proofHash (64-digit hex with optional 0x prefix or CID) or snapshotDigest (decimal field digest, 64-digit hex, or CID). Returns a JSON object with status (verified, cached, pending, or invalid), ISO verifiedAt, attestationCount, and boolean meshQuorum; unknown identifiers return pending. This read-only lookup costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects missing or conflicting selectors with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1025,6 +1015,7 @@ const baseMcpToolDefinitions = [
           },
         ),
       },
+      required: [],
       oneOf: [
         { required: ["proofHash"] },
         { required: ["snapshotDigest"] },
@@ -1073,7 +1064,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "PURPOSE: Lists and filters proof attestations held in the node's bounded process-memory index.\nUSAGE: Use exclusively to query or filter arrays of indexed attestations. Do NOT use to fetch an individual proof or snapshot's status by identifier; use proof.status instead.\nPARAMETERS: limit is an integer from 1 to 100 with default 20; offset is an integer from 0 to 1000 with default 0; status is one of verified, cached, pending, or invalid.\nBEHAVIOR: Filters the process-memory index, orders matches newest first, applies offset and limit, and calculates mesh quorum without durable database writes. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing attestations with proofHash, snapshotDigest, status, submittedAt, attestationCount, and meshQuorum, plus total before pagination.\nERRORS: -32602 (Invalid Parameters) for invalid fields, ranges, or status values; HTTP 429 (Rate Limit) when the shared limit is exceeded. No 402 payment required.",
+      "List recent attestations in bounded process memory with optional status (verified, cached, pending, invalid), limit (1-100, default 20), and offset (0-1000, default 0). Returns a JSON object containing newest-first attestations with proofHash, snapshotDigest, status, submittedAt, attestationCount, and meshQuorum, plus total before pagination. This read-only listing costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects invalid filters with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1101,6 +1092,7 @@ const baseMcpToolDefinitions = [
           { enum: [...proofLifecycleStates] },
         ),
       },
+      required: [],
     },
     outputSchema: {
       type: "object",
@@ -1210,7 +1202,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "PURPOSE: Verifies Groth16/Poseidon BN254 coordinates, indexes their lifecycle in process memory, and attempts Nostr NIP-78 publication for a valid proof.\nUSAGE: Use to submit proof coordinates for lifecycle lookup and optional Nostr publication. Do NOT use when only validating an encoded proof against telemetry data; use proof.verify instead.\nPARAMETERS: proof is an object containing pi_a as three decimal strings, pi_b as three pairs of decimal strings, and pi_c as three decimal strings; publicSignals is exactly five decimal strings ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest; snapshotDigest accepts a decimal field digest or IPFS CID and, when supplied, must equal publicSignals[4].\nBEHAVIOR: Validates and indexes Groth16/BN254 ZK proof attestations through a bounded process-memory lifecycle; records can be refreshed or evicted, so the index is neither durable nor append-only. Valid proofs may be published as NIP-78 attestations. This MCP API exposes no deletion tool. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing proofHash, status as verified or invalid, submittedAt, and attestationStatus describing Nostr publication or why it was not attempted.\nERRORS: -32602 (Invalid Parameters) for malformed coordinates, signals, fields, or a snapshotDigest mismatch; HTTP 429 (Rate Limit) when the shared limit is exceeded; cryptographic rejection is returned as status invalid and publication failure is reported by attestationStatus. No 402 payment required.",
+      "Submit Groth16/BN254 proof coordinates in proof.piA, proof.piB, and proof.piC with five decimal-string publicSignals (blockHeight, thermodynamicHash, timestamp, valuationSat, snapshotDigest) and an optional matching snapshotDigest. Returns a JSON object with proofHash, verified or invalid status, ISO submittedAt, and attestationStatus indicating whether Nostr NIP-78 publication succeeded or was skipped; the bounded lifecycle index is not durable. This state-changing 250-sat L402 call shares a 60-requests-per-minute IP limit, accepts legacy pi_a/pi_b/pi_c input for existing clients, and rejects malformed fields with JSON-RPC -32602.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1218,9 +1210,9 @@ const baseMcpToolDefinitions = [
         "Input payload containing Groth16 proof object and public signals for ingestion and Nostr NIP-78 attestation broadcast.",
       examples: [{
         proof: {
-          pi_a: ["1", "2", "1"],
-          pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
-          pi_c: ["5", "6", "1"],
+          piA: ["1", "2", "1"],
+          piB: [["1", "2"], ["3", "4"], ["1", "0"]],
+          piC: ["5", "6", "1"],
         },
         publicSignals: ["920000", "1", "1789776000000", "12583", "1"],
         snapshotDigest: "1",
@@ -1230,27 +1222,22 @@ const baseMcpToolDefinitions = [
         proof: {
           type: "object",
           description:
-            "Groth16/Poseidon zk-SNARK proof coordinates over the BN254 curve.",
+            "Groth16/Poseidon BN254 proof coordinates using piA and piC as three decimal-string projective coordinates each and piB as three pairs of decimal-string extension-field coordinates; for example, piA ['1','2','1'].",
           example: {
-            pi_a: ["1", "2", "1"],
-            pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
-            pi_c: ["5", "6", "1"],
+            piA: ["1", "2", "1"],
+            piB: [["1", "2"], ["3", "4"], ["1", "0"]],
+            piC: ["5", "6", "1"],
           },
           examples: [{
-            pi_a: ["1", "2", "1"],
-            pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
-            pi_c: ["5", "6", "1"],
+            piA: ["1", "2", "1"],
+            piB: [["1", "2"], ["3", "4"], ["1", "0"]],
+            piC: ["5", "6", "1"],
           }],
-          default: {
-            pi_a: ["1", "2", "1"],
-            pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
-            pi_c: ["5", "6", "1"],
-          },
           additionalProperties: false,
           properties: {
-            pi_a: field(
+            piA: field(
               "array",
-              "Groth16 BN254 proof A projective coordinates.",
+              "Exactly three decimal-string Groth16 BN254 proof A projective coordinates in order.",
               [["1", "2", "1"]],
               {
                 minItems: 3,
@@ -1263,9 +1250,9 @@ const baseMcpToolDefinitions = [
                 ),
               },
             ),
-            pi_b: field(
+            piB: field(
               "array",
-              "Groth16 BN254 proof B projective coordinates.",
+              "Exactly three Groth16 BN254 proof B extension-field coordinate pairs, each containing two decimal strings.",
               [[["1", "2"], ["3", "4"], ["1", "0"]]],
               {
                 minItems: 3,
@@ -1287,9 +1274,9 @@ const baseMcpToolDefinitions = [
                 ),
               },
             ),
-            pi_c: field(
+            piC: field(
               "array",
-              "Groth16 BN254 proof C projective coordinates.",
+              "Exactly three decimal-string Groth16 BN254 proof C projective coordinates in order.",
               [["5", "6", "1"]],
               {
                 minItems: 3,
@@ -1303,7 +1290,7 @@ const baseMcpToolDefinitions = [
               },
             ),
           },
-          required: ["pi_a", "pi_b", "pi_c"],
+          required: ["piA", "piB", "piC"],
         },
         publicSignals: field(
           "array",
@@ -1382,7 +1369,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Creates a signed epistemic anchor receipt for agent context grounded in the current Bitcoin tip.\nUSAGE: Use to ground agent context and obtain a verifiable receipt. Do NOT use for raw ZK proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash as a 64-character case-insensitive hexadecimal SHA-256 digest, agentId as a trimmed 1-256 character string, and an optional metadata object.\nBEHAVIOR: Validates context and checks Bitcoin tip and signing readiness before requesting payment; after 250-sat L402 settlement, returns a signed receipt without a second HTTP payment. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing receipt with signed payload, Merkle proof, NIP-78 signature, normalized contextHash and agentId, blockHeight, blockHash, and timestamp; verify it through /api/v1/zk/verify.\nERRORS: -32602 (Invalid Parameters) for malformed context, HTTP 402 (Payment Required) with a 250-sat invoice when unpaid, 429 (Rate Limit), or 503 when Bitcoin tip or signing is unavailable.",
+      "Ground agent context in the current Bitcoin tip using required contextHash (64 hex characters), required agentId (1-256 trimmed characters), and optional JSON metadata. Returns a JSON object containing a signed receipt with normalized contextHash, agentId, blockHeight, blockHash, timestamp, Merkle proof, and NIP-78 signature, verifiable through POST /api/v1/zk/verify. This 250-sat L402 call checks signing readiness before charging, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1409,7 +1396,7 @@ const baseMcpToolDefinitions = [
         ),
         metadata: field(
           "object",
-          "Key-value JSON object containing arbitrary metadata.",
+          "Optional non-secret JSON key-value metadata bound to the signed receipt; serialized size must not exceed 16 KiB.",
           [{ topic: "difficulty-adjustment" }],
           { additionalProperties: true },
         ),
@@ -1483,7 +1470,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE: Retrieves current peer topology, propagation, cross-validation, and quorum health for the mesh node.\nUSAGE: Use to inspect peer connectivity and consensus readiness. Do NOT use for individual proof validation or telemetry retrieval; use proof.verify or stratigraphy.get instead.\nPARAMETERS: No input properties are accepted.\nBEHAVIOR: Observes current in-process mesh service metrics without changing proof or telemetry state. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold.\nERRORS: -32602 (Invalid Parameters) when any input property is supplied; HTTP 429 (Rate Limit) when the shared limit is exceeded. No 402 payment required.",
+      "Inspect current in-process peer topology and consensus readiness without input parameters; pass an empty object and do not use this tool to validate an individual proof. Returns a JSON object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold. This read-only tool is free, shares a 60-requests-per-minute IP limit, and rejects unexpected inputs with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1491,6 +1478,7 @@ const baseMcpToolDefinitions = [
       examples: [{}],
       additionalProperties: false,
       properties: {},
+      required: [],
     },
     outputSchema: {
       type: "object",
@@ -1660,7 +1648,11 @@ function createBitcoinStratigraphyMcpServer(
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid zk proof submission");
       }
-      const structuredContent = await submitZkProof(parsed.data);
+      const { proof, ...rest } = parsed.data;
+      const canonicalProof = "piA" in proof
+        ? { pi_a: proof.piA, pi_b: proof.piB, pi_c: proof.piC }
+        : proof;
+      const structuredContent = await submitZkProof({ ...rest, proof: canonicalProof });
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,

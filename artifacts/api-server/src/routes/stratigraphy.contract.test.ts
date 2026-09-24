@@ -808,12 +808,6 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${path} must define examples`,
     );
     for (const [name, property] of Object.entries(schema.properties ?? {})) {
-      if (path.includes(".inputSchema")) {
-        assert.ok(
-          Object.hasOwn(property as object, "default"),
-          `${path}.properties.${name} must define default`,
-        );
-      }
       assertDocumentedSchema(
         property as Parameters<typeof assertDocumentedSchema>[0],
         `${path}.properties.${name}`,
@@ -890,49 +884,57 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       );
     }
   };
-  const requiredDescriptionSections = [
-    "PURPOSE:",
-    "USAGE:",
-    "PARAMETERS:",
-    "BEHAVIOR:",
-    "RETURNS:",
-    "ERRORS:",
-  ] as const;
+  const assertInputProperties = (
+    schema: {
+      type?: unknown;
+      required?: unknown;
+      properties?: Record<string, unknown>;
+      items?: unknown;
+    },
+    path: string,
+  ): void => {
+    if (schema.properties) {
+      assert.equal(schema.type, "object", `${path} must be an object schema`);
+      assert.ok(Array.isArray(schema.required), `${path} must explicitly list required properties`);
+      for (const name of schema.required as string[]) {
+        assert.ok(Object.hasOwn(schema.properties, name), `${path}.required includes unknown ${name}`);
+      }
+      for (const [name, property] of Object.entries(schema.properties)) {
+        assert.match(name, /^[a-z][a-zA-Z0-9]*$/, `${path}.${name} must use camelCase`);
+        const documented = property as { description?: string };
+        assert.match(documented.description ?? "", /example/i, `${path}.${name} must describe an example`);
+        assertInputProperties(property as Parameters<typeof assertInputProperties>[0], `${path}.${name}`);
+      }
+    }
+    if (schema.items) {
+      assertInputProperties(schema.items as Parameters<typeof assertInputProperties>[0], `${path}.items`);
+    }
+  };
   for (const candidate of listed.result?.tools ?? []) {
-    const descriptionLines = candidate.description.split("\n");
-    assert.equal(descriptionLines.length, requiredDescriptionSections.length);
-    requiredDescriptionSections.forEach((section, index) => {
-      assert.ok(
-        descriptionLines[index]?.startsWith(section),
-        `${candidate.name} description line ${index + 1} must start with ${section}`,
-      );
-      assert.ok(
-        descriptionLines[index].slice(section.length).trim().length > 0,
-        `${candidate.name} must provide content after ${section}`,
-      );
-    });
-    assert.match(
-      candidate.description,
-      /ERRORS:.*-32602/,
-      `${candidate.name} must document MCP parameter validation errors`,
-    );
-    assert.match(
-      candidate.description,
-      /USAGE: Use .+ Do NOT use .+; use .+ instead\./,
-    );
-    assert.match(candidate.description, /BEHAVIOR: .+ Rate limit:/);
-    assert.doesNotMatch(
-      candidate.description,
-      /BEHAVIOR:.*\b(?:Read-only|Idempotent|Mutating|Non-idempotent)\b/,
-    );
-    assert.match(candidate.description, /Rate limit: 60 req\/min per IP/);
+    const sentences = candidate.description.split(/(?<=[.!?])\s+(?=[A-Z])/);
+    assert.equal(sentences.length, 3, `${candidate.name} must have three detailed sentences`);
+    assert.match(candidate.description, /Returns a JSON object/);
+    assert.match(candidate.description, /JSON-RPC -32602/);
+    assert.match(candidate.description, /60-requests-per-minute IP limit/);
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);
+    assertInputProperties(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertDocumentedSchema(
       candidate.outputSchema,
       `${candidate.name}.outputSchema`,
     );
   }
+  const queryDefaults = listed.result?.tools.find(
+    (candidate: { name: string }) => candidate.name === "stratigraphy.get",
+  )?.inputSchema.properties;
+  assert.equal(queryDefaults.limit.default, 10);
+  assert.equal(Object.hasOwn(queryDefaults.days, "default"), false);
+  assert.equal(Object.hasOwn(queryDefaults.date, "default"), false);
+  const listDefaults = listed.result?.tools.find(
+    (candidate: { name: string }) => candidate.name === "proof.list",
+  )?.inputSchema.properties;
+  assert.equal(listDefaults.limit.default, 20);
+  assert.equal(listDefaults.offset.default, 0);
   const groundingTool = listed.result?.tools.find(
     (candidate: { name: string }) => candidate.name === "proof.ground",
   );
@@ -991,24 +993,17 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${name} must define a concrete example`,
     );
   }
-  assert.deepEqual(
-    (queryProperties.metrics as {
-      items: { type: string; enum: string[] };
-    }).items,
-    {
-      type: "string",
-      description:
-        "Allowed thermodynamic metric name to include in each returned quantitative_alpha object.",
-      example: "target_multiplier",
-      examples: ["target_multiplier"],
-      default: "target_multiplier",
-      enum: [
-        "target_multiplier",
-        "difficulty_epoch_progress",
-        "thermodynamic_signal",
-      ],
-    },
-  );
+  const metricItem = (queryProperties.metrics as {
+    items: { type: string; description: string; enum: string[]; example: string };
+  }).items;
+  assert.equal(metricItem.type, "string");
+  assert.match(metricItem.description, /target_multiplier/);
+  assert.equal(metricItem.example, "target_multiplier");
+  assert.deepEqual(metricItem.enum, [
+    "target_multiplier",
+    "difficulty_epoch_progress",
+    "thermodynamic_signal",
+  ]);
   assert.deepEqual(tool.annotations, {
     readOnlyHint: true,
     destructiveHint: false,
@@ -1168,6 +1163,24 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
   });
   assert.equal(submitted.result?.structuredContent.status, "invalid");
+  const camelCaseSubmitted = await mcpRequest("tools/call", {
+    name: "proof.submit",
+    arguments: {
+      proof: {
+        piA: ["1", "2", "1"],
+        piB: [["1", "2"], ["3", "4"], ["1", "0"]],
+        piC: ["5", "6", "1"],
+      },
+      publicSignals: ["920000", "1", "1789776000000", "12583", "1"],
+      snapshotDigest: "1",
+    },
+  });
+  assert.equal(camelCaseSubmitted.result?.structuredContent.status, "invalid");
+  assert.equal(
+    camelCaseSubmitted.result?.structuredContent.proofHash,
+    submitted.result?.structuredContent.proofHash,
+    "camelCase and legacy Groth16 coordinate names must produce the same canonical proof",
+  );
   assert.equal(
     submitted.result?.structuredContent.attestationStatus,
     "not_broadcast_invalid_proof",

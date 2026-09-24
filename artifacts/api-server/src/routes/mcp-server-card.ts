@@ -107,6 +107,18 @@ export const mcpServerCard = {
           openWorldHint: false,
         },
       },
+      {
+        name: "mesh.broadcast",
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: false,
+          l402: {
+            amountSats: 250,
+          },
+        },
+      },
     ],
   },
 } as const;

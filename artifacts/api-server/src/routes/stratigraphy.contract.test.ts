@@ -777,6 +777,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "proof.submit",
       "proof.ground",
       "mesh.status",
+      "mesh.broadcast",
     ],
   );
   for (const candidate of listed.result?.tools ?? []) {
@@ -912,7 +913,14 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   };
   for (const candidate of listed.result?.tools ?? []) {
     const sentences = candidate.description.split(/(?<=[.!?])\s+(?=[A-Z])/);
-    assert.equal(sentences.length, 3, `${candidate.name} must have three detailed sentences`);
+    const immutableDataTool = candidate.name.startsWith("proof.") ||
+      candidate.name.startsWith("stratigraphy.") || candidate.name === "mesh.broadcast";
+    assert.equal(sentences.length, immutableDataTool ? 4 : 3, `${candidate.name} must have a focused description`);
+    if (immutableDataTool) {
+      assert.ok(candidate.description.endsWith(
+        "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.",
+      ));
+    }
     assert.match(candidate.description, /Returns a JSON object/);
     assert.match(candidate.description, /JSON-RPC -32602/);
     assert.match(candidate.description, /60-requests-per-minute IP limit/);
@@ -1224,6 +1232,107 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 });
 
+test("broadcasts a freshly signed canonical snapshot and requires a peer acknowledgment", async () => {
+  const args = {
+    name: "mesh.broadcast",
+    arguments: { signalType: "telemetry_snapshot", payload: { date: "2026-09-09" } },
+  };
+  const beforeInvoiceCount = mcpInvoiceCount;
+  const unavailable = await mcpRequestAt(baseUrl, "tools/call", args);
+  assert.equal(unavailable.response.status, 503);
+  assert.equal(unavailable.body.error?.code, -32603);
+  assert.equal(mcpInvoiceCount, beforeInvoiceCount, "no configured peers must not create an invoice");
+
+  const signedSnapshots: unknown[] = [];
+  let acknowledge = true;
+  const localAttestation = {
+    pubkey: "ab".repeat(32), signature: "cd".repeat(32), eventId: "ef".repeat(32),
+    createdAt: Math.floor(Date.now() / 1_000), roundTripLatencyMs: 0,
+  };
+  const peerAttestation = {
+    ...localAttestation, pubkey: "12".repeat(32), eventId: "34".repeat(32), roundTripLatencyMs: 3,
+  };
+  const broadcastApp = express();
+  broadcastApp.set("trust proxy", 1);
+  broadcastApp.use(express.json());
+  broadcastApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerMcpRoute(broadcastApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-mcp-broadcast-secret",
+    meshService: {
+      status: () => ({
+        nodePubkey: localAttestation.pubkey,
+        activePeerCount: 1,
+        configuredPeerCount: 1,
+        topologyHealth: "degraded",
+        crossValidationSuccessRate: 0,
+        averagePropagationLatencyMs: 0,
+        quorumThreshold: 2,
+      }),
+      createConsensus: async (snapshot) => {
+        signedSnapshots.push(snapshot);
+        return {
+          quorumScore: acknowledge ? 1 : 0.5,
+          peerAttestations: acknowledge
+            ? [localAttestation, peerAttestation]
+            : [localAttestation],
+          merkleRoot: "56".repeat(32),
+          snapshotDigest: "78".repeat(32),
+          threshold: 2,
+          isolationMode: false,
+          networkId: "bitcoin-stratigraphy-mainnet-v1",
+        };
+      },
+    },
+  });
+  const broadcastServer = broadcastApp.listen(0);
+  await new Promise<void>((resolve) => broadcastServer.once("listening", resolve));
+  const address = broadcastServer.address() as AddressInfo;
+  const broadcastUrl = `http://127.0.0.1:${address.port}`;
+  const paidCall = async () => {
+    const challenge = await mcpRequestAt(broadcastUrl, "tools/call", args);
+    assert.equal(challenge.response.status, 402);
+    const issued = challenge.body as unknown as { macaroon: string; payment_hash: string; amount_sats: number };
+    assert.equal(issued.amount_sats, 250);
+    const payment = mcpInvoices.get(issued.payment_hash);
+    assert.ok(payment);
+    return mcpRequestAt(
+      broadcastUrl, "tools/call", args, undefined,
+      `L402 ${issued.macaroon}:${payment.preimage}`,
+    );
+  };
+  try {
+    const { response, body } = await paidCall();
+    assert.equal(response.status, 200);
+    assert.deepEqual(body.result?.structuredContent, {
+      signalType: "telemetry_snapshot",
+      date: "2026-09-09",
+      snapshotDigest: "78".repeat(32),
+      peerAttestations: 1,
+      quorumThreshold: 2,
+      merkleRoot: "56".repeat(32),
+      networkId: "bitcoin-stratigraphy-mainnet-v1",
+    });
+    assert.equal(signedSnapshots.length, 1);
+    const signed = signedSnapshots[0] as {
+      day: number;
+      attestation: { event: Parameters<typeof verifyEvent>[0] };
+    };
+    assert.equal(signed.day, 422);
+    assert.equal(verifyEvent(signed.attestation.event), true);
+
+    acknowledge = false;
+    const unacknowledged = await paidCall();
+    assert.equal(unacknowledged.body.error?.code, -32603);
+    assert.match(unacknowledged.body.error?.message ?? "", /No mesh peer acknowledged/);
+  } finally {
+    broadcastServer.close();
+  }
+});
+
 test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async () => {
   const invalidApp = express();
   invalidApp.set("trust proxy", 1);
@@ -1257,6 +1366,7 @@ test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async ()
     }],
     ["proof.ground", { contextHash: "not-hex", agentId: "agent" }],
     ["mesh.status", { unexpected: true }],
+    ["mesh.broadcast", { signalType: "telemetry_snapshot", payload: { date: "not-a-date" } }],
   ];
 
   try {

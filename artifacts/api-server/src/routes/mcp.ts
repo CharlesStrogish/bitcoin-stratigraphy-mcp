@@ -19,7 +19,12 @@ import {
   groundEpistemicContext,
   type BitcoinTip,
 } from "../services/epistemicGrounding";
-import { createMeshGossipService } from "../services/meshGossipService";
+import {
+  createMeshGossipService,
+  MeshQuorumError,
+  type MeshGossipService,
+} from "../services/meshGossipService";
+import { createNostrAttestor } from "../services/nostrAttestation";
 import {
   getZkProofStatus,
   listZkProofAttestations,
@@ -371,6 +376,17 @@ const submitProofInputSchema = z.object({
 const meshStatusInputSchema = z.object({}).strict().describe(
   "No input parameters required.",
 );
+
+const meshBroadcastInputSchema = z.object({
+  signalType: z.literal("telemetry_snapshot").describe(
+    "Only telemetry_snapshot is supported: distribute one canonical, freshly signed stratigraphy record.",
+  ),
+  payload: z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe(
+      "UTC YYYY-MM-DD date of the existing stratigraphy record to broadcast.",
+    ),
+  }).strict().describe("Selector for a canonical dataset record; arbitrary caller-supplied snapshots are not accepted."),
+}).strict().describe("Request to broadcast one signed telemetry snapshot to configured, pinned mesh peers.");
 
 const groundContextInputSchema = z.object({
   contextHash: z.string().regex(/^[0-9a-fA-F]{64}$/).describe(
@@ -1497,14 +1513,82 @@ const baseMcpToolDefinitions = [
       required: Object.keys(meshStatusJsonProperties),
     },
   },
+  {
+    name: "mesh.broadcast",
+    title: "Broadcast Telemetry Snapshot to Mesh",
+    description:
+      "Broadcast one canonical Bitcoin Stratigraphy telemetry snapshot to configured, pinned P2P mesh peers using required signalType (telemetry_snapshot) and payload.date (UTC YYYY-MM-DD); arbitrary caller-supplied data and peer targets are not accepted. Returns a JSON object with signalType, date, snapshotDigest, peerAttestations received, quorumThreshold, merkleRoot, and networkId after peer cross-validation. This active 250-sat L402 call requires configured peers and a successful quorum, shares a 60-requests-per-minute IP limit, and rejects invalid inputs with JSON-RPC -32602.",
+    annotations: submissionToolAnnotations,
+    inputSchema: {
+      type: "object",
+      description: "Select a stored telemetry record for fresh signing and active mesh distribution.",
+      examples: [{ signalType: "telemetry_snapshot", payload: { date: "2026-09-09" } }],
+      additionalProperties: false,
+      properties: {
+        signalType: field(
+          "string",
+          "Only telemetry_snapshot is supported; this sends one canonical record rather than accepting arbitrary signals.",
+          ["telemetry_snapshot"],
+          { enum: ["telemetry_snapshot"] },
+        ),
+        payload: {
+          type: "object",
+          description: "Select one existing UTC-dated telemetry record; for example, {\"date\":\"2026-09-09\"}.",
+          examples: [{ date: "2026-09-09" }],
+          additionalProperties: false,
+          properties: {
+            date: field(
+              "string",
+              "UTC calendar date of the existing record to distribute, formatted YYYY-MM-DD.",
+              ["2026-09-09"],
+              { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+            ),
+          },
+          required: ["date"],
+        },
+      },
+      required: ["signalType", "payload"],
+    },
+    outputSchema: {
+      type: "object",
+      description: "Successful peer cross-validation receipt for the selected signed snapshot.",
+      examples: [{
+        signalType: "telemetry_snapshot",
+        date: "2026-09-09",
+        snapshotDigest: "ab".repeat(32),
+        peerAttestations: 1,
+        quorumThreshold: 2,
+        merkleRoot: "cd".repeat(32),
+        networkId: "bitcoin-stratigraphy-mainnet-v1",
+      }],
+      additionalProperties: false,
+      properties: {
+        signalType: field("string", "Signal distributed to configured peers.", ["telemetry_snapshot"], { enum: ["telemetry_snapshot"] }),
+        date: field("string", "UTC date of the distributed telemetry record.", ["2026-09-09"], { format: "date" }),
+        snapshotDigest: field("string", "SHA-256 digest of the canonical mesh-encoded signed snapshot.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+        peerAttestations: field("integer", "Number of remote pinned peers whose signatures were verified; excludes this node.", [1], { minimum: 1 }),
+        quorumThreshold: field("integer", "Required total attestation count, including this node.", [2], { minimum: 1 }),
+        merkleRoot: field("string", "Merkle root of local and peer attestation event identifiers.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+        networkId: field("string", "Mesh network identifier committed in peer attestations.", ["bitcoin-stratigraphy-mainnet-v1"]),
+      },
+      required: ["signalType", "date", "snapshotDigest", "peerAttestations", "quorumThreshold", "merkleRoot", "networkId"],
+    },
+  },
 ];
 
-const mcpToolDefinitions = baseMcpToolDefinitions;
+const immutabilityNote =
+  "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.";
+const mcpToolDefinitions = baseMcpToolDefinitions.map((tool) =>
+  tool.name.startsWith("stratigraphy.") || tool.name.startsWith("proof.") ||
+    tool.name === "mesh.broadcast"
+    ? { ...tool, description: `${tool.description} ${immutabilityNote}` }
+    : tool
+);
 
 function createBitcoinStratigraphyMcpServer(
   groundReceipt?: Awaited<ReturnType<typeof groundEpistemicContext>>,
+  mesh: Pick<MeshGossipService, "status" | "createConsensus"> = createMeshGossipService(),
 ) {
-  const mesh = createMeshGossipService();
   const server = new McpServer(
     {
       name: "bitcoin-stratigraphy",
@@ -1685,6 +1769,53 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent,
       };
     }
+    if (request.params.name === "mesh.broadcast") {
+      const parsed = meshBroadcastInputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid mesh broadcast request");
+      }
+      if (mesh.status().configuredPeerCount === 0) {
+        throw new McpError(ErrorCode.InternalError, "No mesh peers configured");
+      }
+      let records;
+      try {
+        records = await getStratigraphyData({ date: parsed.data.payload.date });
+      } catch (error) {
+        if (error instanceof RangeError) {
+          throw new McpError(ErrorCode.InvalidParams, error.message);
+        }
+        throw error;
+      }
+      if (records.length !== 1) {
+        throw new McpError(ErrorCode.InvalidParams, "No telemetry record exists for that date");
+      }
+      const signedRecord = createNostrAttestor()(records[0]!, Math.floor(Date.now() / 1_000));
+      let consensus;
+      try {
+        consensus = await mesh.createConsensus(signedRecord);
+      } catch (error) {
+        if (error instanceof MeshQuorumError) {
+          throw new McpError(ErrorCode.InternalError, error.message);
+        }
+        throw error;
+      }
+      if (consensus.peerAttestations.length < 2) {
+        throw new McpError(ErrorCode.InternalError, "No mesh peer acknowledged the snapshot");
+      }
+      const structuredContent = {
+        signalType: parsed.data.signalType,
+        date: parsed.data.payload.date,
+        snapshotDigest: consensus.snapshotDigest,
+        peerAttestations: consensus.peerAttestations.length - 1,
+        quorumThreshold: consensus.threshold,
+        merkleRoot: consensus.merkleRoot,
+        networkId: consensus.networkId,
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    }
     throw new McpError(
       ErrorCode.MethodNotFound,
       `Unknown tool: ${request.params.name}`,
@@ -1697,9 +1828,11 @@ function createBitcoinStratigraphyMcpServer(
 async function handleMcpRequest(
   req: Request,
   res: Response,
+  mesh: Pick<MeshGossipService, "status" | "createConsensus">,
 ): Promise<void> {
   const server = createBitcoinStratigraphyMcpServer(
     res.locals.epistemicAnchorReceipt as Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
+    mesh,
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -1767,12 +1900,14 @@ export function registerMcpRoute(
     usageStore?: MacaroonUsageStore;
     ledger?: RevenueLedger;
     readBitcoinTip?: () => Promise<BitcoinTip>;
+    meshService?: Pick<MeshGossipService, "status" | "createConsensus">;
   } = {},
 ): void {
   const rateLimit = createHttpRateLimitMiddleware(
     createSlidingWindowRateLimiter({ limit: 60, windowMs: 60_000 }),
   );
   const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
+  const mesh = options.meshService ?? createMeshGossipService();
   const paidTools = {
     "stratigraphy.list": { amountSats: 10, schema: stratigraphyCatalogInputSchema },
     "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
@@ -1781,6 +1916,7 @@ export function registerMcpRoute(
     "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
     "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
     "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
+    "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
   } as const;
   const gates = Object.fromEntries(
     Object.entries(paidTools).map(([name, { amountSats }]) => [
@@ -1820,7 +1956,7 @@ export function registerMcpRoute(
       next();
       return;
     }
-    const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
+    const body = req.body as { id?: unknown; method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
     const name = body?.method === "tools/call" ? body.params?.name : undefined;
     if (typeof name !== "string" || !Object.hasOwn(paidTools, name)) {
       next();
@@ -1829,6 +1965,14 @@ export function registerMcpRoute(
     const tool = paidTools[name as keyof typeof paidTools];
     if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
       next();
+      return;
+    }
+    if (name === "mesh.broadcast" && mesh.status().configuredPeerCount === 0) {
+      res.status(503).json({
+        jsonrpc: "2.0",
+        id: typeof body?.id === "string" || typeof body?.id === "number" ? body.id : null,
+        error: { code: -32603, message: "No mesh peers configured" },
+      });
       return;
     }
     if (name === "proof.ground") {
@@ -1852,7 +1996,7 @@ export function registerMcpRoute(
       }
     }
     gates[name](req, res, next);
-  }, handleMcpRequest, (_req, res) => {
+  }, (req, res) => handleMcpRequest(req, res, mesh), (_req, res) => {
     if (!res.headersSent) {
       res.status(400).json({
         jsonrpc: "2.0",

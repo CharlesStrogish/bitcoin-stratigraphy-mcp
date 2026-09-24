@@ -8,7 +8,7 @@ import express from "express";
 import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
-import { registerMcpRoute } from "./mcp";
+import { registerMcpRequestGuard, registerMcpRoute } from "./mcp";
 import type { SettlementRouter } from "../services/settlement";
 import {
   glamaConnector,
@@ -234,6 +234,7 @@ function agentAuthorization(
   );
   return `Nostr ${Buffer.from(JSON.stringify(event)).toString("base64")}`;
 }
+registerMcpRequestGuard(app);
 app.use(
   express.json({
     verify(req, _res, buffer) {
@@ -1482,13 +1483,10 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
       "Access-Control-Request-Headers": "Content-Type, Authorization, mcp-session-id",
     },
   });
-  assert.equal(preflight.status, 204);
+  assert.equal(preflight.status, 200);
   assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
-  assert.equal(preflight.headers.get("access-control-allow-methods"), "GET,POST,OPTIONS");
-  assert.equal(
-    preflight.headers.get("access-control-allow-headers"),
-    "Content-Type,Authorization,mcp-session-id",
-  );
+  assert.equal(preflight.headers.get("access-control-allow-methods"), "GET, POST, OPTIONS");
+  assert.equal(preflight.headers.get("access-control-allow-headers"), "*");
 
   const list = await fetch(`${baseUrl}/mcp`, {
     method: "POST",
@@ -1504,6 +1502,25 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
   assert.equal(list.headers.get("access-control-allow-origin"), "*");
   assert.match(list.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.ok(Array.isArray((await list.json() as { result: { tools: unknown[] } }).result.tools));
+
+  const jsonOnly = await fetch(`${baseUrl}/mcp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+  });
+  assert.equal(jsonOnly.status, 200);
+  assert.match(jsonOnly.headers.get("content-type") ?? "", /^application\/json\b/);
+  assert.ok(Array.isArray((await jsonOnly.json() as { result: { tools: unknown[] } }).result.tools));
+
+  for (const method of ["GET", "POST"]) {
+    const unknown = await fetch(`${baseUrl}/mcp/unknown`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+    });
+    assert.equal(unknown.status, 400);
+    assert.match(unknown.headers.get("content-type") ?? "", /^application\/json\b/);
+    assert.equal((await unknown.json() as { error: { code: number } }).error.code, -32600);
+  }
 
   const malformed = await fetch(`${baseUrl}/mcp`, {
     method: "POST",

@@ -1717,6 +1717,15 @@ async function handleMcpRequest(
 
   try {
     await server.connect(transport);
+    // This transport is configured to return JSON for POSTs, but the SDK still
+    // requires clients to advertise SSE. Allow JSON-only clients without
+    // changing the response format or the behavior of GET event streams.
+    const accept = req.headers.accept;
+    if (req.method === "POST" &&
+        accept?.toLowerCase().includes("application/json") &&
+        !accept.toLowerCase().includes("text/event-stream")) {
+      req.headers.accept = `${accept}, text/event-stream`;
+    }
     await transport.handleRequest(req, res, req.body);
     if (!res.headersSent && !res.writableEnded) {
       res.status(502).json({
@@ -1757,6 +1766,14 @@ export function registerMcpRequestGuard(app: Express): void {
       origin: req.headers.origin,
     }, req.url);
     next();
+  });
+  // Register before express.json and payment middleware so preflights never
+  // enter the MCP transport or fail body parsing.
+  app.options("/mcp", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    res.sendStatus(200);
   });
 }
 
@@ -1859,8 +1876,19 @@ export function registerMcpRoute(
     gates[name](req, res, next);
   }, handleMcpRequest, (_req, res) => {
     if (!res.headersSent) {
-      res.status(404).json({ error: "MCP request was not handled" });
+      res.status(400).json({
+        jsonrpc: "2.0",
+        error: { code: -32600, message: "Invalid Request" },
+        id: null,
+      });
     }
+  });
+  app.all(/^\/mcp\/.+/, (_req, res) => {
+    res.status(400).json({
+      jsonrpc: "2.0",
+      error: { code: -32600, message: "Invalid Request" },
+      id: null,
+    });
   });
   // JSON body-parser errors happen before the transport; do not send Express's HTML error page.
   app.use("/mcp", (error: unknown, req: Request, res: Response, next: NextFunction) => {

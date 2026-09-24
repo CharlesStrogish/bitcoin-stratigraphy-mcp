@@ -9,13 +9,12 @@ worker sends to `proof.verify`.
 
 ## Run on Replit
 
-1. Fork this **repository with its `sdk/typescript/` directory**. The SDK is
-   currently a local workspace package (`workspace:*`), not a published npm
-   package. Copy `templates/autonomous-agent/.replit.example` to the fork's
-   root `.replit` and `templates/autonomous-agent/replit.nix.example` to
-   `replit.nix` to make its Run button start this worker rather than the
-   dashboard. In a Repl made solely from this directory, first make the SDK
-   available as a package and replace `workspace:*` in `package.json`.
+1. Copy or fork **this directory as the root of its own Repl**. Its versioned
+   SDK package under `vendor/` is included, so `pnpm install` does not need
+   this monorepo or a published SDK. Copy `.replit.example` to `.replit` and
+   `replit.nix.example` to `replit.nix` in that new root for the provided Run
+   and Reserved VM commands. (This repository keeps the active files as
+   examples because its own root `.replit` runs the dashboard.)
 2. Create a **separate payer wallet** with a limited NWC spending budget and
    `pay_invoice` permission. Add its `nostr+walletconnect://...` URI as the
    `NWC_PAIRING_SECRET` Replit Secret. Do not paste a filled-in `.env` file into
@@ -72,3 +71,9 @@ pnpm --filter @bitcoin-stratigraphy/autonomous-agent-template build
 pnpm --filter @bitcoin-stratigraphy/autonomous-agent-template typecheck
 pnpm --filter @bitcoin-stratigraphy/autonomous-agent-template test
 ```
+
+In a standalone copy, use `pnpm install && pnpm build && pnpm test` instead.
+To adopt a published SDK later, replace the `file:./vendor/...tgz` reference
+with a published `@bitcoin-stratigraphy/sdk` version and remove `vendor/`.
+See `sdk/typescript/README.md` in the source repository for SDK packaging and
+GitHub subdirectory installation instructions.

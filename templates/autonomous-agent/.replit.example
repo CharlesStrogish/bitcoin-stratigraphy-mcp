@@ -1,9 +1,9 @@
-# Use at the root of a fork that includes sdk/typescript/ and templates/autonomous-agent/.
+# Use at the root of a standalone Repl created from this template directory.
 modules = ["nodejs-24"]
-run = "pnpm install && pnpm --filter @bitcoin-stratigraphy/autonomous-agent-template dev"
+run = "pnpm install && pnpm dev"
 
 [deployment]
 deploymentTarget = "vm"
 ignorePorts = true
-build = ["sh", "-c", "pnpm install --frozen-lockfile && pnpm --filter @bitcoin-stratigraphy/autonomous-agent-template build"]
-run = ["sh", "-c", "NODE_ENV=production pnpm --filter @bitcoin-stratigraphy/autonomous-agent-template start"]
+build = ["sh", "-c", "pnpm install --no-frozen-lockfile && pnpm build"]
+run = ["sh", "-c", "NODE_ENV=production pnpm start"]

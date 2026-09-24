@@ -654,17 +654,20 @@ importers:
   sdk/typescript:
     devDependencies:
       '@types/node':
-        specifier: 'catalog:'
+        specifier: ^25.3.3
         version: 25.9.5
       tsx:
-        specifier: 'catalog:'
+        specifier: ^4.23.4
         version: 4.23.4
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
 
   templates/autonomous-agent:
     dependencies:
       '@bitcoin-stratigraphy/sdk':
-        specifier: workspace:*
-        version: link:../../sdk/typescript
+        specifier: file:./vendor/bitcoin-stratigraphy-sdk-0.1.0.tgz
+        version: file:templates/autonomous-agent/vendor/bitcoin-stratigraphy-sdk-0.1.0.tgz
       '@getalby/sdk':
         specifier: 8.0.3
         version: 8.0.3(typescript@5.9.3)
@@ -673,13 +676,13 @@ importers:
         version: 8.22.0
     devDependencies:
       '@types/node':
-        specifier: 'catalog:'
+        specifier: ^25.3.3
         version: 25.9.5
       '@types/pg':
         specifier: ^8.15.5
         version: 8.20.3
       tsx:
-        specifier: 'catalog:'
+        specifier: ^4.23.4
         version: 4.23.4
       typescript:
         specifier: ~5.9.3
@@ -773,6 +776,11 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@bitcoin-stratigraphy/sdk@file:templates/autonomous-agent/vendor/bitcoin-stratigraphy-sdk-0.1.0.tgz':
+    resolution: {integrity: sha512-/bSajoaNG8WaOCtejAE/A1MdGReR7fxAFQC9OjFLNoulQTeGd69hu+Hk8UncLgc3CdHblfPtQ9fvd8oIAR0NvQ==, tarball: file:templates/autonomous-agent/vendor/bitcoin-stratigraphy-sdk-0.1.0.tgz}
+    version: 0.1.0
+    engines: {node: '>=18'}
 
   '@cfworker/json-schema@4.1.1':
     resolution: {integrity: sha512-gAmrUZSGtKc3AiBL71iNWxDsyUC5uMaKKGdvzYsBoTW/xi42JQHl7eKV2OYzCUqvc+D2RCcf7EXY2iCyFIk6og==}
@@ -4203,6 +4211,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@bitcoin-stratigraphy/sdk@file:templates/autonomous-agent/vendor/bitcoin-stratigraphy-sdk-0.1.0.tgz': {}
 
   '@cfworker/json-schema@4.1.1': {}
 

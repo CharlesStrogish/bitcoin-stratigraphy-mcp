@@ -3,7 +3,8 @@ run = "PORT=5000 pnpm --filter @workspace/api-server dev"
 
 [deployment]
 router = "application"
-deploymentTarget = "autoscale"
+deploymentTarget = "gce"
+ignorePorts = false
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]

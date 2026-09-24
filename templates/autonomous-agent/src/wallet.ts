@@ -1,6 +1,7 @@
 import { NWCClient } from "@getalby/sdk";
 import {
   NwcWalletAdapter,
+  type NwcPaymentClient,
   type L402WalletAdapter,
 } from "@bitcoin-stratigraphy/sdk";
 import type { WalletHandler, WalletPayment } from "@bitcoin-stratigraphy/sdk/mcp";
@@ -32,11 +33,12 @@ function requirePreimage(value: WalletPayment): string {
 export function createNwcWallet(
   pairingSecret: string,
   onPayment?: (invoice: string) => void,
+  clientOverride?: NwcPaymentClient,
 ): AgentWallet {
   if (!pairingSecret.startsWith("nostr+walletconnect://")) {
     throw new Error("NWC_PAIRING_SECRET must be a nostr+walletconnect:// pairing URI");
   }
-  const client = new NWCClient({
+  const client = clientOverride ?? new NWCClient({
     nostrWalletConnectUrl: pairingSecret,
     logger: silentLogger,
   });

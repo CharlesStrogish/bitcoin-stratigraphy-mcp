@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import type { BitcoinStratigraphyClient as RestClient } from "@bitcoin-stratigraphy/sdk";
 import type { BitcoinStratigraphyClient as McpClient } from "@bitcoin-stratigraphy/sdk/mcp";
-import { runCycle, type AgentDependencies, type AgentEvent } from "../src/agentLoop.js";
-import { requireNwcPairingSecret } from "../src/runner.js";
-import type { Checkpoint, StateStore } from "../src/state.js";
+import { runAgentLoop, runCycle, type AgentDependencies, type AgentEvent } from "../src/agentLoop.js";
+import { redactDiagnostic, requireNwcPairingSecret } from "../src/runner.js";
+import { createStateStore, type Checkpoint, type StateStore } from "../src/state.js";
 import { createLnurlCapableWallet, createNwcWallet } from "../src/wallet.js";
 
 function fixture(peerCount = 0, valid = true) {
@@ -118,6 +121,24 @@ test("wallet adapters refuse non-preimage payments", async () => {
   await assert.rejects(wallet.payInvoice("lnbc1..."), /32-byte hex/);
 });
 
+test("CoinOS nested NWC preimage reaches the MCP wallet callback", async () => {
+  const preimage = "a1".repeat(32);
+  const invoices: string[] = [];
+  const wallet = createNwcWallet(
+    "nostr+walletconnect://test",
+    (invoice) => invoices.push(invoice),
+    {
+      async payInvoice({ invoice }) {
+        assert.equal(invoice, "lnbc-test");
+        return { result: { preimage } };
+      },
+    },
+  );
+  assert.equal(await wallet.payMcpInvoice("lnbc-test"), preimage);
+  assert.deepEqual(invoices, ["lnbc-test"]);
+  wallet.close();
+});
+
 test("the seeder prioritizes NWC and fails closed on provider-ambiguous keys", () => {
   assert.equal(
     requireNwcPairingSecret({
@@ -131,4 +152,41 @@ test("the seeder prioritizes NWC and fails closed on provider-ambiguous keys", (
     /LNURL_PAYMENT_KEY alone cannot safely settle L402 invoices/,
   );
   assert.throws(() => requireNwcPairingSecret({}), /Set NWC_PAIRING_SECRET/);
+});
+
+test("cycle failures preserve their message and stack for redacted diagnostics", async () => {
+  const { dependencies } = fixture();
+  const failure = new Error("Payment settled but response.result.preimage was missing");
+  dependencies.rest.getLatest = async () => { throw failure; };
+  const controller = new AbortController();
+  const events: AgentEvent[] = [];
+  dependencies.emit = (event) => { events.push(event); controller.abort(); };
+  await runAgentLoop(dependencies, 900_000, controller.signal);
+  assert.equal(events[0]?.type, "error");
+  if (events[0]?.type !== "error") return;
+  assert.equal(events[0].error, failure.message);
+  assert.match(events[0].stack ?? "", /Payment settled/);
+  const sanitized = redactDiagnostic(
+    `Invoice lnbc123abc, L402 macaroon:${"11".repeat(32)}; ${failure.message}`,
+  );
+  assert.match(sanitized, /response\.result\.preimage was missing/);
+  assert.doesNotMatch(sanitized, /lnbc123abc|macaroon:|1111111111/);
+});
+
+test("uninitialized PostgreSQL falls back to preflighted local state only in development", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "stratigraphy-state-"));
+  const localFile = join(dir, "checkpoint.json");
+  const url = "postgresql://127.0.0.1:1/absent";
+  try {
+    const store = await createStateStore({ url, production: false, localFile });
+    assert.equal(await store.load(), null);
+    await store.save({ snapshotKey: "paid-snapshot", verified: true });
+    assert.deepEqual(await store.load(), { snapshotKey: "paid-snapshot", verified: true });
+    await store.close();
+    await assert.rejects(createStateStore({ url, production: true, localFile }));
+    await writeFile(localFile, "not-json");
+    await assert.rejects(createStateStore({ url: null, production: false, localFile }), /JSON/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

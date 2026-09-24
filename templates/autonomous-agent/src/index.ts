@@ -1,6 +1,6 @@
-import { runWorker } from "./runner.js";
+import { logStartupError, runWorker } from "./runner.js";
 
 runWorker(Number(process.env.POLL_INTERVAL_MS ?? 3_600_000)).catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Agent startup failed");
+  logStartupError(error);
   process.exitCode = 1;
 });

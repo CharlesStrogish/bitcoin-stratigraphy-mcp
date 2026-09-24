@@ -14,11 +14,45 @@ export type StateStore = {
   close(): Promise<void>;
 };
 
-export async function createStateStore(): Promise<StateStore> {
-  const url = process.env.DATABASE_URL?.trim() || process.env.REPLIT_DB?.trim();
+type StoreOptions = {
+  url?: string | null;
+  production?: boolean;
+  localFile?: string;
+};
+
+async function createLocalStateStore(file: string): Promise<StateStore> {
+  // Preflight local storage before the first invoice is paid. An absent file
+  // is valid uninitialized state; an unreadable/corrupt one fails before pay.
+  try {
+    await writeFile(file, "null", { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+  const store: StateStore = {
+    async load() {
+      return JSON.parse(await readFile(file, "utf8")) as Checkpoint | null;
+    },
+    async save(value) {
+      const temporary = `${file}.${process.pid}.tmp`;
+      await writeFile(temporary, JSON.stringify(value), { mode: 0o600 });
+      await rename(temporary, file);
+    },
+    async close() {},
+  };
+  await store.load();
+  return store;
+}
+
+export async function createStateStore(options: StoreOptions = {}): Promise<StateStore> {
+  const url = options.url === undefined
+    ? process.env.DATABASE_URL?.trim() || process.env.REPLIT_DB?.trim()
+    : options.url?.trim();
+  const production = options.production ?? process.env.NODE_ENV === "production";
   if (url) {
     if (!/^postgres(?:ql)?:\/\//.test(url)) {
-      throw new Error("DATABASE_URL or REPLIT_DB must be a PostgreSQL connection URL");
+      if (production) throw new Error("DATABASE_URL or REPLIT_DB must be a PostgreSQL connection URL");
+      console.warn("PostgreSQL URL is not configured; using local development checkpoint file");
+      return createLocalStateStore(resolve(options.localFile ?? ".autonomous-agent-state.json"));
     }
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -30,7 +64,9 @@ export async function createStateStore(): Promise<StateStore> {
       `);
     } catch (error) {
       await pool.end();
-      throw error;
+      if (production) throw error;
+      console.warn("PostgreSQL is not initialized; using local development checkpoint file");
+      return createLocalStateStore(resolve(options.localFile ?? ".autonomous-agent-state.json"));
     }
     return {
       async load() {
@@ -53,24 +89,8 @@ export async function createStateStore(): Promise<StateStore> {
   }
 
   // Avoid double payment after a Reserved VM restart: production needs durable DB.
-  if (process.env.NODE_ENV === "production") {
+  if (production) {
     throw new Error("Production requires a Replit PostgreSQL DATABASE_URL before auto-pay");
   }
-  const file = resolve(".autonomous-agent-state.json");
-  return {
-    async load() {
-      try {
-        return JSON.parse(await readFile(file, "utf8")) as Checkpoint;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-        throw error;
-      }
-    },
-    async save(value) {
-      const temporary = `${file}.${process.pid}.tmp`;
-      await writeFile(temporary, JSON.stringify(value), { mode: 0o600 });
-      await rename(temporary, file);
-    },
-    async close() {},
-  };
+  return createLocalStateStore(resolve(options.localFile ?? ".autonomous-agent-state.json"));
 }

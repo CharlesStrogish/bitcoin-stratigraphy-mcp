@@ -5,6 +5,7 @@ import { finalizeEvent, verifyEvent } from "nostr-tools";
 import { canonicalMeshJson } from "../../artifacts/api-server/src/services/meshGossipService";
 import {
   BitcoinStratigraphyClient,
+  NwcWalletAdapter,
   canonicalMeshJson as sdkCanonicalMeshJson,
   MemoryCredentialStore,
   validateMeshConsensus,
@@ -250,6 +251,32 @@ test("intercepts an L402 challenge, pays it, and retries automatically", async (
     requests[2].authorization,
     `L402 cached-macaroon:${preimage}`,
   );
+});
+
+test("redeems a CoinOS NIP-47 result.preimage without a second payment", async () => {
+  let payments = 0;
+  const authorizations: Array<string | null> = [];
+  const wallet = new NwcWalletAdapter({
+    async payInvoice({ invoice }) {
+      assert.equal(invoice, "lnbc-subscription");
+      payments++;
+      return { result: { preimage } };
+    },
+  });
+  const client = new BitcoinStratigraphyClient({
+    baseUrl: "https://node.example",
+    wallet,
+    fetch: async (input, init) => {
+      if (String(input).endsWith("/cost")) return Response.json(cost);
+      const authorization = new Headers(init?.headers).get("Authorization");
+      authorizations.push(authorization);
+      if (!authorization) return Response.json(challenge, { status: 402 });
+      return Response.json(paidResponse);
+    },
+  });
+  assert.deepEqual(await client.getLatest(), paidResponse);
+  assert.equal(payments, 1);
+  assert.deepEqual(authorizations, [null, `L402 cached-macaroon:${preimage}`]);
 });
 
 test("sends NIP-98 identity while acquiring and redeeming a bound pass", async () => {

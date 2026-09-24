@@ -8,7 +8,7 @@ export type AgentEvent =
   | { type: "verified"; snapshotKey: string }
   | { type: "broadcast"; date: string; peerAttestations: number }
   | { type: "isolated"; reason: string }
-  | { type: "error"; error: string };
+  | { type: "error"; error: string; stack?: string };
 
 export type AgentDependencies = {
   rest: Pick<RestClient, "getLatest">;
@@ -99,6 +99,7 @@ export async function runAgentLoop(
       dependencies.emit({
         type: "error",
         error: error instanceof Error ? error.message : "Unknown worker error",
+        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
       });
     }
     if (signal.aborted) break;

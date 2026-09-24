@@ -569,16 +569,20 @@ export class BitcoinStratigraphyClient {
 }
 
 function paymentPreimage(value: unknown): string {
-  const candidate =
-    typeof value === "string"
-      ? value
-      : value && typeof value === "object"
-        ? ("preimage" in value
-            ? value.preimage
-            : "payment_preimage" in value
-              ? value.payment_preimage
-              : undefined)
-        : undefined;
+  // NIP-47 replies may be passed through as the complete response envelope
+  // ({ result: { preimage } }) or already unwrapped by the NWC library.
+  const unwrapped = value && typeof value === "object" && "result" in value
+    ? value.result
+    : value;
+  const candidate = typeof unwrapped === "string"
+    ? unwrapped
+    : unwrapped && typeof unwrapped === "object"
+      ? ("preimage" in unwrapped
+          ? unwrapped.preimage
+          : "payment_preimage" in unwrapped
+            ? unwrapped.payment_preimage
+            : undefined)
+      : undefined;
   if (typeof candidate !== "string" || !/^[0-9a-fA-F]{64}$/.test(candidate)) {
     throw new Error("Wallet did not return a 32-byte payment preimage");
   }

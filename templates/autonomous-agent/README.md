@@ -24,13 +24,14 @@ worker sends to `proof.verify`.
 3. Click **Run**. The provided `.replit.example` command installs packages,
    builds the worker, and starts `pnpm start:seeder` with a 15-minute pause
    between completed cycles. A development run without a database keeps its
-   checkpoint in `.autonomous-agent-state.json`. It is not a durable production
-   store.
+    checkpoint in `.autonomous-agent-state.json`. If PostgreSQL is configured
+    but not initialized in development, the worker logs a warning and uses
+    this local file instead. It is not a durable production store.
 4. For 24/7 operation, add a Replit PostgreSQL database, then choose
    **Reserved VM** when publishing the fork. Reserved VM runs continuously;
    a Scheduled deployment does not. Replit injects `DATABASE_URL` for the
-   database; production startup **fails closed** without it so a restart
-   cannot silently replay paid actions. The worker creates a small
+    database; production startup **fails closed** without an initialized
+    database so a restart cannot silently replay paid actions. The worker creates a small
    `stratigraphy_agent_checkpoint` table. Add the NWC secret to the published
    app's secrets too. The sample `.replit` config uses `ignorePorts = true`
    because this is a background worker, not a web server. Publishing and a
@@ -69,8 +70,9 @@ receiving-only LNURL-pay key as an invoice payer.
 
 Seeder logs include a SHA-256 hash of each paid invoice after the wallet
 reports a valid preimage, the stable latest telemetry hash on every cycle,
-and a verification event after proof verification succeeds. They deliberately
-exclude invoice text, wallet credentials, preimages, and raw upstream errors.
+ and a verification event after proof verification succeeds. Error events include
+ the exception message and stack with wallet URIs, invoices, payment bytes, and
+ configured secrets redacted.
 
 The wallet must return a real 32-byte hex payment preimage; each SDK verifies
 it against its challenge before sending it. `src/wallet.ts` includes an

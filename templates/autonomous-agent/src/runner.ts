@@ -26,12 +26,41 @@ function serverOrigin(value: string): string {
   return server.origin;
 }
 
+export function redactDiagnostic(text: string): string {
+  let result = text;
+  for (const secret of [
+    process.env.NWC_PAIRING_SECRET, process.env.LNURL_PAYMENT_KEY,
+    process.env.DATABASE_URL, process.env.REPLIT_DB,
+  ]) {
+    if (secret && secret.length >= 5) result = result.replaceAll(secret, "[redacted]");
+  }
+  return result
+    .replace(/nostr\+walletconnect:\/\/[^\s"'<>]+/gi, "[redacted NWC URI]")
+    .replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/gi, "[redacted DB URL]")
+    .replace(/L402\s+[^\s"'<>]+/gi, "[redacted L402 authorization]")
+    .replace(/\b(?:lnbc|lntb|lnbcrt)[0-9a-z]+\b/gi, "[redacted invoice]")
+    .replace(/\b(macaroon|invoice|preimage|payment_preimage|token)\s*[:=]\s*["']?[^\s,"'}]+/gi, "$1=[redacted]")
+    .replace(/\b[0-9a-f]{64}\b/gi, "[redacted payment bytes]");
+}
+
 function logEvent(event: AgentEvent | { type: "payment"; invoiceHash: string }): void {
-  // Never print invoices, payment preimages, wallet URIs, access tokens, or DB URLs.
+  // Keep the original message/stack useful without leaking payment material.
   const safeEvent = event.type === "error"
-    ? { type: "error", error: "Cycle failed; check wallet, upstream service, and database" }
+    ? {
+        type: "error",
+        error: redactDiagnostic(event.error),
+        ...(event.stack ? { stack: redactDiagnostic(event.stack) } : {}),
+      }
     : event;
   console.log(JSON.stringify({ time: new Date().toISOString(), ...safeEvent }));
+}
+
+export function logStartupError(error: unknown): void {
+  logEvent({
+    type: "error",
+    error: error instanceof Error ? error.message : "Unknown worker startup error",
+    ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+  });
 }
 
 export async function runWorker(intervalMs: number): Promise<void> {
@@ -46,6 +75,9 @@ export async function runWorker(intervalMs: number): Promise<void> {
   const store = await createStateStore();
   let wallet: ReturnType<typeof createNwcWallet> | undefined;
   try {
+    // Check the state before paying: unreadable local data must not be
+    // discovered only after an invoice has already been settled.
+    await store.load();
     wallet = createNwcWallet(secret, (invoice) => {
       logEvent({
         type: "payment",

@@ -247,6 +247,11 @@ registerMcpServerCardRoute(app);
 registerMcpRoute(app, {
   settlementRouter: mcpSettlementRouter,
   sessionSecret: "contract-mcp-secret",
+  readBitcoinTip: async () => ({
+    height: 920001,
+    hash: "ab".repeat(32),
+    source: "contract-test",
+  }),
 });
 registerNostrStatusRoute(app);
 app.use("/api", healthRouter);
@@ -417,7 +422,16 @@ test("MCP L402 challenges bind price and tool, while discovery and mesh stay fre
     `L402 ${(highChallenge as any).macaroon}:${highPayment.preimage}`,
   );
   assert.equal(highPaid.status, 200);
-  assert.equal(highResult.result?.structuredContent.status, 402);
+  const highReceipt = highResult.result?.structuredContent.receipt;
+  assert.equal(highReceipt.blockHeight, 920001);
+  assert.equal(highReceipt.contextHash, "ab".repeat(32));
+  const verifiedGrounding = await fetch(`${baseUrl}/api/v1/zk/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attestation: highReceipt }),
+  });
+  assert.equal(verifiedGrounding.status, 200);
+  assert.equal(((await verifiedGrounding.json()) as { valid: boolean }).valid, true);
 
   const { response: lowPaid } = await mcpRequestAt(
     baseUrl, "tools/call", lowArgs, undefined, lowAuthorization,
@@ -915,24 +929,19 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       metadata: { purpose: "contract-test" },
     },
   });
-  assert.equal(
-    groundingCalled.result?.isError,
-    true,
-    JSON.stringify(groundingCalled),
-  );
-  assert.deepEqual(groundingCalled.result?.structuredContent, {
-    status: 402,
-    error: "payment_required",
-    endpoint: "/api/v1/zk/ground",
-    amountSats: 5,
-    verificationEndpoint: "/api/v1/zk/verify",
-    request: {
-      contextHash:
-        "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
-      agentId: "contract-agent",
-      metadata: { purpose: "contract-test" },
-    },
+  assert.notEqual(groundingCalled.result?.isError, true);
+  const receipt = groundingCalled.result?.structuredContent.receipt;
+  assert.equal(receipt.contextHash, "4f".repeat(32));
+  assert.equal(receipt.agentId, "contract-agent");
+  assert.equal(receipt.blockHeight, 920001);
+  assert.equal(receipt.blockHash, "ab".repeat(32));
+  const verifiedMcpReceipt = await fetch(`${baseUrl}/api/v1/zk/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attestation: receipt }),
   });
+  assert.equal(verifiedMcpReceipt.status, 200);
+  assert.equal(((await verifiedMcpReceipt.json()) as { valid: boolean }).valid, true);
   const tool = listed.result?.tools.find(
     (candidate: { name: string }) =>
       candidate.name === "stratigraphy.get",

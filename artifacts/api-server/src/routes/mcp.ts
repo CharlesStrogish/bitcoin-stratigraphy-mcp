@@ -15,6 +15,10 @@ import { createDefaultMultiSettlementRouter } from "../services/multiSettlement"
 import type { SettlementRouter } from "../services/settlement";
 import type { MacaroonUsageStore } from "../lib/macaroon-usage-store";
 import type { RevenueLedger } from "../services/ledger";
+import {
+  groundEpistemicContext,
+  type BitcoinTip,
+} from "../services/epistemicGrounding";
 import { createMeshGossipService } from "../services/meshGossipService";
 import {
   getZkProofStatus,
@@ -1378,11 +1382,11 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE: Anchor-creation preparation and L402 routing: prepares agent context for paid anchoring to Bitcoin state through the grounding HTTP endpoint.\nUSAGE: Use to prepare context grounding requests and obtain L402 routing details. Do NOT use for raw ZK proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash as a 64-character case-insensitive hexadecimal SHA-256 digest, agentId as a trimmed 1-256 character string, and an optional metadata object.\nBEHAVIOR: Validates the contextHash and agentId, normalizes the digest, and returns 402 routing metadata for the 5-sat paid HTTP grounding endpoint. Anchor creation requires settlement through that endpoint; this MCP tool does not create an invoice or anchor itself. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: MCP tool-error result containing status 402, error payment_required, endpoint, amountSats 5, verificationEndpoint, and the normalized request.\nERRORS: 400 (Invalid Request), -32602 (Invalid Parameters), 402 (Payment Required in tool result), 429 (Rate Limit).",
+      "PURPOSE: Creates a signed epistemic anchor receipt for agent context grounded in the current Bitcoin tip.\nUSAGE: Use to ground agent context and obtain a verifiable receipt. Do NOT use for raw ZK proof verification; use proof.verify instead.\nPARAMETERS: Accepts contextHash as a 64-character case-insensitive hexadecimal SHA-256 digest, agentId as a trimmed 1-256 character string, and an optional metadata object.\nBEHAVIOR: Validates context and checks Bitcoin tip and signing readiness before requesting payment; after 250-sat L402 settlement, returns a signed receipt without a second HTTP payment. Rate limit: 60 req/min per IP shared across /mcp.\nRETURNS: Object containing receipt with signed payload, Merkle proof, NIP-78 signature, normalized contextHash and agentId, blockHeight, blockHash, and timestamp; verify it through /api/v1/zk/verify.\nERRORS: -32602 (Invalid Parameters) for malformed context, HTTP 402 (Payment Required) with a 250-sat invoice when unpaid, 429 (Rate Limit), or 503 when Bitcoin tip or signing is unavailable.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Epistemic context grounding request routed to the paid HTTP boundary.",
+      description: "Epistemic context grounding request for a directly returned signed anchor receipt after MCP settlement.",
       examples: [{
         contextHash:
           "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
@@ -1414,59 +1418,65 @@ const baseMcpToolDefinitions = [
     },
     outputSchema: {
       type: "object",
-      description: "L402 payment routing response for epistemic grounding.",
+      description: "Signed epistemic anchor receipt grounded against a Bitcoin tip.",
       examples: [{
-        status: 402,
-        error: "payment_required",
-        endpoint: "/api/v1/zk/ground",
-        amountSats: 5,
-        verificationEndpoint: "/api/v1/zk/verify",
-        request: {
+        receipt: {
+          receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
           contextHash:
             "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
           agentId: "research-agent-7",
-          metadata: { topic: "difficulty-adjustment" },
+          blockHeight: 920001,
+          blockHash: "ab".repeat(32),
+          merkleRoot: "cd".repeat(32),
+          timestamp: 1789776000000,
+          schema: "bitcoin-stratigraphy/cryptographic-attestation/v1",
+          payload: { contextHash: "4f".repeat(32) },
+          proof: { algorithm: "sha256", merkleRoot: "cd".repeat(32) },
+          signature: { protocol: "nostr", nip: 78 },
+          nostrSignature: { protocol: "nostr", nip: 78 },
         },
       }],
       additionalProperties: false,
       properties: {
-        status: field("integer", "HTTP-equivalent payment-required status.", [402], {
-          const: 402,
-        }),
-        error: field("string", "Stable payment-required error code.", [
-          "payment_required",
-        ], { const: "payment_required" }),
-        endpoint: field("string", "Paid HTTP endpoint that performs grounding.", [
-          "/api/v1/zk/ground",
-        ]),
-        amountSats: field("integer", "Fixed grounding price in satoshis.", [5], {
-          const: 5,
-        }),
-        verificationEndpoint: field(
-          "string",
-          "Public endpoint that verifies the returned receipt unchanged.",
-          ["/api/v1/zk/verify"],
-        ),
-        request: field(
+        receipt: field(
           "object",
-          "Validated request to submit to the paid HTTP endpoint.",
+          "Full signed receipt; send unchanged to POST /api/v1/zk/verify as attestation.",
           [{
+            receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
             contextHash:
               "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
             agentId: "research-agent-7",
-            metadata: { topic: "difficulty-adjustment" },
+            blockHeight: 920001,
+            blockHash: "ab".repeat(32),
+            merkleRoot: "cd".repeat(32),
+            timestamp: 1789776000000,
+            schema: "bitcoin-stratigraphy/cryptographic-attestation/v1",
+            payload: { contextHash: "4f".repeat(32) },
+            proof: { algorithm: "sha256", merkleRoot: "cd".repeat(32) },
+            signature: { protocol: "nostr", nip: 78 },
+            nostrSignature: { protocol: "nostr", nip: 78 },
           }],
-          { additionalProperties: true },
+          {
+            additionalProperties: true,
+            properties: {
+              receiptSchema: field("string", "Epistemic anchor receipt schema.", ["bitcoin-stratigraphy/epistemic-anchor/v1"]),
+              contextHash: field("string", "Lowercase SHA-256 context digest.", ["4f".repeat(32)]),
+              agentId: field("string", "Trimmed caller identifier.", ["research-agent-7"]),
+              blockHeight: field("integer", "Grounding Bitcoin block height.", [920001]),
+              blockHash: field("string", "Grounding Bitcoin block hash.", ["ab".repeat(32)]),
+              merkleRoot: field("string", "Signed payload Merkle root.", ["cd".repeat(32)]),
+              timestamp: field("integer", "Grounding time in Unix milliseconds.", [1789776000000]),
+              schema: field("string", "Cryptographic attestation schema.", ["bitcoin-stratigraphy/cryptographic-attestation/v1"]),
+              payload: field("object", "Context and Bitcoin state committed by the signature.", [{ contextHash: "4f".repeat(32) }], { additionalProperties: true }),
+              proof: field("object", "SHA-256 payload and Merkle commitment.", [{ algorithm: "sha256", merkleRoot: "cd".repeat(32) }], { additionalProperties: true }),
+              signature: field("object", "Nostr NIP-78 event signing the commitment.", [{ protocol: "nostr", nip: 78 }], { additionalProperties: true }),
+              nostrSignature: field("object", "Alias for the signed NIP-78 event.", [{ protocol: "nostr", nip: 78 }], { additionalProperties: true }),
+            },
+            required: ["receiptSchema", "contextHash", "agentId", "blockHeight", "blockHash", "merkleRoot", "timestamp", "schema", "payload", "proof", "signature", "nostrSignature"],
+          },
         ),
       },
-      required: [
-        "status",
-        "error",
-        "endpoint",
-        "amountSats",
-        "verificationEndpoint",
-        "request",
-      ],
+      required: ["receipt"],
     },
   },
   {
@@ -1503,7 +1513,9 @@ const baseMcpToolDefinitions = [
 
 const mcpToolDefinitions = baseMcpToolDefinitions;
 
-function createBitcoinStratigraphyMcpServer() {
+function createBitcoinStratigraphyMcpServer(
+  groundReceipt?: Awaited<ReturnType<typeof groundEpistemicContext>>,
+) {
   const mesh = createMeshGossipService();
   const server = new McpServer(
     {
@@ -1662,19 +1674,11 @@ function createBitcoinStratigraphyMcpServer() {
           "Invalid epistemic grounding request",
         );
       }
-      const structuredContent = {
-        status: 402,
-        error: "payment_required",
-        endpoint: "/api/v1/zk/ground",
-        amountSats: 5,
-        verificationEndpoint: "/api/v1/zk/verify",
-        request: {
-          ...parsed.data,
-          contextHash: parsed.data.contextHash.toLowerCase(),
-        },
-      };
+      if (!groundReceipt) {
+        throw new McpError(ErrorCode.InternalError, "Grounding receipt is unavailable");
+      }
+      const structuredContent = { receipt: groundReceipt };
       return {
-        isError: true,
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
       };
@@ -1702,7 +1706,9 @@ async function handleMcpRequest(
   req: Request,
   res: Response,
 ): Promise<void> {
-  const server = createBitcoinStratigraphyMcpServer();
+  const server = createBitcoinStratigraphyMcpServer(
+    res.locals.epistemicAnchorReceipt as Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
+  );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -1740,6 +1746,7 @@ export function registerMcpRoute(
     sessionSecret?: string;
     usageStore?: MacaroonUsageStore;
     ledger?: RevenueLedger;
+    readBitcoinTip?: () => Promise<BitcoinTip>;
   } = {},
 ): void {
   const rateLimit = createHttpRateLimitMiddleware(
@@ -1770,12 +1777,12 @@ export function registerMcpRoute(
       }),
     ]),
   ) as Record<string, ReturnType<typeof createL402Middleware>>;
-  app.all("/mcp", rateLimit, (req, res, next) => {
+  app.all("/mcp", rateLimit, async (req, res, next) => {
     if (Array.isArray(req.body)) {
       if (req.body.some((item: unknown) =>
         item !== null && typeof item === "object" &&
         (item as { method?: unknown }).method === "tools/call" &&
-        Object.hasOwn(paidTools, (item as { params?: { name?: unknown } }).params?.name ?? "")
+        Object.hasOwn(paidTools, String((item as { params?: { name?: unknown } }).params?.name ?? ""))
       )) {
         res.status(400).json({
           jsonrpc: "2.0",
@@ -1797,6 +1804,26 @@ export function registerMcpRoute(
     if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
       next();
       return;
+    }
+    if (name === "proof.ground") {
+      const input = groundContextInputSchema.parse(body!.params?.arguments ?? {});
+      if (input.metadata && Buffer.byteLength(JSON.stringify(input.metadata)) > 16_384) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: { code: -32602, message: "Grounding metadata exceeds 16 KiB" },
+          id: typeof (body as { id?: unknown }).id === "number" ? (body as { id: number }).id : null,
+        });
+        return;
+      }
+      try {
+        res.locals.epistemicAnchorReceipt = await groundEpistemicContext(input, {
+          readBitcoinTip: options.readBitcoinTip,
+        });
+      } catch (error) {
+        req.log?.warn({ err: error }, "MCP epistemic grounding preflight failed");
+        res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
+        return;
+      }
     }
     gates[name](req, res, next);
   }, handleMcpRequest);

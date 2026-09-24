@@ -13,11 +13,13 @@
     "test:mcp": "pnpm exec tsx scripts/test-mcp-health.ts",
     "test:nostr": "pnpm exec tsx scripts/test-nostr.ts",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --filter \"./plugins/**\" --filter \"./templates/**\" --if-present run typecheck"
   },
   "private": true,
   "pnpm": {
     "overrides": {
+      "@elizaos/core>crypto-browserify": "-",
+      "@elizaos/core>pdfjs-dist": "6.2.108",
       "esbuild": "0.28.2",
       "fast-uri": "3.1.6",
       "js-yaml": "4.3.2",

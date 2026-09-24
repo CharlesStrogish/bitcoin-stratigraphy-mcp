@@ -2,6 +2,7 @@
 - [Nostr API announcements](nostr-api-announcements.md) — Announce HTTP APIs with general events; reserve NIP-89 for genuine Nostr event-kind handlers.
 - [Nostr payload attestation cache](nostr-payload-attestation-cache.md) — cache signatures by unsigned content, deep-detach payloads, and keep transport receipts bound to final bytes.
 - [Workspace-root package installs](workspace-root-package-installs.md) — root dependency installs need pnpm's workspace-root check handled explicitly.
+- [ElizaOS type-only dependency](elizaos-type-only-dependency.md) — keep the peer contract while pruning vulnerable browser crypto from this workspace's type-only development install.
 - [API artifact root routes](api-artifact-root-routes.md) — root-level API endpoints must be listed in artifact service paths or the Replit proxy returns 404.
 - [Macaroon attenuation budgets](macaroon-attenuation-budgets.md) — descendants must consume every inherited request-cap scope atomically, not only their final token cap.
 - [Macaroon revocation scope](macaroon-revocation-scope.md) — revoke exact final signatures, keep relatives valid, and fail closed when the shared index is unavailable.

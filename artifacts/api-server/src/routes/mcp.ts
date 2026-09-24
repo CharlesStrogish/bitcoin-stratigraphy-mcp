@@ -9,7 +9,6 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Express, NextFunction, Request, Response } from "express";
-import cors from "cors";
 import { z } from "zod";
 import { createL402Middleware } from "../middleware/l402";
 import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
@@ -1758,7 +1757,6 @@ async function handleMcpRequest(
 
 export function registerMcpRequestGuard(app: Express): void {
   app.use("/mcp", (req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
     // Never log Authorization, cookies, or session identifiers.
     console.log("[MCP Request]", req.method, {
       accept: req.headers.accept,
@@ -1766,14 +1764,6 @@ export function registerMcpRequestGuard(app: Express): void {
       origin: req.headers.origin,
     }, req.url);
     next();
-  });
-  // Register before express.json and payment middleware so preflights never
-  // enter the MCP transport or fail body parsing.
-  app.options("/mcp", (_req, res) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "*");
-    res.sendStatus(200);
   });
 }
 
@@ -1815,11 +1805,7 @@ export function registerMcpRoute(
       }),
     ]),
   ) as Record<string, ReturnType<typeof createL402Middleware>>;
-  app.all("/mcp", cors({
-    origin: "*",
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "mcp-session-id"],
-  }), rateLimit, (req, res, next) => {
+  app.all("/mcp", rateLimit, (req, res, next) => {
     if (req.method === "GET" && !req.get("Accept")?.toLowerCase().includes("text/event-stream")) {
       res.status(200).json({ status: "ok", service: "MCP Server" });
       return;
@@ -1893,7 +1879,6 @@ export function registerMcpRoute(
   // JSON body-parser errors happen before the transport; do not send Express's HTML error page.
   app.use("/mcp", (error: unknown, req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) return next(error);
-    res.setHeader("Access-Control-Allow-Origin", "*");
     const incomingStatus = (error as { status?: unknown }).status;
     const status = typeof incomingStatus === "number" &&
         incomingStatus >= 400 && incomingStatus < 500

@@ -35,11 +35,13 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: "*",
-    methods: "*",
-    allowedHeaders: "*",
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["*"],
     preflightContinue: true,
     exposedHeaders: [
+      "*",
       "WWW-Authenticate",
       "X-L402-Receipt",
       "X-Stratigraphy-Records",
@@ -51,6 +53,20 @@ app.use(
     ],
   }),
 );
+// Express 5 requires a regex for a catch-all route rather than the string "*".
+// Reflect requested headers: a literal "*" does not authorize credentialed
+// browser requests carrying Authorization.
+app.options(/.*/, (req, res) => {
+  res.vary("Access-Control-Request-Headers");
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    req.headers["access-control-request-headers"] || "*",
+  );
+  res.header("Access-Control-Allow-Credentials", "true");
+  return res.sendStatus(200);
+});
 app.use(
   pinoHttp({
     logger,
@@ -86,8 +102,6 @@ const macaroonUsageStore = createPostgresMacaroonUsageStore();
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
 registerMcpRoute(app, { usageStore: macaroonUsageStore, ledger: revenueLedger });
-// Express 5 rejects the string "*" route; this regex is its catch-all equivalent.
-app.options(/.*/, cors({ origin: "*", methods: "*", allowedHeaders: "*" }));
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);

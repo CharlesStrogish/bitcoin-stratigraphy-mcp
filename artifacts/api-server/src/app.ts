@@ -76,9 +76,11 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 
+const macaroonUsageStore = createPostgresMacaroonUsageStore();
+
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
-registerMcpRoute(app);
+registerMcpRoute(app, { usageStore: macaroonUsageStore, ledger: revenueLedger });
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);
@@ -88,7 +90,7 @@ registerStratigraphyRoutes(
   undefined,
   undefined,
   createPostgresPaymentChallengeStore(),
-  createPostgresMacaroonUsageStore(),
+  macaroonUsageStore,
   createPostgresMacaroonRevocationStore(),
   pricingEngine,
   undefined,

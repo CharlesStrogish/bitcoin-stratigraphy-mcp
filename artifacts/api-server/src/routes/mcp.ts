@@ -10,6 +10,11 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
+import { createL402Middleware } from "../middleware/l402";
+import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
+import type { SettlementRouter } from "../services/settlement";
+import type { MacaroonUsageStore } from "../lib/macaroon-usage-store";
+import type { RevenueLedger } from "../services/ledger";
 import { createMeshGossipService } from "../services/meshGossipService";
 import {
   getZkProofStatus,
@@ -1728,9 +1733,71 @@ async function handleMcpRequest(
   }
 }
 
-export function registerMcpRoute(app: Express): void {
+export function registerMcpRoute(
+  app: Express,
+  options: {
+    settlementRouter?: SettlementRouter;
+    sessionSecret?: string;
+    usageStore?: MacaroonUsageStore;
+    ledger?: RevenueLedger;
+  } = {},
+): void {
   const rateLimit = createHttpRateLimitMiddleware(
     createSlidingWindowRateLimiter({ limit: 60, windowMs: 60_000 }),
   );
-  app.all("/mcp", rateLimit, handleMcpRequest);
+  const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
+  const paidTools = {
+    "stratigraphy.list": { amountSats: 10, schema: stratigraphyCatalogInputSchema },
+    "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
+    "proof.status": { amountSats: 10, schema: proofStatusInputSchema },
+    "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
+    "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
+    "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
+    "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
+  } as const;
+  const gates = Object.fromEntries(
+    Object.entries(paidTools).map(([name, { amountSats }]) => [
+      name,
+      createL402Middleware({
+        amountSats,
+        description: `Bitcoin Stratigraphy MCP ${name} execution`,
+        settlementRouter,
+        sessionSecret: options.sessionSecret,
+        usageStore: options.usageStore,
+        ledger: options.ledger,
+        scopePath: `/mcp/tools/${name}`,
+        requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
+      }),
+    ]),
+  ) as Record<string, ReturnType<typeof createL402Middleware>>;
+  app.all("/mcp", rateLimit, (req, res, next) => {
+    if (Array.isArray(req.body)) {
+      if (req.body.some((item: unknown) =>
+        item !== null && typeof item === "object" &&
+        (item as { method?: unknown }).method === "tools/call" &&
+        Object.hasOwn(paidTools, (item as { params?: { name?: unknown } }).params?.name ?? "")
+      )) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: { code: -32600, message: "Batch paid tool calls are not supported" },
+          id: null,
+        });
+        return;
+      }
+      next();
+      return;
+    }
+    const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
+    const name = body?.method === "tools/call" ? body.params?.name : undefined;
+    if (typeof name !== "string" || !Object.hasOwn(paidTools, name)) {
+      next();
+      return;
+    }
+    const tool = paidTools[name as keyof typeof paidTools];
+    if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
+      next();
+      return;
+    }
+    gates[name](req, res, next);
+  }, handleMcpRequest);
 }

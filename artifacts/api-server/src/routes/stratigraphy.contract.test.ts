@@ -9,6 +9,7 @@ import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
 import { registerMcpRoute } from "./mcp";
+import type { SettlementRouter } from "../services/settlement";
 import {
   glamaConnector,
   mcpServerCard,
@@ -172,6 +173,38 @@ const staticPricingEngine = {
   quote: (tier: "1-day" | "30-day") => calculateTierCost(tier),
 };
 const groundingLedger = createMemoryRevenueLedger();
+const mcpInvoices = new Map<string, {
+  preimage: string;
+  amountMsats: number;
+  description: string;
+}>();
+let mcpInvoiceCount = 0;
+const mcpSettlementRouter: SettlementRouter = {
+  isConfigured: () => true,
+  activeProvider: () => "contract-mcp",
+  circuitState: () => "closed",
+  createInvoice: async (input) => {
+    const invoicePreimage = (mcpInvoiceCount++).toString(16).padStart(64, "0");
+    const hash = createHash("sha256").update(Buffer.from(invoicePreimage, "hex")).digest("hex");
+    mcpInvoices.set(hash, {
+      preimage: invoicePreimage,
+      amountMsats: input.amountMsats,
+      description: input.description,
+    });
+    return { invoice: `lnbc${input.amountMsats}contractmcp`, paymentHash: hash, provider: "contract-mcp" };
+  },
+  verifyPayment: async (input) => {
+    const issued = mcpInvoices.get(input.paymentHash);
+    return issued &&
+      issued.preimage === input.preimage &&
+      issued.amountMsats === input.expectedAmountMsats &&
+      issued.description === input.expectedDescription &&
+      input.expectedProvider === "contract-mcp" &&
+      input.asset === "btc-lightning"
+      ? { settledAt: Date.now(), provider: "contract-mcp" }
+      : "invalid";
+  },
+};
 
 function agentAuthorization(
   key: Uint8Array,
@@ -211,7 +244,10 @@ app.use(
 );
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
-registerMcpRoute(app);
+registerMcpRoute(app, {
+  settlementRouter: mcpSettlementRouter,
+  sessionSecret: "contract-mcp-secret",
+});
 registerNostrStatusRoute(app);
 app.use("/api", healthRouter);
 registerStratigraphyRoutes(app, () => ({
@@ -268,20 +304,45 @@ after(async () => {
 });
 
 async function mcpRequest(method: string, params?: Record<string, unknown>) {
-  const response = await fetch(`${baseUrl}/mcp`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-      "MCP-Protocol-Version": "2025-03-26",
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method,
-      ...(params ? { params } : {}),
-    }),
+  const payload = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method,
+    ...(params ? { params } : {}),
   });
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+    "MCP-Protocol-Version": "2025-03-26",
+  };
+  let response = await fetch(`${baseUrl}/mcp`, {
+    method: "POST",
+    headers,
+    body: payload,
+  });
+  if (response.status === 402) {
+    const challenge = await response.json() as {
+      macaroon: string;
+      payment_hash: string;
+      amount_sats: number;
+      invoice: string;
+    };
+    const expected = ["stratigraphy.list", "proof.list", "proof.status"].includes(String(params?.name))
+      ? 10 : 250;
+    assert.equal(challenge.amount_sats, expected);
+    assert.match(response.headers.get("www-authenticate") ?? "", /L402 macaroon=".+", invoice="ln.+"/);
+    assert.ok(challenge.invoice.startsWith("ln"));
+    const payment = mcpInvoices.get(challenge.payment_hash);
+    assert.ok(payment);
+    response = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        Authorization: `L402 ${challenge.macaroon}:${payment.preimage}`,
+      },
+      body: payload,
+    });
+  }
   assert.equal(response.status, 200);
   return (await response.json()) as {
     result?: Record<string, any>;
@@ -294,6 +355,7 @@ async function mcpRequestAt(
   method: string,
   params?: Record<string, unknown>,
   forwardedFor?: string,
+  authorization?: string,
 ) {
   const response = await fetch(`${targetBaseUrl}/mcp`, {
     method: "POST",
@@ -302,6 +364,7 @@ async function mcpRequestAt(
       Accept: "application/json, text/event-stream",
       "MCP-Protocol-Version": "2025-03-26",
       ...(forwardedFor ? { "X-Forwarded-For": forwardedFor } : {}),
+      ...(authorization ? { Authorization: authorization } : {}),
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -318,6 +381,58 @@ async function mcpRequestAt(
   };
   return { response, body };
 }
+
+test("MCP L402 challenges bind price and tool, while discovery and mesh stay free", async () => {
+  for (const [method, params] of [
+    ["initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "pricing-test", version: "1" } }],
+    ["tools/list", {}],
+    ["tools/call", { name: "mesh.status", arguments: {} }],
+  ] as const) {
+    const { response } = await mcpRequestAt(baseUrl, method, params);
+    assert.equal(response.status, 200, method);
+    assert.equal(response.headers.get("www-authenticate"), null);
+  }
+
+  const lowArgs = { name: "proof.status", arguments: { snapshotDigest: "1" } };
+  const { response: lowResponse, body: lowChallenge } = await mcpRequestAt(baseUrl, "tools/call", lowArgs);
+  assert.equal(lowResponse.status, 402);
+  assert.equal((lowChallenge as any).amount_sats, 10);
+  assert.match(lowResponse.headers.get("www-authenticate") ?? "", /L402 macaroon=".+", invoice="ln.+"/);
+  const lowPayment = mcpInvoices.get((lowChallenge as any).payment_hash);
+  assert.ok(lowPayment);
+  const lowAuthorization = `L402 ${(lowChallenge as any).macaroon}:${lowPayment.preimage}`;
+  const highArgs = {
+    name: "proof.ground",
+    arguments: { contextHash: "ab".repeat(32), agentId: "pricing-test" },
+  };
+  const { response: crossTier, body: highChallenge } = await mcpRequestAt(
+    baseUrl, "tools/call", highArgs, undefined, lowAuthorization,
+  );
+  assert.equal(crossTier.status, 402);
+  assert.equal((highChallenge as any).amount_sats, 250);
+  const highPayment = mcpInvoices.get((highChallenge as any).payment_hash);
+  assert.ok(highPayment);
+  const { response: highPaid, body: highResult } = await mcpRequestAt(
+    baseUrl, "tools/call", highArgs, undefined,
+    `L402 ${(highChallenge as any).macaroon}:${highPayment.preimage}`,
+  );
+  assert.equal(highPaid.status, 200);
+  assert.equal(highResult.result?.structuredContent.status, 402);
+
+  const { response: lowPaid } = await mcpRequestAt(
+    baseUrl, "tools/call", lowArgs, undefined, lowAuthorization,
+  );
+  assert.equal(lowPaid.status, 200);
+  const { response: replay } = await mcpRequestAt(
+    baseUrl, "tools/call", lowArgs, undefined, lowAuthorization,
+  );
+  assert.equal(replay.status, 429);
+  const { response: invalidParams, body: invalidBody } = await mcpRequestAt(
+    baseUrl, "tools/call", { name: "proof.status", arguments: { snapshotDigest: "" } },
+  );
+  assert.equal(invalidParams.status, 200);
+  assert.equal(invalidBody.error?.code, -32602);
+});
 
 async function assertValidReceipt(response: Response, expectedPaymentHash: string) {
   const rawBody = await response.text();
@@ -1078,7 +1193,10 @@ test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async ()
     (req as any).log = { error: () => undefined };
     next();
   });
-  registerMcpRoute(invalidApp);
+  registerMcpRoute(invalidApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-mcp-secret",
+  });
   const invalidServer = invalidApp.listen(0);
   await new Promise<void>((resolve) => invalidServer.once("listening", resolve));
   const address = invalidServer.address() as AddressInfo;
@@ -1113,27 +1231,20 @@ test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async ()
       assert.equal(body.error?.code, -32602, `${name}: ${JSON.stringify(body)}`);
     }
 
-    for (const name of ["stratigraphy.list", "mesh.status"]) {
-      const { response, body } = await mcpRequestAt(
-        invalidBaseUrl,
-        "tools/call",
-        { name, arguments: {} },
-      );
-      assert.equal(response.status, 200);
-      assert.equal(response.headers.has("www-authenticate"), false);
-      assert.ok(body.result?.structuredContent);
-    }
+    const catalog = await mcpRequestAt(invalidBaseUrl, "tools/call", {
+      name: "stratigraphy.list", arguments: {},
+    });
+    assert.equal(catalog.response.status, 402);
+    assert.equal((catalog.body as any).amount_sats, 10);
+    const mesh = await mcpRequestAt(invalidBaseUrl, "tools/call", {
+      name: "mesh.status", arguments: {},
+    });
+    assert.equal(mesh.response.status, 200);
+    assert.equal(mesh.response.headers.has("www-authenticate"), false);
+    assert.ok(mesh.body.result?.structuredContent);
     const listed = await mcpRequestAt(invalidBaseUrl, "tools/list");
     assert.equal(listed.response.headers.has("www-authenticate"), false);
-    for (const tool of listed.body.result?.tools ?? []) {
-      if (tool.name !== "proof.ground") {
-        assert.match(
-          tool.description,
-          /No 402 payment required\.$/,
-          `${tool.name} must remain payment-free`,
-        );
-      }
-    }
+    assert.ok(listed.body.result?.tools?.length);
   } finally {
     invalidServer.close();
   }

@@ -28,6 +28,7 @@ export type L402MiddlewareOptions = {
   amountSats: number | (() => number);
   description: string;
   settlementRouter: SettlementRouter;
+  scopePath?: string;
   sessionSecret?: string;
   invoiceExpirySeconds?: number;
   now?: () => number;
@@ -51,6 +52,9 @@ export function parseL402Header(
 export function createL402Middleware(
   options: L402MiddlewareOptions,
 ): RequestHandler {
+  if (options.scopePath && !/^\/[^\s]*$/.test(options.scopePath)) {
+    throw new RangeError("L402 scopePath must be an absolute path");
+  }
   if (
     !Number.isSafeInteger(options.invoiceExpirySeconds ?? 3_600) ||
     (options.invoiceExpirySeconds ?? 3_600) <= 0
@@ -156,7 +160,7 @@ export function createL402Middleware(
         paymentProvider: invoice.provider,
       });
       const macaroon = attenuateSubscriptionMacaroon(rootMacaroon, [
-        `allowed_path=${req.path}`,
+        `allowed_path=${options.scopePath ?? req.path}`,
         "max_requests=1",
       ]);
       if (!macaroon) throw new Error("Unable to attenuate L402 macaroon");
@@ -195,10 +199,12 @@ export function createL402Middleware(
         pass.paymentHash === preimageHash &&
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
+        (typeof options.amountSats !== "number" ||
+          pass.amountMsats === options.amountSats * 1_000) &&
         pass.paymentAsset === "btc-lightning" &&
         pass.paymentProvider &&
         pass.allowedPaths.length > 0 &&
-        pass.allowedPaths.every((path) => path === req.path)
+        pass.allowedPaths.every((path) => path === (options.scopePath ?? req.path))
       ) {
         let verification;
         try {

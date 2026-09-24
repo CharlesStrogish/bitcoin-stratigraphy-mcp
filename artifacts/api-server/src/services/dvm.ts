@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import {
   finalizeEvent,
   getPublicKey,
@@ -20,6 +20,7 @@ import {
 } from "./settlement";
 import {
   createServiceAnnouncer,
+  NIP90_5050_FEE_SATS,
   parseNip05Identifier,
   type RelayConnectionStatus,
 } from "./announcer";
@@ -144,10 +145,16 @@ export function loadDvmConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): DvmConfig {
   const configuredKey = env.NOSTR_PRIVATE_KEY?.trim();
-  if (!configuredKey) {
-    throw new Error("NOSTR_PRIVATE_KEY is required for the NIP-90 DVM");
+  const fallbackSecret = env.SESSION_SECRET?.trim();
+  if (!configuredKey && !fallbackSecret) {
+    throw new Error("NOSTR_PRIVATE_KEY or SESSION_SECRET is required for the NIP-90 DVM");
   }
-  const privateKey = parsePrivateKey(configuredKey);
+  // A public, hard-coded seed would let anyone impersonate the DVM.
+  const privateKey = configuredKey
+    ? parsePrivateKey(configuredKey)
+    : createHmac("sha256", fallbackSecret!)
+      .update("bitcoin-stratigraphy/nostr-dvm-key/v1")
+      .digest();
   return {
     privateKey,
     publicKey: getPublicKey(privateKey),
@@ -280,7 +287,14 @@ export function createNwcSettlementWaiter(
 function capabilityFor(event: Event): DvmCapability | undefined {
   const topics = event.tags
     .filter((tag) => tag[0] === "t")
-    .map((tag) => tag[1]?.toLowerCase());
+    .map((tag) => tag[1]?.toLowerCase().replace(/^#/, ""));
+  if (event.kind === 5_050) {
+    if (topics.includes("zk") || topics.includes("zk-proof")) return "zk-proof";
+    if (topics.includes("bitcoin") || topics.includes("stratigraphy")) {
+      return "stratigraphy";
+    }
+    return undefined;
+  }
   if (event.kind === 5_002 || topics.includes("zk-proof")) return "zk-proof";
   if (
     event.kind === 5_000 ||
@@ -481,11 +495,14 @@ export function createNip90Dvm(
     request: Event,
     capability: DvmCapability,
   ) => {
-    const baseFeeSats = capability === "stratigraphy"
-      ? config.stratigraphyFeeSats
-      : config.proofFeeSats;
-    const loadMultiplier =
-      pricingEngine.jobQuote?.(capability, runtimePricingLoad()).multiplier ?? 1;
+    const baseFeeSats = request.kind === 5_050
+      ? NIP90_5050_FEE_SATS
+      : capability === "stratigraphy"
+        ? config.stratigraphyFeeSats
+        : config.proofFeeSats;
+    const loadMultiplier = request.kind === 5_050
+      ? 1
+      : pricingEngine.jobQuote?.(capability, runtimePricingLoad()).multiplier ?? 1;
     const feeSats = Math.ceil(baseFeeSats * loadMultiplier);
     const amountMsats = feeSats * 1_000;
     const bid = requestedBid(request);
@@ -510,7 +527,12 @@ export function createNip90Dvm(
         signal: abortController.signal,
       });
       invoice = { ...created, amountMsats, description };
-      await publishFeedback(request, "payment-required", "", invoice);
+      await publishFeedback(
+        request,
+        "payment-required",
+        "Pay the Lightning invoice in the amount tag to start this job",
+        invoice,
+      );
       settlement = await waitForSettlement(invoice, {
         signal: abortController.signal,
         timeoutMs: config.invoiceExpirySeconds * 1_000,

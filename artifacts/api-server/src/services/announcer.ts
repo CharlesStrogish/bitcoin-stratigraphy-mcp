@@ -7,9 +7,12 @@ import {
 } from "nostr-tools";
 
 export const ANNOUNCEMENT_INTERVAL_MS = 6 * 60 * 60 * 1_000;
-export const DVM_NAME = "Bitcoin Stratigraphy DVM";
+export const DVM_NAME = "Bitcoin Stratigraphy Data Engine & ZK Oracle";
 export const DVM_ABOUT =
-  "Autonomous MCP & NIP-90 telemetry data engine providing Bitcoin block stratigraphy and ZK attestation proofs";
+  "Quantitative Bitcoin thermodynamic dataset, Groth16 zk-SNARK state verification, and L402 payment oracle.";
+export const DVM_MCP_ENDPOINT =
+  "https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp";
+export const NIP90_5050_FEE_SATS = 250;
 
 export type RelayConnectionStatus = {
   relay: string;
@@ -52,6 +55,7 @@ export type NostrDiscoveryStatus = {
   pricing: {
     "5000": { capability: "stratigraphy"; amount_msats: number };
     "5002": { capability: "zk-proof"; amount_msats: number };
+    "5050": { capability: "bitcoin-stratigraphy-or-zk"; amount_msats: number };
   };
   last_announced_at: string | null;
   last_attempted_at: string | null;
@@ -65,6 +69,7 @@ const discoveryStatus: NostrDiscoveryStatus = {
   pricing: {
     "5000": { capability: "stratigraphy", amount_msats: 5_000 },
     "5002": { capability: "zk-proof", amount_msats: 21_000 },
+    "5050": { capability: "bitcoin-stratigraphy-or-zk", amount_msats: NIP90_5050_FEE_SATS * 1_000 },
   },
   last_announced_at: null,
   last_attempted_at: null,
@@ -120,6 +125,10 @@ export function buildNip89HandlerEvent(
   const content = {
     name: DVM_NAME,
     about: DVM_ABOUT,
+    author: "Charles R. Strogish",
+    architect: "Charles R. Strogish",
+    endpoint: DVM_MCP_ENDPOINT,
+    mcp_price: "10 sats (discovery), 250 sats (ZK/Data)",
     picture: config.picture ?? "",
     banner: config.banner ?? "",
     capabilities: ["nip-90", "stratigraphy", "zk-proof", "mcp", "l402"],
@@ -134,18 +143,29 @@ export function buildNip89HandlerEvent(
         capability: "zk-proof",
         amount_msats: Number(proofAmount),
       },
+      {
+        kind: 5_050,
+        capability: "bitcoin-stratigraphy-or-zk",
+        amount_msats: NIP90_5050_FEE_SATS * 1_000,
+      },
     ],
   };
   const template: EventTemplate = {
     kind: 31_990,
     created_at: createdAt,
     tags: [
-      ["d", "bitcoin-stratigraphy-dvm"],
+      ["d", "bitcoin-stratigraphy-mcp"],
       ["k", "5000"],
       ["k", "5002"],
+      ["k", "5050"],
+      ["endpoint", DVM_MCP_ENDPOINT],
+      ["price", "10 sats (discovery), 250 sats (ZK/Data)"],
       ["amount", stratigraphyAmount],
       ["amount", proofAmount],
+      ["amount", String(NIP90_5050_FEE_SATS * 1_000)],
+      ["t", "bitcoin"],
       ["t", "stratigraphy"],
+      ["t", "zk"],
       ["t", "zk-proof"],
       ["capability", "nip-90"],
       ["capability", "mcp"],
@@ -193,6 +213,10 @@ export function createServiceAnnouncer(
     "5002": {
       capability: "zk-proof",
       amount_msats: config.proofFeeSats * 1_000,
+    },
+    "5050": {
+      capability: "bitcoin-stratigraphy-or-zk",
+      amount_msats: NIP90_5050_FEE_SATS * 1_000,
     },
   };
 

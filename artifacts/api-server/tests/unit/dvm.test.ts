@@ -18,6 +18,7 @@ import {
   type DvmTransport,
 } from "../../src/services/dvm";
 import { createMemoryRevenueLedger } from "../../src/services/ledger";
+import { createPricingEngine } from "../../src/services/pricing";
 
 function config(privateKey = generateSecretKey()): DvmConfig {
   return {
@@ -75,13 +76,20 @@ test("loads DVM configuration with validated key and fallback relays", () => {
   assert.deepEqual(loaded.relays, [
     "wss://relay.damus.io",
     "wss://nos.lol",
+    "wss://relay.primal.net",
     "wss://relay.nostr.band",
   ]);
   assert.equal(loaded.stratigraphyFeeSats, 5);
   assert.throws(
     () => loadDvmConfig({}),
-    /NOSTR_PRIVATE_KEY is required/,
+    /NOSTR_PRIVATE_KEY or SESSION_SECRET is required/,
   );
+  const fallback = loadDvmConfig({ SESSION_SECRET: "test-only-private-seed" });
+  assert.equal(
+    fallback.publicKey,
+    loadDvmConfig({ SESSION_SECRET: "test-only-private-seed" }).publicKey,
+  );
+  assert.notEqual(fallback.publicKey, loaded.publicKey);
   assert.throws(
     () =>
       loadDvmConfig({
@@ -125,6 +133,7 @@ test("requires settlement before publishing a signed NIP-90 result", async () =>
   const published: Event[] = [];
   const ledger = createMemoryRevenueLedger();
   const dvm = createNip90Dvm(config(), {
+    pricingEngine: createPricingEngine({ maxLoadMultiplier: 1 }),
     transport: fakeTransport(published),
     createInvoice: async () => ({
       invoice: "lnbc5n1test",
@@ -185,6 +194,7 @@ test("does not execute unpaid, unsupported, or differently targeted jobs", async
   let executions = 0;
   const dvmConfig = config();
   const dvm = createNip90Dvm(dvmConfig, {
+    pricingEngine: createPricingEngine({ maxLoadMultiplier: 1 }),
     transport: fakeTransport(published),
     createInvoice: async () => ({
       invoice: "lnbc21n1test",
@@ -221,6 +231,64 @@ test("does not execute unpaid, unsupported, or differently targeted jobs", async
     request(5_002, {}, [["p", "ff".repeat(32)]]),
   );
   assert.equal(published.length, 2);
+  await dvm.stop();
+});
+
+test("kind 5050 serves tagged bitcoin, stratigraphy, and zk jobs after 250-sat settlement", async () => {
+  const published: Event[] = [];
+  const operations: string[] = [];
+  const dvm = createNip90Dvm(config(), {
+    transport: fakeTransport(published),
+    createInvoice: async ({ amountMsats }) => {
+      assert.equal(amountMsats, 250_000);
+      return {
+        invoice: "lnbc2500n1test",
+        paymentHash: SETTLED_PAYMENT_HASH,
+        provider: "coinos",
+      };
+    },
+    waitForSettlement: async () => ({
+      settledAt: 1_789_963_200,
+      preimage: SETTLED_PREIMAGE,
+    }),
+    queryStratigraphy: async () => {
+      operations.push("stratigraphy");
+      return { records: [] };
+    },
+    verifyProof: async () => {
+      operations.push("zk");
+      return { valid: true };
+    },
+    now: () => 1_789_963_200_000,
+  });
+  dvm.start();
+  for (const [topic, expected] of [
+    ["bitcoin", "stratigraphy"],
+    ["#stratigraphy", "stratigraphy"],
+    ["zk", "zk"],
+  ]) {
+    const job = request(5_050, { days: 1 }, [["t", topic]]);
+    await dvm.handleEvent(job);
+    const events = published.splice(0);
+    assert.deepEqual(events.map((event) => event.kind), [7_000, 7_000, 6_050, 7_000]);
+    for (const feedback of events.filter((event) => event.kind === 7_000)) {
+      assert.equal(verifyEvent(feedback), true);
+      assert.deepEqual(feedback.tags.find((tag) => tag[0] === "e"), ["e", job.id]);
+      assert.deepEqual(feedback.tags.find((tag) => tag[0] === "p"), ["p", job.pubkey]);
+    }
+    assert.deepEqual(
+      events.filter((event) => event.kind === 7_000).map((event) =>
+        event.tags.find((tag) => tag[0] === "status")?.[1]),
+      ["payment-required", "processing", "success"],
+    );
+    assert.deepEqual(events[0]!.tags.find((tag) => tag[0] === "amount"), [
+      "amount", "250000", "lnbc2500n1test",
+    ]);
+    assert.match(events[0]!.tags.find((tag) => tag[0] === "status")?.[2] ?? "", /invoice/);
+    assert.equal(operations.at(-1), expected);
+  }
+  await dvm.handleEvent(request(5_050, {}, [["t", "unrelated"]]));
+  assert.equal(published.length, 0);
   await dvm.stop();
 });
 

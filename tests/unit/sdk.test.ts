@@ -260,7 +260,7 @@ test("redeems a CoinOS NIP-47 result.preimage without a second payment", async (
     async payInvoice({ invoice }) {
       assert.equal(invoice, "lnbc-subscription");
       payments++;
-      return { result: { preimage } };
+      return { result: { preimage: `  0X${preimage.toUpperCase()} \n` } };
     },
   });
   const client = new BitcoinStratigraphyClient({
@@ -277,6 +277,30 @@ test("redeems a CoinOS NIP-47 result.preimage without a second payment", async (
   assert.deepEqual(await client.getLatest(), paidResponse);
   assert.equal(payments, 1);
   assert.deepEqual(authorizations, [null, `L402 cached-macaroon:${preimage}`]);
+});
+
+test("accepts NWC preimages from each wrapped or unwrapped NIP-47 field", async () => {
+  const candidate = `\t0x${preimage.toUpperCase()}  `;
+  for (const response of [
+    { result: { preimage: candidate } },
+    { result: { payment_preimage: candidate } },
+    { preimage: candidate },
+    { payment_preimage: candidate },
+    { result: { preimage: "not-a-preimage" }, payment_preimage: candidate },
+  ]) {
+    const wallet = new NwcWalletAdapter({ payInvoice: async () => response });
+    assert.equal(await wallet.payInvoice("lnbc-test"), preimage);
+  }
+  const invalid = new NwcWalletAdapter({
+    payInvoice: async () => ({ result: { preimage: "wallet-local-uuid" } }),
+  });
+  await assert.rejects(invalid.payInvoice("lnbc-test"), (error: unknown) => {
+    assert.ok(error instanceof Error);
+    assert.match(error.message, /Wallet did not return a 32-byte payment preimage/);
+    assert.match(error.message, /result\.preimage:string/);
+    assert.doesNotMatch(error.message, /wallet-local-uuid/);
+    return true;
+  });
 });
 
 test("sends NIP-98 identity while acquiring and redeeming a bound pass", async () => {

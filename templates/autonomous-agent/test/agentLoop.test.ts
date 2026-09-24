@@ -130,7 +130,7 @@ test("CoinOS nested NWC preimage reaches the MCP wallet callback", async () => {
     {
       async payInvoice({ invoice }) {
         assert.equal(invoice, "lnbc-test");
-        return { result: { preimage } };
+        return { result: { preimage: ` 0x${preimage.toUpperCase()} ` } };
       },
     },
   );

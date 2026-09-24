@@ -197,8 +197,9 @@ export class NwcWalletAdapter implements L402WalletAdapter {
   constructor(private readonly client: NwcPaymentClient) {}
 
   async payInvoice(invoice: string): Promise<string> {
-    const result = await this.client.payInvoice({ invoice });
-    return paymentPreimage(result);
+    // Some clients unwrap the NIP-47 envelope; others return it intact.
+    const response = await this.client.payInvoice({ invoice });
+    return paymentPreimage(response);
   }
 
   close(): void {
@@ -569,24 +570,31 @@ export class BitcoinStratigraphyClient {
 }
 
 function paymentPreimage(value: unknown): string {
-  // NIP-47 replies may be passed through as the complete response envelope
-  // ({ result: { preimage } }) or already unwrapped by the NWC library.
-  const unwrapped = value && typeof value === "object" && "result" in value
-    ? value.result
-    : value;
-  const candidate = typeof unwrapped === "string"
-    ? unwrapped
-    : unwrapped && typeof unwrapped === "object"
-      ? ("preimage" in unwrapped
-          ? unwrapped.preimage
-          : "payment_preimage" in unwrapped
-            ? unwrapped.payment_preimage
-            : undefined)
-      : undefined;
-  if (typeof candidate !== "string" || !/^[0-9a-fA-F]{64}$/.test(candidate)) {
-    throw new Error("Wallet did not return a 32-byte payment preimage");
+  const fields: Array<[string, unknown]> = [];
+  if (typeof value === "string") fields.push(["response", value]);
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const response = value as Record<string, unknown>;
+    const result = response.result;
+    if (result !== null && typeof result === "object" && !Array.isArray(result)) {
+      const nested = result as Record<string, unknown>;
+      fields.push(["result.preimage", nested.preimage]);
+      fields.push(["result.payment_preimage", nested.payment_preimage]);
+    }
+    fields.push(["preimage", response.preimage]);
+    fields.push(["payment_preimage", response.payment_preimage]);
   }
-  return candidate.toLowerCase();
+  for (const [, candidate] of fields) {
+    if (typeof candidate !== "string") continue;
+    const normalized = candidate.trim().replace(/^0x/i, "").toLowerCase();
+    if (/^[0-9a-f]{64}$/.test(normalized)) return normalized;
+  }
+  // Field names and types only: never put the raw NWC reply or a preimage in
+  // error logs. A settled wallet transfer without a real preimage cannot
+  // authorize an L402 request.
+  const shape = fields.map(([name, field]) =>
+    `${name}:${typeof field === "string" ? "string" : field === undefined ? "missing" : typeof field}`,
+  ).join(", ") || "no recognizable fields";
+  throw new Error(`Wallet did not return a 32-byte payment preimage (${shape})`);
 }
 
 async function parseJson<T>(response: Response): Promise<T> {

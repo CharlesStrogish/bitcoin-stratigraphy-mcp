@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 export type SubscriptionTier = "1-day" | "30-day";
 export type AgentTier = "STANDARD" | "VIP" | "SWARM";
 export type SettlementAsset =
@@ -570,11 +571,18 @@ export class BitcoinStratigraphyClient {
 }
 
 function paymentPreimage(value: unknown): string {
+  const isBufferJson = (candidate: unknown): candidate is { type: "Buffer"; data: unknown[] } =>
+    candidate !== null && typeof candidate === "object" &&
+    "type" in candidate && candidate.type === "Buffer" &&
+    "data" in candidate && Array.isArray(candidate.data);
   const fields: Array<[string, unknown]> = [];
-  if (typeof value === "string") fields.push(["response", value]);
+  if (typeof value === "string" || value instanceof Uint8Array || isBufferJson(value)) {
+    fields.push(["response", value]);
+  }
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     const response = value as Record<string, unknown>;
     const result = response.result;
+    if (result instanceof Uint8Array || isBufferJson(result)) fields.push(["result", result]);
     if (result !== null && typeof result === "object" && !Array.isArray(result)) {
       const nested = result as Record<string, unknown>;
       fields.push(["result.preimage", nested.preimage]);
@@ -583,17 +591,51 @@ function paymentPreimage(value: unknown): string {
     fields.push(["preimage", response.preimage]);
     fields.push(["payment_preimage", response.payment_preimage]);
   }
-  for (const [, candidate] of fields) {
-    if (typeof candidate !== "string") continue;
-    const normalized = candidate.trim().replace(/^0x/i, "").toLowerCase();
-    if (/^[0-9a-f]{64}$/.test(normalized)) return normalized;
+  const describe = (field: unknown) => {
+    if (typeof field === "string") {
+      const text = field.trim();
+      const hex = text.replace(/^0x/i, "");
+      const encoded = text.replace(/-/g, "+").replace(/_/g, "/");
+      // Node's Base64 decoder accepts malformed strings; require a canonical
+      // encoding before interpreting any payment proof as bytes.
+      const isBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(encoded) &&
+        encoded.length % 4 !== 1 &&
+        Buffer.from(encoded, "base64").toString("base64").replace(/=+$/, "") ===
+          encoded.replace(/=+$/, "");
+      return {
+        metadata: { typeof: "string", length: field.length, isBase64, isHex: /^[0-9a-f]+$/i.test(hex) },
+        bytes: /^[0-9a-f]{64}$/i.test(hex)
+          ? Buffer.from(hex, "hex")
+          : isBase64 ? Buffer.from(encoded, "base64") : undefined,
+      };
+    }
+    if (field instanceof Uint8Array) {
+      return {
+        metadata: { typeof: "object", length: field.byteLength, isBase64: false, isHex: false },
+        bytes: Buffer.from(field),
+      };
+    }
+    if (field !== null && typeof field === "object" && !Array.isArray(field)) {
+      const json = field as Record<string, unknown>;
+      if (isBufferJson(json)) {
+        const data = json.data;
+        const valid = data.every((byte: unknown) =>
+          Number.isInteger(byte) && (byte as number) >= 0 && (byte as number) <= 255);
+        return {
+          metadata: { typeof: "object", length: data.length, isBase64: false, isHex: false },
+          bytes: valid ? Buffer.from(data as number[]) : undefined,
+        };
+      }
+    }
+    return { metadata: { typeof: field === null ? "null" : typeof field, length: null, isBase64: false, isHex: false }, bytes: undefined };
+  };
+  const descriptions = fields.map(([name, field]) => ({ name, ...describe(field) }));
+  for (const { bytes } of descriptions) {
+    if (bytes?.length === 32) return bytes.toString("hex");
   }
-  // Field names and types only: never put the raw NWC reply or a preimage in
-  // error logs. A settled wallet transfer without a real preimage cannot
-  // authorize an L402 request.
-  const shape = fields.map(([name, field]) =>
-    `${name}:${typeof field === "string" ? "string" : field === undefined ? "missing" : typeof field}`,
-  ).join(", ") || "no recognizable fields";
+  // Only structural metadata; never print the raw response or payment proof.
+  const shape = descriptions.map(({ name, metadata }) =>
+    `${name}:${JSON.stringify(metadata)}`).join(", ") || "no recognizable fields";
   throw new Error(`Wallet did not return a 32-byte payment preimage (${shape})`);
 }
 

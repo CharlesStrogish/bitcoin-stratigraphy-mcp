@@ -260,7 +260,7 @@ test("redeems a CoinOS NIP-47 result.preimage without a second payment", async (
     async payInvoice({ invoice }) {
       assert.equal(invoice, "lnbc-subscription");
       payments++;
-      return { result: { preimage: `  0X${preimage.toUpperCase()} \n` } };
+      return { result: { preimage: Buffer.from(preimage, "hex").toString("base64") } };
     },
   });
   const client = new BitcoinStratigraphyClient({
@@ -281,12 +281,20 @@ test("redeems a CoinOS NIP-47 result.preimage without a second payment", async (
 
 test("accepts NWC preimages from each wrapped or unwrapped NIP-47 field", async () => {
   const candidate = `\t0x${preimage.toUpperCase()}  `;
+  const base64 = Buffer.from(preimage, "hex").toString("base64");
+  assert.equal(base64.length, 44);
   for (const response of [
     { result: { preimage: candidate } },
-    { result: { payment_preimage: candidate } },
+    { result: { payment_preimage: `  ${base64} \n` } },
     { preimage: candidate },
-    { payment_preimage: candidate },
+    { payment_preimage: base64 },
     { result: { preimage: "not-a-preimage" }, payment_preimage: candidate },
+    { result: { preimage: Buffer.from(preimage, "hex") } },
+    { preimage: Uint8Array.from(Buffer.from(preimage, "hex")) },
+    { result: { payment_preimage: Buffer.from(preimage, "hex").toJSON() } },
+    Buffer.from(preimage, "hex"),
+    { result: Buffer.from(preimage, "hex") },
+    Buffer.from(preimage, "hex").toJSON(),
   ]) {
     const wallet = new NwcWalletAdapter({ payInvoice: async () => response });
     assert.equal(await wallet.payInvoice("lnbc-test"), preimage);
@@ -297,10 +305,14 @@ test("accepts NWC preimages from each wrapped or unwrapped NIP-47 field", async 
   await assert.rejects(invalid.payInvoice("lnbc-test"), (error: unknown) => {
     assert.ok(error instanceof Error);
     assert.match(error.message, /Wallet did not return a 32-byte payment preimage/);
-    assert.match(error.message, /result\.preimage:string/);
+    assert.match(error.message, /result\.preimage:\{"typeof":"string","length":17,"isBase64":false,"isHex":false\}/);
     assert.doesNotMatch(error.message, /wallet-local-uuid/);
     return true;
   });
+  for (const bad of [Buffer.alloc(31), "A".repeat(44), { type: "Buffer", data: [256, ...Array(31).fill(0)] }]) {
+    const wallet = new NwcWalletAdapter({ payInvoice: async () => ({ preimage: bad }) });
+    await assert.rejects(wallet.payInvoice("lnbc-test"), /Wallet did not return a 32-byte payment preimage/);
+  }
 });
 
 test("sends NIP-98 identity while acquiring and redeeming a bound pass", async () => {

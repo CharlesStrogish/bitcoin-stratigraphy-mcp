@@ -216,80 +216,30 @@ async function assertToolList(baseUrl: URL) {
   );
 }
 
-function sampleBn254Proof(): string {
-  return Buffer.from(
-    JSON.stringify({
-      pi_a: ["1", "2", "1"],
-      pi_b: [
-        ["1", "2"],
-        ["3", "4"],
-        ["1", "0"],
-      ],
-      pi_c: ["5", "6", "1"],
-      protocol: "groth16",
-      curve: "bn128",
-    }),
-  ).toString("base64url");
-}
-
-async function assertZkVerificationCall(baseUrl: URL) {
+async function assertMeshStatusCall(baseUrl: URL) {
+  // Paid tools such as proof.verify require an L402 payment; use a free call for live health.
   const response = await mcpRequest(baseUrl, 2, "tools/call", {
-    name: "proof.verify",
-    arguments: {
-      proof: sampleBn254Proof(),
-      publicInputs: {
-        blockHeight: 920000,
-        snapshotDigest: "1",
-        thermodynamicHash: "1",
-        timestamp: 1789776000000,
-        valuationSat: 12583,
-      },
-      verificationKeyId: "sha256:mcp-health-check",
-      data: [
-        {
-          block: { height: 920000 },
-          observed_at: "2026-09-19T00:00:00.000Z",
-          thermodynamic: { target_multiplier: 125.83 },
-        },
-      ],
-    },
+    name: "mesh.get_status",
+    arguments: {},
   });
   assert.ok(isRecord(response.result), "tools/call result must be an object");
   assert.notEqual(
     response.result.isError,
     true,
-    "proof.verify returned an MCP tool execution error",
+    "mesh.get_status returned an MCP tool execution error",
   );
   assert.ok(
     isRecord(response.result.structuredContent),
-    "proof.verify must return structuredContent",
+    "mesh.get_status must return structuredContent",
   );
   const output = response.result.structuredContent;
-  assert.equal(typeof output.valid, "boolean", "valid must be a boolean");
+  assert.equal(typeof output.activePeerCount, "number", "activePeerCount must be a number");
   assert.equal(
-    typeof output.verifiedAt,
-    "string",
-    "verifiedAt must be an ISO timestamp",
-  );
-  assert.ok(
-    !Number.isNaN(Date.parse(output.verifiedAt as string)),
-    "verifiedAt must be parseable",
-  );
-  assert.equal(
-    typeof output.computationTimeMs,
+    typeof output.configuredPeerCount,
     "number",
-    "computationTimeMs must be a number",
+    "configuredPeerCount must be a number",
   );
-  assert.ok(
-    (output.computationTimeMs as number) >= 0,
-    "computationTimeMs cannot be negative",
-  );
-  if (output.error !== undefined) {
-    assert.equal(typeof output.error, "string", "error must be a string");
-  }
-  console.log(
-    `Direct proof.verify call verified: valid=${String(output.valid)}, computationTimeMs=${String(output.computationTimeMs)}.`,
-  );
+  console.log(`Free mesh.get_status call verified: ${String(output.activePeerCount)} active peer(s).`);
 }
 
 async function main() {
@@ -297,7 +247,7 @@ async function main() {
   console.log(`Checking live MCP server at ${baseUrl.origin}`);
   await assertHttpHealth(baseUrl);
   await assertToolList(baseUrl);
-  await assertZkVerificationCall(baseUrl);
+  await assertMeshStatusCall(baseUrl);
   console.log("\nAll live MCP health checks passed.");
 }
 

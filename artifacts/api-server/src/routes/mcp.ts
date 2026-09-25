@@ -192,6 +192,21 @@ const submissionToolAnnotations = {
   priority: 1,
 };
 
+// Mesh status observes external peers but does not change their state.
+const meshStatusToolAnnotations = {
+  ...readOnlyToolAnnotations,
+  openWorldHint: true,
+};
+
+// Verification changes the observable in-memory lifecycle index, including
+// verified -> cached on repeat calls, even though it does not publish to Nostr.
+const proofVerificationToolAnnotations = {
+  ...readOnlyToolAnnotations,
+  readOnlyHint: false,
+  idempotentHint: false,
+  readOnly: false,
+};
+
 const thermodynamicMetricNames = [
   "target_multiplier",
   "difficulty_epoch_progress",
@@ -912,7 +927,7 @@ const baseMcpToolDefinitions = [
     title: "Verify Stratigraphy ZK Proof",
     description:
       "Verify a base64url Groth16/Poseidon BN254 proof against required publicInputs, verificationKeyId, and telemetry data; use this tool for transient proof testing, not for proof submission or Nostr publication (use proof.submit). Returns a JSON object with boolean valid, ISO verifiedAt, and computationTimeMs; a cryptographic or snapshot mismatch returns valid false rather than publishing a proof. This 250-sat L402 call updates only bounded process-memory verification indexes, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
-    annotations: readOnlyToolAnnotations,
+    annotations: proofVerificationToolAnnotations,
     inputSchema: {
       type: "object",
       description:
@@ -965,7 +980,6 @@ const baseMcpToolDefinitions = [
         valid: true,
         verifiedAt: "2026-09-19T01:41:36.458Z",
         computationTimeMs: 3.284,
-        error: "Verification key identifier does not match the proof.",
       }],
       additionalProperties: false,
       properties: {
@@ -976,19 +990,15 @@ const baseMcpToolDefinitions = [
         ),
         verifiedAt: field(
           "string",
-          "ISO 8601 UTC date string format.",
+          "ISO 8601 UTC time when this verification finished.",
           ["2026-09-19T01:41:36.458Z"],
+          { format: "date-time" },
         ),
         computationTimeMs: field(
           "number",
           "Server-side proof verification duration in milliseconds.",
           [3.284],
           { minimum: 0 },
-        ),
-        error: field(
-          "string",
-          "Human-readable verification error message when verification cannot validate the proof. Example: 'Verification key identifier does not match the proof.'.",
-          ["Verification key identifier does not match the proof."],
         ),
       },
       required: ["valid", "verifiedAt", "computationTimeMs"],
@@ -1168,7 +1178,7 @@ const baseMcpToolDefinitions = [
                 ),
                 snapshotDigest: field(
                   "string",
-                  "Canonical IPFS CID or hex digest identifier string.",
+                  "Decimal field digest or IPFS CID identifying the indexed telemetry snapshot.",
                   ["1534979302823651498736582947365829473658294"],
                 ),
                 status: field(
@@ -1489,7 +1499,7 @@ const baseMcpToolDefinitions = [
     title: "Get Mesh Status",
     description:
       "Inspect current in-process P2P mesh topology, active peer count, and consensus readiness before mesh.broadcast; pass an empty object, and do not use this tool for individual proof verification (use proof.verify) or telemetry records (use stratigraphy.get). Returns a JSON object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold. This read-only tool is free, shares a 60-requests-per-minute IP limit, and rejects unexpected inputs with JSON-RPC -32602.",
-    annotations: readOnlyToolAnnotations,
+    annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
       description: "No input parameters required.",

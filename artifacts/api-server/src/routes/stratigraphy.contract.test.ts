@@ -936,6 +936,60 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     assert.match(candidate.description, /\b(?:not to|not for|do not)\b/i,
       `${candidate.name} must distinguish nearby tools`);
   }
+  const expectedContracts: Record<string, {
+    keys: string[];
+    readOnly: boolean;
+    idempotent: boolean;
+    openWorld: boolean;
+  }> = {
+    "stratigraphy.list": {
+      keys: ["totalSnapshots", "oldestBlock", "newestBlock", "availableMetrics", "dateBounds"],
+      readOnly: true, idempotent: true, openWorld: false,
+    },
+    "stratigraphy.get": {
+      keys: ["records"], readOnly: true, idempotent: true, openWorld: false,
+    },
+    "mesh.status": {
+      keys: ["nodePubkey", "activePeerCount", "configuredPeerCount", "topologyHealth",
+        "crossValidationSuccessRate", "averagePropagationLatencyMs", "quorumThreshold"],
+      readOnly: true, idempotent: true, openWorld: true,
+    },
+    "mesh.broadcast": {
+      keys: ["signalType", "date", "snapshotDigest", "peerAttestations",
+        "quorumThreshold", "merkleRoot", "networkId"],
+      readOnly: false, idempotent: false, openWorld: true,
+    },
+    "proof.ground": {
+      keys: ["receipt"], readOnly: false, idempotent: false, openWorld: true,
+    },
+    "proof.list": {
+      keys: ["attestations", "total"], readOnly: true, idempotent: true, openWorld: false,
+    },
+    "proof.status": {
+      keys: ["status", "verifiedAt", "attestationCount", "meshQuorum"],
+      readOnly: true, idempotent: true, openWorld: false,
+    },
+    "proof.verify": {
+      keys: ["valid", "verifiedAt", "computationTimeMs"],
+      readOnly: false, idempotent: false, openWorld: false,
+    },
+    "proof.submit": {
+      keys: ["proofHash", "status", "submittedAt", "attestationStatus"],
+      readOnly: false, idempotent: false, openWorld: true,
+    },
+  };
+  for (const candidate of listed.result?.tools ?? []) {
+    const expected = expectedContracts[candidate.name];
+    assert.ok(expected, `${candidate.name} must have a documented runtime contract`);
+    assert.equal(candidate.outputSchema.additionalProperties, false);
+    assert.deepEqual(Object.keys(candidate.outputSchema.properties).sort(), [...expected.keys].sort(),
+      `${candidate.name} outputSchema must describe the returned JSON fields`);
+    assert.deepEqual([...candidate.outputSchema.required].sort(), [...expected.keys].sort());
+    assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expected.keys].sort());
+    assert.equal(candidate.annotations.readOnlyHint, expected.readOnly);
+    assert.equal(candidate.annotations.idempotentHint, expected.idempotent);
+    assert.equal(candidate.annotations.openWorldHint, expected.openWorld);
+  }
   const documentedTool = (name: string) => listed.result?.tools.find(
     (candidate: { name: string }) => candidate.name === name,
   );

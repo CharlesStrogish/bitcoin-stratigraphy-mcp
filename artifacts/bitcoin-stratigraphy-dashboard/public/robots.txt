@@ -1,8 +1,17 @@
 User-agent: *
 Allow: /
+
 User-agent: GPTBot
 Allow: /
+
 User-agent: ClaudeBot
 Allow: /
+
 User-agent: PerplexityBot
 Allow: /
+
+User-agent: FirecrawlBot
+Allow: /
+
+Sitemap: https://bitcoin-stratigraphy-dashboard.replit.app/sitemap.xml
+# Agent discovery: https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt

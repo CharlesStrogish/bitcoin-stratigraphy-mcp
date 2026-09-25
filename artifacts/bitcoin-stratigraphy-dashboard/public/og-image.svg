@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#111b2e"/>
+      <stop offset="1" stop-color="#243750"/>
+    </linearGradient>
+    <linearGradient id="signal" x2="1">
+      <stop stop-color="#e6a91d"/>
+      <stop offset="1" stop-color="#f2c650"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)"/>
+  <path d="M0 490 125 470 212 510 335 405 431 426 533 320 641 370 733 245 834 290 966 155 1070 193 1200 85" fill="none" stroke="url(#signal)" stroke-width="9" opacity=".8"/>
+  <path d="M0 530 125 510 212 550 335 445 431 466 533 360 641 410 733 285 834 330 966 195 1070 233 1200 125V630H0Z" fill="#e6a91d" opacity=".07"/>
+  <text x="74" y="95" fill="#e9b43a" font-family="DejaVu Sans, sans-serif" font-size="25" font-weight="bold" letter-spacing="3">RESEARCH DESK  /  BTC STRATIGRAPHY</text>
+  <text x="74" y="218" fill="#fff" font-family="DejaVu Sans, sans-serif" font-size="64" font-weight="bold">Bitcoin Stratigraphy</text>
+  <text x="74" y="298" fill="#f1c34b" font-family="DejaVu Sans, sans-serif" font-size="39" font-weight="bold">Thermodynamic Notary</text>
+  <text x="74" y="352" fill="#e2e8ef" font-family="DejaVu Sans, sans-serif" font-size="32">&amp; L402 Data Engine</text>
+  <rect x="74" y="479" width="248" height="52" rx="7" fill="#e9b43a"/>
+  <text x="95" y="513" fill="#131d2d" font-family="DejaVu Sans, sans-serif" font-size="23" font-weight="bold">10 MCP TOOLS</text>
+  <text x="350" y="513" fill="#d2dce8" font-family="DejaVu Sans, sans-serif" font-size="23">GROTH16 PROOFS  ·  LIGHTNING L402</text>
+</svg>

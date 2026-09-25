@@ -1,0 +1,107 @@
+# Bitcoin Stratigraphy - Complete MCP Tool Reference
+
+> Static reference for the ten canonical tools returned by `tools/list` at https://bitcoin-stratigraphy-dashboard.replit.app/mcp. JSON Schemas below include every input property, type, required field, enum, range, pattern, and additional-properties rule. Human-readable examples and property descriptions are condensed; `tools/list` is authoritative for the live metadata and any later schema changes.
+
+## Protocol and payment
+
+Use Streamable HTTP: POST JSON-RPC 2.0 to `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`, and `MCP-Protocol-Version: 2025-03-26`. List tools using `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`; call one using `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mesh.get_status","arguments":{}}}`. `mesh.get_status` and `tools/list` are free. Paid calls return an HTTP 402 L402 invoice challenge before they can return their tool result. The MCP catalog/status tools cost 10 sats, and the other paid MCP tools cost 250 sats; separate REST operations can start at 5 sats. Confirm the current policy with GET https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost and the actual L402 challenge. Never send a wallet secret in an MCP request.
+
+Input schemas (JSON Schema objects; descriptive fields and sample values are shortened, but validation constraints match the published tool definitions):
+
+## 1. stratigraphy.get — 250 sats
+
+Retrieve indexed telemetry by recent-day count, one date, indexed block height, or a bounded/open date or block range. Selector modes cannot be combined; range upper bounds must not precede lower bounds.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"days":{"type":"integer","minimum":1,"maximum":365},"date":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$","minLength":1},"blockHeight":{"type":"integer","minimum":0},"metrics":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","enum":["target_multiplier","difficulty_epoch_progress","thermodynamic_signal"]}},"startDate":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$","minLength":1},"endDate":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$","minLength":1},"startBlock":{"type":"integer","minimum":0},"endBlock":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":100,"default":10}},"required":[]}
+```
+
+## 2. stratigraphy.list — 10 sats
+
+List available indexed stratigraphy catalog entries.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{},"required":[]}
+```
+
+## 3. proof.verify — 250 sats
+
+Verify an encoded Groth16/BN254 proof against committed public inputs and the supplied telemetry snapshot. Verification is distinct from attestation submission.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"proof":{"type":"string","minLength":1},"publicInputs":{"type":"object","additionalProperties":false,"properties":{"blockHeight":{"type":"integer","minimum":0},"snapshotDigest":{"type":"string","minLength":1},"thermodynamicHash":{"type":"string","minLength":1},"timestamp":{"type":"integer","minimum":0},"valuationSat":{"type":"integer","minimum":0}},"required":["blockHeight","snapshotDigest","thermodynamicHash","timestamp","valuationSat"]},"verificationKeyId":{"type":"string","minLength":1},"data":{"type":["object","array"]}},"required":["proof","publicInputs","verificationKeyId","data"]}
+```
+
+## 4. proof.get_status — 10 sats
+
+Look up a process-memory proof lifecycle record using exactly one key. A `receiptHash` looks up a signed dataset receipt rather than a ZK proof.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"proofHash":{"type":"string","pattern":"^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"},"snapshotDigest":{"type":"string","pattern":"^(?:\\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"},"receiptHash":{"type":"string","pattern":"^[0-9a-f]{64}$"}},"required":[],"oneOf":[{"required":["proofHash"]},{"required":["snapshotDigest"]},{"required":["receiptHash"]}]}
+```
+
+## 5. proof.list — 10 sats
+
+List the bounded process-memory attestation index with optional pagination and status filtering; it is not a durable archive.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"maximum":100,"default":20},"offset":{"type":"integer","minimum":0,"maximum":1000,"default":0},"status":{"type":"string","enum":["verified","cached","pending","invalid"]}},"required":[]}
+```
+
+## 6. proof.submit — 250 sats
+
+Submit Groth16 coordinates and five public signals, in order: block height, thermodynamic hash, timestamp, valuation in sats, and snapshot digest. This can create an attestation and publish a Nostr event.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"proof":{"type":"object","additionalProperties":false,"properties":{"piA":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","pattern":"^\\d+$"}},"piB":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"array","minItems":2,"maxItems":2,"items":{"type":"string","pattern":"^\\d+$"}}},"piC":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","pattern":"^\\d+$"}}},"required":["piA","piB","piC"]},"publicSignals":{"type":"array","minItems":5,"maxItems":5,"items":{"type":"string","pattern":"^\\d+$"}},"snapshotDigest":{"type":"string","pattern":"^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"}},"required":["proof","publicSignals"]}
+```
+
+## 7. proof.ground — 250 sats
+
+Bind an agent's execution context hash to the live Bitcoin tip and return a signed grounding receipt after settlement. This is not a ZK proof. Metadata must fit the server's 16 KiB serialized limit.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"contextHash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$","minLength":64,"maxLength":64},"agentId":{"type":"string","minLength":1,"maxLength":256},"metadata":{"type":"object","additionalProperties":true}},"required":["contextHash","agentId"]}
+```
+
+## 8. proof.issue_receipt — 250 sats
+
+Create a signed Bitcoin-tip anchor for a dataset CID or 32-byte hash; an anchor is not a Groth16 proof or proof of work.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"cid":{"type":"string","pattern":"^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$","maxLength":256},"nostrEventId":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"},"context":{"type":"object","additionalProperties":true}},"required":["cid"]}
+```
+
+## 9. mesh.get_status — free
+
+Inspect mesh topology, configured and active peers, and quorum readiness without making a paid call.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{},"required":[]}
+```
+
+## 10. mesh.broadcast — 250 sats
+
+Broadcast a freshly signed existing telemetry record to configured mesh peers. The payload is a date selector, not arbitrary caller-provided telemetry; this can change peer state.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"signalType":{"type":"string","enum":["telemetry_snapshot"]},"payload":{"type":"object","additionalProperties":false,"properties":{"date":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$"}},"required":["date"]}},"required":["signalType","payload"]}
+```
+
+## TypeScript SDK
+
+The repository's TypeScript SDK supplies an L402-aware REST client and an NWC wallet adapter. Pass an NWC client obtained by your application; never hardcode a pairing URI, private key or invoice preimage in source.
+
+```ts
+import { BitcoinStratigraphyClient, NwcWalletAdapter } from "@bitcoin-stratigraphy/sdk";
+
+const client = new BitcoinStratigraphyClient({
+  baseUrl: "https://bitcoin-stratigraphy-dashboard.replit.app",
+  wallet: new NwcWalletAdapter(yourNwcClient),
+});
+
+const latest = await client.getLatest();
+console.log(latest);
+```
+
+The SDK discovers pre-flight prices, pays the selected subscription invoice with the supplied wallet, and reuses its macaroon and preimage until expiry. The package also exports an MCP entry point (`@bitcoin-stratigraphy/sdk/mcp`); consult the package's README for install and export details. The SDK's REST `getLatest()` example is not a substitute for a paid MCP `tools/call` request. For plain MCP discovery, use the free `tools/list` request above.

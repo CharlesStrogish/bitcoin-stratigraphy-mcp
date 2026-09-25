@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://bitcoin-stratigraphy-dashboard.replit.app/</loc>
+  </url>
+  <url>
+    <loc>https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt</loc>
+  </url>
+  <url>
+    <loc>https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt</loc>
+  </url>
+  <url>
+    <loc>https://bitcoin-stratigraphy-dashboard.replit.app/openapi.json</loc>
+  </url>
+  <url>
+    <loc>https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json</loc>
+  </url>
+  <url>
+    <loc>https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost</loc>
+  </url>
+</urlset>

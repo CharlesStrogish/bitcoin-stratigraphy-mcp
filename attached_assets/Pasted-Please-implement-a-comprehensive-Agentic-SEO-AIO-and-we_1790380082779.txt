@@ -1,0 +1,26 @@
+Please implement a comprehensive Agentic SEO (AIO) and web search optimization suite for the Bitcoin Stratigraphy dashboard to maximize discovery by both search engines and autonomous AI agents.
+
+1. Implement /llms.txt and /llms-full.txt:
+- Create a static text file served at public/llms.txt following the llms.txt standard.
+- Include a clear H1 (# Bitcoin Stratigraphy - Thermodynamic Notary & L402 Data Engine).
+- Summarize the node's purpose: Quantitative Bitcoin stratigraphy dataset, Groth16 zk-SNARK verification, and 10 MCP tools accessible via L402 micropayments.
+- Detail the key endpoints: GET /api/v1/cost (pre-flight discovery), /mcp (Streamable HTTP), and payment tiers (5-250 sats).
+- Create public/llms-full.txt containing the complete 10-tool schema definitions and TypeScript SDK usage example.
+
+2. Add JSON-LD Structured Data to index.html:
+- Inject server-rendered JSON-LD scripts into <head>:
+  a) Type: "Dataset" (name: "Bitcoin Stratigraphy Dataset", author: "Charles R. Strogish", license: "Open/L402").
+  b) Type: "WebAPI" (name: "Thermodynamic Notary MCP Server", documentation: "https://bitcoin-stratigraphy-dashboard.replit.app").
+  c) Type: "potentialAction" detailing the L402 payment action endpoint.
+
+3. Update HTML Meta Tags & Open Graph:
+- Ensure index.html contains:
+  - <title>Bitcoin Stratigraphy | Thermodynamic Notary & L402 Data Engine</title>
+  - <meta name="description" content="Production-grade L402 Lightning Data Engine & Thermodynamic Notary for autonomous AI agents. Features 10 MCP tools, Groth16 zk-SNARK proofs, and Nostr state attestations.">
+  - Complete Open Graph (og:title, og:description, og:type, og:url, og:image) and Twitter Card tags.
+
+4. Create Robots.txt & Sitemap.xml:
+- Generate public/robots.txt explicitly permitting AI crawlers (User-agent: *, GPTBot, ClaudeBot, PerplexityBot, FirecrawlBot) and linking to /sitemap.xml and /llms.txt.
+- Generate public/sitemap.xml indexing the homepage, /llms.txt, and public API documentation routes.
+
+Verify all files are public, test that GET /llms.txt returns 200 text/plain, and run `npm test` to ensure zero build errors.

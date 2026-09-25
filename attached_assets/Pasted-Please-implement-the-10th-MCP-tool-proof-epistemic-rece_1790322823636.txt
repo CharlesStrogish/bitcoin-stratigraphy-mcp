@@ -1,0 +1,42 @@
+Please implement the 10th MCP tool, `proof.epistemic_receipt`, in `src/mcp/tools` and update the MCP tool registry, handlers, and test suite:
+
+1. Register `proof.epistemic_receipt` in the MCP tool manifest:
+   - Name: "proof.epistemic_receipt"
+   - Description: "Generates a zero-knowledge, thermodynamic epistemic receipt linking a dataset payload CID to a Bitcoin block height, Nostr event ID, and cryptographic proof-of-work state anchor."
+   - Annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+   - Input Parameters:
+     - `cid` (string, required): IPFS content ID or dataset hash to anchor.
+     - `nostrEventId` (string, optional): Nostr event ID associated with the state publication.
+     - `context` (object, optional): Additional contextual metadata to bind to the receipt.
+   - outputSchema:
+     {
+       "type": "object",
+       "properties": {
+         "receiptHash": { "type": "string" },
+         "blockTip": { "type": "number" },
+         "blockHash": { "type": "string" },
+         "ipfsCid": { "type": "string" },
+         "nostrEventId": { "type": "string" },
+         "attestation": {
+           "type": "object",
+           "properties": {
+             "zkProofType": { "type": "string" },
+             "proofPayload": { "type": "string" },
+             "verified": { "type": "boolean" }
+           },
+           "required": ["zkProofType", "proofPayload", "verified"]
+         },
+         "timestamp": { "type": "string" }
+       },
+       "required": ["receiptHash", "blockTip", "blockHash", "ipfsCid", "attestation", "timestamp"]
+     }
+
+2. Implement the Handler Logic:
+   - Query the current Bitcoin block tip height and block hash from the internal stratigraphy block tracker.
+   - Compute a deterministic receipt digest by hashing the combined tuple: (`cid` + `blockHash` + `blockTip` + `nostrEventId` + ISO timestamp).
+   - Construct a lightweight ZK attestation object (`zkProofType`: "Groth16-SHA256-PoW", `proofPayload`: cryptographic hex string, `verified`: true).
+   - Index the generated receipt into the server's lifecycle memory index so it can be looked up via `proof.verify` or `proof.status`.
+
+3. Update Contract Checks & Tests:
+   - Update contract test suites to assert that 10 total MCP tools are registered and active.
+   - Run typecheck, execute unit tests, build the codebase, and restart the service to verify `/mcp` tool list endpoints serve all 10 tools cleanly with output schemas and annotations.

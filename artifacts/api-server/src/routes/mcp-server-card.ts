@@ -150,7 +150,10 @@ export function registerMcpServerCardRoute(app: Express): void {
   ]) {
     app.get(path, (_req, res): void => {
       res.set("Cache-Control", "no-store");
-      res.status(200).type("text/plain").send("smithery-verification=58fb");
+      res.status(200).type("text/plain").send(
+        "smithery-verification=f52238c37708d18a60b49b4f0d4d6f946b1d0d954e4f629e837bdb8bb726d591\n" +
+        "smithery-verification=58fb\n",
+      );
     });
   }
 

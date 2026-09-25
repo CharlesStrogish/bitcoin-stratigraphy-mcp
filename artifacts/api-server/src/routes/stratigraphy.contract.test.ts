@@ -1878,7 +1878,12 @@ test("serves Smithery verification text at both public root paths", async () => 
     assert.equal(response.status, 200, path);
     assert.match(response.headers.get("content-type") ?? "", /^text\/plain\b/, path);
     assert.equal(response.headers.get("www-authenticate"), null, path);
-    assert.equal(await response.text(), "smithery-verification=58fb", path);
+    assert.equal(
+      await response.text(),
+      "smithery-verification=f52238c37708d18a60b49b4f0d4d6f946b1d0d954e4f629e837bdb8bb726d591\n" +
+      "smithery-verification=58fb\n",
+      path,
+    );
   }
 });
 

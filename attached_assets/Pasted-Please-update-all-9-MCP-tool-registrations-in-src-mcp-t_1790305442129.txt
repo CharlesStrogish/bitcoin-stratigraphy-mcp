@@ -1,0 +1,25 @@
+Please update all 9 MCP tool registrations in `src/mcp/tools` to include explicit MCP `annotations` and structured `outputSchema` definitions alongside the descriptions:
+
+1. Add `annotations` to every tool registration object:
+   - `stratigraphy.list`: annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+   - `stratigraphy.get`: annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+   - `mesh.status`: annotations: { readOnlyHint: true, idempotentHint: false, openWorldHint: true }
+   - `mesh.broadcast`: annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true }
+   - `proof.ground`: annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: false }
+   - `proof.list`: annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+   - `proof.status`: annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+   - `proof.verify`: annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+   - `proof.submit`: annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+
+2. Add structured `outputSchema` definitions to each tool schema so agents know the exact return payload structure:
+   - `stratigraphy.list`: outputSchema: { type: "object", properties: { catalog: { type: "object", properties: { dateRange: { type: "object" }, blockRange: { type: "object" }, totalRecords: { type: "number" } } } } }
+   - `stratigraphy.get`: outputSchema: { type: "object", properties: { records: { type: "array", items: { type: "object" } }, count: { type: "number" } } }
+   - `mesh.status`: outputSchema: { type: "object", properties: { status: { type: "string" }, activePeers: { type: "number" }, consensusReady: { type: "boolean" } } }
+   - `mesh.broadcast`: outputSchema: { type: "object", properties: { success: { type: "boolean" }, broadcastHash: { type: "string" }, attestedPeers: { type: "number" } } }
+   - `proof.ground`: outputSchema: { type: "object", properties: { receiptHash: { type: "string" }, blockTip: { type: "number" }, timestamp: { type: "string" } } }
+   - `proof.list`: outputSchema: { type: "object", properties: { attestations: { type: "array", items: { type: "object" } }, total: { type: "number" } } }
+   - `proof.status`: outputSchema: { type: "object", properties: { status: { type: "string" }, proofHash: { type: "string" }, settledAt: { type: "string" } } }
+   - `proof.verify`: outputSchema: { type: "object", properties: { isValid: { type: "boolean" }, evaluatedAt: { type: "string" } } }
+   - `proof.submit`: outputSchema: { type: "object", properties: { submitted: { type: "boolean" }, proofHash: { type: "string" }, nostrEventId: { type: "string" } } }
+
+Rebuild, test, restart the service, and verify `/mcp` renders both `annotations` and `outputSchema` fields for all 9 tools.

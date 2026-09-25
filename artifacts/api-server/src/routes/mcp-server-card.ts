@@ -144,6 +144,16 @@ export const glamaConnector = {
 } as const;
 
 export function registerMcpServerCardRoute(app: Express): void {
+  for (const path of [
+    "/smithery-verification",
+    "/.well-known/smithery-verification",
+  ]) {
+    app.get(path, (_req, res): void => {
+      res.set("Cache-Control", "no-store");
+      res.status(200).type("text/plain").send("smithery-verification=58fb");
+    });
+  }
+
   app.get("/.well-known/mcp/server-card.json", (_req, res): void => {
     res.status(200).json(mcpServerCard);
   });

@@ -1869,6 +1869,19 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   assert.deepEqual(await response.json(), mcpServerCard);
 });
 
+test("serves Smithery verification text at both public root paths", async () => {
+  for (const path of [
+    "/smithery-verification",
+    "/.well-known/smithery-verification",
+  ]) {
+    const response = await fetch(`${baseUrl}${path}`);
+    assert.equal(response.status, 200, path);
+    assert.match(response.headers.get("content-type") ?? "", /^text\/plain\b/, path);
+    assert.equal(response.headers.get("www-authenticate"), null, path);
+    assert.equal(await response.text(), "smithery-verification=58fb", path);
+  }
+});
+
 test("serves all public Glama connector discovery routes exactly", async () => {
   for (const path of [
     "/.well-known/mcp/connector.json",

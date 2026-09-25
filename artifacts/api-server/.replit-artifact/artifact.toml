@@ -7,7 +7,7 @@ id = "3B4_FFSkEVBkAeYMFRJ2e"
 [[services]]
 localPort = 5000
 name = "API Server"
-paths = ["/api", "/mcp", "/openapi.json", "/.well-known/mcp/server-card.json", "/.well-known/mcp/connector.json", "/.well-known/glama-mcp-connector.json", "/.well-known/glama.json"]
+paths = ["/api", "/mcp", "/openapi.json", "/.well-known/mcp/server-card.json", "/.well-known/mcp/connector.json", "/.well-known/glama-mcp-connector.json", "/.well-known/glama.json", "/smithery-verification", "/.well-known/smithery-verification"]
 
 [services.development]
 run = "PORT=5000 pnpm --filter @workspace/api-server run dev"

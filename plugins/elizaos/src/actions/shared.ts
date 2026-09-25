@@ -30,7 +30,10 @@ function walletService(runtime: IAgentRuntime): InvoicePayer | undefined {
 }
 
 export function hasWallet(runtime: IAgentRuntime): boolean {
-  return walletService(runtime) !== undefined;
+  const pairing = runtime.getSetting("NWC_PAIRING_SECRET");
+  return walletService(runtime) !== undefined &&
+    typeof pairing === "string" &&
+    /^nostr\+walletconnect:\/\/\S+$/i.test(pairing);
 }
 
 function clientFor(runtime: IAgentRuntime): BitcoinStratigraphyClient {
@@ -39,6 +42,9 @@ function clientFor(runtime: IAgentRuntime): BitcoinStratigraphyClient {
     throw new Error(
       "A bitcoin-stratigraphy-wallet service with payInvoice(invoice) is required",
     );
+  }
+  if (!hasWallet(runtime)) {
+    throw new Error("A configured NWC_PAIRING_SECRET is required for paid actions");
   }
   const setting = runtime.getSetting("BITCOIN_STRATIGRAPHY_MCP_URL");
   if (setting != null && typeof setting !== "string") {

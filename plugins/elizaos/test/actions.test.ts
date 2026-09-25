@@ -5,9 +5,12 @@ import type { HandlerCallback, IAgentRuntime, Memory } from "@elizaos/core";
 import {
   bitcoinStratigraphyPlugin,
   broadcastMeshAction,
+  bitcoinStratigraphyProvider,
+  fetchBitcoinStratigraphyAction,
   getTelemetryAction,
   verifyProofAction,
 } from "../src/index.js";
+import { rememberTelemetry } from "../src/provider.js";
 
 const preimage = "11".repeat(32);
 const hash = createHash("sha256").update(Buffer.from(preimage, "hex")).digest("hex");
@@ -21,9 +24,14 @@ const challenge = new Response(JSON.stringify({
 });
 
 function runtime(payInvoice?: (invoice: string) => Promise<string>): IAgentRuntime {
+  const cache = new Map<string, unknown>();
   return {
-    getSetting: () => "https://example.test/mcp",
+    agentId: "test-agent",
+    getSetting: (key: string) => key === "NWC_PAIRING_SECRET"
+      ? "nostr+walletconnect://test" : "https://example.test/mcp",
     getService: () => payInvoice ? { payInvoice } : null,
+    getCache: async (key: string) => cache.get(key),
+    setCache: async (key: string, value: unknown) => { cache.set(key, value); return true; },
   } as unknown as IAgentRuntime;
 }
 
@@ -38,8 +46,14 @@ function rpc(result: unknown) {
 }
 
 test("exports three standard ElizaOS actions and fails closed without a wallet", async () => {
-  assert.equal(bitcoinStratigraphyPlugin.actions.length, 3);
-  for (const action of bitcoinStratigraphyPlugin.actions) {
+  assert.equal(bitcoinStratigraphyPlugin.actions?.length, 3);
+  assert.equal(bitcoinStratigraphyPlugin.name, "bitcoin-stratigraphy");
+  assert.ok(bitcoinStratigraphyPlugin.description);
+  assert.deepEqual(bitcoinStratigraphyPlugin.services, []);
+  assert.deepEqual(bitcoinStratigraphyPlugin.providers, [bitcoinStratigraphyProvider]);
+  assert.equal(fetchBitcoinStratigraphyAction.name, "FETCH_BITCOIN_STRATIGRAPHY");
+  assert.equal(getTelemetryAction, fetchBitcoinStratigraphyAction);
+  for (const action of bitcoinStratigraphyPlugin.actions ?? []) {
     assert.ok(action.name && action.description && action.examples?.length);
     assert.ok(action.similes?.length);
     assert.equal(await action.validate(runtime(), message("test")), false);
@@ -47,6 +61,44 @@ test("exports three standard ElizaOS actions and fails closed without a wallet",
   const failure = await getTelemetryAction.handler(runtime(), message("last 7 days"));
   assert.equal(failure?.success, false);
   assert.match(failure?.text ?? "", /wallet service/);
+});
+
+test("paid actions require both a configured NWC pairing and a wallet service", async () => {
+  let payments = 0;
+  const agent = {
+    ...runtime(async () => { payments++; return preimage; }),
+    getSetting: (key: string) => key === "NWC_PAIRING_SECRET"
+      ? undefined : "https://example.test/mcp",
+  } as IAgentRuntime;
+  assert.equal(await fetchBitcoinStratigraphyAction.validate(agent, message("today")), false);
+  const result = await fetchBitcoinStratigraphyAction.handler(agent, message("today"));
+  assert.equal(result?.success, false);
+  assert.match(result?.text ?? "", /NWC_PAIRING_SECRET/);
+  assert.equal(payments, 0);
+});
+
+test("provider reuses cached block and telemetry state without network or wallet calls", async () => {
+  const agent = runtime();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => { throw new Error("Provider must not fetch"); }) as typeof fetch;
+  try {
+    assert.equal(await rememberTelemetry(agent, { records: [{
+      day: 422,
+      quantitative_alpha: {
+        target_multiplier: 125.83,
+        difficulty_epoch_progress: "42%",
+        thermodynamic_signal: "strong",
+      },
+    }] }, 920_000), true);
+    for (let i = 0; i < 2; i++) {
+      const state = await bitcoinStratigraphyProvider.get(agent, message("current state"), {} as never);
+      assert.match(state.text ?? "", /queried block height 920000/);
+      assert.match(state.text ?? "", /"difficulty_epoch_progress":"42%"/);
+      assert.equal(state.values?.bitcoinStratigraphyBlockHeight, 920_000);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("telemetry pays through the runtime wallet and returns an ElizaOS action result", async () => {
@@ -67,12 +119,15 @@ test("telemetry pays through the runtime wallet and returns an ElizaOS action re
     }] });
   }) as typeof fetch;
   try {
+    const agent = runtime(async (requestedInvoice) => {
+      assert.equal(requestedInvoice, invoice);
+      payments++;
+      return preimage;
+    });
+    const before = await bitcoinStratigraphyProvider.get(agent, message("before"), {} as never);
+    assert.match(before.text ?? "", /No Bitcoin Stratigraphy telemetry/);
     const result = await getTelemetryAction.handler(
-      runtime(async (requestedInvoice) => {
-        assert.equal(requestedInvoice, invoice);
-        payments++;
-        return preimage;
-      }),
+      agent,
       message("Give me the Bitcoin thermodynamic telemetry for 2026-09-09"),
       undefined, undefined, callback,
     );
@@ -87,6 +142,12 @@ test("telemetry pays through the runtime wallet and returns an ElizaOS action re
     assert.deepEqual(JSON.parse(sent[0]!.body).params, {
       name: "stratigraphy.get", arguments: { date: "2026-09-09" },
     });
+    const after = await bitcoinStratigraphyProvider.get(agent, message("after"), {} as never);
+    assert.match(after.text ?? "", /day 422/);
+    assert.match(after.text ?? "", /cached, not necessarily the current chain tip/);
+    assert.equal(after.values?.bitcoinStratigraphyFetchedAt !== undefined, true);
+    assert.equal(payments, 1);
+    assert.equal(sent.length, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }

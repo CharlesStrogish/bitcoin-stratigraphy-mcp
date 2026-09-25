@@ -1,15 +1,18 @@
 import type { Plugin } from "@elizaos/core";
-import { getTelemetryAction } from "./actions/getTelemetry.js";
+import { fetchBitcoinStratigraphyAction, getTelemetryAction } from "./actions/getTelemetry.js";
 import { verifyProofAction } from "./actions/verifyProof.js";
 import { broadcastMeshAction } from "./actions/broadcastMesh.js";
+import { bitcoinStratigraphyProvider } from "./provider.js";
 
-export { getTelemetryAction, verifyProofAction, broadcastMeshAction };
+export { fetchBitcoinStratigraphyAction, getTelemetryAction, verifyProofAction, broadcastMeshAction, bitcoinStratigraphyProvider };
 
-export const bitcoinStratigraphyPlugin = {
+export const bitcoinStratigraphyPlugin: Plugin = {
   name: "bitcoin-stratigraphy",
   description:
     "L402-paid Bitcoin thermodynamic telemetry, zk-SNARK verification, and trusted mesh broadcast",
-  actions: [getTelemetryAction, verifyProofAction, broadcastMeshAction],
-} satisfies Plugin;
+  actions: [fetchBitcoinStratigraphyAction, verifyProofAction, broadcastMeshAction],
+  providers: [bitcoinStratigraphyProvider],
+  services: [],
+};
 
 export default bitcoinStratigraphyPlugin;

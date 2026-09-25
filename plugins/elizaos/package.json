@@ -4,17 +4,21 @@
   "description": "ElizaOS actions for the Bitcoin Stratigraphy L402 MCP tools",
   "license": "MIT",
   "type": "module",
+  "publishConfig": { "access": "public" },
+  "engines": { "node": ">=18" },
   "main": "./dist/index.js",
   "types": "./dist/types/plugins/elizaos/src/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/types/plugins/elizaos/src/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": ["dist/index.js", "dist/types/**/*.d.ts", "dist/types/**/*.d.ts.map", "README.md"],
   "scripts": {
     "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js",
+    "prepack": "pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test test/*.test.ts"
   },

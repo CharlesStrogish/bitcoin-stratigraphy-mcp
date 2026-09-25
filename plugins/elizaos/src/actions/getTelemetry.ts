@@ -1,6 +1,7 @@
 import type { Action } from "@elizaos/core";
 import type { McpToolArguments, MetricName } from "../../../../sdk/typescript/client.js";
 import { actionInput, executePaidAction, hasWallet } from "./shared.js";
+import { rememberTelemetry } from "../provider.js";
 
 const metrics: MetricName[] = [
   "target_multiplier", "difficulty_epoch_progress", "thermodynamic_signal",
@@ -54,9 +55,9 @@ function telemetryArgs(
   return args;
 }
 
-export const getTelemetryAction: Action = {
-  name: "GET_BITCOIN_STRATIGRAPHY_TELEMETRY",
-  similes: ["GET_TELEMETRY", "GET_BITCOIN_THERMODYNAMICS", "QUERY_STRATIGRAPHY"],
+export const fetchBitcoinStratigraphyAction: Action = {
+  name: "FETCH_BITCOIN_STRATIGRAPHY",
+  similes: ["GET_BITCOIN_STRATIGRAPHY_TELEMETRY", "GET_TELEMETRY", "GET_BITCOIN_THERMODYNAMICS", "QUERY_STRATIGRAPHY"],
   description:
     "Fetch paid Bitcoin thermodynamic stratigraphy telemetry by date, days, block height, " +
     "date/block range, or selected quantitative metrics. Costs 250 sats per request.",
@@ -66,17 +67,34 @@ export const getTelemetryAction: Action = {
       name: "assistant",
       content: {
         text: "I'll query that daily stratigraphy record.",
-        actions: ["GET_BITCOIN_STRATIGRAPHY_TELEMETRY"],
+        actions: ["FETCH_BITCOIN_STRATIGRAPHY"],
       },
     },
   ]],
   validate: async (runtime) => hasWallet(runtime),
-  handler: async (runtime, message, _state, options, callback) =>
-    executePaidAction(
+  handler: async (runtime, message, _state, options, callback) => {
+    const input = actionInput(message, options);
+    const result = await executePaidAction(
       runtime, message, callback,
       (client) => client.getTelemetry(
-        telemetryArgs(actionInput(message, options), message.content.text ?? ""),
+        telemetryArgs(input, message.content.text ?? ""),
       ),
       (result) => `Retrieved ${(result.records as unknown[]).length} stratigraphy record(s).`,
-    ),
+    );
+    if (result.success && result.data) {
+      try {
+        if (!await rememberTelemetry(runtime, result.data,
+          typeof input.blockHeight === "number" ? input.blockHeight : undefined)) {
+          result.error = "Telemetry was fetched, but runtime memory could not be updated";
+        }
+      } catch {
+        // The paid request succeeded; never mark it failed and risk another payment.
+        result.error = "Telemetry was fetched, but runtime memory could not be updated";
+      }
+    }
+    return result;
+  },
 };
+
+/** Backwards-compatible export for agents that imported the former action symbol. */
+export const getTelemetryAction = fetchBitcoinStratigraphyAction;

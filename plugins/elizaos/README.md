@@ -1,7 +1,7 @@
 # ElizaOS plugin for Bitcoin Stratigraphy
 
 This plugin wraps the existing TypeScript MCP client. It adds three ElizaOS
-actions: `GET_BITCOIN_STRATIGRAPHY_TELEMETRY`,
+actions: `FETCH_BITCOIN_STRATIGRAPHY` (formerly `GET_BITCOIN_STRATIGRAPHY_TELEMETRY`),
 `VERIFY_BITCOIN_STRATIGRAPHY_PROOF`, and
 `BROADCAST_BITCOIN_STRATIGRAPHY_MESH`. It targets `@elizaos/core` 1.x.
 
@@ -25,17 +25,23 @@ export const elizaConfig = {
 Register a wallet plugin that exposes a runtime service named
 `bitcoin-stratigraphy-wallet`. Its service must implement
 `payInvoice(invoice: string): Promise<string | { preimage: string } | { payment_preimage: string }>`.
-The returned value **must contain the actual 32-byte hex Lightning preimage**.
-The agent wallet may use NWC, LNURL, or a Lightning wallet behind this service;
-apply spending limits and approval policy in that wallet plugin. A Nostr
-signing keypair by itself cannot pay an invoice. Do not return a transaction ID,
-payment hash, or a wallet self-payment UUID instead of a preimage.
+Set `NWC_PAIRING_SECRET` in the agent runtime settings to its payer wallet's
+`nostr+walletconnect://` pairing URI; both this setting and the wallet service
+are required for paid actions. The wallet service must enforce its own spending
+limits and approval policy. A Nostr signing keypair by itself cannot pay.
+External Lightning payments require a 32-byte hex preimage. CoinOS internal
+payments may instead return a canonical UUID payment ID, which the API verifies
+against the issuer's incoming and payer's outgoing records.
 
 The handlers find the service using
 `runtime.getService("bitcoin-stratigraphy-wallet")`. If it is absent, action
 validation returns false and direct handler calls report an error without
-requesting payment. The SDK verifies the preimage against the L402 challenge,
-retries the original request once, and never caches single-use credentials.
+requesting payment. The SDK verifies standard preimages against the L402
+challenge, retries the original request once, and never caches single-use
+credentials. The `bitcoinStratigraphyProvider` reads the last successful
+telemetry result from agent-scoped runtime cache to provide a date, day, queried
+block height (if known), and metrics. It never makes a paid request on a prompt
+and never presents a historical record as the current chain tip.
 
 The MCP endpoint defaults to
 `https://bitcoin-stratigraphy-dashboard.replit.app/mcp`. Set
@@ -70,4 +76,8 @@ not as a successful verification claim.
 
 From this repository, run `pnpm --filter @bitcoin-stratigraphy/plugin-elizaos
 build`, `pnpm --filter @bitcoin-stratigraphy/plugin-elizaos typecheck`, or
-`pnpm --filter @bitcoin-stratigraphy/plugin-elizaos test`.
+`pnpm --filter @bitcoin-stratigraphy/plugin-elizaos test`. After building, a
+local agent project can link this directory with `pnpm link /absolute/path/to/plugins/elizaos`;
+that agent project must also install its own compatible `@elizaos/core` peer.
+The package exports its bundled ESM entry point and declaration files, and
+rebuilds them automatically before `pnpm pack` or publication.

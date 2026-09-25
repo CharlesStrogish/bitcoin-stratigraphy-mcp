@@ -219,16 +219,16 @@ const stratigraphyInputSchema = z.object({
     "Telemetry metrics projected into each returned record.",
   ),
   startDate: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
-    "Inclusive UTC lower date bound formatted as YYYY-MM-DD.",
+    "Inclusive UTC lower date bound (YYYY-MM-DD); can be used alone or with endDate, but not with date or blockHeight.",
   ),
   endDate: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
-    "Inclusive UTC upper date bound formatted as YYYY-MM-DD.",
+    "Inclusive UTC upper date bound (YYYY-MM-DD); can be used alone or with startDate, but not with date or blockHeight.",
   ),
   startBlock: z.number().int().nonnegative().optional().describe(
-    "Inclusive lower bound of the daily block-height index.",
+    "Inclusive lower bound of the daily block-height index; can be used alone or with endBlock, but not with date or blockHeight.",
   ),
   endBlock: z.number().int().nonnegative().optional().describe(
-    "Inclusive upper bound of the daily block-height index.",
+    "Inclusive upper bound of the daily block-height index; can be used alone or with startBlock, but not with date or blockHeight.",
   ),
   limit: z.number().int().min(1).max(100).default(10).describe(
     "Maximum number of records to return.",
@@ -286,7 +286,9 @@ const verifyProofInputSchema = z.object({
   proof: z.string().min(1).describe(
     "Base64url-encoded Groth16/Poseidon BN254 proof emitted by this API, without padding.",
   ),
-  publicInputs: publicInputsSchema,
+  publicInputs: publicInputsSchema.describe(
+    "Expected public constants committed by the proof; blockHeight, snapshotDigest, thermodynamicHash, timestamp, and valuationSat must match the telemetry payload in data.",
+  ),
   verificationKeyId: z.string().min(1).describe(
     "SHA-256 verification-key identifier using the sha256: prefix.",
   ),
@@ -297,10 +299,10 @@ const verifyProofInputSchema = z.object({
 
 const proofStatusInputSchema = z.object({
   proofHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$|^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[a-z2-7]{20,}$/).optional().describe(
-    "Canonical IPFS CID or hex digest identifier string.",
+    "Primary lookup key for a proof lifecycle record (hex digest or CID); mutually exclusive with snapshotDigest.",
   ),
   snapshotDigest: z.string().regex(/^(?:\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
-    "Decimal field digest, 64-digit hexadecimal digest, or IPFS CID identifier string.",
+    "Primary lookup key for a snapshot lifecycle record (decimal digest, hex digest, or CID); mutually exclusive with proofHash.",
   ),
 }).strict().refine(
   (input) =>
@@ -317,13 +319,13 @@ const proofLifecycleStates = [
 
 const listProofAttestationsInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20).describe(
-    "Maximum number of records to return.",
+    "Pagination window size, 1-100 records; use with offset to page through the bounded attestation index.",
   ),
   offset: z.number().int().min(0).max(1_000).default(0).describe(
-    "Zero-based pagination skip offset.",
+    "Zero-based pagination skip offset, 0-1000; increase by limit to page through historical attestations.",
   ),
   status: z.enum(proofLifecycleStates).optional().describe(
-    "Filter records by attestation lifecycle state.",
+    "Filter the attestation index to one lifecycle state: verified, cached, pending, or invalid.",
   ),
 }).strict().describe(
   "Input options for listing and discovering historical zk-SNARK proof attestations.",
@@ -346,14 +348,14 @@ const submitProofInputSchema = z.object({
     z.object({ piA: proofPointASchema, piB: proofPointBSchema, piC: proofPointCSchema }).strict(),
     z.object({ pi_a: proofPointASchema, pi_b: proofPointBSchema, pi_c: proofPointCSchema }).strict(),
   ]).describe(
-    "Groth16/Poseidon zk-SNARK proof coordinates over the BN254 curve.",
+    "Groth16/Poseidon BN254 proof coordinates piA, piB, and piC (or legacy pi_a, pi_b, pi_c) for verification and optional NIP-78 publication.",
   ),
   publicSignals: z.array(
     z.string().regex(/^\d+$/).describe(
       "Decimal-encoded BN254 scalar-field element.",
     ),
   ).length(5).describe(
-    "Public signals ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
+    "Five ordered public signals: blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest; must align with the proof coordinates.",
   ),
   snapshotDigest: z.string().regex(/^(?:\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
     "Decimal field digest or IPFS CID that must equal publicSignals[4] when supplied.",
@@ -379,21 +381,21 @@ const meshStatusInputSchema = z.object({}).strict().describe(
 
 const meshBroadcastInputSchema = z.object({
   signalType: z.literal("telemetry_snapshot").describe(
-    "Only telemetry_snapshot is supported: distribute one canonical, freshly signed stratigraphy record.",
+    "Enforces the broadcast event schema; only telemetry_snapshot triggers peer validation for a freshly signed canonical record.",
   ),
   payload: z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe(
       "UTC YYYY-MM-DD date of the existing stratigraphy record to broadcast.",
     ),
-  }).strict().describe("Selector for a canonical dataset record; arbitrary caller-supplied snapshots are not accepted."),
+  }).strict().describe("UTC date selector for the existing telemetry record sent for peer attestation; arbitrary caller-supplied snapshots are not accepted."),
 }).strict().describe("Request to broadcast one signed telemetry snapshot to configured, pinned mesh peers.");
 
 const groundContextInputSchema = z.object({
   contextHash: z.string().regex(/^[0-9a-fA-F]{64}$/).describe(
-    "64-character case-insensitive hexadecimal SHA-256 digest string.",
+    "64-character hexadecimal SHA-256 digest binding the agent's prompt or execution context to the current Bitcoin block tip.",
   ),
   agentId: z.string().trim().min(1).max(256).describe(
-    "Trimmed caller-controlled identifier string from 1 to 256 characters.",
+    "Unique, trimmed caller-controlled agent instance identifier from 1 to 256 characters, named in the signed receipt.",
   ),
   metadata: z.record(z.string(), z.unknown()).optional().describe(
     "Non-secret caller metadata bound into the context anchor.",
@@ -703,7 +705,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Fetch Bitcoin Stratigraphy telemetry by optional days (1-365), date (YYYY-MM-DD), blockHeight, or inclusive startDate/endDate and startBlock/endBlock ranges, with optional metrics projection and limit (1-100); legacy selectors cannot be combined with ranges. Returns a JSON object containing records, an array of matching daily snapshots with quantitative_alpha metrics, or an empty array when none match. This read-only call costs 250 sats through L402, shares a 60-requests-per-minute IP limit, and rejects invalid selectors with JSON-RPC -32602.",
+      "Fetch Bitcoin Stratigraphy telemetry by days (1-365), date, indexed blockHeight, or inclusive open-ended date/block ranges, with optional metrics projection and limit (1-100); use this tool to retrieve historical thermodynamic valuations, not to discover dataset boundaries (use stratigraphy.list); single selectors cannot be combined with ranges. Returns a JSON object containing records, an array of matching daily snapshots with quantitative_alpha metrics, or an empty array when none match. This read-only call costs 250 sats through L402, shares a 60-requests-per-minute IP limit, and rejects invalid selectors with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -756,7 +758,7 @@ const baseMcpToolDefinitions = [
         ),
         startDate: field(
           "string",
-          "Inclusive lower date bound formatted as YYYY-MM-DD in UTC.",
+          "Inclusive lower UTC date bound (YYYY-MM-DD); pair with endDate for a bounded range or use alone for an open range, never with days, date, or blockHeight.",
           ["2026-09-01"],
           {
             format: "date",
@@ -766,7 +768,7 @@ const baseMcpToolDefinitions = [
         ),
         endDate: field(
           "string",
-          "Inclusive upper date bound formatted as YYYY-MM-DD in UTC (must be >= startDate).",
+          "Inclusive upper UTC date bound (YYYY-MM-DD); pair with startDate for a bounded range or use alone for an open range, never with days, date, or blockHeight; must be >= startDate when paired.",
           ["2026-09-18"],
           {
             format: "date",
@@ -776,13 +778,13 @@ const baseMcpToolDefinitions = [
         ),
         startBlock: field(
           "integer",
-          "Inclusive lower block height bound (non-negative integer).",
+          "Inclusive lower indexed block-height bound (non-negative); pair with endBlock for a bounded range or use alone for an open range, never with days, date, or blockHeight.",
           [910000],
           { minimum: 0 },
         ),
         endBlock: field(
           "integer",
-          "Inclusive upper block height bound (non-negative integer, must be >= startBlock).",
+          "Inclusive upper indexed block-height bound (non-negative); pair with startBlock for a bounded range or use alone for an open range, never with days, date, or blockHeight; must be >= startBlock when paired.",
           [920000],
           { minimum: 0 },
         ),
@@ -815,7 +817,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "Discover available Bitcoin Stratigraphy coverage without input parameters; pass an empty object rather than requesting actual telemetry records. Returns a JSON object with totalSnapshots, oldestBlock, newestBlock, availableMetrics, and inclusive dateBounds containing startDate and endDate. This read-only catalog call costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects unexpected input with JSON-RPC -32602.",
+      "Discover Bitcoin Stratigraphy catalog bounds, indexed block heights, date ranges, and metric keys before calling stratigraphy.get; pass an empty object and do not use this tool to fetch telemetry records. Returns a JSON object with totalSnapshots, oldestBlock, newestBlock, availableMetrics, and inclusive dateBounds containing startDate and endDate. This read-only catalog call costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects unexpected input with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -909,7 +911,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Verify a base64url Groth16/Poseidon BN254 proof against required publicInputs (blockHeight, snapshotDigest, thermodynamicHash, timestamp, valuationSat), verificationKeyId, and a data snapshot object or array. Returns a JSON object with boolean valid, ISO verifiedAt, and computationTimeMs; a cryptographic or snapshot mismatch returns valid false rather than publishing a proof. This 250-sat L402 call updates only bounded process-memory verification indexes, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
+      "Verify a base64url Groth16/Poseidon BN254 proof against required publicInputs, verificationKeyId, and telemetry data; use this tool for transient proof testing, not for proof submission or Nostr publication (use proof.submit). Returns a JSON object with boolean valid, ISO verifiedAt, and computationTimeMs; a cryptographic or snapshot mismatch returns valid false rather than publishing a proof. This 250-sat L402 call updates only bounded process-memory verification indexes, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -936,7 +938,7 @@ const baseMcpToolDefinitions = [
         publicInputs: {
           ...publicInputsJsonSchema,
           description:
-            "Object containing five typed public statement inputs committed by the proof: non-negative blockHeight, non-empty snapshotDigest and thermodynamicHash, non-negative Unix-millisecond timestamp, and non-negative valuationSat. Example: blockHeight 920000 and valuationSat 12583.",
+            "Expected public constants committed by the proof; fields must match the corresponding telemetry payload in data: non-negative blockHeight, non-empty snapshotDigest and thermodynamicHash, non-negative Unix-millisecond timestamp, and non-negative valuationSat. Example: blockHeight 920000 and valuationSat 12583.",
         },
         verificationKeyId: field(
           "string",
@@ -996,7 +998,7 @@ const baseMcpToolDefinitions = [
     name: "proof.status",
     title: "Get Proof Status",
     description:
-      "Look up one process-memory proof lifecycle record using exactly one of proofHash (64-digit hex with optional 0x prefix or CID) or snapshotDigest (decimal field digest, 64-digit hex, or CID). Returns a JSON object with status (verified, cached, pending, or invalid), ISO verifiedAt, attestationCount, and boolean meshQuorum; unknown identifiers return pending. This read-only lookup costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects missing or conflicting selectors with JSON-RPC -32602.",
+      "Look up one process-memory proof lifecycle and attestation state using exactly one proofHash or snapshotDigest; use this tool for a known identifier, not to list multiple proofs (use proof.list) or execute verification (use proof.verify). Returns a JSON object with status (verified, cached, pending, or invalid), ISO verifiedAt, attestationCount, and boolean meshQuorum; unknown identifiers return pending. This read-only lookup costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects missing or conflicting selectors with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1010,7 +1012,7 @@ const baseMcpToolDefinitions = [
       properties: {
         proofHash: field(
           "string",
-          "Canonical IPFS CID or hex digest identifier string.",
+          "Primary proof lifecycle lookup key (64-digit hex with optional 0x prefix or IPFS CID); mutually exclusive with snapshotDigest.",
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
@@ -1021,7 +1023,7 @@ const baseMcpToolDefinitions = [
         ),
         snapshotDigest: field(
           "string",
-          "Decimal field digest, 64-digit hexadecimal digest, or IPFS CID identifier string.",
+          "Primary snapshot lifecycle lookup key (decimal field digest, 64-digit hex, or IPFS CID); mutually exclusive with proofHash.",
           [
             "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
           ],
@@ -1080,7 +1082,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "List recent attestations in bounded process memory with optional status (verified, cached, pending, invalid), limit (1-100, default 20), and offset (0-1000, default 0). Returns a JSON object containing newest-first attestations with proofHash, snapshotDigest, status, submittedAt, attestationCount, and meshQuorum, plus total before pagination. This read-only listing costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects invalid filters with JSON-RPC -32602.",
+      "List recent proof attestations in bounded process memory with optional status, limit (1-100, default 20), and offset (0-1000, default 0); use this tool to discover hashes or review historical states, not to submit proofs (use proof.submit) or ground context (use proof.ground). Returns a JSON object containing newest-first attestations with proofHash, snapshotDigest, status, submittedAt, attestationCount, and meshQuorum, plus total before pagination. This read-only listing costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects invalid filters with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1091,19 +1093,19 @@ const baseMcpToolDefinitions = [
       properties: {
         limit: field(
           "integer",
-          "Maximum number of records to return (integer, 1-100).",
+          "Pagination window size: maximum number of attestation records to return (integer, 1-100); increase offset by limit for the next page.",
           [20],
           { minimum: 1, maximum: 100, default: 20 },
         ),
         offset: field(
           "integer",
-          "Zero-based pagination skip offset count.",
+          "Zero-based pagination skip offset (0-1000); increase by limit to page through historical attestations, but multiples of limit are not required.",
           [0],
           { minimum: 0, maximum: 1_000, default: 0 },
         ),
         status: field(
           "string",
-          "Filter records by attestation lifecycle state: verified, cached, pending, or invalid.",
+          "Filter the attestation index to one lifecycle stage: verified, cached, pending, or invalid.",
           ["verified"],
           { enum: [...proofLifecycleStates] },
         ),
@@ -1218,7 +1220,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "Submit Groth16/BN254 proof coordinates in proof.piA, proof.piB, and proof.piC with five decimal-string publicSignals (blockHeight, thermodynamicHash, timestamp, valuationSat, snapshotDigest) and an optional matching snapshotDigest. Returns a JSON object with proofHash, verified or invalid status, ISO submittedAt, and attestationStatus indicating whether Nostr NIP-78 publication succeeded or was skipped; the bounded lifecycle index is not durable. This state-changing 250-sat L402 call shares a 60-requests-per-minute IP limit, accepts legacy pi_a/pi_b/pi_c input for existing clients, and rejects malformed fields with JSON-RPC -32602.",
+      "Submit Groth16/BN254 proof coordinates and five ordered publicSignals for verification and possible Nostr NIP-78 publication; use this tool to record an attestation, not for transient proof testing (use proof.verify). Returns a JSON object with proofHash, verified or invalid status, ISO submittedAt, and attestationStatus indicating whether Nostr NIP-78 publication succeeded or was skipped; the bounded process-memory lifecycle index is not durable. This state-changing 250-sat L402 call shares a 60-requests-per-minute IP limit, accepts legacy pi_a/pi_b/pi_c input for existing clients, and rejects malformed fields with JSON-RPC -32602.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1238,7 +1240,7 @@ const baseMcpToolDefinitions = [
         proof: {
           type: "object",
           description:
-            "Groth16/Poseidon BN254 proof coordinates using piA and piC as three decimal-string projective coordinates each and piB as three pairs of decimal-string extension-field coordinates; for example, piA ['1','2','1'].",
+            "Groth16/Poseidon BN254 proof coordinates for non-interactive validation: piA and piC are three decimal-string projective coordinates each, and piB is three pairs of decimal-string extension-field coordinates; for example, piA ['1','2','1'].",
           example: {
             piA: ["1", "2", "1"],
             piB: [["1", "2"], ["3", "4"], ["1", "0"]],
@@ -1310,7 +1312,7 @@ const baseMcpToolDefinitions = [
         },
         publicSignals: field(
           "array",
-          "Public signals ordered as blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest.",
+          "Five ordered public inputs—blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest—that must align with the submitted proof coordinates.",
           [["920000", "1", "1789776000000", "12583", "1"]],
           {
             minItems: 5,
@@ -1385,7 +1387,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "Ground agent context in the current Bitcoin tip using required contextHash (64 hex characters), required agentId (1-256 trimmed characters), and optional JSON metadata. Returns a JSON object containing a signed receipt with normalized contextHash, agentId, blockHeight, blockHash, timestamp, Merkle proof, and NIP-78 signature, verifiable through POST /api/v1/zk/verify. This 250-sat L402 call checks signing readiness before charging, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
+      "Ground agent context in the current Bitcoin block tip using contextHash, agentId, and optional metadata; use this tool when execution state needs a signed cryptographic receipt, not for general telemetry (use stratigraphy.get) or ZK proof submission (use proof.submit). Returns a JSON object containing a signed receipt with normalized contextHash, agentId, blockHeight, blockHash, timestamp, Merkle proof, and NIP-78 signature, verifiable through POST /api/v1/zk/verify. This 250-sat L402 call checks signing readiness before charging, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1400,13 +1402,13 @@ const baseMcpToolDefinitions = [
       properties: {
         contextHash: field(
           "string",
-          "64-character case-insensitive hexadecimal SHA-256 digest string; normalized to lowercase.",
+          "64-character hexadecimal SHA-256 digest binding the agent's prompt or execution state to the current block tip; normalized to lowercase.",
           ["4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f"],
           { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 },
         ),
         agentId: field(
           "string",
-          "Trimmed client or agent identifier string from 1 to 256 characters.",
+          "Unique agent instance identifier named in the signed attestation receipt; trimmed to 1-256 characters.",
           ["research-agent-7"],
           { minLength: 1, maxLength: 256 },
         ),
@@ -1486,7 +1488,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
-      "Inspect current in-process peer topology and consensus readiness without input parameters; pass an empty object and do not use this tool to validate an individual proof. Returns a JSON object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold. This read-only tool is free, shares a 60-requests-per-minute IP limit, and rejects unexpected inputs with JSON-RPC -32602.",
+      "Inspect current in-process P2P mesh topology, active peer count, and consensus readiness before mesh.broadcast; pass an empty object, and do not use this tool for individual proof verification (use proof.verify) or telemetry records (use stratigraphy.get). Returns a JSON object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold. This read-only tool is free, shares a 60-requests-per-minute IP limit, and rejects unexpected inputs with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1517,7 +1519,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.broadcast",
     title: "Broadcast Telemetry Snapshot to Mesh",
     description:
-      "Broadcast one canonical Bitcoin Stratigraphy telemetry snapshot to configured, pinned P2P mesh peers using required signalType (telemetry_snapshot) and payload.date (UTC YYYY-MM-DD); arbitrary caller-supplied data and peer targets are not accepted. Returns a JSON object with signalType, date, snapshotDigest, peerAttestations received, quorumThreshold, merkleRoot, and networkId after peer cross-validation. This active 250-sat L402 call requires configured peers and a successful quorum, shares a 60-requests-per-minute IP limit, and rejects invalid inputs with JSON-RPC -32602.",
+      "Broadcast a freshly signed canonical telemetry snapshot to pinned P2P mesh peers using signalType telemetry_snapshot and payload.date; use this tool after local record generation to establish multi-node consensus, not to inspect topology (use mesh.status) or fetch records (use stratigraphy.get); arbitrary snapshots and peer targets are not accepted. Returns a JSON object with signalType, date, snapshotDigest, peerAttestations received, quorumThreshold, merkleRoot, and networkId after peer cross-validation. This active 250-sat L402 call requires configured peers and a successful quorum, shares a 60-requests-per-minute IP limit, and rejects invalid inputs with JSON-RPC -32602.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1527,13 +1529,13 @@ const baseMcpToolDefinitions = [
       properties: {
         signalType: field(
           "string",
-          "Only telemetry_snapshot is supported; this sends one canonical record rather than accepting arbitrary signals.",
+          "Enforces the broadcast event schema; must be telemetry_snapshot to trigger peer validation, not an arbitrary signal.",
           ["telemetry_snapshot"],
           { enum: ["telemetry_snapshot"] },
         ),
         payload: {
           type: "object",
-          description: "Select one existing UTC-dated telemetry record; for example, {\"date\":\"2026-09-09\"}.",
+          description: "UTC date selector for an existing telemetry record submitted for peer attestation, not a caller-supplied record object; for example, {\"date\":\"2026-09-09\"}.",
           examples: [{ date: "2026-09-09" }],
           additionalProperties: false,
           properties: {

@@ -932,6 +932,22 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${candidate.name}.outputSchema`,
     );
   }
+  for (const candidate of listed.result?.tools ?? []) {
+    assert.match(candidate.description, /\b(?:not to|not for|do not)\b/i,
+      `${candidate.name} must distinguish nearby tools`);
+  }
+  const documentedTool = (name: string) => listed.result?.tools.find(
+    (candidate: { name: string }) => candidate.name === name,
+  );
+  assert.match(documentedTool("stratigraphy.list").description, /costs 10 sats/);
+  assert.match(documentedTool("proof.submit").description, /not durable/);
+  assert.match(documentedTool("proof.verify").description, /process-memory verification indexes/);
+  assert.match(documentedTool("mesh.broadcast").inputSchema.properties.payload.description,
+    /date selector.*not a caller-supplied record/i);
+  assert.match(documentedTool("proof.list").inputSchema.properties.offset.description,
+    /multiples of limit are not required/);
+  assert.match(documentedTool("stratigraphy.get").inputSchema.properties.startDate.description,
+    /open range/);
   const queryDefaults = listed.result?.tools.find(
     (candidate: { name: string }) => candidate.name === "stratigraphy.get",
   )?.inputSchema.properties;

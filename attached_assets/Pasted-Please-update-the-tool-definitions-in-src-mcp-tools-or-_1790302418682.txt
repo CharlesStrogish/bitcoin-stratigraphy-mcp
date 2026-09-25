@@ -1,0 +1,50 @@
+Please update the tool definitions in `src/mcp/tools` (or wherever MCP tools are registered) to optimize our Glama Tool Definition Quality Score (TDQS) to 5.0/5.0 across all 9 tools:
+
+1. `mesh.broadcast`:
+   - Description: "Broadcast a canonical telemetry snapshot to pinned P2P mesh peers to establish multi-node consensus attestation. Use this tool when distributing verified snapshots to the mesh network after local generation. Do NOT use this tool to check peer topology (use `mesh.status`) or fetch telemetry records (use `stratigraphy.get`). Requires active peers and consensus quorum; costs 250 sats via L402."
+   - Parameters:
+     * `payload`: "The UTC-dated telemetry record object being submitted across the network for peer attestation."
+     * `signalType`: "Enforces the broadcast event schema type; must be 'telemetry_snapshot' to trigger peer validation rules."
+
+2. `mesh.status`:
+   - Description: "Inspect current P2P mesh topology, active peer count, and consensus readiness. Use this tool to verify network health before calling `mesh.broadcast`. Do NOT use this tool to verify individual ZK proofs (use `proof.verify`) or fetch stratigraphy metrics (use `stratigraphy.get`). Free read-only call; pass an empty object."
+
+3. `proof.ground`:
+   - Description: "Ground agent context in the current Bitcoin block tip by generating a signed cryptographic receipt bound to contextHash and agentId. Use this tool when an agent requires verifiable proof of execution state at the latest chain height. Do NOT use this tool to query general telemetry (use `stratigraphy.get`) or submit ZK proofs (use `proof.submit`). Costs 250 sats via L402."
+   - Parameters:
+     * `contextHash`: "Hex digest binding the agent's current prompt or execution state to the block height."
+     * `agentId`: "Unique identifier string naming the requesting agent instance in the attestation receipt."
+
+4. `proof.list`:
+   - Description: "List recent proof attestations stored in process memory with optional lifecycle status filtering. Use this tool to discover attestation hashes or review historical proof states before calling `proof.status`. Do NOT use this tool to submit new proofs (use `proof.submit`) or ground agent context (use `proof.ground`). Costs 10 sats via L402."
+   - Parameters:
+     * `status`: "Filters the attestation index to a specific lifecycle stage to narrow returned results."
+     * `limit`/`offset`: "Controls result pagination window; set `offset` as a multiple of `limit` to page through historical attestations."
+
+5. `proof.status`:
+   - Description: "Look up detailed lifecycle and attestation state for a single proof using proofHash or snapshotDigest. Use this tool to track settlement progress of a known proof identifier. Do NOT use this tool to list multiple proofs (use `proof.list`) or verify proof execution (use `proof.verify`). Exactly one lookup selector must be provided. Costs 10 sats via L402."
+   - Parameters:
+     * `proofHash`: "Primary lookup key for ZK proof records; mutually exclusive with `snapshotDigest`."
+     * `snapshotDigest`: "Primary lookup key for telemetry snapshot records; mutually exclusive with `proofHash`."
+
+6. `proof.submit`:
+   - Description: "Submit a Groth16/BN254 ZK proof and public signals for server verification and Nostr NIP-78 publication. Use this tool to permanently record and publish a zero-knowledge proof. Do NOT use this tool for transient proof testing without recording (use `proof.verify` instead). Costs 250 sats via L402."
+   - Parameters:
+     * `proof`: "Groth16 proof coordinates required to evaluate state validity non-interactively."
+     * `publicSignals`: "Ordered public inputs (blockHeight, thermodynamicHash, timestamp, valuationSat, snapshotDigest) that must align with proof coordinates."
+
+7. `proof.verify`:
+   - Description: "Verify a base64url Groth16 ZK proof against public inputs and telemetry data transiently. Use this tool to validate proof correctness in memory without publishing to Nostr or altering state. Do NOT use this tool to persist or broadcast proofs (use `proof.submit` instead). Costs 250 sats via L402."
+   - Parameters:
+     * `publicInputs`: "Expected public constants committed by the proof; fields must match the corresponding telemetry payload in `data`."
+
+8. `stratigraphy.get`:
+   - Description: "Fetch Bitcoin Stratigraphy telemetry by date, blockHeight, or inclusive date/block ranges. Use this tool to retrieve thermodynamic valuation metrics and historical telemetry records. Do NOT use this tool to discover dataset boundaries (use `stratigraphy.list` first). Single selectors cannot be combined with range bounds. Costs 250 sats via L402."
+   - Parameters:
+     * `startDate`/`endDate`: "Defines an inclusive calendar date range; both must be supplied together and cannot be combined with `date` or `blockHeight`."
+     * `startBlock`/`endBlock`: "Defines an inclusive block height range; both must be supplied together and cannot be combined with `date` or `blockHeight`."
+
+9. `stratigraphy.list`:
+   - Description: "Discover available Bitcoin Stratigraphy catalog bounds, date ranges, block heights, and available metric keys. Use this tool before calling `stratigraphy.get` to determine valid query ranges. Do NOT use this tool to fetch telemetry records (use `stratigraphy.get` instead). Free read-only call; pass an empty object."
+
+Rebuild the application, ensure all MCP tests pass, and confirm the updated schemas are served live at `/mcp`.

@@ -153,11 +153,70 @@ export interface ZkVerifyRequest {
   data: ZkVerifyRequestData;
 }
 
+export type EpistemicAnchorReceiptPayload = { [key: string]: unknown };
+
+export type EpistemicAnchorReceiptProof = { [key: string]: unknown };
+
+/**
+ * Canonical SHA-256/Merkle attestation signed as a Nostr NIP-78 event and bound to the current Bitcoin tip
+ */
+export interface EpistemicAnchorReceipt {
+  schema: string;
+  payload: EpistemicAnchorReceiptPayload;
+  proof: EpistemicAnchorReceiptProof;
+  signature: NostrAttestation;
+  receiptSchema: 'bitcoin-stratigraphy/epistemic-anchor/v1';
+  /** @pattern ^[0-9a-f]{64}$ */
+  contextHash: string;
+  agentId: string;
+  /** @minimum 1 */
+  blockHeight: number;
+  /** @pattern ^[0-9a-f]{64}$ */
+  blockHash: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  merkleRoot: string;
+  /** @minimum 0 */
+  timestamp: number;
+  nostrSignature: NostrAttestation;
+  /** Arbitrary extension data is already permitted on this receipt. */
+  data?: unknown;
+  [key: string]: unknown;
+ }
+
+/**
+ * Accepted request bodies for proof verification, including direct and wrapped epistemic-anchor receipts.
+ */
+export type ZkVerifyInput = ZkVerifyRequest | EpistemicAnchorReceipt | {
+  attestation: EpistemicAnchorReceipt;
+  data?: unknown;
+};
+
 export interface ZkVerifyResponse {
   valid: boolean;
   verifiedAt: string;
   /** @minimum 0 */
   computationTimeMs: number;
+}
+
+/**
+ * Optional non-secret JSON metadata included in the signed anchor
+ */
+export type EpistemicGroundingRequestMetadata = { [key: string]: unknown };
+
+export interface EpistemicGroundingRequest {
+  /**
+     * SHA-256 digest of the agent context
+     * @pattern ^[0-9a-fA-F]{64}$
+     */
+  contextHash: string;
+  /**
+     * Stable caller-controlled agent identifier
+     * @minLength 1
+     * @maxLength 256
+     */
+  agentId: string;
+  /** Optional non-secret JSON metadata included in the signed anchor */
+  metadata?: EpistemicGroundingRequestMetadata;
 }
 
 export type MeshStatusTopologyHealth = typeof MeshStatusTopologyHealth[keyof typeof MeshStatusTopologyHealth];
@@ -169,6 +228,9 @@ export const MeshStatusTopologyHealth = {
   isolated: 'isolated',
 } as const;
 
+/**
+ * Output of MCP tool mesh.get_status; mesh.status is a legacy tool name.
+ */
 export interface MeshStatus {
   /** @pattern ^[0-9a-f]{64}$ */
   nodePubkey: string;
@@ -449,6 +511,7 @@ export type ProofStatusMcpToolIdentifiersItem = typeof ProofStatusMcpToolIdentif
 export const ProofStatusMcpToolIdentifiersItem = {
   proofHash: 'proofHash',
   snapshotDigest: 'snapshotDigest',
+  receiptHash: 'receiptHash',
 } as const;
 
 /**
@@ -482,14 +545,14 @@ export interface ProofStatus {
 }
 
 /**
- * MCP lifecycle query tool registered as proof.status.
+ * MCP lifecycle query tool registered as proof.get_status. proof.status is a legacy tool name.
  */
 export interface ProofStatusMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'proof.status';
+  name: 'proof.get_status';
   /** Human-readable purpose of the proof lifecycle query. */
   description: string;
-  /** Alternative identifiers accepted by the tool; callers provide exactly one. */
+  /** Alternative identifiers accepted by the tool; callers provide exactly one of proofHash, snapshotDigest, or receiptHash. */
   identifiers: ProofStatusMcpToolIdentifiersItem[];
   exampleStatus: ProofStatus;
 }
@@ -834,5 +897,9 @@ export type VerifyZkProof400 = {
 
 export type VerifyZkProof503 = {
   error: 'Zero-knowledge verifier overloaded';
+};
+
+export type GroundEpistemicContext200 = {
+  receipt: EpistemicAnchorReceipt;
 };
 

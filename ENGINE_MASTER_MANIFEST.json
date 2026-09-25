@@ -6,7 +6,7 @@
   "benchmarks": {
     "smithery_quality_score": "100/100",
     "glama_tdqs_score": "4.7/5.0",
-    "active_mcp_tools": 7
+    "active_mcp_tools": 10
   },
   "architecture_stack": {
     "runtime": "Node.js / TypeScript / Express",
@@ -20,9 +20,12 @@
     "stratigraphy.list",
     "stratigraphy.get",
     "proof.list",
-    "proof.status",
+    "proof.get_status",
     "proof.verify",
     "proof.submit",
-    "mesh.status"
+    "proof.ground",
+    "proof.issue_receipt",
+    "mesh.get_status",
+    "mesh.broadcast"
   ]
 }

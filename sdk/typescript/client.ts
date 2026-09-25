@@ -83,9 +83,15 @@ export type McpToolArguments = {
     verificationKeyId: string;
     data: Record<string, unknown> | Record<string, unknown>[];
   };
+  "proof.get_status":
+    | { proofHash: string; snapshotDigest?: never; receiptHash?: never }
+    | { snapshotDigest: string; proofHash?: never; receiptHash?: never }
+    | { receiptHash: string; proofHash?: never; snapshotDigest?: never };
+  /** @deprecated Use proof.get_status. */
   "proof.status":
-    | { proofHash: string; snapshotDigest?: never }
-    | { snapshotDigest: string; proofHash?: never };
+    | { proofHash: string; snapshotDigest?: never; receiptHash?: never }
+    | { snapshotDigest: string; proofHash?: never; receiptHash?: never }
+    | { receiptHash: string; proofHash?: never; snapshotDigest?: never };
   "proof.list": { limit?: number; offset?: number; status?: ProofLifecycle };
   "proof.submit": {
     proof: Groth16Coordinates;
@@ -97,7 +103,20 @@ export type McpToolArguments = {
     agentId: string;
     metadata?: Record<string, unknown>;
   };
+  "mesh.get_status": Record<string, never>;
+  /** @deprecated Use mesh.get_status. */
   "mesh.status": Record<string, never>;
+  "proof.issue_receipt": {
+    cid: string;
+    nostrEventId?: string;
+    context?: Record<string, unknown>;
+  };
+  /** @deprecated Use proof.issue_receipt. */
+  "proof.epistemic_receipt": {
+    cid: string;
+    nostrEventId?: string;
+    context?: Record<string, unknown>;
+  };
   "mesh.broadcast": {
     signalType: "telemetry_snapshot";
     payload: { date: string };
@@ -119,6 +138,13 @@ export type McpToolResponses = {
     computationTimeMs: number;
     error?: string;
   };
+  "proof.get_status": {
+    status: ProofLifecycle;
+    verifiedAt: string;
+    attestationCount: number;
+    meshQuorum: boolean;
+  };
+  /** @deprecated Use proof.get_status. */
   "proof.status": {
     status: ProofLifecycle;
     verifiedAt: string;
@@ -133,6 +159,16 @@ export type McpToolResponses = {
     attestationStatus: string;
   };
   "proof.ground": { receipt: GroundReceipt };
+  "mesh.get_status": {
+    nodePubkey: string;
+    activePeerCount: number;
+    configuredPeerCount: number;
+    topologyHealth: "healthy" | "degraded" | "isolated";
+    crossValidationSuccessRate: number;
+    averagePropagationLatencyMs: number;
+    quorumThreshold: number;
+  };
+  /** @deprecated Use mesh.get_status. */
   "mesh.status": {
     nodePubkey: string;
     activePeerCount: number;
@@ -141,6 +177,33 @@ export type McpToolResponses = {
     crossValidationSuccessRate: number;
     averagePropagationLatencyMs: number;
     quorumThreshold: number;
+  };
+  "proof.issue_receipt": {
+    receiptHash: string;
+    blockTip: number;
+    blockHash: string;
+    ipfsCid: string;
+    nostrEventId?: string;
+    attestation: {
+      type: "Signed-Bitcoin-Tip-Anchor";
+      proofPayload: string;
+      verified: boolean;
+    };
+    timestamp: string;
+  };
+  /** @deprecated Use proof.issue_receipt. */
+  "proof.epistemic_receipt": {
+    receiptHash: string;
+    blockTip: number;
+    blockHash: string;
+    ipfsCid: string;
+    nostrEventId?: string;
+    attestation: {
+      type: "Signed-Bitcoin-Tip-Anchor";
+      proofPayload: string;
+      verified: boolean;
+    };
+    timestamp: string;
   };
   "mesh.broadcast": {
     signalType: "telemetry_snapshot";
@@ -216,8 +279,11 @@ export class BitcoinStratigraphyClient {
   verifyProof(args: McpToolArguments["proof.verify"]) {
     return this.callTool("proof.verify", args);
   }
-  getProofStatus(args: McpToolArguments["proof.status"]) {
-    return this.callTool("proof.status", args);
+  getProofStatus(args: McpToolArguments["proof.get_status"]) {
+    return this.callTool("proof.get_status", args);
+  }
+  issueEpistemicReceipt(args: McpToolArguments["proof.issue_receipt"]) {
+    return this.callTool("proof.issue_receipt", args);
   }
   listProofs(args: McpToolArguments["proof.list"] = {}) {
     return this.callTool("proof.list", args);
@@ -228,7 +294,7 @@ export class BitcoinStratigraphyClient {
   groundProof(args: McpToolArguments["proof.ground"]) {
     return this.callTool("proof.ground", args);
   }
-  getMeshStatus() { return this.callTool("mesh.status", {}); }
+  getMeshStatus() { return this.callTool("mesh.get_status", {}); }
   broadcastMeshSignal(date: string) {
     return this.callTool("mesh.broadcast", {
       signalType: "telemetry_snapshot",

@@ -9,14 +9,14 @@ import type { ProofStatus } from './proofStatus';
 import type { ProofStatusMcpToolIdentifiersItem } from './proofStatusMcpToolIdentifiersItem';
 
 /**
- * MCP lifecycle query tool registered as proof.status.
+ * MCP lifecycle query tool registered as proof.get_status. proof.status is a legacy tool name.
  */
 export interface ProofStatusMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'proof.status';
+  name: 'proof.get_status';
   /** Human-readable purpose of the proof lifecycle query. */
   description: string;
-  /** Alternative identifiers accepted by the tool; callers provide exactly one. */
+  /** Alternative identifiers accepted by the tool; callers provide exactly one of proofHash, snapshotDigest, or receiptHash. */
   identifiers: ProofStatusMcpToolIdentifiersItem[];
   exampleStatus: ProofStatus;
 }

@@ -12,4 +12,5 @@ export type ProofStatusMcpToolIdentifiersItem = typeof ProofStatusMcpToolIdentif
 export const ProofStatusMcpToolIdentifiersItem = {
   proofHash: 'proofHash',
   snapshotDigest: 'snapshotDigest',
+  receiptHash: 'receiptHash',
 } as const;

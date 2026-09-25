@@ -58,7 +58,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "proof.status",
+        name: "proof.get_status",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -99,7 +99,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "proof.epistemic_receipt",
+        name: "proof.issue_receipt",
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,
@@ -114,7 +114,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "mesh.status",
+        name: "mesh.get_status",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,

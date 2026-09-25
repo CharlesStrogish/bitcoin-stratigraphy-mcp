@@ -325,7 +325,7 @@ const proofStatusInputSchema = z.object({
     "Primary lookup key for a snapshot lifecycle record (decimal digest, hex digest, or CID); mutually exclusive with proofHash.",
   ),
   receiptHash: z.string().regex(/^[0-9a-f]{64}$/).optional().describe(
-    "SHA-256 digest returned by proof.epistemic_receipt; mutually exclusive with proofHash and snapshotDigest.",
+    "SHA-256 digest returned by proof.issue_receipt; mutually exclusive with proofHash and snapshotDigest.",
   ),
 }).strict().refine(
   (input) => [input.proofHash, input.snapshotDigest, input.receiptHash]
@@ -740,7 +740,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Fetch Bitcoin Stratigraphy telemetry by days (1-365), date, indexed blockHeight, or inclusive open-ended date/block ranges, with optional metrics projection and limit (1-100); use this tool to retrieve historical thermodynamic valuations, not to discover dataset boundaries (use stratigraphy.list); single selectors cannot be combined with ranges. Returns a JSON object containing records, an array of matching daily snapshots with quantitative_alpha metrics, or an empty array when none match. This read-only call costs 250 sats through L402, shares a 60-requests-per-minute IP limit, and rejects invalid selectors with JSON-RPC -32602.",
+      "Retrieves complete stratigraphy dataset payloads, thermodynamic metrics, and full cryptographic proof content for a target block height.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1025,10 +1025,10 @@ const baseMcpToolDefinitions = [
     },
   },
   {
-    name: "proof.status",
+    name: "proof.get_status",
     title: "Get Proof Status",
     description:
-      "Look up one process-memory proof lifecycle or signed dataset receipt using exactly one proofHash, snapshotDigest, or receiptHash; use this tool for a known identifier, not to list multiple proofs (use proof.list) or execute verification (use proof.verify or POST /api/v1/zk/verify for signed receipts). Returns a JSON object with status (verified, cached, pending, or invalid), ISO verifiedAt, attestationCount, and boolean meshQuorum; unknown identifiers return pending, and signed receipts have zero Nostr attestations unless separately published. This read-only lookup costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects missing or conflicting selectors with JSON-RPC -32602.",
+      "Retrieves the verification status, timestamp, and attestation records of a submitted proof hash.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1064,7 +1064,7 @@ const baseMcpToolDefinitions = [
         ),
         receiptHash: field(
           "string",
-          "SHA-256 digest from proof.epistemic_receipt for a signed Bitcoin-tip anchor, not a Groth16 proof; mutually exclusive with proofHash and snapshotDigest.",
+          "SHA-256 digest from proof.issue_receipt for a signed Bitcoin-tip anchor, not a Groth16 proof; mutually exclusive with proofHash and snapshotDigest.",
           ["ab".repeat(32)],
           { pattern: "^[0-9a-f]{64}$" },
         ),
@@ -1424,7 +1424,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "Ground agent context in the current Bitcoin block tip using contextHash, agentId, and optional metadata; use this tool when execution state needs a signed cryptographic receipt, not for general telemetry (use stratigraphy.get) or ZK proof submission (use proof.submit). Returns a JSON object containing a signed receipt with normalized contextHash, agentId, blockHeight, blockHash, timestamp, Merkle proof, and NIP-78 signature, verifiable through POST /api/v1/zk/verify. This 250-sat L402 call checks signing readiness before charging, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
+      "Anchor live agent execution state, system prompts, or runtime context to the current Bitcoin block height. Use this tool ONLY for runtime agent execution grounding. Do NOT use to anchor static dataset CIDs or off-chain files (use `proof.issue_receipt`).",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1522,10 +1522,10 @@ const baseMcpToolDefinitions = [
     },
   },
   {
-    name: "proof.epistemic_receipt",
+    name: "proof.issue_receipt",
     title: "Anchor a Dataset to the Bitcoin Tip",
     description:
-      "Create a signed Bitcoin-tip receipt binding a dataset CID or hash to the current block height, block hash, and timestamp. Use this tool to anchor a static dataset payload to the live Bitcoin chain tip. Do NOT use this tool to ground live agent execution context (use `proof.ground`), submit ZK proofs (use `proof.submit`), or check attestation status (use `proof.status`). Non-idempotent call costing 250 sats via L402.",
+      "Issue a signed Bitcoin-tip receipt binding an IPFS dataset CID or hash to the active block height. Use this tool ONLY to anchor static dataset payloads for off-chain verification. Do NOT use for live agent execution state grounding (use `proof.ground`), ZK proof submission (use `proof.submit`), or checking attestation status (use `proof.get_status`).",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1607,10 +1607,10 @@ const baseMcpToolDefinitions = [
     },
   },
   {
-    name: "mesh.status",
+    name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "Inspect current in-process P2P mesh topology, active peer count, and consensus readiness before mesh.broadcast; pass an empty object, and do not use this tool for individual proof verification (use proof.verify) or telemetry records (use stratigraphy.get). Returns a JSON object containing nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, and quorumThreshold. This read-only tool is free, shares a 60-requests-per-minute IP limit, and rejects unexpected inputs with JSON-RPC -32602.",
+      "Retrieves live P2P mesh network node health, peer connections, and synchronization status.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1641,7 +1641,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.broadcast",
     title: "Broadcast Telemetry Snapshot to Mesh",
     description:
-      "Broadcast a freshly signed canonical telemetry snapshot to pinned P2P mesh peers using signalType telemetry_snapshot and payload.date; use this tool after local record generation to establish multi-node consensus, not to inspect topology (use mesh.status) or fetch records (use stratigraphy.get); arbitrary snapshots and peer targets are not accepted. Returns a JSON object with signalType, date, snapshotDigest, peerAttestations received, quorumThreshold, merkleRoot, and networkId after peer cross-validation. This active 250-sat L402 call requires configured peers and a successful quorum, shares a 60-requests-per-minute IP limit, and rejects invalid inputs with JSON-RPC -32602.",
+      "Ingests local node telemetry payloads and broadcasts telemetry snapshots across the P2P mesh network.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1702,17 +1702,35 @@ const baseMcpToolDefinitions = [
 
 const immutabilityNote =
   "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.";
+const exactDescriptionToolNames = new Set([
+  "stratigraphy.get",
+  "proof.get_status",
+  "proof.ground",
+  "proof.issue_receipt",
+  "mesh.get_status",
+  "mesh.broadcast",
+]);
 const mcpToolDefinitions = baseMcpToolDefinitions.map((tool) =>
   tool.name.startsWith("stratigraphy.") || tool.name.startsWith("proof.") ||
     tool.name === "mesh.broadcast"
     ? {
         ...tool,
-        description: tool.name === "proof.epistemic_receipt"
+        description: exactDescriptionToolNames.has(tool.name)
           ? tool.description
           : `${tool.description} ${immutabilityNote}`,
       }
     : tool
 );
+
+const legacyToolNames = {
+  "mesh.status": "mesh.get_status",
+  "proof.status": "proof.get_status",
+  "proof.epistemic_receipt": "proof.issue_receipt",
+} as const;
+
+function canonicalToolName(name: string): string {
+  return legacyToolNames[name as keyof typeof legacyToolNames] ?? name;
+}
 
 function createBitcoinStratigraphyMcpServer(
   groundReceipt?: Awaited<ReturnType<typeof groundEpistemicContext>>,
@@ -1747,6 +1765,7 @@ function createBitcoinStratigraphyMcpServer(
   }));
   server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const args = request.params.arguments ?? {};
+    const name = canonicalToolName(request.params.name);
     if (request.params.name === "stratigraphy.get") {
       const parsed = stratigraphyInputSchema.safeParse(args);
       if (!parsed.success) {
@@ -1813,7 +1832,7 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent,
       };
     }
-    if (request.params.name === "proof.status") {
+    if (name === "proof.get_status") {
       const parsed = proofStatusInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(
@@ -1895,7 +1914,7 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent,
       };
     }
-    if (request.params.name === "proof.epistemic_receipt") {
+    if (name === "proof.issue_receipt") {
       if (!epistemicDatasetInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid dataset receipt request");
       }
@@ -1908,7 +1927,7 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent: datasetReceipt,
       };
     }
-    if (request.params.name === "mesh.status") {
+    if (name === "mesh.get_status") {
       if (!meshStatusInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Mesh status takes no arguments");
       }
@@ -2061,10 +2080,12 @@ export function registerMcpRoute(
   const paidTools = {
     "stratigraphy.list": { amountSats: 10, schema: stratigraphyCatalogInputSchema },
     "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
+    "proof.get_status": { amountSats: 10, schema: proofStatusInputSchema },
     "proof.status": { amountSats: 10, schema: proofStatusInputSchema },
     "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
     "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
     "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
+    "proof.issue_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
     "proof.epistemic_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
     "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
     "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
@@ -2146,7 +2167,7 @@ export function registerMcpRoute(
         return;
       }
     }
-    if (name === "proof.epistemic_receipt") {
+    if (canonicalToolName(name) === "proof.issue_receipt") {
       const input = epistemicDatasetInputSchema.parse(body!.params?.arguments ?? {});
       if (Buffer.byteLength(JSON.stringify({
         cid: input.cid,

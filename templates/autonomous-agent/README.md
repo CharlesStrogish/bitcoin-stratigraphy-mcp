@@ -62,11 +62,16 @@ receiving-only LNURL-pay key as an invoice payer.
    after successful verification. The proof catalog does not expose full
    proofs for arbitrary historical records, so this starter cannot verify
    historical hashes without another trusted source of proof material.
-3. Check `mesh.status`. If pinned remote peers are available, look up the
+3. Check `mesh.get_status`. If pinned remote peers are available, look up the
    catalog's latest canonical date and request `mesh.broadcast` (250 sats);
    checkpoint the date only after a matching peer receipt. If the server has
    no configured peers, log `isolated` and leave broadcasting pending. The
    worker does not claim a successful broadcast in that case.
+
+The legacy MCP names `mesh.status`, `proof.status`, and
+`proof.epistemic_receipt` remain accepted by compatible servers. New agents
+should use `mesh.get_status`, `proof.get_status`, and
+`proof.issue_receipt`, respectively.
 
 Seeder logs include a SHA-256 hash of each paid invoice after the wallet
 reports a valid preimage, the stable latest telemetry hash on every cycle,

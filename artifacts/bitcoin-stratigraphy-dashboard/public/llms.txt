@@ -11,5 +11,8 @@
 ## Primary Capabilities for AI Agents
 - `stratigraphy.get` / `stratigraphy.list`: Retrieve verified historical thermodynamic block strata and time-series metadata.
 - `proof.verify` / `proof.submit`: Execute and verify Groth16/BN254 zero-knowledge proofs off-chain.
+- `proof.get_status` / `mesh.get_status`: Inspect proof lifecycle and peer mesh health.
+- `proof.issue_receipt`: Issue a thermodynamic epistemic receipt for a dataset CID.
+- `proof.list` / `mesh.broadcast`: Discover attestations and broadcast canonical snapshots.
 - `proof.ground`: Prepare context grounding and obtain L402 routing details for paid anchor creation through the HTTP grounding endpoint; this MCP tool does not create anchors directly.
-- `mesh.status`: Monitor P2P mesh network topology and node consensus health.
+- Legacy MCP aliases: `proof.status`, `proof.epistemic_receipt`, and `mesh.status`. Use the canonical tool names above in new integrations.

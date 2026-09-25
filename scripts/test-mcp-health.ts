@@ -8,12 +8,33 @@ const EXPECTED_TOOLS = [
   "stratigraphy.get",
   "stratigraphy.list",
   "proof.verify",
-  "proof.status",
+  "proof.get_status",
   "proof.list",
   "proof.submit",
   "proof.ground",
-  "mesh.status",
+  "proof.issue_receipt",
+  "mesh.get_status",
+  "mesh.broadcast",
 ] as const;
+const LEGACY_TOOL_ALIASES = [
+  "mesh.status",
+  "proof.status",
+  "proof.epistemic_receipt",
+] as const;
+const EXPECTED_TOOL_DESCRIPTIONS: Record<string, string> = {
+  "proof.issue_receipt":
+    "Issue a signed Bitcoin-tip receipt binding an IPFS dataset CID or hash to the active block height. Use this tool ONLY to anchor static dataset payloads for off-chain verification. Do NOT use for live agent execution state grounding (use `proof.ground`), ZK proof submission (use `proof.submit`), or checking attestation status (use `proof.get_status`).",
+  "proof.ground":
+    "Anchor live agent execution state, system prompts, or runtime context to the current Bitcoin block height. Use this tool ONLY for runtime agent execution grounding. Do NOT use to anchor static dataset CIDs or off-chain files (use `proof.issue_receipt`).",
+  "mesh.broadcast":
+    "Ingests local node telemetry payloads and broadcasts telemetry snapshots across the P2P mesh network.",
+  "stratigraphy.get":
+    "Retrieves complete stratigraphy dataset payloads, thermodynamic metrics, and full cryptographic proof content for a target block height.",
+  "mesh.get_status":
+    "Retrieves live P2P mesh network node health, peer connections, and synchronization status.",
+  "proof.get_status":
+    "Retrieves the verification status, timestamp, and attestation records of a submitted proof hash.",
+};
 
 type JsonRpcResponse = {
   jsonrpc?: unknown;
@@ -159,14 +180,17 @@ async function assertToolList(baseUrl: URL) {
     "tools/list result must contain a tools array",
   );
   const tools = response.result.tools as McpTool[];
-  assert.equal(tools.length, EXPECTED_TOOLS.length, "Expected exactly 8 MCP tools");
+  assert.equal(tools.length, EXPECTED_TOOLS.length, "Unexpected MCP tool count");
 
   const names = tools.map((tool) => tool.name);
   assert.deepEqual(
     [...names].sort(),
     [...EXPECTED_TOOLS].sort(),
-    "MCP tool names do not match the expected eight tools",
+    "MCP tool names do not match the canonical registry",
   );
+  for (const alias of LEGACY_TOOL_ALIASES) {
+    assert.equal(names.includes(alias), false, `${alias} must remain call-only`);
+  }
   for (const tool of tools) {
     const toolName = tool.name;
     assert.ok(typeof toolName === "string", "Every MCP tool needs a name");
@@ -176,6 +200,16 @@ async function assertToolList(baseUrl: URL) {
       `${toolName} needs a description`,
     );
     assertJsonSchema(tool.inputSchema, toolName);
+  }
+  const toolByName = new Map(
+    tools.map((tool) => [tool.name as string, tool]),
+  );
+  for (const [name, description] of Object.entries(EXPECTED_TOOL_DESCRIPTIONS)) {
+    assert.equal(
+      toolByName.get(name)?.description,
+      description,
+      `${name} description must exactly match the public MCP contract`,
+    );
   }
   console.log(
     `MCP tools/list verified: ${tools.length} tools with valid exported schemas.`,

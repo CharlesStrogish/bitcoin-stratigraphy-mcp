@@ -30,7 +30,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class BitcoinStratigraphyClient:
-    """Call nine MCP tools; pay one path-bound, single-use L402 invoice per paid call."""
+    """Call MCP tools; pay one path-bound, single-use L402 invoice per paid call."""
 
     def __init__(
         self,
@@ -83,13 +83,21 @@ class BitcoinStratigraphyClient:
             "verificationKeyId": verification_key_id, "data": data,
         })
 
-    def get_proof_status(self, *, proof_hash: str | None = None,
-                         snapshot_digest: str | None = None) -> dict[str, Any]:
-        if (proof_hash is None) == (snapshot_digest is None):
-            raise ValueError("Provide exactly one proof_hash or snapshot_digest")
-        return self.call_tool("proof.status", {
-            "proofHash": proof_hash,
-        } if proof_hash is not None else {"snapshotDigest": snapshot_digest})
+    def get_proof_status(
+        self, *, proof_hash: str | None = None,
+        snapshot_digest: str | None = None, receipt_hash: str | None = None,
+    ) -> dict[str, Any]:
+        selectors = [
+            ("proofHash", proof_hash),
+            ("snapshotDigest", snapshot_digest),
+            ("receiptHash", receipt_hash),
+        ]
+        selected = [(key, value) for key, value in selectors if value is not None]
+        if len(selected) != 1:
+            raise ValueError(
+                "Provide exactly one proof_hash, snapshot_digest, or receipt_hash"
+            )
+        return self.call_tool("proof.get_status", {selected[0][0]: selected[0][1]})
 
     def list_proofs(self, *, limit: int = 20, offset: int = 0,
                     status: str | None = None) -> dict[str, Any]:
@@ -112,8 +120,19 @@ class BitcoinStratigraphyClient:
             args["metadata"] = dict(metadata)
         return self.call_tool("proof.ground", args)
 
+    def issue_epistemic_receipt(
+        self, cid: str, *, nostr_event_id: str | None = None,
+        context: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        args: dict[str, Any] = {"cid": cid}
+        if nostr_event_id is not None:
+            args["nostrEventId"] = nostr_event_id
+        if context is not None:
+            args["context"] = dict(context)
+        return self.call_tool("proof.issue_receipt", args)
+
     def get_mesh_status(self) -> dict[str, Any]:
-        return self.call_tool("mesh.status", {})
+        return self.call_tool("mesh.get_status", {})
 
     def broadcast_mesh_signal(self, date: str) -> dict[str, Any]:
         return self.call_tool("mesh.broadcast", {

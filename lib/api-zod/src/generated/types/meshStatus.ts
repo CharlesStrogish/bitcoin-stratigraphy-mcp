@@ -7,6 +7,9 @@
  */
 import type { MeshStatusTopologyHealth } from './meshStatusTopologyHealth';
 
+/**
+ * Output of MCP tool mesh.get_status; mesh.status is a legacy tool name.
+ */
 export interface MeshStatus {
   /** @pattern ^[0-9a-f]{64}$ */
   nodePubkey: string;

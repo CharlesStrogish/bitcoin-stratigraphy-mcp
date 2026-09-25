@@ -21,7 +21,9 @@ import type {
 
 import type {
   DatasetHealthStatus,
+  EpistemicGroundingRequest,
   GetPaidStratigraphyParams,
+  GroundEpistemicContext200,
   HeadPaidStratigraphyParams,
   HealthStatus,
   InvalidRangeError,
@@ -47,7 +49,7 @@ import type {
   VerifyZkProof503,
   WalletGatewayError,
   ZkTelemetryEventEnvelope,
-  ZkVerifyRequest,
+  ZkVerifyInput,
   ZkVerifyResponse
 } from './api.schemas';
 
@@ -942,14 +944,14 @@ export const getVerifyZkProofUrl = () => {
  * Public `POST /api/v1/zk/verify` endpoint for Zero-Knowledge Data Integrity. Verifies the Groth16/Poseidon BN254 zk-SNARK and binds the supplied data payload to its semantic public inputs. Proofs emitted by this API are pre-verified and complete verification in under 10ms.
  * @summary Verify a Groth16/Poseidon zkProof payload
  */
-export const verifyZkProof = async (zkVerifyRequest: ZkVerifyRequest, options?: Parameters<typeof customFetch>[1]): Promise<ZkVerifyResponse> => {
+export const verifyZkProof = async (zkVerifyInput: ZkVerifyInput, options?: Parameters<typeof customFetch>[1]): Promise<ZkVerifyResponse> => {
 
   return customFetch<ZkVerifyResponse>(getVerifyZkProofUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(zkVerifyRequest)
+    body: JSON.stringify(zkVerifyInput)
   }
 );}
 
@@ -958,8 +960,8 @@ export const verifyZkProof = async (zkVerifyRequest: ZkVerifyRequest, options?: 
 
 
 export const getVerifyZkProofMutationOptions = <TError = ErrorType<VerifyZkProof400 | VerifyZkProof503>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyRequest>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyInput>}, TContext> => {
 
 const mutationKey = ['verifyZkProof'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -971,7 +973,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyZkProof>>, {data: BodyType<ZkVerifyRequest>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyZkProof>>, {data: BodyType<ZkVerifyInput>}> = (props) => {
           const {data} = props ?? {};
 
           return  verifyZkProof(data,requestOptions)
@@ -985,21 +987,93 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type VerifyZkProofMutationResult = NonNullable<Awaited<ReturnType<typeof verifyZkProof>>>
-    export type VerifyZkProofMutationBody = BodyType<ZkVerifyRequest>
+    export type VerifyZkProofMutationBody = BodyType<ZkVerifyInput>
     export type VerifyZkProofMutationError = ErrorType<VerifyZkProof400 | VerifyZkProof503>
 
     /**
  * @summary Verify a Groth16/Poseidon zkProof payload
  */
 export const useVerifyZkProof = <TError = ErrorType<VerifyZkProof400 | VerifyZkProof503>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyZkProof>>, TError,{data: BodyType<ZkVerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof verifyZkProof>>,
         TError,
-        {data: BodyType<ZkVerifyRequest>},
+        {data: BodyType<ZkVerifyInput>},
         TContext
       > => {
       return useMutation(getVerifyZkProofMutationOptions(options));
+    }
+
+export const getGroundEpistemicContextUrl = () => {
+
+
+
+
+  return `/api/v1/zk/ground`
+}
+
+/**
+ * Paid `POST /api/v1/zk/ground` endpoint. After a fixed 5-sat L402 settlement, fetches the current Bitcoin block height and hash, binds them to the canonical context hash, caller identifier, optional metadata, and server timestamp, then returns a Nostr-signed Epistemic Anchor Receipt. Submit the returned receipt unchanged to `POST /api/v1/zk/verify`.
+ * @summary Anchor an agent context to the current Bitcoin tip
+ */
+export const groundEpistemicContext = async (epistemicGroundingRequest: EpistemicGroundingRequest, options?: Parameters<typeof customFetch>[1]): Promise<GroundEpistemicContext200> => {
+
+  return customFetch<GroundEpistemicContext200>(getGroundEpistemicContextUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(epistemicGroundingRequest)
+  }
+);}
+
+
+
+
+
+export const getGroundEpistemicContextMutationOptions = <TError = ErrorType<void | L402Challenge>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof groundEpistemicContext>>, TError,{data: BodyType<EpistemicGroundingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof groundEpistemicContext>>, TError,{data: BodyType<EpistemicGroundingRequest>}, TContext> => {
+
+const mutationKey = ['groundEpistemicContext'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof groundEpistemicContext>>, {data: BodyType<EpistemicGroundingRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  groundEpistemicContext(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GroundEpistemicContextMutationResult = NonNullable<Awaited<ReturnType<typeof groundEpistemicContext>>>
+    export type GroundEpistemicContextMutationBody = BodyType<EpistemicGroundingRequest>
+    export type GroundEpistemicContextMutationError = ErrorType<void | L402Challenge>
+
+    /**
+ * @summary Anchor an agent context to the current Bitcoin tip
+ */
+export const useGroundEpistemicContext = <TError = ErrorType<void | L402Challenge>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof groundEpistemicContext>>, TError,{data: BodyType<EpistemicGroundingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof groundEpistemicContext>>,
+        TError,
+        {data: BodyType<EpistemicGroundingRequest>},
+        TContext
+      > => {
+      return useMutation(getGroundEpistemicContextMutationOptions(options));
     }
 
 export const getGetMeshStatusUrl = () => {

@@ -36,7 +36,7 @@ test("free tools work without a wallet and return structured JSON", async () => 
     (async (_url, init) => {
       assert.equal(init?.method, "POST");
       const payload = JSON.parse(String(init?.body));
-      assert.equal(payload.params.name, "mesh.status");
+      assert.equal(payload.params.name, "mesh.get_status");
       assert.deepEqual(payload.params.arguments, {});
       assert.equal((init?.headers as Record<string, string>).Authorization, undefined);
       return rpc({ structuredContent: { topologyHealth: "isolated" } });
@@ -44,6 +44,96 @@ test("free tools work without a wallet and return structured JSON", async () => 
   );
   const result = await client.getMeshStatus();
   assert.equal(result.topologyHealth, "isolated");
+});
+
+test("issues epistemic receipts using the canonical MCP tool name", async () => {
+  const signedReceipt = {
+    schema: "bitcoin-stratigraphy/cryptographic-attestation/v1",
+    payload: {
+      schema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+      contextHash: "cd".repeat(32),
+      agentId: "mcp:proof.epistemic_receipt",
+      metadata: { cid: "bafy-example", nostrEventId: "ab".repeat(32) },
+      bitcoin: {
+        blockHeight: 900_000,
+        blockHash: "ef".repeat(32),
+        source: "https://mempool.space/api",
+      },
+      timestamp: 1_788_912_000_000,
+    },
+    proof: {
+      algorithm: "sha256",
+      payloadSha256: "12".repeat(32),
+      blockSizeBytes: 1024,
+      blockHashes: ["34".repeat(32)],
+      merkleRoot: "56".repeat(32),
+      timestamp: 1_788_912_000_000,
+    },
+    signature: { protocol: "nostr", nip: 78, payload_sha256: "78".repeat(32), event: {} },
+    receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+    contextHash: "cd".repeat(32),
+    agentId: "mcp:proof.epistemic_receipt",
+    blockHeight: 900_000,
+    blockHash: "ef".repeat(32),
+    merkleRoot: "56".repeat(32),
+    timestamp: 1_788_912_000_000,
+    nostrSignature: { protocol: "nostr", nip: 78, payload_sha256: "78".repeat(32), event: {} },
+  };
+  const client = new BitcoinStratigraphyClient(
+    "https://example.test/mcp",
+    undefined,
+    (async (_url, init) => {
+      const payload = JSON.parse(String(init?.body));
+      assert.equal(payload.params.name, "proof.issue_receipt");
+      assert.deepEqual(payload.params.arguments, {
+        cid: "bafy-example", nostrEventId: "ab".repeat(32),
+      });
+      return rpc({ structuredContent: {
+        receiptHash: "cd".repeat(32),
+        blockTip: 900_000,
+        blockHash: "ef".repeat(32),
+        ipfsCid: "bafy-example",
+        nostrEventId: "ab".repeat(32),
+        attestation: {
+          type: "Signed-Bitcoin-Tip-Anchor",
+          proofPayload: JSON.stringify(signedReceipt),
+          verified: true,
+        },
+        timestamp: "2026-09-09T00:00:00.000Z",
+      } });
+    }) as typeof fetch,
+  );
+  const receipt = await client.issueEpistemicReceipt({
+    cid: "bafy-example",
+    nostrEventId: "ab".repeat(32),
+  });
+  assert.equal(receipt.attestation.type, "Signed-Bitcoin-Tip-Anchor");
+  assert.deepEqual(
+    JSON.parse(receipt.attestation.proofPayload),
+    signedReceipt,
+  );
+  assert.equal(receipt.attestation.verified, true);
+});
+
+test("looks up proof status by the canonical receiptHash selector", async () => {
+  const receiptHash = "cd".repeat(32);
+  const client = new BitcoinStratigraphyClient(
+    "https://example.test/mcp",
+    undefined,
+    (async (_url, init) => {
+      const payload = JSON.parse(String(init?.body));
+      assert.equal(payload.params.name, "proof.get_status");
+      assert.deepEqual(payload.params.arguments, { receiptHash });
+      return rpc({ structuredContent: {
+        status: "verified",
+        verifiedAt: "2026-09-09T00:00:00.000Z",
+        attestationCount: 0,
+        meshQuorum: false,
+      } });
+    }) as typeof fetch,
+  );
+  const status = await client.getProofStatus({ receiptHash });
+  assert.equal(status.status, "verified");
 });
 
 test("pays the WWW-Authenticate invoice once and retries the exact tool call", async () => {

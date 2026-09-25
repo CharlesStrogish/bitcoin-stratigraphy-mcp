@@ -98,7 +98,7 @@ class ClientTests(unittest.TestCase):
             client.list_stratigraphy()
         self.assertEqual(payments, [INVOICE])
 
-    def test_all_nine_tools_are_available(self):
+    def test_all_ten_tools_are_available(self):
         seen = []
         client = BitcoinStratigraphyClient()
         client.call_tool = lambda name, arguments: seen.append((name, arguments)) or {}
@@ -109,16 +109,38 @@ class ClientTests(unittest.TestCase):
         client.list_proofs()
         client.submit_proof({}, ["1"] * 5)
         client.ground_proof("ab" * 32, "agent")
+        client.issue_epistemic_receipt(
+            "bafy-example", nostr_event_id="ab" * 32, context={"source": "test"}
+        )
         client.get_mesh_status()
         client.broadcast_mesh_signal("2026-09-09")
         self.assertEqual([name for name, _ in seen], [
             "stratigraphy.get", "stratigraphy.list", "proof.verify",
-            "proof.status", "proof.list", "proof.submit", "proof.ground",
-            "mesh.status", "mesh.broadcast",
+            "proof.get_status", "proof.list", "proof.submit", "proof.ground",
+            "proof.issue_receipt", "mesh.get_status", "mesh.broadcast",
         ])
+        self.assertEqual(seen[7][1], {
+            "cid": "bafy-example", "nostrEventId": "ab" * 32,
+            "context": {"source": "test"},
+        })
         self.assertEqual(seen[-1][1], {
             "signalType": "telemetry_snapshot", "payload": {"date": "2026-09-09"},
         })
+
+    def test_proof_status_accepts_receipt_hash_as_a_selector(self):
+        seen = []
+        client = BitcoinStratigraphyClient()
+        client.call_tool = lambda name, arguments: seen.append((name, arguments)) or {
+            "status": "verified",
+        }
+
+        self.assertEqual(
+            client.get_proof_status(receipt_hash="cd" * 32),
+            {"status": "verified"},
+        )
+        self.assertEqual(seen, [
+            ("proof.get_status", {"receiptHash": "cd" * 32}),
+        ])
 
 
 if __name__ == "__main__":

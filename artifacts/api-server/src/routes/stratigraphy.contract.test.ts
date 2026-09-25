@@ -63,6 +63,20 @@ process.env.MACAROON_OPERATOR_SECRET = operatorSecret;
 const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
+const expectedMcpToolDescriptions: Record<string, string> = {
+  "proof.issue_receipt":
+    "Issue a signed Bitcoin-tip receipt binding an IPFS dataset CID or hash to the active block height. Use this tool ONLY to anchor static dataset payloads for off-chain verification. Do NOT use for live agent execution state grounding (use `proof.ground`), ZK proof submission (use `proof.submit`), or checking attestation status (use `proof.get_status`).",
+  "proof.ground":
+    "Anchor live agent execution state, system prompts, or runtime context to the current Bitcoin block height. Use this tool ONLY for runtime agent execution grounding. Do NOT use to anchor static dataset CIDs or off-chain files (use `proof.issue_receipt`).",
+  "mesh.broadcast":
+    "Ingests local node telemetry payloads and broadcasts telemetry snapshots across the P2P mesh network.",
+  "stratigraphy.get":
+    "Retrieves complete stratigraphy dataset payloads, thermodynamic metrics, and full cryptographic proof content for a target block height.",
+  "mesh.get_status":
+    "Retrieves live P2P mesh network node health, peer connections, and synchronization status.",
+  "proof.get_status":
+    "Retrieves the verification status, timestamp, and attestation records of a submitted proof hash.",
+};
 
 type OpenApiDocument = {
   paths: Record<string, { get?: unknown }>;
@@ -107,6 +121,88 @@ function paymentContract(document: OpenApiDocument) {
     entrySchema: document.components.schemas.StratigraphyEntry,
     readinessSchema: document.components.schemas.ReadinessStatus,
   };
+}
+
+function mcpSchemaContract(schema: unknown, path: string): unknown {
+  assert.ok(
+    typeof schema === "object" && schema !== null && !Array.isArray(schema),
+    `${path} must be a JSON Schema object`,
+  );
+  const input = schema as Record<string, unknown>;
+  const contract: Record<string, unknown> = {};
+  for (const key of [
+    "type",
+    "additionalProperties",
+    "required",
+    "enum",
+    "const",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "minLength",
+    "maxLength",
+    "pattern",
+    "format",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+  ]) {
+    if (Object.hasOwn(input, key)) {
+      if (key === "required" && Array.isArray(input[key])) {
+        if (input[key].length > 0) {
+          contract[key] = [...(input[key] as unknown[])].sort();
+        }
+      } else if (
+        key === "additionalProperties" &&
+        typeof input[key] === "object" &&
+        input[key] !== null &&
+        !Array.isArray(input[key])
+      ) {
+        contract[key] = mcpSchemaContract(
+          input[key],
+          `${path}.additionalProperties`,
+        );
+      } else {
+        contract[key] = input[key];
+      }
+    }
+  }
+  if (Object.hasOwn(input, "properties")) {
+    const properties = input.properties;
+    assert.ok(
+      typeof properties === "object" && properties !== null &&
+        !Array.isArray(properties),
+      `${path}.properties must be an object`,
+    );
+    contract.properties = Object.fromEntries(
+      Object.entries(properties as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([name, propertySchema]) => [
+          name,
+          mcpSchemaContract(propertySchema, `${path}.properties.${name}`),
+        ]),
+    );
+  }
+  if (Object.hasOwn(input, "items")) {
+    contract.items = mcpSchemaContract(input.items, `${path}.items`);
+  }
+  for (const key of ["oneOf", "anyOf", "allOf"]) {
+    if (Object.hasOwn(input, key)) {
+      const branches = input[key];
+      assert.ok(Array.isArray(branches), `${path}.${key} must be an array`);
+      contract[key] = branches
+        .map((branch, index) =>
+          mcpSchemaContract(branch, `${path}.${key}[${index}]`),
+        )
+        .sort((left, right) =>
+          (JSON.stringify(left) ?? "").localeCompare(
+            JSON.stringify(right) ?? "",
+          ),
+        );
+    }
+  }
+  return contract;
 }
 
 type Transaction = {
@@ -169,6 +265,7 @@ let invoiceRequestCount = 0;
 let invoiceGate: Promise<void> | undefined;
 let lookupInvoiceCount = 0;
 const app = express();
+app.set("trust proxy", 1);
 const staticPricingEngine = {
   recordRequest: () => undefined,
   requestVelocity: () => 0,
@@ -350,7 +447,12 @@ async function mcpRequest(method: string, params?: Record<string, unknown>) {
       amount_sats: number;
       invoice: string;
     };
-    const expected = ["stratigraphy.list", "proof.list", "proof.status"].includes(String(params?.name))
+    const expected = [
+      "stratigraphy.list",
+      "proof.list",
+      "proof.get_status",
+      "proof.status",
+    ].includes(String(params?.name))
       ? 10 : 250;
     assert.equal(challenge.amount_sats, expected);
     assert.match(response.headers.get("www-authenticate") ?? "", /L402 macaroon=".+", invoice="ln.+"/);
@@ -409,6 +511,7 @@ test("MCP L402 challenges bind price and tool, while discovery and mesh stay fre
   for (const [method, params] of [
     ["initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "pricing-test", version: "1" } }],
     ["tools/list", {}],
+    ["tools/call", { name: "mesh.get_status", arguments: {} }],
     ["tools/call", { name: "mesh.status", arguments: {} }],
   ] as const) {
     const { response } = await mcpRequestAt(baseUrl, method, params);
@@ -416,7 +519,7 @@ test("MCP L402 challenges bind price and tool, while discovery and mesh stay fre
     assert.equal(response.headers.get("www-authenticate"), null);
   }
 
-  const lowArgs = { name: "proof.status", arguments: { snapshotDigest: "1" } };
+  const lowArgs = { name: "proof.get_status", arguments: { snapshotDigest: "1" } };
   const { response: lowResponse, body: lowChallenge } = await mcpRequestAt(baseUrl, "tools/call", lowArgs);
   assert.equal(lowResponse.status, 402);
   assert.equal((lowChallenge as any).amount_sats, 10);
@@ -459,11 +562,207 @@ test("MCP L402 challenges bind price and tool, while discovery and mesh stay fre
     baseUrl, "tools/call", lowArgs, undefined, lowAuthorization,
   );
   assert.equal(replay.status, 429);
+
+  const legacyStatusArgs = {
+    name: "proof.status",
+    arguments: { snapshotDigest: "1" },
+  };
+  const { response: legacyStatusChallengeResponse, body: legacyStatusChallenge } =
+    await mcpRequestAt(baseUrl, "tools/call", legacyStatusArgs);
+  assert.equal(legacyStatusChallengeResponse.status, 402);
+  assert.equal((legacyStatusChallenge as any).amount_sats, 10);
+  const legacyStatusPayment = mcpInvoices.get(
+    (legacyStatusChallenge as any).payment_hash,
+  );
+  assert.ok(legacyStatusPayment);
+  const legacyStatusAuthorization =
+    `L402 ${(legacyStatusChallenge as any).macaroon}:${legacyStatusPayment.preimage}`;
+  const { response: canonicalStatusWithLegacyMacaroon } = await mcpRequestAt(
+    baseUrl,
+    "tools/call",
+    lowArgs,
+    undefined,
+    legacyStatusAuthorization,
+  );
+  assert.equal(
+    canonicalStatusWithLegacyMacaroon.status,
+    402,
+    "Legacy proof.status payment scope must not authorize proof.get_status",
+  );
+  const { response: legacyStatusPaidResponse, body: legacyStatusPaid } =
+    await mcpRequestAt(
+      baseUrl,
+      "tools/call",
+      legacyStatusArgs,
+      undefined,
+      legacyStatusAuthorization,
+    );
+  assert.equal(legacyStatusPaidResponse.status, 200);
+  assert.equal(
+    legacyStatusPaid.result?.structuredContent.status,
+    "pending",
+  );
+
+  // Legacy names remain callable, but are intentionally absent from discovery.
+  // In particular, the paid receipt alias must retain the canonical 250-sat
+  // price and dispatch to the signed dataset-receipt implementation.
+  const legacyReceiptArgs = {
+    name: "proof.epistemic_receipt",
+    arguments: { cid: "ef".repeat(32) },
+  };
+  const { response: legacyReceiptChallengeResponse, body: legacyReceiptChallenge } =
+    await mcpRequestAt(baseUrl, "tools/call", legacyReceiptArgs);
+  assert.equal(legacyReceiptChallengeResponse.status, 402);
+  assert.equal((legacyReceiptChallenge as any).amount_sats, 250);
+  const legacyReceiptPayment = mcpInvoices.get(
+    (legacyReceiptChallenge as any).payment_hash,
+  );
+  assert.ok(legacyReceiptPayment);
+  const legacyReceiptAuthorization =
+    `L402 ${(legacyReceiptChallenge as any).macaroon}:${legacyReceiptPayment.preimage}`;
+  const { response: canonicalReceiptWithLegacyMacaroon } = await mcpRequestAt(
+    baseUrl,
+    "tools/call",
+    {
+      name: "proof.issue_receipt",
+      arguments: { cid: "ef".repeat(32) },
+    },
+    undefined,
+    legacyReceiptAuthorization,
+  );
+  assert.equal(
+    canonicalReceiptWithLegacyMacaroon.status,
+    402,
+    "Legacy proof.epistemic_receipt payment scope must not authorize proof.issue_receipt",
+  );
+  const { response: legacyReceiptPaidResponse, body: legacyReceiptPaid } =
+    await mcpRequestAt(
+      baseUrl,
+      "tools/call",
+      legacyReceiptArgs,
+      undefined,
+      legacyReceiptAuthorization,
+    );
+  assert.equal(legacyReceiptPaidResponse.status, 200);
+  assert.equal(
+    legacyReceiptPaid.result?.structuredContent.ipfsCid,
+    "ef".repeat(32),
+  );
   const { response: invalidParams, body: invalidBody } = await mcpRequestAt(
     baseUrl, "tools/call", { name: "proof.status", arguments: { snapshotDigest: "" } },
   );
   assert.equal(invalidParams.status, 200);
   assert.equal(invalidBody.error?.code, -32602);
+});
+
+test("rejects canonical and legacy paid tool calls in JSON-RPC batches before execution", async () => {
+  const requests = [
+    {
+      id: 1,
+      method: "tools/call",
+      params: {
+        name: "proof.get_status",
+        arguments: { snapshotDigest: "1" },
+      },
+    },
+    {
+      id: 2,
+      method: "tools/call",
+      params: {
+        name: "proof.issue_receipt",
+        arguments: { cid: "ef".repeat(32) },
+      },
+    },
+    {
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "proof.status",
+        arguments: { snapshotDigest: "1" },
+      },
+    },
+    {
+      id: 4,
+      method: "tools/call",
+      params: {
+        name: "proof.epistemic_receipt",
+        arguments: { cid: "ef".repeat(32) },
+      },
+    },
+  ];
+  const batches = [
+    ...requests.map((request) => [request]),
+    [
+      {
+        id: 5,
+        method: "tools/call",
+        params: { name: "mesh.status", arguments: {} },
+      },
+      requests[3],
+    ],
+  ];
+
+  const assertPaidBatchRejected = async (
+    batch: typeof batches[number],
+    authorization?: string,
+  ) => {
+    const invoiceCountBefore = mcpInvoiceCount;
+    const response = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        "MCP-Protocol-Version": "2025-03-26",
+        "X-Forwarded-For": "198.51.100.42",
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
+      body: JSON.stringify(batch),
+    });
+    const body = await response.json() as {
+      jsonrpc?: string;
+      id?: unknown;
+      error?: { code?: number; message?: string };
+    };
+    assert.equal(response.status, 400, "paid batch must be rejected");
+    assert.equal(response.headers.get("www-authenticate"), null);
+    assert.deepEqual(body, {
+      jsonrpc: "2.0",
+      error: {
+        code: -32600,
+        message: "Batch paid tool calls are not supported",
+      },
+      id: null,
+    });
+    assert.equal(
+      mcpInvoiceCount,
+      invoiceCountBefore,
+      "batch must be rejected before paid dispatch or invoice creation",
+    );
+  };
+  for (const batch of batches) {
+    await assertPaidBatchRejected(batch);
+  }
+
+  for (const call of [requests[1], requests[3]]) {
+    const challenge = await mcpRequestAt(
+      baseUrl,
+      "tools/call",
+      call.params,
+    );
+    assert.equal(challenge.response.status, 402);
+    const issued = challenge.body as unknown as {
+      macaroon: string;
+      payment_hash: string;
+      amount_sats: number;
+    };
+    assert.equal(issued.amount_sats, 250);
+    const payment = mcpInvoices.get(issued.payment_hash);
+    assert.ok(payment);
+    await assertPaidBatchRejected(
+      [call],
+      `L402 ${issued.macaroon}:${payment.preimage}`,
+    );
+  }
 });
 
 async function assertValidReceipt(response: Response, expectedPaymentHash: string) {
@@ -758,6 +1057,99 @@ test("reports public peer mesh status without payment", async () => {
   assert.equal(body.quorumThreshold, 1);
 });
 
+test("keeps six OpenAPI MCP tool descriptions and selector/output schemas in parity", async () => {
+  const sharedDocument = parse(
+    await readFile(
+      resolve(process.cwd(), "../../lib/api-spec/openapi.yaml"),
+      "utf8",
+    ),
+  ) as { "x-mcp-tools"?: Record<string, unknown> };
+  const xMcpTools = sharedDocument["x-mcp-tools"];
+  assert.ok(
+    xMcpTools && typeof xMcpTools === "object" && !Array.isArray(xMcpTools),
+    "Shared OpenAPI document must define x-mcp-tools",
+  );
+
+  const listed = await mcpRequest("tools/list");
+  const listedTools = listed.result?.tools as Array<{
+    name: string;
+    description: string;
+    inputSchema: unknown;
+    outputSchema: unknown;
+  }>;
+  for (const [name, expectedDescription] of Object.entries(
+    expectedMcpToolDescriptions,
+  )) {
+    const openApiTool = xMcpTools[name] as {
+      description?: unknown;
+      inputSchema?: unknown;
+      outputSchema?: unknown;
+    } | undefined;
+    assert.ok(openApiTool, `OpenAPI x-mcp-tools must define ${name}`);
+    assert.equal(
+      openApiTool.description,
+      expectedDescription,
+      `${name} OpenAPI description must match the exact public description`,
+    );
+    const listedTool = listedTools.find((candidate) => candidate.name === name);
+    assert.ok(listedTool, `tools/list must define ${name}`);
+    assert.equal(
+      listedTool.description,
+      expectedDescription,
+      `${name} tools/list description must match the exact public description`,
+    );
+  }
+
+  const requiredSchemaTools = [
+    "mesh.get_status",
+    "proof.get_status",
+    "proof.issue_receipt",
+  ];
+  const schemaEntries = Object.entries(xMcpTools).filter(([, candidate]) => {
+    assert.ok(
+      typeof candidate === "object" && candidate !== null &&
+        !Array.isArray(candidate),
+      "Each x-mcp-tools entry must be an object",
+    );
+    return Object.hasOwn(candidate, "inputSchema") ||
+      Object.hasOwn(candidate, "outputSchema");
+  });
+  const schemaToolNames = new Set(schemaEntries.map(([name]) => name));
+  for (const name of requiredSchemaTools) {
+    assert.ok(
+      schemaToolNames.has(name),
+      `OpenAPI x-mcp-tools must define selector and output schemas for ${name}`,
+    );
+  }
+  for (const [name, rawOpenApiTool] of schemaEntries) {
+    const openApiTool = rawOpenApiTool as {
+      inputSchema?: unknown;
+      outputSchema?: unknown;
+    };
+    assert.ok(
+      Object.hasOwn(openApiTool, "inputSchema") &&
+        Object.hasOwn(openApiTool, "outputSchema"),
+      `${name} must define both inputSchema and outputSchema`,
+    );
+    assert.deepEqual(
+      mcpSchemaContract(openApiTool.inputSchema, `x-mcp-tools.${name}.inputSchema`),
+      mcpSchemaContract(
+        listedTools.find((candidate) => candidate.name === name)?.inputSchema,
+        `${name}.inputSchema`,
+      ),
+      `${name} selector/input schema must be in parity`,
+    );
+    assert.deepEqual(
+      mcpSchemaContract(openApiTool.outputSchema, `x-mcp-tools.${name}.outputSchema`),
+      mcpSchemaContract(
+        listedTools.find((candidate) => candidate.name === name)?.outputSchema,
+        `${name}.outputSchema`,
+      ),
+      `${name} output schema must be in parity`,
+    );
+  }
+});
+
 test("exposes the stratigraphy MCP tool with structured quantitative data", async () => {
   const initialized = await mcpRequest("initialize", {
     protocolVersion: "2025-03-26",
@@ -773,12 +1165,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "stratigraphy.get",
       "stratigraphy.list",
       "proof.verify",
-      "proof.status",
+      "proof.get_status",
       "proof.list",
       "proof.submit",
       "proof.ground",
-      "proof.epistemic_receipt",
-      "mesh.status",
+      "proof.issue_receipt",
+      "mesh.get_status",
       "mesh.broadcast",
     ],
   );
@@ -786,6 +1178,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     mcpServerCard.capabilities.tools.map((candidate) => candidate.name),
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
   );
+  const listedToolNames = new Set(
+    listed.result?.tools.map((candidate: { name: string }) => candidate.name),
+  );
+  for (const alias of ["mesh.status", "proof.status", "proof.epistemic_receipt"]) {
+    assert.equal(listedToolNames.has(alias), false, `${alias} must remain call-only`);
+  }
   for (const candidate of listed.result?.tools ?? []) {
     assert.match(
       candidate.name,
@@ -909,7 +1307,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       for (const [name, property] of Object.entries(schema.properties)) {
         assert.match(name, /^[a-z][a-zA-Z0-9]*$/, `${path}.${name} must use camelCase`);
         const documented = property as { description?: string };
-        if (!path.startsWith("proof.epistemic_receipt.inputSchema")) {
+        if (!path.startsWith("proof.issue_receipt.inputSchema")) {
           assert.match(documented.description ?? "", /example/i, `${path}.${name} must describe an example`);
         }
         assertInputProperties(property as Parameters<typeof assertInputProperties>[0], `${path}.${name}`);
@@ -920,9 +1318,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    if (candidate.name === "proof.epistemic_receipt") {
-      assert.equal(candidate.description,
-        "Create a signed Bitcoin-tip receipt binding a dataset CID or hash to the current block height, block hash, and timestamp. Use this tool to anchor a static dataset payload to the live Bitcoin chain tip. Do NOT use this tool to ground live agent execution context (use `proof.ground`), submit ZK proofs (use `proof.submit`), or check attestation status (use `proof.status`). Non-idempotent call costing 250 sats via L402.");
+    if (candidate.name === "proof.issue_receipt") {
       assert.deepEqual(
         Object.fromEntries(Object.entries(candidate.inputSchema.properties).map(
           ([key, value]) => [key, (value as { description: string }).description],
@@ -937,15 +1333,24 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       const sentences = candidate.description.split(/(?<=[.!?])\s+(?=[A-Z])/);
       const immutableDataTool = candidate.name.startsWith("proof.") ||
         candidate.name.startsWith("stratigraphy.") || candidate.name === "mesh.broadcast";
-      assert.equal(sentences.length, immutableDataTool ? 4 : 3, `${candidate.name} must have a focused description`);
-      if (immutableDataTool) {
+      const exactDescription = Object.hasOwn(
+        expectedMcpToolDescriptions,
+        candidate.name,
+      );
+      assert.ok(
+        exactDescription || sentences.length === (immutableDataTool ? 4 : 3),
+        `${candidate.name} must have a focused description`,
+      );
+      if (immutableDataTool && !exactDescription) {
         assert.ok(candidate.description.endsWith(
           "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.",
         ));
       }
-      assert.match(candidate.description, /Returns a JSON object/);
-      assert.match(candidate.description, /JSON-RPC -32602/);
-      assert.match(candidate.description, /60-requests-per-minute IP limit/);
+      if (!exactDescription) {
+        assert.match(candidate.description, /Returns a JSON object/);
+        assert.match(candidate.description, /JSON-RPC -32602/);
+        assert.match(candidate.description, /60-requests-per-minute IP limit/);
+      }
     }
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);
@@ -956,8 +1361,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     );
   }
   for (const candidate of listed.result?.tools ?? []) {
-    assert.match(candidate.description, /\b(?:not to|not for|do not)\b/i,
-      `${candidate.name} must distinguish nearby tools`);
+    if (!Object.hasOwn(expectedMcpToolDescriptions, candidate.name)) {
+      assert.match(candidate.description, /\b(?:not to|not for|do not)\b/i,
+        `${candidate.name} must distinguish nearby tools`);
+    }
   }
   const expectedContracts: Record<string, {
     keys: string[];
@@ -972,7 +1379,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "stratigraphy.get": {
       keys: ["records"], readOnly: true, idempotent: true, openWorld: false,
     },
-    "mesh.status": {
+    "mesh.get_status": {
       keys: ["nodePubkey", "activePeerCount", "configuredPeerCount", "topologyHealth",
         "crossValidationSuccessRate", "averagePropagationLatencyMs", "quorumThreshold"],
       readOnly: true, idempotent: true, openWorld: true,
@@ -985,7 +1392,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "proof.ground": {
       keys: ["receipt"], readOnly: false, idempotent: false, openWorld: true,
     },
-    "proof.epistemic_receipt": {
+    "proof.issue_receipt": {
       keys: ["receiptHash", "blockTip", "blockHash", "ipfsCid", "nostrEventId",
         "attestation", "timestamp"],
       readOnly: false, idempotent: false, openWorld: true,
@@ -993,7 +1400,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "proof.list": {
       keys: ["attestations", "total"], readOnly: true, idempotent: true, openWorld: false,
     },
-    "proof.status": {
+    "proof.get_status": {
       keys: ["status", "verifiedAt", "attestationCount", "meshQuorum"],
       readOnly: true, idempotent: true, openWorld: false,
     },
@@ -1014,7 +1421,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${candidate.name} outputSchema must describe the returned JSON fields`);
     assert.deepEqual([...candidate.outputSchema.required].sort(),
       expected.keys.filter((key) =>
-        candidate.name !== "proof.epistemic_receipt" || key !== "nostrEventId"
+        candidate.name !== "proof.issue_receipt" || key !== "nostrEventId"
       ).sort());
     assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expected.keys].sort());
     assert.equal(candidate.annotations.readOnlyHint, expected.readOnly);
@@ -1024,6 +1431,20 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   const documentedTool = (name: string) => listed.result?.tools.find(
     (candidate: { name: string }) => candidate.name === name,
   );
+  for (const [name, description] of Object.entries(expectedMcpToolDescriptions)) {
+    assert.equal(
+      documentedTool(name).description,
+      description,
+      `${name} description must exactly match the public MCP contract`,
+    );
+  }
+  for (const name of ["mesh.get_status", "proof.get_status", "proof.issue_receipt"]) {
+    assert.doesNotMatch(
+      documentedTool(name).description,
+      /Note: Stratigraphy records and zk-SNARK proofs are append-only/,
+      `${name} must not append the generic immutability note to its exact description`,
+    );
+  }
   assert.match(documentedTool("stratigraphy.list").description, /costs 10 sats/);
   assert.match(documentedTool("proof.submit").description, /not durable/);
   assert.match(documentedTool("proof.verify").description, /process-memory verification indexes/);
@@ -1076,7 +1497,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     context: { purpose: "contract-test" },
   };
   const datasetCalled = await mcpRequest("tools/call", {
-    name: "proof.epistemic_receipt",
+    name: "proof.issue_receipt",
     arguments: datasetArgs,
   });
   const datasetReceipt = datasetCalled.result?.structuredContent;
@@ -1115,7 +1536,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     } },
   }), false);
   const datasetStatus = await mcpRequest("tools/call", {
-    name: "proof.status", arguments: { receiptHash: datasetReceipt.receiptHash },
+    name: "proof.get_status", arguments: { receiptHash: datasetReceipt.receiptHash },
   });
   assert.equal(datasetStatus.result?.structuredContent.status, "verified");
   assert.equal(datasetStatus.result?.structuredContent.attestationCount, 0);
@@ -1259,7 +1680,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const meshCalled = await mcpRequest("tools/call", {
-    name: "mesh.status",
+    name: "mesh.get_status",
     arguments: {},
   });
   assert.equal(meshCalled.result?.structuredContent.topologyHealth, "isolated");
@@ -1291,7 +1712,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const proofStatusCalled = await mcpRequest("tools/call", {
-    name: "proof.status",
+    name: "proof.get_status",
     arguments: { snapshotDigest: "1" },
   });
   assert.deepEqual(
@@ -1961,7 +2382,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
     "limit",
   ]);
   assert.equal(body.catalog_tool.name, "stratigraphy.list");
-  assert.equal(body.proof_status_tool.name, "proof.status");
+  assert.equal(body.proof_status_tool.name, "proof.get_status");
   assert.deepEqual(body.proof_status_tool.identifiers, [
     "proofHash",
     "snapshotDigest",

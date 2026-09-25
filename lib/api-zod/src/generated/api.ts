@@ -262,16 +262,16 @@ export const GetStratigraphyCostResponse = zod.object({
 }).describe('Discoverable bounds and metric inventory for the stratigraphy dataset.')
 }).describe('MCP dataset discovery tool registered as stratigraphy.list.'),
   "proof_status_tool": zod.object({
-  "name": zod.literal("proof.status").describe('Stable MCP tool name used with tools\/call.'),
+  "name": zod.literal("proof.get_status").describe('Stable MCP tool name used with tools\/call.'),
   "description": zod.string().describe('Human-readable purpose of the proof lifecycle query.'),
-  "identifiers": zod.array(zod.enum(['proofHash', 'snapshotDigest'])).describe('Alternative identifiers accepted by the tool; callers provide exactly one.'),
+  "identifiers": zod.array(zod.enum(['proofHash', 'snapshotDigest', 'receiptHash'])).describe('Alternative identifiers accepted by the tool; callers provide exactly one of proofHash, snapshotDigest, or receiptHash.'),
   "exampleStatus": zod.object({
   "status": zod.enum(['verified', 'cached', 'pending', 'invalid']).describe('Current proof verification lifecycle state.'),
   "verifiedAt": zod.coerce.date().describe('ISO 8601 timestamp of the latest verification-state observation.'),
   "attestationCount": zod.number().int().min(getStratigraphyCostResponseProofStatusToolExampleStatusAttestationCountMin).describe('Number of Nostr NIP-78 attestations observed on the snapshot.'),
   "meshQuorum": zod.boolean().describe('Whether attestationCount meets the current mesh quorum threshold.')
 }).describe('Cryptographic verification and publication lifecycle state.')
-}).describe('MCP lifecycle query tool registered as proof.status.'),
+}).describe('MCP lifecycle query tool registered as proof.get_status. proof.status is a legacy tool name.'),
   "proof_attestations_tool": zod.object({
   "name": zod.literal("proof.list").describe('Stable MCP tool name used with tools\/call.'),
   "description": zod.string().describe('Human-readable purpose of the attestation listing tool.'),
@@ -545,37 +545,148 @@ export const StreamStratigraphyTelemetryResponse = zod.unknown()
  * Public `POST /api/v1/zk/verify` endpoint for Zero-Knowledge Data Integrity. Verifies the Groth16/Poseidon BN254 zk-SNARK and binds the supplied data payload to its semantic public inputs. Proofs emitted by this API are pre-verified and complete verification in under 10ms.
  * @summary Verify a Groth16/Poseidon zkProof payload
  */
-export const verifyZkProofBodyPublicInputsBlockHeightMin = 0;
-export const verifyZkProofBodyPublicInputsBlockHeightMax = 4294967295;
+export const verifyZkProofBodyOnePublicInputsBlockHeightMin = 0;
+export const verifyZkProofBodyOnePublicInputsBlockHeightMax = 4294967295;
 
-export const verifyZkProofBodyPublicInputsThermodynamicHashMax = 77;
-
-
-export const verifyZkProofBodyPublicInputsThermodynamicHashRegExp = new RegExp('^[0-9]+$');
-export const verifyZkProofBodyPublicInputsSnapshotDigestMax = 77;
+export const verifyZkProofBodyOnePublicInputsThermodynamicHashMax = 77;
 
 
-export const verifyZkProofBodyPublicInputsSnapshotDigestRegExp = new RegExp('^[0-9]+$');
-export const verifyZkProofBodyPublicInputsTimestampMin = 0;
-export const verifyZkProofBodyPublicInputsTimestampMax = 281474976710655;
-
-export const verifyZkProofBodyPublicInputsValuationSatMin = 0;
-export const verifyZkProofBodyPublicInputsValuationSatMax = 281474976710655;
+export const verifyZkProofBodyOnePublicInputsThermodynamicHashRegExp = new RegExp('^[0-9]+$');
+export const verifyZkProofBodyOnePublicInputsSnapshotDigestMax = 77;
 
 
+export const verifyZkProofBodyOnePublicInputsSnapshotDigestRegExp = new RegExp('^[0-9]+$');
+export const verifyZkProofBodyOnePublicInputsTimestampMin = 0;
+export const verifyZkProofBodyOnePublicInputsTimestampMax = 281474976710655;
 
-export const VerifyZkProofBody = zod.object({
+export const verifyZkProofBodyOnePublicInputsValuationSatMin = 0;
+export const verifyZkProofBodyOnePublicInputsValuationSatMax = 281474976710655;
+
+export const verifyZkProofBodyTwoSignaturePayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyTwoSignatureEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyTwoSignatureEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyTwoSignatureEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+export const verifyZkProofBodyTwoContextHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
+export const verifyZkProofBodyTwoBlockHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyTwoMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyTwoTimestampMin = 0;
+
+export const verifyZkProofBodyTwoNostrSignaturePayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyTwoNostrSignatureEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyTwoNostrSignatureEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyTwoNostrSignatureEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+export const verifyZkProofBodyThreeAttestationSignaturePayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyThreeAttestationSignatureEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyThreeAttestationSignatureEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyThreeAttestationSignatureEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+export const verifyZkProofBodyThreeAttestationContextHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
+export const verifyZkProofBodyThreeAttestationBlockHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyThreeAttestationMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyThreeAttestationTimestampMin = 0;
+
+export const verifyZkProofBodyThreeAttestationNostrSignaturePayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyThreeAttestationNostrSignatureEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyThreeAttestationNostrSignatureEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyZkProofBodyThreeAttestationNostrSignatureEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+
+
+export const VerifyZkProofBody = zod.union([zod.object({
   "proof": zod.string(),
   "publicInputs": zod.object({
-  "blockHeight": zod.number().int().min(verifyZkProofBodyPublicInputsBlockHeightMin).max(verifyZkProofBodyPublicInputsBlockHeightMax),
-  "thermodynamicHash": zod.string().max(verifyZkProofBodyPublicInputsThermodynamicHashMax).regex(verifyZkProofBodyPublicInputsThermodynamicHashRegExp),
-  "snapshotDigest": zod.string().max(verifyZkProofBodyPublicInputsSnapshotDigestMax).regex(verifyZkProofBodyPublicInputsSnapshotDigestRegExp).describe('Decimal BN254 field element digest for the bound telemetry snapshot (0 through the BN254 field modulus)'),
-  "timestamp": zod.number().int().min(verifyZkProofBodyPublicInputsTimestampMin).max(verifyZkProofBodyPublicInputsTimestampMax),
-  "valuationSat": zod.number().int().min(verifyZkProofBodyPublicInputsValuationSatMin).max(verifyZkProofBodyPublicInputsValuationSatMax)
+  "blockHeight": zod.number().int().min(verifyZkProofBodyOnePublicInputsBlockHeightMin).max(verifyZkProofBodyOnePublicInputsBlockHeightMax),
+  "thermodynamicHash": zod.string().max(verifyZkProofBodyOnePublicInputsThermodynamicHashMax).regex(verifyZkProofBodyOnePublicInputsThermodynamicHashRegExp),
+  "snapshotDigest": zod.string().max(verifyZkProofBodyOnePublicInputsSnapshotDigestMax).regex(verifyZkProofBodyOnePublicInputsSnapshotDigestRegExp).describe('Decimal BN254 field element digest for the bound telemetry snapshot (0 through the BN254 field modulus)'),
+  "timestamp": zod.number().int().min(verifyZkProofBodyOnePublicInputsTimestampMin).max(verifyZkProofBodyOnePublicInputsTimestampMax),
+  "valuationSat": zod.number().int().min(verifyZkProofBodyOnePublicInputsValuationSatMin).max(verifyZkProofBodyOnePublicInputsValuationSatMax)
 }),
   "verificationKeyId": zod.string().describe('Verification-key identifier used by the verifier'),
   "data": zod.union([zod.record(zod.string(), zod.unknown()),zod.array(zod.unknown())]).describe('Telemetry data to bind to the proof. Supplying this required payload enables binding verification; proof and publicInputs provide the cryptographic verification inputs.')
+}),zod.object({
+  "schema": zod.string(),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "proof": zod.record(zod.string(), zod.unknown()),
+  "signature": zod.object({
+  "protocol": zod.literal("nostr"),
+  "nip": zod.literal(78),
+  "payload_sha256": zod.string().regex(verifyZkProofBodyTwoSignaturePayloadSha256RegExp),
+  "event": zod.object({
+  "id": zod.string().regex(verifyZkProofBodyTwoSignatureEventIdRegExp),
+  "pubkey": zod.string().regex(verifyZkProofBodyTwoSignatureEventPubkeyRegExp),
+  "created_at": zod.number().int(),
+  "kind": zod.literal(30078),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string(),
+  "sig": zod.string().regex(verifyZkProofBodyTwoSignatureEventSigRegExp)
 })
+}).describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached'),
+  "receiptSchema": zod.literal("bitcoin-stratigraphy/epistemic-anchor/v1"),
+  "contextHash": zod.string().regex(verifyZkProofBodyTwoContextHashRegExp),
+  "agentId": zod.string(),
+  "blockHeight": zod.number().int().min(1),
+  "blockHash": zod.string().regex(verifyZkProofBodyTwoBlockHashRegExp),
+  "merkleRoot": zod.string().regex(verifyZkProofBodyTwoMerkleRootRegExp),
+  "timestamp": zod.number().int().min(verifyZkProofBodyTwoTimestampMin),
+  "nostrSignature": zod.object({
+  "protocol": zod.literal("nostr"),
+  "nip": zod.literal(78),
+  "payload_sha256": zod.string().regex(verifyZkProofBodyTwoNostrSignaturePayloadSha256RegExp),
+  "event": zod.object({
+  "id": zod.string().regex(verifyZkProofBodyTwoNostrSignatureEventIdRegExp),
+  "pubkey": zod.string().regex(verifyZkProofBodyTwoNostrSignatureEventPubkeyRegExp),
+  "created_at": zod.number().int(),
+  "kind": zod.literal(30078),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string(),
+  "sig": zod.string().regex(verifyZkProofBodyTwoNostrSignatureEventSigRegExp)
+})
+}).describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached'),
+  "data": zod.unknown().optional().describe('Arbitrary extension data is already permitted on this receipt.')
+}).describe('Canonical SHA-256\/Merkle attestation signed as a Nostr NIP-78 event and bound to the current Bitcoin tip'),zod.object({
+  "attestation": zod.object({
+  "schema": zod.string(),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "proof": zod.record(zod.string(), zod.unknown()),
+  "signature": zod.object({
+  "protocol": zod.literal("nostr"),
+  "nip": zod.literal(78),
+  "payload_sha256": zod.string().regex(verifyZkProofBodyThreeAttestationSignaturePayloadSha256RegExp),
+  "event": zod.object({
+  "id": zod.string().regex(verifyZkProofBodyThreeAttestationSignatureEventIdRegExp),
+  "pubkey": zod.string().regex(verifyZkProofBodyThreeAttestationSignatureEventPubkeyRegExp),
+  "created_at": zod.number().int(),
+  "kind": zod.literal(30078),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string(),
+  "sig": zod.string().regex(verifyZkProofBodyThreeAttestationSignatureEventSigRegExp)
+})
+}).describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached'),
+  "receiptSchema": zod.literal("bitcoin-stratigraphy/epistemic-anchor/v1"),
+  "contextHash": zod.string().regex(verifyZkProofBodyThreeAttestationContextHashRegExp),
+  "agentId": zod.string(),
+  "blockHeight": zod.number().int().min(1),
+  "blockHash": zod.string().regex(verifyZkProofBodyThreeAttestationBlockHashRegExp),
+  "merkleRoot": zod.string().regex(verifyZkProofBodyThreeAttestationMerkleRootRegExp),
+  "timestamp": zod.number().int().min(verifyZkProofBodyThreeAttestationTimestampMin),
+  "nostrSignature": zod.object({
+  "protocol": zod.literal("nostr"),
+  "nip": zod.literal(78),
+  "payload_sha256": zod.string().regex(verifyZkProofBodyThreeAttestationNostrSignaturePayloadSha256RegExp),
+  "event": zod.object({
+  "id": zod.string().regex(verifyZkProofBodyThreeAttestationNostrSignatureEventIdRegExp),
+  "pubkey": zod.string().regex(verifyZkProofBodyThreeAttestationNostrSignatureEventPubkeyRegExp),
+  "created_at": zod.number().int(),
+  "kind": zod.literal(30078),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string(),
+  "sig": zod.string().regex(verifyZkProofBodyThreeAttestationNostrSignatureEventSigRegExp)
+})
+}).describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached'),
+  "data": zod.unknown().optional().describe('Arbitrary extension data is already permitted on this receipt.')
+}).describe('Canonical SHA-256\/Merkle attestation signed as a Nostr NIP-78 event and bound to the current Bitcoin tip'),
+  "data": zod.unknown().optional()
+})]).describe('Accepted request bodies for proof verification, including direct and wrapped epistemic-anchor receipts.')
 
 export const verifyZkProofResponseComputationTimeMsMin = 0;
 
@@ -585,6 +696,82 @@ export const VerifyZkProofResponse = zod.object({
   "valid": zod.boolean(),
   "verifiedAt": zod.coerce.date(),
   "computationTimeMs": zod.number().min(verifyZkProofResponseComputationTimeMsMin)
+})
+
+
+/**
+ * Paid `POST /api/v1/zk/ground` endpoint. After a fixed 5-sat L402 settlement, fetches the current Bitcoin block height and hash, binds them to the canonical context hash, caller identifier, optional metadata, and server timestamp, then returns a Nostr-signed Epistemic Anchor Receipt. Submit the returned receipt unchanged to `POST /api/v1/zk/verify`.
+ * @summary Anchor an agent context to the current Bitcoin tip
+ */
+export const groundEpistemicContextBodyContextHashRegExp = new RegExp('^[0-9a-fA-F]{64}$');
+export const groundEpistemicContextBodyAgentIdMax = 256;
+
+
+
+export const GroundEpistemicContextBody = zod.object({
+  "contextHash": zod.string().regex(groundEpistemicContextBodyContextHashRegExp).describe('SHA-256 digest of the agent context'),
+  "agentId": zod.string().min(1).max(groundEpistemicContextBodyAgentIdMax).describe('Stable caller-controlled agent identifier'),
+  "metadata": zod.record(zod.string(), zod.unknown()).optional().describe('Optional non-secret JSON metadata included in the signed anchor')
+})
+
+export const groundEpistemicContextResponseReceiptSignaturePayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const groundEpistemicContextResponseReceiptSignatureEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const groundEpistemicContextResponseReceiptSignatureEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const groundEpistemicContextResponseReceiptSignatureEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+export const groundEpistemicContextResponseReceiptContextHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
+export const groundEpistemicContextResponseReceiptBlockHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const groundEpistemicContextResponseReceiptMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+export const groundEpistemicContextResponseReceiptTimestampMin = 0;
+
+export const groundEpistemicContextResponseReceiptNostrSignaturePayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+export const groundEpistemicContextResponseReceiptNostrSignatureEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const groundEpistemicContextResponseReceiptNostrSignatureEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const groundEpistemicContextResponseReceiptNostrSignatureEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+
+
+export const GroundEpistemicContextResponse = zod.object({
+  "receipt": zod.object({
+  "schema": zod.string(),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "proof": zod.record(zod.string(), zod.unknown()),
+  "signature": zod.object({
+  "protocol": zod.literal("nostr"),
+  "nip": zod.literal(78),
+  "payload_sha256": zod.string().regex(groundEpistemicContextResponseReceiptSignaturePayloadSha256RegExp),
+  "event": zod.object({
+  "id": zod.string().regex(groundEpistemicContextResponseReceiptSignatureEventIdRegExp),
+  "pubkey": zod.string().regex(groundEpistemicContextResponseReceiptSignatureEventPubkeyRegExp),
+  "created_at": zod.number().int(),
+  "kind": zod.literal(30078),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string(),
+  "sig": zod.string().regex(groundEpistemicContextResponseReceiptSignatureEventSigRegExp)
+})
+}).describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached'),
+  "receiptSchema": zod.literal("bitcoin-stratigraphy/epistemic-anchor/v1"),
+  "contextHash": zod.string().regex(groundEpistemicContextResponseReceiptContextHashRegExp),
+  "agentId": zod.string(),
+  "blockHeight": zod.number().int().min(1),
+  "blockHash": zod.string().regex(groundEpistemicContextResponseReceiptBlockHashRegExp),
+  "merkleRoot": zod.string().regex(groundEpistemicContextResponseReceiptMerkleRootRegExp),
+  "timestamp": zod.number().int().min(groundEpistemicContextResponseReceiptTimestampMin),
+  "nostrSignature": zod.object({
+  "protocol": zod.literal("nostr"),
+  "nip": zod.literal(78),
+  "payload_sha256": zod.string().regex(groundEpistemicContextResponseReceiptNostrSignaturePayloadSha256RegExp),
+  "event": zod.object({
+  "id": zod.string().regex(groundEpistemicContextResponseReceiptNostrSignatureEventIdRegExp),
+  "pubkey": zod.string().regex(groundEpistemicContextResponseReceiptNostrSignatureEventPubkeyRegExp),
+  "created_at": zod.number().int(),
+  "kind": zod.literal(30078),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string(),
+  "sig": zod.string().regex(groundEpistemicContextResponseReceiptNostrSignatureEventSigRegExp)
+})
+}).describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached'),
+  "data": zod.unknown().optional().describe('Arbitrary extension data is already permitted on this receipt.')
+}).describe('Canonical SHA-256\/Merkle attestation signed as a Nostr NIP-78 event and bound to the current Bitcoin tip')
 })
 
 
@@ -612,7 +799,7 @@ export const GetMeshStatusResponse = zod.object({
   "crossValidationSuccessRate": zod.number().min(getMeshStatusResponseCrossValidationSuccessRateMin).max(getMeshStatusResponseCrossValidationSuccessRateMax),
   "averagePropagationLatencyMs": zod.number().min(getMeshStatusResponseAveragePropagationLatencyMsMin),
   "quorumThreshold": zod.number().int().min(1)
-})
+}).describe('Output of MCP tool mesh.get_status; mesh.status is a legacy tool name.')
 
 
 /**

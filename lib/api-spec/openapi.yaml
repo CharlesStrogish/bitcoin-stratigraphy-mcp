@@ -22,6 +22,107 @@ tags:
     description: Groth16/Poseidon BN254 zk-SNARK verification for zkProof payloads
   - name: mesh
     description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
+x-mcp-tools:
+  mesh.get_status:
+    description: "Retrieves live P2P mesh network node health, peer connections, and synchronization status."
+    legacyNames: [mesh.status]
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        nodePubkey: { type: string }
+        activePeerCount: { type: integer, minimum: 1 }
+        configuredPeerCount: { type: integer, minimum: 0 }
+        topologyHealth: { type: string, enum: [healthy, degraded, isolated] }
+        crossValidationSuccessRate: { type: number, minimum: 0, maximum: 1 }
+        averagePropagationLatencyMs: { type: number, minimum: 0 }
+        quorumThreshold: { type: integer, minimum: 1 }
+      required: [nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, quorumThreshold]
+  proof.get_status:
+    description: "Retrieves the verification status, timestamp, and attestation records of a submitted proof hash."
+    legacyNames: [proof.status]
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        proofHash:
+          type: string
+          pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"
+          description: "Primary proof lifecycle lookup key (64-digit hex with optional 0x prefix or IPFS CID); mutually exclusive with snapshotDigest and receiptHash."
+        snapshotDigest:
+          type: string
+          pattern: "^(?:\\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"
+          description: "Primary snapshot lifecycle lookup key (decimal field digest, 64-digit hex, or IPFS CID); mutually exclusive with proofHash and receiptHash."
+        receiptHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: "SHA-256 digest from proof.issue_receipt for a signed Bitcoin-tip anchor, not a Groth16 proof; mutually exclusive with proofHash and snapshotDigest."
+      required: []
+      oneOf:
+        - required: [proofHash]
+        - required: [snapshotDigest]
+        - required: [receiptHash]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [verified, cached, pending, invalid] }
+        verifiedAt: { type: string, format: date-time }
+        attestationCount: { type: integer, minimum: 0 }
+        meshQuorum: { type: boolean }
+      required: [status, verifiedAt, attestationCount, meshQuorum]
+  proof.issue_receipt:
+    description: "Issue a signed Bitcoin-tip receipt binding an IPFS dataset CID or hash to the active block height. Use this tool ONLY to anchor static dataset payloads for off-chain verification. Do NOT use for live agent execution state grounding (use `proof.ground`), ZK proof submission (use `proof.submit`), or checking attestation status (use `proof.get_status`)."
+    legacyNames: [proof.epistemic_receipt]
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        cid:
+          type: string
+          maxLength: 256
+          pattern: "^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$"
+          description: IPFS content ID or dataset hash to anchor.
+        nostrEventId:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          description: Optional Nostr event ID associated with the state publication.
+        context:
+          type: object
+          additionalProperties: true
+          description: Optional additional contextual metadata to bind to the receipt.
+      required: [cid]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        receiptHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+        blockTip: { type: integer, minimum: 1 }
+        blockHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+        ipfsCid: { type: string }
+        nostrEventId: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+        attestation:
+          type: object
+          additionalProperties: false
+          properties:
+            type:
+              type: string
+              const: Signed-Bitcoin-Tip-Anchor
+            proofPayload: { type: string }
+            verified: { type: boolean }
+          required: [type, proofPayload, verified]
+        timestamp: { type: string, format: date-time }
+      required: [receiptHash, blockTip, blockHash, ipfsCid, attestation, timestamp]
+  proof.ground:
+    description: "Anchor live agent execution state, system prompts, or runtime context to the current Bitcoin block height. Use this tool ONLY for runtime agent execution grounding. Do NOT use to anchor static dataset CIDs or off-chain files (use `proof.issue_receipt`)."
+  mesh.broadcast:
+    description: "Ingests local node telemetry payloads and broadcasts telemetry snapshots across the P2P mesh network."
+  stratigraphy.get:
+    description: "Retrieves complete stratigraphy dataset payloads, thermodynamic metrics, and full cryptographic proof content for a target block height."
 security:
   - L402: []
 paths:
@@ -439,15 +540,7 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-                - $ref: "#/components/schemas/ZkVerifyRequest"
-                - $ref: "#/components/schemas/EpistemicAnchorReceipt"
-                - type: object
-                  additionalProperties: false
-                  properties:
-                    attestation:
-                      $ref: "#/components/schemas/EpistemicAnchorReceipt"
-                  required: [attestation]
+              $ref: "#/components/schemas/ZkVerifyInput"
       responses:
         "200":
           description: Proof verification result
@@ -660,6 +753,19 @@ components:
             - type: array
               items: {}
       required: [proof, publicInputs, verificationKeyId, data]
+    ZkVerifyInput:
+      description: Accepted request bodies for proof verification, including direct and wrapped epistemic-anchor receipts.
+      oneOf:
+        - $ref: "#/components/schemas/ZkVerifyRequest"
+        - $ref: "#/components/schemas/EpistemicAnchorReceipt"
+        - type: object
+          additionalProperties: false
+          properties:
+            attestation:
+              $ref: "#/components/schemas/EpistemicAnchorReceipt"
+            data:
+              not: {}
+          required: [attestation]
     ZkVerifyResponse:
       type: object
       additionalProperties: false
@@ -728,6 +834,8 @@ components:
           minimum: 0
         nostrSignature:
           $ref: "#/components/schemas/NostrAttestation"
+        data:
+          description: Arbitrary extension data is already permitted on this receipt.
       required:
         - schema
         - payload
@@ -792,6 +900,7 @@ components:
       required: [quorumScore, peerAttestations, merkleRoot, snapshotDigest, threshold, isolationMode, networkId]
     MeshStatus:
       type: object
+      description: Output of MCP tool mesh.get_status; mesh.status is a legacy tool name.
       additionalProperties: false
       properties:
         nodePubkey:
@@ -1259,13 +1368,13 @@ components:
       required: [proofHash, status, submittedAt, attestationStatus]
     ProofStatusMcpTool:
       type: object
-      description: MCP lifecycle query tool registered as proof.status.
+      description: MCP lifecycle query tool registered as proof.get_status. proof.status is a legacy tool name.
       properties:
         name:
           type: string
-          const: proof.status
+          const: proof.get_status
           description: Stable MCP tool name used with tools/call.
-          examples: [proof.status]
+          examples: [proof.get_status]
         description:
           type: string
           description: Human-readable purpose of the proof lifecycle query.
@@ -1273,12 +1382,12 @@ components:
             - Query the cryptographic attestation status, verification cache history, and Nostr NIP-78 publication state of a previously submitted zk-SNARK proof digest or snapshot CID.
         identifiers:
           type: array
-          description: Alternative identifiers accepted by the tool; callers provide exactly one.
+          description: Alternative identifiers accepted by the tool; callers provide exactly one of proofHash, snapshotDigest, or receiptHash.
           examples:
-            - [proofHash, snapshotDigest]
+            - [proofHash, snapshotDigest, receiptHash]
           items:
             type: string
-            enum: [proofHash, snapshotDigest]
+            enum: [proofHash, snapshotDigest, receiptHash]
         exampleStatus:
           $ref: "#/components/schemas/ProofStatus"
       required: [name, description, identifiers, exampleStatus]

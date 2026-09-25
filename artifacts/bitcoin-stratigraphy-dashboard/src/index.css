@@ -484,10 +484,11 @@ code { color: hsl(var(--muted-foreground)); font-size: 10px; }
 .chart-tooltip { background: hsl(var(--popover)); border: 1px solid hsl(var(--border)); padding: 8px 10px; min-width: 120px; color: hsl(var(--foreground)); font-size: 10px; box-shadow: 0 8px 25px rgba(0,0,0,.12); }.chart-tooltip strong { display: block; margin-bottom: 5px; font: 10px var(--app-font-mono); }.chart-tooltip div { display: flex; align-items: center; gap: 5px; margin-top: 3px; }.chart-tooltip div span { width: 6px; height: 6px; border-radius: 50%; }.chart-tooltip b { margin-left: auto; font-family: var(--app-font-mono); }
 .error-state { padding: 80px 25px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }.error-state span { color: hsl(var(--muted-foreground)); font-size: 12px; }.error-state .reset-button { width: auto; padding: 0 18px; margin-top: 12px; color: hsl(var(--foreground)); }
 .footer-note { display: flex; justify-content: space-between; gap: 15px; color: hsl(var(--muted-foreground)); font-size: 8px; padding-top: 18px; letter-spacing: .05em; }.footer-note span { display: inline-flex; align-items: center; gap: 5px; }
-.smithery-backlink { display: flex; justify-content: flex-end; padding: 10px max(20px, calc((100% - 1180px) / 2)) 0; background: hsl(var(--background)); font-family: Inter, sans-serif; }
+.smithery-backlink { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px max(20px, calc((100% - 1180px) / 2)) 0; background: hsl(var(--background)); font-family: Inter, sans-serif; }
 .smithery-backlink a { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 8px; color: hsl(var(--foreground)); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 .smithery-backlink a:hover { color: hsl(var(--primary)); }
 .smithery-backlink img { width: 88px; height: 20px; object-fit: contain; }
+.smithery-backlink img[alt="Glama Score Badge"] { width: auto; max-width: 180px; }
 
 @media (max-width: 980px) {
   .shell-inner { width: min(100% - 28px, 760px); }.workspace-grid { grid-template-columns: 1fr; }.filter-rail { position: static; min-height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }.rail-heading, .rail-count, .rail-note, .reset-button, .rail-footer { grid-column: 1 / -1; }.rail-count { margin-bottom: 16px; }.rail-note { margin-top: 3px; }.rail-footer { margin-top: 0; }.insights-grid { grid-template-columns: 1fr; }

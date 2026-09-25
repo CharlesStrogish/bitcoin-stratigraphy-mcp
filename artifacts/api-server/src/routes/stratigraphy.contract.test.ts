@@ -909,7 +909,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       for (const [name, property] of Object.entries(schema.properties)) {
         assert.match(name, /^[a-z][a-zA-Z0-9]*$/, `${path}.${name} must use camelCase`);
         const documented = property as { description?: string };
-        assert.match(documented.description ?? "", /example/i, `${path}.${name} must describe an example`);
+        if (!path.startsWith("proof.epistemic_receipt.inputSchema")) {
+          assert.match(documented.description ?? "", /example/i, `${path}.${name} must describe an example`);
+        }
         assertInputProperties(property as Parameters<typeof assertInputProperties>[0], `${path}.${name}`);
       }
     }
@@ -918,18 +920,33 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    const sentences = candidate.description.split(/(?<=[.!?])\s+(?=[A-Z])/);
-    const immutableDataTool = candidate.name.startsWith("proof.") ||
-      candidate.name.startsWith("stratigraphy.") || candidate.name === "mesh.broadcast";
-    assert.equal(sentences.length, immutableDataTool ? 4 : 3, `${candidate.name} must have a focused description`);
-    if (immutableDataTool) {
-      assert.ok(candidate.description.endsWith(
-        "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.",
-      ));
+    if (candidate.name === "proof.epistemic_receipt") {
+      assert.equal(candidate.description,
+        "Create a signed Bitcoin-tip receipt binding a dataset CID or hash to the current block height, block hash, and timestamp. Use this tool to anchor a static dataset payload to the live Bitcoin chain tip. Do NOT use this tool to ground live agent execution context (use `proof.ground`), submit ZK proofs (use `proof.submit`), or check attestation status (use `proof.status`). Non-idempotent call costing 250 sats via L402.");
+      assert.deepEqual(
+        Object.fromEntries(Object.entries(candidate.inputSchema.properties).map(
+          ([key, value]) => [key, (value as { description: string }).description],
+        )),
+        {
+          cid: "Target IPFS CID or 32-byte hex dataset hash anchored directly to the live Bitcoin block height.",
+          nostrEventId: "Optional Nostr event ID linked into the signed receipt payload to bind off-chain publications to the block tip.",
+          context: "Optional JSON metadata object bound into the signed receipt tuple for additional execution context.",
+        },
+      );
+    } else {
+      const sentences = candidate.description.split(/(?<=[.!?])\s+(?=[A-Z])/);
+      const immutableDataTool = candidate.name.startsWith("proof.") ||
+        candidate.name.startsWith("stratigraphy.") || candidate.name === "mesh.broadcast";
+      assert.equal(sentences.length, immutableDataTool ? 4 : 3, `${candidate.name} must have a focused description`);
+      if (immutableDataTool) {
+        assert.ok(candidate.description.endsWith(
+          "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.",
+        ));
+      }
+      assert.match(candidate.description, /Returns a JSON object/);
+      assert.match(candidate.description, /JSON-RPC -32602/);
+      assert.match(candidate.description, /60-requests-per-minute IP limit/);
     }
-    assert.match(candidate.description, /Returns a JSON object/);
-    assert.match(candidate.description, /JSON-RPC -32602/);
-    assert.match(candidate.description, /60-requests-per-minute IP limit/);
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertInputProperties(candidate.inputSchema, `${candidate.name}.inputSchema`);

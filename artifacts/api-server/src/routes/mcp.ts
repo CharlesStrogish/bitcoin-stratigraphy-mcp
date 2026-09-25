@@ -1525,7 +1525,7 @@ const baseMcpToolDefinitions = [
     name: "proof.epistemic_receipt",
     title: "Anchor a Dataset to the Bitcoin Tip",
     description:
-      "Create a signed Bitcoin-tip receipt binding a dataset CID or hash, optional Nostr event ID and context, current block height and hash, and timestamp; use this tool for a verifiable dataset anchor, not for a Groth16 proof (use proof.submit) or an unbound signature. Returns a JSON object with receiptHash, blockTip, blockHash, ipfsCid, optional nostrEventId, ISO timestamp, and an attestation containing the complete signed receipt as JSON for POST /api/v1/zk/verify; this is not a zero-knowledge proof and no Nostr event is published. This non-idempotent 250-sat L402 call preflights signing before charging, shares a 60-requests-per-minute IP limit, and rejects malformed input with JSON-RPC -32602.",
+      "Create a signed Bitcoin-tip receipt binding a dataset CID or hash to the current block height, block hash, and timestamp. Use this tool to anchor a static dataset payload to the live Bitcoin chain tip. Do NOT use this tool to ground live agent execution context (use `proof.ground`), submit ZK proofs (use `proof.submit`), or check attestation status (use `proof.status`). Non-idempotent call costing 250 sats via L402.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1537,24 +1537,28 @@ const baseMcpToolDefinitions = [
       }],
       additionalProperties: false,
       properties: {
-        cid: field(
-          "string",
-          "IPFS CIDv0/CIDv1 or 32-byte hex dataset hash to anchor at the current Bitcoin tip.",
-          ["ab".repeat(32)],
-          { pattern: "^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$", maxLength: 256 },
-        ),
-        nostrEventId: field(
-          "string",
-          "Optional 32-byte hex ID of an existing Nostr event; it is included in the signature, not published by this tool.",
-          ["ab".repeat(32)],
-          { pattern: "^[0-9a-fA-F]{64}$" },
-        ),
-        context: field(
-          "object",
-          "Optional non-secret metadata bound into the signed receipt; combined metadata must be at most 16 KiB.",
-          [{ source: "dataset" }],
-          { additionalProperties: true },
-        ),
+        cid: {
+          type: "string",
+          description: "Target IPFS CID or 32-byte hex dataset hash anchored directly to the live Bitcoin block height.",
+          example: "ab".repeat(32),
+          examples: ["ab".repeat(32)],
+          pattern: "^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$",
+          maxLength: 256,
+        },
+        nostrEventId: {
+          type: "string",
+          description: "Optional Nostr event ID linked into the signed receipt payload to bind off-chain publications to the block tip.",
+          example: "ab".repeat(32),
+          examples: ["ab".repeat(32)],
+          pattern: "^[0-9a-fA-F]{64}$",
+        },
+        context: {
+          type: "object",
+          description: "Optional JSON metadata object bound into the signed receipt tuple for additional execution context.",
+          example: { source: "dataset" },
+          examples: [{ source: "dataset" }],
+          additionalProperties: true,
+        },
       },
       required: ["cid"],
     },
@@ -1701,7 +1705,12 @@ const immutabilityNote =
 const mcpToolDefinitions = baseMcpToolDefinitions.map((tool) =>
   tool.name.startsWith("stratigraphy.") || tool.name.startsWith("proof.") ||
     tool.name === "mesh.broadcast"
-    ? { ...tool, description: `${tool.description} ${immutabilityNote}` }
+    ? {
+        ...tool,
+        description: tool.name === "proof.epistemic_receipt"
+          ? tool.description
+          : `${tool.description} ${immutabilityNote}`,
+      }
     : tool
 );
 

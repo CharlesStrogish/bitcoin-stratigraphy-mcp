@@ -539,8 +539,13 @@ export class BitcoinStratigraphyClient {
       .payInvoice(selected.invoice)
       .then(async (result) => {
         const preimage = paymentPreimage(result);
-        const paymentHash = await sha256Hex(preimage);
-        if (paymentHash !== selected.payment_hash.toLowerCase()) {
+        const isCoinosReference =
+          /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(preimage);
+        if (isCoinosReference && selected.payment_asset !== "btc-lightning") {
+          throw new Error("CoinOS payment references require Lightning settlement");
+        }
+        if (!isCoinosReference &&
+            await sha256Hex(preimage) !== selected.payment_hash.toLowerCase()) {
           throw new Error(
             "Wallet preimage does not match the L402 payment hash",
           );
@@ -629,14 +634,18 @@ function paymentPreimage(value: unknown): string {
     }
     return { metadata: { typeof: field === null ? "null" : typeof field, length: null, isBase64: false, isHex: false }, bytes: undefined };
   };
-  const descriptions = fields.map(([name, field]) => ({ name, ...describe(field) }));
-  for (const { bytes } of descriptions) {
+  const descriptions = fields.map(([name, field]) => ({ name, field, ...describe(field) }));
+  for (const { field, bytes } of descriptions) {
     if (bytes?.length === 32) return bytes.toString("hex");
+    if (typeof field === "string" &&
+        /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(field.trim())) {
+      return field.trim().toLowerCase();
+    }
   }
   // Only structural metadata; never print the raw response or payment proof.
   const shape = descriptions.map(({ name, metadata }) =>
     `${name}:${JSON.stringify(metadata)}`).join(", ") || "no recognizable fields";
-  throw new Error(`Wallet did not return a 32-byte payment preimage (${shape})`);
+  throw new Error(`Wallet did not return a 32-byte payment preimage or CoinOS payment reference (${shape})`);
 }
 
 async function parseJson<T>(response: Response): Promise<T> {

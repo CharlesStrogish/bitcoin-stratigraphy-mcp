@@ -9,7 +9,7 @@ export type WalletPayment =
   | string
   | { preimage: string }
   | { payment_preimage: string };
-/** Wrap Lightning, LNURL, or NWC payInvoice here; return the 32-byte hex preimage. */
+/** Return a 32-byte Lightning preimage, or a CoinOS internal-payment UUID for server-side verification. */
 export type WalletHandler = (invoice: string) => Promise<WalletPayment>;
 
 export type MetricName =
@@ -260,15 +260,16 @@ export class BitcoinStratigraphyClient {
       const preimage = typeof paid === "string"
         ? paid
         : "preimage" in paid ? paid.preimage : paid.payment_preimage;
-      if (!/^[0-9a-fA-F]{64}$/.test(preimage)) {
-        throw new Error("Wallet did not return a 32-byte hex payment preimage");
-      }
-      const bytes = Uint8Array.from(preimage.match(/.{2}/g)!, (hex) => Number.parseInt(hex, 16));
-      const digest = await crypto.subtle.digest("SHA-256", bytes);
-      const hash = Array.from(new Uint8Array(digest), (byte) =>
-        byte.toString(16).padStart(2, "0")).join("");
-      if (hash !== challenge.payment_hash.toLowerCase()) {
-        throw new Error("Wallet preimage does not match the L402 payment hash");
+      if (/^[0-9a-fA-F]{64}$/.test(preimage)) {
+        const bytes = Uint8Array.from(preimage.match(/.{2}/g)!, (hex) => Number.parseInt(hex, 16));
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        const hash = Array.from(new Uint8Array(digest), (byte) =>
+          byte.toString(16).padStart(2, "0")).join("");
+        if (hash !== challenge.payment_hash.toLowerCase()) {
+          throw new Error("Wallet preimage does not match the L402 payment hash");
+        }
+      } else if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(preimage)) {
+        throw new Error("Wallet did not return a 32-byte hex payment preimage or CoinOS payment reference");
       }
       response = await send(`L402 ${challenge.macaroon}:${preimage.toLowerCase()}`);
       if (response.status === 402) throw new Error("L402 payment was rejected; not paying again");

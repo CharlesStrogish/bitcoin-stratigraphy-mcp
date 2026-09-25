@@ -10,7 +10,7 @@ import {
 export type NwcClient = Pick<
   NWCClient,
   "lookupInvoice" | "makeInvoice" | "close"
->;
+> & Partial<Pick<NWCClient, "listTransactions">>;
 export type NwcClientFactory = (nwcUri: string) => NwcClient;
 
 const silentNwcLogger = {
@@ -60,6 +60,7 @@ function retryableProviderError(error: unknown) {
 export function createNwcSettlementProvider(input: {
   name: string;
   uri: () => string | undefined;
+  payerUri?: () => string | undefined;
   clientFactory?: NwcClientFactory;
 }): SettlementProvider {
   const clientFactory = input.clientFactory ?? createNwcClient;
@@ -139,19 +140,25 @@ export function createNwcSettlementProvider(input: {
       }
     },
     async verifyPayment(request: SettlementVerificationInput) {
+      const isHexPreimage = /^[0-9a-f]{64}$/.test(request.preimage);
+      const isCoinosReference =
+        input.name === "coinos" &&
+        /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(request.preimage);
       if (
         !/^[0-9a-f]{64}$/.test(request.paymentHash) ||
-        !/^[0-9a-f]{64}$/.test(request.preimage) ||
+        (!isHexPreimage && !isCoinosReference) ||
         request.asset && request.asset !== "btc-lightning" ||
         !Number.isSafeInteger(request.expectedAmountMsats) ||
         request.expectedAmountMsats <= 0
       ) {
         return "invalid";
       }
-      const computedHash = createHash("sha256")
-        .update(Buffer.from(request.preimage, "hex"))
-        .digest("hex");
-      if (computedHash !== request.paymentHash) return "invalid";
+      if (isHexPreimage) {
+        const computedHash = createHash("sha256")
+          .update(Buffer.from(request.preimage, "hex"))
+          .digest("hex");
+        if (computedHash !== request.paymentHash) return "invalid";
+      }
       const uri = configuredUri();
       if (!uri) {
         throw new SettlementProviderError(
@@ -189,16 +196,74 @@ export function createNwcSettlementProvider(input: {
         const valid =
           transaction.type === "incoming" &&
           transaction.state === "settled" &&
-          transaction.amount === request.expectedAmountMsats &&
+          (isCoinosReference || transaction.amount === request.expectedAmountMsats) &&
           transaction.description === request.expectedDescription &&
           transactionPaymentHash === request.paymentHash &&
-          (!transactionPreimage || transactionPreimage === request.preimage) &&
-          (transactionPreimage === undefined ||
-            /^[0-9a-f]{64}$/.test(transactionPreimage)) &&
+          (isCoinosReference ||
+            ((!transactionPreimage || transactionPreimage === request.preimage) &&
+              (transactionPreimage === undefined ||
+                /^[0-9a-f]{64}$/.test(transactionPreimage)))) &&
           (transaction.settled_at === undefined ||
             (typeof transaction.settled_at === "number" &&
               Number.isSafeInteger(transaction.settled_at) &&
               transaction.settled_at > 0));
+        if (!valid) return "invalid";
+        if (isCoinosReference) {
+          // CoinOS returns the outgoing payment ID, not a Lightning preimage,
+          // for internal transfers. The issuing wallet must see BOTH the paid
+          // incoming invoice and that exact outgoing payment in its own account.
+          const settledAt = transaction.settled_at;
+          if (!Number.isSafeInteger(settledAt) ||
+              !settledAt || typeof transaction.invoice !== "string") return "invalid";
+          const from = Math.max(0, settledAt - 3_600);
+          const until = settledAt + 3_600;
+          const matchesTransaction = async (
+            wallet: NwcClient,
+            type: "incoming" | "outgoing",
+          ): Promise<boolean> => {
+            if (!wallet.listTransactions) return false;
+            for (let offset = 0; offset < 500; offset += 100) {
+              if (request.signal?.aborted) return false;
+              const page = await wallet.listTransactions({
+                type, from, until, limit: 100, offset,
+              });
+              if (!Array.isArray(page.transactions)) return false;
+              if (page.transactions.some((payment) =>
+                payment.type === type &&
+                payment.state === "settled" &&
+                (type === "incoming" ||
+                  payment.payment_hash?.toLowerCase() === request.preimage.toLowerCase()) &&
+                payment.invoice === transaction.invoice &&
+                payment.amount === request.expectedAmountMsats &&
+                typeof payment.created_at === "number" &&
+                payment.created_at >= from && payment.created_at <= until
+              )) return true;
+              if (page.transactions.length < 100) break;
+            }
+            return false;
+          };
+          // Internal credits may leave CLN's amount_received_msat unset. The
+          // issuer's incoming transaction list supplies the actual credited amount.
+          if (!await matchesTransaction(client, "incoming")) return "invalid";
+          if (await matchesTransaction(client, "outgoing")) {
+            return { settledAt, provider: input.name, asset: "btc-lightning" };
+          }
+          const payerUri = input.payerUri?.()?.trim();
+          if (payerUri && payerUri !== uri) {
+            const payer = clientFactory(payerUri);
+            const closePayer = () => payer.close();
+            request.signal?.addEventListener("abort", closePayer, { once: true });
+            try {
+              if (!request.signal?.aborted && await matchesTransaction(payer, "outgoing")) {
+                return { settledAt, provider: input.name, asset: "btc-lightning" };
+              }
+            } finally {
+              request.signal?.removeEventListener("abort", closePayer);
+              payer.close();
+            }
+          }
+          return "invalid";
+        }
         return valid
           ? {
               settledAt:

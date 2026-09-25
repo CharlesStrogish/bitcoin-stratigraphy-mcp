@@ -778,7 +778,7 @@ packages:
     engines: {node: '>=6.9.0'}
 
   '@bitcoin-stratigraphy/sdk@file:templates/autonomous-agent/vendor/bitcoin-stratigraphy-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-tGR341a8JnLTBGssTCJq7oc8yKUsFhyi83l96KiqOa523to560+h1u7wHtvcVuTWG/HryRCbv5t395kYQKXJTA==, tarball: file:templates/autonomous-agent/vendor/bitcoin-stratigraphy-sdk-0.1.0.tgz}
+    resolution: {integrity: sha512-BEarI9EvVNfxQmIBmg/PglfdSrcHCxEIBWnIenxProLGe/WEpN4YnUU2VUL6V97w++v8yKqfnRyDnjcDnhNSMg==, tarball: file:templates/autonomous-agent/vendor/bitcoin-stratigraphy-sdk-0.1.0.tgz}
     version: 0.1.0
     engines: {node: '>=18'}
 

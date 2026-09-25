@@ -139,6 +139,15 @@ test("CoinOS nested NWC preimage reaches the MCP wallet callback", async () => {
   wallet.close();
 });
 
+test("CoinOS internal payment ID reaches the MCP callback for server verification", async () => {
+  const reference = "123e4567-e89b-12d3-a456-426614174000";
+  const wallet = createNwcWallet("nostr+walletconnect://test", undefined, {
+    payInvoice: async () => ({ result: { preimage: reference.toUpperCase() } }),
+  });
+  assert.equal(await wallet.payMcpInvoice("lnbc-test"), reference);
+  wallet.close();
+});
+
 test("the seeder prioritizes NWC and fails closed on provider-ambiguous keys", () => {
   assert.equal(
     requireNwcPairingSecret({

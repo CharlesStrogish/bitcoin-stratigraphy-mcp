@@ -84,6 +84,23 @@ test("pays the WWW-Authenticate invoice once and retries the exact tool call", a
   });
 });
 
+test("forwards a CoinOS internal-payment UUID once for server verification", async () => {
+  const reference = "123E4567-E89B-12D3-A456-426614174000";
+  let payments = 0;
+  const headers: Array<string | undefined> = [];
+  const client = new BitcoinStratigraphyClient(
+    "https://example.test/mcp",
+    async () => { payments++; return { preimage: reference }; },
+    (async (_url, init) => {
+      headers.push((init?.headers as Record<string, string>).Authorization);
+      return headers.length === 1 ? paymentRequired() : rpc({ structuredContent: { totalSnapshots: 1 } });
+    }) as typeof fetch,
+  );
+  await client.listStratigraphy();
+  assert.equal(payments, 1);
+  assert.deepEqual(headers, [undefined, `L402 ${macaroon}:${reference.toLowerCase()}`]);
+});
+
 test("rejects missing or conflicting L402 headers before paying", async () => {
   for (const response of [
     paymentRequired(challenge, ""),

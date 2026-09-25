@@ -392,7 +392,7 @@ function selectRange(req: Request, dataset: Dataset): SelectedRange | string {
 function parseL402Authorization(value: string | undefined) {
   if (!value) return null;
 
-  const match = /^L402\s+([^:\s]+):([0-9a-fA-F]{64})$/.exec(
+  const match = /^L402\s+([^:\s]+):([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$/.exec(
     value.trim(),
   );
   if (!match) return null;
@@ -824,7 +824,9 @@ export function registerStratigraphyRoutes(
         requestKind: "stratigraphy",
         satsReceived: Math.ceil(input.amountMsats / 1_000),
         paymentHash: input.paymentHash,
-        preimage: input.preimage,
+        ...(/^[0-9a-f]{64}$/i.test(input.preimage)
+          ? { preimage: input.preimage }
+          : { coinosPaymentId: input.preimage }),
         clientIdentifier: input.clientIdentifier,
       });
     } catch (error) {

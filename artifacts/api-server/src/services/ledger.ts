@@ -3,16 +3,20 @@ import { createHash } from "node:crypto";
 export type RevenueChannel = "NIP-90" | "L402";
 export type RevenueRequestKind = "stratigraphy" | "zk-proof";
 
-export type RevenueLedgerEntry = {
+type RevenueLedgerBase = {
   id: string;
   timestamp: string;
   channel: RevenueChannel;
   requestKind: RevenueRequestKind;
   satsReceived: number;
   paymentHash: string;
-  preimage: string;
   clientIdentifier: string;
 };
+
+export type RevenueLedgerEntry = RevenueLedgerBase & (
+  | { preimage: string; coinosPaymentId?: never }
+  | { preimage?: never; coinosPaymentId: string }
+);
 
 export type RevenueChannelBreakdown = Record<RevenueChannel, number>;
 
@@ -61,14 +65,21 @@ export function validateLedgerEntry(
   if (!/^[0-9a-f]{64}$/i.test(entry.paymentHash)) {
     throw new TypeError("paymentHash must be a 32-byte hexadecimal digest");
   }
-  if (!/^[0-9a-f]{64}$/i.test(entry.preimage)) {
-    throw new TypeError("preimage must be a 32-byte hexadecimal value");
-  }
-  const boundHash = createHash("sha256")
-    .update(Buffer.from(entry.preimage, "hex"))
-    .digest("hex");
-  if (boundHash !== entry.paymentHash.toLowerCase()) {
-    throw new TypeError("preimage does not match paymentHash");
+  if (entry.coinosPaymentId !== undefined) {
+    if (entry.channel !== "L402" ||
+        !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(entry.coinosPaymentId)) {
+      throw new TypeError("Invalid CoinOS settlement reference");
+    }
+  } else {
+    if (!entry.preimage || !/^[0-9a-f]{64}$/i.test(entry.preimage)) {
+      throw new TypeError("preimage must be a 32-byte hexadecimal value");
+    }
+    const boundHash = createHash("sha256")
+      .update(Buffer.from(entry.preimage, "hex"))
+      .digest("hex");
+    if (boundHash !== entry.paymentHash.toLowerCase()) {
+      throw new TypeError("preimage does not match paymentHash");
+    }
   }
   if (!entry.clientIdentifier) {
     throw new TypeError("clientIdentifier is required");

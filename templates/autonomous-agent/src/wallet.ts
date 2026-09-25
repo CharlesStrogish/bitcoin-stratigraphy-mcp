@@ -19,12 +19,15 @@ export type AgentWallet = L402WalletAdapter & {
   close(): void;
 };
 
-function requirePreimage(value: WalletPayment): string {
+function requirePreimage(value: WalletPayment, allowCoinosReference = false): string {
   const preimage = typeof value === "string"
     ? value
     : "preimage" in value ? value.preimage : value.payment_preimage;
-  if (typeof preimage !== "string" || !/^[0-9a-fA-F]{64}$/.test(preimage)) {
-    throw new Error("Wallet must return a real 32-byte hex Lightning preimage");
+  if (typeof preimage !== "string" ||
+      !(/^[0-9a-fA-F]{64}$/.test(preimage) ||
+        (allowCoinosReference &&
+          /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(preimage)))) {
+    throw new Error("Wallet must return a 32-byte hex Lightning preimage or CoinOS payment reference");
   }
   return preimage.toLowerCase();
 }
@@ -44,7 +47,7 @@ export function createNwcWallet(
   });
   const adapter = new NwcWalletAdapter(client);
   const payInvoice = async (invoice: string): Promise<string> => {
-    const preimage = requirePreimage(await adapter.payInvoice(invoice));
+    const preimage = requirePreimage(await adapter.payInvoice(invoice), true);
     onPayment?.(invoice);
     return preimage;
   };

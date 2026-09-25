@@ -41,7 +41,7 @@ export type L402MiddlewareOptions = {
 export function parseL402Header(
   value: string | undefined,
 ): L402Authorization | null {
-  const match = /^L402\s+([^:\s]+):([0-9a-fA-F]{64})$/.exec(
+  const match = /^L402\s+([^:\s]+):([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$/.exec(
     value?.trim() ?? "",
   );
   return match
@@ -191,12 +191,15 @@ export function createL402Middleware(
         secret,
         Math.floor(now() / 1_000),
       );
-      const preimageHash = createHash("sha256")
-        .update(Buffer.from(authorization.preimage, "hex"))
-        .digest("hex");
+      const preimageHash = /^[0-9a-f]{64}$/.test(authorization.preimage)
+        ? createHash("sha256")
+          .update(Buffer.from(authorization.preimage, "hex"))
+          .digest("hex")
+        : null;
       if (
         pass &&
-        pass.paymentHash === preimageHash &&
+        (pass.paymentHash === preimageHash ||
+          (pass.paymentProvider === "coinos" && preimageHash === null)) &&
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
         (typeof options.amountSats !== "number" ||
@@ -246,7 +249,9 @@ export function createL402Middleware(
                 requestKind: options.requestKind ?? "stratigraphy",
                 satsReceived: Math.ceil(pass.amountMsats / 1_000),
                 paymentHash: pass.paymentHash,
-                preimage: authorization.preimage,
+                ...(/^[0-9a-f]{64}$/.test(authorization.preimage)
+                  ? { preimage: authorization.preimage }
+                  : { coinosPaymentId: authorization.preimage }),
                 clientIdentifier:
                   req.ip || req.socket.remoteAddress || "unknown",
               });

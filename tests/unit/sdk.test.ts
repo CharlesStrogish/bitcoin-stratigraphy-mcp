@@ -279,6 +279,29 @@ test("redeems a CoinOS NIP-47 result.preimage without a second payment", async (
   assert.deepEqual(authorizations, [null, `L402 cached-macaroon:${preimage}`]);
 });
 
+test("sends an internal CoinOS payment ID once for issuer-side verification", async () => {
+  const reference = "123e4567-e89b-12d3-a456-426614174000";
+  let payments = 0;
+  const authorizations: Array<string | null> = [];
+  const wallet = new NwcWalletAdapter({
+    payInvoice: async () => { payments++; return { result: { preimage: reference } }; },
+  });
+  const client = new BitcoinStratigraphyClient({
+    baseUrl: "https://node.example", wallet,
+    fetch: async (input, init) => {
+      if (String(input).endsWith("/cost")) return Response.json(cost);
+      const authorization = new Headers(init?.headers).get("Authorization");
+      authorizations.push(authorization);
+      return authorization
+        ? Response.json(paidResponse)
+        : Response.json(challenge, { status: 402 });
+    },
+  });
+  assert.deepEqual(await client.getLatest(), paidResponse);
+  assert.equal(payments, 1);
+  assert.deepEqual(authorizations, [null, `L402 cached-macaroon:${reference}`]);
+});
+
 test("accepts NWC preimages from each wrapped or unwrapped NIP-47 field", async () => {
   const candidate = `\t0x${preimage.toUpperCase()}  `;
   const base64 = Buffer.from(preimage, "hex").toString("base64");
@@ -299,6 +322,10 @@ test("accepts NWC preimages from each wrapped or unwrapped NIP-47 field", async 
     const wallet = new NwcWalletAdapter({ payInvoice: async () => response });
     assert.equal(await wallet.payInvoice("lnbc-test"), preimage);
   }
+  const internal = new NwcWalletAdapter({
+    payInvoice: async () => ({ result: { preimage: "123E4567-E89B-12D3-A456-426614174000" } }),
+  });
+  assert.equal(await internal.payInvoice("lnbc-test"), "123e4567-e89b-12d3-a456-426614174000");
   const invalid = new NwcWalletAdapter({
     payInvoice: async () => ({ result: { preimage: "wallet-local-uuid" } }),
   });

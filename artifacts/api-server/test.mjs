@@ -8,6 +8,7 @@ const outputs = [
   "./dist/stratigraphy.contract.test.js",
   "./dist/pricing.test.js",
   "./dist/settlement_redundancy.test.js",
+  "./dist/coinos-uuid-settlement.test.js",
   "./dist/stream.test.js",
   "./dist/nostrAttestation.test.js",
   "./dist/agentReputation.test.js",
@@ -28,6 +29,8 @@ await build({
     "pricing.test": "./tests/unit/pricing.test.ts",
     "settlement_redundancy.test":
       "./tests/unit/settlement_redundancy.test.ts",
+    "coinos-uuid-settlement.test":
+      "./tests/unit/coinos-uuid-settlement.test.ts",
     "stream.test": "./tests/unit/stream.test.ts",
     "nostrAttestation.test": "../../tests/nostrAttestation.test.ts",
     "agentReputation.test": "../../tests/agentReputation.test.ts",

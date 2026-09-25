@@ -10,6 +10,7 @@ import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
 import { registerMcpRequestGuard, registerMcpRoute } from "./mcp";
+import { verifyEpistemicDatasetReceipt } from "../services/epistemicDatasetReceipt";
 import type { SettlementRouter } from "../services/settlement";
 import {
   glamaConnector,
@@ -776,14 +777,19 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "proof.list",
       "proof.submit",
       "proof.ground",
+      "proof.epistemic_receipt",
       "mesh.status",
       "mesh.broadcast",
     ],
   );
+  assert.deepEqual(
+    mcpServerCard.capabilities.tools.map((candidate) => candidate.name),
+    listed.result?.tools.map((candidate: { name: string }) => candidate.name),
+  );
   for (const candidate of listed.result?.tools ?? []) {
     assert.match(
       candidate.name,
-      /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*$/,
+      /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/,
       `${candidate.name} must use namespace.action dot notation`,
     );
   }
@@ -962,6 +968,11 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "proof.ground": {
       keys: ["receipt"], readOnly: false, idempotent: false, openWorld: true,
     },
+    "proof.epistemic_receipt": {
+      keys: ["receiptHash", "blockTip", "blockHash", "ipfsCid", "nostrEventId",
+        "attestation", "timestamp"],
+      readOnly: false, idempotent: false, openWorld: true,
+    },
     "proof.list": {
       keys: ["attestations", "total"], readOnly: true, idempotent: true, openWorld: false,
     },
@@ -984,7 +995,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     assert.equal(candidate.outputSchema.additionalProperties, false);
     assert.deepEqual(Object.keys(candidate.outputSchema.properties).sort(), [...expected.keys].sort(),
       `${candidate.name} outputSchema must describe the returned JSON fields`);
-    assert.deepEqual([...candidate.outputSchema.required].sort(), [...expected.keys].sort());
+    assert.deepEqual([...candidate.outputSchema.required].sort(),
+      expected.keys.filter((key) =>
+        candidate.name !== "proof.epistemic_receipt" || key !== "nostrEventId"
+      ).sort());
     assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expected.keys].sort());
     assert.equal(candidate.annotations.readOnlyHint, expected.readOnly);
     assert.equal(candidate.annotations.idempotentHint, expected.idempotent);
@@ -1039,6 +1053,55 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   });
   assert.equal(verifiedMcpReceipt.status, 200);
   assert.equal(((await verifiedMcpReceipt.json()) as { valid: boolean }).valid, true);
+  const datasetArgs = {
+    cid: "ab".repeat(32),
+    nostrEventId: "cd".repeat(32),
+    context: { purpose: "contract-test" },
+  };
+  const datasetCalled = await mcpRequest("tools/call", {
+    name: "proof.epistemic_receipt",
+    arguments: datasetArgs,
+  });
+  const datasetReceipt = datasetCalled.result?.structuredContent;
+  assert.equal(datasetReceipt.blockTip, 920001);
+  assert.equal(datasetReceipt.blockHash, "ab".repeat(32));
+  assert.equal(datasetReceipt.ipfsCid, datasetArgs.cid);
+  assert.equal(datasetReceipt.nostrEventId, datasetArgs.nostrEventId);
+  assert.equal(datasetReceipt.attestation.type, "Signed-Bitcoin-Tip-Anchor");
+  assert.equal(datasetReceipt.attestation.verified, true);
+  assert.equal(verifyEpistemicDatasetReceipt(datasetReceipt), true);
+  assert.equal(verifyEpistemicDatasetReceipt({ ...datasetReceipt, ipfsCid: "ef".repeat(32) }), false);
+  assert.equal(verifyEpistemicDatasetReceipt({ ...datasetReceipt, blockHash: "ef".repeat(32) }), false);
+  assert.equal(datasetReceipt.receiptHash, createHash("sha256").update(JSON.stringify([
+    datasetArgs.cid, datasetReceipt.blockHash, datasetReceipt.blockTip,
+    datasetArgs.nostrEventId, datasetReceipt.timestamp,
+  ])).digest("hex"));
+  const signedDatasetReceipt = JSON.parse(datasetReceipt.attestation.proofPayload);
+  assert.equal(signedDatasetReceipt.contextHash, datasetReceipt.receiptHash);
+  assert.equal(signedDatasetReceipt.payload.metadata.cid, datasetArgs.cid);
+  assert.equal(signedDatasetReceipt.payload.metadata.nostrEventId, datasetArgs.nostrEventId);
+  assert.deepEqual(signedDatasetReceipt.payload.metadata.context, datasetArgs.context);
+  const verifyDatasetReceipt = async (attestation: unknown) => {
+    const response = await fetch(`${baseUrl}/api/v1/zk/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attestation }),
+    });
+    assert.equal(response.status, 200);
+    return (await response.json() as { valid: boolean }).valid;
+  };
+  assert.equal(await verifyDatasetReceipt(signedDatasetReceipt), true);
+  assert.equal(await verifyDatasetReceipt({
+    ...signedDatasetReceipt,
+    payload: { ...signedDatasetReceipt.payload, metadata: {
+      ...signedDatasetReceipt.payload.metadata, cid: "ef".repeat(32),
+    } },
+  }), false);
+  const datasetStatus = await mcpRequest("tools/call", {
+    name: "proof.status", arguments: { receiptHash: datasetReceipt.receiptHash },
+  });
+  assert.equal(datasetStatus.result?.structuredContent.status, "verified");
+  assert.equal(datasetStatus.result?.structuredContent.attestationCount, 0);
   const tool = listed.result?.tools.find(
     (candidate: { name: string }) =>
       candidate.name === "stratigraphy.get",
@@ -1435,6 +1498,7 @@ test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async ()
       snapshotDigest: "2",
     }],
     ["proof.ground", { contextHash: "not-hex", agentId: "agent" }],
+    ["proof.epistemic_receipt", { cid: "not-a-cid" }],
     ["mesh.status", { unexpected: true }],
     ["mesh.broadcast", { signalType: "telemetry_snapshot", payload: { date: "not-a-date" } }],
   ];

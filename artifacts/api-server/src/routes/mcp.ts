@@ -10,6 +10,11 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Express, NextFunction, Request, Response } from "express";
 import { z } from "zod";
+import {
+  createEpistemicDatasetReceipt,
+  getEpistemicDatasetReceiptStatus,
+  indexEpistemicDatasetReceipt,
+} from "../services/epistemicDatasetReceipt";
 import { createL402Middleware } from "../middleware/l402";
 import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
 import type { SettlementRouter } from "../services/settlement";
@@ -319,10 +324,13 @@ const proofStatusInputSchema = z.object({
   snapshotDigest: z.string().regex(/^(?:\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
     "Primary lookup key for a snapshot lifecycle record (decimal digest, hex digest, or CID); mutually exclusive with proofHash.",
   ),
+  receiptHash: z.string().regex(/^[0-9a-f]{64}$/).optional().describe(
+    "SHA-256 digest returned by proof.epistemic_receipt; mutually exclusive with proofHash and snapshotDigest.",
+  ),
 }).strict().refine(
-  (input) =>
-    (input.proofHash === undefined) !== (input.snapshotDigest === undefined),
-  "Provide exactly one of proofHash or snapshotDigest",
+  (input) => [input.proofHash, input.snapshotDigest, input.receiptHash]
+    .filter((value) => value !== undefined).length === 1,
+  "Provide exactly one of proofHash, snapshotDigest, or receiptHash",
 ).describe("Input arguments for querying single proof attestation lifecycle status.");
 
 const proofLifecycleStates = [
@@ -416,6 +424,18 @@ const groundContextInputSchema = z.object({
     "Non-secret caller metadata bound into the context anchor.",
   ),
 }).strict().describe("Paid epistemic context grounding request.");
+
+const epistemicDatasetInputSchema = z.object({
+  cid: z.string().max(256).regex(/^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$/).describe(
+    "IPFS CIDv0/CIDv1 or 32-byte hexadecimal dataset hash to bind into the signed receipt.",
+  ),
+  nostrEventId: z.string().regex(/^[0-9a-fA-F]{64}$/).optional().describe(
+    "Optional 32-byte hexadecimal Nostr event ID to bind into the signed receipt; this tool does not publish it.",
+  ),
+  context: z.record(z.string(), z.unknown()).optional().describe(
+    "Optional non-secret JSON context bound to the signed receipt (maximum 16 KiB together with the other metadata).",
+  ),
+}).strict().describe("Dataset CID and optional publication context for a Bitcoin-tip signed receipt.");
 
 const field = (
   type: string | string[],
@@ -1008,7 +1028,7 @@ const baseMcpToolDefinitions = [
     name: "proof.status",
     title: "Get Proof Status",
     description:
-      "Look up one process-memory proof lifecycle and attestation state using exactly one proofHash or snapshotDigest; use this tool for a known identifier, not to list multiple proofs (use proof.list) or execute verification (use proof.verify). Returns a JSON object with status (verified, cached, pending, or invalid), ISO verifiedAt, attestationCount, and boolean meshQuorum; unknown identifiers return pending. This read-only lookup costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects missing or conflicting selectors with JSON-RPC -32602.",
+      "Look up one process-memory proof lifecycle or signed dataset receipt using exactly one proofHash, snapshotDigest, or receiptHash; use this tool for a known identifier, not to list multiple proofs (use proof.list) or execute verification (use proof.verify or POST /api/v1/zk/verify for signed receipts). Returns a JSON object with status (verified, cached, pending, or invalid), ISO verifiedAt, attestationCount, and boolean meshQuorum; unknown identifiers return pending, and signed receipts have zero Nostr attestations unless separately published. This read-only lookup costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects missing or conflicting selectors with JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1042,11 +1062,18 @@ const baseMcpToolDefinitions = [
               "^(?:\\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
           },
         ),
+        receiptHash: field(
+          "string",
+          "SHA-256 digest from proof.epistemic_receipt for a signed Bitcoin-tip anchor, not a Groth16 proof; mutually exclusive with proofHash and snapshotDigest.",
+          ["ab".repeat(32)],
+          { pattern: "^[0-9a-f]{64}$" },
+        ),
       },
       required: [],
       oneOf: [
         { required: ["proofHash"] },
         { required: ["snapshotDigest"] },
+        { required: ["receiptHash"] },
       ],
     },
     outputSchema: {
@@ -1495,6 +1522,87 @@ const baseMcpToolDefinitions = [
     },
   },
   {
+    name: "proof.epistemic_receipt",
+    title: "Anchor a Dataset to the Bitcoin Tip",
+    description:
+      "Create a signed Bitcoin-tip receipt binding a dataset CID or hash, optional Nostr event ID and context, current block height and hash, and timestamp; use this tool for a verifiable dataset anchor, not for a Groth16 proof (use proof.submit) or an unbound signature. Returns a JSON object with receiptHash, blockTip, blockHash, ipfsCid, optional nostrEventId, ISO timestamp, and an attestation containing the complete signed receipt as JSON for POST /api/v1/zk/verify; this is not a zero-knowledge proof and no Nostr event is published. This non-idempotent 250-sat L402 call preflights signing before charging, shares a 60-requests-per-minute IP limit, and rejects malformed input with JSON-RPC -32602.",
+    annotations: submissionToolAnnotations,
+    inputSchema: {
+      type: "object",
+      description: "Dataset identifier and optional Nostr provenance to bind to a signed Bitcoin-tip anchor.",
+      examples: [{
+        cid: "bafybeigdyrzt5sfp7udm7hu76uhka4lyer5y2wjy7zt6fw7v6r2w4x3ydq",
+        nostrEventId: "ab".repeat(32),
+        context: { source: "dataset" },
+      }],
+      additionalProperties: false,
+      properties: {
+        cid: field(
+          "string",
+          "IPFS CIDv0/CIDv1 or 32-byte hex dataset hash to anchor at the current Bitcoin tip.",
+          ["ab".repeat(32)],
+          { pattern: "^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$", maxLength: 256 },
+        ),
+        nostrEventId: field(
+          "string",
+          "Optional 32-byte hex ID of an existing Nostr event; it is included in the signature, not published by this tool.",
+          ["ab".repeat(32)],
+          { pattern: "^[0-9a-fA-F]{64}$" },
+        ),
+        context: field(
+          "object",
+          "Optional non-secret metadata bound into the signed receipt; combined metadata must be at most 16 KiB.",
+          [{ source: "dataset" }],
+          { additionalProperties: true },
+        ),
+      },
+      required: ["cid"],
+    },
+    outputSchema: {
+      type: "object",
+      description: "Signed dataset anchor; receiptHash is a tuple digest and proofPayload is a full verifiable signed receipt, not a ZK proof.",
+      examples: [{
+        receiptHash: "cd".repeat(32),
+        blockTip: 920001,
+        blockHash: "ab".repeat(32),
+        ipfsCid: "ef".repeat(32),
+        nostrEventId: "ab".repeat(32),
+        attestation: {
+          type: "Signed-Bitcoin-Tip-Anchor",
+          proofPayload: JSON.stringify({ receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1", contextHash: "cd".repeat(32) }),
+          verified: true,
+        },
+        timestamp: "2026-09-19T01:41:36.458Z",
+      }],
+      additionalProperties: false,
+      properties: {
+        receiptHash: field("string", "SHA-256 hex digest of the JSON tuple [cid, blockHash, blockTip, nostrEventId or empty string, ISO timestamp], signed as the receipt contextHash.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+        blockTip: field("integer", "Current Bitcoin block height verified at receipt issuance.", [920001], { minimum: 1 }),
+        blockHash: field("string", "Current Bitcoin block hash included in the signed payload.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+        ipfsCid: field("string", "Original dataset CID or hex hash included in the signed payload.", ["ef".repeat(32)]),
+        nostrEventId: field("string", "Optional caller-supplied Nostr event ID included in the signed payload; not a publication result.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
+        attestation: {
+          type: "object",
+          description: "Self-verified signed Bitcoin-tip attestation; not a Groth16 proof or a PoW validity proof.",
+          examples: [{
+            type: "Signed-Bitcoin-Tip-Anchor",
+            proofPayload: JSON.stringify({ receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1", contextHash: "cd".repeat(32) }),
+            verified: true,
+          }],
+          additionalProperties: false,
+          properties: {
+            type: field("string", "Signed Bitcoin-tip anchor type, not a ZK scheme.", ["Signed-Bitcoin-Tip-Anchor"], { const: "Signed-Bitcoin-Tip-Anchor" }),
+            proofPayload: field("string", "JSON-serialized complete signed receipt; parse and send as attestation to POST /api/v1/zk/verify.", [JSON.stringify({ receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1" })]),
+            verified: field("boolean", "Whether the signed receipt passed self-verification before return; not a Bitcoin PoW or ZK proof verification.", [true]),
+          },
+          required: ["type", "proofPayload", "verified"],
+        },
+        timestamp: field("string", "ISO 8601 UTC receipt issuance time included in the signed tuple.", ["2026-09-19T01:41:36.458Z"], { format: "date-time" }),
+      },
+      required: ["receiptHash", "blockTip", "blockHash", "ipfsCid", "attestation", "timestamp"],
+    },
+  },
+  {
     name: "mesh.status",
     title: "Get Mesh Status",
     description:
@@ -1600,6 +1708,7 @@ const mcpToolDefinitions = baseMcpToolDefinitions.map((tool) =>
 function createBitcoinStratigraphyMcpServer(
   groundReceipt?: Awaited<ReturnType<typeof groundEpistemicContext>>,
   mesh: Pick<MeshGossipService, "status" | "createConsensus"> = createMeshGossipService(),
+  datasetReceipt?: Awaited<ReturnType<typeof createEpistemicDatasetReceipt>>,
 ) {
   const server = new McpServer(
     {
@@ -1700,11 +1809,17 @@ function createBitcoinStratigraphyMcpServer(
       if (!parsed.success) {
         throw new McpError(
           ErrorCode.InvalidParams,
-          "Provide exactly one proofHash or snapshotDigest",
+          "Provide exactly one proofHash, snapshotDigest, or receiptHash",
         );
       }
-      const identifier = parsed.data.proofHash ?? parsed.data.snapshotDigest!;
-      const history = getZkProofStatus(identifier);
+      const receiptVerifiedAt = parsed.data.receiptHash
+        ? getEpistemicDatasetReceiptStatus(parsed.data.receiptHash)
+        : undefined;
+      const history = parsed.data.receiptHash
+        ? receiptVerifiedAt
+          ? { status: "verified" as const, verifiedAt: receiptVerifiedAt, attestationCount: 0 }
+          : undefined
+        : getZkProofStatus(parsed.data.proofHash ?? parsed.data.snapshotDigest!);
       const attestationCount = history?.attestationCount ?? 0;
       const structuredContent = {
         status: history?.status ?? "pending",
@@ -1769,6 +1884,19 @@ function createBitcoinStratigraphyMcpServer(
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
+      };
+    }
+    if (request.params.name === "proof.epistemic_receipt") {
+      if (!epistemicDatasetInputSchema.safeParse(args).success) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid dataset receipt request");
+      }
+      if (!datasetReceipt) {
+        throw new McpError(ErrorCode.InternalError, "Signed dataset receipt is unavailable");
+      }
+      indexEpistemicDatasetReceipt(datasetReceipt.receiptHash, datasetReceipt.timestamp);
+      return {
+        content: [{ type: "text", text: JSON.stringify(datasetReceipt) }],
+        structuredContent: datasetReceipt,
       };
     }
     if (request.params.name === "mesh.status") {
@@ -1845,6 +1973,7 @@ async function handleMcpRequest(
   const server = createBitcoinStratigraphyMcpServer(
     res.locals.epistemicAnchorReceipt as Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
     mesh,
+    res.locals.epistemicDatasetReceipt as Awaited<ReturnType<typeof createEpistemicDatasetReceipt>> | undefined,
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -1927,6 +2056,7 @@ export function registerMcpRoute(
     "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
     "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
     "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
+    "proof.epistemic_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
     "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
     "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
   } as const;
@@ -2003,6 +2133,30 @@ export function registerMcpRoute(
         });
       } catch (error) {
         req.log?.warn({ err: error }, "MCP epistemic grounding preflight failed");
+        res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
+        return;
+      }
+    }
+    if (name === "proof.epistemic_receipt") {
+      const input = epistemicDatasetInputSchema.parse(body!.params?.arguments ?? {});
+      if (Buffer.byteLength(JSON.stringify({
+        cid: input.cid,
+        nostrEventId: input.nostrEventId,
+        context: input.context,
+      })) > 16_384) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: { code: -32602, message: "Dataset receipt metadata exceeds 16 KiB" },
+          id: typeof body?.id === "number" ? body.id : null,
+        });
+        return;
+      }
+      try {
+        res.locals.epistemicDatasetReceipt = await createEpistemicDatasetReceipt(input, {
+          readBitcoinTip: options.readBitcoinTip,
+        });
+      } catch (error) {
+        req.log?.warn({ err: error }, "MCP dataset receipt preflight failed");
         res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
         return;
       }

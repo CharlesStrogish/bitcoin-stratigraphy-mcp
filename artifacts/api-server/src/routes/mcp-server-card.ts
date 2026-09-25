@@ -51,9 +51,9 @@ export const mcpServerCard = {
       {
         name: "proof.verify",
         annotations: {
-          readOnlyHint: true,
+          readOnlyHint: false,
           destructiveHint: false,
-          idempotentHint: true,
+          idempotentHint: false,
           openWorldHint: false,
         },
       },
@@ -87,14 +87,29 @@ export const mcpServerCard = {
       {
         name: "proof.ground",
         annotations: {
-          readOnlyHint: true,
+          readOnlyHint: false,
           destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
           l402: {
-            endpoint: "POST /api/v1/zk/ground",
-            amountSats: 5,
+            endpoint: "POST /mcp",
+            amountSats: 250,
           },
+          verificationEndpoint: "POST /api/v1/zk/verify",
+        },
+      },
+      {
+        name: "proof.epistemic_receipt",
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+          l402: {
+            endpoint: "POST /mcp",
+            amountSats: 250,
+          },
+          attestationType: "Signed-Bitcoin-Tip-Anchor",
           verificationEndpoint: "POST /api/v1/zk/verify",
         },
       },
@@ -104,7 +119,7 @@ export const mcpServerCard = {
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,
-          openWorldHint: false,
+          openWorldHint: true,
         },
       },
       {
@@ -113,7 +128,7 @@ export const mcpServerCard = {
           readOnlyHint: false,
           destructiveHint: false,
           idempotentHint: false,
-          openWorldHint: false,
+          openWorldHint: true,
           l402: {
             amountSats: 250,
           },

@@ -488,7 +488,6 @@ code { color: hsl(var(--muted-foreground)); font-size: 10px; }
 .smithery-backlink a { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 8px; color: hsl(var(--foreground)); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 .smithery-backlink a:hover { color: hsl(var(--primary)); }
 .smithery-backlink img { width: 88px; height: 20px; object-fit: contain; }
-.smithery-backlink .smithery-fallback { padding: 3px 7px; border-radius: 3px; background: #d89b1f; color: #1d2430; font-weight: 700; text-decoration: none; }
 
 @media (max-width: 980px) {
   .shell-inner { width: min(100% - 28px, 760px); }.workspace-grid { grid-template-columns: 1fr; }.filter-rail { position: static; min-height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }.rail-heading, .rail-count, .rail-note, .reset-button, .rail-footer { grid-column: 1 / -1; }.rail-count { margin-bottom: 16px; }.rail-note { margin-top: 3px; }.rail-footer { margin-top: 0; }.insights-grid { grid-template-columns: 1fr; }

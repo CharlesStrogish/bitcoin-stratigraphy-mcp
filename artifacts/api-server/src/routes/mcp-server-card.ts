@@ -69,6 +69,15 @@ export const mcpServerCard = {
         },
       },
       {
+        name: "proof.attenuate",
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      {
         name: "proof.verify",
         annotations: {
           readOnlyHint: false,

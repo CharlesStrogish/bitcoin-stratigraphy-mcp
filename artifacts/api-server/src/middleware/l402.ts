@@ -14,6 +14,7 @@ import type {
   RevenueLedger,
   RevenueRequestKind,
 } from "../services/ledger";
+import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import {
   paymentReference,
   recordRevenueWithRetry,
@@ -35,6 +36,7 @@ export type L402MiddlewareOptions = {
   usageStore?: MacaroonUsageStore;
   maxChallengesPerMinute?: number;
   ledger?: RevenueLedger;
+  revocationStore?: MacaroonRevocationStore;
   requestKind?: RevenueRequestKind;
 };
 
@@ -191,6 +193,25 @@ export function createL402Middleware(
         secret,
         Math.floor(now() / 1_000),
       );
+      if (pass) {
+        if (!options.scopePath?.startsWith("/mcp/tools/") &&
+          (pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined)) {
+          res.status(403).json({ error: "Macaroon tool or target caveat forbids this route" });
+          return;
+        }
+        if (options.revocationStore) {
+          try {
+            if (await options.revocationStore.isRevoked(pass.tokenId)) {
+              res.status(401).json({ error: "Macaroon is revoked" });
+              return;
+            }
+          } catch (error) {
+            req.log?.error({ err: error }, "L402 revocation lookup failed");
+            res.status(503).json({ error: "Revocation lookup unavailable" });
+            return;
+          }
+        }
+      }
       const preimageHash = /^[0-9a-f]{64}$/.test(authorization.preimage)
         ? createHash("sha256")
           .update(Buffer.from(authorization.preimage, "hex"))

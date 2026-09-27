@@ -37,6 +37,8 @@ export type VerifiedSubscriptionMacaroon = {
   tier: SubscriptionTier;
   validUntil: number;
   allowedPaths: string[];
+  allowedToolSets: string[][];
+  maxTarget?: number;
   maxRequests?: number;
   requestLimits: Array<{ tokenId: string; maxRequests: number }>;
   tokenId: string;
@@ -91,7 +93,10 @@ export function attenuateSubscriptionMacaroon(
   for (const caveat of newCaveats) {
     if (
       !/^allowed_path=\/[^\s]*$/.test(caveat) &&
-      !/^max_requests=[1-9]\d*$/.test(caveat)
+      !/^max_requests=[1-9]\d*$/.test(caveat) &&
+      !/^time_before=(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/.test(caveat) &&
+      !/^max_target=(?:0|[1-9]\d*)$/.test(caveat) &&
+      !/^allowed_tools=[a-z][a-z0-9]*\.[a-z][a-z0-9_]*(?:,[a-z][a-z0-9]*\.[a-z][a-z0-9_]*)*$/.test(caveat)
     ) {
       return null;
     }
@@ -157,6 +162,9 @@ export function verifySubscriptionMacaroon(
     );
     const rootValues = new Map<string, string>();
     const allowedPaths: string[] = [];
+    const allowedToolSets: string[][] = [];
+    let maxTarget: number | undefined;
+    let timeBefore: number | undefined;
     const requestLimits: number[] = [];
     const meteredScopes: Array<{ tokenId: string; maxRequests: number }> = [];
     for (const caveat of token.caveats) {
@@ -176,6 +184,21 @@ export function verifySubscriptionMacaroon(
           tokenId: runningSignature.toString("hex"),
           maxRequests: limit,
         });
+      } else if (key === "time_before") {
+        if (!/^(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/.test(value)) return null;
+        const parsed = Date.parse(value.length === 10 ? `${value}T00:00:00.000Z` : value);
+        if (!Number.isFinite(parsed) ||
+          new Date(parsed).toISOString() !== (value.length === 10 ? `${value}T00:00:00.000Z` : value)) return null;
+        // A date-only caveat includes that calendar date; timestamps use exclusive bounds.
+        const expiry = parsed + (value.length === 10 ? 86_400_000 : 0);
+        timeBefore = Math.min(timeBefore ?? expiry, expiry);
+      } else if (key === "max_target") {
+        const bound = Number(value);
+        if (!/^(?:0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(bound)) return null;
+        maxTarget = Math.min(maxTarget ?? bound, bound);
+      } else if (key === "allowed_tools") {
+        if (!/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*(?:,[a-z][a-z0-9]*\.[a-z][a-z0-9_]*)*$/.test(value)) return null;
+        allowedToolSets.push(value.split(","));
       } else {
         if (
           ![
@@ -217,6 +240,7 @@ export function verifySubscriptionMacaroon(
       !(tier in SUBSCRIPTION_TIERS) ||
       !Number.isSafeInteger(validUntil) ||
       validUntil <= nowSeconds
+      || (timeBefore !== undefined && nowSeconds * 1_000 >= timeBefore)
       || (amountMsatsValue !== undefined &&
         (!/^[1-9]\d*$/.test(amountMsatsValue) ||
           !Number.isSafeInteger(amountMsats))) ||
@@ -241,6 +265,8 @@ export function verifySubscriptionMacaroon(
       tier,
       validUntil,
       allowedPaths,
+      allowedToolSets,
+      maxTarget,
       maxRequests:
         requestLimits.length > 0 ? Math.min(...requestLimits) : undefined,
       requestLimits: meteredScopes,

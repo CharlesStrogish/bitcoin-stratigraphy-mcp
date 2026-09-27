@@ -929,6 +929,7 @@ export function registerStratigraphyRoutes(
       settlementRouter,
       now: policy.now,
       usageStore: macaroonUsageStore,
+      revocationStore,
       ledger: revenueLedger,
       requestKind: "stratigraphy",
     }),
@@ -994,6 +995,7 @@ export function registerStratigraphyRoutes(
       settlementRouter,
       now: policy.now,
       usageStore: macaroonUsageStore,
+      revocationStore,
       ledger: revenueLedger,
       requestKind: "zk-proof",
     }),
@@ -1044,6 +1046,7 @@ export function registerStratigraphyRoutes(
       settlementRouter,
       now: policy.now,
       usageStore: macaroonUsageStore,
+      revocationStore,
       ledger: revenueLedger,
       requestKind: "zk-proof",
     }),
@@ -1684,7 +1687,8 @@ export function registerStratigraphyRoutes(
         }
         if (pass) {
           if (
-            pass.allowedPaths.some((allowedPath) => allowedPath !== req.path)
+            pass.allowedPaths.some((allowedPath) => allowedPath !== req.path) ||
+            pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined
           ) {
             res.status(403).json({ error: "Macaroon path is not allowed" });
             return;
@@ -1973,7 +1977,8 @@ export function registerStratigraphyRoutes(
           }
           if (pass) {
             if (
-              pass.allowedPaths.some((allowedPath) => allowedPath !== req.path)
+              pass.allowedPaths.some((allowedPath) => allowedPath !== req.path) ||
+              pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined
             ) {
               res.status(403).json({ error: "Macaroon path is not allowed" });
               return;

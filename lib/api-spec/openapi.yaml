@@ -23,6 +23,30 @@ tags:
   - name: mesh
     description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
 x-mcp-tools:
+  proof.attenuate:
+    description: "Derive attenuated Macaroon sub-tokens with embedded caveats (time-to-live limits, max target bounds, tool restriction) for delegated agent swarms."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        macaroon: { type: string, minLength: 1, maxLength: 8192 }
+        caveats:
+          type: array
+          maxItems: 16
+          items: { type: string, minLength: 1, maxLength: 256 }
+        ttlSeconds: { type: number, minimum: 1, maximum: 2592000 }
+      required: [macaroon, caveats]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, const: attenuated }
+        attenuatedMacaroon: { type: string }
+        appliedCaveats:
+          type: array
+          items: { type: string }
+        issuedAt: { type: string, format: date-time }
+      required: [status, attenuatedMacaroon, appliedCaveats, issuedAt]
   stratigraphy.diff:
     description: "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call."
     inputSchema:

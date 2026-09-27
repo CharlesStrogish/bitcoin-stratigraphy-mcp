@@ -12,6 +12,14 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
+  attenuateSubscriptionMacaroon,
+  getMacaroonSignatureId,
+  verifySubscriptionMacaroon,
+} from "../lib/subscription-pass";
+import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
+import { createPostgresMacaroonRevocationStore } from "../lib/postgres-macaroon-revocation-store";
+import { parseL402Header } from "../middleware/l402";
+import {
   createEpistemicDatasetReceipt,
   getEpistemicDatasetReceiptStatus,
   indexEpistemicDatasetReceipt,
@@ -337,6 +345,14 @@ const stratigraphyDiffInputSchema = z.object({
   fromTarget: z.string().regex(new RegExp(diffTargetPattern)).refine(validDiffTarget),
   toTarget: z.string().regex(new RegExp(diffEndTargetPattern)).refine(validDiffTarget).default("latest"),
 }).strict();
+
+const attenuateInputSchema = z.object({
+  macaroon: z.string().min(1).max(8192),
+  caveats: z.array(z.string().min(1).max(256)).max(16),
+  ttlSeconds: z.number().int().positive().max(2_592_000).optional(),
+}).strict().refine(({ caveats, ttlSeconds }) => caveats.length > 0 || ttlSeconds !== undefined, {
+  message: "At least one caveat or ttlSeconds is required",
+});
 
 const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
   "No input parameters required.",
@@ -874,6 +890,73 @@ async function queryStratigraphyDiff(
   };
 }
 
+function normalizedAttenuationCaveats(
+  input: z.infer<typeof attenuateInputSchema>,
+  now: number,
+): string[] {
+  const normalized = input.caveats.map((raw) => {
+    const match = /^\s*([a-z_]+)\s*=\s*(.*?)\s*$/.exec(raw);
+    if (!match) throw new RangeError("Unsupported attenuation caveat");
+    const [, key, value] = match;
+    const caveat = `${key}=${value}`;
+    if (key === "allowed_tools") {
+      const names = value.split(",").map((name) => name.trim());
+      if (names.length > 13 || names.some((name) =>
+        !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/.test(name) ||
+        !baseMcpToolDefinitions.some((tool) => tool.name === name)
+      )) throw new RangeError("allowed_tools must list canonical MCP tools");
+      return `allowed_tools=${names.join(",")}`;
+    }
+    if (key === "time_before" && value.length === 10) {
+      const time = Date.parse(`${value}T00:00:00.000Z`);
+      if (!Number.isFinite(time) || new Date(time).toISOString().slice(0, 10) !== value) {
+        throw new RangeError("Invalid time_before UTC date");
+      }
+    }
+    if (
+      !/^(?:allowed_path=\/[^\s]*|max_requests=[1-9]\d*|max_target=(?:0|[1-9]\d*)|time_before=(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z))$/.test(caveat)
+    ) throw new RangeError("Unsupported attenuation caveat");
+    return caveat;
+  });
+  if (input.ttlSeconds !== undefined) {
+    normalized.push(`time_before=${new Date(now + input.ttlSeconds * 1_000).toISOString()}`);
+  }
+  return normalized;
+}
+
+async function withinMcpTargetBound(
+  name: string,
+  args: unknown,
+  maxTarget: number,
+): Promise<boolean> {
+  const records = await getStratigraphyData();
+  const heightAt = (index: number) => snapshotBlock(index, records.length);
+  if (name === "stratigraphy.get") {
+    const selected = await queryStratigraphy(stratigraphyInputSchema.parse(args));
+    return selected.length > 0 && selected.every((record) => heightAt(record.day - 1) <= maxTarget);
+  }
+  if (name === "stratigraphy.diff") {
+    const { fromTarget, toTarget } = stratigraphyDiffInputSchema.parse(args);
+    return [fromTarget, toTarget].every((target) =>
+      heightAt(indexedStratumIndex(target, records)) <= maxTarget
+    );
+  }
+  if (name === "stratigraphy.digest") {
+    const { target } = stratigraphyDigestInputSchema.parse(args);
+    if (!target.includes("..")) {
+      return heightAt(indexedStratumIndex(target, records)) <= maxTarget;
+    }
+    const [start, end] = target.split("..");
+    const selected = records.flatMap((_record, index) => {
+      const date = snapshotDate(index, records.length);
+      return date >= start && date <= end ? [index] : [];
+    });
+    return selected.length > 0 && selected.every((index) => heightAt(index) <= maxTarget);
+  }
+  // Never silently ignore a target caveat on unrelated tools.
+  return false;
+}
+
 const diffStratumExample = { height: 919856, date: "2026-09-08", target_multiplier: 125.5 };
 const diffStratumSchema = {
   type: "object",
@@ -1207,6 +1290,50 @@ const baseMcpToolDefinitions = [
         "availableMetrics",
         "dateBounds",
       ],
+    },
+  },
+  {
+    name: "proof.attenuate",
+    title: "Attenuate a Macaroon",
+    description:
+      "Derive attenuated Macaroon sub-tokens with embedded caveats (time-to-live limits, max target bounds, tool restriction) for delegated agent swarms.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: {
+      type: "object",
+      description: "Derive a narrower child of an authentic, unexpired subscription macaroon; this delegation call does not issue a payment invoice.",
+      examples: [{ macaroon: "base64url-parent-macaroon", caveats: ["allowed_tools = stratigraphy.get,stratigraphy.digest", "max_target = 870000"], ttlSeconds: 3600 }],
+      additionalProperties: false,
+      properties: {
+        macaroon: field("string", "Base L402 Macaroon string to attenuate.", ["base64url-parent-macaroon"], { minLength: 1, maxLength: 8192 }),
+        caveats: field("array", "List of restriction caveats to append (e.g. ['time_before = 2026-12-31', 'max_target = 870000', 'allowed_tools = stratigraphy.get,stratigraphy.digest']). Existing allowed_path and max_requests restrictions are also supported.", [["time_before = 2026-12-31", "max_target = 870000", "allowed_tools = stratigraphy.get,stratigraphy.digest"]], {
+          maxItems: 16,
+          items: field("string", "One supported restriction caveat.", ["max_target = 870000"], { minLength: 1, maxLength: 256 }),
+        }),
+        ttlSeconds: field("number", "Optional time-to-live in seconds to automatically append an expiration caveat. Must be a positive integer of at most 30 days.", [3600], {
+          minimum: 1, maximum: 2_592_000,
+        }),
+      },
+      required: ["macaroon", "caveats"],
+    },
+    outputSchema: {
+      type: "object",
+      description: "New macaroon and canonical restrictions inherited from the parent plus those added by this call. The child still requires the parent's payment proof for use.",
+      examples: [{ status: "attenuated", attenuatedMacaroon: "base64url-child-macaroon", appliedCaveats: ["max_target=870000"], issuedAt: "2026-09-27T21:00:00.000Z" }],
+      additionalProperties: false,
+      properties: {
+        status: field("string", "Successful attenuation status.", ["attenuated"], { const: "attenuated" }),
+        attenuatedMacaroon: field("string", "Encoded child subscription macaroon. Treat as a bearer credential.", ["base64url-child-macaroon"]),
+        appliedCaveats: field("array", "New canonical caveats appended to the parent; inherited caveats are preserved inside the token.", [["max_target=870000"]], {
+          items: field("string", "One appended canonical caveat.", ["max_target=870000"]),
+        }),
+        issuedAt: field("string", "UTC issuance timestamp.", ["2026-09-27T21:00:00.000Z"], { format: "date-time" }),
+      },
+      required: ["status", "attenuatedMacaroon", "appliedCaveats", "issuedAt"],
     },
   },
   {
@@ -1973,6 +2100,7 @@ const exactDescriptionToolNames = new Set([
   "stratigraphy.get",
   "stratigraphy.digest",
   "stratigraphy.diff",
+  "proof.attenuate",
   "proof.get_status",
   "proof.ground",
   "proof.issue_receipt",
@@ -2005,6 +2133,12 @@ function createBitcoinStratigraphyMcpServer(
   groundReceipt?: Awaited<ReturnType<typeof groundEpistemicContext>>,
   mesh: Pick<MeshGossipService, "status" | "createConsensus"> = createMeshGossipService(),
   datasetReceipt?: Awaited<ReturnType<typeof createEpistemicDatasetReceipt>>,
+  attenuation?: {
+    status: "attenuated";
+    attenuatedMacaroon: string;
+    appliedCaveats: string[];
+    issuedAt: string;
+  },
 ) {
   const server = new McpServer(
     {
@@ -2110,6 +2244,15 @@ function createBitcoinStratigraphyMcpServer(
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
+      };
+    }
+    if (request.params.name === "proof.attenuate") {
+      if (!attenuation) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid or unauthorized parent macaroon");
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(attenuation) }],
+        structuredContent: attenuation,
       };
     }
     if (request.params.name === "proof.verify") {
@@ -2303,6 +2446,7 @@ async function handleMcpRequest(
     res.locals.epistemicAnchorReceipt as Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
     mesh,
     res.locals.epistemicDatasetReceipt as Awaited<ReturnType<typeof createEpistemicDatasetReceipt>> | undefined,
+    res.locals.attenuation as Parameters<typeof createBitcoinStratigraphyMcpServer>[3],
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -2371,6 +2515,7 @@ export function registerMcpRoute(
     ledger?: RevenueLedger;
     readBitcoinTip?: () => Promise<BitcoinTip>;
     meshService?: Pick<MeshGossipService, "status" | "createConsensus">;
+    revocationStore?: MacaroonRevocationStore;
   } = {},
 ): void {
   const rateLimit = createHttpRateLimitMiddleware(
@@ -2378,6 +2523,7 @@ export function registerMcpRoute(
   );
   const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
   const mesh = options.meshService ?? createMeshGossipService();
+  const revocationStore = options.revocationStore ?? createPostgresMacaroonRevocationStore();
   const paidTools = {
     "stratigraphy.list": { amountSats: 10, schema: stratigraphyCatalogInputSchema },
     "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
@@ -2402,6 +2548,7 @@ export function registerMcpRoute(
         settlementRouter,
         sessionSecret: options.sessionSecret,
         usageStore: options.usageStore,
+        revocationStore,
         ledger: options.ledger,
         scopePath: `/mcp/tools/${name}`,
         requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
@@ -2419,7 +2566,8 @@ export function registerMcpRoute(
       if (req.body.some((item: unknown) =>
         item !== null && typeof item === "object" &&
         (item as { method?: unknown }).method === "tools/call" &&
-        Object.hasOwn(paidTools, String((item as { params?: { name?: unknown } }).params?.name ?? ""))
+        (Object.hasOwn(paidTools, String((item as { params?: { name?: unknown } }).params?.name ?? "")) ||
+          (item as { params?: { name?: unknown } }).params?.name === "proof.attenuate")
       )) {
         res.status(400).json({
           jsonrpc: "2.0",
@@ -2433,6 +2581,58 @@ export function registerMcpRoute(
     }
     const body = req.body as { id?: unknown; method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
     const name = body?.method === "tools/call" ? body.params?.name : undefined;
+    if (name === "proof.attenuate") {
+      const parsed = attenuateInputSchema.safeParse(body?.params?.arguments ?? {});
+      if (!parsed.success) {
+        res.status(400).json({
+          jsonrpc: "2.0", id: body?.id ?? null,
+          error: { code: -32602, message: "Invalid attenuation input" },
+        });
+        return;
+      }
+      const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+      if (!secret) {
+        res.status(503).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32603, message: "Macaroon verification unavailable" } });
+        return;
+      }
+      const now = Date.now();
+      const parent = verifySubscriptionMacaroon(parsed.data.macaroon, secret, Math.floor(now / 1_000));
+      if (!parent || !getMacaroonSignatureId(parsed.data.macaroon)) {
+        res.status(401).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32602, message: "Invalid or expired parent macaroon" } });
+        return;
+      }
+      try {
+        if (await revocationStore.isRevoked(parent.tokenId)) {
+          res.status(401).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32602, message: "Parent macaroon is revoked" } });
+          return;
+        }
+      } catch (error) {
+        req.log?.error({ err: error }, "MCP macaroon revocation lookup failed");
+        res.status(503).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32603, message: "Revocation lookup unavailable" } });
+        return;
+      }
+      let caveats: string[];
+      try {
+        caveats = normalizedAttenuationCaveats(parsed.data, now);
+      } catch (error) {
+        res.status(400).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32602, message: error instanceof Error ? error.message : "Invalid attenuation caveats" } });
+        return;
+      }
+      const child = attenuateSubscriptionMacaroon(parsed.data.macaroon, caveats);
+      if (!child || !verifySubscriptionMacaroon(child, secret, Math.floor(now / 1_000))) {
+        res.status(400).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32602, message: "Invalid attenuation caveats or expired child" } });
+        return;
+      }
+      res.setHeader("Cache-Control", "no-store");
+      res.locals.attenuation = {
+        status: "attenuated",
+        attenuatedMacaroon: child,
+        appliedCaveats: caveats,
+        issuedAt: new Date(now).toISOString(),
+      };
+      next();
+      return;
+    }
     if (typeof name !== "string" || !Object.hasOwn(paidTools, name)) {
       next();
       return;
@@ -2440,6 +2640,22 @@ export function registerMcpRoute(
     const tool = paidTools[name as keyof typeof paidTools];
     if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
       next();
+      return;
+    }
+    const authorization = parseL402Header(req.header("Authorization"));
+    const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+    const pass = authorization && secret
+      ? verifySubscriptionMacaroon(authorization.macaroon, secret, Math.floor(Date.now() / 1_000))
+      : null;
+    if (pass && (
+      pass.allowedToolSets.some((set) => !set.includes(name)) ||
+      (pass.maxTarget !== undefined &&
+        !(await withinMcpTargetBound(name, body?.params?.arguments ?? {}, pass.maxTarget)))
+    )) {
+      res.status(403).json({
+        jsonrpc: "2.0", id: body?.id ?? null,
+        error: { code: -32602, message: "Macaroon tool or target caveat forbids this request" },
+      });
       return;
     }
     if (name === "stratigraphy.digest" || name === "stratigraphy.diff") {

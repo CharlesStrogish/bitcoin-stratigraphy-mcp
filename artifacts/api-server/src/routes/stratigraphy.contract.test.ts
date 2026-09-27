@@ -64,6 +64,8 @@ const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
 const expectedMcpToolDescriptions: Record<string, string> = {
+  "proof.attenuate":
+    "Derive attenuated Macaroon sub-tokens with embedded caveats (time-to-live limits, max target bounds, tool restriction) for delegated agent swarms.",
   "stratigraphy.diff":
     "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call.",
   "stratigraphy.digest":
@@ -1170,6 +1172,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "stratigraphy.digest",
       "stratigraphy.diff",
       "stratigraphy.list",
+      "proof.attenuate",
       "proof.verify",
       "proof.get_status",
       "proof.list",
@@ -1390,6 +1393,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
     "stratigraphy.diff": {
       keys: ["from", "to", "delta"], readOnly: true, idempotent: true, openWorld: false,
+    },
+    "proof.attenuate": {
+      keys: ["status", "attenuatedMacaroon", "appliedCaveats", "issuedAt"],
+      readOnly: true, idempotent: true, openWorld: false,
     },
     "mesh.get_status": {
       keys: ["nodePubkey", "activePeerCount", "configuredPeerCount", "topologyHealth",
@@ -1984,6 +1991,137 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
   } finally {
     await new Promise<void>((resolve, reject) =>
       diffServer.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("derives authentic caveated MCP sub-tokens and enforces inherited restrictions", async () => {
+  const revocationStore = createMemoryMacaroonRevocationStore();
+  const attenuationApp = express();
+  attenuationApp.use(express.json());
+  registerMcpRoute(attenuationApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-mcp-secret",
+    revocationStore,
+  });
+  const attenuationServer = attenuationApp.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => attenuationServer.once("listening", resolve));
+  const attenuationBase = `http://127.0.0.1:${(attenuationServer.address() as AddressInfo).port}`;
+  try {
+    const listed = (await mcpRequestAt(attenuationBase, "tools/list")).body;
+    const tool = listed.result?.tools.find(
+      (candidate: { name: string }) => candidate.name === "proof.attenuate",
+    );
+    assert.ok(tool);
+    assert.deepEqual(tool.inputSchema.required, ["macaroon", "caveats"]);
+    assert.equal(tool.annotations.readOnlyHint, true);
+    assert.equal(tool.annotations.idempotentHint, true);
+
+    const digestArgs = { name: "stratigraphy.digest", arguments: { target: "2026-09-09" } };
+    const challenge = await mcpRequestAt(attenuationBase, "tools/call", digestArgs);
+    assert.equal(challenge.response.status, 402);
+    const offer = challenge.body as unknown as { macaroon: string; payment_hash: string };
+    const payment = mcpInvoices.get(offer.payment_hash);
+    assert.ok(payment);
+    const cutoff = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const call = async (args: Record<string, unknown>) =>
+      mcpRequestAt(attenuationBase, "tools/call", {
+        name: "proof.attenuate", arguments: args,
+      });
+    const derived = await call({
+      macaroon: offer.macaroon,
+      caveats: [
+        `time_before = ${cutoff}`,
+        "max_target = 920000",
+        "allowed_tools = stratigraphy.get,stratigraphy.digest",
+      ],
+      ttlSeconds: 300,
+    });
+    assert.equal(derived.response.status, 200);
+    assert.equal(derived.response.headers.get("cache-control"), "no-store");
+    const result = JSON.parse(derived.body.result?.content[0].text);
+    assert.deepEqual(derived.body.result?.structuredContent, result);
+    assert.equal(result.status, "attenuated");
+    assert.equal(new Date(result.issuedAt).toISOString(), result.issuedAt);
+    assert.deepEqual(result.appliedCaveats.slice(0, 3), [
+      `time_before=${cutoff}`,
+      "max_target=920000",
+      "allowed_tools=stratigraphy.get,stratigraphy.digest",
+    ]);
+    assert.match(result.appliedCaveats[3], /^time_before=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    const verified = verifySubscriptionMacaroon(
+      result.attenuatedMacaroon,
+      "contract-mcp-secret",
+      Math.floor(Date.now() / 1000),
+    );
+    assert.ok(verified);
+    assert.deepEqual(verified.allowedPaths, ["/mcp/tools/stratigraphy.digest"]);
+    assert.deepEqual(verified.allowedToolSets, [["stratigraphy.get", "stratigraphy.digest"]]);
+    assert.equal(verified.maxTarget, 920000);
+    assert.equal(verified.maxRequests, 1);
+    assert.equal(verifySubscriptionMacaroon(
+      result.attenuatedMacaroon, "contract-mcp-secret",
+      Math.floor(Date.now() / 1000) + 301,
+    ), null);
+    const wrongTool = await mcpRequestAt(
+      attenuationBase, "tools/call",
+      { name: "stratigraphy.diff", arguments: { fromTarget: "919856" } },
+      undefined,
+      `L402 ${result.attenuatedMacaroon}:${payment.preimage}`,
+    );
+    assert.equal(wrongTool.response.status, 403);
+    const paid = await mcpRequestAt(
+      attenuationBase, "tools/call", digestArgs, undefined,
+      `L402 ${result.attenuatedMacaroon}:${payment.preimage}`,
+    );
+    assert.equal(paid.response.status, 200);
+    assert.match(paid.body.result?.content[0].text, /HEIGHT:920000/);
+
+    const another = await mcpRequestAt(attenuationBase, "tools/call", digestArgs);
+    const secondOffer = another.body as unknown as { macaroon: string; payment_hash: string };
+    const secondPayment = mcpInvoices.get(secondOffer.payment_hash);
+    assert.ok(secondPayment);
+    const bounded = await call({
+      macaroon: secondOffer.macaroon, caveats: ["max_target = 919856"],
+    });
+    assert.equal(bounded.response.status, 200);
+    const boundedToken = bounded.body.result?.structuredContent.attenuatedMacaroon;
+    const blocked = await mcpRequestAt(
+      attenuationBase, "tools/call", digestArgs, undefined,
+      `L402 ${boundedToken}:${secondPayment.preimage}`,
+    );
+    assert.equal(blocked.response.status, 403);
+    const invalid = await call({ macaroon: "not-a-macaroon", caveats: ["max_target = 870000"] });
+    assert.equal(invalid.response.status, 401);
+    const ignored = await call({ macaroon: secondOffer.macaroon, caveats: ["unsupported = anything"] });
+    assert.equal(ignored.response.status, 400);
+    await revocationStore.revoke(getMacaroonSignatureId(secondOffer.macaroon)!);
+    const revoked = await call({ macaroon: secondOffer.macaroon, caveats: ["max_target = 870000"] });
+    assert.equal(revoked.response.status, 401);
+    const revokedUse = await mcpRequestAt(
+      attenuationBase, "tools/call", digestArgs, undefined,
+      `L402 ${secondOffer.macaroon}:${secondPayment.preimage}`,
+    );
+    assert.equal(revokedUse.response.status, 401);
+
+    const restParent = createSubscriptionMacaroon({
+      secret: process.env.SESSION_SECRET!,
+      paymentHash,
+      tier: "1-day",
+      validUntil: Math.floor(Date.now() / 1000) + 3600,
+      amountMsats: 5_000,
+      paymentProvider: "contract-mcp",
+    });
+    for (const caveat of ["allowed_tools=stratigraphy.get", "max_target=0"]) {
+      const restChild = attenuateSubscriptionMacaroon(restParent, [caveat]);
+      assert.ok(restChild);
+      const deniedRest = await fetch(`${baseUrl}/api/v1/stratigraphy/l402`, {
+        headers: { Authorization: `L402 ${restChild}:${preimage}` },
+      });
+      assert.equal(deniedRest.status, 403, `${caveat} must not be ignored by REST L402`);
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      attenuationServer.close((error) => error ? reject(error) : resolve()));
   }
 });
 

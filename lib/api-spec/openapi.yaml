@@ -23,6 +23,45 @@ tags:
   - name: mesh
     description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
 x-mcp-tools:
+  stratigraphy.diff:
+    description: "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        fromTarget:
+          type: string
+          pattern: "^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
+          description: Starting indexed height or ISO date; required.
+        toTarget:
+          type: string
+          pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
+          default: latest
+          description: Ending indexed height or ISO date; latest is the latest indexed dataset entry, not the live Bitcoin tip.
+      required: [fromTarget]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        from: &diffStratum
+          type: object
+          additionalProperties: false
+          properties:
+            height: { type: integer }
+            date: { type: string, format: date }
+            target_multiplier: { type: number }
+          required: [height, date, target_multiplier]
+        to: *diffStratum
+        delta:
+          type: object
+          additionalProperties: false
+          properties:
+            heightDelta: { type: integer }
+            multiplierDelta: { type: number }
+            percentageChange: { type: string }
+            timeSpanDays: { type: integer }
+          required: [heightDelta, multiplierDelta, percentageChange, timeSpanDays]
+      required: [from, to, delta]
   stratigraphy.digest:
     description: "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot."
     inputSchema:

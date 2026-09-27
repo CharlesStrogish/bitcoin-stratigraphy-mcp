@@ -64,6 +64,8 @@ const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
 const expectedMcpToolDescriptions: Record<string, string> = {
+  "stratigraphy.diff":
+    "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call.",
   "stratigraphy.digest":
     "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot.",
   "proof.issue_receipt":
@@ -1166,6 +1168,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     [
       "stratigraphy.get",
       "stratigraphy.digest",
+      "stratigraphy.diff",
       "stratigraphy.list",
       "proof.verify",
       "proof.get_status",
@@ -1384,6 +1387,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
     "stratigraphy.digest": {
       keys: ["result", "proofAvailable"], readOnly: true, idempotent: true, openWorld: false,
+    },
+    "stratigraphy.diff": {
+      keys: ["from", "to", "delta"], readOnly: true, idempotent: true, openWorld: false,
     },
     "mesh.get_status": {
       keys: ["nodePubkey", "activePeerCount", "configuredPeerCount", "topologyHealth",
@@ -1889,6 +1895,95 @@ test("returns a paid digest of stored records without inventing a block hash or 
   } finally {
     await new Promise<void>((resolve, reject) =>
       digestServer.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("compares two paid indexed strata with signed height, multiplier, percentage, and day deltas", async () => {
+  const diffApp = express();
+  diffApp.use(express.json());
+  registerMcpRequestGuard(diffApp);
+  registerMcpRoute(diffApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-mcp-secret",
+  });
+  const diffServer = diffApp.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => diffServer.once("listening", resolve));
+  const diffBase = `http://127.0.0.1:${(diffServer.address() as AddressInfo).port}`;
+  try {
+    const listed = (await mcpRequestAt(diffBase, "tools/list")).body;
+    const tool = listed.result?.tools.find(
+      (candidate: { name: string }) => candidate.name === "stratigraphy.diff",
+    );
+    assert.ok(tool);
+    assert.deepEqual(tool.inputSchema.required, ["fromTarget"]);
+    assert.equal(tool.inputSchema.properties.toTarget.default, "latest");
+    assert.equal(tool.annotations.readOnlyHint, true);
+    assert.equal(tool.annotations.idempotentHint, true);
+
+    const [previous, current] = (await readDataset()).slice(-2);
+    const fromMultiplier = previous.quantitative_alpha.target_multiplier;
+    const toMultiplier = current.quantitative_alpha.target_multiplier;
+    const expected = {
+      from: { height: 919856, date: "2026-09-08", target_multiplier: fromMultiplier },
+      to: { height: 920000, date: "2026-09-09", target_multiplier: toMultiplier },
+      delta: {
+        heightDelta: 144,
+        multiplierDelta: toMultiplier - fromMultiplier,
+        percentageChange: `${Number((((toMultiplier - fromMultiplier) / fromMultiplier) * 100).toFixed(2))}%`,
+        timeSpanDays: 1,
+      },
+    };
+    const paidDiff = async (args: Record<string, unknown>) => {
+      const params = { name: "stratigraphy.diff", arguments: args };
+      const challenge = await mcpRequestAt(diffBase, "tools/call", params);
+      assert.equal(challenge.response.status, 402);
+      const offer = challenge.body as unknown as { amount_sats: number; macaroon: string; payment_hash: string };
+      assert.equal(offer.amount_sats, 250);
+      const payment = mcpInvoices.get(offer.payment_hash);
+      assert.ok(payment);
+      const paid = await mcpRequestAt(diffBase, "tools/call", params, undefined,
+        `L402 ${offer.macaroon}:${payment.preimage}`);
+      assert.equal(paid.response.status, 200);
+      assert.deepEqual(paid.body.result?.content.map((item: { type: string }) => item.type), ["text"]);
+      const result = JSON.parse(paid.body.result?.content[0].text);
+      assert.deepEqual(paid.body.result?.structuredContent, result);
+      return result;
+    };
+    assert.deepEqual(await paidDiff({ fromTarget: "919856" }), expected);
+    assert.deepEqual(await paidDiff({ fromTarget: "2026-09-08", toTarget: "2026-09-09" }), expected);
+    const reverse = await paidDiff({ fromTarget: "920000", toTarget: "919856" });
+    assert.deepEqual(reverse, {
+      from: expected.to,
+      to: expected.from,
+      delta: {
+        heightDelta: -144,
+        multiplierDelta: fromMultiplier - toMultiplier,
+        percentageChange: `${Number((((fromMultiplier - toMultiplier) / toMultiplier) * 100).toFixed(2))}%`,
+        timeSpanDays: -1,
+      },
+    });
+    const same = await paidDiff({ fromTarget: "920000", toTarget: "2026-09-09" });
+    assert.deepEqual(same.delta, {
+      heightDelta: 0, multiplierDelta: 0, percentageChange: "0%", timeSpanDays: 0,
+    });
+    for (const args of [
+      {},
+      { fromTarget: "2026-02-30" },
+      { fromTarget: "919856", toTarget: "2026-09-27" },
+      { fromTarget: "919857" },
+    ]) {
+      const invoiceCount = mcpInvoiceCount;
+      const invalid = await mcpRequestAt(diffBase, "tools/call", {
+        name: "stratigraphy.diff", arguments: args,
+      });
+      assert.ok([200, 400].includes(invalid.response.status));
+      assert.equal(invalid.body.error?.code, -32602);
+      assert.equal(invalid.response.headers.get("www-authenticate"), null);
+      assert.equal(mcpInvoiceCount, invoiceCount);
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      diffServer.close((error) => error ? reject(error) : resolve()));
   }
 });
 

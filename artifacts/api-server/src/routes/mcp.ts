@@ -325,6 +325,19 @@ const stratigraphyDigestInputSchema = z.object({
   }
 });
 
+const diffTargetPattern = "^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$";
+const diffEndTargetPattern = "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$";
+function validDiffTarget(target: string): boolean {
+  if (target === "latest") return true;
+  if (/^\d+$/.test(target)) return Number.isSafeInteger(Number(target));
+  const parsed = new Date(`${target}T00:00:00.000Z`);
+  return Number.isFinite(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === target;
+}
+const stratigraphyDiffInputSchema = z.object({
+  fromTarget: z.string().regex(new RegExp(diffTargetPattern)).refine(validDiffTarget),
+  toTarget: z.string().regex(new RegExp(diffEndTargetPattern)).refine(validDiffTarget).default("latest"),
+}).strict();
+
 const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
   "No input parameters required.",
 );
@@ -778,6 +791,21 @@ function digestRecord(record: StratumRecord, index: number, total: number) {
   return { height, date, targetMultiplier, recordHash };
 }
 
+function indexedStratumIndex(target: string, records: StratumRecord[]): number {
+  if (records.length === 0) throw new RangeError("No indexed stratigraphy records available");
+  if (target === "latest") return records.length - 1;
+  if (/^\d+$/.test(target)) {
+    const height = Number(target);
+    if (!Number.isSafeInteger(height)) throw new RangeError("Target height is too large");
+    const index = records.findIndex((_record, i) => snapshotBlock(i, records.length) === height);
+    if (index >= 0) return index;
+  } else {
+    const index = records.findIndex((_record, i) => snapshotDate(i, records.length) === target);
+    if (index >= 0) return index;
+  }
+  throw new RangeError(`No indexed stratum matches target: ${target}`);
+}
+
 async function queryStratigraphyDigest(
   { target, format }: z.infer<typeof stratigraphyDigestInputSchema>,
 ) {
@@ -794,17 +822,16 @@ async function queryStratigraphyDigest(
   if (target === "latest") {
     indices = [records.length - 1];
   } else if (/^\d+$/.test(target)) {
-    const height = Number(target);
-    if (!Number.isSafeInteger(height)) throw new RangeError("target height is too large");
-    const index = records.findIndex((_record, i) => snapshotBlock(i, records.length) === height);
-    indices = index < 0 ? [] : [index];
+    indices = [indexedStratumIndex(target, records)];
   } else {
     const [start, end] = target.split("..").map(checkedDate);
     if (end !== undefined && start > end) throw new RangeError("target range is reversed");
-    indices = records.flatMap((_record, i) => {
-      const date = snapshotDate(i, records.length);
-      return date >= start && date <= (end ?? start) ? [i] : [];
-    });
+    indices = end === undefined
+      ? [indexedStratumIndex(start, records)]
+      : records.flatMap((_record, i) => {
+        const date = snapshotDate(i, records.length);
+        return date >= start && date <= end ? [i] : [];
+      });
     if (indices.length > 100) throw new RangeError("target range exceeds 100 records");
   }
   if (indices.length === 0) throw new RangeError("No indexed stratum matches target");
@@ -817,6 +844,49 @@ async function queryStratigraphyDigest(
   });
   return target.includes("..") ? formatted : formatted[0];
 }
+
+async function queryStratigraphyDiff(
+  { fromTarget, toTarget }: z.infer<typeof stratigraphyDiffInputSchema>,
+) {
+  const records = await getStratigraphyData();
+  const fromIndex = indexedStratumIndex(fromTarget, records);
+  const toIndex = indexedStratumIndex(toTarget, records);
+  const stratum = (index: number) => ({
+    height: snapshotBlock(index, records.length),
+    date: snapshotDate(index, records.length),
+    target_multiplier: records[index].quantitative_alpha.target_multiplier,
+  });
+  const from = stratum(fromIndex);
+  const to = stratum(toIndex);
+  if (from.target_multiplier === 0) {
+    throw new RangeError("Cannot calculate percentage change from a zero starting multiplier");
+  }
+  const multiplierDelta = to.target_multiplier - from.target_multiplier;
+  return {
+    from,
+    to,
+    delta: {
+      heightDelta: to.height - from.height,
+      multiplierDelta,
+      percentageChange: `${Number(((multiplierDelta / from.target_multiplier) * 100).toFixed(2))}%`,
+      timeSpanDays: (Date.parse(to.date) - Date.parse(from.date)) / DAY_MS,
+    },
+  };
+}
+
+const diffStratumExample = { height: 919856, date: "2026-09-08", target_multiplier: 125.5 };
+const diffStratumSchema = {
+  type: "object",
+  description: "One indexed daily stratum; the height is a deterministic dataset index, not a live Bitcoin block height.",
+  examples: [diffStratumExample],
+  additionalProperties: false,
+  properties: {
+    height: field("integer", "Deterministic indexed height for the dataset day.", [919856]),
+    date: field("string", "Indexed UTC calendar date.", ["2026-09-08"], { format: "date" }),
+    target_multiplier: field("number", "Stored target multiplier; not a measured energy quantity.", [125.5]),
+  },
+  required: ["height", "date", "target_multiplier"],
+};
 
 const baseMcpToolDefinitions = [
   {
@@ -982,6 +1052,67 @@ const baseMcpToolDefinitions = [
         ),
       },
       required: ["result", "proofAvailable"],
+    },
+  },
+  {
+    name: "stratigraphy.diff",
+    title: "Compare Stratigraphy Strata",
+    description:
+      "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: {
+      type: "object",
+      description: "Select two indexed daily strata by height or ISO date; latest refers to the latest indexed entry, not the live chain tip.",
+      examples: [{ fromTarget: "919856", toTarget: "latest" }, { fromTarget: "2026-09-08", toTarget: "2026-09-09" }],
+      additionalProperties: false,
+      properties: {
+        fromTarget: field(
+          "string",
+          "Starting block height or ISO date string (e.g. '850000' or '2026-01-01'). Only indexed dataset heights are supported.",
+          ["919856", "2026-09-08"],
+          { pattern: diffTargetPattern },
+        ),
+        toTarget: field(
+          "string",
+          "Ending block height or ISO date string. 'latest' means the latest indexed entry, not the live Bitcoin tip.",
+          ["latest", "920000", "2026-09-09"],
+          { pattern: diffEndTargetPattern, default: "latest" },
+        ),
+      },
+      required: ["fromTarget"],
+    },
+    outputSchema: {
+      type: "object",
+      description: "Signed difference between two indexed daily records. Percent change is rounded to two decimal places; source data provides a target multiplier, not a direct difficulty or energy measurement.",
+      examples: [{
+        from: diffStratumExample,
+        to: { height: 920000, date: "2026-09-09", target_multiplier: 125.83 },
+        delta: { heightDelta: 144, multiplierDelta: 0.33, percentageChange: "0.26%", timeSpanDays: 1 },
+      }],
+      additionalProperties: false,
+      properties: {
+        from: diffStratumSchema,
+        to: diffStratumSchema,
+        delta: {
+          type: "object",
+          description: "Signed change from the starting indexed entry to the ending entry.",
+          examples: [{ heightDelta: 144, multiplierDelta: 0.33, percentageChange: "0.26%", timeSpanDays: 1 }],
+          additionalProperties: false,
+          properties: {
+            heightDelta: field("integer", "Ending indexed height minus starting indexed height.", [144]),
+            multiplierDelta: field("number", "Ending stored target multiplier minus starting multiplier.", [0.33]),
+            percentageChange: field("string", "Multiplier change divided by starting multiplier, formatted as a percentage to two decimal places.", ["0.26%"]),
+            timeSpanDays: field("integer", "Signed number of UTC calendar days between indexed dates.", [1]),
+          },
+          required: ["heightDelta", "multiplierDelta", "percentageChange", "timeSpanDays"],
+        },
+      },
+      required: ["from", "to", "delta"],
     },
   },
   {
@@ -1841,6 +1972,7 @@ const immutabilityNote =
 const exactDescriptionToolNames = new Set([
   "stratigraphy.get",
   "stratigraphy.digest",
+  "stratigraphy.diff",
   "proof.get_status",
   "proof.ground",
   "proof.issue_receipt",
@@ -1948,6 +2080,22 @@ function createBitcoinStratigraphyMcpServer(
         return {
           content: [{ type: "text", text: JSON.stringify(result) }],
           structuredContent: { result, proofAvailable: false },
+        };
+      } catch (error) {
+        if (error instanceof RangeError) throw new McpError(ErrorCode.InvalidParams, error.message);
+        throw error;
+      }
+    }
+    if (request.params.name === "stratigraphy.diff") {
+      const parsed = stratigraphyDiffInputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid diff targets");
+      }
+      try {
+        const result = await queryStratigraphyDiff(parsed.data);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: result,
         };
       } catch (error) {
         if (error instanceof RangeError) throw new McpError(ErrorCode.InvalidParams, error.message);
@@ -2237,6 +2385,7 @@ export function registerMcpRoute(
     "proof.status": { amountSats: 10, schema: proofStatusInputSchema },
     "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
     "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
+    "stratigraphy.diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
     "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
     "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
     "proof.issue_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
@@ -2293,11 +2442,13 @@ export function registerMcpRoute(
       next();
       return;
     }
-    if (name === "stratigraphy.digest") {
+    if (name === "stratigraphy.digest" || name === "stratigraphy.diff") {
       try {
-        await queryStratigraphyDigest(
-          stratigraphyDigestInputSchema.parse(body?.params?.arguments ?? {}),
-        );
+        if (name === "stratigraphy.digest") {
+          await queryStratigraphyDigest(stratigraphyDigestInputSchema.parse(body?.params?.arguments ?? {}));
+        } else {
+          await queryStratigraphyDiff(stratigraphyDiffInputSchema.parse(body?.params?.arguments ?? {}));
+        }
       } catch (error) {
         if (!(error instanceof RangeError)) return next(error);
         res.status(400).json({

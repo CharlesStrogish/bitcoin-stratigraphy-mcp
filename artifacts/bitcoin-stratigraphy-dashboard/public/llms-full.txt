@@ -1,6 +1,6 @@
 # Bitcoin Stratigraphy - Complete MCP Tool Reference
 
-> Static reference for the eleven canonical tools returned by `tools/list` at https://bitcoin-stratigraphy-dashboard.replit.app/mcp. JSON Schemas below include every input property, type, required field, enum, range, pattern, and additional-properties rule. Human-readable examples and property descriptions are condensed; `tools/list` is authoritative for the live metadata and any later schema changes.
+> Static reference for the twelve canonical tools returned by `tools/list` at https://bitcoin-stratigraphy-dashboard.replit.app/mcp. JSON Schemas below include every input property, type, required field, enum, range, pattern, and additional-properties rule. Human-readable examples and property descriptions are condensed; `tools/list` is authoritative for the live metadata and any later schema changes.
 
 ## Protocol and payment
 
@@ -24,7 +24,15 @@ Return a compressed summary for an indexed block height, ISO date, or inclusive 
 {"type":"object","additionalProperties":false,"properties":{"target":{"type":"string","pattern":"^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2}(?:\\.\\.\\d{4}-\\d{2}-\\d{2})?)$","default":"latest"},"format":{"type":"string","enum":["compact","minimal","kv"],"default":"compact"}},"required":[]}
 ```
 
-## 3. stratigraphy.list — 10 sats
+## 3. stratigraphy.diff — 250 sats
+
+Compare two indexed daily strata by height or ISO date. `fromTarget` is required; `toTarget` defaults to the latest indexed dataset entry, not the live Bitcoin tip. Returns `from` and `to` with `height`, `date`, and `target_multiplier`, and `delta` with signed `heightDelta`, `multiplierDelta`, `percentageChange` (a percentage string rounded to two decimals), and `timeSpanDays`. Height is a deterministic daily dataset index and the stored multiplier is not a direct measurement of energy or difficulty. Reversed targets yield negative height/day differences. A zero starting multiplier cannot produce a percentage change; unavailable targets are rejected before an L402 challenge.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"fromTarget":{"type":"string","pattern":"^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"},"toTarget":{"type":"string","pattern":"^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$","default":"latest"}},"required":["fromTarget"]}
+```
+
+## 4. stratigraphy.list — 10 sats
 
 List available indexed stratigraphy catalog entries.
 
@@ -32,7 +40,7 @@ List available indexed stratigraphy catalog entries.
 {"type":"object","additionalProperties":false,"properties":{},"required":[]}
 ```
 
-## 4. proof.verify — 250 sats
+## 5. proof.verify — 250 sats
 
 Verify an encoded Groth16/BN254 proof against committed public inputs and the supplied telemetry snapshot. Verification is distinct from attestation submission.
 
@@ -40,7 +48,7 @@ Verify an encoded Groth16/BN254 proof against committed public inputs and the su
 {"type":"object","additionalProperties":false,"properties":{"proof":{"type":"string","minLength":1},"publicInputs":{"type":"object","additionalProperties":false,"properties":{"blockHeight":{"type":"integer","minimum":0},"snapshotDigest":{"type":"string","minLength":1},"thermodynamicHash":{"type":"string","minLength":1},"timestamp":{"type":"integer","minimum":0},"valuationSat":{"type":"integer","minimum":0}},"required":["blockHeight","snapshotDigest","thermodynamicHash","timestamp","valuationSat"]},"verificationKeyId":{"type":"string","minLength":1},"data":{"type":["object","array"]}},"required":["proof","publicInputs","verificationKeyId","data"]}
 ```
 
-## 5. proof.get_status — 10 sats
+## 6. proof.get_status — 10 sats
 
 Look up a process-memory proof lifecycle record using exactly one key. A `receiptHash` looks up a signed dataset receipt rather than a ZK proof.
 
@@ -48,7 +56,7 @@ Look up a process-memory proof lifecycle record using exactly one key. A `receip
 {"type":"object","additionalProperties":false,"properties":{"proofHash":{"type":"string","pattern":"^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"},"snapshotDigest":{"type":"string","pattern":"^(?:\\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"},"receiptHash":{"type":"string","pattern":"^[0-9a-f]{64}$"}},"required":[],"oneOf":[{"required":["proofHash"]},{"required":["snapshotDigest"]},{"required":["receiptHash"]}]}
 ```
 
-## 6. proof.list — 10 sats
+## 7. proof.list — 10 sats
 
 List the bounded process-memory attestation index with optional pagination and status filtering; it is not a durable archive.
 
@@ -56,7 +64,7 @@ List the bounded process-memory attestation index with optional pagination and s
 {"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"maximum":100,"default":20},"offset":{"type":"integer","minimum":0,"maximum":1000,"default":0},"status":{"type":"string","enum":["verified","cached","pending","invalid"]}},"required":[]}
 ```
 
-## 7. proof.submit — 250 sats
+## 8. proof.submit — 250 sats
 
 Submit Groth16 coordinates and five public signals, in order: block height, thermodynamic hash, timestamp, valuation in sats, and snapshot digest. This can create an attestation and publish a Nostr event.
 
@@ -64,7 +72,7 @@ Submit Groth16 coordinates and five public signals, in order: block height, ther
 {"type":"object","additionalProperties":false,"properties":{"proof":{"type":"object","additionalProperties":false,"properties":{"piA":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","pattern":"^\\d+$"}},"piB":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"array","minItems":2,"maxItems":2,"items":{"type":"string","pattern":"^\\d+$"}}},"piC":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","pattern":"^\\d+$"}}},"required":["piA","piB","piC"]},"publicSignals":{"type":"array","minItems":5,"maxItems":5,"items":{"type":"string","pattern":"^\\d+$"}},"snapshotDigest":{"type":"string","pattern":"^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"}},"required":["proof","publicSignals"]}
 ```
 
-## 8. proof.ground — 250 sats
+## 9. proof.ground — 250 sats
 
 Bind an agent's execution context hash to the live Bitcoin tip and return a signed grounding receipt after settlement. This is not a ZK proof. Metadata must fit the server's 16 KiB serialized limit.
 
@@ -72,7 +80,7 @@ Bind an agent's execution context hash to the live Bitcoin tip and return a sign
 {"type":"object","additionalProperties":false,"properties":{"contextHash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$","minLength":64,"maxLength":64},"agentId":{"type":"string","minLength":1,"maxLength":256},"metadata":{"type":"object","additionalProperties":true}},"required":["contextHash","agentId"]}
 ```
 
-## 9. proof.issue_receipt — 250 sats
+## 10. proof.issue_receipt — 250 sats
 
 Create a signed Bitcoin-tip anchor for a dataset CID or 32-byte hash; an anchor is not a Groth16 proof or proof of work.
 
@@ -80,7 +88,7 @@ Create a signed Bitcoin-tip anchor for a dataset CID or 32-byte hash; an anchor 
 {"type":"object","additionalProperties":false,"properties":{"cid":{"type":"string","pattern":"^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$","maxLength":256},"nostrEventId":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"},"context":{"type":"object","additionalProperties":true}},"required":["cid"]}
 ```
 
-## 10. mesh.get_status — free
+## 11. mesh.get_status — free
 
 Inspect mesh topology, configured and active peers, and quorum readiness without making a paid call.
 
@@ -88,7 +96,7 @@ Inspect mesh topology, configured and active peers, and quorum readiness without
 {"type":"object","additionalProperties":false,"properties":{},"required":[]}
 ```
 
-## 11. mesh.broadcast — 250 sats
+## 12. mesh.broadcast — 250 sats
 
 Broadcast a freshly signed existing telemetry record to configured mesh peers. The payload is a date selector, not arbitrary caller-provided telemetry; this can change peer state.
 

@@ -64,6 +64,10 @@ const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
 const expectedMcpToolDescriptions: Record<string, string> = {
+  "proof.get_by_hash":
+    "Retrieve a specific ZK-SNARK proof record, cryptographic receipt, or anchored IPFS CID directly by its hash fingerprint.",
+  "payment.info":
+    "Inspect L402 payment requirements, per-tool satoshi pricing, invoice challenge parameters, and Macaroon authentication requirements.",
   "stratigraphy.range":
     "Retrieve a sequential batch of thermodynamic dataset strata between start and end bounds under a single consolidated query.",
   "proof.attenuate":
@@ -431,7 +435,7 @@ after(async () => {
   await pool.end();
 });
 
-async function mcpRequest(method: string, params?: Record<string, unknown>) {
+async function mcpRequest(method: string, params?: Record<string, unknown>, targetBaseUrl = baseUrl) {
   const payload = JSON.stringify({
     jsonrpc: "2.0",
     id: 1,
@@ -443,7 +447,7 @@ async function mcpRequest(method: string, params?: Record<string, unknown>) {
     Accept: "application/json, text/event-stream",
     "MCP-Protocol-Version": "2025-03-26",
   };
-  let response = await fetch(`${baseUrl}/mcp`, {
+  let response = await fetch(`${targetBaseUrl}/mcp`, {
     method: "POST",
     headers,
     body: payload,
@@ -467,7 +471,7 @@ async function mcpRequest(method: string, params?: Record<string, unknown>) {
     assert.ok(challenge.invoice.startsWith("ln"));
     const payment = mcpInvoices.get(challenge.payment_hash);
     assert.ok(payment);
-    response = await fetch(`${baseUrl}/mcp`, {
+    response = await fetch(`${targetBaseUrl}/mcp`, {
       method: "POST",
       headers: {
         ...headers,
@@ -514,6 +518,108 @@ async function mcpRequestAt(
   };
   return { response, body };
 }
+
+test("retrieves indexed proof payloads and receipts, and reports MCP prices without an invoice", async () => {
+  const isolatedApp = express();
+  isolatedApp.use(express.json());
+  registerMcpRoute(isolatedApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-mcp-secret",
+    readBitcoinTip: async () => ({
+      height: 920001, hash: "ab".repeat(32), source: "contract-test",
+    }),
+  });
+  const isolatedServer = isolatedApp.listen(0);
+  try {
+    await new Promise<void>((resolve) => {
+      if (isolatedServer.listening) resolve();
+      else isolatedServer.once("listening", resolve);
+    });
+    const address = isolatedServer.address() as AddressInfo;
+    const url = `http://127.0.0.1:${address.port}`;
+    const absent = await mcpRequestAt(url, "tools/call", {
+      name: "proof.get_by_hash", arguments: { hash: "ef".repeat(32) },
+    });
+    assert.equal(absent.response.status, 404);
+    assert.equal(absent.response.headers.get("www-authenticate"), null);
+    assert.equal(absent.body.error?.code, -32004);
+    assert.match(absent.body.error?.message ?? "", /not found/i);
+
+    const { response: priceResponse } = await mcpRequestAt(url, "tools/call", {
+      name: "payment.info", arguments: {},
+    });
+    assert.equal(priceResponse.status, 200);
+    assert.equal(priceResponse.headers.get("www-authenticate"), null);
+    const paymentInfo = await mcpRequest("tools/call", {
+      name: "payment.info", arguments: {},
+    }, url);
+    const prices = paymentInfo.result?.structuredContent.perToolSats;
+    assert.equal(Object.keys(prices).length, 16);
+    assert.equal(paymentInfo.result?.structuredContent.standardInvoiceSats, 250);
+    assert.equal(prices["proof.get_by_hash"], 250);
+    assert.equal(prices["proof.get_status"], 10);
+    assert.equal(prices["payment.info"], 0);
+    assert.equal(prices["mesh.get_status"], 0);
+    assert.equal(paymentInfo.result?.structuredContent.invoiceExpirySeconds, 3600);
+    assert.deepEqual(paymentInfo.result?.structuredContent.activeAuthSchemes, ["L402"]);
+    const onePrice = await mcpRequest("tools/call", {
+      name: "payment.info", arguments: { toolName: "proof.get_by_hash" },
+    }, url);
+    assert.deepEqual(onePrice.result?.structuredContent.perToolSats, { "proof.get_by_hash": 250 });
+    const unknownPrice = await mcpRequest("tools/call", {
+      name: "payment.info", arguments: { toolName: "proof.unknown" },
+    }, url);
+    assert.equal(unknownPrice.error?.message.includes("Unknown MCP tool"), true);
+
+    const cid = "Qm" + "a".repeat(44);
+    const issued = await mcpRequest("tools/call", {
+      name: "proof.issue_receipt", arguments: { cid },
+    }, url);
+    const receipt = issued.result?.structuredContent;
+    assert.equal(verifyEpistemicDatasetReceipt(receipt), true);
+    for (const hash of [receipt.receiptHash, cid]) {
+      const found = await mcpRequest("tools/call", {
+        name: "proof.get_by_hash", arguments: { hash },
+      }, url);
+      assert.equal(found.result?.structuredContent.kind, "dataset-receipt");
+      assert.equal(found.result?.structuredContent.hash, receipt.receiptHash);
+      assert.equal(found.result?.structuredContent.status, "verified");
+      assert.equal(found.result?.structuredContent.timestamp, receipt.timestamp);
+      assert.deepEqual(found.result?.structuredContent.proofPayload, receipt);
+    }
+
+    const data = [{
+      block: { height: 920000 },
+      observed_at: "2026-09-19T00:00:00.000Z",
+      thermodynamic: { target_multiplier: 125.83 },
+    }];
+    const proof = "invalid-proof-for-lookup";
+    const verified = await mcpRequest("tools/call", {
+      name: "proof.verify",
+      arguments: {
+        proof,
+        publicInputs: {
+          blockHeight: 920000, snapshotDigest: "123456789012345678901234567890", thermodynamicHash: "1",
+          timestamp: 1789776000000, valuationSat: 12583,
+        },
+        verificationKeyId: "sha256:unknown",
+        data,
+      },
+    }, url);
+    assert.equal(verified.result?.structuredContent.valid, false);
+    const proofHash = `0x${createHash("sha256").update(proof).digest("hex")}`;
+    const foundProof = await mcpRequest("tools/call", {
+      name: "proof.get_by_hash", arguments: { hash: proofHash.slice(2).toUpperCase() },
+    }, url);
+    assert.equal(foundProof.result?.structuredContent.kind, "zk-proof");
+    assert.equal(foundProof.result?.structuredContent.hash, proofHash);
+    assert.equal(foundProof.result?.structuredContent.status, "invalid");
+    assert.equal(foundProof.result?.structuredContent.proofPayload.proof, proof);
+    assert.deepEqual(foundProof.result?.structuredContent.proofPayload.data, data);
+  } finally {
+    isolatedServer.close();
+  }
+});
 
 test("MCP L402 challenges bind price and tool, while discovery and mesh stay free", async () => {
   for (const [method, params] of [
@@ -1112,6 +1218,8 @@ test("keeps six OpenAPI MCP tool descriptions and selector/output schemas in par
     "mesh.get_status",
     "proof.get_status",
     "proof.issue_receipt",
+    "proof.get_by_hash",
+    "payment.info",
   ];
   const schemaEntries = Object.entries(xMcpTools).filter(([, candidate]) => {
     assert.ok(
@@ -1178,10 +1286,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "proof.attenuate",
       "proof.verify",
       "proof.get_status",
+      "proof.get_by_hash",
       "proof.list",
       "proof.submit",
       "proof.ground",
       "proof.issue_receipt",
+      "payment.info",
       "mesh.get_status",
       "mesh.broadcast",
     ],
@@ -1430,6 +1540,15 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       keys: ["status", "verifiedAt", "attestationCount", "meshQuorum"],
       readOnly: true, idempotent: true, openWorld: false,
     },
+    "proof.get_by_hash": {
+      keys: ["kind", "hash", "status", "timestamp", "proofPayload"],
+      readOnly: true, idempotent: true, openWorld: false,
+    },
+    "payment.info": {
+      keys: ["standardInvoiceSats", "perToolSats", "acceptedPaymentMethods",
+        "invoiceExpirySeconds", "challenge", "activeAuthSchemes", "macaroonRequirements"],
+      readOnly: true, idempotent: true, openWorld: false,
+    },
     "proof.verify": {
       keys: ["valid", "verifiedAt", "computationTimeMs"],
       readOnly: false, idempotent: false, openWorld: false,
@@ -1464,7 +1583,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${name} description must exactly match the public MCP contract`,
     );
   }
-  for (const name of ["mesh.get_status", "proof.get_status", "proof.issue_receipt"]) {
+  for (const name of ["mesh.get_status", "proof.get_status", "proof.issue_receipt", "proof.get_by_hash", "payment.info"]) {
     assert.doesNotMatch(
       documentedTool(name).description,
       /Note: Stratigraphy records and zk-SNARK proofs are append-only/,

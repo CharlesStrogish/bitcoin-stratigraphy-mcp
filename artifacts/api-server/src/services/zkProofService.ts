@@ -70,6 +70,41 @@ export type ZkProofAttestationRecord = {
 const proofStatusByIdentifier = new Map<string, ZkProofLifecycleStatus>();
 const MAX_PROOF_STATUS_ENTRIES = 1_000;
 const proofAttestationsByHash = new Map<string, ZkProofAttestationRecord>();
+type ArchivedZkProof = {
+  kind: "zk-proof";
+  hash: string;
+  proofPayload: Record<string, unknown>;
+  timestamp: string;
+  status: ZkProofLifecycleStatus["status"];
+};
+const proofArchive = new Map<string, ArchivedZkProof>();
+const MAX_PROOF_ARCHIVE_ENTRIES = 128;
+
+function indexZkProofPayload(hash: string, proofPayload: Record<string, unknown>, timestamp: string): void {
+  // The HTTP JSON limit and snapshot verifier cap payloads; bound retained process memory too.
+  if (Buffer.byteLength(JSON.stringify(proofPayload)) > 2_097_152) {
+    throw new RangeError("Proof payload exceeds archive limit");
+  }
+  proofArchive.delete(hash);
+  proofArchive.set(hash, {
+    kind: "zk-proof",
+    hash,
+    proofPayload: structuredClone(proofPayload),
+    timestamp,
+    status: getZkProofStatus(hash)?.status ?? "pending",
+  });
+  while (proofArchive.size > MAX_PROOF_ARCHIVE_ENTRIES) {
+    proofArchive.delete(proofArchive.keys().next().value!);
+  }
+}
+
+export function getZkProofRecord(hash: string): ArchivedZkProof | undefined {
+  const normalized = `0x${hash.replace(/^0x/i, "").toLowerCase()}`;
+  const archived = proofArchive.get(normalized);
+  if (!archived) return undefined;
+  const status = getZkProofStatus(normalized)?.status ?? archived.status;
+  return { ...archived, status, proofPayload: structuredClone(archived.proofPayload) };
+}
 const generatedProofCache = new Map<string, Promise<ZkProofPayload>>();
 const MAX_GENERATED_PROOF_CACHE_ENTRIES = 256;
 const proofLanes = {
@@ -244,6 +279,11 @@ export async function submitZkProof(input: {
     submittedAt,
     attestationCount,
   });
+  indexZkProofPayload(fingerprint, {
+    proof: input.proof,
+    publicSignals: input.publicSignals,
+    ...(input.snapshotDigest ? { snapshotDigest: input.snapshotDigest } : {}),
+  }, submittedAt);
   return {
     proofHash: fingerprint,
     status: valid ? "verified" : "invalid",
@@ -745,6 +785,12 @@ export async function verifyZkProofForSnapshot(
       submittedAt,
       attestationCount,
     });
+    indexZkProofPayload(fingerprint, {
+      proof: candidate.proof,
+      publicInputs: candidate.publicInputs,
+      verificationKeyId: candidate.verificationKeyId,
+      data: snapshot,
+    }, submittedAt);
     return valid;
   };
   try {

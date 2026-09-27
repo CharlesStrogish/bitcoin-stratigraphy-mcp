@@ -13,7 +13,8 @@ export type EpistemicDatasetInput = {
 };
 
 const MAX_RECEIPTS = 1_000;
-const receiptIndex = new Map<string, string>();
+type DatasetReceipt = Awaited<ReturnType<typeof createEpistemicDatasetReceipt>>;
+const receiptIndex = new Map<string, DatasetReceipt>();
 
 export async function createEpistemicDatasetReceipt(
   input: EpistemicDatasetInput,
@@ -103,14 +104,27 @@ export function verifyEpistemicDatasetReceipt(value: unknown): boolean {
   }
 }
 
-export function indexEpistemicDatasetReceipt(receiptHash: string, timestamp: string): void {
-  receiptIndex.delete(receiptHash);
-  receiptIndex.set(receiptHash, timestamp);
+export function indexEpistemicDatasetReceipt(receipt: DatasetReceipt): void {
+  if (!verifyEpistemicDatasetReceipt(receipt)) {
+    throw new Error("Cannot index an invalid signed dataset receipt");
+  }
+  receiptIndex.delete(receipt.receiptHash);
+  receiptIndex.set(receipt.receiptHash, structuredClone(receipt));
   while (receiptIndex.size > MAX_RECEIPTS) {
     receiptIndex.delete(receiptIndex.keys().next().value!);
   }
 }
 
 export function getEpistemicDatasetReceiptStatus(receiptHash: string): string | undefined {
-  return receiptIndex.get(receiptHash);
+  return receiptIndex.get(receiptHash)?.timestamp;
+}
+
+export function getEpistemicDatasetReceiptByHash(hashOrCid: string): DatasetReceipt | undefined {
+  const direct = receiptIndex.get(hashOrCid.toLowerCase());
+  if (direct) return structuredClone(direct);
+  // Most recent signed anchor wins when a CID has been anchored more than once.
+  for (const receipt of [...receiptIndex.values()].reverse()) {
+    if (receipt.ipfsCid === hashOrCid) return structuredClone(receipt);
+  }
+  return undefined;
 }

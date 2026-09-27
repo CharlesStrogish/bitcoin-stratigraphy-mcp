@@ -106,6 +106,16 @@ export const mcpServerCard = {
         },
       },
       {
+        name: "proof.get_by_hash",
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+          l402: { amountSats: 250 },
+        },
+      },
+      {
         name: "proof.list",
         annotations: {
           readOnlyHint: true,
@@ -150,6 +160,15 @@ export const mcpServerCard = {
           },
           attestationType: "Signed-Bitcoin-Tip-Anchor",
           verificationEndpoint: "POST /api/v1/zk/verify",
+        },
+      },
+      {
+        name: "payment.info",
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
         },
       },
       {

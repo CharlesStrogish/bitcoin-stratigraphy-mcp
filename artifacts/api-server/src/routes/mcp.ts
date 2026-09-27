@@ -21,6 +21,7 @@ import { createPostgresMacaroonRevocationStore } from "../lib/postgres-macaroon-
 import { parseL402Header } from "../middleware/l402";
 import {
   createEpistemicDatasetReceipt,
+  getEpistemicDatasetReceiptByHash,
   getEpistemicDatasetReceiptStatus,
   indexEpistemicDatasetReceipt,
 } from "../services/epistemicDatasetReceipt";
@@ -40,6 +41,7 @@ import {
 } from "../services/meshGossipService";
 import { createNostrAttestor } from "../services/nostrAttestation";
 import {
+  getZkProofRecord,
   getZkProofStatus,
   listZkProofAttestations,
   submitZkProof,
@@ -402,6 +404,36 @@ const proofLifecycleStates = [
   "pending",
   "invalid",
 ] as const;
+
+const proofByHashInputSchema = z.object({
+  hash: z.string().regex(/^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/),
+}).strict();
+
+const paymentInfoInputSchema = z.object({
+  toolName: z.string().min(1).optional(),
+}).strict();
+
+type ArchivedProofLookup = {
+  kind: "zk-proof" | "dataset-receipt";
+  hash: string;
+  status: "verified" | "cached" | "pending" | "invalid";
+  timestamp: string;
+  proofPayload: Record<string, unknown>;
+};
+
+function findArchivedProof(hash: string): ArchivedProofLookup | undefined {
+  const proof = getZkProofRecord(hash);
+  if (proof) return proof;
+  const receipt = getEpistemicDatasetReceiptByHash(hash);
+  if (!receipt) return undefined;
+  return {
+    kind: "dataset-receipt",
+    hash: receipt.receiptHash,
+    status: "verified",
+    timestamp: receipt.timestamp,
+    proofPayload: receipt,
+  };
+}
 
 const listProofAttestationsInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20).describe(
@@ -928,7 +960,7 @@ function normalizedAttenuationCaveats(
     const caveat = `${key}=${value}`;
     if (key === "allowed_tools") {
       const names = value.split(",").map((name) => name.trim());
-      if (names.length > 14 || names.some((name) =>
+      if (names.length > 16 || names.some((name) =>
         !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/.test(name) ||
         !baseMcpToolDefinitions.some((tool) => tool.name === name)
       )) throw new RangeError("allowed_tools must list canonical MCP tools");
@@ -1601,6 +1633,56 @@ const baseMcpToolDefinitions = [
     },
   },
   {
+    name: "proof.get_by_hash",
+    title: "Get Proof or Receipt by Hash",
+    description:
+      "Retrieve a specific ZK-SNARK proof record, cryptographic receipt, or anchored IPFS CID directly by its hash fingerprint.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: {
+      type: "object",
+      description: "Look up a retained proof by SHA-256 proof hash, or a signed dataset anchor by receipt hash or exact CID. Unknown or evicted payloads return HTTP 404 before payment.",
+      examples: [{ hash: `0x${"ab".repeat(32)}` }, { hash: "Qm" + "a".repeat(44) }],
+      additionalProperties: false,
+      properties: {
+        hash: field(
+          "string",
+          "Cryptographic hash or IPFS CID of the target proof or receipt.",
+          [`0x${"ab".repeat(32)}`, "Qm" + "a".repeat(44)],
+          { pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$" },
+        ),
+      },
+      required: ["hash"],
+    },
+    outputSchema: {
+      type: "object",
+      description: "A payload retained in bounded process memory. Submitted proof coordinates and signals do not imply the original signed snapshot is archived; verification lookups include their original data. Signed dataset anchors are receipts, not ZK proofs.",
+      examples: [{
+        kind: "zk-proof", hash: `0x${"ab".repeat(32)}`, status: "verified",
+        timestamp: "2026-09-27T21:00:00.000Z",
+        proofPayload: { proof: { pi_a: ["1"] }, publicSignals: ["1", "2", "3", "4", "5"] },
+      }],
+      additionalProperties: false,
+      properties: {
+        kind: field("string", "Distinguishes a ZK proof from a signed Bitcoin-tip dataset receipt.", ["zk-proof"], { enum: ["zk-proof", "dataset-receipt"] }),
+        hash: field("string", "Canonical proof or receipt hash. CID lookups return the matching receipt hash.", [`0x${"ab".repeat(32)}`]),
+        status: field("string", "Current indexed lifecycle status.", ["verified"], { enum: ["verified", "cached", "pending", "invalid"] }),
+        timestamp: field("string", "Original submission, verification, or receipt creation time.", ["2026-09-27T21:00:00.000Z"], { format: "date-time" }),
+        proofPayload: {
+          type: "object", description: "Exact retained proof input or signed receipt; do not infer missing snapshot data from a submitted proof.",
+          examples: [{ proof: { pi_a: ["1"] }, publicSignals: ["1", "2", "3", "4", "5"] }],
+          additionalProperties: true,
+          properties: {},
+        },
+      },
+      required: ["kind", "hash", "status", "timestamp", "proofPayload"],
+    },
+  },
+  {
     name: "proof.list",
     title: "List Proof Attestations",
     description:
@@ -2092,6 +2174,75 @@ const baseMcpToolDefinitions = [
     },
   },
   {
+    name: "payment.info",
+    title: "Get MCP Payment Information",
+    description:
+      "Inspect L402 payment requirements, per-tool satoshi pricing, invoice challenge parameters, and Macaroon authentication requirements.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: {
+      type: "object",
+      description: "Optional canonical MCP tool name; omit to see pricing for every advertised tool. This information request does not issue an invoice.",
+      examples: [{}, { toolName: "stratigraphy.digest" }],
+      additionalProperties: false,
+      properties: {
+        toolName: field("string", "Specific MCP tool name to query pricing and caveats for (e.g., 'stratigraphy.digest'). Returns general tier pricing if omitted.", ["stratigraphy.digest"], { minLength: 1 }),
+      },
+      required: [],
+    },
+    outputSchema: {
+      type: "object",
+      description: "Configured MCP prices in sats (zero denotes a free tool) and fixed-fee Lightning L402 challenge rules. No live invoice is created by this tool.",
+      examples: [{
+        standardInvoiceSats: 250, perToolSats: { "stratigraphy.digest": 250 },
+        acceptedPaymentMethods: ["Lightning L402"], invoiceExpirySeconds: 3600,
+        challenge: { httpStatus: 402, header: "WWW-Authenticate", fields: ["macaroon", "invoice", "payment_hash", "amount_sats"] },
+        activeAuthSchemes: ["L402"],
+        macaroonRequirements: { authorizationHeader: "L402 <macaroon>:<preimage>", scope: "exact MCP tool path", maxRequests: 1 },
+      }],
+      additionalProperties: false,
+      properties: {
+        standardInvoiceSats: field("integer", "Standard paid MCP execution price. Catalog and status lookups may cost less; free tools cost zero.", [250], { const: 250 }),
+        perToolSats: {
+          type: "object", description: "Current advertised canonical tool prices in sats; optional toolName narrows this map.",
+          examples: [{ "stratigraphy.digest": 250 }],
+          additionalProperties: { type: "integer", minimum: 0 },
+          properties: {},
+        },
+        acceptedPaymentMethods: field("array", "Supported MCP payment method.", [["Lightning L402"]], { items: field("string", "Lightning invoice with L402 payment proof.", ["Lightning L402"]) }),
+        invoiceExpirySeconds: field("integer", "Default expiry for both the issued Lightning invoice and its path-bound macaroon.", [3600], { minimum: 1 }),
+        challenge: {
+          type: "object", description: "HTTP payment challenge and response fields.",
+          examples: [{ httpStatus: 402, header: "WWW-Authenticate", fields: ["macaroon", "invoice", "payment_hash", "amount_sats"] }],
+          additionalProperties: false,
+          properties: {
+            httpStatus: field("integer", "HTTP status for a payment challenge.", [402], { const: 402 }),
+            header: field("string", "Header carrying the L402 macaroon and invoice.", ["WWW-Authenticate"]),
+            fields: field("array", "JSON challenge body fields.", [["macaroon", "invoice", "payment_hash", "amount_sats"]], { items: field("string", "Challenge field name.", ["invoice"]) }),
+          },
+          required: ["httpStatus", "header", "fields"],
+        },
+        activeAuthSchemes: field("array", "Authentication scheme for paid MCP calls; free discovery and payment.info require none.", [["L402"]], { items: field("string", "MCP paid-call scheme.", ["L402"]) }),
+        macaroonRequirements: {
+          type: "object", description: "A valid payment proof must match the bound invoice, provider, amount, path, expiry and single-use restriction. proof.attenuate is free but requires a valid parent token.",
+          examples: [{ authorizationHeader: "L402 <macaroon>:<preimage>", scope: "exact MCP tool path", maxRequests: 1 }],
+          additionalProperties: false,
+          properties: {
+            authorizationHeader: field("string", "Authorization header form for redeeming a settled challenge.", ["L402 <macaroon>:<preimage>"]),
+            scope: field("string", "Issued macaroons are bound to the challenged MCP tool path.", ["exact MCP tool path"]),
+            maxRequests: field("integer", "Each issued paid-tool macaroon is single-use.", [1], { const: 1 }),
+          },
+          required: ["authorizationHeader", "scope", "maxRequests"],
+        },
+      },
+      required: ["standardInvoiceSats", "perToolSats", "acceptedPaymentMethods", "invoiceExpirySeconds", "challenge", "activeAuthSchemes", "macaroonRequirements"],
+    },
+  },
+  {
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
@@ -2194,6 +2345,7 @@ const exactDescriptionToolNames = new Set([
   "stratigraphy.range",
   "proof.attenuate",
   "proof.get_status",
+  "proof.get_by_hash",
   "proof.ground",
   "proof.issue_receipt",
   "mesh.get_status",
@@ -2210,6 +2362,30 @@ const mcpToolDefinitions = baseMcpToolDefinitions.map((tool) =>
       }
     : tool
 );
+
+const paidTools = {
+  "stratigraphy.list": { amountSats: 10, schema: stratigraphyCatalogInputSchema },
+  "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
+  "proof.get_status": { amountSats: 10, schema: proofStatusInputSchema },
+  "proof.status": { amountSats: 10, schema: proofStatusInputSchema },
+  "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
+  "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
+  "stratigraphy.diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
+  "stratigraphy.range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
+  "proof.get_by_hash": { amountSats: 250, schema: proofByHashInputSchema },
+  "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
+  "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
+  "proof.issue_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
+  "proof.epistemic_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
+  "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
+  "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
+} as const;
+const mcpToolPrices = Object.fromEntries(mcpToolDefinitions.map((tool) => [
+  tool.name,
+  Object.hasOwn(paidTools, tool.name)
+    ? paidTools[tool.name as keyof typeof paidTools].amountSats
+    : 0,
+])) as Record<string, number>;
 
 const legacyToolNames = {
   "mesh.status": "mesh.get_status",
@@ -2231,6 +2407,7 @@ function createBitcoinStratigraphyMcpServer(
     appliedCaveats: string[];
     issuedAt: string;
   },
+  archivedProof?: ArchivedProofLookup,
 ) {
   const server = new McpServer(
     {
@@ -2412,6 +2589,47 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent,
       };
     }
+    if (name === "proof.get_by_hash") {
+      if (!proofByHashInputSchema.safeParse(args).success) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid proof or receipt hash");
+      }
+      if (!archivedProof) {
+        throw new McpError(ErrorCode.InvalidParams, "Proof or receipt not found");
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(archivedProof) }],
+        structuredContent: archivedProof,
+      };
+    }
+    if (name === "payment.info") {
+      const parsed = paymentInfoInputSchema.safeParse(args);
+      if (!parsed.success) throw new McpError(ErrorCode.InvalidParams, "Invalid payment info request");
+      const toolName = parsed.data.toolName;
+      if (toolName && !Object.hasOwn(mcpToolPrices, toolName)) {
+        throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
+      }
+      const structuredContent = {
+        standardInvoiceSats: 250,
+        perToolSats: toolName ? { [toolName]: mcpToolPrices[toolName] } : mcpToolPrices,
+        acceptedPaymentMethods: ["Lightning L402"],
+        invoiceExpirySeconds: 3600,
+        challenge: {
+          httpStatus: 402,
+          header: "WWW-Authenticate",
+          fields: ["macaroon", "invoice", "payment_hash", "amount_sats"],
+        },
+        activeAuthSchemes: ["L402"],
+        macaroonRequirements: {
+          authorizationHeader: "L402 <macaroon>:<preimage>",
+          scope: "exact MCP tool path",
+          maxRequests: 1,
+        },
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    }
     if (request.params.name === "proof.list") {
       const parsed = listProofAttestationsInputSchema.safeParse(args);
       if (!parsed.success) {
@@ -2473,7 +2691,7 @@ function createBitcoinStratigraphyMcpServer(
       if (!datasetReceipt) {
         throw new McpError(ErrorCode.InternalError, "Signed dataset receipt is unavailable");
       }
-      indexEpistemicDatasetReceipt(datasetReceipt.receiptHash, datasetReceipt.timestamp);
+      indexEpistemicDatasetReceipt(datasetReceipt);
       return {
         content: [{ type: "text", text: JSON.stringify(datasetReceipt) }],
         structuredContent: datasetReceipt,
@@ -2555,6 +2773,7 @@ async function handleMcpRequest(
     mesh,
     res.locals.epistemicDatasetReceipt as Awaited<ReturnType<typeof createEpistemicDatasetReceipt>> | undefined,
     res.locals.attenuation as Parameters<typeof createBitcoinStratigraphyMcpServer>[3],
+    res.locals.archivedProof as ArchivedProofLookup | undefined,
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -2632,22 +2851,6 @@ export function registerMcpRoute(
   const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
   const mesh = options.meshService ?? createMeshGossipService();
   const revocationStore = options.revocationStore ?? createPostgresMacaroonRevocationStore();
-  const paidTools = {
-    "stratigraphy.list": { amountSats: 10, schema: stratigraphyCatalogInputSchema },
-    "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
-    "proof.get_status": { amountSats: 10, schema: proofStatusInputSchema },
-    "proof.status": { amountSats: 10, schema: proofStatusInputSchema },
-    "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
-    "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
-    "stratigraphy.diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
-    "stratigraphy.range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
-    "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
-    "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
-    "proof.issue_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
-    "proof.epistemic_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
-    "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
-    "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
-  } as const;
   const gates = Object.fromEntries(
     Object.entries(paidTools).map(([name, { amountSats }]) => [
       name,
@@ -2750,6 +2953,19 @@ export function registerMcpRoute(
     if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
       next();
       return;
+    }
+    if (name === "proof.get_by_hash") {
+      const hash = proofByHashInputSchema.parse(body?.params?.arguments ?? {}).hash;
+      const found = findArchivedProof(hash);
+      if (!found) {
+        res.status(404).json({
+          jsonrpc: "2.0",
+          id: typeof body?.id === "string" || typeof body?.id === "number" ? body.id : null,
+          error: { code: -32004, message: "Proof or receipt not found" },
+        });
+        return;
+      }
+      res.locals.archivedProof = found;
     }
     const authorization = parseL402Header(req.header("Authorization"));
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;

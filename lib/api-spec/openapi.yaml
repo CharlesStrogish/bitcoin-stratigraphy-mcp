@@ -23,6 +23,73 @@ tags:
   - name: mesh
     description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
 x-mcp-tools:
+  proof.get_by_hash:
+    description: "Retrieve a specific ZK-SNARK proof record, cryptographic receipt, or anchored IPFS CID directly by its hash fingerprint."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        hash:
+          type: string
+          pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"
+          description: Cryptographic hash or exact IPFS CID of a retained proof or signed dataset receipt.
+      required: [hash]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        kind: { type: string, enum: [zk-proof, dataset-receipt] }
+        hash: { type: string }
+        status: { type: string, enum: [verified, cached, pending, invalid] }
+        timestamp: { type: string, format: date-time }
+        proofPayload:
+          type: object
+          additionalProperties: true
+          properties: {}
+      required: [kind, hash, status, timestamp, proofPayload]
+  payment.info:
+    description: "Inspect L402 payment requirements, per-tool satoshi pricing, invoice challenge parameters, and Macaroon authentication requirements."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        toolName: { type: string, minLength: 1 }
+      required: []
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        standardInvoiceSats: { type: integer, const: 250 }
+        perToolSats:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+          properties: {}
+        acceptedPaymentMethods:
+          type: array
+          items: { type: string }
+        invoiceExpirySeconds: { type: integer, minimum: 1 }
+        challenge:
+          type: object
+          additionalProperties: false
+          properties:
+            httpStatus: { type: integer, const: 402 }
+            header: { type: string }
+            fields:
+              type: array
+              items: { type: string }
+          required: [httpStatus, header, fields]
+        activeAuthSchemes:
+          type: array
+          items: { type: string }
+        macaroonRequirements:
+          type: object
+          additionalProperties: false
+          properties:
+            authorizationHeader: { type: string }
+            scope: { type: string }
+            maxRequests: { type: integer, const: 1 }
+          required: [authorizationHeader, scope, maxRequests]
+      required: [standardInvoiceSats, perToolSats, acceptedPaymentMethods, invoiceExpirySeconds, challenge, activeAuthSchemes, macaroonRequirements]
   stratigraphy.range:
     description: "Retrieve a sequential batch of thermodynamic dataset strata between start and end bounds under a single consolidated query."
     inputSchema:

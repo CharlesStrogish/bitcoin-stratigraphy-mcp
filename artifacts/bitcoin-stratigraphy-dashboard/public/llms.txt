@@ -1,6 +1,6 @@
 # Bitcoin Stratigraphy - Thermodynamic Notary & L402 Data Engine
 
-> Quantitative Bitcoin stratigraphy dataset and a Thermodynamic Notary for autonomous AI agents. Groth16 zk-SNARK verification, signed Bitcoin-tip receipts, Nostr state attestations, and 10 canonical MCP tools are available through an L402 Lightning-micropayment API. Created and architected by Charles R. Strogish.
+> Quantitative Bitcoin stratigraphy dataset and a Thermodynamic Notary for autonomous AI agents. Groth16 zk-SNARK verification, signed Bitcoin-tip receipts, Nostr state attestations, and 11 canonical MCP tools are available through an L402 Lightning-micropayment API. Created and architected by Charles R. Strogish.
 
 ## Agent entry points
 - [Complete tool schemas and TypeScript SDK usage](https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt)
@@ -14,7 +14,7 @@
 Public metadata, health and MCP tool discovery need no payment. Paid REST operations start at 5 sats; MCP tool calls currently range from 10 to 250 sats. A paid call without credentials receives an HTTP 402 L402 challenge. Prices can vary by endpoint and policy: always query `/api/v1/cost` and use the challenge actually returned; do not assume a fixed 5-sat price for every MCP tool. The TypeScript SDK supports NWC wallet payments and credential reuse.
 
 ## Scope
-Use `stratigraphy.get`/`stratigraphy.list` for the indexed telemetry dataset, `proof.verify`/`proof.submit` for Groth16 proof workflows, `proof.get_status`/`proof.list` for process-memory attestation lookups, `proof.ground` for tip-grounded agent context receipts, `proof.issue_receipt` for dataset CID-to-Bitcoin-tip receipts, and `mesh.get_status`/`mesh.broadcast` for peer topology and telemetry distribution. A signed dataset-tip receipt is not a ZK proof or proof of work.
+Use `stratigraphy.get`/`stratigraphy.list` for the indexed telemetry dataset and `stratigraphy.digest` for token-optimized record summaries (record hash, not block hash or ZK proof). Use `proof.verify`/`proof.submit` for Groth16 proof workflows, `proof.get_status`/`proof.list` for process-memory attestation lookups, `proof.ground` for tip-grounded agent context receipts, `proof.issue_receipt` for dataset CID-to-Bitcoin-tip receipts, and `mesh.get_status`/`mesh.broadcast` for peer topology and telemetry distribution. A signed dataset-tip receipt is not a ZK proof or proof of work.
 
 ## License and access
 The dataset metadata declares CC BY 4.0; access to paid API data is separately governed by L402. "Open/L402" describes discovery and payment access, not a replacement copyright license.

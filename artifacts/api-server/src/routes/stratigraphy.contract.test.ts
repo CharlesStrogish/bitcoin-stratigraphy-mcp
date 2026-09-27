@@ -64,6 +64,8 @@ const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
 const expectedMcpToolDescriptions: Record<string, string> = {
+  "stratigraphy.digest":
+    "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot.",
   "proof.issue_receipt":
     "Issue a signed Bitcoin-tip receipt binding an IPFS dataset CID or hash to the active block height. Use this tool ONLY to anchor static dataset payloads for off-chain verification. Do NOT use for live agent execution state grounding (use `proof.ground`), ZK proof submission (use `proof.submit`), or checking attestation status (use `proof.get_status`).",
   "proof.ground":
@@ -1163,6 +1165,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
     [
       "stratigraphy.get",
+      "stratigraphy.digest",
       "stratigraphy.list",
       "proof.verify",
       "proof.get_status",
@@ -1378,6 +1381,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
     "stratigraphy.get": {
       keys: ["records"], readOnly: true, idempotent: true, openWorld: false,
+    },
+    "stratigraphy.digest": {
+      keys: ["result", "proofAvailable"], readOnly: true, idempotent: true, openWorld: false,
     },
     "mesh.get_status": {
       keys: ["nodePubkey", "activePeerCount", "configuredPeerCount", "topologyHealth",
@@ -1801,6 +1807,89 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       meshQuorum: false,
     },
   );
+});
+
+test("returns a paid digest of stored records without inventing a block hash or proof", async () => {
+  // Isolate the digest checks from the shared 60-request/minute MCP test server.
+  const digestApp = express();
+  digestApp.use(express.json());
+  registerMcpRequestGuard(digestApp);
+  registerMcpRoute(digestApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-mcp-secret",
+  });
+  const digestServer = digestApp.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => digestServer.once("listening", resolve));
+  const digestBase = `http://127.0.0.1:${(digestServer.address() as AddressInfo).port}`;
+  try {
+  const listed = (await mcpRequestAt(digestBase, "tools/list")).body;
+  const tool = listed.result?.tools.find(
+    (candidate: { name: string }) => candidate.name === "stratigraphy.digest",
+  );
+  assert.ok(tool);
+  assert.equal(tool.inputSchema.properties.format.default, "compact");
+  assert.equal(tool.inputSchema.properties.target.default, "latest");
+  assert.deepEqual(tool.inputSchema.properties.format.enum, ["compact", "minimal", "kv"]);
+  assert.equal(tool.annotations.readOnlyHint, true);
+  assert.equal(tool.annotations.idempotentHint, true);
+  assert.equal(tool.annotations.zkProof, undefined);
+
+  const source = (await readDataset()).at(-1)!;
+  const expectedHash = createHash("sha256").update(JSON.stringify([
+    source.day, source.title, source.video_id, source.transcript_summary,
+    source.quantitative_alpha.target_multiplier,
+    source.quantitative_alpha.difficulty_epoch_progress,
+    source.quantitative_alpha.thermodynamic_signal,
+  ])).digest("hex");
+  const multiplier = source.quantitative_alpha.target_multiplier;
+  const compact = `HEIGHT:920000|DATE:2026-09-09|TM:${multiplier}|HASH:${expectedHash}`;
+  const callDigest = async (args: Record<string, unknown>) => {
+    const params = { name: "stratigraphy.digest", arguments: args };
+    const challenge = await mcpRequestAt(digestBase, "tools/call", params);
+    assert.equal(challenge.response.status, 402);
+    const offer = challenge.body as unknown as { amount_sats: number; macaroon: string; payment_hash: string };
+    assert.equal(offer.amount_sats, 250);
+    const payment = mcpInvoices.get(offer.payment_hash);
+    assert.ok(payment);
+    const paid = await mcpRequestAt(digestBase, "tools/call", params, undefined,
+      `L402 ${offer.macaroon}:${payment.preimage}`);
+    assert.equal(paid.response.status, 200);
+    return paid.body;
+  };
+  for (const [args, expected] of [
+    [{}, compact],
+    [{ target: "920000", format: "minimal" }, [920000, "2026-09-09", multiplier, expectedHash]],
+    [{ target: "2026-09-09", format: "kv" }, {
+      h: 920000, ts: "2026-09-09", tm: multiplier, hash: expectedHash,
+    }],
+    [{ target: "2026-09-08..2026-09-09", format: "kv" }, null],
+  ] as const) {
+    const called = await callDigest(args);
+    const content = called.result?.content;
+    assert.deepEqual(content.map((item: { type: string }) => item.type), ["text"]);
+    const result = JSON.parse(content[0].text);
+    assert.deepEqual(called.result?.structuredContent.result, result);
+    assert.equal(called.result?.structuredContent.proofAvailable, false);
+    if (expected === null) {
+      assert.equal(result.length, 2);
+      assert.equal(result[1].hash, expectedHash);
+      assert.equal(result[0].ts, "2026-09-08");
+    } else {
+      assert.deepEqual(result, expected);
+    }
+  }
+  for (const target of ["2026-09-27", "862401", "2026-09-09..2026-09-08"]) {
+    const invalid = await mcpRequestAt(digestBase, "tools/call", {
+      name: "stratigraphy.digest", arguments: { target },
+    });
+    assert.ok([200, 400].includes(invalid.response.status));
+    assert.equal(invalid.body.error?.code, -32602);
+    assert.equal(invalid.response.headers.get("www-authenticate"), null);
+  }
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      digestServer.close((error) => error ? reject(error) : resolve()));
+  }
 });
 
 test("broadcasts a freshly signed canonical snapshot and requires a peer acknowledgment", async () => {

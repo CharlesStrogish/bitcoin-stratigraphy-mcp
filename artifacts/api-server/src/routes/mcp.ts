@@ -9,6 +9,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Express, NextFunction, Request, Response } from "express";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
   createEpistemicDatasetReceipt,
@@ -297,6 +298,32 @@ const stratigraphyInputSchema = z.object({
     });
   }
 }).describe("Validated raw stratigraphy telemetry query parameters.");
+
+const stratigraphyDigestInputSchema = z.object({
+  target: z.string().regex(/^(?:latest|(?:0|[1-9]\d*)|\d{4}-\d{2}-\d{2}(?:\.\.\d{4}-\d{2}-\d{2})?)$/).default("latest"),
+  format: z.enum(["compact", "minimal", "kv"]).default("compact"),
+}).strict().superRefine(({ target }, context) => {
+  if (target === "latest") return;
+  if (/^\d+$/.test(target)) {
+    if (Number.isSafeInteger(Number(target))) return;
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "target height is too large" });
+    return;
+  }
+  const dates = target.split("..");
+  for (const date of dates) {
+    const parsed = new Date(`${date}T00:00:00.000Z`);
+    if (!Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== date) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "target must contain a valid ISO calendar date" });
+      return;
+    }
+  }
+  if (dates.length === 2 && (
+    dates[0] > dates[1] ||
+    (Date.parse(dates[1]) - Date.parse(dates[0])) / DAY_MS >= 100
+  )) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "target range must be ascending and cover at most 100 days" });
+  }
+});
 
 const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
   "No input parameters required.",
@@ -735,6 +762,62 @@ async function queryStratigraphy(
   return records;
 }
 
+type StratumRecord = Awaited<ReturnType<typeof getStratigraphyData>>[number];
+
+// The dataset has no block hash, energy or per-record proof. This fingerprint
+// hashes only validated source fields, never a synthetic block or proof.
+function digestRecord(record: StratumRecord, index: number, total: number) {
+  const height = snapshotBlock(index, total);
+  const date = snapshotDate(index, total);
+  const targetMultiplier = record.quantitative_alpha.target_multiplier;
+  const recordHash = createHash("sha256").update(JSON.stringify([
+    record.day, record.title, record.video_id, record.transcript_summary,
+    targetMultiplier, record.quantitative_alpha.difficulty_epoch_progress,
+    record.quantitative_alpha.thermodynamic_signal,
+  ])).digest("hex");
+  return { height, date, targetMultiplier, recordHash };
+}
+
+async function queryStratigraphyDigest(
+  { target, format }: z.infer<typeof stratigraphyDigestInputSchema>,
+) {
+  const records = await getStratigraphyData();
+  if (records.length === 0) throw new RangeError("No indexed stratigraphy records available");
+  const checkedDate = (date: string): string => {
+    const parsed = new Date(`${date}T00:00:00.000Z`);
+    if (!Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== date) {
+      throw new RangeError("target must contain a valid ISO calendar date");
+    }
+    return date;
+  };
+  let indices: number[];
+  if (target === "latest") {
+    indices = [records.length - 1];
+  } else if (/^\d+$/.test(target)) {
+    const height = Number(target);
+    if (!Number.isSafeInteger(height)) throw new RangeError("target height is too large");
+    const index = records.findIndex((_record, i) => snapshotBlock(i, records.length) === height);
+    indices = index < 0 ? [] : [index];
+  } else {
+    const [start, end] = target.split("..").map(checkedDate);
+    if (end !== undefined && start > end) throw new RangeError("target range is reversed");
+    indices = records.flatMap((_record, i) => {
+      const date = snapshotDate(i, records.length);
+      return date >= start && date <= (end ?? start) ? [i] : [];
+    });
+    if (indices.length > 100) throw new RangeError("target range exceeds 100 records");
+  }
+  if (indices.length === 0) throw new RangeError("No indexed stratum matches target");
+  const formatted = indices.map((index) => {
+    const { height, date, targetMultiplier, recordHash } =
+      digestRecord(records[index], index, records.length);
+    if (format === "minimal") return [height, date, targetMultiplier, recordHash];
+    if (format === "kv") return { h: height, ts: date, tm: targetMultiplier, hash: recordHash };
+    return `HEIGHT:${height}|DATE:${date}|TM:${targetMultiplier}|HASH:${recordHash}`;
+  });
+  return target.includes("..") ? formatted : formatted[0];
+}
+
 const baseMcpToolDefinitions = [
   {
     name: "stratigraphy.get",
@@ -846,6 +929,59 @@ const baseMcpToolDefinitions = [
         ),
       },
       required: ["records"],
+    },
+  },
+  {
+    name: "stratigraphy.digest",
+    title: "Get Compressed Stratigraphy Digest",
+    description:
+      "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: {
+      type: "object",
+      description: "Select a daily indexed stratum or bounded date range for compression.",
+      examples: [{ target: "latest", format: "compact" }, { target: "2026-09-01..2026-09-09", format: "kv" }],
+      additionalProperties: false,
+      properties: {
+        target: field(
+          "string",
+          "Indexed Bitcoin height (e.g. '920000'), ISO date, or inclusive ISO date range joined with '..'. Defaults to the latest available dataset entry, not the live Bitcoin tip.",
+          ["latest", "920000", "2026-09-09", "2026-09-01..2026-09-09"],
+          { pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2}(?:\\.\\.\\d{4}-\\d{2}-\\d{2})?)$", default: "latest" },
+        ),
+        format: field(
+          "string",
+          "Compression format: minimal returns [height,date,target_multiplier,record_hash]; kv returns {h,ts,tm,hash}; compact returns HEIGHT:...|DATE:...|TM:...|HASH:.... Record hashes are SHA-256 of stored entry fields, not Bitcoin block hashes; no per-record proof is available.",
+          ["compact", "minimal", "kv"],
+          { enum: ["compact", "minimal", "kv"], default: "compact" },
+        ),
+      },
+      required: [],
+    },
+    outputSchema: {
+      type: "object",
+      description: "Compressed digest plus a flag indicating whether source entries carry per-record proofs; a date range returns an array of results in ascending date order.",
+      examples: [{ result: "HEIGHT:920000|DATE:2026-09-09|TM:125.83|HASH:0123456789abcdef", proofAvailable: false }],
+      additionalProperties: false,
+      properties: {
+        result: field(
+          ["string", "array", "object"],
+          "Selected compact string, minimal array or kv object; a date range returns an array of selected results. The hash is a SHA-256 record fingerprint, not a Bitcoin block hash or ZK proof.",
+          ["HEIGHT:920000|DATE:2026-09-09|TM:125.83|HASH:0123456789abcdef"],
+        ),
+        proofAvailable: field(
+          "boolean",
+          "False for indexed dataset source entries; no per-record ZK proof is stored in this dataset.",
+          [false],
+          { const: false },
+        ),
+      },
+      required: ["result", "proofAvailable"],
     },
   },
   {
@@ -1704,6 +1840,7 @@ const immutabilityNote =
   "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.";
 const exactDescriptionToolNames = new Set([
   "stratigraphy.get",
+  "stratigraphy.digest",
   "proof.get_status",
   "proof.ground",
   "proof.issue_receipt",
@@ -1799,6 +1936,22 @@ function createBitcoinStratigraphyMcpServer(
             },
           ],
         };
+      }
+    }
+    if (request.params.name === "stratigraphy.digest") {
+      const parsed = stratigraphyDigestInputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid digest target or format");
+      }
+      try {
+        const result = await queryStratigraphyDigest(parsed.data);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          structuredContent: { result, proofAvailable: false },
+        };
+      } catch (error) {
+        if (error instanceof RangeError) throw new McpError(ErrorCode.InvalidParams, error.message);
+        throw error;
       }
     }
     if (request.params.name === "stratigraphy.list") {
@@ -2083,6 +2236,7 @@ export function registerMcpRoute(
     "proof.get_status": { amountSats: 10, schema: proofStatusInputSchema },
     "proof.status": { amountSats: 10, schema: proofStatusInputSchema },
     "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
+    "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
     "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
     "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
     "proof.issue_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
@@ -2138,6 +2292,21 @@ export function registerMcpRoute(
     if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
       next();
       return;
+    }
+    if (name === "stratigraphy.digest") {
+      try {
+        await queryStratigraphyDigest(
+          stratigraphyDigestInputSchema.parse(body?.params?.arguments ?? {}),
+        );
+      } catch (error) {
+        if (!(error instanceof RangeError)) return next(error);
+        res.status(400).json({
+          jsonrpc: "2.0",
+          id: typeof body?.id === "string" || typeof body?.id === "number" ? body.id : null,
+          error: { code: -32602, message: error.message },
+        });
+        return;
+      }
     }
     if (name === "mesh.broadcast" && mesh.status().configuredPeerCount === 0) {
       res.status(503).json({

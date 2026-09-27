@@ -23,6 +23,35 @@ tags:
   - name: mesh
     description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
 x-mcp-tools:
+  stratigraphy.digest:
+    description: "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        target:
+          type: string
+          pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2}(?:\\.\\.\\d{4}-\\d{2}-\\d{2})?)$"
+          default: latest
+          description: Indexed height, ISO date or inclusive ISO date range joined with '..'; latest means the newest indexed dataset entry, not the live tip.
+        format:
+          type: string
+          enum: [compact, minimal, kv]
+          default: compact
+          description: Return a delimited string, raw metric array or terse key-value object.
+      required: []
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        result:
+          type: [string, array, object]
+          description: A compressed result, or an array of results for a date range; hash is a deterministic source-record fingerprint, not a Bitcoin block hash or ZK proof.
+        proofAvailable:
+          type: boolean
+          const: false
+          description: False because indexed source entries do not store per-record ZK proofs.
+      required: [result, proofAvailable]
   mesh.get_status:
     description: "Retrieves live P2P mesh network node health, peer connections, and synchronization status."
     legacyNames: [mesh.status]

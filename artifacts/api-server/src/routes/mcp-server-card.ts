@@ -40,6 +40,16 @@ export const mcpServerCard = {
         },
       },
       {
+        name: "stratigraphy.digest",
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+          l402: { amountSats: 250 },
+        },
+      },
+      {
         name: "stratigraphy.list",
         annotations: {
           readOnlyHint: true,

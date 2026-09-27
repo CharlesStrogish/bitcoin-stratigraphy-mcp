@@ -346,6 +346,13 @@ const stratigraphyDiffInputSchema = z.object({
   toTarget: z.string().regex(new RegExp(diffEndTargetPattern)).refine(validDiffTarget).default("latest"),
 }).strict();
 
+const stratigraphyRangeInputSchema = z.object({
+  startTarget: z.string().regex(new RegExp(diffTargetPattern)).refine(validDiffTarget),
+  endTarget: z.string().regex(new RegExp(diffEndTargetPattern)).refine(validDiffTarget).default("latest"),
+  limit: z.number().int().min(1).max(100).default(50),
+  format: z.enum(["compact", "minimal", "kv"]).default("compact"),
+}).strict();
+
 const attenuateInputSchema = z.object({
   macaroon: z.string().min(1).max(8192),
   caveats: z.array(z.string().min(1).max(256)).max(16),
@@ -822,6 +829,13 @@ function indexedStratumIndex(target: string, records: StratumRecord[]): number {
   throw new RangeError(`No indexed stratum matches target: ${target}`);
 }
 
+function formatDigestRecord(record: StratumRecord, index: number, total: number, format: "compact" | "minimal" | "kv") {
+  const { height, date, targetMultiplier, recordHash } = digestRecord(record, index, total);
+  if (format === "minimal") return [height, date, targetMultiplier, recordHash];
+  if (format === "kv") return { h: height, ts: date, tm: targetMultiplier, hash: recordHash };
+  return `HEIGHT:${height}|DATE:${date}|TM:${targetMultiplier}|HASH:${recordHash}`;
+}
+
 async function queryStratigraphyDigest(
   { target, format }: z.infer<typeof stratigraphyDigestInputSchema>,
 ) {
@@ -851,14 +865,27 @@ async function queryStratigraphyDigest(
     if (indices.length > 100) throw new RangeError("target range exceeds 100 records");
   }
   if (indices.length === 0) throw new RangeError("No indexed stratum matches target");
-  const formatted = indices.map((index) => {
-    const { height, date, targetMultiplier, recordHash } =
-      digestRecord(records[index], index, records.length);
-    if (format === "minimal") return [height, date, targetMultiplier, recordHash];
-    if (format === "kv") return { h: height, ts: date, tm: targetMultiplier, hash: recordHash };
-    return `HEIGHT:${height}|DATE:${date}|TM:${targetMultiplier}|HASH:${recordHash}`;
-  });
+  const formatted = indices.map((index) =>
+    formatDigestRecord(records[index], index, records.length, format)
+  );
   return target.includes("..") ? formatted : formatted[0];
+}
+
+async function queryStratigraphyRange({
+  startTarget, endTarget, limit, format,
+}: z.infer<typeof stratigraphyRangeInputSchema>) {
+  const records = await getStratigraphyData();
+  const start = indexedStratumIndex(startTarget, records);
+  const end = indexedStratumIndex(endTarget, records);
+  if (start > end) throw new RangeError("startTarget must not follow endTarget");
+  const formattedRecords = records.slice(start, Math.min(end + 1, start + limit))
+    .map((record, offset) => formatDigestRecord(record, start + offset, records.length, format));
+  return {
+    range: { start: startTarget, end: endTarget },
+    count: formattedRecords.length,
+    format,
+    records: formattedRecords,
+  };
 }
 
 async function queryStratigraphyDiff(
@@ -901,7 +928,7 @@ function normalizedAttenuationCaveats(
     const caveat = `${key}=${value}`;
     if (key === "allowed_tools") {
       const names = value.split(",").map((name) => name.trim());
-      if (names.length > 13 || names.some((name) =>
+      if (names.length > 14 || names.some((name) =>
         !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/.test(name) ||
         !baseMcpToolDefinitions.some((tool) => tool.name === name)
       )) throw new RangeError("allowed_tools must list canonical MCP tools");
@@ -940,6 +967,18 @@ async function withinMcpTargetBound(
     return [fromTarget, toTarget].every((target) =>
       heightAt(indexedStratumIndex(target, records)) <= maxTarget
     );
+  }
+  if (name === "stratigraphy.range") {
+    const { startTarget, endTarget } = stratigraphyRangeInputSchema.parse(args);
+    try {
+      const start = indexedStratumIndex(startTarget, records);
+      const end = indexedStratumIndex(endTarget, records);
+      return start <= end &&
+        heightAt(start) <= maxTarget && heightAt(end) <= maxTarget;
+    } catch (error) {
+      if (error instanceof RangeError) return false;
+      throw error;
+    }
   }
   if (name === "stratigraphy.digest") {
     const { target } = stratigraphyDigestInputSchema.parse(args);
@@ -1196,6 +1235,58 @@ const baseMcpToolDefinitions = [
         },
       },
       required: ["from", "to", "delta"],
+    },
+  },
+  {
+    name: "stratigraphy.range",
+    title: "Get Stratigraphy Range",
+    description:
+      "Retrieve a sequential batch of thermodynamic dataset strata between start and end bounds under a single consolidated query.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: {
+      type: "object",
+      description: "Select an inclusive, ascending range of indexed daily strata. Bounds must match recorded heights or UTC dates; latest refers to the latest indexed entry, not the live Bitcoin tip.",
+      examples: [{ startTarget: "919712", endTarget: "latest", limit: 3, format: "kv" }, { startTarget: "2026-09-08", endTarget: "2026-09-09", format: "minimal" }],
+      additionalProperties: false,
+      properties: {
+        startTarget: field("string", "Starting block height or ISO date string (e.g. '850000' or '2026-01-01').", ["919712", "2026-09-07"], { pattern: diffTargetPattern }),
+        endTarget: field("string", "Ending block height or ISO date string.", ["latest", "920000", "2026-09-09"], { pattern: diffEndTargetPattern, default: "latest" }),
+        limit: field("number", "Maximum number of strata entries to return in the batch.", [50], { minimum: 1, maximum: 100, default: 50 }),
+        format: field("string", "Payload compression format applied to each item in the batch.", ["compact", "minimal", "kv"], { enum: ["compact", "minimal", "kv"], default: "compact" }),
+      },
+      required: ["startTarget"],
+    },
+    outputSchema: {
+      type: "object",
+      description: "Ascending indexed strata between inclusive bounds, truncated at limit. Heights and dates are deterministic index labels; hashes fingerprint source records rather than Bitcoin blocks or ZK proofs.",
+      examples: [{
+        range: { start: "919856", end: "919856" }, count: 1, format: "compact",
+        records: ["HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef"],
+      }],
+      additionalProperties: false,
+      properties: {
+        range: {
+          type: "object", description: "Requested bounds, including default latest if omitted.",
+          examples: [{ start: "919856", end: "latest" }], additionalProperties: false,
+          properties: {
+            start: field("string", "Requested starting target.", ["919856"]),
+            end: field("string", "Requested ending target.", ["latest"]),
+          },
+          required: ["start", "end"],
+        },
+        count: field("integer", "Number of records returned, at most limit.", [2], { minimum: 1, maximum: 100 }),
+        format: field("string", "Compression format of each record.", ["compact"], { enum: ["compact", "minimal", "kv"] }),
+        records: field("array", "Records in ascending indexed order; compact strings, minimal arrays, or terse key-value objects.", [["HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef"]], {
+          minItems: 1, maxItems: 100,
+          items: field(["string", "array", "object"], "One compressed source-record digest.", ["HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef"]),
+        }),
+      },
+      required: ["range", "count", "format", "records"],
     },
   },
   {
@@ -2100,6 +2191,7 @@ const exactDescriptionToolNames = new Set([
   "stratigraphy.get",
   "stratigraphy.digest",
   "stratigraphy.diff",
+  "stratigraphy.range",
   "proof.attenuate",
   "proof.get_status",
   "proof.ground",
@@ -2230,6 +2322,22 @@ function createBitcoinStratigraphyMcpServer(
         return {
           content: [{ type: "text", text: JSON.stringify(result) }],
           structuredContent: result,
+        };
+      } catch (error) {
+        if (error instanceof RangeError) throw new McpError(ErrorCode.InvalidParams, error.message);
+        throw error;
+      }
+    }
+    if (request.params.name === "stratigraphy.range") {
+      const parsed = stratigraphyRangeInputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid range bounds, limit or format");
+      }
+      try {
+        const structuredContent = await queryStratigraphyRange(parsed.data);
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+          structuredContent,
         };
       } catch (error) {
         if (error instanceof RangeError) throw new McpError(ErrorCode.InvalidParams, error.message);
@@ -2532,6 +2640,7 @@ export function registerMcpRoute(
     "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
     "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
     "stratigraphy.diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
+    "stratigraphy.range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
     "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
     "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
     "proof.issue_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
@@ -2658,10 +2767,12 @@ export function registerMcpRoute(
       });
       return;
     }
-    if (name === "stratigraphy.digest" || name === "stratigraphy.diff") {
+    if (name === "stratigraphy.digest" || name === "stratigraphy.diff" || name === "stratigraphy.range") {
       try {
         if (name === "stratigraphy.digest") {
           await queryStratigraphyDigest(stratigraphyDigestInputSchema.parse(body?.params?.arguments ?? {}));
+        } else if (name === "stratigraphy.range") {
+          await queryStratigraphyRange(stratigraphyRangeInputSchema.parse(body?.params?.arguments ?? {}));
         } else {
           await queryStratigraphyDiff(stratigraphyDiffInputSchema.parse(body?.params?.arguments ?? {}));
         }

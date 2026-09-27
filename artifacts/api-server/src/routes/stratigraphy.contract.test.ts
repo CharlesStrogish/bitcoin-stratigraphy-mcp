@@ -64,6 +64,8 @@ const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
 const expectedMcpToolDescriptions: Record<string, string> = {
+  "stratigraphy.range":
+    "Retrieve a sequential batch of thermodynamic dataset strata between start and end bounds under a single consolidated query.",
   "proof.attenuate":
     "Derive attenuated Macaroon sub-tokens with embedded caveats (time-to-live limits, max target bounds, tool restriction) for delegated agent swarms.",
   "stratigraphy.diff":
@@ -1171,6 +1173,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "stratigraphy.get",
       "stratigraphy.digest",
       "stratigraphy.diff",
+      "stratigraphy.range",
       "stratigraphy.list",
       "proof.attenuate",
       "proof.verify",
@@ -1393,6 +1396,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
     "stratigraphy.diff": {
       keys: ["from", "to", "delta"], readOnly: true, idempotent: true, openWorld: false,
+    },
+    "stratigraphy.range": {
+      keys: ["range", "count", "format", "records"],
+      readOnly: true, idempotent: true, openWorld: false,
     },
     "proof.attenuate": {
       keys: ["status", "attenuatedMacaroon", "appliedCaveats", "issuedAt"],
@@ -1991,6 +1998,135 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
   } finally {
     await new Promise<void>((resolve, reject) =>
       diffServer.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test("returns a bounded sequential range for one 250-sat MCP payment", async () => {
+  const rangeApp = express();
+  rangeApp.use(express.json());
+  registerMcpRoute(rangeApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-mcp-secret",
+    revocationStore: createMemoryMacaroonRevocationStore(),
+  });
+  const rangeServer = rangeApp.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => rangeServer.once("listening", resolve));
+  const rangeBase = `http://127.0.0.1:${(rangeServer.address() as AddressInfo).port}`;
+  try {
+    const tools = (await mcpRequestAt(rangeBase, "tools/list")).body.result?.tools;
+    const tool = tools.find((candidate: { name: string }) => candidate.name === "stratigraphy.range");
+    assert.ok(tool);
+    assert.deepEqual(tool.inputSchema.required, ["startTarget"]);
+    assert.equal(tool.inputSchema.properties.endTarget.default, "latest");
+    assert.equal(tool.inputSchema.properties.limit.default, 50);
+    assert.equal(tool.inputSchema.properties.limit.maximum, 100);
+    assert.equal(tool.inputSchema.properties.format.default, "compact");
+    assert.deepEqual(tool.inputSchema.properties.format.enum, ["compact", "minimal", "kv"]);
+    assert.equal(tool.annotations.readOnlyHint, true);
+    assert.equal(tool.annotations.idempotentHint, true);
+
+    const dataset = await readDataset();
+    const fingerprint = (record: typeof dataset[number]) => createHash("sha256").update(JSON.stringify([
+      record.day, record.title, record.video_id, record.transcript_summary,
+      record.quantitative_alpha.target_multiplier,
+      record.quantitative_alpha.difficulty_epoch_progress,
+      record.quantitative_alpha.thermodynamic_signal,
+    ])).digest("hex");
+    const expectedItem = (offset: number, format: "compact" | "minimal" | "kv") => {
+      const record = dataset.at(offset)!;
+      const height = 920000 + (offset + 1) * 144;
+      const date = new Date(Date.UTC(2026, 8, 9) +
+        (offset + 1) * 86_400_000)
+        .toISOString().slice(0, 10);
+      const tm = record.quantitative_alpha.target_multiplier;
+      const hash = fingerprint(record);
+      if (format === "minimal") return [height, date, tm, hash];
+      if (format === "kv") return { h: height, ts: date, tm, hash };
+      return `HEIGHT:${height}|DATE:${date}|TM:${tm}|HASH:${hash}`;
+    };
+    const paidRange = async (args: Record<string, unknown>) => {
+      const params = { name: "stratigraphy.range", arguments: args };
+      const challenge = await mcpRequestAt(rangeBase, "tools/call", params);
+      assert.equal(challenge.response.status, 402);
+      const offer = challenge.body as unknown as { amount_sats: number; macaroon: string; payment_hash: string };
+      assert.equal(offer.amount_sats, 250);
+      const payment = mcpInvoices.get(offer.payment_hash);
+      assert.ok(payment);
+      const paid = await mcpRequestAt(rangeBase, "tools/call", params, undefined,
+        `L402 ${offer.macaroon}:${payment.preimage}`);
+      assert.equal(paid.response.status, 200);
+      assert.deepEqual(paid.body.result?.content.map((item: { type: string }) => item.type), ["text"]);
+      const result = JSON.parse(paid.body.result?.content[0].text);
+      assert.deepEqual(paid.body.result?.structuredContent, result);
+      return result;
+    };
+    assert.deepEqual(await paidRange({ startTarget: "919712" }), {
+      range: { start: "919712", end: "latest" },
+      count: 3, format: "compact",
+      records: [-3, -2, -1].map((index) => expectedItem(index, "compact")),
+    });
+    assert.deepEqual(await paidRange({
+      startTarget: "919712", endTarget: "2026-09-08", limit: 1, format: "minimal",
+    }), {
+      range: { start: "919712", end: "2026-09-08" },
+      count: 1, format: "minimal",
+      records: [expectedItem(-3, "minimal")],
+    });
+    assert.deepEqual(await paidRange({
+      startTarget: "2026-09-08", endTarget: "920000", format: "kv",
+    }), {
+      range: { start: "2026-09-08", end: "920000" },
+      count: 2, format: "kv",
+      records: [expectedItem(-2, "kv"), expectedItem(-1, "kv")],
+    });
+    const oldest = String(920000 - (dataset.length - 1) * 144);
+    const defaultLimit = await paidRange({ startTarget: oldest });
+    assert.equal(defaultLimit.count, 50);
+    assert.equal(defaultLimit.records.length, 50);
+    const maxLimit = await paidRange({ startTarget: oldest, limit: 100 });
+    assert.equal(maxLimit.count, 100);
+    assert.equal(maxLimit.records.length, 100);
+    for (const args of [
+      {}, { startTarget: "2026-02-30" }, { startTarget: "919857" },
+      { startTarget: "920000", endTarget: "919856" },
+      { startTarget: "919856", endTarget: "2026-09-27" },
+      { startTarget: "919856", limit: 101 },
+      { startTarget: "919856", limit: 0 },
+      { startTarget: "919856", limit: 1.5 },
+      { startTarget: "919856", format: "raw" },
+    ]) {
+      const invoiceCount = mcpInvoiceCount;
+      const invalid = await mcpRequestAt(rangeBase, "tools/call", {
+        name: "stratigraphy.range", arguments: args,
+      });
+      assert.ok([200, 400].includes(invalid.response.status));
+      assert.equal(invalid.body.error?.code, -32602);
+      assert.equal(invalid.response.headers.get("www-authenticate"), null);
+      assert.equal(mcpInvoiceCount, invoiceCount);
+    }
+    const params = {
+      name: "stratigraphy.range",
+      arguments: { startTarget: "919856", endTarget: "latest" },
+    };
+    const challenge = await mcpRequestAt(rangeBase, "tools/call", params);
+    assert.equal(challenge.response.status, 402);
+    const offer = challenge.body as unknown as { macaroon: string; payment_hash: string };
+    const payment = mcpInvoices.get(offer.payment_hash);
+    assert.ok(payment);
+    const bounded = attenuateSubscriptionMacaroon(offer.macaroon, ["max_target=919856"]);
+    assert.ok(bounded);
+    const forbidden = await mcpRequestAt(rangeBase, "tools/call", params, undefined,
+      `L402 ${bounded}:${payment.preimage}`);
+    assert.equal(forbidden.response.status, 403);
+    const permitted = await mcpRequestAt(rangeBase, "tools/call", {
+      name: "stratigraphy.range",
+      arguments: { startTarget: "919856", endTarget: "919856" },
+    }, undefined, `L402 ${bounded}:${payment.preimage}`);
+    assert.equal(permitted.response.status, 200);
+    assert.equal(JSON.parse(permitted.body.result?.content[0].text).count, 1);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      rangeServer.close((error) => error ? reject(error) : resolve()));
   }
 });
 

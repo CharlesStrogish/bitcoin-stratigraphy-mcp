@@ -505,22 +505,28 @@ export interface StratigraphyCatalogMcpTool {
   catalog: StratigraphyCatalog;
 }
 
-export type ProofStatusMcpToolIdentifiersItem = typeof ProofStatusMcpToolIdentifiersItem[keyof typeof ProofStatusMcpToolIdentifiersItem];
+export type ProofByHashMcpToolIdentifiersItem = typeof ProofByHashMcpToolIdentifiersItem[keyof typeof ProofByHashMcpToolIdentifiersItem];
 
 
-export const ProofStatusMcpToolIdentifiersItem = {
-  proofHash: 'proofHash',
-  snapshotDigest: 'snapshotDigest',
-  receiptHash: 'receiptHash',
+export const ProofByHashMcpToolIdentifiersItem = {
+  hash: 'hash',
+  jobId: 'jobId',
 } as const;
 
-/**
- * Current proof verification lifecycle state.
- */
-export type ProofStatusStatus = typeof ProofStatusStatus[keyof typeof ProofStatusStatus];
+export type ProofByHashMcpToolExampleResultKind = typeof ProofByHashMcpToolExampleResultKind[keyof typeof ProofByHashMcpToolExampleResultKind];
 
 
-export const ProofStatusStatus = {
+export const ProofByHashMcpToolExampleResultKind = {
+  'zk-proof': 'zk-proof',
+  'dataset-receipt': 'dataset-receipt',
+  'context-receipt': 'context-receipt',
+  'zk-proof-status': 'zk-proof-status',
+} as const;
+
+export type ProofByHashMcpToolExampleResultStatus = typeof ProofByHashMcpToolExampleResultStatus[keyof typeof ProofByHashMcpToolExampleResultStatus];
+
+
+export const ProofByHashMcpToolExampleResultStatus = {
   verified: 'verified',
   cached: 'cached',
   pending: 'pending',
@@ -528,33 +534,39 @@ export const ProofStatusStatus = {
 } as const;
 
 /**
- * Cryptographic verification and publication lifecycle state.
+ * Optional retained proof or signed receipt payload; omitted for status-only records.
  */
-export interface ProofStatus {
-  /** Current proof verification lifecycle state. */
-  status: ProofStatusStatus;
-  /** ISO 8601 timestamp of the latest verification-state observation. */
-  verifiedAt: string;
-  /**
-     * Number of Nostr NIP-78 attestations observed on the snapshot.
-     * @minimum 0
-     */
-  attestationCount: number;
-  /** Whether attestationCount meets the current mesh quorum threshold. */
-  meshQuorum: boolean;
-}
+export type ProofByHashMcpToolExampleResultProofPayload = { [key: string]: unknown };
 
 /**
- * MCP lifecycle query tool registered as proof.get_status. proof.status is a legacy tool name.
+ * A status-only lookup result omits proofPayload when the payload is not retained.
  */
-export interface ProofStatusMcpTool {
+export type ProofByHashMcpToolExampleResult = {
+  kind: ProofByHashMcpToolExampleResultKind;
+  hash: string;
+  /** Submission job ID when a proof payload is retained. */
+  jobId?: string;
+  status: ProofByHashMcpToolExampleResultStatus;
+  timestamp: string;
+  /** @minimum 0 */
+  attestationCount?: number;
+  meshQuorum?: boolean;
+  /** Optional retained proof or signed receipt payload; omitted for status-only records. */
+  proofPayload?: ProofByHashMcpToolExampleResultProofPayload;
+};
+
+/**
+ * MCP proof and lifecycle lookup tool registered as proof.get_by_hash.
+ */
+export interface ProofByHashMcpTool {
   /** Stable MCP tool name used with tools/call. */
-  name: 'proof.get_status';
-  /** Human-readable purpose of the proof lifecycle query. */
+  name: 'proof.get_by_hash';
+  /** Human-readable purpose of the proof and lifecycle lookup. */
   description: string;
-  /** Alternative identifiers accepted by the tool; callers provide exactly one of proofHash, snapshotDigest, or receiptHash. */
-  identifiers: ProofStatusMcpToolIdentifiersItem[];
-  exampleStatus: ProofStatus;
+  /** Alternative lookup keys; provide either hash or jobId. */
+  identifiers: ProofByHashMcpToolIdentifiersItem[];
+  /** A status-only lookup result omits proofPayload when the payload is not retained. */
+  exampleResult: ProofByHashMcpToolExampleResult;
 }
 
 /**
@@ -657,6 +669,8 @@ export const SubmitZkProofResultStatus = {
 export interface SubmitZkProofResult {
   /** Lowercase 0x-prefixed SHA-256 fingerprint of the canonical proof. */
   proofHash: string;
+  /** Server-generated submission job ID accepted by proof.get_by_hash. */
+  jobId: string;
   /** Immediate Groth16 verification result. */
   status: SubmitZkProofResultStatus;
   /** ISO 8601 proof submission timestamp. */
@@ -708,7 +722,7 @@ export interface StratigraphyCost {
   dataset: StratigraphyCostDataset;
   mcp_tool: StratigraphyCostMcpTool;
   catalog_tool: StratigraphyCatalogMcpTool;
-  proof_status_tool: ProofStatusMcpTool;
+  proof_by_hash_tool: ProofByHashMcpTool;
   proof_attestations_tool: ListProofAttestationsMcpTool;
   submit_proof_tool: SubmitZkProofMcpTool;
   response_schema: JsonSchema;

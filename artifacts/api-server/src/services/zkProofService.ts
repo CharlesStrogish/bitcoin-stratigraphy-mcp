@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { groth16 } from "snarkjs";
@@ -73,33 +73,43 @@ const proofAttestationsByHash = new Map<string, ZkProofAttestationRecord>();
 type ArchivedZkProof = {
   kind: "zk-proof";
   hash: string;
+  jobId?: string;
   proofPayload: Record<string, unknown>;
   timestamp: string;
   status: ZkProofLifecycleStatus["status"];
 };
 const proofArchive = new Map<string, ArchivedZkProof>();
+const proofHashByJobId = new Map<string, string>();
 const MAX_PROOF_ARCHIVE_ENTRIES = 128;
 
-function indexZkProofPayload(hash: string, proofPayload: Record<string, unknown>, timestamp: string): void {
+function indexZkProofPayload(hash: string, proofPayload: Record<string, unknown>, timestamp: string, jobId?: string): void {
   // The HTTP JSON limit and snapshot verifier cap payloads; bound retained process memory too.
   if (Buffer.byteLength(JSON.stringify(proofPayload)) > 2_097_152) {
     throw new RangeError("Proof payload exceeds archive limit");
   }
+  const previous = proofArchive.get(hash);
+  if (previous?.jobId) proofHashByJobId.delete(previous.jobId);
   proofArchive.delete(hash);
+  if (jobId) proofHashByJobId.set(jobId, hash);
   proofArchive.set(hash, {
     kind: "zk-proof",
     hash,
+    ...(jobId ? { jobId } : {}),
     proofPayload: structuredClone(proofPayload),
     timestamp,
     status: getZkProofStatus(hash)?.status ?? "pending",
   });
   while (proofArchive.size > MAX_PROOF_ARCHIVE_ENTRIES) {
-    proofArchive.delete(proofArchive.keys().next().value!);
+    const oldestHash = proofArchive.keys().next().value!;
+    const oldest = proofArchive.get(oldestHash)!;
+    if (oldest.jobId) proofHashByJobId.delete(oldest.jobId);
+    proofArchive.delete(oldestHash);
   }
 }
 
 export function getZkProofRecord(hash: string): ArchivedZkProof | undefined {
-  const normalized = `0x${hash.replace(/^0x/i, "").toLowerCase()}`;
+  const normalized = proofHashByJobId.get(hash.toLowerCase()) ??
+    `0x${hash.replace(/^0x/i, "").toLowerCase()}`;
   const archived = proofArchive.get(normalized);
   if (!archived) return undefined;
   const status = getZkProofStatus(normalized)?.status ?? archived.status;
@@ -207,6 +217,7 @@ export async function submitZkProof(input: {
   snapshotDigest?: string;
 }): Promise<{
   proofHash: string;
+  jobId: string;
   status: "verified" | "invalid";
   submittedAt: string;
   attestationStatus: string;
@@ -216,9 +227,11 @@ export async function submitZkProof(input: {
   const fingerprint = `0x${createHash("sha256")
     .update(canonicalProof)
     .digest("hex")}`;
+  const jobId = randomUUID();
   const signalDigest = input.publicSignals[4];
   const identifiers = [
     fingerprint,
+    jobId,
     ...(typeof signalDigest === "string" ? [signalDigest] : []),
     ...(input.snapshotDigest ? [input.snapshotDigest] : []),
   ];
@@ -283,9 +296,10 @@ export async function submitZkProof(input: {
     proof: input.proof,
     publicSignals: input.publicSignals,
     ...(input.snapshotDigest ? { snapshotDigest: input.snapshotDigest } : {}),
-  }, submittedAt);
+  }, submittedAt, jobId);
   return {
     proofHash: fingerprint,
+    jobId,
     status: valid ? "verified" : "invalid",
     submittedAt,
     attestationStatus,

@@ -13,6 +13,8 @@ import type { SubmitZkProofResultStatus } from './submitZkProofResultStatus';
 export interface SubmitZkProofResult {
   /** Lowercase 0x-prefixed SHA-256 fingerprint of the canonical proof. */
   proofHash: string;
+  /** Server-generated submission job ID accepted by proof.get_by_hash. */
+  jobId: string;
   /** Immediate Groth16 verification result. */
   status: SubmitZkProofResultStatus;
   /** ISO 8601 proof submission timestamp. */

@@ -22,7 +22,6 @@ import { parseL402Header } from "../middleware/l402";
 import {
   createEpistemicDatasetReceipt,
   getEpistemicDatasetReceiptByHash,
-  getEpistemicDatasetReceiptStatus,
   indexEpistemicDatasetReceipt,
 } from "../services/epistemicDatasetReceipt";
 import { createL402Middleware } from "../middleware/l402";
@@ -32,6 +31,8 @@ import type { MacaroonUsageStore } from "../lib/macaroon-usage-store";
 import type { RevenueLedger } from "../services/ledger";
 import {
   groundEpistemicContext,
+  getGroundedContextReceipt,
+  indexGroundedContextReceipt,
   type BitcoinTip,
 } from "../services/epistemicGrounding";
 import {
@@ -406,32 +407,58 @@ const proofLifecycleStates = [
 ] as const;
 
 const proofByHashInputSchema = z.object({
-  hash: z.string().regex(/^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/),
-}).strict();
+  hash: z.string().regex(/^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/).optional(),
+  jobId: z.string().uuid().optional(),
+}).strict().refine(({ hash, jobId }) => (hash === undefined) !== (jobId === undefined), {
+  message: "Provide exactly one hash or jobId",
+});
 
 const paymentInfoInputSchema = z.object({
   toolName: z.string().min(1).optional(),
 }).strict();
 
 type ArchivedProofLookup = {
-  kind: "zk-proof" | "dataset-receipt";
+  kind: "zk-proof" | "dataset-receipt" | "context-receipt" | "zk-proof-status";
   hash: string;
   status: "verified" | "cached" | "pending" | "invalid";
   timestamp: string;
-  proofPayload: Record<string, unknown>;
+  proofPayload?: Record<string, unknown>;
+  attestationCount?: number;
+  meshQuorum?: boolean;
+  jobId?: string;
 };
 
-function findArchivedProof(hash: string): ArchivedProofLookup | undefined {
+function findArchivedProof(hash: string, quorumThreshold: number): ArchivedProofLookup | undefined {
   const proof = getZkProofRecord(hash);
   if (proof) return proof;
   const receipt = getEpistemicDatasetReceiptByHash(hash);
-  if (!receipt) return undefined;
-  return {
+  if (receipt) return {
     kind: "dataset-receipt",
     hash: receipt.receiptHash,
     status: "verified",
     timestamp: receipt.timestamp,
     proofPayload: receipt,
+  };
+  const contextReceipt = getGroundedContextReceipt(hash);
+  if (contextReceipt) return {
+    kind: "context-receipt",
+    hash: contextReceipt.contextHash,
+    status: "verified",
+    timestamp: new Date(contextReceipt.timestamp).toISOString(),
+    proofPayload: contextReceipt,
+  };
+  const history = getZkProofStatus(hash) ??
+    (/^(?:0x)?[0-9a-fA-F]{64}$/.test(hash)
+      ? getZkProofStatus(`0x${hash.replace(/^0x/i, "").toLowerCase()}`)
+      : undefined);
+  if (!history) return undefined;
+  return {
+    kind: "zk-proof-status",
+    hash,
+    status: history.status,
+    timestamp: history.verifiedAt,
+    attestationCount: history.attestationCount,
+    meshQuorum: history.attestationCount >= quorumThreshold,
   };
 }
 
@@ -531,6 +558,7 @@ const epistemicDatasetInputSchema = z.object({
     "Optional non-secret JSON context bound to the signed receipt (maximum 16 KiB together with the other metadata).",
   ),
 }).strict().describe("Dataset CID and optional publication context for a Bitcoin-tip signed receipt.");
+const proofGroundInputSchema = z.union([groundContextInputSchema, epistemicDatasetInputSchema]);
 
 const field = (
   type: string | string[],
@@ -1463,7 +1491,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Verify a base64url Groth16/Poseidon BN254 proof against required publicInputs, verificationKeyId, and telemetry data; use this tool for transient proof testing, not for proof submission or Nostr publication (use proof.submit). Returns a JSON object with boolean valid, ISO verifiedAt, and computationTimeMs; a cryptographic or snapshot mismatch returns valid false rather than publishing a proof. This 250-sat L402 call updates only bounded process-memory verification indexes, shares a 60-requests-per-minute IP limit, and rejects malformed inputs with JSON-RPC -32602.",
+      "Perform offline/stateless zk-SNARK verification. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`).",
     annotations: proofVerificationToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1636,7 +1664,7 @@ const baseMcpToolDefinitions = [
     name: "proof.get_by_hash",
     title: "Get Proof or Receipt by Hash",
     description:
-      "Retrieve a specific ZK-SNARK proof record, cryptographic receipt, or anchored IPFS CID directly by its hash fingerprint.",
+      "Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1645,22 +1673,23 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Look up a retained proof by SHA-256 proof hash, or a signed dataset anchor by receipt hash or exact CID. Unknown or evicted payloads return HTTP 404 before payment.",
+      description: "Look up a proof hash, signed receipt hash or CID, decimal snapshot digest, or proof submission job ID. Unknown identifiers return HTTP 404 before payment.",
       examples: [{ hash: `0x${"ab".repeat(32)}` }, { hash: "Qm" + "a".repeat(44) }],
       additionalProperties: false,
       properties: {
         hash: field(
           "string",
-          "Cryptographic hash or IPFS CID of the target proof or receipt.",
+          "Cryptographic hash, snapshot digest, IPFS CID, or submission job ID to query.",
           [`0x${"ab".repeat(32)}`, "Qm" + "a".repeat(44)],
-          { pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$" },
+          { pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$" },
         ),
+        jobId: field("string", "UUID returned by proof.submit; use instead of hash.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
       },
-      required: ["hash"],
+      oneOf: [{ required: ["hash"] }, { required: ["jobId"] }],
     },
     outputSchema: {
       type: "object",
-      description: "A payload retained in bounded process memory. Submitted proof coordinates and signals do not imply the original signed snapshot is archived; verification lookups include their original data. Signed dataset anchors are receipts, not ZK proofs.",
+      description: "Exact retained proof or signed receipt, or lifecycle-only status when the original payload is unavailable. No payload is reconstructed from a digest.",
       examples: [{
         kind: "zk-proof", hash: `0x${"ab".repeat(32)}`, status: "verified",
         timestamp: "2026-09-27T21:00:00.000Z",
@@ -1668,10 +1697,13 @@ const baseMcpToolDefinitions = [
       }],
       additionalProperties: false,
       properties: {
-        kind: field("string", "Distinguishes a ZK proof from a signed Bitcoin-tip dataset receipt.", ["zk-proof"], { enum: ["zk-proof", "dataset-receipt"] }),
+        kind: field("string", "Distinguishes ZK proofs, signed receipts, and lifecycle-only status.", ["zk-proof"], { enum: ["zk-proof", "dataset-receipt", "context-receipt", "zk-proof-status"] }),
         hash: field("string", "Canonical proof or receipt hash. CID lookups return the matching receipt hash.", [`0x${"ab".repeat(32)}`]),
         status: field("string", "Current indexed lifecycle status.", ["verified"], { enum: ["verified", "cached", "pending", "invalid"] }),
         timestamp: field("string", "Original submission, verification, or receipt creation time.", ["2026-09-27T21:00:00.000Z"], { format: "date-time" }),
+        jobId: field("string", "Submission job identifier when an exact submitted proof payload is retained.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
+        attestationCount: field("integer", "NIP-78 attestation count for lifecycle-only lookups.", [0], { minimum: 0 }),
+        meshQuorum: field("boolean", "Whether current mesh quorum is met for lifecycle-only lookups.", [false]),
         proofPayload: {
           type: "object", description: "Exact retained proof input or signed receipt; do not infer missing snapshot data from a submitted proof.",
           examples: [{ proof: { pi_a: ["1"] }, publicSignals: ["1", "2", "3", "4", "5"] }],
@@ -1679,7 +1711,7 @@ const baseMcpToolDefinitions = [
           properties: {},
         },
       },
-      required: ["kind", "hash", "status", "timestamp", "proofPayload"],
+      required: ["kind", "hash", "status", "timestamp"],
     },
   },
   {
@@ -1824,7 +1856,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "Submit Groth16/BN254 proof coordinates and five ordered publicSignals for verification and possible Nostr NIP-78 publication; use this tool to record an attestation, not for transient proof testing (use proof.verify). Returns a JSON object with proofHash, verified or invalid status, ISO submittedAt, and attestationStatus indicating whether Nostr NIP-78 publication succeeded or was skipped; the bounded process-memory lifecycle index is not durable. This state-changing 250-sat L402 call shares a 60-requests-per-minute IP limit, accepts legacy pi_a/pi_b/pi_c input for existing clients, and rejects malformed fields with JSON-RPC -32602.",
+      "Submit new ZK proof instances to process memory. Do NOT use to verify existing proofs (use `proof.verify`).",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1948,6 +1980,7 @@ const baseMcpToolDefinitions = [
       examples: [{
         proofHash:
           "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+        jobId: "123e4567-e89b-42d3-a456-426614174000",
         status: "verified",
         submittedAt: "2026-09-19T06:20:00.000Z",
         attestationStatus: "broadcast_confirmed",
@@ -1961,6 +1994,7 @@ const baseMcpToolDefinitions = [
             "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
           ],
         ),
+        jobId: field("string", "Server-generated proof submission job ID for status lookup.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
         status: field(
           "string",
           "Immediate Groth16 verification result for the submitted proof and public signals.",
@@ -1981,6 +2015,7 @@ const baseMcpToolDefinitions = [
       },
       required: [
         "proofHash",
+        "jobId",
         "status",
         "submittedAt",
         "attestationStatus",
@@ -1991,7 +2026,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "Anchor live agent execution state, system prompts, or runtime context to the current Bitcoin block height. Use this tool ONLY for runtime agent execution grounding. Do NOT use to anchor static dataset CIDs or off-chain files (use `proof.issue_receipt`).",
+      "Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT use for stateless proof verification without anchoring (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`).",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2106,7 +2141,7 @@ const baseMcpToolDefinitions = [
       properties: {
         cid: {
           type: "string",
-          description: "Target IPFS CID or 32-byte hex dataset hash anchored directly to the live Bitcoin block height.",
+          description: "Target IPFS CID or 32-byte hex dataset hash anchored directly to the live Bitcoin block height. Example: a 64-character lowercase hex digest.",
           example: "ab".repeat(32),
           examples: ["ab".repeat(32)],
           pattern: "^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$",
@@ -2114,14 +2149,14 @@ const baseMcpToolDefinitions = [
         },
         nostrEventId: {
           type: "string",
-          description: "Optional Nostr event ID linked into the signed receipt payload to bind off-chain publications to the block tip.",
+          description: "Optional Nostr event ID linked into the signed receipt payload to bind off-chain publications to the block tip. Example: a 64-character lowercase hex event ID.",
           example: "ab".repeat(32),
           examples: ["ab".repeat(32)],
           pattern: "^[0-9a-fA-F]{64}$",
         },
         context: {
           type: "object",
-          description: "Optional JSON metadata object bound into the signed receipt tuple for additional execution context.",
+          description: "Optional JSON metadata object bound into the signed receipt tuple for additional execution context. Example: {\"source\":\"dataset\"}.",
           example: { source: "dataset" },
           examples: [{ source: "dataset" }],
           additionalProperties: true,
@@ -2344,39 +2379,69 @@ const exactDescriptionToolNames = new Set([
   "stratigraphy.diff",
   "stratigraphy.range",
   "proof.attenuate",
-  "proof.get_status",
   "proof.get_by_hash",
   "proof.ground",
-  "proof.issue_receipt",
+  "proof.verify",
+  "proof.submit",
   "mesh.get_status",
   "mesh.broadcast",
 ]);
-const mcpToolDefinitions = baseMcpToolDefinitions.map((tool) =>
-  tool.name.startsWith("stratigraphy.") || tool.name.startsWith("proof.") ||
-    tool.name === "mesh.broadcast"
-    ? {
-        ...tool,
-        description: exactDescriptionToolNames.has(tool.name)
-          ? tool.description
-          : `${tool.description} ${immutabilityNote}`,
-      }
-    : tool
-);
+const datasetReceiptDefinition = baseMcpToolDefinitions.find((tool) => tool.name === "proof.issue_receipt")!;
+const mcpToolDefinitions = baseMcpToolDefinitions
+  .filter((tool) => tool.name !== "proof.get_status" && tool.name !== "proof.issue_receipt")
+  .map((tool) => {
+    const merged = tool.name === "proof.ground"
+      ? {
+          ...tool,
+          inputSchema: {
+            type: "object",
+            description: "Provide contextHash and agentId to ground live agent context, or cid to anchor a dataset; the modes are exclusive.",
+            examples: [...tool.inputSchema.examples, ...datasetReceiptDefinition.inputSchema.examples],
+            additionalProperties: false,
+            properties: { ...tool.inputSchema.properties, ...datasetReceiptDefinition.inputSchema.properties },
+            oneOf: [{ required: ["contextHash", "agentId"] }, { required: ["cid"] }],
+          },
+          outputSchema: {
+            type: "object",
+            description: "Signed context or dataset receipt anchored to the current Bitcoin tip.",
+            examples: [
+              { receipt: (tool.outputSchema.examples[0] as { receipt: unknown }).receipt },
+              { receipt: datasetReceiptDefinition.outputSchema.examples[0] },
+            ],
+            additionalProperties: false,
+            properties: {
+              receipt: {
+                type: "object",
+                description: "Full signed context receipt or signed dataset receipt wrapper. Example: a signed Bitcoin-tip anchor.",
+                examples: [(tool.outputSchema.examples[0] as { receipt: unknown }).receipt],
+                oneOf: [(tool.outputSchema.properties as Record<string, unknown>).receipt, datasetReceiptDefinition.outputSchema],
+              },
+            },
+            required: ["receipt"],
+          },
+        }
+      : tool;
+    return tool.name.startsWith("stratigraphy.") || tool.name.startsWith("proof.") ||
+      tool.name === "mesh.broadcast"
+      ? {
+          ...merged,
+          description: exactDescriptionToolNames.has(tool.name)
+            ? tool.description
+            : `${tool.description} ${immutabilityNote}`,
+        }
+      : merged;
+  });
 
 const paidTools = {
   "stratigraphy.list": { amountSats: 10, schema: stratigraphyCatalogInputSchema },
   "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
-  "proof.get_status": { amountSats: 10, schema: proofStatusInputSchema },
-  "proof.status": { amountSats: 10, schema: proofStatusInputSchema },
   "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
   "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
   "stratigraphy.diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
   "stratigraphy.range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
   "proof.get_by_hash": { amountSats: 250, schema: proofByHashInputSchema },
   "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
-  "proof.ground": { amountSats: 250, schema: groundContextInputSchema },
-  "proof.issue_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
-  "proof.epistemic_receipt": { amountSats: 250, schema: epistemicDatasetInputSchema },
+  "proof.ground": { amountSats: 250, schema: proofGroundInputSchema },
   "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
   "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
 } as const;
@@ -2389,8 +2454,6 @@ const mcpToolPrices = Object.fromEntries(mcpToolDefinitions.map((tool) => [
 
 const legacyToolNames = {
   "mesh.status": "mesh.get_status",
-  "proof.status": "proof.get_status",
-  "proof.epistemic_receipt": "proof.issue_receipt",
 } as const;
 
 function canonicalToolName(name: string): string {
@@ -2438,6 +2501,9 @@ function createBitcoinStratigraphyMcpServer(
   server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const args = request.params.arguments ?? {};
     const name = canonicalToolName(request.params.name);
+    if (!mcpToolDefinitions.some((tool) => tool.name === name)) {
+      throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
+    }
     if (request.params.name === "stratigraphy.get") {
       const parsed = stratigraphyInputSchema.safeParse(args);
       if (!parsed.success) {
@@ -2561,34 +2627,6 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent,
       };
     }
-    if (name === "proof.get_status") {
-      const parsed = proofStatusInputSchema.safeParse(args);
-      if (!parsed.success) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          "Provide exactly one proofHash, snapshotDigest, or receiptHash",
-        );
-      }
-      const receiptVerifiedAt = parsed.data.receiptHash
-        ? getEpistemicDatasetReceiptStatus(parsed.data.receiptHash)
-        : undefined;
-      const history = parsed.data.receiptHash
-        ? receiptVerifiedAt
-          ? { status: "verified" as const, verifiedAt: receiptVerifiedAt, attestationCount: 0 }
-          : undefined
-        : getZkProofStatus(parsed.data.proofHash ?? parsed.data.snapshotDigest!);
-      const attestationCount = history?.attestationCount ?? 0;
-      const structuredContent = {
-        status: history?.status ?? "pending",
-        verifiedAt: history?.verifiedAt ?? new Date().toISOString(),
-        attestationCount,
-        meshQuorum: attestationCount >= mesh.status().quorumThreshold,
-      };
-      return {
-        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
-        structuredContent,
-      };
-    }
     if (name === "proof.get_by_hash") {
       if (!proofByHashInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid proof or receipt hash");
@@ -2668,33 +2706,28 @@ function createBitcoinStratigraphyMcpServer(
       };
     }
     if (request.params.name === "proof.ground") {
-      const parsed = groundContextInputSchema.safeParse(args);
+      const parsed = proofGroundInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(
           ErrorCode.InvalidParams,
           "Invalid epistemic grounding request",
         );
       }
-      if (!groundReceipt) {
-        throw new McpError(ErrorCode.InternalError, "Grounding receipt is unavailable");
+      if ("cid" in parsed.data) {
+        if (!datasetReceipt) {
+          throw new McpError(ErrorCode.InternalError, "Signed dataset receipt is unavailable");
+        }
+        indexEpistemicDatasetReceipt(datasetReceipt);
+      } else {
+        if (!groundReceipt) {
+          throw new McpError(ErrorCode.InternalError, "Grounding receipt is unavailable");
+        }
+        indexGroundedContextReceipt(groundReceipt);
       }
-      const structuredContent = { receipt: groundReceipt };
+      const structuredContent = { receipt: "cid" in parsed.data ? datasetReceipt! : groundReceipt! };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
-      };
-    }
-    if (name === "proof.issue_receipt") {
-      if (!epistemicDatasetInputSchema.safeParse(args).success) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid dataset receipt request");
-      }
-      if (!datasetReceipt) {
-        throw new McpError(ErrorCode.InternalError, "Signed dataset receipt is unavailable");
-      }
-      indexEpistemicDatasetReceipt(datasetReceipt);
-      return {
-        content: [{ type: "text", text: JSON.stringify(datasetReceipt) }],
-        structuredContent: datasetReceipt,
       };
     }
     if (name === "mesh.get_status") {
@@ -2955,8 +2988,8 @@ export function registerMcpRoute(
       return;
     }
     if (name === "proof.get_by_hash") {
-      const hash = proofByHashInputSchema.parse(body?.params?.arguments ?? {}).hash;
-      const found = findArchivedProof(hash);
+      const lookup = proofByHashInputSchema.parse(body?.params?.arguments ?? {});
+      const found = findArchivedProof(lookup.hash ?? lookup.jobId!, mesh.status().quorumThreshold);
       if (!found) {
         res.status(404).json({
           jsonrpc: "2.0",
@@ -3011,47 +3044,41 @@ export function registerMcpRoute(
       return;
     }
     if (name === "proof.ground") {
-      const input = groundContextInputSchema.parse(body!.params?.arguments ?? {});
-      if (input.metadata && Buffer.byteLength(JSON.stringify(input.metadata)) > 16_384) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: { code: -32602, message: "Grounding metadata exceeds 16 KiB" },
-          id: typeof (body as { id?: unknown }).id === "number" ? (body as { id: number }).id : null,
-        });
-        return;
-      }
-      try {
-        res.locals.epistemicAnchorReceipt = await groundEpistemicContext(input, {
-          readBitcoinTip: options.readBitcoinTip,
-        });
-      } catch (error) {
-        req.log?.warn({ err: error }, "MCP epistemic grounding preflight failed");
-        res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
-        return;
-      }
-    }
-    if (canonicalToolName(name) === "proof.issue_receipt") {
-      const input = epistemicDatasetInputSchema.parse(body!.params?.arguments ?? {});
-      if (Buffer.byteLength(JSON.stringify({
-        cid: input.cid,
-        nostrEventId: input.nostrEventId,
-        context: input.context,
-      })) > 16_384) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: { code: -32602, message: "Dataset receipt metadata exceeds 16 KiB" },
-          id: typeof body?.id === "number" ? body.id : null,
-        });
-        return;
-      }
-      try {
-        res.locals.epistemicDatasetReceipt = await createEpistemicDatasetReceipt(input, {
-          readBitcoinTip: options.readBitcoinTip,
-        });
-      } catch (error) {
-        req.log?.warn({ err: error }, "MCP dataset receipt preflight failed");
-        res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
-        return;
+      const input = proofGroundInputSchema.parse(body!.params?.arguments ?? {});
+      if ("cid" in input) {
+        if (Buffer.byteLength(JSON.stringify(input)) > 16_384) {
+          res.status(400).json({
+            jsonrpc: "2.0", id: body?.id ?? null,
+            error: { code: -32602, message: "Dataset receipt metadata exceeds 16 KiB" },
+          });
+          return;
+        }
+        try {
+          res.locals.epistemicDatasetReceipt = await createEpistemicDatasetReceipt(input, {
+            readBitcoinTip: options.readBitcoinTip,
+          });
+        } catch (error) {
+          req.log?.warn({ err: error }, "MCP dataset receipt preflight failed");
+          res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
+          return;
+        }
+      } else {
+        if (input.metadata && Buffer.byteLength(JSON.stringify(input.metadata)) > 16_384) {
+          res.status(400).json({
+            jsonrpc: "2.0", id: body?.id ?? null,
+            error: { code: -32602, message: "Grounding metadata exceeds 16 KiB" },
+          });
+          return;
+        }
+        try {
+          res.locals.epistemicAnchorReceipt = await groundEpistemicContext(input, {
+            readBitcoinTip: options.readBitcoinTip,
+          });
+        } catch (error) {
+          req.log?.warn({ err: error }, "MCP epistemic grounding preflight failed");
+          res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
+          return;
+        }
       }
     }
     gates[name](req, res, next);

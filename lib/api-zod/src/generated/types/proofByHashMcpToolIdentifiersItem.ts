@@ -6,15 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-/**
- * Current proof verification lifecycle state.
- */
-export type ProofStatusStatus = typeof ProofStatusStatus[keyof typeof ProofStatusStatus];
+export type ProofByHashMcpToolIdentifiersItem = typeof ProofByHashMcpToolIdentifiersItem[keyof typeof ProofByHashMcpToolIdentifiersItem];
 
 
-export const ProofStatusStatus = {
-  verified: 'verified',
-  cached: 'cached',
-  pending: 'pending',
-  invalid: 'invalid',
+export const ProofByHashMcpToolIdentifiersItem = {
+  hash: 'hash',
+  jobId: 'jobId',
 } as const;

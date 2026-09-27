@@ -97,15 +97,6 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "proof.get_status",
-        annotations: {
-          readOnlyHint: true,
-          destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: false,
-        },
-      },
-      {
         name: "proof.get_by_hash",
         annotations: {
           readOnlyHint: true,
@@ -135,20 +126,6 @@ export const mcpServerCard = {
       },
       {
         name: "proof.ground",
-        annotations: {
-          readOnlyHint: false,
-          destructiveHint: false,
-          idempotentHint: false,
-          openWorldHint: true,
-          l402: {
-            endpoint: "POST /mcp",
-            amountSats: 250,
-          },
-          verificationEndpoint: "POST /api/v1/zk/verify",
-        },
-      },
-      {
-        name: "proof.issue_receipt",
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,

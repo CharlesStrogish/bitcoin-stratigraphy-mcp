@@ -7,6 +7,24 @@ const DEFAULT_MEMPOOL_API = "https://mempool.space/api";
 const MAX_RESPONSE_BYTES = 4_096;
 const HEX_32 = /^[0-9a-f]{64}$/;
 const RECEIPT_SCHEMA = "bitcoin-stratigraphy/epistemic-anchor/v1";
+const contextReceiptIndex = new Map<string, Awaited<ReturnType<typeof groundEpistemicContext>>>();
+const MAX_CONTEXT_RECEIPTS = 1_000;
+
+export function indexGroundedContextReceipt(receipt: Awaited<ReturnType<typeof groundEpistemicContext>>): void {
+  if (!verifyEpistemicAnchorReceipt(receipt)) {
+    throw new Error("Cannot index an invalid signed context receipt");
+  }
+  contextReceiptIndex.delete(receipt.contextHash);
+  contextReceiptIndex.set(receipt.contextHash, structuredClone(receipt));
+  while (contextReceiptIndex.size > MAX_CONTEXT_RECEIPTS) {
+    contextReceiptIndex.delete(contextReceiptIndex.keys().next().value!);
+  }
+}
+
+export function getGroundedContextReceipt(hash: string): Awaited<ReturnType<typeof groundEpistemicContext>> | undefined {
+  const receipt = contextReceiptIndex.get(hash.replace(/^0x/i, "").toLowerCase());
+  return receipt ? structuredClone(receipt) : undefined;
+}
 
 function validateBitcoinTip(tip: BitcoinTip): BitcoinTip {
   if (

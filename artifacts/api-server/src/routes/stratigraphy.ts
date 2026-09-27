@@ -1311,14 +1311,17 @@ export function registerStratigraphyRoutes(
           },
         },
       },
-      proof_status_tool: {
-        name: "proof.get_status",
+      proof_by_hash_tool: {
+        name: "proof.get_by_hash",
         description:
-          "Query the cryptographic attestation status, verification cache history, and Nostr NIP-78 publication state of a previously submitted zk-SNARK proof digest or snapshot CID.",
-        identifiers: ["proofHash", "snapshotDigest"],
-        exampleStatus: {
+          "Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors.",
+        identifiers: ["hash", "jobId"],
+        exampleResult: {
+          kind: "zk-proof",
+          hash:
+            "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
           status: "pending",
-          verifiedAt: new Date(calculatedAt).toISOString(),
+          timestamp: new Date(calculatedAt).toISOString(),
           attestationCount: 0,
           meshQuorum: false,
         },
@@ -1367,6 +1370,7 @@ export function registerStratigraphyRoutes(
         exampleResult: {
           proofHash:
             "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+          jobId: "123e4567-e89b-42d3-a456-426614174000",
           status: "verified",
           submittedAt: new Date(calculatedAt).toISOString(),
           attestationStatus: "broadcast_confirmed",

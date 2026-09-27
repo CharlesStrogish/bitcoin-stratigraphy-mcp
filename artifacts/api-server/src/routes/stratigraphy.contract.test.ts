@@ -65,7 +65,7 @@ const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
 const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
-    "Retrieve a specific ZK-SNARK proof record, cryptographic receipt, or anchored IPFS CID directly by its hash fingerprint.",
+    "Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors.",
   "payment.info":
     "Inspect L402 payment requirements, per-tool satoshi pricing, invoice challenge parameters, and Macaroon authentication requirements.",
   "stratigraphy.range":
@@ -76,18 +76,18 @@ const expectedMcpToolDescriptions: Record<string, string> = {
     "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call.",
   "stratigraphy.digest":
     "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot.",
-  "proof.issue_receipt":
-    "Issue a signed Bitcoin-tip receipt binding an IPFS dataset CID or hash to the active block height. Use this tool ONLY to anchor static dataset payloads for off-chain verification. Do NOT use for live agent execution state grounding (use `proof.ground`), ZK proof submission (use `proof.submit`), or checking attestation status (use `proof.get_status`).",
   "proof.ground":
-    "Anchor live agent execution state, system prompts, or runtime context to the current Bitcoin block height. Use this tool ONLY for runtime agent execution grounding. Do NOT use to anchor static dataset CIDs or off-chain files (use `proof.issue_receipt`).",
+    "Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT use for stateless proof verification without anchoring (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`).",
+  "proof.verify":
+    "Perform offline/stateless zk-SNARK verification. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`).",
+  "proof.submit":
+    "Submit new ZK proof instances to process memory. Do NOT use to verify existing proofs (use `proof.verify`).",
   "mesh.broadcast":
     "Ingests local node telemetry payloads and broadcasts telemetry snapshots across the P2P mesh network.",
   "stratigraphy.get":
     "Retrieves complete stratigraphy dataset payloads, thermodynamic metrics, and full cryptographic proof content for a target block height.",
   "mesh.get_status":
     "Retrieves live P2P mesh network node health, peer connections, and synchronization status.",
-  "proof.get_status":
-    "Retrieves the verification status, timestamp, and attestation records of a submitted proof hash.",
 };
 
 type OpenApiDocument = {
@@ -462,7 +462,6 @@ async function mcpRequest(method: string, params?: Record<string, unknown>, targ
     const expected = [
       "stratigraphy.list",
       "proof.list",
-      "proof.get_status",
       "proof.status",
     ].includes(String(params?.name))
       ? 10 : 250;
@@ -554,10 +553,11 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: "payment.info", arguments: {},
     }, url);
     const prices = paymentInfo.result?.structuredContent.perToolSats;
-    assert.equal(Object.keys(prices).length, 16);
+    assert.equal(Object.keys(prices).length, 14);
     assert.equal(paymentInfo.result?.structuredContent.standardInvoiceSats, 250);
     assert.equal(prices["proof.get_by_hash"], 250);
-    assert.equal(prices["proof.get_status"], 10);
+    assert.equal(Object.hasOwn(prices, "proof.get_status"), false);
+    assert.equal(Object.hasOwn(prices, "proof.issue_receipt"), false);
     assert.equal(prices["payment.info"], 0);
     assert.equal(prices["mesh.get_status"], 0);
     assert.equal(paymentInfo.result?.structuredContent.invoiceExpirySeconds, 3600);
@@ -573,9 +573,12 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
 
     const cid = "Qm" + "a".repeat(44);
     const issued = await mcpRequest("tools/call", {
-      name: "proof.issue_receipt", arguments: { cid },
+      name: "proof.ground", arguments: { cid, context: { purpose: "lookup-test" } },
     }, url);
-    const receipt = issued.result?.structuredContent;
+    const receipt = issued.result?.structuredContent.receipt;
+    const signedReceipt = JSON.parse(receipt.attestation.proofPayload);
+    assert.equal(receipt.ipfsCid, cid);
+    assert.equal(signedReceipt.payload.metadata.cid, cid);
     assert.equal(verifyEpistemicDatasetReceipt(receipt), true);
     for (const hash of [receipt.receiptHash, cid]) {
       const found = await mcpRequest("tools/call", {
@@ -633,7 +636,7 @@ test("MCP L402 challenges bind price and tool, while discovery and mesh stay fre
     assert.equal(response.headers.get("www-authenticate"), null);
   }
 
-  const lowArgs = { name: "proof.get_status", arguments: { snapshotDigest: "1" } };
+  const lowArgs = { name: "proof.list", arguments: { limit: 10 } };
   const { response: lowResponse, body: lowChallenge } = await mcpRequestAt(baseUrl, "tools/call", lowArgs);
   assert.equal(lowResponse.status, 402);
   assert.equal((lowChallenge as any).amount_sats, 10);
@@ -677,129 +680,37 @@ test("MCP L402 challenges bind price and tool, while discovery and mesh stay fre
   );
   assert.equal(replay.status, 429);
 
-  const legacyStatusArgs = {
-    name: "proof.status",
-    arguments: { snapshotDigest: "1" },
-  };
-  const { response: legacyStatusChallengeResponse, body: legacyStatusChallenge } =
-    await mcpRequestAt(baseUrl, "tools/call", legacyStatusArgs);
-  assert.equal(legacyStatusChallengeResponse.status, 402);
-  assert.equal((legacyStatusChallenge as any).amount_sats, 10);
-  const legacyStatusPayment = mcpInvoices.get(
-    (legacyStatusChallenge as any).payment_hash,
-  );
-  assert.ok(legacyStatusPayment);
-  const legacyStatusAuthorization =
-    `L402 ${(legacyStatusChallenge as any).macaroon}:${legacyStatusPayment.preimage}`;
-  const { response: canonicalStatusWithLegacyMacaroon } = await mcpRequestAt(
-    baseUrl,
-    "tools/call",
-    lowArgs,
-    undefined,
-    legacyStatusAuthorization,
-  );
-  assert.equal(
-    canonicalStatusWithLegacyMacaroon.status,
-    402,
-    "Legacy proof.status payment scope must not authorize proof.get_status",
-  );
-  const { response: legacyStatusPaidResponse, body: legacyStatusPaid } =
-    await mcpRequestAt(
-      baseUrl,
-      "tools/call",
-      legacyStatusArgs,
-      undefined,
-      legacyStatusAuthorization,
-    );
-  assert.equal(legacyStatusPaidResponse.status, 200);
-  assert.equal(
-    legacyStatusPaid.result?.structuredContent.status,
-    "pending",
-  );
-
-  // Legacy names remain callable, but are intentionally absent from discovery.
-  // In particular, the paid receipt alias must retain the canonical 250-sat
-  // price and dispatch to the signed dataset-receipt implementation.
-  const legacyReceiptArgs = {
-    name: "proof.epistemic_receipt",
-    arguments: { cid: "ef".repeat(32) },
-  };
-  const { response: legacyReceiptChallengeResponse, body: legacyReceiptChallenge } =
-    await mcpRequestAt(baseUrl, "tools/call", legacyReceiptArgs);
-  assert.equal(legacyReceiptChallengeResponse.status, 402);
-  assert.equal((legacyReceiptChallenge as any).amount_sats, 250);
-  const legacyReceiptPayment = mcpInvoices.get(
-    (legacyReceiptChallenge as any).payment_hash,
-  );
-  assert.ok(legacyReceiptPayment);
-  const legacyReceiptAuthorization =
-    `L402 ${(legacyReceiptChallenge as any).macaroon}:${legacyReceiptPayment.preimage}`;
-  const { response: canonicalReceiptWithLegacyMacaroon } = await mcpRequestAt(
-    baseUrl,
-    "tools/call",
-    {
-      name: "proof.issue_receipt",
-      arguments: { cid: "ef".repeat(32) },
-    },
-    undefined,
-    legacyReceiptAuthorization,
-  );
-  assert.equal(
-    canonicalReceiptWithLegacyMacaroon.status,
-    402,
-    "Legacy proof.epistemic_receipt payment scope must not authorize proof.issue_receipt",
-  );
-  const { response: legacyReceiptPaidResponse, body: legacyReceiptPaid } =
-    await mcpRequestAt(
-      baseUrl,
-      "tools/call",
-      legacyReceiptArgs,
-      undefined,
-      legacyReceiptAuthorization,
-    );
-  assert.equal(legacyReceiptPaidResponse.status, 200);
-  assert.equal(
-    legacyReceiptPaid.result?.structuredContent.ipfsCid,
-    "ef".repeat(32),
-  );
-  const { response: invalidParams, body: invalidBody } = await mcpRequestAt(
-    baseUrl, "tools/call", { name: "proof.status", arguments: { snapshotDigest: "" } },
-  );
-  assert.equal(invalidParams.status, 200);
-  assert.equal(invalidBody.error?.code, -32602);
+  for (const name of ["proof.status", "proof.epistemic_receipt"]) {
+    const invoicesBefore = mcpInvoiceCount;
+    const { response, body } = await mcpRequestAt(baseUrl, "tools/call", {
+      name,
+      arguments: name === "proof.status"
+        ? { snapshotDigest: "1" }
+        : { cid: "ef".repeat(32) },
+    });
+    assert.equal(response.status, 200, name);
+    assert.equal(response.headers.get("www-authenticate"), null, name);
+    assert.equal(body.error?.code, -32602, name);
+    assert.match(body.error?.message ?? "", /unknown/i, name);
+    assert.equal(mcpInvoiceCount, invoicesBefore, `${name} must not create an invoice`);
+  }
 });
 
-test("rejects canonical and legacy paid tool calls in JSON-RPC batches before execution", async () => {
+test("rejects canonical paid tool calls in JSON-RPC batches before execution", async () => {
   const requests = [
     {
       id: 1,
       method: "tools/call",
       params: {
-        name: "proof.get_status",
-        arguments: { snapshotDigest: "1" },
+        name: "proof.get_by_hash",
+        arguments: { hash: "1" },
       },
     },
     {
       id: 2,
       method: "tools/call",
       params: {
-        name: "proof.issue_receipt",
-        arguments: { cid: "ef".repeat(32) },
-      },
-    },
-    {
-      id: 3,
-      method: "tools/call",
-      params: {
-        name: "proof.status",
-        arguments: { snapshotDigest: "1" },
-      },
-    },
-    {
-      id: 4,
-      method: "tools/call",
-      params: {
-        name: "proof.epistemic_receipt",
+        name: "proof.ground",
         arguments: { cid: "ef".repeat(32) },
       },
     },
@@ -810,9 +721,9 @@ test("rejects canonical and legacy paid tool calls in JSON-RPC batches before ex
       {
         id: 5,
         method: "tools/call",
-        params: { name: "mesh.status", arguments: {} },
+       params: { name: "mesh.status", arguments: {} },
       },
-      requests[3],
+      requests[0],
     ],
   ];
 
@@ -857,7 +768,7 @@ test("rejects canonical and legacy paid tool calls in JSON-RPC batches before ex
     await assertPaidBatchRejected(batch);
   }
 
-  for (const call of [requests[1], requests[3]]) {
+  for (const call of [requests[1]]) {
     const challenge = await mcpRequestAt(
       baseUrl,
       "tools/call",
@@ -1171,7 +1082,7 @@ test("reports public peer mesh status without payment", async () => {
   assert.equal(body.quorumThreshold, 1);
 });
 
-test("keeps six OpenAPI MCP tool descriptions and selector/output schemas in parity", async () => {
+test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity", async () => {
   const sharedDocument = parse(
     await readFile(
       resolve(process.cwd(), "../../lib/api-spec/openapi.yaml"),
@@ -1216,9 +1127,10 @@ test("keeps six OpenAPI MCP tool descriptions and selector/output schemas in par
 
   const requiredSchemaTools = [
     "mesh.get_status",
-    "proof.get_status",
-    "proof.issue_receipt",
     "proof.get_by_hash",
+    "proof.ground",
+    "proof.submit",
+    "proof.verify",
     "payment.info",
   ];
   const schemaEntries = Object.entries(xMcpTools).filter(([, candidate]) => {
@@ -1285,17 +1197,31 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "stratigraphy.list",
       "proof.attenuate",
       "proof.verify",
-      "proof.get_status",
       "proof.get_by_hash",
       "proof.list",
       "proof.submit",
       "proof.ground",
-      "proof.issue_receipt",
       "payment.info",
       "mesh.get_status",
       "mesh.broadcast",
     ],
   );
+  for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt"]) {
+    assert.equal(
+      listed.result?.tools.some((candidate: { name: string }) =>
+        candidate.name === unregisteredTool
+      ),
+      false,
+      `${unregisteredTool} must not be registered`,
+    );
+    assert.equal(
+      mcpServerCard.capabilities.tools.some((candidate) =>
+        candidate.name === unregisteredTool
+      ),
+      false,
+      `${unregisteredTool} must not be in the server card`,
+    );
+  }
   assert.deepEqual(
     mcpServerCard.capabilities.tools.map((candidate) => candidate.name),
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
@@ -1303,8 +1229,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   const listedToolNames = new Set(
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
   );
+  const openApiTools = openApiDocument["x-mcp-tools"] as Record<string, unknown>;
+  for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt"]) {
+    assert.equal(Object.hasOwn(openApiTools, unregisteredTool), false);
+  }
   for (const alias of ["mesh.status", "proof.status", "proof.epistemic_receipt"]) {
-    assert.equal(listedToolNames.has(alias), false, `${alias} must remain call-only`);
+    assert.equal(listedToolNames.has(alias), false, `${alias} must not be advertised`);
   }
   for (const candidate of listed.result?.tools ?? []) {
     assert.match(
@@ -1417,22 +1347,34 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       required?: unknown;
       properties?: Record<string, unknown>;
       items?: unknown;
+      oneOf?: unknown[];
     },
     path: string,
   ): void => {
     if (schema.properties) {
       assert.equal(schema.type, "object", `${path} must be an object schema`);
-      assert.ok(Array.isArray(schema.required), `${path} must explicitly list required properties`);
-      for (const name of schema.required as string[]) {
+      const required = schema.required ?? [];
+      assert.ok(Array.isArray(required), `${path}.required must be an array when present`);
+      for (const name of required as string[]) {
         assert.ok(Object.hasOwn(schema.properties, name), `${path}.required includes unknown ${name}`);
       }
       for (const [name, property] of Object.entries(schema.properties)) {
         assert.match(name, /^[a-z][a-zA-Z0-9]*$/, `${path}.${name} must use camelCase`);
         const documented = property as { description?: string };
-        if (!path.startsWith("proof.issue_receipt.inputSchema")) {
-          assert.match(documented.description ?? "", /example/i, `${path}.${name} must describe an example`);
-        }
+        assert.match(documented.description ?? "", /example/i, `${path}.${name} must describe an example`);
         assertInputProperties(property as Parameters<typeof assertInputProperties>[0], `${path}.${name}`);
+      }
+    }
+    for (const [index, branch] of (schema.oneOf ?? []).entries()) {
+      const alternative = branch as { required?: unknown };
+      if (alternative.required !== undefined) {
+        assert.ok(Array.isArray(alternative.required), `${path}.oneOf[${index}].required must be an array`);
+        for (const name of alternative.required as string[]) {
+          assert.ok(
+            Object.hasOwn(schema.properties ?? {}, name),
+            `${path}.oneOf[${index}].required includes unknown ${name}`,
+          );
+        }
       }
     }
     if (schema.items) {
@@ -1440,39 +1382,26 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    if (candidate.name === "proof.issue_receipt") {
-      assert.deepEqual(
-        Object.fromEntries(Object.entries(candidate.inputSchema.properties).map(
-          ([key, value]) => [key, (value as { description: string }).description],
-        )),
-        {
-          cid: "Target IPFS CID or 32-byte hex dataset hash anchored directly to the live Bitcoin block height.",
-          nostrEventId: "Optional Nostr event ID linked into the signed receipt payload to bind off-chain publications to the block tip.",
-          context: "Optional JSON metadata object bound into the signed receipt tuple for additional execution context.",
-        },
-      );
-    } else {
-      const sentences = candidate.description.split(/(?<=[.!?])\s+(?=[A-Z])/);
-      const immutableDataTool = candidate.name.startsWith("proof.") ||
-        candidate.name.startsWith("stratigraphy.") || candidate.name === "mesh.broadcast";
-      const exactDescription = Object.hasOwn(
-        expectedMcpToolDescriptions,
-        candidate.name,
-      );
-      assert.ok(
-        exactDescription || sentences.length === (immutableDataTool ? 4 : 3),
-        `${candidate.name} must have a focused description`,
-      );
-      if (immutableDataTool && !exactDescription) {
-        assert.ok(candidate.description.endsWith(
-          "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.",
-        ));
-      }
-      if (!exactDescription) {
-        assert.match(candidate.description, /Returns a JSON object/);
-        assert.match(candidate.description, /JSON-RPC -32602/);
-        assert.match(candidate.description, /60-requests-per-minute IP limit/);
-      }
+    const sentences = candidate.description.split(/(?<=[.!?])\s+(?=[A-Z])/);
+    const immutableDataTool = candidate.name.startsWith("proof.") ||
+      candidate.name.startsWith("stratigraphy.") || candidate.name === "mesh.broadcast";
+    const exactDescription = Object.hasOwn(
+      expectedMcpToolDescriptions,
+      candidate.name,
+    );
+    assert.ok(
+      exactDescription || sentences.length === (immutableDataTool ? 4 : 3),
+      `${candidate.name} must have a focused description`,
+    );
+    if (immutableDataTool && !exactDescription) {
+      assert.ok(candidate.description.endsWith(
+        "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.",
+      ));
+    }
+    if (!exactDescription) {
+      assert.match(candidate.description, /Returns a JSON object/);
+      assert.match(candidate.description, /JSON-RPC -32602/);
+      assert.match(candidate.description, /60-requests-per-minute IP limit/);
     }
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);
@@ -1528,20 +1457,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "proof.ground": {
       keys: ["receipt"], readOnly: false, idempotent: false, openWorld: true,
     },
-    "proof.issue_receipt": {
-      keys: ["receiptHash", "blockTip", "blockHash", "ipfsCid", "nostrEventId",
-        "attestation", "timestamp"],
-      readOnly: false, idempotent: false, openWorld: true,
-    },
     "proof.list": {
       keys: ["attestations", "total"], readOnly: true, idempotent: true, openWorld: false,
     },
-    "proof.get_status": {
-      keys: ["status", "verifiedAt", "attestationCount", "meshQuorum"],
-      readOnly: true, idempotent: true, openWorld: false,
-    },
     "proof.get_by_hash": {
-      keys: ["kind", "hash", "status", "timestamp", "proofPayload"],
+      keys: ["kind", "hash", "status", "timestamp", "jobId", "attestationCount",
+        "meshQuorum", "proofPayload"],
       readOnly: true, idempotent: true, openWorld: false,
     },
     "payment.info": {
@@ -1554,7 +1475,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       readOnly: false, idempotent: false, openWorld: false,
     },
     "proof.submit": {
-      keys: ["proofHash", "status", "submittedAt", "attestationStatus"],
+      keys: ["proofHash", "jobId", "status", "submittedAt", "attestationStatus"],
       readOnly: false, idempotent: false, openWorld: true,
     },
   };
@@ -1564,11 +1485,19 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     assert.equal(candidate.outputSchema.additionalProperties, false);
     assert.deepEqual(Object.keys(candidate.outputSchema.properties).sort(), [...expected.keys].sort(),
       `${candidate.name} outputSchema must describe the returned JSON fields`);
+    const expectedRequired = candidate.name === "proof.get_by_hash"
+      ? ["kind", "hash", "status", "timestamp"]
+      : expected.keys;
     assert.deepEqual([...candidate.outputSchema.required].sort(),
-      expected.keys.filter((key) =>
-        candidate.name !== "proof.issue_receipt" || key !== "nostrEventId"
-      ).sort());
-    assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expected.keys].sort());
+      [...expectedRequired].sort());
+    if (candidate.name === "proof.get_by_hash") {
+      const payloadExample = candidate.outputSchema.examples[0] as Record<string, unknown>;
+      assert.equal(payloadExample.kind, "zk-proof");
+      assert.ok(Object.hasOwn(payloadExample, "proofPayload"));
+      assert.ok(Object.hasOwn(payloadExample, "timestamp"));
+    } else {
+      assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expected.keys].sort());
+    }
     assert.equal(candidate.annotations.readOnlyHint, expected.readOnly);
     assert.equal(candidate.annotations.idempotentHint, expected.idempotent);
     assert.equal(candidate.annotations.openWorldHint, expected.openWorld);
@@ -1583,7 +1512,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${name} description must exactly match the public MCP contract`,
     );
   }
-  for (const name of ["mesh.get_status", "proof.get_status", "proof.issue_receipt", "proof.get_by_hash", "payment.info"]) {
+  for (const name of ["mesh.get_status", "proof.get_by_hash", "payment.info"]) {
     assert.doesNotMatch(
       documentedTool(name).description,
       /Note: Stratigraphy records and zk-SNARK proofs are append-only/,
@@ -1591,8 +1520,6 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     );
   }
   assert.match(documentedTool("stratigraphy.list").description, /costs 10 sats/);
-  assert.match(documentedTool("proof.submit").description, /not durable/);
-  assert.match(documentedTool("proof.verify").description, /process-memory verification indexes/);
   assert.match(documentedTool("mesh.broadcast").inputSchema.properties.payload.description,
     /date selector.*not a caller-supplied record/i);
   assert.match(documentedTool("proof.list").inputSchema.properties.offset.description,
@@ -1636,31 +1563,26 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   });
   assert.equal(verifiedMcpReceipt.status, 200);
   assert.equal(((await verifiedMcpReceipt.json()) as { valid: boolean }).valid, true);
+  const groundInput = groundingTool.inputSchema.properties;
+  assert.ok(Object.hasOwn(groundInput, "contextHash"));
+  assert.ok(Object.hasOwn(groundInput, "cid"));
+  assert.ok(Object.hasOwn(groundInput, "context"));
   const datasetArgs = {
     cid: "ab".repeat(32),
     nostrEventId: "cd".repeat(32),
     context: { purpose: "contract-test" },
   };
   const datasetCalled = await mcpRequest("tools/call", {
-    name: "proof.issue_receipt",
+    name: "proof.ground",
     arguments: datasetArgs,
   });
-  const datasetReceipt = datasetCalled.result?.structuredContent;
+  const datasetReceipt = datasetCalled.result?.structuredContent.receipt;
   assert.equal(datasetReceipt.blockTip, 920001);
   assert.equal(datasetReceipt.blockHash, "ab".repeat(32));
   assert.equal(datasetReceipt.ipfsCid, datasetArgs.cid);
-  assert.equal(datasetReceipt.nostrEventId, datasetArgs.nostrEventId);
-  assert.equal(datasetReceipt.attestation.type, "Signed-Bitcoin-Tip-Anchor");
   assert.equal(datasetReceipt.attestation.verified, true);
   assert.equal(verifyEpistemicDatasetReceipt(datasetReceipt), true);
-  assert.equal(verifyEpistemicDatasetReceipt({ ...datasetReceipt, ipfsCid: "ef".repeat(32) }), false);
-  assert.equal(verifyEpistemicDatasetReceipt({ ...datasetReceipt, blockHash: "ef".repeat(32) }), false);
-  assert.equal(datasetReceipt.receiptHash, createHash("sha256").update(JSON.stringify([
-    datasetArgs.cid, datasetReceipt.blockHash, datasetReceipt.blockTip,
-    datasetArgs.nostrEventId, datasetReceipt.timestamp,
-  ])).digest("hex"));
   const signedDatasetReceipt = JSON.parse(datasetReceipt.attestation.proofPayload);
-  assert.equal(signedDatasetReceipt.contextHash, datasetReceipt.receiptHash);
   assert.equal(signedDatasetReceipt.payload.metadata.cid, datasetArgs.cid);
   assert.equal(signedDatasetReceipt.payload.metadata.nostrEventId, datasetArgs.nostrEventId);
   assert.deepEqual(signedDatasetReceipt.payload.metadata.context, datasetArgs.context);
@@ -1680,11 +1602,17 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       ...signedDatasetReceipt.payload.metadata, cid: "ef".repeat(32),
     } },
   }), false);
-  const datasetStatus = await mcpRequest("tools/call", {
-    name: "proof.get_status", arguments: { receiptHash: datasetReceipt.receiptHash },
-  });
-  assert.equal(datasetStatus.result?.structuredContent.status, "verified");
-  assert.equal(datasetStatus.result?.structuredContent.attestationCount, 0);
+  for (const hash of [datasetReceipt.receiptHash, datasetArgs.cid]) {
+    const datasetFound = await mcpRequest("tools/call", {
+      name: "proof.get_by_hash", arguments: { hash },
+    });
+    assert.equal(datasetFound.result?.structuredContent.kind, "dataset-receipt");
+    assert.equal(datasetFound.result?.structuredContent.status, "verified");
+    assert.deepEqual(
+      datasetFound.result?.structuredContent.proofPayload,
+      datasetReceipt,
+    );
+  }
   const tool = listed.result?.tools.find(
     (candidate: { name: string }) =>
       candidate.name === "stratigraphy.get",
@@ -1856,24 +1784,6 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "number",
   );
 
-  const proofStatusCalled = await mcpRequest("tools/call", {
-    name: "proof.get_status",
-    arguments: { snapshotDigest: "1" },
-  });
-  assert.deepEqual(
-    {
-      status: proofStatusCalled.result?.structuredContent.status,
-      attestationCount:
-        proofStatusCalled.result?.structuredContent.attestationCount,
-      meshQuorum: proofStatusCalled.result?.structuredContent.meshQuorum,
-    },
-    { status: "invalid", attestationCount: 0, meshQuorum: false },
-  );
-  assert.match(
-    proofStatusCalled.result?.structuredContent.verifiedAt,
-    /^\d{4}-\d{2}-\d{2}T/,
-  );
-
   const submitted = await mcpRequest("tools/call", {
     name: "proof.submit",
     arguments: {
@@ -1887,6 +1797,20 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
   });
   assert.equal(submitted.result?.structuredContent.status, "invalid");
+  assert.match(
+    submitted.result?.structuredContent.jobId,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  );
+  for (const hash of ["1", submitted.result?.structuredContent.jobId]) {
+    const statusOnly = await mcpRequest("tools/call", {
+      name: "proof.get_by_hash",
+      arguments: { hash },
+    });
+    assert.equal(statusOnly.result?.structuredContent.status, "invalid");
+    assert.equal(statusOnly.result?.structuredContent.kind, hash === "1" ? "zk-proof-status" : "zk-proof");
+    assert.equal(typeof statusOnly.result?.structuredContent.timestamp, "string");
+    assert.equal(Object.hasOwn(statusOnly.result?.structuredContent, "proofPayload"), hash !== "1");
+  }
   const camelCaseSubmitted = await mcpRequest("tools/call", {
     name: "proof.submit",
     arguments: {
@@ -1915,9 +1839,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 
   const submittedStatus = await mcpRequest("tools/call", {
-    name: "proof.status",
+    name: "proof.get_by_hash",
     arguments: {
-      proofHash: submitted.result?.structuredContent.proofHash,
+      hash: submitted.result?.structuredContent.proofHash,
     },
   });
   assert.equal(submittedStatus.result?.structuredContent.status, "invalid");
@@ -2502,6 +2426,8 @@ test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async ()
     ["stratigraphy.list", { unexpected: true }],
     ["proof.verify", {}],
     ["proof.status", { proofHash: "<script>alert(1)</script>" }],
+    ["proof.get_by_hash", { hash: "not-a-hash-or-cid" }],
+    ["proof.get_by_hash", {}],
     ["proof.list", { limit: 0 }],
     ["proof.submit", {
       proof: {
@@ -2928,7 +2854,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
     dataset: { days: number; grows_over_time: boolean };
     mcp_tool: { name: string; parameters: Record<string, unknown> };
     catalog_tool: { name: string; description: string };
-    proof_status_tool: { name: string; identifiers: string[] };
+    proof_by_hash_tool: { name: string; identifiers: string[] };
     proof_attestations_tool: {
       name: string;
       parameters: Record<string, unknown>;
@@ -2959,11 +2885,8 @@ test("serves public pre-flight cost and schema metadata", async () => {
     "limit",
   ]);
   assert.equal(body.catalog_tool.name, "stratigraphy.list");
-  assert.equal(body.proof_status_tool.name, "proof.get_status");
-  assert.deepEqual(body.proof_status_tool.identifiers, [
-    "proofHash",
-    "snapshotDigest",
-  ]);
+  assert.equal(body.proof_by_hash_tool.name, "proof.get_by_hash");
+  assert.deepEqual(body.proof_by_hash_tool.identifiers, ["hash", "jobId"]);
   assert.equal(
     body.proof_attestations_tool.name,
     "proof.list",

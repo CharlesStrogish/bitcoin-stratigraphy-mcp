@@ -6,11 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ProofStatusMcpToolIdentifiersItem = typeof ProofStatusMcpToolIdentifiersItem[keyof typeof ProofStatusMcpToolIdentifiersItem];
+export type ProofByHashMcpToolExampleResultStatus = typeof ProofByHashMcpToolExampleResultStatus[keyof typeof ProofByHashMcpToolExampleResultStatus];
 
 
-export const ProofStatusMcpToolIdentifiersItem = {
-  proofHash: 'proofHash',
-  snapshotDigest: 'snapshotDigest',
-  receiptHash: 'receiptHash',
+export const ProofByHashMcpToolExampleResultStatus = {
+  verified: 'verified',
+  cached: 'cached',
+  pending: 'pending',
+  invalid: 'invalid',
 } as const;

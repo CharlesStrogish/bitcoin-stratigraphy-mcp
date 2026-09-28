@@ -3,8 +3,8 @@ name: Vendored archive integrity
 description: Why unrelated pnpm frozen installs can fail on a local SDK archive checksum.
 ---
 
-Regenerating a workspace lockfile can update the integrity of a local vendored SDK archive even when the task changes only another dependency. Avoid silently carrying that unrelated lockfile change into a narrowly scoped dependency fix.
+The integrity recorded for a local vendored SDK archive must match the exact committed archive bytes. A dependency-only lockfile update may expose a pre-existing mismatch; do not treat a filtered install as proof that the full workspace can install.
 
-**Why:** The checked-in archive's bytes and the existing lockfile checksum differed during a security dependency update. A full frozen install rejected the archive, while a filtered install of the affected packages succeeded.
+**Why:** A security dependency update merged successfully, but post-merge frozen installation failed because the local archive's checksum differed from its lockfile entry. Reconciliation of the committed archive and lockfile restored frozen installs.
 
-**How to apply:** When a lockfile-only update changes local archive integrity, compare it to the existing lockfile, keep the dependency change scoped, and report the frozen-install limitation. Reconcile the archive checksum separately if a complete frozen install is required.
+**How to apply:** Before merging a lockfile change, verify a full frozen install, including local archives. If an archive changes, confirm its provenance and update its lockfile checksum to its actual bytes; never disable integrity checking or silently skip the archive.

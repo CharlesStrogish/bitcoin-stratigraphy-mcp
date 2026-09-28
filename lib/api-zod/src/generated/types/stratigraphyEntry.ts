@@ -14,5 +14,15 @@ export interface StratigraphyEntry {
   video_id: string;
   transcript_summary: string;
   quantitative_alpha: QuantitativeAlpha;
+  /**
+     * SHA-256 hash of the prior indexed stratum, or 64 zeroes for genesis; not a Bitcoin block hash.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  prevHash: string;
+  /**
+     * Domain-separated SHA-256 hash of this source-record fingerprint, index, and prevHash.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  stratumHash: string;
   attestation?: NostrAttestation;
 }

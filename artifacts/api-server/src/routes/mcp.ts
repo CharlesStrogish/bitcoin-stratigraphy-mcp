@@ -48,7 +48,9 @@ import {
   submitZkProof,
   verifyZkProofForSnapshot,
 } from "../services/zkProofService";
-import { getStratigraphyData } from "./stratigraphy";
+import { getStratigraphyData, readDataset } from "./stratigraphy";
+import { buildProvenanceChain } from "../services/provenanceChain";
+import { getProvenanceAnchor } from "../services/otsProvenance";
 import {
   createHttpRateLimitMiddleware,
   createSlidingWindowRateLimiter,
@@ -427,6 +429,51 @@ type ArchivedProofLookup = {
   meshQuorum?: boolean;
   jobId?: string;
 };
+
+type BoundProvenance = { headHash: string; merkleRoot: string; totalDepth: number };
+
+function boundProvenance(value: unknown): BoundProvenance | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const state = value as Record<string, unknown>;
+  return /^[0-9a-f]{64}$/.test(String(state.headHash)) &&
+    /^[0-9a-f]{64}$/.test(String(state.merkleRoot)) &&
+    Number.isSafeInteger(state.totalDepth) && (state.totalDepth as number) > 0
+    ? state as BoundProvenance : undefined;
+}
+
+function receiptProvenance(value: unknown): BoundProvenance | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const receipt = value as Record<string, unknown>;
+  if (receipt.attestation && typeof (receipt.attestation as Record<string, unknown>).proofPayload === "string") {
+    try {
+      const signed = JSON.parse((receipt.attestation as { proofPayload: string }).proofPayload) as {
+        payload?: { metadata?: { context?: { datasetProvenance?: unknown } } };
+      };
+      return boundProvenance(signed.payload?.metadata?.context?.datasetProvenance);
+    } catch { return undefined; }
+  }
+  return boundProvenance((receipt.payload as { metadata?: { datasetProvenance?: unknown } } | undefined)
+    ?.metadata?.datasetProvenance);
+}
+
+async function provenanceForReceipt(receipt: unknown) {
+  const bound = receiptProvenance(receipt);
+  if (!bound) return { provenanceVerified: false };
+  const chain = buildProvenanceChain(await readDataset());
+  if (chain.headHash !== bound.headHash || chain.merkleRoot !== bound.merkleRoot ||
+      chain.totalDepth !== bound.totalDepth || !chain.verified) {
+    return { provenanceVerified: false };
+  }
+  const anchor = await getProvenanceAnchor(bound.headHash);
+  if (anchor && (anchor.merkleRoot !== bound.merkleRoot || anchor.totalDepth !== bound.totalDepth)) {
+    return { provenanceVerified: false };
+  }
+  return {
+    provenanceVerified: true,
+    provenanceMerkleRoot: bound.merkleRoot,
+    ...(anchor ? { otsProof: anchor.otsProof, otsStatus: anchor.otsStatus } : {}),
+  };
+}
 
 function findArchivedProof(hash: string, quorumThreshold: number): ArchivedProofLookup | undefined {
   const proof = getZkProofRecord(hash);
@@ -1676,6 +1723,7 @@ const baseMcpToolDefinitions = [
         kind: "zk-proof", hash: `0x${"ab".repeat(32)}`, status: "verified",
         timestamp: "2026-09-27T21:00:00.000Z",
         proofPayload: { proof: { pi_a: ["1"] }, publicSignals: ["1", "2", "3", "4", "5"] },
+        provenanceVerified: false,
       }],
       additionalProperties: false,
       properties: {
@@ -1686,6 +1734,10 @@ const baseMcpToolDefinitions = [
         jobId: field("string", "Submission job identifier when an exact submitted proof payload is retained.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
         attestationCount: field("integer", "NIP-78 attestation count for lifecycle-only lookups.", [0], { minimum: 0 }),
         meshQuorum: field("boolean", "Whether current mesh quorum is met for lifecycle-only lookups.", [false]),
+        provenanceVerified: field("boolean", "Whether this exact signed receipt binds the currently validated dataset strata chain; does not imply Bitcoin OTS confirmation.", [false]),
+        provenanceMerkleRoot: field("string", "Merkle root bound in the signed receipt when the current dataset chain matches.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+        otsProof: field("string", "Base64 serialized .ots proof for the bound dataset root bytes when a calendar receipt is available.", ["AQID"], { format: "byte" }),
+        otsStatus: field("string", "Calendar-only or independently Bitcoin-verified status of the bound OTS receipt.", ["pending_calendar"], { enum: ["pending_calendar", "bitcoin_block_attested"] }),
         proofPayload: {
           type: "object", description: "Exact retained proof input or signed receipt; do not infer missing snapshot data from a submitted proof.",
           examples: [{ proof: { pi_a: ["1"] }, publicSignals: ["1", "2", "3", "4", "5"] }],
@@ -1693,7 +1745,7 @@ const baseMcpToolDefinitions = [
           properties: {},
         },
       },
-      required: ["kind", "hash", "status", "timestamp"],
+      required: ["kind", "hash", "status", "timestamp", "provenanceVerified"],
     },
   },
   {
@@ -2410,8 +2462,8 @@ const mcpToolDefinitions = baseMcpToolDefinitions
             type: "object",
             description: "Signed context or dataset receipt anchored to the current Bitcoin tip.",
             examples: [
-              { receipt: (tool.outputSchema.examples[0] as { receipt: unknown }).receipt },
-              { receipt: datasetReceiptDefinition.outputSchema.examples[0] },
+              { receipt: (tool.outputSchema.examples[0] as { receipt: unknown }).receipt, provenanceVerified: true },
+              { receipt: datasetReceiptDefinition.outputSchema.examples[0], provenanceVerified: true },
             ],
             additionalProperties: false,
             properties: {
@@ -2421,8 +2473,12 @@ const mcpToolDefinitions = baseMcpToolDefinitions
                 examples: [(tool.outputSchema.examples[0] as { receipt: unknown }).receipt],
                 oneOf: [(tool.outputSchema.properties as Record<string, unknown>).receipt, datasetReceiptDefinition.outputSchema],
               },
+              provenanceVerified: field("boolean", "Whether this signed receipt binds the current verified dataset chain, not whether Bitcoin has attested its OTS proof.", [true]),
+              provenanceMerkleRoot: field("string", "Dataset chain root signed in the receipt, when the referenced dataset still matches.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+              otsProof: field("string", "Base64 serialized .ots proof of the dataset root bytes, when a calendar receipt is available.", ["AQID"], { format: "byte" }),
+              otsStatus: field("string", "Calendar-only or independently Bitcoin-verified status of the OTS receipt.", ["pending_calendar"], { enum: ["pending_calendar", "bitcoin_block_attested"] }),
             },
-            required: ["receipt"],
+            required: ["receipt", "provenanceVerified"],
           },
         }
       : tool;
@@ -2639,9 +2695,13 @@ function createBitcoinStratigraphyMcpServer(
       if (!archivedProof) {
         throw new McpError(ErrorCode.InvalidParams, "Proof or receipt not found");
       }
+      const structuredContent = {
+        ...archivedProof,
+        ...await provenanceForReceipt(archivedProof.proofPayload),
+      };
       return {
-        content: [{ type: "text", text: JSON.stringify(archivedProof) }],
-        structuredContent: archivedProof,
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
       };
     }
     if (name === "payment.info") {
@@ -2729,7 +2789,8 @@ function createBitcoinStratigraphyMcpServer(
         }
         indexGroundedContextReceipt(groundReceipt);
       }
-      const structuredContent = { receipt: "cid" in parsed.data ? datasetReceipt! : groundReceipt! };
+      const receipt = "cid" in parsed.data ? datasetReceipt! : groundReceipt!;
+      const structuredContent = { receipt, ...await provenanceForReceipt(receipt) };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
@@ -3052,22 +3113,18 @@ export function registerMcpRoute(
       return;
     }
     if (name === "proof.ground") {
-      const input = proofGroundInputSchema.parse(body!.params?.arguments ?? {});
+      const parsed = proofGroundInputSchema.safeParse(body!.params?.arguments ?? {});
+      if (!parsed.success) {
+        next();
+        return;
+      }
+      const input = parsed.data;
       if ("cid" in input) {
         if (Buffer.byteLength(JSON.stringify(input)) > 16_384) {
           res.status(400).json({
             jsonrpc: "2.0", id: body?.id ?? null,
             error: { code: -32602, message: "Dataset receipt metadata exceeds 16 KiB" },
           });
-          return;
-        }
-        try {
-          res.locals.epistemicDatasetReceipt = await createEpistemicDatasetReceipt(input, {
-            readBitcoinTip: options.readBitcoinTip,
-          });
-        } catch (error) {
-          req.log?.warn({ err: error }, "MCP dataset receipt preflight failed");
-          res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
           return;
         }
       } else {
@@ -3078,18 +3135,46 @@ export function registerMcpRoute(
           });
           return;
         }
-        try {
-          res.locals.epistemicAnchorReceipt = await groundEpistemicContext(input, {
-            readBitcoinTip: options.readBitcoinTip,
-          });
-        } catch (error) {
-          req.log?.warn({ err: error }, "MCP epistemic grounding preflight failed");
-          res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
-          return;
-        }
       }
     }
     gates[name](req, res, next);
+  }, async (req, res, next) => {
+    const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
+    if (body?.method !== "tools/call" || body.params?.name !== "proof.ground") {
+      next();
+      return;
+    }
+    const parsed = proofGroundInputSchema.safeParse(body.params?.arguments ?? {});
+    if (!parsed.success) {
+      next();
+      return;
+    }
+    const input = parsed.data;
+    try {
+      const current = buildProvenanceChain(await readDataset());
+      const datasetProvenance: BoundProvenance = {
+        headHash: current.headHash, merkleRoot: current.merkleRoot,
+        totalDepth: current.totalDepth,
+      };
+      if ("cid" in input) {
+        res.locals.epistemicDatasetReceipt = await createEpistemicDatasetReceipt({
+          ...input, context: { ...input.context, datasetProvenance },
+        }, {
+          readBitcoinTip: options.readBitcoinTip,
+        });
+      } else {
+        res.locals.epistemicAnchorReceipt = await groundEpistemicContext({
+          ...input, metadata: { ...input.metadata, datasetProvenance },
+        }, {
+          readBitcoinTip: options.readBitcoinTip,
+        });
+      }
+    } catch (error) {
+      req.log?.warn({ err: error }, "MCP epistemic grounding post-payment failed");
+      res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
+      return;
+    }
+    next();
   }, (req, res) => handleMcpRequest(req, res, mesh), (_req, res) => {
     if (!res.headersSent) {
       res.status(400).json({

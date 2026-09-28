@@ -777,6 +777,71 @@ test("MCP L402 challenges bind price and tool, while discovery and mesh stay fre
   }
 });
 
+test("MCP proof.ground reads and signs Bitcoin receipts only after L402 settles", async () => {
+  const isolatedApp = express();
+  isolatedApp.use(express.json());
+  let tipReads = 0;
+  registerMcpRoute(isolatedApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-mcp-secret",
+    readBitcoinTip: async () => {
+      tipReads += 1;
+      return { height: 920001, hash: "ab".repeat(32), source: "contract-test" };
+    },
+  });
+  const isolatedServer = isolatedApp.listen(0);
+  try {
+    await new Promise<void>((resolve) => {
+      if (isolatedServer.listening) resolve();
+      else isolatedServer.once("listening", resolve);
+    });
+    const address = isolatedServer.address() as AddressInfo;
+    const url = `http://127.0.0.1:${address.port}`;
+
+    const callAfterPayment = async (
+      args: Record<string, unknown>,
+      forwardedFor: string,
+    ) => {
+      const request = { name: "proof.ground", arguments: args };
+      const readsBeforeChallenge = tipReads;
+      const { response: challengeResponse, body: challenge } = await mcpRequestAt(
+        url, "tools/call", request, forwardedFor,
+      );
+      assert.equal(challengeResponse.status, 402);
+      assert.equal(tipReads, readsBeforeChallenge, "L402 challenge must not perform Bitcoin-tip lookup");
+      const payment = mcpInvoices.get((challenge as any).payment_hash);
+      assert.ok(payment);
+      const authorization = `L402 ${(challenge as any).macaroon}:${payment.preimage}`;
+      const paid = await mcpRequestAt(url, "tools/call", request, forwardedFor, authorization);
+      assert.equal(paid.response.status, 200);
+      return { authorization, request, receipt: paid.body.result?.structuredContent.receipt };
+    };
+
+    const cidCall = await callAfterPayment(
+      { cid: "Qm" + "a".repeat(44), context: { purpose: "paid-dataset" } },
+      "198.51.100.71",
+    );
+    assert.equal(tipReads, 1);
+    assert.equal(cidCall.receipt.ipfsCid, "Qm" + "a".repeat(44));
+    assert.equal(cidCall.receipt.blockTip, 920001);
+    const replay = await mcpRequestAt(
+      url, "tools/call", cidCall.request, "198.51.100.71", cidCall.authorization,
+    );
+    assert.equal(replay.response.status, 429);
+    assert.equal(tipReads, 1, "a replay must not repeat grounding work");
+
+    const contextCall = await callAfterPayment(
+      { contextHash: "cd".repeat(32), agentId: "paid-context" },
+      "198.51.100.72",
+    );
+    assert.equal(contextCall.receipt.contextHash, "cd".repeat(32));
+    assert.equal(contextCall.receipt.blockHeight, 920001);
+    assert.equal(tipReads, 2);
+  } finally {
+    isolatedServer.close();
+  }
+});
+
 test("rejects canonical paid tool calls in JSON-RPC batches before execution", async () => {
   const requests = [
     {
@@ -1538,14 +1603,15 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       readOnly: false, idempotent: false, openWorld: true,
     },
     "proof.ground": {
-      keys: ["receipt"], readOnly: false, idempotent: false, openWorld: true,
+      keys: ["receipt", "provenanceVerified", "provenanceMerkleRoot", "otsProof", "otsStatus"],
+      readOnly: false, idempotent: false, openWorld: true,
     },
     "proof.list": {
       keys: ["attestations", "total"], readOnly: true, idempotent: true, openWorld: false,
     },
     "proof.get_by_hash": {
       keys: ["kind", "hash", "status", "timestamp", "jobId", "attestationCount",
-        "meshQuorum", "proofPayload"],
+        "meshQuorum", "proofPayload", "provenanceVerified", "provenanceMerkleRoot", "otsProof", "otsStatus"],
       readOnly: true, idempotent: true, openWorld: false,
     },
     "payment.info": {
@@ -1569,10 +1635,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     assert.deepEqual(Object.keys(candidate.outputSchema.properties).sort(), [...expected.keys].sort(),
       `${candidate.name} outputSchema must describe the returned JSON fields`);
     const expectedRequired = candidate.name === "proof.get_by_hash"
-      ? ["kind", "hash", "status", "timestamp"]
+      ? ["kind", "hash", "status", "timestamp", "provenanceVerified"]
       : candidate.name === "mesh.broadcast"
         ? expected.keys.filter((key) => key !== "agentPubkey")
-        : expected.keys;
+        : candidate.name === "proof.ground"
+          ? ["receipt", "provenanceVerified"]
+          : expected.keys;
     assert.deepEqual([...candidate.outputSchema.required].sort(),
       [...expectedRequired].sort());
     if (candidate.name === "proof.get_by_hash") {
@@ -1637,6 +1705,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   });
   assert.notEqual(groundingCalled.result?.isError, true);
   const receipt = groundingCalled.result?.structuredContent.receipt;
+  assert.equal(groundingCalled.result?.structuredContent.provenanceVerified, true);
   assert.equal(receipt.contextHash, "4f".repeat(32));
   assert.equal(receipt.agentId, "contract-agent");
   assert.equal(receipt.blockHeight, 920001);
@@ -1670,7 +1739,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   const signedDatasetReceipt = JSON.parse(datasetReceipt.attestation.proofPayload);
   assert.equal(signedDatasetReceipt.payload.metadata.cid, datasetArgs.cid);
   assert.equal(signedDatasetReceipt.payload.metadata.nostrEventId, datasetArgs.nostrEventId);
-  assert.deepEqual(signedDatasetReceipt.payload.metadata.context, datasetArgs.context);
+  assert.equal(signedDatasetReceipt.payload.metadata.context.purpose, datasetArgs.context.purpose);
+  assert.match(signedDatasetReceipt.payload.metadata.context.datasetProvenance.merkleRoot, /^[0-9a-f]{64}$/);
+  assert.equal(datasetCalled.result?.structuredContent.provenanceVerified, true);
   const verifyDatasetReceipt = async (attestation: unknown) => {
     const response = await fetch(`${baseUrl}/api/v1/zk/verify`, {
       method: "POST",
@@ -1693,6 +1764,17 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     });
     assert.equal(datasetFound.result?.structuredContent.kind, "dataset-receipt");
     assert.equal(datasetFound.result?.structuredContent.status, "verified");
+    assert.equal(datasetFound.result?.structuredContent.provenanceVerified, true);
+    assert.equal(
+      datasetFound.result?.structuredContent.provenanceMerkleRoot,
+      signedDatasetReceipt.payload.metadata.context.datasetProvenance.merkleRoot,
+    );
+    if (datasetFound.result?.structuredContent.otsProof) {
+      assert.match(datasetFound.result.structuredContent.otsProof, /^[A-Za-z0-9+/]+={0,2}$/);
+      assert.ok(["pending_calendar", "bitcoin_block_attested"].includes(
+        datasetFound.result.structuredContent.otsStatus,
+      ));
+    }
     assert.deepEqual(
       datasetFound.result?.structuredContent.proofPayload,
       datasetReceipt,

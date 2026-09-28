@@ -44,6 +44,8 @@ import type {
   PaymentChallengeRateLimitError,
   PaymentChallengeServiceUnavailableError,
   PaymentConfigurationError,
+  ProvenanceAnchorStatus,
+  ProvenanceChainStatus,
   ReadinessStatus,
   SettlementAssetSelectionError,
   StratigraphyCost,
@@ -1312,6 +1314,233 @@ export const useGroundEpistemicContext = <TError = ErrorType<void | L402Challeng
         TContext
       > => {
       return useMutation(getGroundEpistemicContextMutationOptions(options));
+    }
+
+export const getGetProvenanceChainUrl = () => {
+
+
+
+
+  return `/api/provenance/chain`
+}
+
+/**
+ * Historical strata are linked in dataset order; synthetic indexed heights are not native Bitcoin block heights. The root commits to all linked records, while OTS status separately describes external timestamp progress.
+ * @summary Inspect the deterministic cumulative strata chain
+ */
+export const getProvenanceChain = async ( options?: Parameters<typeof customFetch>[1]): Promise<ProvenanceChainStatus> => {
+
+  return customFetch<ProvenanceChainStatus>(getGetProvenanceChainUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProvenanceChainQueryKey = () => {
+    return [
+    `/api/provenance/chain`
+    ] as const;
+    }
+
+
+export const getGetProvenanceChainQueryOptions = <TData = Awaited<ReturnType<typeof getProvenanceChain>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProvenanceChain>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProvenanceChainQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProvenanceChain>>> = ({ signal }) => getProvenanceChain({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceChain>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProvenanceChainQueryResult = NonNullable<Awaited<ReturnType<typeof getProvenanceChain>>>
+export type GetProvenanceChainQueryError = ErrorType<void>
+
+
+/**
+ * @summary Inspect the deterministic cumulative strata chain
+ */
+
+export function useGetProvenanceChain<TData = Awaited<ReturnType<typeof getProvenanceChain>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProvenanceChain>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProvenanceChainQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetProvenanceAnchorUrl = () => {
+
+
+
+
+  return `/api/provenance/anchor`
+}
+
+/**
+ * @summary Read the latest serialized OpenTimestamps receipt
+ */
+export const getProvenanceAnchor = async ( options?: Parameters<typeof customFetch>[1]): Promise<ProvenanceAnchorStatus> => {
+
+  return customFetch<ProvenanceAnchorStatus>(getGetProvenanceAnchorUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProvenanceAnchorQueryKey = () => {
+    return [
+    `/api/provenance/anchor`
+    ] as const;
+    }
+
+
+export const getGetProvenanceAnchorQueryOptions = <TData = Awaited<ReturnType<typeof getProvenanceAnchor>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProvenanceAnchor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProvenanceAnchorQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProvenanceAnchor>>> = ({ signal }) => getProvenanceAnchor({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceAnchor>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProvenanceAnchorQueryResult = NonNullable<Awaited<ReturnType<typeof getProvenanceAnchor>>>
+export type GetProvenanceAnchorQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the latest serialized OpenTimestamps receipt
+ */
+
+export function useGetProvenanceAnchor<TData = Awaited<ReturnType<typeof getProvenanceAnchor>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProvenanceAnchor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProvenanceAnchorQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAnchorProvenanceUrl = () => {
+
+
+
+
+  return `/api/provenance/anchor`
+}
+
+/**
+ * Requires an operator Bearer token; the background job also stamps and periodically upgrades pending calendar receipts. An OTS calendar receipt is not Bitcoin block attestation until independently verified.
+ * @summary Stamp or upgrade the current Merkle-root timestamp
+ */
+export const anchorProvenance = async ( options?: Parameters<typeof customFetch>[1]): Promise<ProvenanceAnchorStatus> => {
+
+  return customFetch<ProvenanceAnchorStatus>(getAnchorProvenanceUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAnchorProvenanceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof anchorProvenance>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof anchorProvenance>>, TError,void, TContext> => {
+
+const mutationKey = ['anchorProvenance'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof anchorProvenance>>, void> = () => {
+
+
+          return  anchorProvenance(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnchorProvenanceMutationResult = NonNullable<Awaited<ReturnType<typeof anchorProvenance>>>
+
+    export type AnchorProvenanceMutationError = ErrorType<void>
+
+    /**
+ * @summary Stamp or upgrade the current Merkle-root timestamp
+ */
+export const useAnchorProvenance = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof anchorProvenance>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof anchorProvenance>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAnchorProvenanceMutationOptions(options));
     }
 
 export const getGetMeshStatusUrl = () => {

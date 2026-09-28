@@ -142,6 +142,8 @@ export const ReadinessCheckResponse = zod.object({
  * @summary Get the free five-record sample
  */
 export const getStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
+export const getStratigraphyResponsePrevHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getStratigraphyResponseStratumHashRegExp = new RegExp('^[0-9a-f]{64}$');
 export const getStratigraphyResponseAttestationPayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
 export const getStratigraphyResponseAttestationEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
 export const getStratigraphyResponseAttestationEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -158,6 +160,8 @@ export const GetStratigraphyResponseItem = zod.object({
   "difficulty_epoch_progress": zod.string().regex(getStratigraphyResponseQuantitativeAlphaDifficultyEpochProgressRegExp).describe('Estimated progress through the current 14-day difficulty epoch'),
   "thermodynamic_signal": zod.string().describe('Qualitative target-distance band derived from the multiplier')
 }),
+  "prevHash": zod.string().regex(getStratigraphyResponsePrevHashRegExp).describe('SHA-256 hash of the prior indexed stratum, or 64 zeroes for genesis; not a Bitcoin block hash.'),
+  "stratumHash": zod.string().regex(getStratigraphyResponseStratumHashRegExp).describe('Domain-separated SHA-256 hash of this source-record fingerprint, index, and prevHash.'),
   "attestation": zod.object({
   "protocol": zod.literal("nostr"),
   "nip": zod.literal(78),
@@ -537,6 +541,8 @@ export const GetPaidStratigraphyHeader = zod.object({
 })
 
 export const getPaidStratigraphyResponseDataItemQuantitativeAlphaDifficultyEpochProgressRegExp = new RegExp('^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$');
+export const getPaidStratigraphyResponseDataItemPrevHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getPaidStratigraphyResponseDataItemStratumHashRegExp = new RegExp('^[0-9a-f]{64}$');
 export const getPaidStratigraphyResponseDataItemAttestationPayloadSha256RegExp = new RegExp('^[0-9a-f]{64}$');
 export const getPaidStratigraphyResponseDataItemAttestationEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
 export const getPaidStratigraphyResponseDataItemAttestationEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -586,6 +592,8 @@ export const GetPaidStratigraphyResponse = zod.object({
   "difficulty_epoch_progress": zod.string().regex(getPaidStratigraphyResponseDataItemQuantitativeAlphaDifficultyEpochProgressRegExp).describe('Estimated progress through the current 14-day difficulty epoch'),
   "thermodynamic_signal": zod.string().describe('Qualitative target-distance band derived from the multiplier')
 }),
+  "prevHash": zod.string().regex(getPaidStratigraphyResponseDataItemPrevHashRegExp).describe('SHA-256 hash of the prior indexed stratum, or 64 zeroes for genesis; not a Bitcoin block hash.'),
+  "stratumHash": zod.string().regex(getPaidStratigraphyResponseDataItemStratumHashRegExp).describe('Domain-separated SHA-256 hash of this source-record fingerprint, index, and prevHash.'),
   "attestation": zod.object({
   "protocol": zod.literal("nostr"),
   "nip": zod.literal(78),
@@ -874,6 +882,62 @@ export const GroundEpistemicContextResponse = zod.object({
 }).describe('NIP-01 signed NIP-78 attestation over the payload before this block was attached'),
   "data": zod.unknown().optional().describe('Arbitrary extension data is already permitted on this receipt.')
 }).describe('Canonical SHA-256\/Merkle attestation signed as a Nostr NIP-78 event and bound to the current Bitcoin tip')
+})
+
+
+/**
+ * Historical strata are linked in dataset order; synthetic indexed heights are not native Bitcoin block heights. The root commits to all linked records, while OTS status separately describes external timestamp progress.
+ * @summary Inspect the deterministic cumulative strata chain
+ */
+
+export const getProvenanceChainResponseMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getProvenanceChainResponseGenesisHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getProvenanceChainResponseHeadHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const GetProvenanceChainResponse = zod.object({
+  "totalDepth": zod.number().int().min(1),
+  "merkleRoot": zod.string().regex(getProvenanceChainResponseMerkleRootRegExp),
+  "latestOtsStatus": zod.enum(['not_anchored', 'pending_calendar', 'bitcoin_block_attested']),
+  "genesisHash": zod.string().regex(getProvenanceChainResponseGenesisHashRegExp),
+  "headHash": zod.string().regex(getProvenanceChainResponseHeadHashRegExp)
+})
+
+
+/**
+ * @summary Read the latest serialized OpenTimestamps receipt
+ */
+export const getProvenanceAnchorResponseHeadHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getProvenanceAnchorResponseMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+
+export const GetProvenanceAnchorResponse = zod.object({
+  "headHash": zod.string().regex(getProvenanceAnchorResponseHeadHashRegExp),
+  "merkleRoot": zod.string().regex(getProvenanceAnchorResponseMerkleRootRegExp),
+  "totalDepth": zod.number().int().min(1),
+  "otsStatus": zod.enum(['not_anchored', 'pending_calendar', 'bitcoin_block_attested']),
+  "otsProof": zod.string().optional().describe('Base64-encoded serialized .ots receipt, present after a successful calendar stamp.'),
+  "updatedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * Requires an operator Bearer token; the background job also stamps and periodically upgrades pending calendar receipts. An OTS calendar receipt is not Bitcoin block attestation until independently verified.
+ * @summary Stamp or upgrade the current Merkle-root timestamp
+ */
+export const anchorProvenanceResponseHeadHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const anchorProvenanceResponseMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+
+export const AnchorProvenanceResponse = zod.object({
+  "headHash": zod.string().regex(anchorProvenanceResponseHeadHashRegExp),
+  "merkleRoot": zod.string().regex(anchorProvenanceResponseMerkleRootRegExp),
+  "totalDepth": zod.number().int().min(1),
+  "otsStatus": zod.enum(['not_anchored', 'pending_calendar', 'bitcoin_block_attested']),
+  "otsProof": zod.string().optional().describe('Base64-encoded serialized .ots receipt, present after a successful calendar stamp.'),
+  "updatedAt": zod.coerce.date().optional()
 })
 
 

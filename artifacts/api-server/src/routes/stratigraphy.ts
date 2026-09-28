@@ -17,6 +17,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { buildProvenanceChain, type ProvenanceSourceRecord } from "../services/provenanceChain";
+import { persistProvenancePrefix } from "../services/provenancePersistence";
 import { fileURLToPath } from "node:url";
 import {
   createMemoryPaymentChallengeStore,
@@ -222,7 +224,27 @@ async function readValidatedDataset() {
         return suppliedEntry;
       })
     : parsed;
-  return GetPaidStratigraphyResponse.shape.data.parse(supplied);
+  const chain = Array.isArray(supplied)
+    ? buildProvenanceChain(supplied as ProvenanceSourceRecord[])
+    : undefined;
+  // The 422 published source strata predate the durable prefix table. Pin
+  // their final hash so a fresh database cannot bootstrap from a rewritten
+  // copy of the historical JSON before append-only persistence takes over.
+  if (
+    chain &&
+    (chain.totalDepth < 422 ||
+      chain.records[421].stratumHash !==
+        "771b391c5621ab422c60e94cf07edcf7b98e06ddf8eddaa807ded2e5c2141246")
+  ) {
+    throw new Error("Canonical provenance baseline has been rewritten or truncated");
+  }
+  const validated = GetPaidStratigraphyResponse.shape.data.parse(
+    chain?.records ?? supplied,
+  );
+  if (chain) {
+    await persistProvenancePrefix(chain.records);
+  }
+  return validated;
 }
 
 let datasetPromise: ReturnType<typeof readValidatedDataset> | undefined;

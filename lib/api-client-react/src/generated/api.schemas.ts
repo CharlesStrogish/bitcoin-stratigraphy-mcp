@@ -200,6 +200,16 @@ export interface StratigraphyEntry {
   video_id: string;
   transcript_summary: string;
   quantitative_alpha: QuantitativeAlpha;
+  /**
+     * SHA-256 hash of the prior indexed stratum, or 64 zeroes for genesis; not a Bitcoin block hash.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  prevHash: string;
+  /**
+     * Domain-separated SHA-256 hash of this source-record fingerprint, index, and prevHash.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  stratumHash: string;
   attestation?: NostrAttestation;
 }
 
@@ -910,6 +920,49 @@ export interface NostrHeartbeatStatus {
   /** @nullable */
   published_at: string | null;
   relays: NostrHeartbeatStatusRelaysItem[];
+}
+
+export type ProvenanceChainStatusLatestOtsStatus = typeof ProvenanceChainStatusLatestOtsStatus[keyof typeof ProvenanceChainStatusLatestOtsStatus];
+
+
+export const ProvenanceChainStatusLatestOtsStatus = {
+  not_anchored: 'not_anchored',
+  pending_calendar: 'pending_calendar',
+  bitcoin_block_attested: 'bitcoin_block_attested',
+} as const;
+
+export interface ProvenanceChainStatus {
+  /** @minimum 1 */
+  totalDepth: number;
+  /** @pattern ^[0-9a-f]{64}$ */
+  merkleRoot: string;
+  latestOtsStatus: ProvenanceChainStatusLatestOtsStatus;
+  /** @pattern ^[0-9a-f]{64}$ */
+  genesisHash: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  headHash: string;
+}
+
+export type ProvenanceAnchorStatusOtsStatus = typeof ProvenanceAnchorStatusOtsStatus[keyof typeof ProvenanceAnchorStatusOtsStatus];
+
+
+export const ProvenanceAnchorStatusOtsStatus = {
+  not_anchored: 'not_anchored',
+  pending_calendar: 'pending_calendar',
+  bitcoin_block_attested: 'bitcoin_block_attested',
+} as const;
+
+export interface ProvenanceAnchorStatus {
+  /** @pattern ^[0-9a-f]{64}$ */
+  headHash: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  merkleRoot: string;
+  /** @minimum 1 */
+  totalDepth: number;
+  otsStatus: ProvenanceAnchorStatusOtsStatus;
+  /** Base64-encoded serialized .ots receipt, present after a successful calendar stamp. */
+  otsProof?: string;
+  updatedAt?: string;
 }
 
 export type L402SubscriptionPassTier = typeof L402SubscriptionPassTier[keyof typeof L402SubscriptionPassTier];

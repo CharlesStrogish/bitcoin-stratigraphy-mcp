@@ -56,7 +56,13 @@ x-mcp-tools:
           type: object
           additionalProperties: true
           properties: {}
-      required: [kind, hash, status, timestamp]
+        provenanceVerified:
+          type: boolean
+          description: True only if this receipt cryptographically binds the current verified dataset chain; this does not imply an OTS Bitcoin attestation.
+        provenanceMerkleRoot: { type: string, pattern: "^[0-9a-f]{64}$" }
+        otsProof: { type: string, format: byte, description: Base64-encoded serialized .ots receipt when available }
+        otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
+      required: [kind, hash, status, timestamp, provenanceVerified]
   payment.info:
     description: "Inspect L402 payment requirements, per-tool satoshi pricing, invoice challenge parameters, and Macaroon authentication requirements."
     inputSchema:
@@ -337,7 +343,13 @@ x-mcp-tools:
                   required: [proofPayload, type, verified]
                 timestamp: { type: string, format: date-time }
               required: [receiptHash, blockTip, blockHash, ipfsCid, attestation, timestamp]
-      required: [receipt]
+        provenanceVerified:
+          type: boolean
+          description: True only when the signed receipt binds the currently validated dataset strata chain; independent of Bitcoin OTS confirmation.
+        provenanceMerkleRoot: { type: string, pattern: "^[0-9a-f]{64}$" }
+        otsProof: { type: string, format: byte, description: Base64-encoded serialized .ots receipt when available }
+        otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
+      required: [receipt, provenanceVerified]
   proof.verify:
     description: "Perform offline/stateless zk-SNARK verification. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`)."
     inputSchema:
@@ -1022,6 +1034,59 @@ paths:
           description: Settlement provider could not create or verify the payment
         "503":
           description: Current Bitcoin tip lookup or server signing is unavailable
+  /provenance/chain:
+    get:
+      operationId: getProvenanceChain
+      tags: [stratigraphy]
+      summary: Inspect the deterministic cumulative strata chain
+      description: Historical strata are linked in dataset order; synthetic indexed heights are not native Bitcoin block heights. The root commits to all linked records, while OTS status separately describes external timestamp progress.
+      security: []
+      responses:
+        "200":
+          description: Current validated provenance state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvenanceChainStatus"
+        "503":
+          description: Provenance state or stored anchor is unavailable
+  /provenance/anchor:
+    get:
+      operationId: getProvenanceAnchor
+      tags: [stratigraphy]
+      summary: Read the latest serialized OpenTimestamps receipt
+      security: []
+      responses:
+        "200":
+          description: Current head's anchored receipt or not_anchored state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvenanceAnchorStatus"
+        "409":
+          description: Stored anchor conflicts with the current verified chain
+        "503":
+          description: Provenance state or stored anchor is unavailable
+    post:
+      operationId: anchorProvenance
+      tags: [stratigraphy]
+      summary: Stamp or upgrade the current Merkle-root timestamp
+      description: Requires an operator Bearer token; the background job also stamps and periodically upgrades pending calendar receipts. An OTS calendar receipt is not Bitcoin block attestation until independently verified.
+      security:
+        - operatorBearer: []
+      responses:
+        "200":
+          description: Serialized OTS receipt bound to the current strata root
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvenanceAnchorStatus"
+        "401":
+          description: Operator authorization required
+        "429":
+          description: Anchor request rate limit exceeded
+        "503":
+          description: Operator auth configuration, calendar, or storage unavailable
   /v1/mesh/status:
     get:
       operationId: getMeshStatus
@@ -1062,6 +1127,10 @@ paths:
           description: Snapshot digest, source signatures, freshness, or mesh network binding failed validation
 components:
   securitySchemes:
+    operatorBearer:
+      type: http
+      scheme: bearer
+      description: Operator-only provenance stamping using the configured operator secret.
     L402:
       type: apiKey
       in: header
@@ -2099,6 +2168,14 @@ components:
           type: string
         quantitative_alpha:
           $ref: "#/components/schemas/QuantitativeAlpha"
+        prevHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: SHA-256 hash of the prior indexed stratum, or 64 zeroes for genesis; not a Bitcoin block hash.
+        stratumHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Domain-separated SHA-256 hash of this source-record fingerprint, index, and prevHash.
         attestation:
           $ref: "#/components/schemas/NostrAttestation"
       required:
@@ -2107,6 +2184,32 @@ components:
         - video_id
         - transcript_summary
         - quantitative_alpha
+        - prevHash
+        - stratumHash
+    ProvenanceChainStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        totalDepth: { type: integer, minimum: 1 }
+        merkleRoot: { type: string, pattern: "^[0-9a-f]{64}$" }
+        latestOtsStatus: { type: string, enum: [not_anchored, pending_calendar, bitcoin_block_attested] }
+        genesisHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+        headHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+      required: [totalDepth, merkleRoot, latestOtsStatus, genesisHash, headHash]
+    ProvenanceAnchorStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        headHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+        merkleRoot: { type: string, pattern: "^[0-9a-f]{64}$" }
+        totalDepth: { type: integer, minimum: 1 }
+        otsStatus: { type: string, enum: [not_anchored, pending_calendar, bitcoin_block_attested] }
+        otsProof:
+          type: string
+          format: byte
+          description: Base64-encoded serialized .ots receipt, present after a successful calendar stamp.
+        updatedAt: { type: string, format: date-time }
+      required: [headHash, merkleRoot, totalDepth, otsStatus]
     NostrAttestation:
       type: object
       description: NIP-01 signed NIP-78 attestation over the payload before this block was attached

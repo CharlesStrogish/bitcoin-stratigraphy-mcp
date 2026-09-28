@@ -20,6 +20,7 @@ import {
 } from "./middleware/rateLimiter";
 import { registerSystemHealthRoute } from "./routes/system-health";
 import { registerLlmExportRoutes } from "./routes/llm-export";
+import { registerProvenanceRoutes } from "./routes/provenance";
 import { createMeshGossipService } from "./services/meshGossipService";
 
 const app: Express = express();
@@ -109,6 +110,7 @@ registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);
 registerLlmExportRoutes(app);
+registerProvenanceRoutes(app, { schedule: true });
 app.use("/api", router);
 registerStratigraphyRoutes(
   app,

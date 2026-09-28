@@ -37,4 +37,5 @@
 - [Smithery badge reliability](smithery-badge-reliability.md) — the remote badge endpoint returned HTTP 500; prefer the local SVG fallback until a working dynamic endpoint is verified.
 - [Public training export policy](public-training-export-policy.md) — crawler dataset exports stay open while interactive MCP queries remain L402-paid; describe index/proof limits plainly.
 - [OTS pool receipt calendars](ots-pool-receipt-calendars.md) — public pools can return underlying calendar URLs; inspect real receipts before tightening the accepted issuer list.
-- [x402 paid MCP settlement](x402-paid-mcp-settlement.md) — use upfront settlement before side-effecting tools and advertise the rail only after facilitator support is confirmed.
+- [x402 paid MCP settlement](x402-paid-mcp-settlement.md) — quote both rails without credentials, but mark x402 unavailable and require upfront settlement before tool execution.
+- [Standalone server-source imports](standalone-server-source-imports.md) — bundled API asset URLs and package-local dependencies may not resolve when a root script imports server TypeScript directly.

@@ -22,12 +22,14 @@ import type {
 import type {
   DatasetHealthStatus,
   EpistemicGroundingRequest,
+  ExportHuggingFaceDatasetParams,
   GetPaidStratigraphyParams,
   GroundEpistemicContext200,
   HeadPaidStratigraphyParams,
   HealthStatus,
   InvalidRangeError,
   L402Challenge,
+  LlmSchemaManifest,
   MacaroonAttenuationRequest,
   MacaroonAttenuationResponse,
   MacaroonRevocationRequest,
@@ -79,6 +81,168 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getExportHuggingFaceDatasetUrl = (params?: ExportHuggingFaceDatasetParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/export/huggingface?${stringifiedParams}` : `/api/export/huggingface`
+}
+
+/**
+ * Export the most recent indexed entries in chronological order. Heights and timestamps are deterministic daily index labels, not observed Bitcoin blocks. A record hash fingerprints validated source fields, not a block or ZK proof; source entries have no per-record ZK proofs. No L402 authorization is required.
+ * @summary Public Hugging Face instruction-tuning dataset export
+ */
+export const exportHuggingFaceDataset = async (params?: ExportHuggingFaceDatasetParams, options?: Parameters<typeof customFetch>[1]): Promise<Response> => {
+
+  return customFetch<Response>(getExportHuggingFaceDatasetUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportHuggingFaceDatasetQueryKey = (params?: ExportHuggingFaceDatasetParams,) => {
+    return [
+    `/api/export/huggingface`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportHuggingFaceDatasetQueryOptions = <TData = Awaited<ReturnType<typeof exportHuggingFaceDataset>>, TError = ErrorType<void>>(params?: ExportHuggingFaceDatasetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportHuggingFaceDataset>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportHuggingFaceDatasetQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportHuggingFaceDataset>>> = ({ signal }) => exportHuggingFaceDataset(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportHuggingFaceDataset>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportHuggingFaceDatasetQueryResult = NonNullable<Awaited<ReturnType<typeof exportHuggingFaceDataset>>>
+export type ExportHuggingFaceDatasetQueryError = ErrorType<void>
+
+
+/**
+ * @summary Public Hugging Face instruction-tuning dataset export
+ */
+
+export function useExportHuggingFaceDataset<TData = Awaited<ReturnType<typeof exportHuggingFaceDataset>>, TError = ErrorType<void>>(
+ params?: ExportHuggingFaceDatasetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportHuggingFaceDataset>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportHuggingFaceDatasetQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLlmSchemaManifestUrl = () => {
+
+
+
+
+  return `/api/.well-known/llm-schema.json`
+}
+
+/**
+ * @summary Public machine-readable dataset export schema and verification rules
+ */
+export const getLlmSchemaManifest = async ( options?: Parameters<typeof customFetch>[1]): Promise<LlmSchemaManifest> => {
+
+  return customFetch<LlmSchemaManifest>(getGetLlmSchemaManifestUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLlmSchemaManifestQueryKey = () => {
+    return [
+    `/api/.well-known/llm-schema.json`
+    ] as const;
+    }
+
+
+export const getGetLlmSchemaManifestQueryOptions = <TData = Awaited<ReturnType<typeof getLlmSchemaManifest>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLlmSchemaManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLlmSchemaManifestQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLlmSchemaManifest>>> = ({ signal }) => getLlmSchemaManifest({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLlmSchemaManifest>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLlmSchemaManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getLlmSchemaManifest>>>
+export type GetLlmSchemaManifestQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public machine-readable dataset export schema and verification rules
+ */
+
+export function useGetLlmSchemaManifest<TData = Awaited<ReturnType<typeof getLlmSchemaManifest>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLlmSchemaManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLlmSchemaManifestQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getHealthCheckUrl = () => {
 

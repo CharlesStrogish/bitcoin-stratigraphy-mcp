@@ -456,6 +456,53 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /export/huggingface:
+    get:
+      operationId: exportHuggingFaceDataset
+      tags: [stratigraphy]
+      summary: Public Hugging Face instruction-tuning dataset export
+      description: >-
+        Export the most recent indexed entries in chronological order. Heights and
+        timestamps are deterministic daily index labels, not observed Bitcoin blocks.
+        A record hash fingerprints validated source fields, not a block or ZK proof;
+        source entries have no per-record ZK proofs. No L402 authorization is required.
+      security: []
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 500 }
+          description: Maximum number of most recent records; returned in ascending order.
+        - in: query
+          name: format
+          schema: { type: string, enum: [jsonl, json], default: jsonl }
+          description: JSONL is one JSON object per line; JSON returns an array.
+      responses:
+        "200":
+          description: Hugging Face-ready export
+          content:
+            application/x-ndjson:
+              schema: { type: string, description: Newline-delimited HuggingFaceExportRecord JSON objects }
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/HuggingFaceExportRecord" }
+        "400":
+          description: Invalid query parameter
+  /.well-known/llm-schema.json:
+    get:
+      operationId: getLlmSchemaManifest
+      tags: [stratigraphy]
+      summary: Public machine-readable dataset export schema and verification rules
+      servers:
+        - url: /
+      security: []
+      responses:
+        "200":
+          description: Public autonomous crawler schema manifest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmSchemaManifest"
   /healthz:
     get:
       operationId: healthCheck
@@ -1000,6 +1047,38 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    HuggingFaceExportRecord:
+      type: object
+      additionalProperties: false
+      required: [height, timestamp, target_multiplier, record_hash, zk_proof_status, instruction, prompt, response, day, title, video_id, transcript_summary, difficulty_epoch_progress, thermodynamic_signal]
+      properties:
+        height: { type: integer, description: Deterministic daily 144-block index label; not a measured block height }
+        timestamp: { type: string, format: date-time, description: UTC midnight for the indexed source date }
+        target_multiplier: { type: number, description: Source title-derived target-distance proxy; not measured energy }
+        record_hash: { type: string, pattern: "^[0-9a-f]{64}$", description: SHA-256 of the validated source fields }
+        zk_proof_status: { type: string, enum: [unavailable], description: No per-record ZK proof is present in the source dataset }
+        instruction: { type: string, description: Instruction-tuning question about Bitcoin Stratigraphy terms and this entry }
+        prompt: { type: string, description: Formatted instruction prompt with a response marker for text-generation training }
+        response: { type: string, description: Source-grounded answer that distinguishes proxies from physical measurements }
+        day: { type: integer, description: One-based source record day }
+        title: { type: string, description: Validated source title }
+        video_id: { type: string, description: Source video identifier }
+        transcript_summary: { type: string, description: Validated source transcript summary }
+        difficulty_epoch_progress: { type: string, description: Source or derived estimated 14-day epoch progress }
+        thermodynamic_signal: { type: string, description: Source or derived qualitative target-distance band }
+    LlmSchemaManifest:
+      type: object
+      description: Machine-readable export parameters, record schema, domain constraints, and verification protocols.
+      required: [schema_version, dataset, endpoints, parameters, record_schema, domain_constraints, verification_protocols, access_policy]
+      properties:
+        schema_version: { type: string }
+        dataset: { type: string }
+        endpoints: { type: object, additionalProperties: true }
+        parameters: { type: object, additionalProperties: true }
+        record_schema: { type: object, additionalProperties: true }
+        domain_constraints: { type: object, additionalProperties: true }
+        verification_protocols: { type: object, additionalProperties: true }
+        access_policy: { type: object, additionalProperties: true }
     ZkPublicInputs:
       type: object
       additionalProperties: false

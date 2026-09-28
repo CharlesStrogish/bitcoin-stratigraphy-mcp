@@ -5,6 +5,76 @@
  * Bitcoin Stratigraphy API with Zero-Knowledge Data Integrity. Paid JSON responses and live SSE telemetry include `zkProof` payloads backed by Groth16/Poseidon BN254 zk-SNARKs. Verify them with `POST /api/v1/zk/verify`; proofs emitted by this API are pre-verified for sub-10ms verification. Access supports L402 multi-asset payments, and records carry Nostr NIP-78 attestations.
  * OpenAPI spec version: 0.1.0
  */
+/**
+ * No per-record ZK proof is present in the source dataset
+ */
+export type HuggingFaceExportRecordZkProofStatus = typeof HuggingFaceExportRecordZkProofStatus[keyof typeof HuggingFaceExportRecordZkProofStatus];
+
+
+export const HuggingFaceExportRecordZkProofStatus = {
+  unavailable: 'unavailable',
+} as const;
+
+export interface HuggingFaceExportRecord {
+  /** Deterministic daily 144-block index label; not a measured block height */
+  height: number;
+  /** UTC midnight for the indexed source date */
+  timestamp: string;
+  /** Source title-derived target-distance proxy; not measured energy */
+  target_multiplier: number;
+  /**
+     * SHA-256 of the validated source fields
+     * @pattern ^[0-9a-f]{64}$
+     */
+  record_hash: string;
+  /** No per-record ZK proof is present in the source dataset */
+  zk_proof_status: HuggingFaceExportRecordZkProofStatus;
+  /** Instruction-tuning question about Bitcoin Stratigraphy terms and this entry */
+  instruction: string;
+  /** Formatted instruction prompt with a response marker for text-generation training */
+  prompt: string;
+  /** Source-grounded answer that distinguishes proxies from physical measurements */
+  response: string;
+  /** One-based source record day */
+  day: number;
+  /** Validated source title */
+  title: string;
+  /** Source video identifier */
+  video_id: string;
+  /** Validated source transcript summary */
+  transcript_summary: string;
+  /** Source or derived estimated 14-day epoch progress */
+  difficulty_epoch_progress: string;
+  /** Source or derived qualitative target-distance band */
+  thermodynamic_signal: string;
+}
+
+export type LlmSchemaManifestEndpoints = { [key: string]: unknown };
+
+export type LlmSchemaManifestParameters = { [key: string]: unknown };
+
+export type LlmSchemaManifestRecordSchema = { [key: string]: unknown };
+
+export type LlmSchemaManifestDomainConstraints = { [key: string]: unknown };
+
+export type LlmSchemaManifestVerificationProtocols = { [key: string]: unknown };
+
+export type LlmSchemaManifestAccessPolicy = { [key: string]: unknown };
+
+/**
+ * Machine-readable export parameters, record schema, domain constraints, and verification protocols.
+ */
+export interface LlmSchemaManifest {
+  schema_version: string;
+  dataset: string;
+  endpoints: LlmSchemaManifestEndpoints;
+  parameters: LlmSchemaManifestParameters;
+  record_schema: LlmSchemaManifestRecordSchema;
+  domain_constraints: LlmSchemaManifestDomainConstraints;
+  verification_protocols: LlmSchemaManifestVerificationProtocols;
+  access_policy: LlmSchemaManifestAccessPolicy;
+}
+
 export interface ZkPublicInputs {
   /**
      * @minimum 0
@@ -882,6 +952,27 @@ export const WalletGatewayErrorError = {
 export interface WalletGatewayError {
   error: WalletGatewayErrorError;
 }
+
+export type ExportHuggingFaceDatasetParams = {
+/**
+ * Maximum number of most recent records; returned in ascending order.
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+/**
+ * JSONL is one JSON object per line; JSON returns an array.
+ */
+format?: ExportHuggingFaceDatasetFormat;
+};
+
+export type ExportHuggingFaceDatasetFormat = typeof ExportHuggingFaceDatasetFormat[keyof typeof ExportHuggingFaceDatasetFormat];
+
+
+export const ExportHuggingFaceDatasetFormat = {
+  jsonl: 'jsonl',
+  json: 'json',
+} as const;
 
 export type HeadPaidStratigraphyParams = {
 /**

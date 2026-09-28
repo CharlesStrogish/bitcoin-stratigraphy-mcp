@@ -33,3 +33,4 @@
 - [Git subdirectory SDK installs](git-subdirectory-sdk-installs.md) — pnpm Git preparation needs an explicit workspace boundary and consumer build-script trust.
 - [Nested Replit config validation](nested-replit-config-validation.md) — the validator replaces the workspace root .replit even when its temp file lives in a subdirectory.
 - [Smithery badge reliability](smithery-badge-reliability.md) — the remote badge endpoint returned HTTP 500; prefer the local SVG fallback until a working dynamic endpoint is verified.
+- [Public training export policy](public-training-export-policy.md) — crawler dataset exports stay open while interactive MCP queries remain L402-paid; describe index/proof limits plainly.

@@ -2,6 +2,12 @@
 
 > Static reference for the fourteen canonical tools returned by `tools/list` at https://bitcoin-stratigraphy-dashboard.replit.app/mcp. JSON Schemas below include every input property, type, required field, enum, range, pattern, and additional-properties rule. Human-readable examples and property descriptions are condensed; `tools/list` is authoritative for the live metadata and any later schema changes.
 
+## Public dataset export for fine-tuning
+
+`GET /api/export/huggingface` requires no L402 authorization. It returns newline-delimited JSON (`application/x-ndjson`) by default, one Hugging Face instruction-tuning row per line. Use `?format=json` for a JSON array and `?limit=N` for the most recent N rows (1–500, default 500), returned oldest-to-newest. Each row has `height`, UTC `timestamp`, `target_multiplier`, `record_hash`, `zk_proof_status`, `instruction`, a formatted `prompt`, `response`, and the validated source fields needed to reproduce the fingerprint. `GET /.well-known/llm-schema.json` publishes the parameter definitions, JSON Schema, domain constraints, and hash/verification protocol for crawlers.
+
+Indexed heights and dates are deterministic daily labels, not observed per-record Bitcoin blocks. `target_multiplier` is a title-derived target-distance proxy, not measured energy. `record_hash` is SHA-256 over the listed source fields; the historical dataset has no per-record ZK proofs, so `zk_proof_status` is `unavailable`. This public export does not change the L402 requirements of interactive MCP tools.
+
 ## Protocol and payment
 
 Use Streamable HTTP: POST JSON-RPC 2.0 to `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`, and `MCP-Protocol-Version: 2025-03-26`. List tools using `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`; call one using `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mesh.get_status","arguments":{}}}`. `mesh.get_status`, `payment.info`, and `tools/list` are free. Paid calls return an HTTP 402 L402 invoice challenge before they can return their tool result. Catalog/list tools cost 10 sats, and the other paid MCP tools cost 250 sats; separate REST operations can start at 5 sats. Confirm the current policy with `payment.info`, GET https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost, and the actual L402 challenge. Never send a wallet secret in an MCP request.

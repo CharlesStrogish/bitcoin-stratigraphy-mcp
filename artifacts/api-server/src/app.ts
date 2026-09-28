@@ -19,6 +19,7 @@ import {
   createSlidingWindowRateLimiter,
 } from "./middleware/rateLimiter";
 import { registerSystemHealthRoute } from "./routes/system-health";
+import { registerLlmExportRoutes } from "./routes/llm-export";
 
 const app: Express = express();
 const revenueLedger = createPostgresRevenueLedger();
@@ -105,6 +106,7 @@ registerMcpRoute(app, { usageStore: macaroonUsageStore, ledger: revenueLedger })
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);
+registerLlmExportRoutes(app);
 app.use("/api", router);
 registerStratigraphyRoutes(
   app,

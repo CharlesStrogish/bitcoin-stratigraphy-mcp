@@ -19,6 +19,7 @@ import {
 } from "./mcp-server-card";
 import { registerOpenApiRoute } from "./openapi";
 import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
+import { registerLlmExportRoutes } from "./llm-export";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
 import type { PaymentChallengeStore } from "../lib/payment-challenge-store";
 import { createPostgresPaymentChallengeStore } from "../lib/postgres-payment-challenge-store";
@@ -381,6 +382,7 @@ registerMcpRoute(app, {
   }),
 });
 registerNostrStatusRoute(app);
+registerLlmExportRoutes(app);
 app.use("/api", healthRouter);
 registerStratigraphyRoutes(app, () => ({
   lookupInvoice: async () => {
@@ -4855,6 +4857,53 @@ test("keeps the free sample at exactly five records", async () => {
       "string",
     );
   }
+});
+
+test("serves a public, verifiable JSONL export and a crawler schema manifest", async () => {
+  const invoicesBefore = invoiceRequestCount;
+  const exported = await fetch(`${baseUrl}/api/export/huggingface`);
+  assert.equal(exported.status, 200);
+  assert.match(exported.headers.get("content-type") ?? "", /application\/x-ndjson/);
+  assert.equal(exported.headers.get("www-authenticate"), null);
+  const text = await exported.text();
+  assert.ok(text.endsWith("\n"));
+  const lines = text.trimEnd().split("\n");
+  assert.equal(lines.length, 422);
+  const rows = lines.map((line) => JSON.parse(line) as Record<string, any>);
+  assert.ok(rows.every((row) => row.zk_proof_status === "unavailable"));
+  assert.equal(rows.at(-1)?.height, 920000);
+  assert.equal(rows.at(-1)?.timestamp, "2026-09-09T00:00:00.000Z");
+  assert.equal(rows[0].height, 920000 - 421 * 144);
+  for (const row of [rows[0], rows.at(-1)!]) {
+    assert.equal(row.record_hash, createHash("sha256").update(JSON.stringify([
+      row.day, row.title, row.video_id, row.transcript_summary,
+      row.target_multiplier, row.difficulty_epoch_progress, row.thermodynamic_signal,
+    ])).digest("hex"));
+    assert.match(row.instruction, /thermodynamic truth/);
+    assert.equal(row.prompt, `### Instruction:\n${row.instruction}\n### Response:\n`);
+    assert.match(row.response, /not independently measured physical truth/);
+  }
+  const json = await fetch(`${baseUrl}/api/export/huggingface?format=json&limit=2`);
+  assert.equal(json.status, 200);
+  assert.match(json.headers.get("content-type") ?? "", /application\/json/);
+  const selected = await json.json() as typeof rows;
+  assert.deepEqual(selected, rows.slice(-2));
+  for (const query of ["limit=0", "limit=501", "limit=abc", "limit=1&limit=2", "format=csv", "extra=1"]) {
+    const response = await fetch(`${baseUrl}/api/export/huggingface?${query}`);
+    assert.equal(response.status, 400, query);
+  }
+  assert.equal(invoiceRequestCount, invoicesBefore);
+  const schema = await fetch(`${baseUrl}/.well-known/llm-schema.json`);
+  assert.equal(schema.status, 200);
+  const manifest = await schema.json() as Record<string, any>;
+  assert.equal(manifest.endpoints.export, "/api/export/huggingface");
+  assert.equal(manifest.parameters.limit.default, 500);
+  assert.deepEqual(manifest.parameters.format.enum, ["jsonl", "json"]);
+  assert.deepEqual(manifest.record_schema, (openApiDocument as any).components.schemas.HuggingFaceExportRecord);
+  assert.match(manifest.verification_protocols.record_hash.canonicalization, /JSON\.stringify/);
+  assert.match(manifest.domain_constraints.proof_availability, /no per-record ZK proofs/);
+  assert.equal((openApiDocument as any).paths["/export/huggingface"].get.security.length, 0);
+  assert.equal((openApiDocument as any).paths["/.well-known/llm-schema.json"].get.servers[0].url, "/");
 });
 
 test("supplies nonzero quantitative multipliers across the primary dataset", async () => {

@@ -9,6 +9,57 @@ import * as zod from 'zod';
 
 
 /**
+ * Export the most recent indexed entries in chronological order. Heights and timestamps are deterministic daily index labels, not observed Bitcoin blocks. A record hash fingerprints validated source fields, not a block or ZK proof; source entries have no per-record ZK proofs. No L402 authorization is required.
+ * @summary Public Hugging Face instruction-tuning dataset export
+ */
+export const exportHuggingFaceDatasetQueryLimitDefault = 500;
+export const exportHuggingFaceDatasetQueryLimitMax = 500;
+
+export const exportHuggingFaceDatasetQueryFormatDefault = `jsonl`;
+
+export const ExportHuggingFaceDatasetQueryParams = zod.object({
+  "limit": zod.coerce.number().int().min(1).max(exportHuggingFaceDatasetQueryLimitMax).default(exportHuggingFaceDatasetQueryLimitDefault).describe('Maximum number of most recent records; returned in ascending order.'),
+  "format": zod.enum(['jsonl', 'json']).default(exportHuggingFaceDatasetQueryFormatDefault).describe('JSONL is one JSON object per line; JSON returns an array.')
+})
+
+export const exportHuggingFaceDatasetResponseRecordHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ExportHuggingFaceDatasetResponseItem = zod.object({
+  "height": zod.number().int().describe('Deterministic daily 144-block index label; not a measured block height'),
+  "timestamp": zod.coerce.date().describe('UTC midnight for the indexed source date'),
+  "target_multiplier": zod.number().describe('Source title-derived target-distance proxy; not measured energy'),
+  "record_hash": zod.string().regex(exportHuggingFaceDatasetResponseRecordHashRegExp).describe('SHA-256 of the validated source fields'),
+  "zk_proof_status": zod.enum(['unavailable']).describe('No per-record ZK proof is present in the source dataset'),
+  "instruction": zod.string().describe('Instruction-tuning question about Bitcoin Stratigraphy terms and this entry'),
+  "prompt": zod.string().describe('Formatted instruction prompt with a response marker for text-generation training'),
+  "response": zod.string().describe('Source-grounded answer that distinguishes proxies from physical measurements'),
+  "day": zod.number().int().describe('One-based source record day'),
+  "title": zod.string().describe('Validated source title'),
+  "video_id": zod.string().describe('Source video identifier'),
+  "transcript_summary": zod.string().describe('Validated source transcript summary'),
+  "difficulty_epoch_progress": zod.string().describe('Source or derived estimated 14-day epoch progress'),
+  "thermodynamic_signal": zod.string().describe('Source or derived qualitative target-distance band')
+})
+export const ExportHuggingFaceDatasetResponse = zod.array(ExportHuggingFaceDatasetResponseItem)
+
+
+/**
+ * @summary Public machine-readable dataset export schema and verification rules
+ */
+export const GetLlmSchemaManifestResponse = zod.object({
+  "schema_version": zod.string(),
+  "dataset": zod.string(),
+  "endpoints": zod.record(zod.string(), zod.unknown()),
+  "parameters": zod.record(zod.string(), zod.unknown()),
+  "record_schema": zod.record(zod.string(), zod.unknown()),
+  "domain_constraints": zod.record(zod.string(), zod.unknown()),
+  "verification_protocols": zod.record(zod.string(), zod.unknown()),
+  "access_policy": zod.record(zod.string(), zod.unknown())
+}).describe('Machine-readable export parameters, record schema, domain constraints, and verification protocols.')
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

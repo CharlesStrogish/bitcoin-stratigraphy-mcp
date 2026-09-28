@@ -9,8 +9,8 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Express, NextFunction, Request, Response } from "express";
-import { createHash } from "node:crypto";
 import { z } from "zod";
+import { digestRecord, snapshotBlock, snapshotDate } from "./stratigraphy-index";
 import {
   attenuateSubscriptionMacaroon,
   getMacaroonSignatureId,
@@ -747,9 +747,6 @@ const meshStatusJsonProperties = {
   ),
 };
 
-const LATEST_DATASET_DATE = "2026-09-09";
-const LATEST_DATASET_BLOCK = 920_000;
-const BLOCKS_PER_RECORDED_EPOCH = 144;
 const DAY_MS = 86_400_000;
 const catalogMetricNames = [
   "day",
@@ -760,18 +757,6 @@ const catalogMetricNames = [
   "quantitative_alpha.difficulty_epoch_progress",
   "quantitative_alpha.thermodynamic_signal",
 ] as const;
-
-function snapshotDate(index: number, total: number): string {
-  return new Date(
-    Date.parse(`${LATEST_DATASET_DATE}T00:00:00.000Z`) -
-      (total - index - 1) * DAY_MS,
-  ).toISOString().slice(0, 10);
-}
-
-function snapshotBlock(index: number, total: number): number {
-  return LATEST_DATASET_BLOCK -
-    (total - index - 1) * BLOCKS_PER_RECORDED_EPOCH;
-}
 
 async function stratigraphyCatalog() {
   const records = await getStratigraphyData();
@@ -859,20 +844,6 @@ async function queryStratigraphy(
 }
 
 type StratumRecord = Awaited<ReturnType<typeof getStratigraphyData>>[number];
-
-// The dataset has no block hash, energy or per-record proof. This fingerprint
-// hashes only validated source fields, never a synthetic block or proof.
-function digestRecord(record: StratumRecord, index: number, total: number) {
-  const height = snapshotBlock(index, total);
-  const date = snapshotDate(index, total);
-  const targetMultiplier = record.quantitative_alpha.target_multiplier;
-  const recordHash = createHash("sha256").update(JSON.stringify([
-    record.day, record.title, record.video_id, record.transcript_summary,
-    targetMultiplier, record.quantitative_alpha.difficulty_epoch_progress,
-    record.quantitative_alpha.thermodynamic_signal,
-  ])).digest("hex");
-  return { height, date, targetMultiplier, recordHash };
-}
 
 function indexedStratumIndex(target: string, records: StratumRecord[]): number {
   if (records.length === 0) throw new RangeError("No indexed stratigraphy records available");

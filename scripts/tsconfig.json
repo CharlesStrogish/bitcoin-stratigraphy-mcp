@@ -12,6 +12,7 @@
     "test-l402.ts",
     "test-dvm-client.ts",
     "test-mcp-health.ts",
+    "test-live-agent.ts",
     "test-e2e-master.ts",
     "test-nostr.ts"
   ]

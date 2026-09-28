@@ -32,6 +32,7 @@
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
 - [Published domain changes](published-domain-changes.md) — a target change can leave the former .replit.app address at “isn't live yet”; verify the current primary URL before advertising endpoints.
 - [Git subdirectory SDK installs](git-subdirectory-sdk-installs.md) — pnpm Git preparation needs an explicit workspace boundary and consumer build-script trust.
+- [Vendored archive integrity](vendored-archive-integrity.md) — a repacked local SDK archive can make unrelated frozen installs fail after lockfile regeneration.
 - [Nested Replit config validation](nested-replit-config-validation.md) — the validator replaces the workspace root .replit even when its temp file lives in a subdirectory.
 - [Smithery badge reliability](smithery-badge-reliability.md) — the remote badge endpoint returned HTTP 500; prefer the local SVG fallback until a working dynamic endpoint is verified.
 - [Public training export policy](public-training-export-policy.md) — crawler dataset exports stay open while interactive MCP queries remain L402-paid; describe index/proof limits plainly.

@@ -14,3 +14,9 @@ For an explicit MCP tool rename, advertise only the canonical name, but keep the
 **Why:** Previously issued paid credentials must remain valid for legacy callers without letting an alias bypass payment. A convincing but incorrect receipt field or omitted lookup selector can make a schema-validating client reject actual server responses.
 
 **How to apply:** Update discovery, server cards, cost metadata, docs, SDK helpers, gate lookup, and handler dispatch together; compare canonical descriptions and input/output schemas end-to-end, and test legacy and canonical payments independently.
+
+For description-only quality work, verify semantic coverage and exact contract parity rather than enforcing a fixed sentence count or incidental prose phrases.
+
+**Why:** Earlier description tests encoded a previous writing style and rejected accurate, structured purpose/usage/consequences guidance even though the advertised behavior was unchanged.
+
+**How to apply:** Check every advertised tool has truthful boundaries, usage guidance, cost and failure notes, and that shared metadata matches; retain independent assertions for critical facts and exact tool count.

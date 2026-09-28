@@ -24,7 +24,7 @@ tags:
     description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
 x-mcp-tools:
   proof.get_by_hash:
-    description: "Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors."
+    description: "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error."
     inputSchema:
       type: object
       additionalProperties: false
@@ -32,11 +32,11 @@ x-mcp-tools:
         hash:
           type: string
           pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
-          description: Proof or receipt hash, exact CID, decimal snapshot digest, UUID job ID, or grounded-context contextHash.
+          description: Required when jobId is absent; accepts a proof/receipt 64-hex hash (optional 0x), decimal snapshot digest, IPFS CID, or UUID submission job ID; unknown identifiers return 404 before payment.
         jobId:
           type: string
           format: uuid
-          description: UUID returned by proof.submit; may be used instead of hash.
+          description: UUID returned by proof.submit; use instead of hash, never together.
       required: []
       oneOf:
         - required: [hash]
@@ -64,12 +64,12 @@ x-mcp-tools:
         otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
       required: [kind, hash, status, timestamp, provenanceVerified]
   payment.info:
-    description: "Retrieve L402 pricing rates, Lightning invoice requirements, and Macaroon authentication specs. This informational tool does not create invoices or settle payments; execution occurs dynamically via HTTP L402 challenge/preimage settlement on paid tool calls."
+    description: "PURPOSE & BOUNDARIES: Read configured MCP prices, Lightning invoice requirements, and macaroon authentication rules; this tool never creates an invoice or settles payment. USAGE GUIDELINES: Use this to estimate costs before a paid tool call; use `proof.attenuate` to restrict an existing token, not to pay. BEHAVIOR & CONSEQUENCES: Free and read-only. Paid execution dynamically uses an HTTP L402 challenge and preimage settlement without valid credentials; unknown toolName or malformed input returns an error."
     inputSchema:
       type: object
       additionalProperties: false
       properties:
-        toolName: { type: string, minLength: 1 }
+        toolName: { type: string, minLength: 1, description: "Optional nonempty canonical MCP tool name (e.g. 'stratigraphy.digest'); narrows perToolSats, while omission returns all tool prices. Unknown names fail validation." }
       required: []
     outputSchema:
       type: object
@@ -107,7 +107,7 @@ x-mcp-tools:
           required: [authorizationHeader, scope, maxRequests]
       required: [standardInvoiceSats, perToolSats, acceptedPaymentMethods, invoiceExpirySeconds, challenge, activeAuthSchemes, macaroonRequirements]
   stratigraphy.range:
-    description: "Retrieve an ascending batch of compressed indexed daily strata between height or date bounds. Do NOT use for full uncompressed records (use `stratigraphy.get`) or a single summary digest (use `stratigraphy.digest`)."
+    description: "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.digest` for a single compact summary or `stratigraphy.diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences."
     inputSchema:
       type: object
       additionalProperties: false
@@ -115,14 +115,14 @@ x-mcp-tools:
         startTarget:
           type: string
           pattern: "^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
-          description: Starting indexed block height or ISO date, inclusive.
+          description: Required inclusive starting indexed height (e.g. '850000') or UTC ISO date (e.g. '2026-01-01'); must resolve no later than endTarget.
         endTarget:
           type: string
           pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
           default: latest
-          description: Ending indexed block height or ISO date, inclusive; latest selects the newest indexed entry.
-        limit: { type: number, minimum: 1, maximum: 100, default: 50 }
-        format: { type: string, enum: [compact, minimal, kv], default: compact }
+          description: Optional inclusive ending indexed height, UTC ISO date, or 'latest' (default latest indexed entry, not live tip); must resolve no earlier than startTarget.
+        limit: { type: number, minimum: 1, maximum: 100, default: 50, description: "Maximum compressed records returned from startTarget toward endTarget, 1-100 (default 50); smaller limits truncate the batch." }
+        format: { type: string, enum: [compact, minimal, kv], default: compact, description: "Compression of every returned record; does not change selected bounds." }
       required: [startTarget]
     outputSchema:
       type: object
@@ -144,17 +144,18 @@ x-mcp-tools:
           items: { type: [string, array, object] }
       required: [range, count, format, records]
   proof.attenuate:
-    description: "Derive attenuated Macaroon sub-tokens with embedded caveats (time-to-live limits, max target bounds, tool restriction) for delegated agent swarms."
+    description: "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened."
     inputSchema:
       type: object
       additionalProperties: false
       properties:
-        macaroon: { type: string, minLength: 1, maxLength: 8192 }
+        macaroon: { type: string, minLength: 1, maxLength: 8192, description: "Required authentic, unexpired parent L402 macaroon (1-8192 characters); restrictions can only narrow its scope." }
         caveats:
           type: array
           maxItems: 16
+          description: "Required list of 0-16 supported restrictions such as max_target=870000 or allowed_tools=stratigraphy.get; combines with inherited parent caveats."
           items: { type: string, minLength: 1, maxLength: 256 }
-        ttlSeconds: { type: number, minimum: 1, maximum: 2592000 }
+        ttlSeconds: { type: number, minimum: 1, maximum: 2592000, description: "Optional integer TTL of 1-2592000 seconds; adds an expiry caveat without extending the parent's expiry." }
       required: [macaroon, caveats]
     outputSchema:
       type: object
@@ -168,7 +169,7 @@ x-mcp-tools:
         issuedAt: { type: string, format: date-time }
       required: [status, attenuatedMacaroon, appliedCaveats, issuedAt]
   stratigraphy.diff:
-    description: "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call."
+    description: "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error."
     inputSchema:
       type: object
       additionalProperties: false
@@ -176,12 +177,12 @@ x-mcp-tools:
         fromTarget:
           type: string
           pattern: "^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
-          description: Starting indexed height or ISO date; required.
+          description: "Required baseline indexed height (e.g. '850000') or UTC ISO date (e.g. '2026-01-01'); compared with toTarget to calculate signed deltas. Either chronological order is allowed; only indexed entries resolve."
         toTarget:
           type: string
           pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
           default: latest
-          description: Ending indexed height or ISO date; latest is the latest indexed dataset entry, not the live Bitcoin tip.
+          description: "Optional comparison indexed height (e.g. '919856'), UTC ISO date (e.g. '2026-09-01'), or 'latest' (default); deltas are toTarget minus fromTarget. 'latest' is the latest dataset entry, not the live Bitcoin tip."
       required: [fromTarget]
     outputSchema:
       type: object
@@ -207,7 +208,7 @@ x-mcp-tools:
           required: [heightDelta, multiplierDelta, percentageChange, timeSpanDays]
       required: [from, to, delta]
   stratigraphy.digest:
-    description: "Retrieve a compressed, token-optimized summary digest of indexed thermodynamic state for an LLM context window. Do NOT use for full uncompressed records (use `stratigraphy.get`) or compressed per-record range batches (use `stratigraphy.range`)."
+    description: "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.range` for compressed per-record batches or `stratigraphy.diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs."
     inputSchema:
       type: object
       additionalProperties: false
@@ -236,7 +237,7 @@ x-mcp-tools:
           description: False because indexed source entries do not store per-record ZK proofs.
       required: [result, proofAvailable]
   mesh.get_status:
-    description: "Retrieve P2P mesh health, active peer connections, and synchronization metrics to assess peer availability. Inbound peer subscription state is not exposed. Do NOT use to publish outbound telemetry (use `mesh.broadcast`)."
+    description: "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error."
     legacyNames: [mesh.status]
     inputSchema:
       type: object
@@ -255,7 +256,7 @@ x-mcp-tools:
         quorumThreshold: { type: integer, minimum: 1 }
       required: [nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, quorumThreshold]
   proof.ground:
-    description: "Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT use for stateless proof verification without anchoring (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`)."
+    description: "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required."
     inputSchema:
       type: object
       additionalProperties: false
@@ -351,7 +352,7 @@ x-mcp-tools:
         otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
       required: [receipt, provenanceVerified]
   proof.verify:
-    description: "Verify a Groth16 proof. Telemetry verification is offline; drift verification consults a Bitcoin block provider. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`)."
+    description: "PURPOSE & BOUNDARIES: Verify a Groth16 telemetry or drift proof without submitting it or creating a new anchor; telemetry verification is offline, while drift checks consult a Bitcoin block provider. USAGE GUIDELINES: Use this instead of `proof.submit` for validation without ingestion, or `proof.ground` when a signed Bitcoin-tip receipt is needed. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed or mismatched proof inputs fail validation, and drift verification requires a reachable block provider."
     inputSchema:
       type: object
       description: Verify either a telemetry snapshot proof or a zk.drift.v1 context-drift proof.
@@ -425,7 +426,7 @@ x-mcp-tools:
           description: Server-side proof verification duration in milliseconds.
       required: [valid, verifiedAt, computationTimeMs]
   proof.submit:
-    description: "Submit new ZK proof instances to process memory. Do NOT use to verify existing proofs (use `proof.verify`)."
+    description: "PURPOSE & BOUNDARIES: Validate and ingest a new Groth16 proof and its five public signals, then attempt Nostr NIP-78 attestation; this changes process state. USAGE GUIDELINES: Use `proof.verify` for verification without submission, `proof.get_by_hash` for retained submissions, or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately."
     inputSchema:
       type: object
       additionalProperties: false
@@ -474,9 +475,9 @@ x-mcp-tools:
         attestationStatus: { type: string }
       required: [proofHash, jobId, status, submittedAt, attestationStatus]
   mesh.broadcast:
-    description: "Broadcast a signed stored telemetry snapshot to mesh peers for inbound validation and acknowledgment. Do NOT use to inspect node mesh status (use `mesh.get_status`) or publish inbound peer sync messages (not supported)."
+    description: "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors."
   stratigraphy.get:
-    description: "Retrieve full indexed stratum records by date or block height, including single-record lookups and bounded queries. Do NOT use for compressed record batches (use `stratigraphy.range`) or condensed context digests (use `stratigraphy.digest`)."
+    description: "PURPOSE & BOUNDARIES: Retrieve full indexed daily telemetry records by date, indexed height, recent days, or inclusive bounds. USAGE GUIDELINES: Use this instead of `stratigraphy.range` for uncompressed records; use `stratigraphy.digest` for a compact summary and `stratigraphy.list` to discover available bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups."
 security:
   - L402: []
 paths:

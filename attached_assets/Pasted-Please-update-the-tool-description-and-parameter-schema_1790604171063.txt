@@ -1,0 +1,21 @@
+Please update the tool description and parameter schema for `stratigraphy.diff` (and apply this exact pattern across all 14 MCP tools) to achieve 5/5 across all individual tool TDQS metrics:
+
+1. REFACTOR `stratigraphy.diff` TOOL DESCRIPTION:
+   "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata.
+
+   - PURPOSE & BOUNDARIES: Calculates exact numerical deltas between two distinct block strata. Use `stratigraphy.diff` instead of `stratigraphy.digest` when needing quantitative variance between two endpoints rather than a single-block compressed text summary.
+   - USAGE GUIDELINES: Use `stratigraphy.diff` instead of `stratigraphy.get` or `stratigraphy.range` when comparing two specific block heights or dates in a single operation. Use `stratigraphy.get` for single-block data, `stratigraphy.range` for contiguous raw block sequences, and `stratigraphy.list` for browsing catalog availability.
+   - BEHAVIOR & CONSEQUENCES: Read-only and idempotent. Requires L402 payment challenge for unauthenticated callers. `fromTarget` must represent a block height chronologically prior to or equal to `toTarget`. Returns an error response if either requested height is unindexed or out of dataset bounds."
+
+2. REFACTOR `stratigraphy.diff` PARAMETER SCHEMAS:
+   - `fromTarget`: "Starting baseline block height (e.g. '850000') or ISO date string (e.g. '2026-01-01'). Required. Interacts with `toTarget` to set the baseline origin for delta calculations; must be <= `toTarget`."
+   - `toTarget`: "Ending comparison block height (e.g. '919856'), ISO date string (e.g. '2026-09-01'), or 'latest'. Optional (defaults to 'latest'). Defines the target state compared against `fromTarget`."
+
+3. APPLY THIS STRUCTURED SCHEMA PATTERN TO ALL 14 MCP TOOLS:
+   - Every tool description in `src/mcp/` must include:
+     a) Explicit Purpose & Boundary (How it differs from its closest sibling).
+     b) Usage Guidelines ('Use X instead of Y when Z' rules).
+     c) Behavior & Consequences (L402 cost, order constraints, and failure modes on invalid inputs).
+   - Parameter descriptions must explain parameter interactions, valid ranges, and operational intent.
+
+4. Run workspace typechecks, verify API tests pass, and restart the server advertising the updated 14-tool registry.

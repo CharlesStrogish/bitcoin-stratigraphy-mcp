@@ -1130,11 +1130,11 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Retrieve full indexed stratum records by date or block height, including single-record lookups and bounded queries. Do NOT use for compressed record batches (use `stratigraphy.range`) or condensed context digests (use `stratigraphy.digest`).",
+      "PURPOSE & BOUNDARIES: Retrieve full indexed daily telemetry records by date, indexed height, recent days, or inclusive bounds. USAGE GUIDELINES: Use this instead of `stratigraphy.range` for uncompressed records; use `stratigraphy.digest` for a compact summary and `stratigraphy.list` to discover available bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Stratigraphy telemetry query parameters.",
+      description: "Choose recent days, one date/indexed height, or an inclusive date/height range; selector modes cannot be combined. Limit and metrics refine the selected records.",
       examples: [
         { days: 7, limit: 7 },
         { date: "2026-09-09", limit: 1 },
@@ -1146,13 +1146,13 @@ const baseMcpToolDefinitions = [
       properties: {
         days: field(
           "integer",
-          "Count of recent days of telemetry to fetch (integer, 1-365).",
+          "Fetch the most recent 1-365 indexed daily records (e.g. 7), capped by limit; cannot combine with date, blockHeight, or range bounds.",
           [7],
           { minimum: 1, maximum: 365 },
         ),
         date: field(
           "string",
-          "Calendar date selecting one telemetry day, formatted as YYYY-MM-DD in UTC.",
+          "Select one indexed UTC day (YYYY-MM-DD, e.g. '2026-09-19'); cannot combine with days, blockHeight, or range bounds.",
           ["2026-09-19"],
           {
             format: "date",
@@ -1162,13 +1162,13 @@ const baseMcpToolDefinitions = [
         ),
         blockHeight: field(
           "integer",
-          "Indexed Bitcoin block height selecting one telemetry record (non-negative integer).",
+          "Select one indexed non-negative dataset height (e.g. 850000), not an arbitrary live chain lookup; cannot combine with days, date, or range bounds.",
           [850000],
           { minimum: 0 },
         ),
         metrics: field(
           "array",
-          "Array of specific telemetry metric key strings to project into returned records.",
+          "Unique telemetry metric keys to project into each selected record's quantitative_alpha; omit for all metrics, or choose one or more allowed names.",
           [["target_multiplier"]],
           {
             minItems: 1,
@@ -1215,7 +1215,7 @@ const baseMcpToolDefinitions = [
         ),
         limit: field(
           "integer",
-          "Maximum number of records to return (integer, 1-100).",
+          "Cap records returned by the chosen selector at 1-100 (default 10); does not expand days or range bounds.",
           [10],
           { minimum: 1, maximum: 100, default: 10 },
         ),
@@ -1242,7 +1242,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "Retrieve a compressed, token-optimized summary digest of indexed thermodynamic state for an LLM context window. Do NOT use for full uncompressed records (use `stratigraphy.get`) or compressed per-record range batches (use `stratigraphy.range`).",
+      "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.range` for compressed per-record batches or `stratigraphy.diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1295,7 +1295,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.diff",
     title: "Compare Stratigraphy Strata",
     description:
-      "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call.",
+      "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1304,19 +1304,19 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Select two indexed daily strata by height or ISO date; latest refers to the latest indexed entry, not the live chain tip.",
+      description: "Compare a required baseline indexed height or UTC date with an optional endpoint; either order is valid and produces signed deltas. latest refers to the latest indexed entry, not the live chain tip.",
       examples: [{ fromTarget: "919856", toTarget: "latest" }, { fromTarget: "2026-09-08", toTarget: "2026-09-09" }],
       additionalProperties: false,
       properties: {
         fromTarget: field(
           "string",
-          "Starting block height or ISO date string (e.g. '850000' or '2026-01-01'). Only indexed dataset heights are supported.",
+          "Required baseline indexed height (e.g. '850000') or UTC ISO date (e.g. '2026-01-01'); compared with toTarget to calculate signed deltas. Either chronological order is allowed; only indexed entries resolve.",
           ["919856", "2026-09-08"],
           { pattern: diffTargetPattern },
         ),
         toTarget: field(
           "string",
-          "Ending block height or ISO date string. 'latest' means the latest indexed entry, not the live Bitcoin tip.",
+          "Optional comparison indexed height (e.g. '919856'), UTC ISO date (e.g. '2026-09-01'), or 'latest' (default); deltas are toTarget minus fromTarget. 'latest' is the latest dataset entry, not the live Bitcoin tip.",
           ["latest", "920000", "2026-09-09"],
           { pattern: diffEndTargetPattern, default: "latest" },
         ),
@@ -1356,7 +1356,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.range",
     title: "Get Stratigraphy Range",
     description:
-      "Retrieve an ascending batch of compressed indexed daily strata between height or date bounds. Do NOT use for full uncompressed records (use `stratigraphy.get`) or a single summary digest (use `stratigraphy.digest`).",
+      "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.digest` for a single compact summary or `stratigraphy.diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1369,10 +1369,10 @@ const baseMcpToolDefinitions = [
       examples: [{ startTarget: "919712", endTarget: "latest", limit: 3, format: "kv" }, { startTarget: "2026-09-08", endTarget: "2026-09-09", format: "minimal" }],
       additionalProperties: false,
       properties: {
-        startTarget: field("string", "Starting block height or ISO date string (e.g. '850000' or '2026-01-01').", ["919712", "2026-09-07"], { pattern: diffTargetPattern }),
-        endTarget: field("string", "Ending block height or ISO date string.", ["latest", "920000", "2026-09-09"], { pattern: diffEndTargetPattern, default: "latest" }),
-        limit: field("number", "Maximum number of strata entries to return in the batch.", [50], { minimum: 1, maximum: 100, default: 50 }),
-        format: field("string", "Payload compression format applied to each item in the batch.", ["compact", "minimal", "kv"], { enum: ["compact", "minimal", "kv"], default: "compact" }),
+        startTarget: field("string", "Required inclusive starting indexed height (e.g. '850000') or UTC ISO date (e.g. '2026-01-01'); must resolve no later than endTarget.", ["919712", "2026-09-07"], { pattern: diffTargetPattern }),
+        endTarget: field("string", "Optional inclusive ending indexed height, UTC ISO date, or 'latest' (default: latest indexed entry, not live tip); must resolve no earlier than startTarget.", ["latest", "920000", "2026-09-09"], { pattern: diffEndTargetPattern, default: "latest" }),
+        limit: field("number", "Maximum compressed records returned from startTarget toward endTarget, 1-100 (default 50); smaller limits truncate the batch.", [50], { minimum: 1, maximum: 100, default: 50 }),
+        format: field("string", "Compression of every returned record: compact (default), minimal, or kv; does not change selected bounds.", ["compact", "minimal", "kv"], { enum: ["compact", "minimal", "kv"], default: "compact" }),
       },
       required: ["startTarget"],
     },
@@ -1408,12 +1408,12 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "Discover Bitcoin Stratigraphy catalog bounds, indexed block heights, date ranges, and metric keys before calling stratigraphy.get; pass an empty object and do not use this tool to fetch telemetry records. Returns a JSON object with totalSnapshots, oldestBlock, newestBlock, availableMetrics, and inclusive dateBounds containing startDate and endDate. This read-only catalog call costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects unexpected input with JSON-RPC -32602.",
+      "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Read-only; costs 10 sats via HTTP L402 without valid credentials and shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
       description:
-        "No input parameters required.",
+        "Pass {} to discover catalog bounds before selecting records; any parameter is rejected.",
       examples: [{}],
       additionalProperties: false,
       properties: {},
@@ -1502,7 +1502,7 @@ const baseMcpToolDefinitions = [
     name: "proof.attenuate",
     title: "Attenuate a Macaroon",
     description:
-      "Derive attenuated Macaroon sub-tokens with embedded caveats (time-to-live limits, max target bounds, tool restriction) for delegated agent swarms.",
+      "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1511,16 +1511,16 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Derive a narrower child of an authentic, unexpired subscription macaroon; this delegation call does not issue a payment invoice.",
+      description: "Provide an authentic parent macaroon, an array of restrictions, and optional TTL; child caveats intersect with inherited constraints and no payment invoice is issued.",
       examples: [{ macaroon: "base64url-parent-macaroon", caveats: ["allowed_tools = stratigraphy.get,stratigraphy.digest", "max_target = 870000"], ttlSeconds: 3600 }],
       additionalProperties: false,
       properties: {
-        macaroon: field("string", "Base L402 Macaroon string to attenuate.", ["base64url-parent-macaroon"], { minLength: 1, maxLength: 8192 }),
+        macaroon: field("string", "Required authentic, unexpired parent L402 macaroon (1-8192 characters); caveats and ttlSeconds can only narrow its scope.", ["base64url-parent-macaroon"], { minLength: 1, maxLength: 8192 }),
         caveats: field("array", "List of restriction caveats to append (e.g. ['time_before = 2026-12-31', 'max_target = 870000', 'allowed_tools = stratigraphy.get,stratigraphy.digest']). Existing allowed_path and max_requests restrictions are also supported.", [["time_before = 2026-12-31", "max_target = 870000", "allowed_tools = stratigraphy.get,stratigraphy.digest"]], {
           maxItems: 16,
           items: field("string", "One supported restriction caveat.", ["max_target = 870000"], { minLength: 1, maxLength: 256 }),
         }),
-        ttlSeconds: field("number", "Optional time-to-live in seconds to automatically append an expiration caveat. Must be a positive integer of at most 30 days.", [3600], {
+        ttlSeconds: field("number", "Optional positive integer TTL of 1-2592000 seconds (e.g. 3600); appends an expiration caveat without extending the parent's expiry.", [3600], {
           minimum: 1, maximum: 2_592_000,
         }),
       },
@@ -1546,7 +1546,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Verify a Groth16 proof. Telemetry verification is offline; drift verification consults a Bitcoin block provider. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`).",
+      "PURPOSE & BOUNDARIES: Verify a Groth16 telemetry or drift proof without submitting it or creating a new anchor; telemetry verification is offline, while drift checks consult a Bitcoin block provider. USAGE GUIDELINES: Use this instead of `proof.submit` for validation without ingestion, or `proof.ground` when a signed Bitcoin-tip receipt is needed. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed or mismatched proof inputs fail validation, and drift verification requires a reachable block provider.",
     annotations: proofVerificationToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1848,7 +1848,7 @@ const baseMcpToolDefinitions = [
     name: "proof.get_by_hash",
     title: "Get Proof or Receipt by Hash",
     description:
-      "Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors.",
+      "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1857,17 +1857,17 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Look up a proof hash, signed receipt hash or CID, decimal snapshot digest, or proof submission job ID. Unknown identifiers return HTTP 404 before payment.",
+      description: "Supply exactly one of hash or jobId to retrieve an exact retained proof/receipt or lifecycle state. Unknown identifiers return HTTP 404 before payment.",
       examples: [{ hash: `0x${"ab".repeat(32)}` }, { hash: "Qm" + "a".repeat(44) }],
       additionalProperties: false,
       properties: {
         hash: field(
           "string",
-          "Cryptographic hash, snapshot digest, IPFS CID, or submission job ID to query.",
+          "Required when jobId is absent: proof/receipt 64-hex hash (optional 0x), decimal snapshot digest, IPFS CID, or UUID submission job ID; unknown identifiers return 404.",
           [`0x${"ab".repeat(32)}`, "Qm" + "a".repeat(44)],
           { pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$" },
         ),
-        jobId: field("string", "UUID returned by proof.submit; use instead of hash.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
+        jobId: field("string", "UUID returned by proof.submit (e.g. '123e4567-e89b-42d3-a456-426614174000'); use instead of hash, never together.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
       },
       oneOf: [{ required: ["hash"] }, { required: ["jobId"] }],
     },
@@ -1907,12 +1907,12 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "List recent proof attestations in bounded process memory with optional status, limit (1-100, default 20), and offset (0-1000, default 0); use this tool to discover hashes or review historical states, not to submit proofs (use proof.submit) or ground context (use proof.ground). Returns a JSON object containing newest-first attestations with proofHash, snapshotDigest, status, submittedAt, attestationCount, and meshQuorum, plus total before pagination. This read-only listing costs 10 sats through L402, shares a 60-requests-per-minute IP limit, and rejects invalid filters with JSON-RPC -32602.",
+      "PURPOSE & BOUNDARIES: List recent proof attestation states newest-first from bounded process memory, with total before pagination; this does not retrieve full proof payloads. USAGE GUIDELINES: Use this to discover hashes before `proof.get_by_hash`; do not use it to submit proofs (`proof.submit`) or anchor context (`proof.ground`). BEHAVIOR & CONSEQUENCES: Read-only; costs 10 sats via HTTP L402 without valid credentials and shares a 60-requests-per-minute IP limit. Invalid status or pagination filters return JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
       description:
-        "Input options for listing and discovering historical zk-SNARK proof attestations.",
+        "Filter bounded proof attestations by lifecycle status, then paginate newest-first with limit and offset; omit all fields for the first default page.",
       examples: [{ limit: 20, offset: 0, status: "verified" }],
       additionalProperties: false,
       properties: {
@@ -2045,7 +2045,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "Submit new ZK proof instances to process memory. Do NOT use to verify existing proofs (use `proof.verify`).",
+      "PURPOSE & BOUNDARIES: Validate and ingest a new Groth16 proof and its five public signals, then attempt Nostr NIP-78 attestation; this changes process state. USAGE GUIDELINES: Use `proof.verify` for verification without submission, `proof.get_by_hash` for retained submissions, or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2215,7 +2215,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT use for stateless proof verification without anchoring (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`).",
+      "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2401,7 +2401,7 @@ const baseMcpToolDefinitions = [
     name: "payment.info",
     title: "Get MCP Payment Information",
     description:
-      "Retrieve L402 pricing rates, Lightning invoice requirements, and Macaroon authentication specs. This informational tool does not create invoices or settle payments; execution occurs dynamically via HTTP L402 challenge/preimage settlement on paid tool calls.",
+      "PURPOSE & BOUNDARIES: Read configured MCP prices, Lightning invoice requirements, and macaroon authentication rules; this tool never creates an invoice or settles payment. USAGE GUIDELINES: Use this to estimate costs before a paid tool call; use `proof.attenuate` to restrict an existing token, not to pay. BEHAVIOR & CONSEQUENCES: Free and read-only. Paid execution dynamically uses an HTTP L402 challenge and preimage settlement without valid credentials; unknown toolName or malformed input returns an error.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2410,11 +2410,11 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Optional canonical MCP tool name; omit to see pricing for every advertised tool. This information request does not issue an invoice.",
+      description: "Pass an optional canonical toolName to narrow the returned price map; omit it for all advertised prices. This free request does not issue an invoice.",
       examples: [{}, { toolName: "stratigraphy.digest" }],
       additionalProperties: false,
       properties: {
-        toolName: field("string", "Specific MCP tool name to query pricing and caveats for (e.g., 'stratigraphy.digest'). Returns general tier pricing if omitted.", ["stratigraphy.digest"], { minLength: 1 }),
+        toolName: field("string", "Optional nonempty canonical MCP tool name (e.g. 'stratigraphy.digest'); narrows perToolSats, while omission returns all tool prices. Unknown names fail validation.", ["stratigraphy.digest"], { minLength: 1 }),
       },
       required: [],
     },
@@ -2470,11 +2470,11 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "Retrieve P2P mesh health, active peer connections, and synchronization metrics to assess peer availability. Inbound peer subscription state is not exposed. Do NOT use to publish outbound telemetry (use `mesh.broadcast`).",
+      "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "No input parameters required.",
+      description: "Pass {} for current peer health and quorum; extra arguments are rejected and inbound subscription state is not tracked.",
       examples: [{}],
       additionalProperties: false,
       properties: {},
@@ -2501,7 +2501,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.broadcast",
     title: "Broadcast Telemetry Snapshot to Mesh",
     description:
-      "Broadcast a signed stored telemetry snapshot to mesh peers for inbound validation and acknowledgment. Do NOT use to inspect node mesh status (use `mesh.get_status`) or publish inbound peer sync messages (not supported).",
+      "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2523,7 +2523,7 @@ const baseMcpToolDefinitions = [
           properties: {
             date: field(
               "string",
-              "UTC calendar date of the existing record to distribute, formatted YYYY-MM-DD.",
+              "Required UTC date of an existing indexed record (YYYY-MM-DD, e.g. '2026-09-09'); selects the stored snapshot signed for peer validation, not a caller-supplied payload.",
               ["2026-09-09"],
               { format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
             ),
@@ -2607,7 +2607,7 @@ const mcpToolDefinitions = baseMcpToolDefinitions
           ...tool,
           inputSchema: {
             type: "object",
-            description: "Provide contextHash and agentId to ground live agent context, or cid to anchor a dataset; the modes are exclusive.",
+            description: "Provide contextHash and agentId together for live agent context, or cid for a dataset anchor; these two modes are exclusive. Optional metadata applies to context mode; optional nostrEventId and context apply to dataset mode.",
             examples: [...tool.inputSchema.examples, ...datasetReceiptDefinition.inputSchema.examples],
             additionalProperties: false,
             properties: { ...tool.inputSchema.properties, ...datasetReceiptDefinition.inputSchema.properties },

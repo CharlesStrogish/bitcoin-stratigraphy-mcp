@@ -70,29 +70,29 @@ const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
 const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
-    "Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors.",
+    "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error.",
   "payment.info":
-    "Retrieve L402 pricing rates, Lightning invoice requirements, and Macaroon authentication specs. This informational tool does not create invoices or settle payments; execution occurs dynamically via HTTP L402 challenge/preimage settlement on paid tool calls.",
+    "PURPOSE & BOUNDARIES: Read configured MCP prices, Lightning invoice requirements, and macaroon authentication rules; this tool never creates an invoice or settles payment. USAGE GUIDELINES: Use this to estimate costs before a paid tool call; use `proof.attenuate` to restrict an existing token, not to pay. BEHAVIOR & CONSEQUENCES: Free and read-only. Paid execution dynamically uses an HTTP L402 challenge and preimage settlement without valid credentials; unknown toolName or malformed input returns an error.",
   "stratigraphy.range":
-    "Retrieve an ascending batch of compressed indexed daily strata between height or date bounds. Do NOT use for full uncompressed records (use `stratigraphy.get`) or a single summary digest (use `stratigraphy.digest`).",
+    "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.digest` for a single compact summary or `stratigraphy.diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences.",
   "proof.attenuate":
-    "Derive attenuated Macaroon sub-tokens with embedded caveats (time-to-live limits, max target bounds, tool restriction) for delegated agent swarms.",
+    "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
   "stratigraphy.diff":
-    "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call.",
+    "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error.",
   "stratigraphy.digest":
-    "Retrieve a compressed, token-optimized summary digest of indexed thermodynamic state for an LLM context window. Do NOT use for full uncompressed records (use `stratigraphy.get`) or compressed per-record range batches (use `stratigraphy.range`).",
+    "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.range` for compressed per-record batches or `stratigraphy.diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs.",
   "proof.ground":
-    "Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT use for stateless proof verification without anchoring (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`).",
+    "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
   "proof.verify":
-    "Verify a Groth16 proof. Telemetry verification is offline; drift verification consults a Bitcoin block provider. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`).",
+    "PURPOSE & BOUNDARIES: Verify a Groth16 telemetry or drift proof without submitting it or creating a new anchor; telemetry verification is offline, while drift checks consult a Bitcoin block provider. USAGE GUIDELINES: Use this instead of `proof.submit` for validation without ingestion, or `proof.ground` when a signed Bitcoin-tip receipt is needed. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed or mismatched proof inputs fail validation, and drift verification requires a reachable block provider.",
   "proof.submit":
-    "Submit new ZK proof instances to process memory. Do NOT use to verify existing proofs (use `proof.verify`).",
+    "PURPOSE & BOUNDARIES: Validate and ingest a new Groth16 proof and its five public signals, then attempt Nostr NIP-78 attestation; this changes process state. USAGE GUIDELINES: Use `proof.verify` for verification without submission, `proof.get_by_hash` for retained submissions, or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
   "mesh.broadcast":
-    "Broadcast a signed stored telemetry snapshot to mesh peers for inbound validation and acknowledgment. Do NOT use to inspect node mesh status (use `mesh.get_status`) or publish inbound peer sync messages (not supported).",
+    "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
   "stratigraphy.get":
-    "Retrieve full indexed stratum records by date or block height, including single-record lookups and bounded queries. Do NOT use for compressed record batches (use `stratigraphy.range`) or condensed context digests (use `stratigraphy.digest`).",
+    "PURPOSE & BOUNDARIES: Retrieve full indexed daily telemetry records by date, indexed height, recent days, or inclusive bounds. USAGE GUIDELINES: Use this instead of `stratigraphy.range` for uncompressed records; use `stratigraphy.digest` for a compact summary and `stratigraphy.list` to discover available bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups.",
   "mesh.get_status":
-    "Retrieve P2P mesh health, active peer connections, and synchronization metrics to assess peer availability. Inbound peer subscription state is not exposed. Do NOT use to publish outbound telemetry (use `mesh.broadcast`).",
+    "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error.",
 };
 
 type OpenApiDocument = {
@@ -1622,26 +1622,14 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    const sentences = candidate.description.split(/(?<=[.!?])\s+(?=[A-Z])/);
-    const immutableDataTool = candidate.name.startsWith("proof.") ||
-      candidate.name.startsWith("stratigraphy.") || candidate.name === "mesh.broadcast";
-    const exactDescription = Object.hasOwn(
-      expectedMcpToolDescriptions,
-      candidate.name,
-    );
-    assert.ok(
-      exactDescription || sentences.length === (immutableDataTool ? 4 : 3),
-      `${candidate.name} must have a focused description`,
-    );
-    if (immutableDataTool && !exactDescription) {
-      assert.ok(candidate.description.endsWith(
-        "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.",
-      ));
-    }
-    if (!exactDescription) {
-      assert.match(candidate.description, /Returns a JSON object/);
-      assert.match(candidate.description, /JSON-RPC -32602/);
-      assert.match(candidate.description, /60-requests-per-minute IP limit/);
+    assert.match(candidate.description, /^PURPOSE & BOUNDARIES: .+/,
+      `${candidate.name} must identify its purpose`);
+    assert.match(candidate.description, /USAGE GUIDELINES: .+/,
+      `${candidate.name} must explain when to use it`);
+    assert.match(candidate.description, /BEHAVIOR & CONSEQUENCES: .+/,
+      `${candidate.name} must explain cost and failures`);
+    if (candidate.name === "stratigraphy.list" || candidate.name === "proof.list") {
+      assert.match(candidate.description, /costs 10 sats.*JSON-RPC -32602/);
     }
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);

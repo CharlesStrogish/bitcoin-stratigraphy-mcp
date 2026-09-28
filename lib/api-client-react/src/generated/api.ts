@@ -37,7 +37,9 @@ import type {
   MeshAttestRequest,
   MeshAttestResponse,
   MeshStatus,
+  NostrAgentIdentity,
   NostrHeartbeatStatus,
+  NostrIdentityInput,
   PaidStratigraphyResponse,
   PaymentChallengeRateLimitError,
   PaymentChallengeServiceUnavailableError,
@@ -81,6 +83,78 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getVerifyNostrAgentIdentityUrl = () => {
+
+
+
+
+  return `/api/nostr/verify-identity`
+}
+
+/**
+ * A bare npub/hex key identifies an account but does not prove key possession. A standalone Schnorr signature cannot be checked without its complete NIP-01 event. Trust is earned only from signed, network-bound kind 30079 p-tag vouchers by pinned mesh nodes, or one further signed introduction hop.
+ * @summary Verify NIP-01 agent identity and mesh-signed web-of-trust attestations
+ */
+export const verifyNostrAgentIdentity = async (nostrIdentityInput: NostrIdentityInput, options?: Parameters<typeof customFetch>[1]): Promise<NostrAgentIdentity> => {
+
+  return customFetch<NostrAgentIdentity>(getVerifyNostrAgentIdentityUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(nostrIdentityInput)
+  }
+);}
+
+
+
+
+
+export const getVerifyNostrAgentIdentityMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyNostrAgentIdentity>>, TError,{data: BodyType<NostrIdentityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyNostrAgentIdentity>>, TError,{data: BodyType<NostrIdentityInput>}, TContext> => {
+
+const mutationKey = ['verifyNostrAgentIdentity'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyNostrAgentIdentity>>, {data: BodyType<NostrIdentityInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyNostrAgentIdentity(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyNostrAgentIdentityMutationResult = NonNullable<Awaited<ReturnType<typeof verifyNostrAgentIdentity>>>
+    export type VerifyNostrAgentIdentityMutationBody = BodyType<NostrIdentityInput>
+    export type VerifyNostrAgentIdentityMutationError = ErrorType<void>
+
+    /**
+ * @summary Verify NIP-01 agent identity and mesh-signed web-of-trust attestations
+ */
+export const useVerifyNostrAgentIdentity = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyNostrAgentIdentity>>, TError,{data: BodyType<NostrIdentityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyNostrAgentIdentity>>,
+        TError,
+        {data: BodyType<NostrIdentityInput>},
+        TContext
+      > => {
+      return useMutation(getVerifyNostrAgentIdentityMutationOptions(options));
+    }
 
 export const getExportHuggingFaceDatasetUrl = (params?: ExportHuggingFaceDatasetParams,) => {
   const normalizedParams = new URLSearchParams();

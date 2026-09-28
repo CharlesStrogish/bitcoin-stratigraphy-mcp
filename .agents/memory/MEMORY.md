@@ -16,6 +16,7 @@
 - [SNARK worker bundling](snark-worker-bundling.md) — keep worker-spawning cryptography external to server/test bundles and tear workers down only in test processes.
 - [Telemetry proof semantics](telemetry-proof-semantics.md) — require exact payload binding and derive public fields from emitted snapshot semantics, not independent request state.
 - [Mesh consensus trust](mesh-consensus-trust.md) — peer certificates require pinned reciprocal membership, canonical snapshots, fresh source signatures, and external quorum policy.
+- [Nostr agent trust](nostr-agent-trust.md) — require network-bound vouchers from pinned mesh keys; never treat a bare pubkey, follow, or cached event verification as proof.
 - [MCP schema metadata](mcp-schema-metadata.md) — Zod 3 conversion drops examples; publish explicit JSON Schemas while retaining separate runtime validation.
 - [Catalog block index](catalog-block-index.md) — historical daily snapshots lack native heights, so block-range discovery uses a documented deterministic 144-block/day index.
 - [Digest provenance](digest-provenance.md) — compact summaries use indexed dates/heights, source multipliers, and source-record fingerprints; never imply live tip or per-record proof.

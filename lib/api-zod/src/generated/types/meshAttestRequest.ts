@@ -5,6 +5,7 @@
  * Bitcoin Stratigraphy API with Zero-Knowledge Data Integrity. Paid JSON responses and live SSE telemetry include `zkProof` payloads backed by Groth16/Poseidon BN254 zk-SNARKs. Verify them with `POST /api/v1/zk/verify`; proofs emitted by this API are pre-verified for sub-10ms verification. Access supports L402 multi-asset payments, and records carry Nostr NIP-78 attestations.
  * OpenAPI spec version: 0.1.0
  */
+import type { MeshAttestRequestAgentSession } from './meshAttestRequestAgentSession';
 import type { MeshAttestRequestSnapshot } from './meshAttestRequestSnapshot';
 
 export interface MeshAttestRequest {
@@ -14,6 +15,8 @@ export interface MeshAttestRequest {
   networkId: string;
   /** @pattern ^[0-9a-f]{64}$ */
   originPubkey: string;
+  /** Optional agent-signed kind 20079 NIP-01 event. For direct attestation, event.content is JSON.stringify({networkId,snapshotDigest}). With date, it is JSON.stringify({networkId,date}) and the peer also compares the supplied signed snapshot against the selected source record. The signer must have a pinned-node, network-bound kind 30079 trust path. */
+  agentSession?: MeshAttestRequestAgentSession;
   /** Complete Nostr-attested snapshot. The peer recomputes its canonical digest and verifies source attestations before signing. */
   snapshot: MeshAttestRequestSnapshot;
 }

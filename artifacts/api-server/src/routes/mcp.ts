@@ -533,6 +533,17 @@ const meshBroadcastInputSchema = z.object({
       "UTC YYYY-MM-DD date of the existing stratigraphy record to broadcast.",
     ),
   }).strict().describe("UTC date selector for the existing telemetry record sent for peer attestation; arbitrary caller-supplied snapshots are not accepted."),
+  agentEvent: z.object({
+    id: z.string().regex(/^[0-9a-f]{64}$/),
+    pubkey: z.string().regex(/^[0-9a-f]{64}$/),
+    sig: z.string().regex(/^[0-9a-f]{128}$/),
+    kind: z.literal(20079),
+    created_at: z.number().int(),
+    tags: z.array(z.array(z.string())),
+    content: z.string(),
+  }).strict().optional().describe(
+    'Optional fresh NIP-01 agent session event. Sign JSON.stringify({networkId,date}) with kind 20079; the date must match payload.date. The agent must have a trusted mesh attestation.',
+  ),
 }).strict().describe("Request to broadcast one signed telemetry snapshot to configured, pinned mesh peers.");
 
 const groundContextInputSchema = z.object({
@@ -2312,6 +2323,28 @@ const baseMcpToolDefinitions = [
           },
           required: ["date"],
         },
+        agentEvent: {
+          type: "object",
+          description: "Optional NIP-01 kind 20079 signature over JSON.stringify({networkId,date}) for this exact date selector. The signer must have a trusted mesh attestation. Example: a complete signed event with a matching date.",
+          examples: [{ id: "ab".repeat(32), pubkey: "cd".repeat(32), sig: "ef".repeat(64), kind: 20079, created_at: 1790000000, tags: [], content: '{"networkId":"bitcoin-stratigraphy-mainnet-v1","date":"2026-09-09"}' }],
+          additionalProperties: false,
+          properties: {
+            id: field("string", "NIP-01 event hash.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+            pubkey: field("string", "Signing agent Nostr pubkey.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+            sig: field("string", "Schnorr signature over the NIP-01 event.", ["ef".repeat(64)], { pattern: "^[0-9a-f]{128}$" }),
+            kind: field("integer", "Agent session event kind.", [20079], { const: 20079 }),
+            created_at: field("integer", "Unix event timestamp in seconds.", [1790000000]),
+            tags: {
+              type: "array", description: "NIP-01 string tag arrays. Example: [].", examples: [[]],
+              items: {
+                type: "array", description: "One NIP-01 tag. Example: [\"t\",\"session\"].", examples: [["t", "session"]],
+                items: field("string", "One string tag element.", ["session"]),
+              },
+            },
+            content: field("string", "Exact JSON.stringify({networkId,date}) session binding.", ['{"networkId":"bitcoin-stratigraphy-mainnet-v1","date":"2026-09-09"}']),
+          },
+          required: ["id", "pubkey", "sig", "kind", "created_at", "tags", "content"],
+        },
       },
       required: ["signalType", "payload"],
     },
@@ -2336,6 +2369,7 @@ const baseMcpToolDefinitions = [
         quorumThreshold: field("integer", "Required total attestation count, including this node.", [2], { minimum: 1 }),
         merkleRoot: field("string", "Merkle root of local and peer attestation event identifiers.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
         networkId: field("string", "Mesh network identifier committed in peer attestations.", ["bitcoin-stratigraphy-mainnet-v1"]),
+        agentPubkey: field("string", "Present only when an agent-signed session was verified and accepted by the peer mesh.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
       },
       required: ["signalType", "date", "snapshotDigest", "peerAttestations", "quorumThreshold", "merkleRoot", "networkId"],
     },
@@ -2734,7 +2768,9 @@ function createBitcoinStratigraphyMcpServer(
       const signedRecord = createNostrAttestor()(records[0]!, Math.floor(Date.now() / 1_000));
       let consensus;
       try {
-        consensus = await mesh.createConsensus(signedRecord);
+        consensus = await mesh.createConsensus(signedRecord, parsed.data.agentEvent
+          ? { event: parsed.data.agentEvent, date: parsed.data.payload.date }
+          : undefined);
       } catch (error) {
         if (error instanceof MeshQuorumError) {
           throw new McpError(ErrorCode.InternalError, error.message);
@@ -2752,6 +2788,7 @@ function createBitcoinStratigraphyMcpServer(
         quorumThreshold: consensus.threshold,
         merkleRoot: consensus.merkleRoot,
         networkId: consensus.networkId,
+        ...(parsed.data.agentEvent ? { agentPubkey: parsed.data.agentEvent.pubkey } : {}),
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],

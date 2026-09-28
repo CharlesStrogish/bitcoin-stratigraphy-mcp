@@ -320,6 +320,72 @@ export interface MeshStatus {
   quorumThreshold: number;
 }
 
+export interface NostrIdentityEvent {
+  /** @pattern ^[0-9a-f]{64}$ */
+  id: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  pubkey: string;
+  /** @pattern ^[0-9a-f]{128}$ */
+  sig: string;
+  kind: number;
+  created_at: number;
+  tags: string[][];
+  content: string;
+}
+
+export type NostrIdentityInput = (unknown & {
+  /** Lowercase hex or npub */
+  pubkey?: string;
+  event?: NostrIdentityEvent;
+  /**
+     * Optional cross-check against event.sig; not valid alone
+     * @pattern ^[0-9a-f]{128}$
+     */
+  signature?: string;
+});
+
+export type NostrAgentIdentityMetadata = {
+  name?: string;
+  about?: string;
+};
+
+export interface NostrAgentIdentity {
+  /** @pattern ^[0-9a-f]{64}$ */
+  pubkey: string;
+  /** False for a bare key or invalid signed event */
+  isValidSignature: boolean;
+  /**
+     * Unique trusted signers across one or two hops
+     * @minimum 0
+     */
+  attestationCount: number;
+  /**
+     * 0.6 per direct trusted vouch; 0.2 per second-hop vouch, capped at 1; pinned mesh keys score 1
+     * @minimum 0
+     * @maximum 1
+     */
+  trustScore: number;
+  /**
+     * Earliest valid caller or NIP-01 kind 0 profile event, seconds since epoch
+     * @nullable
+     */
+  firstSeenTimestamp: number | null;
+  /**
+     * 0 for pinned mesh key, 1 direct, 2 via signed introduction
+     * @nullable
+     */
+  attestationDepth: number | null;
+  metadata: NostrAgentIdentityMetadata;
+}
+
+/**
+ * Optional agent-signed kind 20079 NIP-01 event. For direct attestation, event.content is JSON.stringify({networkId,snapshotDigest}). With date, it is JSON.stringify({networkId,date}) and the peer also compares the supplied signed snapshot against the selected source record. The signer must have a pinned-node, network-bound kind 30079 trust path.
+ */
+export type MeshAttestRequestAgentSession = {
+  event: NostrIdentityEvent;
+  date?: string;
+};
+
 /**
  * Complete Nostr-attested snapshot. The peer recomputes its canonical digest and verifies source attestations before signing.
  */
@@ -332,6 +398,8 @@ export interface MeshAttestRequest {
   networkId: string;
   /** @pattern ^[0-9a-f]{64}$ */
   originPubkey: string;
+  /** Optional agent-signed kind 20079 NIP-01 event. For direct attestation, event.content is JSON.stringify({networkId,snapshotDigest}). With date, it is JSON.stringify({networkId,date}) and the peer also compares the supplied signed snapshot against the selected source record. The signer must have a pinned-node, network-bound kind 30079 trust path. */
+  agentSession?: MeshAttestRequestAgentSession;
   /** Complete Nostr-attested snapshot. The peer recomputes its canonical digest and verifies source attestations before signing. */
   snapshot: MeshAttestRequestSnapshot;
 }
@@ -351,6 +419,7 @@ export interface MeshSignedEvent {
 
 export interface MeshAttestResponse {
   event: MeshSignedEvent;
+  agentIdentity?: NostrAgentIdentity;
 }
 
 export type SettlementAsset = typeof SettlementAsset[keyof typeof SettlementAsset];

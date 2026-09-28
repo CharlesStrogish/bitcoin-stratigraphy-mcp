@@ -9,6 +9,52 @@ import * as zod from 'zod';
 
 
 /**
+ * A bare npub/hex key identifies an account but does not prove key possession. A standalone Schnorr signature cannot be checked without its complete NIP-01 event. Trust is earned only from signed, network-bound kind 30079 p-tag vouchers by pinned mesh nodes, or one further signed introduction hop.
+ * @summary Verify NIP-01 agent identity and mesh-signed web-of-trust attestations
+ */
+export const verifyNostrAgentIdentityBodyThreeEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyNostrAgentIdentityBodyThreeEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyNostrAgentIdentityBodyThreeEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+export const verifyNostrAgentIdentityBodyThreeSignatureRegExp = new RegExp('^[0-9a-f]{128}$');
+
+
+export const VerifyNostrAgentIdentityBody = zod.union([zod.unknown(),zod.unknown()]).and(zod.object({
+  "pubkey": zod.string().optional().describe('Lowercase hex or npub'),
+  "event": zod.object({
+  "id": zod.string().regex(verifyNostrAgentIdentityBodyThreeEventIdRegExp),
+  "pubkey": zod.string().regex(verifyNostrAgentIdentityBodyThreeEventPubkeyRegExp),
+  "sig": zod.string().regex(verifyNostrAgentIdentityBodyThreeEventSigRegExp),
+  "kind": zod.number().int(),
+  "created_at": zod.number().int(),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string()
+}).optional(),
+  "signature": zod.string().regex(verifyNostrAgentIdentityBodyThreeSignatureRegExp).optional().describe('Optional cross-check against event.sig; not valid alone')
+}))
+
+export const verifyNostrAgentIdentityResponsePubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const verifyNostrAgentIdentityResponseAttestationCountMin = 0;
+
+export const verifyNostrAgentIdentityResponseTrustScoreMin = 0;
+export const verifyNostrAgentIdentityResponseTrustScoreMax = 1;
+
+
+
+export const VerifyNostrAgentIdentityResponse = zod.object({
+  "pubkey": zod.string().regex(verifyNostrAgentIdentityResponsePubkeyRegExp),
+  "isValidSignature": zod.boolean().describe('False for a bare key or invalid signed event'),
+  "attestationCount": zod.number().int().min(verifyNostrAgentIdentityResponseAttestationCountMin).describe('Unique trusted signers across one or two hops'),
+  "trustScore": zod.number().min(verifyNostrAgentIdentityResponseTrustScoreMin).max(verifyNostrAgentIdentityResponseTrustScoreMax).describe('0.6 per direct trusted vouch; 0.2 per second-hop vouch, capped at 1; pinned mesh keys score 1'),
+  "firstSeenTimestamp": zod.number().int().nullable().describe('Earliest valid caller or NIP-01 kind 0 profile event, seconds since epoch'),
+  "attestationDepth": zod.number().int().nullable().describe('0 for pinned mesh key, 1 direct, 2 via signed introduction'),
+  "metadata": zod.object({
+  "name": zod.string().optional(),
+  "about": zod.string().optional()
+})
+})
+
+
+/**
  * Export the most recent indexed entries in chronological order. Heights and timestamps are deterministic daily index labels, not observed Bitcoin blocks. A record hash fingerprints validated source fields, not a block or ZK proof; source entries have no per-record ZK proofs. No L402 authorization is required.
  * @summary Public Hugging Face instruction-tuning dataset export
  */
@@ -865,6 +911,9 @@ export const GetMeshStatusResponse = zod.object({
 export const attestMeshSnapshotBodySnapshotDigestRegExp = new RegExp('^[0-9a-f]{64}$');
 
 export const attestMeshSnapshotBodyOriginPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const attestMeshSnapshotBodyAgentSessionEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const attestMeshSnapshotBodyAgentSessionEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const attestMeshSnapshotBodyAgentSessionEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
 
 
 
@@ -872,12 +921,30 @@ export const AttestMeshSnapshotBody = zod.object({
   "snapshotDigest": zod.string().regex(attestMeshSnapshotBodySnapshotDigestRegExp),
   "networkId": zod.string().min(1),
   "originPubkey": zod.string().regex(attestMeshSnapshotBodyOriginPubkeyRegExp),
+  "agentSession": zod.object({
+  "event": zod.object({
+  "id": zod.string().regex(attestMeshSnapshotBodyAgentSessionEventIdRegExp),
+  "pubkey": zod.string().regex(attestMeshSnapshotBodyAgentSessionEventPubkeyRegExp),
+  "sig": zod.string().regex(attestMeshSnapshotBodyAgentSessionEventSigRegExp),
+  "kind": zod.number().int(),
+  "created_at": zod.number().int(),
+  "tags": zod.array(zod.array(zod.string())),
+  "content": zod.string()
+}),
+  "date": zod.coerce.date().optional()
+}).optional().describe('Optional agent-signed kind 20079 NIP-01 event. For direct attestation, event.content is JSON.stringify({networkId,snapshotDigest}). With date, it is JSON.stringify({networkId,date}) and the peer also compares the supplied signed snapshot against the selected source record. The signer must have a pinned-node, network-bound kind 30079 trust path.'),
   "snapshot": zod.union([zod.record(zod.string(), zod.unknown()),zod.array(zod.record(zod.string(), zod.unknown())).min(1)]).describe('Complete Nostr-attested snapshot. The peer recomputes its canonical digest and verifies source attestations before signing.')
 })
 
 export const attestMeshSnapshotResponseEventIdRegExp = new RegExp('^[0-9a-f]{64}$');
 export const attestMeshSnapshotResponseEventPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
 export const attestMeshSnapshotResponseEventSigRegExp = new RegExp('^[0-9a-f]{128}$');
+export const attestMeshSnapshotResponseAgentIdentityPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const attestMeshSnapshotResponseAgentIdentityAttestationCountMin = 0;
+
+export const attestMeshSnapshotResponseAgentIdentityTrustScoreMin = 0;
+export const attestMeshSnapshotResponseAgentIdentityTrustScoreMax = 1;
+
 
 
 export const AttestMeshSnapshotResponse = zod.object({
@@ -889,7 +956,19 @@ export const AttestMeshSnapshotResponse = zod.object({
   "tags": zod.array(zod.array(zod.string())),
   "content": zod.string(),
   "sig": zod.string().regex(attestMeshSnapshotResponseEventSigRegExp)
+}),
+  "agentIdentity": zod.object({
+  "pubkey": zod.string().regex(attestMeshSnapshotResponseAgentIdentityPubkeyRegExp),
+  "isValidSignature": zod.boolean().describe('False for a bare key or invalid signed event'),
+  "attestationCount": zod.number().int().min(attestMeshSnapshotResponseAgentIdentityAttestationCountMin).describe('Unique trusted signers across one or two hops'),
+  "trustScore": zod.number().min(attestMeshSnapshotResponseAgentIdentityTrustScoreMin).max(attestMeshSnapshotResponseAgentIdentityTrustScoreMax).describe('0.6 per direct trusted vouch; 0.2 per second-hop vouch, capped at 1; pinned mesh keys score 1'),
+  "firstSeenTimestamp": zod.number().int().nullable().describe('Earliest valid caller or NIP-01 kind 0 profile event, seconds since epoch'),
+  "attestationDepth": zod.number().int().nullable().describe('0 for pinned mesh key, 1 direct, 2 via signed introduction'),
+  "metadata": zod.object({
+  "name": zod.string().optional(),
+  "about": zod.string().optional()
 })
+}).optional()
 })
 
 

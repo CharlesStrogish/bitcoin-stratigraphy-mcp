@@ -20,8 +20,10 @@ import {
 } from "./middleware/rateLimiter";
 import { registerSystemHealthRoute } from "./routes/system-health";
 import { registerLlmExportRoutes } from "./routes/llm-export";
+import { createMeshGossipService } from "./services/meshGossipService";
 
 const app: Express = express();
+const meshService = createMeshGossipService();
 const revenueLedger = createPostgresRevenueLedger();
 const pricingEngine = createPricingEngine({
   loadProvider: runtimePricingLoad,
@@ -102,7 +104,7 @@ const macaroonUsageStore = createPostgresMacaroonUsageStore();
 
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
-registerMcpRoute(app, { usageStore: macaroonUsageStore, ledger: revenueLedger });
+registerMcpRoute(app, { usageStore: macaroonUsageStore, ledger: revenueLedger, meshService });
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);
@@ -117,7 +119,7 @@ registerStratigraphyRoutes(
   createPostgresMacaroonRevocationStore(),
   pricingEngine,
   undefined,
-  { revenueLedger, l402RateLimiter },
+  { revenueLedger, l402RateLimiter, meshService },
 );
 
 export default app;

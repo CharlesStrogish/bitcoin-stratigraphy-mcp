@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { MeshSignedEvent } from './meshSignedEvent';
+import type { NostrAgentIdentity } from './nostrAgentIdentity';
 
 export interface MeshAttestResponse {
   event: MeshSignedEvent;
+  agentIdentity?: NostrAgentIdentity;
 }

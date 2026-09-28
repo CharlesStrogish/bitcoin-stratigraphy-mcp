@@ -20,6 +20,9 @@ import {
 import { registerOpenApiRoute } from "./openapi";
 import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { registerLlmExportRoutes } from "./llm-export";
+import { MeshGossipService, canonicalMeshJson } from "../services/meshGossipService";
+import { NostrWebOfTrust } from "../services/nostrWebOfTrust";
+import { createNostrAttestor } from "../services/nostrAttestation";
 import { createMemoryPaymentChallengeStore } from "../lib/payment-challenge-store";
 import type { PaymentChallengeStore } from "../lib/payment-challenge-store";
 import { createPostgresPaymentChallengeStore } from "../lib/postgres-payment-challenge-store";
@@ -36,6 +39,7 @@ import {
   finalizeEvent,
   generateSecretKey,
   getPublicKey,
+  nip19,
   verifyEvent,
 } from "nostr-tools";
 import { createMemoryMacaroonRevocationStore } from "../lib/macaroon-revocation-store";
@@ -232,8 +236,10 @@ type Transaction = {
 async function withContractServer(
   clientFactory: Parameters<typeof registerStratigraphyRoutes>[1],
   run: (paidUrl: string, baseUrl: string) => Promise<void>,
+  meshService?: MeshGossipService,
 ) {
   const contractApp = express();
+  contractApp.use(express.json());
   contractApp.use((req, _res, next) => {
     (req as any).log = {
       error: () => undefined,
@@ -246,6 +252,8 @@ async function withContractServer(
     clientFactory,
     undefined,
     createMemoryPaymentChallengeStore(),
+    undefined, undefined, undefined, undefined,
+    { meshService },
   );
   const contractServer = contractApp.listen(0);
   await new Promise<void>((resolve) =>
@@ -260,6 +268,77 @@ async function withContractServer(
     contractServer.close();
   }
 }
+
+test("verifies public Nostr identity and binds a trusted agent session to mesh.attest", async () => {
+  const originKey = generateSecretKey();
+  const originPubkey = getPublicKey(originKey);
+  const originSecret = Buffer.from(originKey).toString("hex");
+  const nodeKey = generateSecretKey();
+  const identityService = new NostrWebOfTrust({
+    trustedPubkeys: [originPubkey],
+    networkId: "bitcoin-stratigraphy-mainnet-v1",
+    loadEvents: async () => [],
+  });
+  const mesh = new MeshGossipService({
+    privateKey: Buffer.from(nodeKey).toString("hex"),
+    peers: [{ url: "https://origin.example", pubkey: originPubkey }],
+    identityService,
+  });
+  await withContractServer(undefined, async (_paidUrl, base) => {
+    const identity = await fetch(`${base}/api/nostr/verify-identity`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pubkey: nip19.npubEncode(originPubkey) }),
+    });
+    assert.equal(identity.status, 200);
+    const bareKey = await identity.json() as { pubkey: string; isValidSignature: boolean; trustScore: number };
+    assert.equal(bareKey.pubkey, originPubkey);
+    assert.equal(bareKey.isValidSignature, false);
+    assert.equal(bareKey.trustScore, 1);
+    const signatureOnly = await fetch(`${base}/api/nostr/verify-identity`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ signature: "ab".repeat(64) }),
+    });
+    assert.equal(signatureOnly.status, 400);
+    const snapshot = createNostrAttestor(originSecret)({ height: 920_000 });
+    const snapshotDigest = createHash("sha256").update(canonicalMeshJson(snapshot)).digest("hex");
+    const event = finalizeEvent({
+      kind: 20079, created_at: Math.floor(Date.now() / 1_000), tags: [],
+      content: JSON.stringify({ networkId: mesh.networkId, snapshotDigest }),
+    }, originKey);
+    const verified = await fetch(`${base}/api/nostr/verify-identity`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event, signature: event.sig }),
+    });
+    assert.equal(verified.status, 200);
+    const body = await verified.json() as { pubkey: string; isValidSignature: boolean; trustScore: number; firstSeenTimestamp: number };
+    assert.equal(body.pubkey, originPubkey);
+    assert.equal(body.isValidSignature, true);
+    assert.equal(body.trustScore, 1);
+    assert.equal(body.firstSeenTimestamp, event.created_at);
+    const request = { snapshot, snapshotDigest, networkId: mesh.networkId,
+      originPubkey, agentSession: { event } };
+    const attest = async (value: unknown) => fetch(`${base}/api/v1/mesh/attest`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(value),
+    });
+    const rejected = await attest({ ...request, agentSession: {
+      event: { ...event, content: JSON.stringify({ networkId: mesh.networkId, snapshotDigest: "ff".repeat(32) }) },
+    } });
+    assert.equal(rejected.status, 422);
+    assert.equal(mesh.getSessionState(snapshotDigest), undefined);
+    const accepted = await attest(request);
+    assert.equal(accepted.status, 200);
+    assert.equal(mesh.getSessionState(snapshotDigest)?.pubkey, originPubkey);
+    const response = await accepted.json() as {
+      event: Parameters<typeof verifyEvent>[0];
+      agentIdentity: { pubkey: string; isValidSignature: boolean; trustScore: number };
+    };
+    assert.equal(verifyEvent(response.event), true);
+    assert.equal(response.agentIdentity.pubkey, originPubkey);
+    assert.equal(response.agentIdentity.isValidSignature, true);
+    assert.equal(response.agentIdentity.trustScore, 1);
+  }, mesh);
+});
 
 const validTransaction: Transaction = {
   type: "incoming",
@@ -1361,7 +1440,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         assert.ok(Object.hasOwn(schema.properties, name), `${path}.required includes unknown ${name}`);
       }
       for (const [name, property] of Object.entries(schema.properties)) {
-        assert.match(name, /^[a-z][a-zA-Z0-9]*$/, `${path}.${name} must use camelCase`);
+        if (!(path.endsWith(".agentEvent") && name === "created_at")) {
+          assert.match(name, /^[a-z][a-zA-Z0-9]*$/, `${path}.${name} must use camelCase`);
+        }
         const documented = property as { description?: string };
         assert.match(documented.description ?? "", /example/i, `${path}.${name} must describe an example`);
         assertInputProperties(property as Parameters<typeof assertInputProperties>[0], `${path}.${name}`);
@@ -1453,7 +1534,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
     "mesh.broadcast": {
       keys: ["signalType", "date", "snapshotDigest", "peerAttestations",
-        "quorumThreshold", "merkleRoot", "networkId"],
+        "quorumThreshold", "merkleRoot", "networkId", "agentPubkey"],
       readOnly: false, idempotent: false, openWorld: true,
     },
     "proof.ground": {
@@ -1489,7 +1570,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${candidate.name} outputSchema must describe the returned JSON fields`);
     const expectedRequired = candidate.name === "proof.get_by_hash"
       ? ["kind", "hash", "status", "timestamp"]
-      : expected.keys;
+      : candidate.name === "mesh.broadcast"
+        ? expected.keys.filter((key) => key !== "agentPubkey")
+        : expected.keys;
     assert.deepEqual([...candidate.outputSchema.required].sort(),
       [...expectedRequired].sort());
     if (candidate.name === "proof.get_by_hash") {
@@ -1498,7 +1581,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       assert.ok(Object.hasOwn(payloadExample, "proofPayload"));
       assert.ok(Object.hasOwn(payloadExample, "timestamp"));
     } else {
-      assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expected.keys].sort());
+      assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expectedRequired].sort());
     }
     assert.equal(candidate.annotations.readOnlyHint, expected.readOnly);
     assert.equal(candidate.annotations.idempotentHint, expected.idempotent);

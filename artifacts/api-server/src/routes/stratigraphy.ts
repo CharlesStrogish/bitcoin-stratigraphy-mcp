@@ -1061,29 +1061,72 @@ export function registerStratigraphyRoutes(
     res.status(200).json(mesh.status());
   });
 
-  app.post("/api/v1/mesh/attest", (req, res): void => {
+  app.post("/api/nostr/verify-identity",
+    createHttpRateLimitMiddleware(createSlidingWindowRateLimiter({
+      limit: 20, windowMs: 60_000, maxKeys: 10_000,
+    })),
+    async (req, res): Promise<void> => {
     const body = req.body as Record<string, unknown> | null;
+    if (!body || typeof body !== "object" || Array.isArray(body) ||
+        Object.keys(body).some((key) => !["pubkey", "event", "signature"].includes(key)) ||
+        (body.pubkey !== undefined && typeof body.pubkey !== "string") ||
+        (body.signature !== undefined && typeof body.signature !== "string")) {
+      res.status(400).json({ error: "Expected pubkey/npub or a NIP-01 event with an optional matching signature" });
+      return;
+    }
+    try {
+      res.json(await mesh.verifyIdentity(body));
+    } catch (error) {
+      if (error instanceof Error && /pubkey|signature|event|required/.test(error.message)) {
+        res.status(400).json({ error: error.message });
+      } else {
+        req.log?.warn({ err: error }, "Nostr relay identity lookup failed");
+        res.status(503).json({ error: "Nostr relay identity lookup unavailable" });
+      }
+    }
+    });
+
+  app.post("/api/v1/mesh/attest", async (req, res): Promise<void> => {
+    const body = req.body as Record<string, unknown> | null;
+    const session = body?.agentSession as { event?: unknown; date?: unknown } | undefined;
     if (
       !body ||
-      Object.keys(body).length !== 4 ||
+      Object.keys(body).some((key) => !["snapshot", "snapshotDigest", "networkId", "originPubkey", "agentSession"].includes(key)) ||
       typeof body.snapshotDigest !== "string" ||
       !/^[0-9a-f]{64}$/.test(body.snapshotDigest) ||
       typeof body.networkId !== "string" ||
       typeof body.originPubkey !== "string" ||
       !/^[0-9a-f]{64}$/.test(body.originPubkey) ||
-      !("snapshot" in body)
+      !("snapshot" in body) ||
+      (session !== undefined && (!session || typeof session !== "object" || Array.isArray(session) ||
+        !session.event || (session.date !== undefined && (typeof session.date !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(session.date)))))
     ) {
       res.status(400).json({ error: "Invalid mesh attestation request" });
       return;
     }
     try {
-      res.status(200).json({
-        event: mesh.attestSnapshot({
+      if (session?.date) {
+        const [record] = await getStratigraphyData({ date: session.date as string });
+        const snapshot = body.snapshot as Record<string, unknown> | null;
+        if (!record || !snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+          throw new Error("Session date is not the selected source record");
+        }
+        const { attestation: _attestation, ...unsigned } = snapshot;
+        if (JSON.stringify(unsigned) !== JSON.stringify(record)) {
+          throw new Error("Session date is not the selected source record");
+        }
+      }
+      const event = await mesh.attestSnapshot({
           snapshot: body.snapshot,
           snapshotDigest: body.snapshotDigest,
           networkId: body.networkId,
           originPubkey: body.originPubkey,
-        }),
+          ...(session ? { agentSession: session as { event: import("nostr-tools").Event; date?: string } } : {}),
+        });
+      res.status(200).json({
+        event,
+        ...(session ? { agentIdentity: mesh.getSessionState(body.snapshotDigest)?.identity } : {}),
       });
     } catch {
       res.status(422).json({ error: "Mesh snapshot validation failed" });

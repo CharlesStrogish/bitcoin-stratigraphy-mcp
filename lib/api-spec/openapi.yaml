@@ -456,6 +456,36 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /nostr/verify-identity:
+    post:
+      operationId: verifyNostrAgentIdentity
+      tags: [mesh]
+      summary: Verify NIP-01 agent identity and mesh-signed web-of-trust attestations
+      description: >-
+        A bare npub/hex key identifies an account but does not prove key possession.
+        A standalone Schnorr signature cannot be checked without its complete NIP-01 event.
+        Trust is earned only from signed, network-bound kind 30079 p-tag vouchers
+        by pinned mesh nodes, or one further signed introduction hop.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NostrIdentityInput"
+      responses:
+        "200":
+          description: Signature and mesh trust assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NostrAgentIdentity"
+        "400":
+          description: Invalid identity input or signature without a NIP-01 event
+        "429":
+          description: Identity lookup rate limit exceeded
+        "503":
+          description: Nostr relay identity lookup unavailable
   /export/huggingface:
     get:
       operationId: exportHuggingFaceDataset
@@ -1335,6 +1365,49 @@ components:
           type: integer
           minimum: 1
       required: [nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, quorumThreshold]
+    NostrIdentityInput:
+      type: object
+      additionalProperties: false
+      properties:
+        pubkey: { type: string, description: Lowercase hex or npub }
+        event: { $ref: "#/components/schemas/NostrIdentityEvent" }
+        signature: { type: string, pattern: "^[0-9a-f]{128}$", description: Optional cross-check against event.sig; not valid alone }
+      anyOf:
+        - required: [pubkey]
+        - required: [event]
+    NostrIdentityEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        pubkey: { type: string, pattern: "^[0-9a-f]{64}$" }
+        sig: { type: string, pattern: "^[0-9a-f]{128}$" }
+        kind: { type: integer }
+        created_at: { type: integer }
+        tags:
+          type: array
+          items:
+            type: array
+            items: { type: string }
+        content: { type: string }
+      required: [id, pubkey, sig, kind, created_at, tags, content]
+    NostrAgentIdentity:
+      type: object
+      additionalProperties: false
+      properties:
+        pubkey: { type: string, pattern: "^[0-9a-f]{64}$" }
+        isValidSignature: { type: boolean, description: False for a bare key or invalid signed event }
+        attestationCount: { type: integer, minimum: 0, description: Unique trusted signers across one or two hops }
+        trustScore: { type: number, minimum: 0, maximum: 1, description: "0.6 per direct trusted vouch; 0.2 per second-hop vouch, capped at 1; pinned mesh keys score 1" }
+        firstSeenTimestamp: { type: ["integer", "null"], description: "Earliest valid caller or NIP-01 kind 0 profile event, seconds since epoch" }
+        attestationDepth: { type: ["integer", "null"], description: "0 for pinned mesh key, 1 direct, 2 via signed introduction" }
+        metadata:
+          type: object
+          additionalProperties: false
+          properties:
+            name: { type: string }
+            about: { type: string }
+      required: [pubkey, isValidSignature, attestationCount, trustScore, firstSeenTimestamp, attestationDepth, metadata]
     MeshAttestRequest:
       type: object
       additionalProperties: false
@@ -1348,6 +1421,19 @@ components:
         originPubkey:
           type: string
           pattern: "^[0-9a-f]{64}$"
+        agentSession:
+          type: object
+          additionalProperties: false
+          description: >-
+            Optional agent-signed kind 20079 NIP-01 event. For direct attestation,
+            event.content is JSON.stringify({networkId,snapshotDigest}). With
+            date, it is JSON.stringify({networkId,date}) and the peer also
+            compares the supplied signed snapshot against the selected source record.
+            The signer must have a pinned-node, network-bound kind 30079 trust path.
+          properties:
+            event: { $ref: "#/components/schemas/NostrIdentityEvent" }
+            date: { type: string, format: date }
+          required: [event]
         snapshot:
           description: Complete Nostr-attested snapshot. The peer recomputes its canonical digest and verifies source attestations before signing.
           oneOf:
@@ -1392,6 +1478,8 @@ components:
       properties:
         event:
           $ref: "#/components/schemas/MeshSignedEvent"
+        agentIdentity:
+          $ref: "#/components/schemas/NostrAgentIdentity"
       required: [event]
     SettlementAsset:
       type: string

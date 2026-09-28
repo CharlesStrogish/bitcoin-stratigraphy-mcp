@@ -7,6 +7,7 @@ import {
   type Event,
   type EventTemplate,
 } from "nostr-tools";
+import { NostrWebOfTrust, verifyAgentSessionEvent, type AgentIdentity, type IdentityInput } from "./nostrWebOfTrust";
 
 const HEX_32 = /^[0-9a-f]{64}$/;
 const DEFAULT_TIMEOUT_MS = 1_500;
@@ -58,6 +59,7 @@ export type MeshGossipServiceOptions = {
   timeoutMs?: number;
   now?: () => number;
   networkId?: string;
+  identityService?: NostrWebOfTrust;
 };
 
 function parsePrivateKey(value: string): Uint8Array {
@@ -254,6 +256,11 @@ export class MeshGossipService {
   private readonly fetcher: typeof globalThis.fetch;
   private readonly timeoutMs: number;
   private readonly now: () => number;
+  private readonly identities: NostrWebOfTrust;
+  private readonly sessionGraph = new Map<string, {
+    pubkey: string; eventId: string; acceptedAt: number; identity: AgentIdentity;
+  }>();
+  private readonly sessionUsage = new Map<string, string>();
   private validationAttempts = 0;
   private validationSuccesses = 0;
   private propagationLatencyTotal = 0;
@@ -297,6 +304,52 @@ export class MeshGossipService {
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.now = options.now ?? Date.now;
+    this.identities = options.identityService ?? new NostrWebOfTrust({
+      trustedPubkeys: [this.nodePubkey, ...this.peers.map((peer) => peer.pubkey)],
+      networkId: this.networkId, now: this.now,
+    });
+  }
+
+  verifyIdentity(input: IdentityInput): Promise<AgentIdentity> {
+    return this.identities.verify(input);
+  }
+
+  getSessionState(snapshotDigest: string) {
+    return this.sessionGraph.get(snapshotDigest);
+  }
+
+  private recordSession(snapshotDigest: string, agentEvent: Event, identity: AgentIdentity): void {
+    const previous = this.sessionUsage.get(agentEvent.id);
+    if (previous && previous !== snapshotDigest) {
+      throw new Error("Agent session event was already bound to a different mesh state");
+    }
+    this.sessionUsage.set(agentEvent.id, snapshotDigest);
+    this.sessionGraph.set(snapshotDigest, {
+      pubkey: identity.pubkey, eventId: agentEvent.id, acceptedAt: this.now(), identity,
+    });
+    if (this.sessionGraph.size > 2_048) this.sessionGraph.delete(this.sessionGraph.keys().next().value!);
+    if (this.sessionUsage.size > 2_048) this.sessionUsage.delete(this.sessionUsage.keys().next().value!);
+  }
+
+  private async validateAgentSession(
+    agentSession: { event: Event; date?: string },
+    snapshotDigest: string,
+  ): Promise<AgentIdentity> {
+    const binding = agentSession.date === undefined
+      ? { networkId: this.networkId, snapshotDigest }
+      : { networkId: this.networkId, date: agentSession.date };
+    if (!verifyAgentSessionEvent(agentSession.event, binding, this.now())) {
+      throw new Error("Agent session event does not bind to the mesh state");
+    }
+    const previous = this.sessionUsage.get(agentSession.event.id);
+    if (previous && previous !== snapshotDigest) {
+      throw new Error("Agent session event was already bound to a different mesh state");
+    }
+    const identity = await this.verifyIdentity({ event: agentSession.event });
+    if (!identity.isValidSignature || identity.trustScore <= 0) {
+      throw new Error("Agent session has no trusted Nostr attestation");
+    }
+    return identity;
   }
 
   get quorumThreshold(): number {
@@ -324,12 +377,13 @@ export class MeshGossipService {
     );
   }
 
-  attestSnapshot(input: {
+  async attestSnapshot(input: {
     snapshot: unknown;
     snapshotDigest: string;
     networkId: string;
     originPubkey: string;
-  }): Event {
+    agentSession?: { event: Event; date?: string };
+  }): Promise<Event> {
     if (
       input.networkId !== this.networkId ||
       !this.peers.some((peer) => peer.pubkey === input.originPubkey) ||
@@ -337,6 +391,10 @@ export class MeshGossipService {
       !validGossipedSnapshot(input.snapshot, this.now(), input.originPubkey)
     ) {
       throw new Error("Mesh snapshot validation failed");
+    }
+    if (input.agentSession) {
+      const identity = await this.validateAgentSession(input.agentSession, input.snapshotDigest);
+      this.recordSession(input.snapshotDigest, input.agentSession.event, identity);
     }
     return this.signDigest(input.snapshotDigest);
   }
@@ -365,8 +423,14 @@ export class MeshGossipService {
     );
   }
 
-  async createConsensus(snapshot: unknown): Promise<MeshConsensus> {
+  async createConsensus(
+    snapshot: unknown,
+    agentSession?: { event: Event; date?: string },
+  ): Promise<MeshConsensus> {
     const snapshotDigest = digestJson(snapshot);
+    const agentIdentity = agentSession
+      ? await this.validateAgentSession(agentSession, snapshotDigest)
+      : undefined;
     const localEvent = this.signDigest(snapshotDigest);
     const attestations: MeshPeerAttestation[] = [
       {
@@ -393,6 +457,7 @@ export class MeshGossipService {
                 snapshotDigest,
                 networkId: this.networkId,
                 originPubkey: this.nodePubkey,
+                ...(agentSession ? { agentSession } : {}),
               }),
             },
           );
@@ -442,6 +507,9 @@ export class MeshGossipService {
     const threshold = this.quorumThreshold;
     if (this.peers.length > 0 && attestations.length < threshold) {
       throw new MeshQuorumError(attestations.length, threshold);
+    }
+    if (agentIdentity && agentSession) {
+      this.recordSession(snapshotDigest, agentSession.event, agentIdentity);
     }
     return {
       quorumScore: Math.min(1, attestations.length / threshold),

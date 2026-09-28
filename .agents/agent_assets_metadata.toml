@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "8yyob6eYio3207lfXthin"
+uri = "file://CONNECT.md"
+type = "text"
+title = "Developer integration guide"
+description = "MCP client setup, live tool catalog, pricing preflight, and TypeScript L402 payment flow."
+logical_id = "c0c9f8d9-1dcb-45f2-be84-08bfc0df6468"
+content_hash = "sha256:d0a7f6774787e65298aa55aa0070901f9e6b96861869f3bab1c8dafc7afa9ee6"
+size = 11095
+mtime_ms = 1790632871623
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/c0c9f8d9-1dcb-45f2-be84-08bfc0df6468/77ac682c-7a88-4468-95e3-c5703f6f3f76"
+storage_version_token = "1790632981892193"
+content_type = "text/markdown"

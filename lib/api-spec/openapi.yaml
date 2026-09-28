@@ -65,11 +65,11 @@ x-mcp-tools:
       required: [kind, hash, status, timestamp, provenanceVerified]
   payment.info:
     description: |-
-      Retrieve configured MCP pricing rates, Lightning invoice specs, and Macaroon rules.
+      Retrieve configured MCP pricing, Lightning invoice rules, and optional Base USDC x402 terms.
 
-      - PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use `payment.info` instead of calling paid tools blindly when checking L402 pricing upfront.
-      - USAGE GUIDELINES: Use `payment.info` instead of `proof.attenuate` when discovering required sat fees or active auth schemes across tools. Do NOT use `payment.info` to settle payments or issue invoices (settlement occurs dynamically via HTTP L402 challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use `proof.attenuate` instead).
-      - BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns advertised rates, accepted methods ('Lightning L402'), and invoice expiry limits. Passing an unknown `toolName` returns a validation error.
+      - PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use `payment.info` instead of calling paid tools blindly when checking pricing upfront.
+      - USAGE GUIDELINES: Use `payment.info` instead of `proof.attenuate` when discovering required sat fees or active auth schemes across tools. Do NOT use `payment.info` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use `proof.attenuate` instead).
+      - BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns Lightning rates and invoice expiry limits; Base USDC x402 terms appear only when authenticated settlement is ready. Passing an unknown `toolName` returns a validation error.
     inputSchema:
       type: object
       additionalProperties: false
@@ -102,6 +102,16 @@ x-mcp-tools:
         activeAuthSchemes:
           type: array
           items: { type: string }
+        x402:
+          type: object
+          additionalProperties: false
+          properties:
+            network: { type: string }
+            scheme: { type: string }
+            asset: { type: string }
+            amount: { type: string }
+            payTo: { type: string }
+          required: [network, scheme, asset, amount, payTo]
         macaroonRequirements:
           type: object
           additionalProperties: false
@@ -483,6 +493,8 @@ x-mcp-tools:
     description: "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors."
   stratigraphy.get:
     description: "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.digest` for complete single-record data, `stratigraphy.range` for compressed multi-record sequence listings, and `stratigraphy.digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups."
+  stratigraphy.list:
+    description: "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602."
 security:
   - L402: []
 paths:

@@ -12,6 +12,38 @@ export type WalletPayment =
 /** Return a 32-byte Lightning preimage, or a CoinOS internal-payment UUID for server-side verification. */
 export type WalletHandler = (invoice: string) => Promise<WalletPayment>;
 
+export type X402PaymentRequirements = {
+  scheme: "exact";
+  network: "eip155:8453";
+  asset: string;
+  amount: string;
+  payTo: string;
+  maxTimeoutSeconds: number;
+  extra: {
+    paymentFlow: "upfront";
+    name: "USD Coin";
+    version: "2";
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+export type X402PaymentTerms = {
+  x402Version: 2;
+  accepted: X402PaymentRequirements;
+  resource: { url: string; [key: string]: unknown };
+};
+/** Agent signer returns the base64-encoded x402 PAYMENT-SIGNATURE envelope. */
+export type X402WalletHandler = (terms: X402PaymentTerms) => Promise<string>;
+export type StratigraphyClientOptions = {
+  /** Optional legacy Lightning/CoinOS wallet, used for L402 challenges. */
+  wallet?: WalletHandler;
+  /** Agent signer used for x402 v2 exact payments. */
+  x402Wallet?: X402WalletHandler;
+  /** Maximum exact payment in integer micro-USDC. Required when x402Wallet is configured. */
+  maxPaymentMicroUsdc?: string | number;
+  fetcher?: typeof fetch;
+};
+
 export type MetricName =
   | "target_multiplier"
   | "difficulty_epoch_progress"
@@ -234,12 +266,12 @@ type RpcResponse<T> = {
 
 export class BitcoinStratigraphyClient {
   private nextId = 0;
-  private readonly serverUrl: string;
+  protected readonly serverUrl: string;
 
   constructor(
     serverUrl: string = DEFAULT_MCP_SERVER_URL,
-    private readonly wallet?: WalletHandler,
-    private readonly fetcher: typeof fetch = globalThis.fetch,
+    protected readonly wallet?: WalletHandler,
+    protected readonly fetcher: typeof fetch = globalThis.fetch,
   ) {
     const url = new URL(serverUrl);
     if (!["https:", "http:"].includes(url.protocol)) {
@@ -254,15 +286,21 @@ export class BitcoinStratigraphyClient {
     return result.tools;
   }
 
-  async callTool<K extends McpToolName>(
+  callTool<K extends McpToolName>(
     name: K,
     args: McpToolArguments[K],
-  ): Promise<McpToolResponses[K]> {
+  ): Promise<McpToolResponses[K]>;
+  /** Call a server-advertised MCP tool even when it is not in this SDK's typed catalog. */
+  callTool(name: string, args?: Record<string, unknown>): Promise<unknown>;
+  async callTool(
+    name: string,
+    args?: Record<string, unknown>,
+  ): Promise<unknown> {
     const result = await this.request<{
-      structuredContent?: McpToolResponses[K];
+      structuredContent?: unknown;
       isError?: boolean;
       content?: Array<{ type: string; text?: string }>;
-    }>("tools/call", { name, arguments: args });
+    }>("tools/call", { name, arguments: args ?? {} });
     if (result.isError) {
       throw new Error(result.content?.find((item) => item.type === "text")?.text ?? `${name} failed`);
     }
@@ -302,7 +340,7 @@ export class BitcoinStratigraphyClient {
     });
   }
 
-  private async request<T>(method: string, params?: Record<string, unknown>): Promise<T> {
+  protected async request<T>(method: string, params?: Record<string, unknown>): Promise<T> {
     const id = ++this.nextId;
     const body = JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) });
     const send = (authorization?: string) =>
@@ -320,35 +358,286 @@ export class BitcoinStratigraphyClient {
 
     let response = await send();
     if (response.status === 402) {
-      const challenge = await parseChallenge(response);
-      if (!this.wallet) throw new Error(`L402 payment required for ${method}; provide a wallet callback`);
-      const paid = await this.wallet(challenge.invoice);
-      const preimage = typeof paid === "string"
-        ? paid
-        : "preimage" in paid ? paid.preimage : paid.payment_preimage;
-      if (/^[0-9a-fA-F]{64}$/.test(preimage)) {
-        const bytes = Uint8Array.from(preimage.match(/.{2}/g)!, (hex) => Number.parseInt(hex, 16));
-        const digest = await crypto.subtle.digest("SHA-256", bytes);
-        const hash = Array.from(new Uint8Array(digest), (byte) =>
-          byte.toString(16).padStart(2, "0")).join("");
-        if (hash !== challenge.payment_hash.toLowerCase()) {
-          throw new Error("Wallet preimage does not match the L402 payment hash");
-        }
-      } else if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(preimage)) {
-        throw new Error("Wallet did not return a 32-byte hex payment preimage or CoinOS payment reference");
-      }
-      response = await send(`L402 ${challenge.macaroon}:${preimage.toLowerCase()}`);
-      if (response.status === 402) throw new Error("L402 payment was rejected; not paying again");
+      response = await this.retryL402(response, method, send);
     }
-    if (!response.ok) throw new Error(`MCP HTTP ${response.status}: ${await response.text()}`);
-    const envelope = await response.json() as RpcResponse<T>;
-    if (envelope.jsonrpc !== "2.0" || envelope.id !== id) {
-      throw new Error("Invalid MCP JSON-RPC response");
-    }
-    if (envelope.error) throw new Error(`MCP ${envelope.error.code}: ${envelope.error.message}`);
-    if (envelope.result === undefined) throw new Error("MCP response has no result");
-    return envelope.result;
+    return parseRpcResponse<T>(response, id);
   }
+
+  protected async retryL402(
+    response: Response,
+    method: string,
+    send: (authorization?: string) => Promise<Response>,
+  ): Promise<Response> {
+    const challenge = await parseChallenge(response);
+    if (!this.wallet) throw new Error(`L402 payment required for ${method}; provide a wallet callback`);
+    const paid = await this.wallet(challenge.invoice);
+    const preimage = typeof paid === "string"
+      ? paid
+      : "preimage" in paid ? paid.preimage : paid.payment_preimage;
+    if (/^[0-9a-fA-F]{64}$/.test(preimage)) {
+      const bytes = Uint8Array.from(preimage.match(/.{2}/g)!, (hex) => Number.parseInt(hex, 16));
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      const hash = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, "0")).join("");
+      if (hash !== challenge.payment_hash.toLowerCase()) {
+        throw new Error("Wallet preimage does not match the L402 payment hash");
+      }
+    } else if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(preimage)) {
+      throw new Error("Wallet did not return a 32-byte hex payment preimage or CoinOS payment reference");
+    }
+    response = await send(`L402 ${challenge.macaroon}:${preimage.toLowerCase()}`);
+    if (response.status === 402) throw new Error("L402 payment was rejected; not paying again");
+    return response;
+  }
+}
+
+/**
+ * Client supporting the existing L402 flow and x402 v2 Base USDC payments.
+ * x402 is opt-in: configure an agent signer and a hard micro-USDC spending cap.
+ */
+export class StratigraphyClient extends BitcoinStratigraphyClient {
+  private nextStratigraphyId = 0;
+  private readonly x402Wallet?: X402WalletHandler;
+  private readonly maxPaymentMicroUsdc?: bigint;
+
+  constructor(
+    serverUrl: string = DEFAULT_MCP_SERVER_URL,
+    options: StratigraphyClientOptions = {},
+  ) {
+    super(serverUrl, options.wallet, options.fetcher);
+    this.x402Wallet = options.x402Wallet;
+    if (options.maxPaymentMicroUsdc !== undefined) {
+      const cap = String(options.maxPaymentMicroUsdc);
+      if (!/^\d+$/.test(cap)) throw new Error("maxPaymentMicroUsdc must be a non-negative integer");
+      this.maxPaymentMicroUsdc = BigInt(cap);
+    }
+    if (this.x402Wallet && this.maxPaymentMicroUsdc === undefined) {
+      throw new Error("maxPaymentMicroUsdc is required when an x402 wallet is configured");
+    }
+  }
+
+  protected override async request<T>(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<T> {
+    const id = ++this.nextStratigraphyId;
+    const body = JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) });
+    const send = (paymentSignature?: string) =>
+      this.fetcher(this.serverUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          "MCP-Protocol-Version": "2025-03-26",
+          ...(paymentSignature ? { "PAYMENT-SIGNATURE": paymentSignature } : {}),
+        },
+        body,
+        redirect: "error",
+      });
+
+    let response = await send();
+    if (response.status === 402) {
+      const requiredHeader = response.headers.get("PAYMENT-REQUIRED");
+      if (requiredHeader !== null && this.x402Wallet) {
+        const terms = parseX402Requirements(requiredHeader, this.serverUrl, this.maxPaymentMicroUsdc);
+        const signature = await this.x402Wallet(terms);
+        validateX402Signature(signature, terms);
+        response = await send(signature);
+        if (response.status === 402) throw new Error("x402 payment was rejected; not paying again");
+      } else if (this.wallet) {
+        response = await this.retryL402(response, method, (authorization) => {
+          // Use the standard Authorization header for the backward-compatible L402 retry.
+          return this.fetcher(this.serverUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json, text/event-stream",
+              "MCP-Protocol-Version": "2025-03-26",
+              ...(authorization ? { Authorization: authorization } : {}),
+            },
+            body,
+            redirect: "error",
+          });
+        });
+      } else {
+        throw new Error(
+          `Payment required for ${method}; configure an x402 agent signer or L402 wallet callback`,
+        );
+      }
+    }
+    return parseRpcResponse<T>(response, id);
+  }
+}
+
+const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+
+function parseX402Requirements(
+  header: string,
+  serverUrl: string,
+  maxAmount: bigint | undefined,
+): X402PaymentTerms {
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(decodeBase64(header));
+  } catch {
+    throw new Error("Invalid base64 PAYMENT-REQUIRED x402 envelope");
+  }
+  if (!envelope || typeof envelope !== "object") {
+    throw new Error("Invalid PAYMENT-REQUIRED x402 envelope");
+  }
+  const value = envelope as {
+    x402Version?: unknown;
+    accepts?: unknown;
+    resource?: Record<string, unknown>;
+  };
+  if (value.x402Version !== 2 || !Array.isArray(value.accepts)) {
+    throw new Error("Unsupported PAYMENT-REQUIRED x402 version or format");
+  }
+  let resourceUrl: string;
+  try {
+    if (typeof value.resource?.url !== "string") throw new Error("missing URL");
+    resourceUrl = new URL(value.resource.url).toString();
+  } catch {
+    throw new Error("Invalid x402 resource URL");
+  }
+  if (resourceUrl !== serverUrl) throw new Error("x402 resource URL does not match the MCP server URL");
+  const accepted = value.accepts.find((candidate) => {
+    if (!candidate || typeof candidate !== "object") return false;
+    const item = candidate as Record<string, unknown>;
+    return item.scheme === "exact" && item.network === "eip155:8453";
+  }) as Record<string, unknown> | undefined;
+  if (!accepted) throw new Error("x402 challenge does not offer exact payments on eip155:8453");
+  if (
+    typeof accepted.asset !== "string" ||
+    accepted.asset.toLowerCase() !== BASE_USDC_ADDRESS
+  ) {
+    throw new Error("x402 challenge asset is not USDC on Base");
+  }
+  if (
+    typeof accepted.payTo !== "string" ||
+    !/^0x[0-9a-fA-F]{40}$/.test(accepted.payTo) ||
+    /^0x0{40}$/i.test(accepted.payTo)
+  ) {
+    throw new Error("x402 challenge has an invalid or zero payTo address");
+  }
+  if (typeof accepted.amount !== "string" || !/^\d+$/.test(accepted.amount)) {
+    throw new Error("x402 challenge amount must be integer micro-USDC");
+  }
+  const amount = BigInt(accepted.amount);
+  if (amount === 0n) throw new Error("x402 challenge must require a non-zero payment");
+  if (maxAmount === undefined || amount > maxAmount) {
+    throw new Error("x402 challenge exceeds the configured maximum micro-USDC amount");
+  }
+  if (
+    !Number.isSafeInteger(accepted.maxTimeoutSeconds) ||
+    (accepted.maxTimeoutSeconds as number) <= 0
+  ) {
+    throw new Error("x402 challenge has an invalid maxTimeoutSeconds");
+  }
+  if (!accepted.extra || typeof accepted.extra !== "object") {
+    throw new Error("x402 challenge is missing token payment metadata");
+  }
+  const extra = accepted.extra as Record<string, unknown>;
+  if (extra.paymentFlow !== "upfront" || extra.name !== "USD Coin" || extra.version !== "2") {
+    throw new Error("x402 challenge has unsupported USDC payment metadata");
+  }
+  const resource = value.resource as Record<string, unknown>;
+  const acceptedTerms = {
+    ...accepted,
+    scheme: "exact" as const,
+    network: "eip155:8453" as const,
+    asset: accepted.asset,
+    amount: accepted.amount,
+    payTo: accepted.payTo,
+    maxTimeoutSeconds: accepted.maxTimeoutSeconds as number,
+    extra: extra as X402PaymentRequirements["extra"],
+  } as X402PaymentRequirements;
+  return {
+    x402Version: 2,
+    accepted: acceptedTerms,
+    resource: { ...resource, url: resourceUrl },
+  };
+}
+
+function validateX402Signature(signature: string, terms: X402PaymentTerms): void {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(decodeBase64(signature));
+  } catch {
+    throw new Error("Agent signer must return a base64 PAYMENT-SIGNATURE x402 payload");
+  }
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Invalid x402 PAYMENT-SIGNATURE payload");
+  }
+  const envelope = payload as {
+    x402Version?: unknown;
+    accepted?: unknown;
+    resource?: unknown;
+    payload?: {
+      signature?: unknown;
+      authorization?: { to?: unknown; value?: unknown };
+    };
+  };
+  if (envelope.x402Version !== 2) {
+    throw new Error("Agent signer returned a mismatched x402 v2 version");
+  }
+  if (!jsonValuesEqual(envelope.accepted, terms.accepted)) {
+    throw new Error("Agent signer accepted terms do not match the x402 challenge");
+  }
+  if (
+    !envelope.resource ||
+    typeof envelope.resource !== "object" ||
+    (envelope.resource as Record<string, unknown>).url !== terms.resource.url
+  ) {
+    throw new Error("Agent signer resource does not match the x402 challenge");
+  }
+  const payment = envelope.payload;
+  if (typeof payment?.signature !== "string" || payment.signature.length === 0) {
+    throw new Error("Agent signer returned an x402 payload without a signature");
+  }
+  const authorization = payment.authorization;
+  if (
+    !authorization ||
+    typeof authorization.to !== "string" ||
+    authorization.to.toLowerCase() !== terms.accepted.payTo.toLowerCase() ||
+    (typeof authorization.value !== "string" && typeof authorization.value !== "number") ||
+    String(authorization.value) !== terms.accepted.amount
+  ) {
+    throw new Error("Agent signer payment authorization does not match accepted x402 terms");
+  }
+}
+
+function jsonValuesEqual(left: unknown, right: unknown): boolean {
+  const stable = (value: unknown): string => {
+    if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
+    if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      return `{${Object.keys(record).sort().map((key) =>
+        `${JSON.stringify(key)}:${stable(record[key])}`).join(",")}}`;
+    }
+    return JSON.stringify(value);
+  };
+  return stable(left) === stable(right);
+}
+
+function decodeBase64(value: string): string {
+  if (!value || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(value)) {
+    throw new Error("Invalid base64");
+  }
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  return atob(padded);
+}
+
+async function parseRpcResponse<T>(response: Response, id: number): Promise<T> {
+  if (!response.ok) throw new Error(`MCP HTTP ${response.status}: ${await response.text()}`);
+  const envelope = await response.json() as RpcResponse<T>;
+  if (envelope.jsonrpc !== "2.0" || envelope.id !== id) {
+    throw new Error("Invalid MCP JSON-RPC response");
+  }
+  if (envelope.error) throw new Error(`MCP ${envelope.error.code}: ${envelope.error.message}`);
+  if (envelope.result === undefined) throw new Error("MCP response has no result");
+  return envelope.result;
 }
 
 async function parseChallenge(response: Response): Promise<Challenge> {

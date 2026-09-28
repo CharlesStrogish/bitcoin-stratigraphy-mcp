@@ -100,7 +100,7 @@ The published `tools/list` response contains **14 tools**. The prices below are 
 | `stratigraphy.digest` | 250 | Token-optimized telemetry summary. |
 | `stratigraphy.diff` | 250 | Differences between indexed strata. |
 | `stratigraphy.range` | 250 | Compressed records across a bounded sequence. |
-| `stratigraphy.list` | 10 | Discover dataset bounds and metrics. |
+| `stratigraphy.list` | 0 | Discover dataset bounds and metrics. |
 | `proof.attenuate` | 0 | Narrow an existing valid macaroon; does not pay an invoice. |
 | `proof.verify` | 250 | Validate an existing Groth16 proof without registering it; not an OTS-record verifier. |
 | `proof.get_by_hash` | 250 | Look up a retained proof or signed receipt. |

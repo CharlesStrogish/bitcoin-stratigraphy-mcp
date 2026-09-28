@@ -44,6 +44,10 @@ import {
 } from "nostr-tools";
 import { createMemoryMacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { createPostgresMacaroonRevocationStore } from "../lib/postgres-macaroon-revocation-store";
+import { x402ResourceServer } from "@x402/core/server";
+import type { FacilitatorClient } from "@x402/core/server";
+import type { PaymentPayload } from "@x402/core/types";
+import { ExactEvmScheme } from "@x402/evm/exact/server";
 import {
   calculateTierCost,
   createPricingEngine,
@@ -74,11 +78,13 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error.",
   "payment.info":
-    `Retrieve configured MCP pricing rates, Lightning invoice specs, and Macaroon rules.
+    `Retrieve configured MCP pricing, Lightning invoice rules, and optional Base USDC x402 terms.
 
-- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.info\` instead of calling paid tools blindly when checking L402 pricing upfront.
-- USAGE GUIDELINES: Use \`payment.info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP L402 challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
-- BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns advertised rates, accepted methods ('Lightning L402'), and invoice expiry limits. Passing an unknown \`toolName\` returns a validation error.`,
+- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.info\` instead of calling paid tools blindly when checking pricing upfront.
+- USAGE GUIDELINES: Use \`payment.info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
+- BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns Lightning rates and invoice expiry limits; Base USDC x402 terms appear only when authenticated settlement is ready. Passing an unknown \`toolName\` returns a validation error.`,
+  "stratigraphy.list":
+    "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
   "stratigraphy.range":
     "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.digest` for a single compact summary or `stratigraphy.diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences.",
   "proof.attenuate":
@@ -547,7 +553,6 @@ async function mcpRequest(method: string, params?: Record<string, unknown>, targ
       invoice: string;
     };
     const expected = [
-      "stratigraphy.list",
       "proof.list",
       "proof.status",
     ].includes(String(params?.name))
@@ -579,6 +584,7 @@ async function mcpRequestAt(
   params?: Record<string, unknown>,
   forwardedFor?: string,
   authorization?: string,
+  paymentSignature?: string,
 ) {
   const response = await fetch(`${targetBaseUrl}/mcp`, {
     method: "POST",
@@ -588,6 +594,7 @@ async function mcpRequestAt(
       "MCP-Protocol-Version": "2025-03-26",
       ...(forwardedFor ? { "X-Forwarded-For": forwardedFor } : {}),
       ...(authorization ? { Authorization: authorization } : {}),
+      ...(paymentSignature ? { "PAYMENT-SIGNATURE": paymentSignature } : {}),
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -662,6 +669,13 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     });
     assert.equal(priceResponse.status, 200);
     assert.equal(priceResponse.headers.get("www-authenticate"), null);
+    const catalog = await mcpRequestAt(url, "tools/call", {
+      name: "stratigraphy.list", arguments: {},
+    });
+    assert.equal(catalog.response.status, 200);
+    assert.equal(catalog.response.headers.get("www-authenticate"), null);
+    assert.equal(catalog.response.headers.get("payment-required"), null);
+    assert.equal(catalog.body.result?.structuredContent.totalSnapshots, 422);
     const paymentInfo = await mcpRequest("tools/call", {
       name: "payment.info", arguments: {},
     }, url);
@@ -672,6 +686,8 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     assert.equal(Object.hasOwn(prices, "proof.get_status"), false);
     assert.equal(Object.hasOwn(prices, "proof.issue_receipt"), false);
     assert.equal(prices["payment.info"], 0);
+    assert.equal(prices["stratigraphy.list"], 0);
+    assert.equal(prices["proof.list"], 10);
     assert.equal(prices["mesh.get_status"], 0);
     assert.equal(paymentInfo.result?.structuredContent.invoiceExpirySeconds, 3600);
     assert.deepEqual(paymentInfo.result?.structuredContent.activeAuthSchemes, ["L402"]);
@@ -1632,14 +1648,14 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   for (const candidate of listed.result?.tools ?? []) {
     assert.match(candidate.description,
       candidate.name === "payment.info"
-        ? /^Retrieve configured MCP pricing rates.*\n\n- PURPOSE & BOUNDARIES: .+/
+        ? /^Retrieve configured MCP pricing,.*\n\n- PURPOSE & BOUNDARIES: .+/
         : /^PURPOSE & BOUNDARIES: .+/,
       `${candidate.name} must identify its purpose`);
     assert.match(candidate.description, /USAGE GUIDELINES: .+/,
       `${candidate.name} must explain when to use it`);
     assert.match(candidate.description, /BEHAVIOR & CONSEQUENCES: .+/,
       `${candidate.name} must explain cost and failures`);
-    if (candidate.name === "stratigraphy.list" || candidate.name === "proof.list") {
+    if (candidate.name === "proof.list") {
       assert.match(candidate.description, /costs 10 sats.*JSON-RPC -32602/);
     }
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
@@ -1723,7 +1739,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     const expected = expectedContracts[candidate.name];
     assert.ok(expected, `${candidate.name} must have a documented runtime contract`);
     assert.equal(candidate.outputSchema.additionalProperties, false);
-    assert.deepEqual(Object.keys(candidate.outputSchema.properties).sort(), [...expected.keys].sort(),
+    const outputKeys = candidate.name === "payment.info"
+      ? [...expected.keys, "x402"]
+      : expected.keys;
+    assert.deepEqual(Object.keys(candidate.outputSchema.properties).sort(), [...outputKeys].sort(),
       `${candidate.name} outputSchema must describe the returned JSON fields`);
     const expectedRequired = candidate.name === "proof.get_by_hash"
       ? ["kind", "hash", "status", "timestamp", "provenanceVerified"]
@@ -1763,7 +1782,8 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${name} must not append the generic immutability note to its exact description`,
     );
   }
-  assert.match(documentedTool("stratigraphy.list").description, /costs 10 sats/);
+  assert.match(documentedTool("stratigraphy.list").description, /Free and read-only/);
+  assert.match(documentedTool("proof.list").description, /costs 10 sats/);
   assert.match(documentedTool("mesh.broadcast").inputSchema.properties.payload.description,
     /date selector.*not a caller-supplied record/i);
   assert.match(documentedTool("proof.list").inputSchema.properties.offset.description,
@@ -2128,6 +2148,151 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       meshQuorum: false,
     },
   );
+});
+
+test("MCP paid tools issue dual challenges and settle x402 before execution", async () => {
+  let facilitatorSettlesPayment = true;
+  let verifyCalls = 0;
+  let settleCalls = 0;
+  const facilitator: FacilitatorClient = {
+    verify: async () => {
+      verifyCalls += 1;
+      return { isValid: true };
+    },
+    settle: async () => {
+      settleCalls += 1;
+      return {
+        success: facilitatorSettlesPayment,
+        transaction: facilitatorSettlesPayment ? "0x" + "ab".repeat(32) : "",
+        network: "eip155:8453",
+        amount: "1000",
+        ...(!facilitatorSettlesPayment
+          ? { errorReason: "invalid_signature", errorMessage: "Invalid payment signature" }
+          : {}),
+      };
+    },
+    getSupported: async () => ({
+      kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:8453" }],
+      extensions: [],
+      signers: {},
+    }),
+  };
+  const x402Server = new x402ResourceServer(facilitator)
+    .register("eip155:8453", new ExactEvmScheme());
+  const paymentApp = express();
+  paymentApp.use(express.json());
+  registerMcpRequestGuard(paymentApp);
+  registerMcpRoute(paymentApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-x402-secret",
+    x402ResourceServer: x402Server,
+  });
+  const server = paymentApp.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const free = await mcpRequestAt(baseUrl, "tools/call", {
+      name: "payment.info", arguments: {},
+    });
+    assert.equal(free.response.status, 200);
+    assert.equal(free.body.result?.structuredContent.x402.amount, "1000");
+    assert.equal(free.response.headers.get("payment-required"), null);
+
+    const catalog = await mcpRequestAt(baseUrl, "tools/call", {
+      name: "stratigraphy.list", arguments: {},
+    });
+    assert.equal(catalog.response.status, 200);
+    assert.equal(catalog.response.headers.get("payment-required"), null);
+    assert.equal(catalog.body.result?.structuredContent.totalSnapshots, 422);
+
+    const params = { name: "proof.list", arguments: {} };
+    const challenge = await mcpRequestAt(baseUrl, "tools/call", params);
+    assert.equal(challenge.response.status, 402);
+    assert.match(challenge.response.headers.get("www-authenticate") ?? "", /^L402 /);
+    const encoded = challenge.response.headers.get("payment-required");
+    assert.ok(encoded);
+    const paymentRequired = JSON.parse(
+      Buffer.from(encoded, "base64").toString("utf8"),
+    ) as {
+      x402Version: number;
+      resource: { url: string };
+      accepts: Array<Record<string, unknown>>;
+    };
+    assert.equal(paymentRequired.x402Version, 2);
+    assert.equal(paymentRequired.accepts[0]?.amount, "1000");
+    assert.equal(paymentRequired.accepts[0]?.network, "eip155:8453");
+    assert.equal(
+      (paymentRequired.accepts[0]?.extra as { paymentFlow?: string }).paymentFlow,
+      "upfront",
+    );
+    assert.equal((challenge.body as { amount_sats?: number }).amount_sats, 10);
+    const payload: PaymentPayload = {
+      x402Version: 2,
+      resource: paymentRequired.resource,
+      accepted: paymentRequired.accepts[0] as PaymentPayload["accepted"],
+      payload: { signature: "facilitator-test-signature" },
+    };
+    const paymentSignature = Buffer.from(JSON.stringify(payload)).toString("base64");
+
+    facilitatorSettlesPayment = false;
+    const invalid = await mcpRequestAt(
+      baseUrl, "tools/call", params, undefined, undefined, paymentSignature,
+    );
+    assert.equal(invalid.response.status, 502);
+    assert.equal(verifyCalls, 0);
+    assert.equal(settleCalls, 1);
+
+    facilitatorSettlesPayment = true;
+    const paid = await mcpRequestAt(
+      baseUrl, "tools/call", params, undefined, undefined, paymentSignature,
+    );
+    assert.equal(paid.response.status, 200);
+    assert.equal(verifyCalls, 0);
+    assert.equal(settleCalls, 2);
+
+    facilitatorSettlesPayment = false;
+    const retried = await mcpRequestAt(
+      baseUrl, "tools/call", params, undefined, undefined, paymentSignature,
+    );
+    assert.equal(retried.response.status, 502);
+    assert.equal(verifyCalls, 0);
+    assert.equal(settleCalls, 3);
+
+    const wrongTerms = {
+      ...payload,
+      accepted: { ...payload.accepted, amount: "1001" },
+    };
+    const rejectedTerms = await mcpRequestAt(
+      baseUrl,
+      "tools/call",
+      params,
+      undefined,
+      undefined,
+      Buffer.from(JSON.stringify(wrongTerms)).toString("base64"),
+    );
+    assert.equal(rejectedTerms.response.status, 400);
+    assert.equal(verifyCalls, 0);
+    assert.equal(settleCalls, 3);
+    for (const invalidPayload of [
+      { ...payload, x402Version: 1 },
+      { ...payload, resource: { url: `${paymentRequired.resource.url}/wrong` } },
+    ]) {
+      const rejected = await mcpRequestAt(
+        baseUrl,
+        "tools/call",
+        params,
+        undefined,
+        undefined,
+        Buffer.from(JSON.stringify(invalidPayload)).toString("base64"),
+      );
+      assert.equal(rejected.response.status, 400);
+    }
+    assert.equal(verifyCalls, 0);
+    assert.equal(settleCalls, 3);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => error ? reject(error) : resolve()));
+  }
 });
 
 test("returns a paid digest of stored records without inventing a block hash or proof", async () => {
@@ -2716,8 +2881,9 @@ test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async ()
     const catalog = await mcpRequestAt(invalidBaseUrl, "tools/call", {
       name: "stratigraphy.list", arguments: {},
     });
-    assert.equal(catalog.response.status, 402);
-    assert.equal((catalog.body as any).amount_sats, 10);
+    assert.equal(catalog.response.status, 200);
+    assert.equal(catalog.response.headers.has("www-authenticate"), false);
+    assert.ok(catalog.body.result?.structuredContent);
     const mesh = await mcpRequestAt(invalidBaseUrl, "tools/call", {
       name: "mesh.status", arguments: {},
     });

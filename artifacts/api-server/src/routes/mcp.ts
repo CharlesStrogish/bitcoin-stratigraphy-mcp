@@ -25,6 +25,12 @@ import {
   indexEpistemicDatasetReceipt,
 } from "../services/epistemicDatasetReceipt";
 import { createL402Middleware } from "../middleware/l402";
+import {
+  createCdpX402ResourceServer,
+  createX402PaymentMiddleware,
+  isCdpX402Configured,
+  type X402ResourceServerLike,
+} from "../middleware/payment";
 import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
 import type { SettlementRouter } from "../services/settlement";
 import type { MacaroonUsageStore } from "../lib/macaroon-usage-store";
@@ -1408,7 +1414,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Read-only; costs 10 sats via HTTP L402 without valid credentials and shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
+      "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2401,11 +2407,11 @@ const baseMcpToolDefinitions = [
     name: "payment.info",
     title: "Get MCP Payment Information",
     description:
-      `Retrieve configured MCP pricing rates, Lightning invoice specs, and Macaroon rules.
+      `Retrieve configured MCP pricing, Lightning invoice rules, and optional Base USDC x402 terms.
 
-- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.info\` instead of calling paid tools blindly when checking L402 pricing upfront.
-- USAGE GUIDELINES: Use \`payment.info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP L402 challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
-- BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns advertised rates, accepted methods ('Lightning L402'), and invoice expiry limits. Passing an unknown \`toolName\` returns a validation error.`,
+- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.info\` instead of calling paid tools blindly when checking pricing upfront.
+- USAGE GUIDELINES: Use \`payment.info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
+- BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns Lightning rates and invoice expiry limits; Base USDC x402 terms appear only when authenticated settlement is ready. Passing an unknown \`toolName\` returns a validation error.`,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2424,7 +2430,7 @@ const baseMcpToolDefinitions = [
     },
     outputSchema: {
       type: "object",
-      description: "Configured MCP prices in sats (zero denotes a free tool) and fixed-fee Lightning L402 challenge rules. No live invoice is created by this tool.",
+      description: "Configured MCP prices in sats (zero denotes a free tool), Lightning L402 rules, and optional Base USDC x402 terms. No live invoice is created by this tool.",
       examples: [{
         standardInvoiceSats: 250, perToolSats: { "stratigraphy.digest": 250 },
         acceptedPaymentMethods: ["Lightning L402"], invoiceExpirySeconds: 3600,
@@ -2455,6 +2461,24 @@ const baseMcpToolDefinitions = [
           required: ["httpStatus", "header", "fields"],
         },
         activeAuthSchemes: field("array", "Authentication scheme for paid MCP calls; free discovery and payment.info require none.", [["L402"]], { items: field("string", "MCP paid-call scheme.", ["L402"]) }),
+        x402: {
+          type: "object",
+          description: "Base mainnet USDC x402 exact terms; present only when authenticated CDP settlement is configured.",
+          examples: [{
+            network: "eip155:8453", scheme: "exact",
+            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            amount: "1000", payTo: "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775",
+          }],
+          additionalProperties: false,
+          properties: {
+            network: field("string", "x402 CAIP-2 network.", ["eip155:8453"]),
+            scheme: field("string", "x402 scheme.", ["exact"]),
+            asset: field("string", "USDC token contract.", ["0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"]),
+            amount: field("string", "Atomic USDC units per paid call.", ["1000"]),
+            payTo: field("string", "Payment recipient.", ["0x7a4183ce5b9989833bb33133dcbb8efd6a84e775"]),
+          },
+          required: ["network", "scheme", "asset", "amount", "payTo"],
+        },
         macaroonRequirements: {
           type: "object", description: "A valid payment proof must match the bound invoice, provider, amount, path, expiry and single-use restriction. proof.attenuate is free but requires a valid parent token.",
           examples: [{ authorizationHeader: "L402 <macaroon>:<preimage>", scope: "exact MCP tool path", maxRequests: 1 }],
@@ -2594,6 +2618,7 @@ const exactDescriptionToolNames = new Set([
   "stratigraphy.digest",
   "stratigraphy.diff",
   "stratigraphy.range",
+  "stratigraphy.list",
   "proof.attenuate",
   "proof.get_by_hash",
   "proof.ground",
@@ -2653,7 +2678,6 @@ const mcpToolDefinitions = baseMcpToolDefinitions
   });
 
 const paidTools = {
-  "stratigraphy.list": { amountSats: 10, schema: stratigraphyCatalogInputSchema },
   "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
   "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
   "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
@@ -2692,6 +2716,7 @@ function createBitcoinStratigraphyMcpServer(
   },
   archivedProof?: ArchivedProofLookup,
   driftVerification?: { valid: boolean; startedAt: number },
+  x402Configured = false,
 ) {
   const server = new McpServer(
     {
@@ -2886,14 +2911,25 @@ function createBitcoinStratigraphyMcpServer(
       const structuredContent = {
         standardInvoiceSats: 250,
         perToolSats: toolName ? { [toolName]: mcpToolPrices[toolName] } : mcpToolPrices,
-        acceptedPaymentMethods: ["Lightning L402"],
+        acceptedPaymentMethods: x402Configured
+          ? ["Lightning L402", "x402 Exact (Base USDC)"]
+          : ["Lightning L402"],
         invoiceExpirySeconds: 3600,
         challenge: {
           httpStatus: 402,
           header: "WWW-Authenticate",
           fields: ["macaroon", "invoice", "payment_hash", "amount_sats"],
         },
-        activeAuthSchemes: ["L402"],
+        activeAuthSchemes: x402Configured ? ["L402", "x402"] : ["L402"],
+        ...(x402Configured ? {
+          x402: {
+            network: "eip155:8453",
+            scheme: "exact",
+            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            amount: "1000",
+            payTo: "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775",
+          },
+        } : {}),
         macaroonRequirements: {
           authorizationHeader: "L402 <macaroon>:<preimage>",
           scope: "exact MCP tool path",
@@ -3049,6 +3085,7 @@ async function handleMcpRequest(
     res.locals.attenuation as Parameters<typeof createBitcoinStratigraphyMcpServer>[3],
     res.locals.archivedProof as ArchivedProofLookup | undefined,
     res.locals.driftVerification as { valid: boolean; startedAt: number } | undefined,
+    Boolean(res.locals.x402Configured),
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -3112,6 +3149,7 @@ export function registerMcpRoute(
   app: Express,
   options: {
     settlementRouter?: SettlementRouter;
+    x402ResourceServer?: X402ResourceServerLike;
     sessionSecret?: string;
     usageStore?: MacaroonUsageStore;
     ledger?: RevenueLedger;
@@ -3124,12 +3162,25 @@ export function registerMcpRoute(
     createSlidingWindowRateLimiter({ limit: 60, windowMs: 60_000 }),
   );
   const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
+  let x402SetupError: unknown;
+  let x402Ready = Boolean(options.x402ResourceServer);
+  const x402ResourceServer = Promise.resolve(
+    options.x402ResourceServer ?? createCdpX402ResourceServer(),
+  ).then((server) => {
+    x402Ready = Boolean(server);
+    return server;
+  }).catch((error: unknown) => {
+    x402SetupError = error;
+    x402Ready = false;
+    return undefined;
+  });
   const mesh = options.meshService ?? createMeshGossipService();
   const revocationStore = options.revocationStore ?? createPostgresMacaroonRevocationStore();
   const gates = Object.fromEntries(
     Object.entries(paidTools).map(([name, { amountSats }]) => [
       name,
-      createL402Middleware({
+      (() => {
+        const l402 = createL402Middleware({
         amountSats,
         description: `Bitcoin Stratigraphy MCP ${name} execution`,
         settlementRouter,
@@ -3139,10 +3190,47 @@ export function registerMcpRoute(
         ledger: options.ledger,
         scopePath: `/mcp/tools/${name}`,
         requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
-      }),
+        });
+        return async (req: Request, res: Response, next: NextFunction) => {
+          if (req.header("PAYMENT-SIGNATURE")) {
+            const server = await x402ResourceServer;
+            if (!server) {
+              if (x402SetupError) {
+                req.log?.error({ err: x402SetupError }, "CDP x402 setup failed");
+              }
+              res.status(503).json({ error: "x402 settlement is not configured" });
+              return;
+            }
+            createX402PaymentMiddleware({ resourceServer: server })(
+              req, res, () => next(),
+            );
+            return;
+          }
+          if (!x402Ready && !isCdpX402Configured()) {
+            l402(req, res, next);
+            return;
+          }
+          const server = await x402ResourceServer;
+          if (!server) {
+            if (x402SetupError) {
+              req.log?.error({ err: x402SetupError }, "CDP x402 setup failed");
+            }
+            l402(req, res, next);
+            return;
+          }
+          res.locals.x402ChallengeEnabled = true;
+          createX402PaymentMiddleware({ resourceServer: server })(
+            req, res, () =>
+              req.header("PAYMENT-SIGNATURE")
+                ? next()
+                : l402(req, res, next),
+          );
+        };
+      })(),
     ]),
-  ) as Record<string, ReturnType<typeof createL402Middleware>>;
+  ) as Record<string, (req: Request, res: Response, next: NextFunction) => void | Promise<void>>;
   app.all("/mcp", rateLimit, (req, res, next) => {
+    res.locals.x402Configured = x402Ready;
     if (req.method === "GET" && !req.get("Accept")?.toLowerCase().includes("text/event-stream")) {
       res.status(200).json({ status: "ok", service: "MCP Server" });
       return;

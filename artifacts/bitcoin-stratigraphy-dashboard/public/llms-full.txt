@@ -10,7 +10,7 @@ Indexed heights and dates are deterministic daily labels, not observed per-recor
 
 ## Protocol and payment
 
-Use Streamable HTTP: POST JSON-RPC 2.0 to `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`, and `MCP-Protocol-Version: 2025-03-26`. List tools using `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`; call one using `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mesh.get_status","arguments":{}}}`. `mesh.get_status`, `payment.info`, and `tools/list` are free. Paid calls return an HTTP 402 L402 invoice challenge before they can return their tool result. Catalog/list tools cost 10 sats, and the other paid MCP tools cost 250 sats; separate REST operations can start at 5 sats. Confirm the current policy with `payment.info`, GET https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost, and the actual L402 challenge. Never send a wallet secret in an MCP request.
+Use Streamable HTTP: POST JSON-RPC 2.0 to `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`, and `MCP-Protocol-Version: 2025-03-26`. List tools using `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`; call one using `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mesh.get_status","arguments":{}}}`. `mesh.get_status`, `payment.info`, `stratigraphy.list`, and `tools/list` are free. Paid calls return an HTTP 402 L402 invoice challenge before they can return their tool result. `proof.list` costs 10 sats and the other paid MCP tools cost 250 sats; separate REST operations can start at 5 sats. Confirm the current policy with `payment.info`, GET https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost, and the actual L402 challenge. Never send a wallet secret in an MCP request.
 
 Input schemas (JSON Schema objects; descriptive fields and sample values are shortened, but validation constraints match the published tool definitions):
 
@@ -46,7 +46,7 @@ Retrieve ascending daily-index entries between inclusive `startTarget` and `endT
 {"type":"object","additionalProperties":false,"properties":{"startTarget":{"type":"string","pattern":"^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"},"endTarget":{"type":"string","pattern":"^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$","default":"latest"},"limit":{"type":"number","minimum":1,"maximum":100,"default":50},"format":{"type":"string","enum":["compact","minimal","kv"],"default":"compact"}},"required":["startTarget"]}
 ```
 
-## 5. stratigraphy.list — 10 sats
+## 5. stratigraphy.list — free
 
 List available indexed stratigraphy catalog entries.
 
@@ -104,7 +104,7 @@ Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT us
 
 ## 12. payment.info — free
 
-Return the standard 250-sat amount, actual per-tool prices (0 for free tools and 10 for catalog/list calls; proof.get_by_hash is 250 sats), 3,600-second Lightning L402 invoice expiry, HTTP 402 challenge fields, and path-bound single-use Macaroon requirements. Pass an advertised `toolName` to narrow the pricing map; omit it for every canonical tool. This call does not create an invoice.
+Return the standard 250-sat amount, actual per-tool prices (0 for free tools and 10 for `proof.list`; `stratigraphy.list` is free and `proof.get_by_hash` is 250 sats), 3,600-second Lightning L402 invoice expiry, HTTP 402 challenge fields, and path-bound single-use Macaroon requirements. Pass an advertised `toolName` to narrow the pricing map; omit it for every canonical tool. This call does not create an invoice.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"toolName":{"type":"string","minLength":1}},"required":[]}

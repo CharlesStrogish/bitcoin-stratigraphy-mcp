@@ -3,7 +3,7 @@ import type { Express } from "express";
 export const mcpServerCard = {
   name: "bitcoin-stratigraphy",
   description:
-    "Bitcoin Stratigraphy data with Zero-Knowledge Data Integrity (Groth16/Poseidon zk-SNARKs), L402 multi-asset payments, and Nostr NIP-78 attestations. Paid payloads include zkProof data verifiable at POST /api/v1/zk/verify in sub-10ms for proofs emitted by this API.",
+    "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.",
   transport: {
     type: "sse",
     url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",

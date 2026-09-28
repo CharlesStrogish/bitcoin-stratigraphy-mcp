@@ -1130,7 +1130,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE & BOUNDARIES: Retrieve full indexed daily telemetry records by date, indexed height, recent days, or inclusive bounds. USAGE GUIDELINES: Use this instead of `stratigraphy.range` for uncompressed records; use `stratigraphy.digest` for a compact summary and `stratigraphy.list` to discover available bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups.",
+      "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.digest` for complete single-record data, `stratigraphy.range` for compressed multi-record sequence listings, and `stratigraphy.digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1546,7 +1546,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "PURPOSE & BOUNDARIES: Verify a Groth16 telemetry or drift proof without submitting it or creating a new anchor; telemetry verification is offline, while drift checks consult a Bitcoin block provider. USAGE GUIDELINES: Use this instead of `proof.submit` for validation without ingestion, or `proof.ground` when a signed Bitcoin-tip receipt is needed. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed or mismatched proof inputs fail validation, and drift verification requires a reachable block provider.",
+      "PURPOSE & BOUNDARIES: Verify cryptographic integrity of a Groth16 telemetry or drift zk-SNARK proof without modifying proof registry state; this does not verify OTS records. Telemetry verification is offline, while drift checks consult a Bitcoin block provider. USAGE GUIDELINES: Use `proof.verify` instead of `proof.submit` for read-only validation of existing proofs, and use `proof.submit` exclusively when registering a new proof attestation. Use `proof.ground` when a signed Bitcoin-tip receipt is needed. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed or mismatched proof inputs fail validation, and drift verification requires a reachable block provider.",
     annotations: proofVerificationToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2045,7 +2045,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "PURPOSE & BOUNDARIES: Validate and ingest a new Groth16 proof and its five public signals, then attempt Nostr NIP-78 attestation; this changes process state. USAGE GUIDELINES: Use `proof.verify` for verification without submission, `proof.get_by_hash` for retained submissions, or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
+      "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2700,7 +2700,7 @@ function createBitcoinStratigraphyMcpServer(
     },
     {
       instructions:
-        "Returns Bitcoin Stratigraphy data with Nostr NIP-78 attestations and zkProof payloads. Verify emitted Groth16/Poseidon BN254 proofs with POST /api/v1/zk/verify; emitted proofs are pre-verified for sub-10ms verification. Paid access supports L402 multi-asset settlement.",
+        "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.",
       capabilities: {
         prompts: {},
         resources: {},

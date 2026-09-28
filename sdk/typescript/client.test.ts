@@ -472,6 +472,22 @@ test("does not pay x402 without a configured wallet", async () => {
   assert.equal(requests, 1);
 });
 
+test("does not sign an x402 quote when settlement is unavailable", async () => {
+  let signs = 0;
+  let requests = 0;
+  const client = new StratigraphyClient("https://example.test/mcp", {
+    maxPaymentMicroUsdc: 200_000,
+    x402Wallet: async () => { signs++; return x402Signature(); },
+    fetcher: (async () => {
+      requests++;
+      return x402Required({ extra: { ...x402Terms.accepted.extra, settlementAvailable: false } });
+    }) as typeof fetch,
+  });
+  await assert.rejects(client.getMeshStatus(), /settlement is unavailable/);
+  assert.equal(signs, 0);
+  assert.equal(requests, 1);
+});
+
 test("never requests a second x402 payment when the signed retry gets a 402", async () => {
   let signs = 0;
   let requests = 0;

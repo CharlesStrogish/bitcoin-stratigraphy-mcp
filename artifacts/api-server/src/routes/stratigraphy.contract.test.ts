@@ -2150,6 +2150,56 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   );
 });
 
+test("MCP quotes both rails without a facilitator but refuses signed x402 requests", async () => {
+  const app = express();
+  app.use(express.json());
+  registerMcpRequestGuard(app);
+  registerMcpRoute(app, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-no-facilitator-secret",
+    x402ResourceServer: null,
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    for (const name of ["payment.info", "stratigraphy.list"]) {
+      const free = await mcpRequestAt(baseUrl, "tools/call", { name, arguments: {} });
+      assert.equal(free.response.status, 200);
+      assert.ok(free.body.result?.structuredContent);
+      assert.equal(free.response.headers.get("payment-required"), null);
+    }
+    const challenge = await mcpRequestAt(baseUrl, "tools/call", {
+      name: "stratigraphy.get", arguments: { days: 1 },
+    });
+    assert.equal(challenge.response.status, 402);
+    assert.match(challenge.response.headers.get("www-authenticate") ?? "", /L402 macaroon="[^"]+", invoice="[^"]+"/);
+    const encoded = challenge.response.headers.get("payment-required");
+    assert.ok(encoded);
+    const terms = JSON.parse(Buffer.from(encoded, "base64").toString("utf8")) as {
+      x402Version: number;
+      resource: { url: string };
+      accepts: Array<{ amount: string; asset: string; payTo: string; network: string; extra: Record<string, unknown> }>;
+    };
+    assert.equal(terms.x402Version, 2);
+    assert.equal(terms.resource.url, `${baseUrl}/mcp`);
+    assert.equal(terms.accepts[0]?.amount, "1000");
+    assert.equal(terms.accepts[0]?.asset.toLowerCase(), "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913");
+    assert.equal(terms.accepts[0]?.payTo.toLowerCase(), (process.env.X402_RECEIVING_ADDRESS ?? "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775").toLowerCase());
+    assert.equal(terms.accepts[0]?.network, "eip155:8453");
+    assert.equal(terms.accepts[0]?.extra.displayAmount, "0.001");
+    assert.equal(terms.accepts[0]?.extra.settlementAvailable, false);
+    const attempted = await mcpRequestAt(
+      baseUrl, "tools/call", { name: "stratigraphy.get", arguments: { days: 1 } },
+      undefined, undefined, Buffer.from("{}").toString("base64"),
+    );
+    assert.equal(attempted.response.status, 503);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test("MCP paid tools issue dual challenges and settle x402 before execution", async () => {
   let facilitatorSettlesPayment = true;
   let verifyCalls = 0;

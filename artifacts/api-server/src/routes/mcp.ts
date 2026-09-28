@@ -28,7 +28,6 @@ import { createL402Middleware } from "../middleware/l402";
 import {
   createCdpX402ResourceServer,
   createX402PaymentMiddleware,
-  isCdpX402Configured,
   type X402ResourceServerLike,
 } from "../middleware/payment";
 import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
@@ -3149,7 +3148,7 @@ export function registerMcpRoute(
   app: Express,
   options: {
     settlementRouter?: SettlementRouter;
-    x402ResourceServer?: X402ResourceServerLike;
+    x402ResourceServer?: X402ResourceServerLike | null;
     sessionSecret?: string;
     usageStore?: MacaroonUsageStore;
     ledger?: RevenueLedger;
@@ -3165,7 +3164,9 @@ export function registerMcpRoute(
   let x402SetupError: unknown;
   let x402Ready = Boolean(options.x402ResourceServer);
   const x402ResourceServer = Promise.resolve(
-    options.x402ResourceServer ?? createCdpX402ResourceServer(),
+    options.x402ResourceServer === null
+      ? undefined
+      : options.x402ResourceServer ?? createCdpX402ResourceServer(),
   ).then((server) => {
     x402Ready = Boolean(server);
     return server;
@@ -3206,24 +3207,12 @@ export function registerMcpRoute(
             );
             return;
           }
-          if (!x402Ready && !isCdpX402Configured()) {
-            l402(req, res, next);
-            return;
-          }
-          const server = await x402ResourceServer;
-          if (!server) {
-            if (x402SetupError) {
-              req.log?.error({ err: x402SetupError }, "CDP x402 setup failed");
-            }
-            l402(req, res, next);
-            return;
-          }
-          res.locals.x402ChallengeEnabled = true;
+           // An unauthenticated challenge is only a quote. It does not grant
+           // tool access; a signed x402 request still requires live settlement.
+           const server = x402Ready ? await x402ResourceServer : undefined;
           createX402PaymentMiddleware({ resourceServer: server })(
             req, res, () =>
-              req.header("PAYMENT-SIGNATURE")
-                ? next()
-                : l402(req, res, next),
+               l402(req, res, next),
           );
         };
       })(),

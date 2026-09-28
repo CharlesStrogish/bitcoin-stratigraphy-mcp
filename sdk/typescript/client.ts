@@ -541,6 +541,9 @@ function parseX402Requirements(
   if (extra.paymentFlow !== "upfront" || extra.name !== "USD Coin" || extra.version !== "2") {
     throw new Error("x402 challenge has unsupported USDC payment metadata");
   }
+  if (extra.settlementAvailable === false) {
+    throw new Error("x402 settlement is unavailable; use L402 instead");
+  }
   const resource = value.resource as Record<string, unknown>;
   const acceptedTerms = {
     ...accepted,

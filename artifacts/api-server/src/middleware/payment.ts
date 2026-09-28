@@ -9,6 +9,7 @@ export const X402_NETWORK: PaymentRequirements["network"] = "eip155:8453";
 export const X402_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 export const X402_PAY_TO = "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775";
 export const X402_AMOUNT = "1000";
+export const X402_DISPLAY_AMOUNT = "0.001";
 
 export type X402ResourceServerLike = Pick<
   x402ResourceServer,
@@ -16,7 +17,7 @@ export type X402ResourceServerLike = Pick<
 >;
 
 export type X402MiddlewareOptions = {
-  resourceServer: X402ResourceServerLike;
+  resourceServer?: X402ResourceServerLike;
   amount?: string;
   payTo?: string;
   asset?: string;
@@ -97,38 +98,48 @@ function exactTerms(
 export function createX402PaymentMiddleware(
   options: X402MiddlewareOptions,
 ): RequestHandler {
+  const payTo = options.payTo ?? process.env.X402_RECEIVING_ADDRESS ?? X402_PAY_TO;
+  if (!/^0x[a-fA-F0-9]{40}$/.test(payTo)) {
+    throw new Error("X402_RECEIVING_ADDRESS must be a 20-byte EVM address");
+  }
   const expected: PaymentRequirements = {
     scheme: "exact",
     network: options.network ?? X402_NETWORK,
     asset: options.asset ?? X402_ASSET,
     amount: options.amount ?? X402_AMOUNT,
-    payTo: options.payTo ?? X402_PAY_TO,
+    payTo,
     maxTimeoutSeconds: 60,
     extra: {
       name: "USD Coin",
       version: "2",
       paymentFlow: "upfront",
+      displayAmount: X402_DISPLAY_AMOUNT,
     },
   };
 
   const createChallengeHeader = async (req: Request): Promise<string> => {
     const resourceUrl = requestResourceUrl(req);
-    const response = await options.resourceServer.createPaymentRequiredResponse(
-      [expected],
-      { url: resourceUrl, description: "MCP tool call payment" },
-    );
+    const response = options.resourceServer
+      ? await options.resourceServer.createPaymentRequiredResponse(
+        [expected],
+        { url: resourceUrl, description: "MCP tool call payment" },
+      )
+      : {
+        x402Version: 2,
+        resource: { url: resourceUrl, description: "MCP tool call payment" },
+        accepts: [{
+          ...expected,
+          extra: { ...expected.extra, settlementAvailable: false },
+        }],
+      };
     return Buffer.from(JSON.stringify(response)).toString("base64");
   };
 
   return async (req, res, next) => {
     const signature = req.header("PAYMENT-SIGNATURE");
     if (!signature) {
-      // Preserve the existing L402 response and add x402 only when its authenticated
-      // settlement path is configured and the L402 gate actually challenges.
-      if (!res.locals.x402ChallengeEnabled) {
-        next();
-        return;
-      }
+      // Quote both rails on L402 challenges even without a facilitator.
+      // A quote is not proof of settlement; signatures still fail closed below.
       const sendJson = res.json.bind(res);
       res.json = ((body: unknown) => {
         if (res.statusCode !== 402) return sendJson(body);
@@ -148,6 +159,10 @@ export function createX402PaymentMiddleware(
     }
 
     const payload = decodePaymentSignature(signature);
+    if (!options.resourceServer) {
+      res.status(503).json({ error: "x402 settlement is not configured; use L402" });
+      return;
+    }
     const resourceUrl = requestResourceUrl(req);
     if (!payload || payload.resource?.url !== resourceUrl ||
         !exactTerms(payload.accepted, expected)) {

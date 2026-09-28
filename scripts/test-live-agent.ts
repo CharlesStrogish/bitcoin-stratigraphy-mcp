@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-const MCP_URL = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
+const MCP_URL = process.env.MCP_URL ?? "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
 const RECIPIENT = "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775";
 const BASE_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const TIMEOUT_MS = 30_000;
@@ -72,7 +72,7 @@ async function checkPaidChallenge(): Promise<void> {
   assert.ok(l402, "Missing L402 WWW-Authenticate challenge");
   const l402Parts = /(?:^|,\s*)L402\s+macaroon="([^"]+)",\s*invoice="([^"]+)"/i.exec(l402);
   assert.ok(l402Parts?.[1] && l402Parts[2], "L402 challenge lacks a macaroon or Lightning invoice");
-  assert.ok(x402, "Missing x402 PAYMENT-REQUIRED challenge (production may not have the new code/credentials)");
+  assert.ok(x402, "Missing x402 PAYMENT-REQUIRED challenge (production may not have the new code)");
   let decoded: unknown;
   try {
     decoded = JSON.parse(Buffer.from(x402, "base64").toString("utf8"));
@@ -82,7 +82,7 @@ async function checkPaidChallenge(): Promise<void> {
   const challenge = object(decoded, "x402 challenge");
   const resource = object(challenge.resource, "x402 resource");
   assert.equal(challenge.x402Version, 2, "Expected x402 v2");
-  assert.equal(resource.url, MCP_URL, "Challenge resource URL mismatch");
+  assert.equal(resource.url, new URL(MCP_URL).href, "Challenge resource URL mismatch");
   assert.ok(Array.isArray(challenge.accepts), "Missing x402 accepted payment terms");
   const accepted = (challenge.accepts as unknown[]).map((entry) => object(entry, "payment terms"));
   const terms = accepted.find((entry) =>
@@ -94,10 +94,13 @@ async function checkPaidChallenge(): Promise<void> {
   assert.ok(terms, "No exact Base USDC 0.001 payment to the expected recipient");
   const extra = object(terms.extra, "x402 extra");
   assert.equal(extra.paymentFlow, "upfront", "Expected upfront settlement");
+  assert.equal(extra.displayAmount, "0.001", "Expected human-readable 0.001 USDC");
   console.log("Decoded x402 terms:", JSON.stringify({
     version: challenge.x402Version, resource: resource.url,
     scheme: terms.scheme, network: terms.network, asset: terms.asset,
-    amountAtomicUnits: terms.amount, payTo: terms.payTo, paymentFlow: extra.paymentFlow,
+    amountAtomicUnits: terms.amount, amountUsdc: extra.displayAmount,
+    payTo: terms.payTo, paymentFlow: extra.paymentFlow,
+    settlementAvailable: extra.settlementAvailable !== false,
   }, null, 2));
   console.log("Both L402 and x402 challenges verified; no payment was made.");
 }

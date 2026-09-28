@@ -1130,7 +1130,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Retrieves complete stratigraphy dataset payloads, thermodynamic metrics, and full cryptographic proof content for a target block height.",
+      "Retrieve full indexed stratum records by date or block height, including single-record lookups and bounded queries. Do NOT use for compressed record batches (use `stratigraphy.range`) or condensed context digests (use `stratigraphy.digest`).",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1242,7 +1242,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot.",
+      "Retrieve a compressed, token-optimized summary digest of indexed thermodynamic state for an LLM context window. Do NOT use for full uncompressed records (use `stratigraphy.get`) or compressed per-record range batches (use `stratigraphy.range`).",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1356,7 +1356,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.range",
     title: "Get Stratigraphy Range",
     description:
-      "Retrieve a sequential batch of thermodynamic dataset strata between start and end bounds under a single consolidated query.",
+      "Retrieve an ascending batch of compressed indexed daily strata between height or date bounds. Do NOT use for full uncompressed records (use `stratigraphy.get`) or a single summary digest (use `stratigraphy.digest`).",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2401,7 +2401,7 @@ const baseMcpToolDefinitions = [
     name: "payment.info",
     title: "Get MCP Payment Information",
     description:
-      "Inspect L402 payment requirements, per-tool satoshi pricing, invoice challenge parameters, and Macaroon authentication requirements.",
+      "Retrieve L402 pricing rates, Lightning invoice requirements, and Macaroon authentication specs. This informational tool does not create invoices or settle payments; execution occurs dynamically via HTTP L402 challenge/preimage settlement on paid tool calls.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2470,7 +2470,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "Retrieves live P2P mesh network node health, peer connections, and synchronization status.",
+      "Retrieve P2P mesh health, active peer connections, and synchronization metrics to assess peer availability. Inbound peer subscription state is not exposed. Do NOT use to publish outbound telemetry (use `mesh.broadcast`).",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2501,7 +2501,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.broadcast",
     title: "Broadcast Telemetry Snapshot to Mesh",
     description:
-      "Ingests local node telemetry payloads and broadcasts telemetry snapshots across the P2P mesh network.",
+      "Broadcast a signed stored telemetry snapshot to mesh peers for inbound validation and acknowledgment. Do NOT use to inspect node mesh status (use `mesh.get_status`) or publish inbound peer sync messages (not supported).",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",

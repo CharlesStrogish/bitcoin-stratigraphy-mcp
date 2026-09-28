@@ -64,7 +64,7 @@ x-mcp-tools:
         otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
       required: [kind, hash, status, timestamp, provenanceVerified]
   payment.info:
-    description: "Inspect L402 payment requirements, per-tool satoshi pricing, invoice challenge parameters, and Macaroon authentication requirements."
+    description: "Retrieve L402 pricing rates, Lightning invoice requirements, and Macaroon authentication specs. This informational tool does not create invoices or settle payments; execution occurs dynamically via HTTP L402 challenge/preimage settlement on paid tool calls."
     inputSchema:
       type: object
       additionalProperties: false
@@ -107,7 +107,7 @@ x-mcp-tools:
           required: [authorizationHeader, scope, maxRequests]
       required: [standardInvoiceSats, perToolSats, acceptedPaymentMethods, invoiceExpirySeconds, challenge, activeAuthSchemes, macaroonRequirements]
   stratigraphy.range:
-    description: "Retrieve a sequential batch of thermodynamic dataset strata between start and end bounds under a single consolidated query."
+    description: "Retrieve an ascending batch of compressed indexed daily strata between height or date bounds. Do NOT use for full uncompressed records (use `stratigraphy.get`) or a single summary digest (use `stratigraphy.digest`)."
     inputSchema:
       type: object
       additionalProperties: false
@@ -207,7 +207,7 @@ x-mcp-tools:
           required: [heightDelta, multiplierDelta, percentageChange, timeSpanDays]
       required: [from, to, delta]
   stratigraphy.digest:
-    description: "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot."
+    description: "Retrieve a compressed, token-optimized summary digest of indexed thermodynamic state for an LLM context window. Do NOT use for full uncompressed records (use `stratigraphy.get`) or compressed per-record range batches (use `stratigraphy.range`)."
     inputSchema:
       type: object
       additionalProperties: false
@@ -236,7 +236,7 @@ x-mcp-tools:
           description: False because indexed source entries do not store per-record ZK proofs.
       required: [result, proofAvailable]
   mesh.get_status:
-    description: "Retrieves live P2P mesh network node health, peer connections, and synchronization status."
+    description: "Retrieve P2P mesh health, active peer connections, and synchronization metrics to assess peer availability. Inbound peer subscription state is not exposed. Do NOT use to publish outbound telemetry (use `mesh.broadcast`)."
     legacyNames: [mesh.status]
     inputSchema:
       type: object
@@ -474,9 +474,9 @@ x-mcp-tools:
         attestationStatus: { type: string }
       required: [proofHash, jobId, status, submittedAt, attestationStatus]
   mesh.broadcast:
-    description: "Ingests local node telemetry payloads and broadcasts telemetry snapshots across the P2P mesh network."
+    description: "Broadcast a signed stored telemetry snapshot to mesh peers for inbound validation and acknowledgment. Do NOT use to inspect node mesh status (use `mesh.get_status`) or publish inbound peer sync messages (not supported)."
   stratigraphy.get:
-    description: "Retrieves complete stratigraphy dataset payloads, thermodynamic metrics, and full cryptographic proof content for a target block height."
+    description: "Retrieve full indexed stratum records by date or block height, including single-record lookups and bounded queries. Do NOT use for compressed record batches (use `stratigraphy.range`) or condensed context digests (use `stratigraphy.digest`)."
 security:
   - L402: []
 paths:

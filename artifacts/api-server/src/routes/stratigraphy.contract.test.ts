@@ -72,15 +72,15 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors.",
   "payment.info":
-    "Inspect L402 payment requirements, per-tool satoshi pricing, invoice challenge parameters, and Macaroon authentication requirements.",
+    "Retrieve L402 pricing rates, Lightning invoice requirements, and Macaroon authentication specs. This informational tool does not create invoices or settle payments; execution occurs dynamically via HTTP L402 challenge/preimage settlement on paid tool calls.",
   "stratigraphy.range":
-    "Retrieve a sequential batch of thermodynamic dataset strata between start and end bounds under a single consolidated query.",
+    "Retrieve an ascending batch of compressed indexed daily strata between height or date bounds. Do NOT use for full uncompressed records (use `stratigraphy.get`) or a single summary digest (use `stratigraphy.digest`).",
   "proof.attenuate":
     "Derive attenuated Macaroon sub-tokens with embedded caveats (time-to-live limits, max target bounds, tool restriction) for delegated agent swarms.",
   "stratigraphy.diff":
     "Calculate thermodynamic variance, difficulty deltas, and temporal progression between two dataset strata in a single call.",
   "stratigraphy.digest":
-    "Fetch token-optimized, compressed thermodynamic state summaries for a given block height or date range to prevent LLM context window rot.",
+    "Retrieve a compressed, token-optimized summary digest of indexed thermodynamic state for an LLM context window. Do NOT use for full uncompressed records (use `stratigraphy.get`) or compressed per-record range batches (use `stratigraphy.range`).",
   "proof.ground":
     "Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT use for stateless proof verification without anchoring (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`).",
   "proof.verify":
@@ -88,11 +88,11 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.submit":
     "Submit new ZK proof instances to process memory. Do NOT use to verify existing proofs (use `proof.verify`).",
   "mesh.broadcast":
-    "Ingests local node telemetry payloads and broadcasts telemetry snapshots across the P2P mesh network.",
+    "Broadcast a signed stored telemetry snapshot to mesh peers for inbound validation and acknowledgment. Do NOT use to inspect node mesh status (use `mesh.get_status`) or publish inbound peer sync messages (not supported).",
   "stratigraphy.get":
-    "Retrieves complete stratigraphy dataset payloads, thermodynamic metrics, and full cryptographic proof content for a target block height.",
+    "Retrieve full indexed stratum records by date or block height, including single-record lookups and bounded queries. Do NOT use for compressed record batches (use `stratigraphy.range`) or condensed context digests (use `stratigraphy.digest`).",
   "mesh.get_status":
-    "Retrieves live P2P mesh network node health, peer connections, and synchronization status.",
+    "Retrieve P2P mesh health, active peer connections, and synchronization metrics to assess peer availability. Inbound peer subscription state is not exposed. Do NOT use to publish outbound telemetry (use `mesh.broadcast`).",
 };
 
 type OpenApiDocument = {

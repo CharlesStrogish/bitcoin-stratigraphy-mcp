@@ -84,7 +84,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.ground":
     "Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT use for stateless proof verification without anchoring (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`).",
   "proof.verify":
-    "Perform offline/stateless zk-SNARK verification. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`).",
+    "Verify a Groth16 proof. Telemetry verification is offline; drift verification consults a Bitcoin block provider. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`).",
   "proof.submit":
     "Submit new ZK proof instances to process memory. Do NOT use to verify existing proofs (use `proof.verify`).",
   "mesh.broadcast":
@@ -617,6 +617,32 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     });
     const address = isolatedServer.address() as AddressInfo;
     const url = `http://127.0.0.1:${address.port}`;
+    const listed = await mcpRequestAt(url, "tools/list");
+    const listedTools = listed.body.result?.tools as Array<{
+      name: string;
+      inputSchema: { oneOf?: Array<Record<string, any>> };
+    }>;
+    assert.equal(listedTools.length, 14);
+    const verifyTool = listedTools.find(({ name }) => name === "proof.verify");
+    assert.ok(verifyTool);
+    assert.equal(verifyTool.inputSchema.oneOf?.length, 2);
+    assert.deepEqual(verifyTool.inputSchema.oneOf?.map((branch) => branch.required), [
+      ["proof", "publicInputs", "verificationKeyId", "data"],
+      ["circuit", "sessionContextHash", "targetBlockHeight", "entropyThreshold", "proof"],
+    ]);
+    assert.equal(verifyTool.inputSchema.oneOf?.every(
+      (branch) => branch.additionalProperties === false,
+    ), true);
+    const compactTargetSchema = verifyTool.inputSchema.oneOf?.[1].properties?.compactTarget;
+    assert.deepEqual(
+      compactTargetSchema && {
+        type: compactTargetSchema.type,
+        minimum: compactTargetSchema.minimum,
+        maximum: compactTargetSchema.maximum,
+      },
+      { type: "integer", minimum: 0, maximum: 0xffff_ffff },
+    );
+
     const absent = await mcpRequestAt(url, "tools/call", {
       name: "proof.get_by_hash", arguments: { hash: "ef".repeat(32) },
     });
@@ -700,6 +726,64 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     assert.equal(foundProof.result?.structuredContent.status, "invalid");
     assert.equal(foundProof.result?.structuredContent.proofPayload.proof, proof);
     assert.deepEqual(foundProof.result?.structuredContent.proofPayload.data, data);
+
+    const driftProof = {
+      circuit: "zk.drift.v1",
+      sessionContextHash: "ab".repeat(32),
+      targetBlockHeight: 920000,
+      entropyThreshold: 0.75,
+      proof: {
+        circuit: "zk.drift.v1",
+        pi_a: ["1", "2", "1"],
+        pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+        pi_c: ["1", "2", "1"],
+        publicSignals: ["1", "2"],
+        verificationKeyId: "sha256:4c095e183ea45a9d",
+      },
+    };
+    const mixedProofModes = await mcpRequestAt(url, "tools/call", {
+      name: "proof.verify",
+      arguments: {
+        ...driftProof,
+        proof: "legacy proof",
+        publicInputs: {
+          blockHeight: 920000, snapshotDigest: "1", thermodynamicHash: "1",
+          timestamp: 1789776000000, valuationSat: 12583,
+        },
+        verificationKeyId: "sha256:unknown",
+        data,
+      },
+    });
+    assert.equal(mixedProofModes.body.error?.code, -32602);
+
+    const invalidDriftProof = await mcpRequestAt(url, "tools/call", {
+      name: "proof.verify",
+      arguments: {
+        ...driftProof,
+        proof: { ...driftProof.proof, circuit: "zk.other.v1" },
+      },
+    });
+    assert.equal(invalidDriftProof.body.error?.code, -32602);
+
+    const stringCompactTarget = await mcpRequestAt(url, "tools/call", {
+      name: "proof.verify",
+      arguments: { ...driftProof, compactTarget: "1d00ffff" },
+    });
+    assert.equal(stringCompactTarget.body.error?.code, -32602);
+
+    const driftChallenge = await mcpRequestAt(url, "tools/call", {
+      name: "proof.verify",
+      arguments: {
+        ...driftProof,
+        driftScore: 0.25,
+        isAligned: true,
+        thermodynamicEntropyBits: 0.5,
+        blockHash: "ab".repeat(32),
+        compactTarget: 486604799,
+      },
+    });
+    assert.equal(driftChallenge.response.status, 402);
+    assert.equal((driftChallenge.body as any).amount_sats, 250);
   } finally {
     isolatedServer.close();
   }
@@ -1496,7 +1580,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       oneOf?: unknown[];
     },
     path: string,
+    inheritedProperties: ReadonlySet<string> = new Set(),
   ): void => {
+    const propertyNames = new Set([
+      ...inheritedProperties,
+      ...Object.keys(schema.properties ?? {}),
+    ]);
     if (schema.properties) {
       assert.equal(schema.type, "object", `${path} must be an object schema`);
       const required = schema.required ?? [];
@@ -1505,7 +1594,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         assert.ok(Object.hasOwn(schema.properties, name), `${path}.required includes unknown ${name}`);
       }
       for (const [name, property] of Object.entries(schema.properties)) {
-        if (!(path.endsWith(".agentEvent") && name === "created_at")) {
+        const groth16Coordinate = path.endsWith(".proof") &&
+          ["pi_a", "pi_b", "pi_c"].includes(name);
+        if (!(path.endsWith(".agentEvent") && name === "created_at") && !groth16Coordinate) {
           assert.match(name, /^[a-z][a-zA-Z0-9]*$/, `${path}.${name} must use camelCase`);
         }
         const documented = property as { description?: string };
@@ -1514,16 +1605,17 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       }
     }
     for (const [index, branch] of (schema.oneOf ?? []).entries()) {
-      const alternative = branch as { required?: unknown };
+      const alternative = branch as Parameters<typeof assertInputProperties>[0];
       if (alternative.required !== undefined) {
         assert.ok(Array.isArray(alternative.required), `${path}.oneOf[${index}].required must be an array`);
         for (const name of alternative.required as string[]) {
           assert.ok(
-            Object.hasOwn(schema.properties ?? {}, name),
+            Object.hasOwn(alternative.properties ?? {}, name) || propertyNames.has(name),
             `${path}.oneOf[${index}].required includes unknown ${name}`,
           );
         }
       }
+      assertInputProperties(alternative, `${path}.oneOf[${index}]`, propertyNames);
     }
     if (schema.items) {
       assertInputProperties(schema.items as Parameters<typeof assertInputProperties>[0], `${path}.items`);

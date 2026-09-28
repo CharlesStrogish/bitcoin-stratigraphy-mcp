@@ -652,6 +652,73 @@ export const StreamStratigraphyTelemetryResponse = zod.unknown()
 
 
 /**
+ * Computes an explicitly defined bit-density proxy: context and Bitcoin block hash Hamming weights, the context hash's leading-zero run, and the leading-zero count of the block's compact difficulty target. A Groth16 proof constrains the score and alignment threshold against block data from a public Bitcoin provider, not independently validated consensus. thermodynamicEntropyBits is a hash bit-balance proxy (twice the smaller of zero/one bit counts), not measured physical entropy. The proof does not establish Bitcoin consensus or PoW in-circuit. Its locally generated Groth16 key has a single-party setup, not an independently verified multiparty ceremony.
+ * @summary Prove a context-hash bit-density drift score against a Bitcoin block
+ */
+export const generateZkDriftProofBodySessionContextHashRegExp = new RegExp('^[0-9a-fA-F]{64}$');
+export const generateZkDriftProofBodyBlockHeightOneMin = 0;
+
+export const generateZkDriftProofBodyBlockHeightTwoRegExp = new RegExp('^(0|[1-9][0-9]*)$');
+export const generateZkDriftProofBodyEntropyThresholdDefault = 0.85;
+export const generateZkDriftProofBodyEntropyThresholdMin = 0;
+export const generateZkDriftProofBodyEntropyThresholdMax = 1;
+
+
+
+export const GenerateZkDriftProofBody = zod.object({
+  "sessionContextHash": zod.string().regex(generateZkDriftProofBodySessionContextHashRegExp).describe('Exactly 32 bytes of digest, hex encoded; not raw session text.'),
+  "blockHeight": zod.union([zod.number().int().min(generateZkDriftProofBodyBlockHeightOneMin),zod.string().regex(generateZkDriftProofBodyBlockHeightTwoRegExp)]).optional().describe('Optional Bitcoin height; omitted means the latest block returned by the public block API.'),
+  "entropyThreshold": zod.number().min(generateZkDriftProofBodyEntropyThresholdMin).max(generateZkDriftProofBodyEntropyThresholdMax).default(generateZkDriftProofBodyEntropyThresholdDefault).describe('Maximum permitted driftScore; 0.85 when omitted.')
+})
+
+export const generateZkDriftProofResponseDriftScoreMin = 0;
+export const generateZkDriftProofResponseDriftScoreMax = 1;
+
+export const generateZkDriftProofResponseTargetBlockHeightMin = 0;
+
+export const generateZkDriftProofResponseProofPiAMin = 3;
+export const generateZkDriftProofResponseProofPiAMax = 3;
+
+export const generateZkDriftProofResponseProofPiBItemMin = 2;
+export const generateZkDriftProofResponseProofPiBItemMax = 2;
+
+export const generateZkDriftProofResponseProofPiBMin = 3;
+export const generateZkDriftProofResponseProofPiBMax = 3;
+
+export const generateZkDriftProofResponseProofPiCMin = 3;
+export const generateZkDriftProofResponseProofPiCMax = 3;
+
+
+export const generateZkDriftProofResponseThermodynamicEntropyBitsMin = 0;
+export const generateZkDriftProofResponseThermodynamicEntropyBitsMax = 256;
+
+export const generateZkDriftProofResponseBlockHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const generateZkDriftProofResponseCompactTargetMin = 0;
+export const generateZkDriftProofResponseCompactTargetMax = 4294967295;
+
+
+
+export const GenerateZkDriftProofResponse = zod.object({
+  "driftScore": zod.number().min(generateZkDriftProofResponseDriftScoreMin).max(generateZkDriftProofResponseDriftScoreMax).describe('(Hamming-weight gap + leading-zero difficulty gap) divided by 512; lower means closer.'),
+  "isAligned": zod.boolean().describe('True exactly when driftScore is no greater than entropyThreshold.'),
+  "targetBlockHeight": zod.number().int().min(generateZkDriftProofResponseTargetBlockHeightMin),
+  "proof": zod.object({
+  "circuit": zod.literal("zk.drift.v1"),
+  "pi_a": zod.array(zod.string()).min(generateZkDriftProofResponseProofPiAMin).max(generateZkDriftProofResponseProofPiAMax),
+  "pi_b": zod.array(zod.array(zod.string()).min(generateZkDriftProofResponseProofPiBItemMin).max(generateZkDriftProofResponseProofPiBItemMax)).min(generateZkDriftProofResponseProofPiBMin).max(generateZkDriftProofResponseProofPiBMax),
+  "pi_c": zod.array(zod.string()).min(generateZkDriftProofResponseProofPiCMin).max(generateZkDriftProofResponseProofPiCMax),
+  "publicSignals": zod.array(zod.string()).min(1).describe('Ordered public commitments and circuit outputs required for independent Groth16 verification.'),
+  "verificationKeyId": zod.string().describe('Digest identifying the drift-specific Groth16 verification key.')
+}),
+  "thermodynamicEntropyBits": zod.number().int().min(generateZkDriftProofResponseThermodynamicEntropyBitsMin).max(generateZkDriftProofResponseThermodynamicEntropyBitsMax).describe('Bit-balance proxy 2 × min(one bits, zero bits) of the context digest, not physical thermodynamic entropy.'),
+  "blockHash": zod.string().regex(generateZkDriftProofResponseBlockHashRegExp).describe('Bitcoin block hash returned by the public block API and bound into the proof.'),
+  "compactTarget": zod.number().int().min(generateZkDriftProofResponseCompactTargetMin).max(generateZkDriftProofResponseCompactTargetMax).describe('Compact nBits field returned for the targeted block, used to derive difficulty leading-zero bits.'),
+  "entropyInterpretation": zod.string().describe('States that thermodynamicEntropyBits is a digest bit-balance proxy rather than physical entropy.'),
+  "proofInterpretation": zod.string().describe('States the public block-provider and single-party setup trust limits of the circuit proof.')
+})
+
+
+/**
  * Public `POST /api/v1/zk/verify` endpoint for Zero-Knowledge Data Integrity. Verifies the Groth16/Poseidon BN254 zk-SNARK and binds the supplied data payload to its semantic public inputs. Proofs emitted by this API are pre-verified and complete verification in under 10ms.
  * @summary Verify a Groth16/Poseidon zkProof payload
  */

@@ -48,6 +48,7 @@ import {
   submitZkProof,
   verifyZkProofForSnapshot,
 } from "../services/zkProofService";
+import { verifyDriftProof } from "../services/zkDriftService";
 import { getStratigraphyData, readDataset } from "./stratigraphy";
 import { buildProvenanceChain } from "../services/provenanceChain";
 import { getProvenanceAnchor } from "../services/otsProvenance";
@@ -370,7 +371,7 @@ const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
   "No input parameters required.",
 );
 
-const verifyProofInputSchema = z.object({
+const verifySnapshotProofInputSchema = z.object({
   proof: z.string().min(1).describe(
     "Base64url-encoded Groth16/Poseidon BN254 proof emitted by this API, without padding.",
   ),
@@ -384,6 +385,31 @@ const verifyProofInputSchema = z.object({
 }).strict().describe(
   "Input arguments containing an encoded Groth16 proof, typed public inputs, a verification-key identifier, and telemetry data.",
 );
+
+const driftProofInputSchema = z.object({
+  circuit: z.literal("zk.drift.v1"),
+  sessionContextHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  targetBlockHeight: z.number().int().nonnegative().max(0xffff_ffff),
+  entropyThreshold: z.number().min(0).max(1),
+  proof: z.object({
+    circuit: z.literal("zk.drift.v1"),
+    pi_a: z.array(z.string().min(1)).length(3),
+    pi_b: z.array(z.array(z.string().min(1)).length(2)).length(3),
+    pi_c: z.array(z.string().min(1)).length(3),
+    publicSignals: z.array(z.string().min(1)).min(1),
+    verificationKeyId: z.string().min(1),
+  }).strict(),
+  driftScore: z.number().optional(),
+  isAligned: z.boolean().optional(),
+  thermodynamicEntropyBits: z.number().nonnegative().optional(),
+  blockHash: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
+  compactTarget: z.number().int().min(0).max(0xffff_ffff).optional(),
+}).strict();
+
+const verifyProofInputSchema = z.union([
+  verifySnapshotProofInputSchema,
+  driftProofInputSchema,
+]);
 
 const proofStatusInputSchema = z.object({
   proofHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$|^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[a-z2-7]{20,}$/).optional().describe(
@@ -1520,52 +1546,181 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "Perform offline/stateless zk-SNARK verification. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`).",
+      "Verify a Groth16 proof. Telemetry verification is offline; drift verification consults a Bitcoin block provider. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`).",
     annotations: proofVerificationToolAnnotations,
     inputSchema: {
       type: "object",
       description:
         "Input arguments containing an encoded Groth16 proof, typed public inputs, a verification-key identifier, and telemetry data.",
-      examples: [{
-        proof: "eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0",
-        publicInputs: publicInputsJsonSchema.examples[0],
-        verificationKeyId: "sha256:4c095e183ea45a9d",
-        data: [{
-          block: { height: 920000 },
-          observed_at: "2026-09-19T00:00:00.000Z",
-          thermodynamic: { target_multiplier: 125.83 },
-        }],
-      }],
-      additionalProperties: false,
-      properties: {
-        proof: field(
-          "string",
-          "Base64url-encoded Groth16/Poseidon BN254 proof string without padding.",
-          ["eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0"],
-          { minLength: 1 },
-        ),
-        publicInputs: {
-          ...publicInputsJsonSchema,
-          description:
-            "Expected public constants committed by the proof; fields must match the corresponding telemetry payload in data: non-negative blockHeight, non-empty snapshotDigest and thermodynamicHash, non-negative Unix-millisecond timestamp, and non-negative valuationSat. Example: blockHeight 920000 and valuationSat 12583.",
-        },
-        verificationKeyId: field(
-          "string",
-          "SHA-256 verification-key identifier string formatted with 'sha256:' prefix.",
-          ["sha256:4c095e183ea45a9d"],
-          { minLength: 1 },
-        ),
-        data: field(
-          ["object", "array"],
-          "Telemetry snapshot payload object or array of objects containing canonical state values.",
-          [[{
+      examples: [
+        {
+          proof: "eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0",
+          publicInputs: publicInputsJsonSchema.examples[0],
+          verificationKeyId: "sha256:4c095e183ea45a9d",
+          data: [{
             block: { height: 920000 },
             observed_at: "2026-09-19T00:00:00.000Z",
             thermodynamic: { target_multiplier: 125.83 },
-          }]],
-        ),
-      },
-      required: ["proof", "publicInputs", "verificationKeyId", "data"],
+          }],
+        },
+        {
+          circuit: "zk.drift.v1",
+          sessionContextHash: "ab".repeat(32),
+          targetBlockHeight: 920000,
+          entropyThreshold: 0.75,
+          proof: {
+            circuit: "zk.drift.v1",
+            pi_a: ["1", "2", "1"],
+            pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+            pi_c: ["1", "2", "1"],
+            publicSignals: ["1", "2"],
+            verificationKeyId: "sha256:4c095e183ea45a9d",
+          },
+          driftScore: 0.25,
+          isAligned: true,
+          thermodynamicEntropyBits: 0.5,
+          blockHash: "ab".repeat(32),
+          compactTarget: 486604799,
+        },
+      ],
+      oneOf: [
+        {
+          type: "object",
+          description: "Legacy telemetry-bound Groth16 proof verification input. Example: provide a proof, public inputs, verification key, and telemetry data.",
+          examples: [{
+            proof: "eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0",
+            publicInputs: publicInputsJsonSchema.examples[0],
+            verificationKeyId: "sha256:4c095e183ea45a9d",
+            data: [{
+              block: { height: 920000 },
+              observed_at: "2026-09-19T00:00:00.000Z",
+              thermodynamic: { target_multiplier: 125.83 },
+            }],
+          }],
+          additionalProperties: false,
+          properties: {
+            proof: field(
+              "string",
+              "Base64url-encoded Groth16/Poseidon BN254 proof string without padding.",
+              ["eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0"],
+              { minLength: 1 },
+            ),
+            publicInputs: {
+              ...publicInputsJsonSchema,
+              description:
+                "Expected public constants committed by the proof; fields must match the corresponding telemetry payload in data: non-negative blockHeight, non-empty snapshotDigest and thermodynamicHash, non-negative Unix-millisecond timestamp, and non-negative valuationSat. Example: blockHeight 920000 and valuationSat 12583.",
+            },
+            verificationKeyId: field(
+              "string",
+              "SHA-256 verification-key identifier string formatted with 'sha256:' prefix.",
+              ["sha256:4c095e183ea45a9d"],
+              { minLength: 1 },
+            ),
+            data: field(
+              ["object", "array"],
+              "Telemetry snapshot payload object or array of objects containing canonical state values.",
+              [[{
+                block: { height: 920000 },
+                observed_at: "2026-09-19T00:00:00.000Z",
+                thermodynamic: { target_multiplier: 125.83 },
+              }]],
+            ),
+          },
+          required: ["proof", "publicInputs", "verificationKeyId", "data"],
+        },
+        {
+          type: "object",
+          description: "Native zk.drift.v1 proof verification input, optionally bound to the complete verifier response. Example: supply the circuit discriminator, session hash, target height, threshold, and proof.",
+          examples: [{
+            circuit: "zk.drift.v1",
+            sessionContextHash: "ab".repeat(32),
+            targetBlockHeight: 920000,
+            entropyThreshold: 0.75,
+            proof: {
+              circuit: "zk.drift.v1",
+              pi_a: ["1", "2", "1"],
+              pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+              pi_c: ["1", "2", "1"],
+              publicSignals: ["1", "2"],
+              verificationKeyId: "sha256:4c095e183ea45a9d",
+            },
+            driftScore: 0.25,
+            isAligned: true,
+            thermodynamicEntropyBits: 0.5,
+            blockHash: "ab".repeat(32),
+            compactTarget: 486604799,
+          }],
+          additionalProperties: false,
+          properties: {
+            circuit: field("string", "Drift proof circuit discriminator.", ["zk.drift.v1"], { const: "zk.drift.v1" }),
+            sessionContextHash: field("string", "Hash binding this proof to its agent session context.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
+            targetBlockHeight: field("integer", "Bitcoin block height being evaluated.", [920000], { minimum: 0, maximum: 0xffff_ffff }),
+            entropyThreshold: field("number", "Maximum accepted thermodynamic entropy threshold.", [0.75], { minimum: 0, maximum: 1 }),
+            proof: {
+              type: "object",
+              description: "Groth16 proof points, public signals, and verification-key identifier for zk.drift.v1. Example: pi_a, pi_b, pi_c, and public signals.",
+              examples: [{
+                circuit: "zk.drift.v1",
+                pi_a: ["1", "2", "1"],
+                pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+                pi_c: ["1", "2", "1"],
+                publicSignals: ["1", "2"],
+                verificationKeyId: "sha256:4c095e183ea45a9d",
+              }],
+              additionalProperties: false,
+              properties: {
+                circuit: field("string", "Proof circuit discriminator.", ["zk.drift.v1"], { const: "zk.drift.v1" }),
+                pi_a: {
+                  type: "array",
+                  description: "Three Groth16 pi_a field elements. Example: [\"1\", \"2\", \"1\"].",
+                  examples: [["1", "2", "1"]],
+                  minItems: 3,
+                  maxItems: 3,
+                  items: field("string", "Groth16 pi_a field element.", ["1"], { minLength: 1 }),
+                },
+                pi_b: {
+                  type: "array",
+                  description: "Three pairs of Groth16 pi_b field elements. Example: [[\"1\", \"2\"], [\"3\", \"4\"], [\"1\", \"0\"]].",
+                  examples: [[["1", "2"], ["3", "4"], ["1", "0"]]],
+                  minItems: 3,
+                  maxItems: 3,
+                  items: {
+                    type: "array",
+                    description: "A pair of Groth16 pi_b field elements. Example: [\"1\", \"2\"].",
+                    examples: [["1", "2"]],
+                    minItems: 2,
+                    maxItems: 2,
+                    items: field("string", "Groth16 pi_b field element.", ["1"], { minLength: 1 }),
+                  },
+                },
+                pi_c: {
+                  type: "array",
+                  description: "Three Groth16 pi_c field elements. Example: [\"1\", \"2\", \"1\"].",
+                  examples: [["1", "2", "1"]],
+                  minItems: 3,
+                  maxItems: 3,
+                  items: field("string", "Groth16 pi_c field element.", ["1"], { minLength: 1 }),
+                },
+                publicSignals: {
+                  type: "array",
+                  description: "Public field elements bound to the drift proof. Example: [\"1\", \"2\"].",
+                  examples: [["1", "2"]],
+                  minItems: 1,
+                  items: field("string", "Public signal field element.", ["1"], { minLength: 1 }),
+                },
+                verificationKeyId: field("string", "Identifier of the verification key to use.", ["sha256:4c095e183ea45a9d"], { minLength: 1 }),
+              },
+              required: ["circuit", "pi_a", "pi_b", "pi_c", "publicSignals", "verificationKeyId"],
+            },
+            driftScore: field("number", "Drift score bound to the complete verifier response.", [0.25]),
+            isAligned: field("boolean", "Alignment result bound to the complete verifier response.", [true]),
+            thermodynamicEntropyBits: field("number", "Thermodynamic entropy value bound to the complete verifier response.", [0.5], { minimum: 0 }),
+            blockHash: field("string", "Bitcoin block hash bound to the complete verifier response.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
+            compactTarget: field("integer", "Raw compact target bits bound to the complete verifier response.", [486604799], { minimum: 0, maximum: 0xffff_ffff }),
+          },
+          required: ["circuit", "sessionContextHash", "targetBlockHeight", "entropyThreshold", "proof"],
+        },
+      ],
     },
     outputSchema: {
       type: "object",
@@ -2532,6 +2687,7 @@ function createBitcoinStratigraphyMcpServer(
     issuedAt: string;
   },
   archivedProof?: ArchivedProofLookup,
+  driftVerification?: { valid: boolean; startedAt: number },
 ) {
   const server = new McpServer(
     {
@@ -2672,16 +2828,28 @@ function createBitcoinStratigraphyMcpServer(
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid proof payload");
       }
-      const { proof, publicInputs, verificationKeyId, data } = parsed.data;
+      let valid: boolean;
       const startedAt = performance.now();
-      const valid = await verifyZkProofForSnapshot(
-        { proof, publicInputs, verificationKeyId },
-        data,
-      );
+      if ("circuit" in parsed.data) {
+        if (!driftVerification) {
+          throw new McpError(ErrorCode.InternalError, "Drift proof verification provider unavailable");
+        }
+        valid = driftVerification.valid;
+      } else {
+        const { proof, publicInputs, verificationKeyId, data } = parsed.data;
+        valid = await verifyZkProofForSnapshot(
+          { proof, publicInputs, verificationKeyId },
+          data,
+        );
+      }
       const structuredContent = {
         valid,
         verifiedAt: new Date().toISOString(),
-        computationTimeMs: Number((performance.now() - startedAt).toFixed(3)),
+        computationTimeMs: Number((
+          "circuit" in parsed.data && driftVerification
+            ? performance.now() - driftVerification.startedAt
+            : performance.now() - startedAt
+        ).toFixed(3)),
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
@@ -2876,6 +3044,7 @@ async function handleMcpRequest(
     res.locals.epistemicDatasetReceipt as Awaited<ReturnType<typeof createEpistemicDatasetReceipt>> | undefined,
     res.locals.attenuation as Parameters<typeof createBitcoinStratigraphyMcpServer>[3],
     res.locals.archivedProof as ArchivedProofLookup | undefined,
+    res.locals.driftVerification as { valid: boolean; startedAt: number } | undefined,
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -3138,6 +3307,32 @@ export function registerMcpRoute(
       }
     }
     gates[name](req, res, next);
+  }, async (req, res, next) => {
+    const body = req.body as { id?: unknown; method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
+    if (body?.method !== "tools/call" || body.params?.name !== "proof.verify") {
+      next();
+      return;
+    }
+    const parsed = driftProofInputSchema.safeParse(body.params?.arguments ?? {});
+    if (!parsed.success) {
+      next();
+      return;
+    }
+    const { circuit: _circuit, ...verifyInput } = parsed.data;
+    const startedAt = performance.now();
+    try {
+      const valid = await verifyDriftProof(verifyInput);
+      res.locals.driftVerification = { valid, startedAt };
+    } catch (error) {
+      req.log?.warn({ err: error }, "MCP drift proof verifier unavailable");
+      res.status(503).json({
+        jsonrpc: "2.0",
+        id: typeof body.id === "string" || typeof body.id === "number" ? body.id : null,
+        error: { code: -32603, message: "Drift proof verification provider unavailable" },
+      });
+      return;
+    }
+    next();
   }, async (req, res, next) => {
     const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
     if (body?.method !== "tools/call" || body.params?.name !== "proof.ground") {

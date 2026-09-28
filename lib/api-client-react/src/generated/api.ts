@@ -54,6 +54,8 @@ import type {
   VerifyZkProof400,
   VerifyZkProof503,
   WalletGatewayError,
+  ZkDriftRequest,
+  ZkDriftResponse,
   ZkTelemetryEventEnvelope,
   ZkVerifyInput,
   ZkVerifyResponse
@@ -1171,6 +1173,78 @@ export function useStreamStratigraphyTelemetry<TData = Awaited<ReturnType<typeof
 
 
 
+
+export const getGenerateZkDriftProofUrl = () => {
+
+
+
+
+  return `/api/zk/drift`
+}
+
+/**
+ * Computes an explicitly defined bit-density proxy: context and Bitcoin block hash Hamming weights, the context hash's leading-zero run, and the leading-zero count of the block's compact difficulty target. A Groth16 proof constrains the score and alignment threshold against block data from a public Bitcoin provider, not independently validated consensus. thermodynamicEntropyBits is a hash bit-balance proxy (twice the smaller of zero/one bit counts), not measured physical entropy. The proof does not establish Bitcoin consensus or PoW in-circuit. Its locally generated Groth16 key has a single-party setup, not an independently verified multiparty ceremony.
+ * @summary Prove a context-hash bit-density drift score against a Bitcoin block
+ */
+export const generateZkDriftProof = async (zkDriftRequest: ZkDriftRequest, options?: Parameters<typeof customFetch>[1]): Promise<ZkDriftResponse> => {
+
+  return customFetch<ZkDriftResponse>(getGenerateZkDriftProofUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(zkDriftRequest)
+  }
+);}
+
+
+
+
+
+export const getGenerateZkDriftProofMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateZkDriftProof>>, TError,{data: BodyType<ZkDriftRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateZkDriftProof>>, TError,{data: BodyType<ZkDriftRequest>}, TContext> => {
+
+const mutationKey = ['generateZkDriftProof'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateZkDriftProof>>, {data: BodyType<ZkDriftRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateZkDriftProof(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateZkDriftProofMutationResult = NonNullable<Awaited<ReturnType<typeof generateZkDriftProof>>>
+    export type GenerateZkDriftProofMutationBody = BodyType<ZkDriftRequest>
+    export type GenerateZkDriftProofMutationError = ErrorType<void>
+
+    /**
+ * @summary Prove a context-hash bit-density drift score against a Bitcoin block
+ */
+export const useGenerateZkDriftProof = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateZkDriftProof>>, TError,{data: BodyType<ZkDriftRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateZkDriftProof>>,
+        TError,
+        {data: BodyType<ZkDriftRequest>},
+        TContext
+      > => {
+      return useMutation(getGenerateZkDriftProofMutationOptions(options));
+    }
 
 export const getVerifyZkProofUrl = () => {
 

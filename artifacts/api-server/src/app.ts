@@ -22,6 +22,7 @@ import { registerSystemHealthRoute } from "./routes/system-health";
 import { registerLlmExportRoutes } from "./routes/llm-export";
 import { registerProvenanceRoutes } from "./routes/provenance";
 import { createMeshGossipService } from "./services/meshGossipService";
+import { registerZkDriftRoute } from "./routes/zk-drift";
 
 const app: Express = express();
 const meshService = createMeshGossipService();
@@ -111,6 +112,7 @@ registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);
 registerLlmExportRoutes(app);
 registerProvenanceRoutes(app, { schedule: true });
+registerZkDriftRoute(app);
 app.use("/api", router);
 registerStratigraphyRoutes(
   app,

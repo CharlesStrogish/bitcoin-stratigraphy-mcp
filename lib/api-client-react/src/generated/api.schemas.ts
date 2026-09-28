@@ -75,6 +75,85 @@ export interface LlmSchemaManifest {
   access_policy: LlmSchemaManifestAccessPolicy;
 }
 
+export interface ZkDriftRequest {
+  /**
+     * Exactly 32 bytes of digest, hex encoded; not raw session text.
+     * @pattern ^[0-9a-fA-F]{64}$
+     */
+  sessionContextHash: string;
+  /** Optional Bitcoin height; omitted means the latest block returned by the public block API. */
+  blockHeight?: number | string;
+  /**
+     * Maximum permitted driftScore; 0.85 when omitted.
+     * @minimum 0
+     * @maximum 1
+     */
+  entropyThreshold?: number;
+}
+
+export interface ZkDriftProof {
+  circuit: 'zk.drift.v1';
+  /**
+     * @minItems 3
+     * @maxItems 3
+     */
+  pi_a: string[];
+  /**
+     * @minItems 3
+     * @maxItems 3
+     * @items.minItems 2
+     * @items.maxItems 2
+     */
+  pi_b: string[][];
+  /**
+     * @minItems 3
+     * @maxItems 3
+     */
+  pi_c: string[];
+  /**
+     * Ordered public commitments and circuit outputs required for independent Groth16 verification.
+     * @minItems 1
+     */
+  publicSignals: string[];
+  /** Digest identifying the drift-specific Groth16 verification key. */
+  verificationKeyId: string;
+}
+
+export interface ZkDriftResponse {
+  /**
+     * (Hamming-weight gap + leading-zero difficulty gap) divided by 512; lower means closer.
+     * @minimum 0
+     * @maximum 1
+     */
+  driftScore: number;
+  /** True exactly when driftScore is no greater than entropyThreshold. */
+  isAligned: boolean;
+  /** @minimum 0 */
+  targetBlockHeight: number;
+  proof: ZkDriftProof;
+  /**
+     * Bit-balance proxy 2 × min(one bits, zero bits) of the context digest, not physical thermodynamic entropy.
+     * @minimum 0
+     * @maximum 256
+     */
+  thermodynamicEntropyBits: number;
+  /**
+     * Bitcoin block hash returned by the public block API and bound into the proof.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  blockHash: string;
+  /**
+     * Compact nBits field returned for the targeted block, used to derive difficulty leading-zero bits.
+     * @minimum 0
+     * @maximum 4294967295
+     */
+  compactTarget: number;
+  /** States that thermodynamicEntropyBits is a digest bit-balance proxy rather than physical entropy. */
+  entropyInterpretation: string;
+  /** States the public block-provider and single-party setup trust limits of the circuit proof. */
+  proofInterpretation: string;
+}
+
 export interface ZkPublicInputs {
   /**
      * @minimum 0

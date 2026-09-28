@@ -64,12 +64,17 @@ x-mcp-tools:
         otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
       required: [kind, hash, status, timestamp, provenanceVerified]
   payment.info:
-    description: "PURPOSE & BOUNDARIES: Read configured MCP prices, Lightning invoice requirements, and macaroon authentication rules; this tool never creates an invoice or settles payment. USAGE GUIDELINES: Use this to estimate costs before a paid tool call; use `proof.attenuate` to restrict an existing token, not to pay. BEHAVIOR & CONSEQUENCES: Free and read-only. Paid execution dynamically uses an HTTP L402 challenge and preimage settlement without valid credentials; unknown toolName or malformed input returns an error."
+    description: |-
+      Retrieve configured MCP pricing rates, Lightning invoice specs, and Macaroon rules.
+
+      - PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use `payment.info` instead of calling paid tools blindly when checking L402 pricing upfront.
+      - USAGE GUIDELINES: Use `payment.info` instead of `proof.attenuate` when discovering required sat fees or active auth schemes across tools. Do NOT use `payment.info` to settle payments or issue invoices (settlement occurs dynamically via HTTP L402 challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use `proof.attenuate` instead).
+      - BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns advertised rates, accepted methods ('Lightning L402'), and invoice expiry limits. Passing an unknown `toolName` returns a validation error.
     inputSchema:
       type: object
       additionalProperties: false
       properties:
-        toolName: { type: string, minLength: 1, description: "Optional nonempty canonical MCP tool name (e.g. 'stratigraphy.digest'); narrows perToolSats, while omission returns all tool prices. Unknown names fail validation." }
+        toolName: { type: string, minLength: 1, description: "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.digest' or 'proof.verify'). When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name string." }
       required: []
     outputSchema:
       type: object

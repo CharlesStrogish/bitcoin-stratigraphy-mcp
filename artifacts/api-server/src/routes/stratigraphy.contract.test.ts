@@ -72,7 +72,11 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error.",
   "payment.info":
-    "PURPOSE & BOUNDARIES: Read configured MCP prices, Lightning invoice requirements, and macaroon authentication rules; this tool never creates an invoice or settles payment. USAGE GUIDELINES: Use this to estimate costs before a paid tool call; use `proof.attenuate` to restrict an existing token, not to pay. BEHAVIOR & CONSEQUENCES: Free and read-only. Paid execution dynamically uses an HTTP L402 challenge and preimage settlement without valid credentials; unknown toolName or malformed input returns an error.",
+    `Retrieve configured MCP pricing rates, Lightning invoice specs, and Macaroon rules.
+
+- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.info\` instead of calling paid tools blindly when checking L402 pricing upfront.
+- USAGE GUIDELINES: Use \`payment.info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP L402 challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
+- BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns advertised rates, accepted methods ('Lightning L402'), and invoice expiry limits. Passing an unknown \`toolName\` returns a validation error.`,
   "stratigraphy.range":
     "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.digest` for a single compact summary or `stratigraphy.diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences.",
   "proof.attenuate":
@@ -1622,7 +1626,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    assert.match(candidate.description, /^PURPOSE & BOUNDARIES: .+/,
+    assert.match(candidate.description,
+      candidate.name === "payment.info"
+        ? /^Retrieve configured MCP pricing rates.*\n\n- PURPOSE & BOUNDARIES: .+/
+        : /^PURPOSE & BOUNDARIES: .+/,
       `${candidate.name} must identify its purpose`);
     assert.match(candidate.description, /USAGE GUIDELINES: .+/,
       `${candidate.name} must explain when to use it`);

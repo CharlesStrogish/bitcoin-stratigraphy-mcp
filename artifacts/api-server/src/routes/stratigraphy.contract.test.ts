@@ -76,21 +76,21 @@ const expectedMcpOverview =
   "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.";
 const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
-    "Retrieve one retained proof payload, signed receipt, or lifecycle status by a known hash, CID, snapshot digest, or submission job ID. Use `proof.list` to discover indexed proof hashes when unknown; missing payloads cannot be reconstructed.",
+    "Retrieve one retained proof payload, signed receipt, or verification status by a known hash, CID, snapshot digest, or submission job ID. Requires a known identifier; use `proof.list` to discover proof hashes. Missing payloads cannot be reconstructed.",
   "proof.list":
-    "Discover, filter by status, and paginate recent proof attestation lifecycle states from bounded process memory. Returns summaries and hashes, not full proof payloads; use `proof.get_by_hash` for an exact retained item. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
+    "Discover, filter by status, and paginate recent proof attestation lifecycle summaries from bounded process memory. Does not retrieve full proof payloads or receipts by specific hash; use `proof.get_by_hash` for exact lookup. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
   "payment.get_info":
-    "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire; an operator-only HTTP endpoint can revoke macaroons. Complete MCP pricing and settlement-status interface: key refresh, token revocation, and manual billing administration are not exposed as MCP tools.",
+    "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire. Note: Operator-only macaroon revocation is available over HTTP; key refresh and fee updates are not exposed as public MCP tools.",
   "stratigraphy.list":
     "List available stratum heights and catalog metadata. Primary discovery tool for valid query targets.",
   "stratigraphy.get_range":
-    "Retrieve compact summaries of indexed strata across an inclusive height or date span. Primary tool for compressed multi-record range queries; use `stratigraphy.get` for full telemetry record bodies.",
+    "Retrieve a contiguous span of compressed indexed stratum summaries across an inclusive height or date range. Primary tool for compact multi-record span queries; use `stratigraphy.get` for full telemetry record bodies.",
   "proof.attenuate":
     "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
   "stratigraphy.get_diff":
     "Compute and return parameter delta variances between two distinct stratum heights.",
   "stratigraphy.get_digest":
-    "Fetch a compact digest summary of indexed strata: date, indexed height, target multiplier, and SHA-256 source-record fingerprint. No full telemetry record body is returned; the fingerprint is not a Bitcoin block-header hash or per-record proof.",
+    "Fetch a compact fingerprint and metadata summary for an indexed stratum height or date, or a bounded date range. Returns no full telemetry record body; the source-record fingerprint is not a Bitcoin block-header hash.",
   "proof.ground":
     "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
   "proof.verify":
@@ -102,7 +102,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "stratigraphy.get":
     "Retrieve full indexed telemetry stratum records by date or indexed height, including single-target and bounded multi-record queries. Use `stratigraphy.get_range` for compact contiguous multi-record summaries instead.",
   "mesh.get_status":
-    "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated. Inspect active P2P mesh network topology and node health. Automated mesh consensus; direct manual mesh administration is intentionally out of scope.",
+    "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Free, read-only status; use `mesh.broadcast` to distribute a snapshot. Note: Mesh consensus is automated; this tool does not administer peers or edit topology. No internal peer-administration HTTP tool is advertised.",
 };
 
 type OpenApiDocument = {
@@ -1723,7 +1723,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     if ([
       "payment.get_info", "stratigraphy.get", "stratigraphy.list",
       "stratigraphy.get_range", "stratigraphy.get_digest", "stratigraphy.get_diff",
-      "proof.verify", "proof.get_by_hash", "proof.list",
+      "proof.verify", "proof.get_by_hash", "proof.list", "mesh.get_status",
     ].includes(candidate.name)) {
       assert.equal(candidate.description, expectedMcpToolDescriptions[candidate.name]);
     } else {

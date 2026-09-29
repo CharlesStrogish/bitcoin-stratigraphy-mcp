@@ -1281,7 +1281,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "Fetch a compact digest summary of indexed strata: date, indexed height, target multiplier, and SHA-256 source-record fingerprint. No full telemetry record body is returned; the fingerprint is not a Bitcoin block-header hash or per-record proof.",
+      "Fetch a compact fingerprint and metadata summary for an indexed stratum height or date, or a bounded date range. Returns no full telemetry record body; the source-record fingerprint is not a Bitcoin block-header hash.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1395,7 +1395,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "Retrieve compact summaries of indexed strata across an inclusive height or date span. Primary tool for compressed multi-record range queries; use `stratigraphy.get` for full telemetry record bodies.",
+      "Retrieve a contiguous span of compressed indexed stratum summaries across an inclusive height or date range. Primary tool for compact multi-record span queries; use `stratigraphy.get` for full telemetry record bodies.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1887,7 +1887,7 @@ const baseMcpToolDefinitions = [
     name: "proof.get_by_hash",
     title: "Get Proof or Receipt by Hash",
     description:
-      "Retrieve one retained proof payload, signed receipt, or lifecycle status by a known hash, CID, snapshot digest, or submission job ID. Use `proof.list` to discover indexed proof hashes when unknown; missing payloads cannot be reconstructed.",
+      "Retrieve one retained proof payload, signed receipt, or verification status by a known hash, CID, snapshot digest, or submission job ID. Requires a known identifier; use `proof.list` to discover proof hashes. Missing payloads cannot be reconstructed.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1946,7 +1946,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "Discover, filter by status, and paginate recent proof attestation lifecycle states from bounded process memory. Returns summaries and hashes, not full proof payloads; use `proof.get_by_hash` for an exact retained item. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
+      "Discover, filter by status, and paginate recent proof attestation lifecycle summaries from bounded process memory. Does not retrieve full proof payloads or receipts by specific hash; use `proof.get_by_hash` for exact lookup. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2531,7 +2531,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated. Inspect active P2P mesh network topology and node health. Automated mesh consensus; direct manual mesh administration is intentionally out of scope.",
+      "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Free, read-only status; use `mesh.broadcast` to distribute a snapshot. Note: Mesh consensus is automated; this tool does not administer peers or edit topology. No internal peer-administration HTTP tool is advertised.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2773,7 +2773,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Query MCP Prices or Verify Payment Settlement",
-          description: "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire; an operator-only HTTP endpoint can revoke macaroons. Complete MCP pricing and settlement-status interface: key refresh, token revocation, and manual billing administration are not exposed as MCP tools.",
+          description: "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire. Note: Operator-only macaroon revocation is available over HTTP; key refresh and fee updates are not exposed as public MCP tools.",
           annotations: { ...tool.annotations, readOnlyHint: false, idempotentHint: false, openWorldHint: true },
           inputSchema: {
             type: "object",

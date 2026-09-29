@@ -78,7 +78,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "Retrieve a stored historical verification receipt or proof record by hash.",
   "payment.get_info":
-    "Query MCP pricing parameters and verify L402 payment status. Note: Macaroons and Lightning invoices are issued dynamically via HTTP 402 WWW-Authenticate headers during API challenges; explicit invoice minting tools are intentionally unnecessary.",
+    "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire; an operator-only HTTP endpoint can revoke macaroons. No MCP key-refresh or token-revocation tool is exposed.",
   "stratigraphy.list":
     "List available stratum heights and catalog metadata. Primary discovery tool for valid query targets.",
   "stratigraphy.get_range":
@@ -88,17 +88,17 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "stratigraphy.get_diff":
     "Compute and return parameter delta variances between two distinct stratum heights.",
   "stratigraphy.get_digest":
-    "Fetch a lightweight, highly compressed cryptographic header summary for a single stratum height.",
+    "Fetch a compact digest summary of indexed strata: date, indexed height, target multiplier, and SHA-256 source-record fingerprint. No full telemetry record body is returned; the fingerprint is not a Bitcoin block-header hash or per-record proof.",
   "proof.ground":
     "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
   "proof.verify":
-    "Execute active cryptographic ZK-SNARK or OpenTimestamps verification on a proof payload.",
+    "Execute active cryptographic ZK-SNARK or OpenTimestamps verification on a proof payload. This tool verifies supplied proofs; it does not revoke proofs or refresh verification keys. Verification status and retained payloads are bounded, not permanent attestations.",
   "proof.submit":
     "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
   "mesh.broadcast":
     "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
   "stratigraphy.get":
-    "Fetch a single stratum record by height or hash. Primary lookup tool for individual block data.",
+    "Fetch indexed daily stratum telemetry records, including quantitative metrics, by date or indexed height (or a bounded range). Use when record contents are required; metrics can optionally narrow returned fields.",
   "mesh.get_status":
     "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated.",
 };

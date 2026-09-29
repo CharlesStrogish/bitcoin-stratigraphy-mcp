@@ -20,3 +20,9 @@ For description-only quality work, verify semantic coverage and exact contract p
 **Why:** Earlier description tests encoded a previous writing style and rejected accurate, structured purpose/usage/consequences guidance even though the advertised behavior was unchanged. New tool descriptions with exact requested lead-ins can encounter the same issue.
 
 **How to apply:** Check every advertised tool has truthful boundaries, usage guidance, cost and failure notes, and that shared metadata matches; retain independent assertions for critical facts and exact tool count.
+
+When evaluator-suggested wording conflicts with real credential or payload behavior, prefer accurate copy over literal phrasing. The user approved substituting truthful descriptions rather than advertising unsupported guarantees.
+
+**Why:** Security claims such as non-expiring, non-revocable credentials and payload claims such as raw block bodies or header-only digests could mislead callers even if they improve a rubric score.
+
+**How to apply:** Verify claimed revocation, expiration, retention, and payload semantics against handlers and schemas before publishing metadata; ask for clarification when exact requested copy would be false.

@@ -1169,7 +1169,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Fetch a single stratum record by height or hash. Primary lookup tool for individual block data.",
+      "Fetch indexed daily stratum telemetry records, including quantitative metrics, by date or indexed height (or a bounded range). Use when record contents are required; metrics can optionally narrow returned fields.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1281,7 +1281,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "Fetch a lightweight, highly compressed cryptographic header summary for a single stratum height.",
+      "Fetch a compact digest summary of indexed strata: date, indexed height, target multiplier, and SHA-256 source-record fingerprint. No full telemetry record body is returned; the fingerprint is not a Bitcoin block-header hash or per-record proof.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2732,7 +2732,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Verify Groth16 or OpenTimestamps Proof",
-          description: "Execute active cryptographic ZK-SNARK or OpenTimestamps verification on a proof payload.",
+          description: "Execute active cryptographic ZK-SNARK or OpenTimestamps verification on a proof payload. This tool verifies supplied proofs; it does not revoke proofs or refresh verification keys. Verification status and retained payloads are bounded, not permanent attestations.",
           annotations: { ...tool.annotations, openWorldHint: true },
           inputSchema: {
             type: "object", description: "Select groth16 (default) or ots, supplying only fields for the selected verification path.",
@@ -2772,7 +2772,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Query MCP Prices or Verify Payment Settlement",
-          description: "Query MCP pricing parameters and verify L402 payment status. Note: Macaroons and Lightning invoices are issued dynamically via HTTP 402 WWW-Authenticate headers during API challenges; explicit invoice minting tools are intentionally unnecessary.",
+          description: "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire; an operator-only HTTP endpoint can revoke macaroons. No MCP key-refresh or token-revocation tool is exposed.",
           annotations: { ...tool.annotations, readOnlyHint: false, idempotentHint: false, openWorldHint: true },
           inputSchema: {
             type: "object",

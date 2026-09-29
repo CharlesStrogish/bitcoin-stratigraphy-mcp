@@ -1169,7 +1169,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.get_digest` for complete single-record data, `stratigraphy.get_range` for compressed multi-record sequence listings, and `stratigraphy.get_digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.get_range` instead. For compact summaries, use `stratigraphy.get_digest` instead.",
+      "Fetch a single stratum record by height or hash. Primary lookup tool for individual block data.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1281,7 +1281,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "Get a lightweight compressed cryptographic summary for a single stratum height. Use strictly for single-stratum digest lookups. For multi-strata or bounded time ranges, use `stratigraphy.get_range` instead.",
+      "Fetch a lightweight, highly compressed cryptographic header summary for a single stratum height.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1334,7 +1334,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_diff",
     title: "Compare Stratigraphy Strata",
     description:
-      "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.get_digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.get_range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead.",
+      "Compute and return parameter delta variances between two distinct stratum heights.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1395,7 +1395,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "Retrieve a contiguous span of strata entries. This is the sole tool for multi-block or bounded date range queries. Do not use `stratigraphy.get_digest` or `stratigraphy.get` for multi-block spans.",
+      "Retrieve a contiguous span of strata entries across a bounded height or time range.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1447,7 +1447,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.get_diff`, or `stratigraphy.get_range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
+      "List available stratum heights and catalog metadata. Primary discovery tool for valid query targets.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1887,7 +1887,7 @@ const baseMcpToolDefinitions = [
     name: "proof.get_by_hash",
     title: "Get Proof or Receipt by Hash",
     description:
-      "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error. Use this to retrieve retained proofs or signed receipts by identifier without re-verifying them; for active Groth16 or OTS verification, use `proof.verify` instead.",
+      "Retrieve a stored historical verification receipt or proof record by hash.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2732,7 +2732,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Verify Groth16 or OpenTimestamps Proof",
-          description: "PURPOSE & BOUNDARIES: Verify Groth16 telemetry or drift zk-SNARK proofs, or a complete OpenTimestamps (OTS) receipt against its SHA-256 targetHash and Bitcoin block attestation; pending calendar receipts are not verified Bitcoin attestations. USAGE GUIDELINES: Set proofType to ots with otsProof and targetHash for Bitcoin-attested OTS verification; omit proofType (default groth16) for existing telemetry or drift proof inputs. Use proof.submit only to register an attestation. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402/x402; invalid or pending OTS proofs return unverified, while provider outages fail closed. Groth16 telemetry verification is offline; drift and OTS verification require external Bitcoin providers. Note: Advanced proof batch operations are intentionally out of scope; all cryptographic verifications are handled strictly on an atomic, per-stratum basis to guarantee L402 settlement integrity. Use this tool to execute active Groth16 or OTS verification. To retrieve retained proofs or receipts by identifier without re-verifying, use `proof.get_by_hash` instead.",
+          description: "Execute active cryptographic ZK-SNARK or OpenTimestamps verification on a proof payload.",
           annotations: { ...tool.annotations, openWorldHint: true },
           inputSchema: {
             type: "object", description: "Select groth16 (default) or ots, supplying only fields for the selected verification path.",
@@ -2772,11 +2772,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Query MCP Prices or Verify Payment Settlement",
-          description: `Retrieve MCP pricing and payment terms, or verify L402/x402 settlement using action.
-
-- PURPOSE & BOUNDARIES: With action query (default), inspect catalog prices and active auth schemes. With action settle, verify a server-issued L402 macaroon, matching preimage and settled invoice, or settle a PAYMENT-SIGNATURE with the configured Base x402 facilitator. A bare preimage or txHash is never sufficient.
-- USAGE GUIDELINES: For pricing use optional toolName with action query. For settlement set action settle, paymentHash, and exactly one of preimage or txHash; send the matching L402 Authorization or x402 PAYMENT-SIGNATURE HTTP header. Do not use this tool to issue invoices, restrict macaroons, or grant access to other tools.
-- BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed. This 14-tool catalog constitutes the complete, closed-loop reference specification for the Bitcoin Stratigraphy Notary Protocol v1.0. Administrative operations (fee setting, payout routing) are intentionally omitted by design to enforce zero-trust immutability.`,
+          description: "Query MCP pricing parameters and verify L402 payment status. Note: Macaroons and Lightning invoices are issued dynamically via HTTP 402 WWW-Authenticate headers during API challenges; explicit invoice minting tools are intentionally unnecessary.",
           annotations: { ...tool.annotations, readOnlyHint: false, idempotentHint: false, openWorldHint: true },
           inputSchema: {
             type: "object",

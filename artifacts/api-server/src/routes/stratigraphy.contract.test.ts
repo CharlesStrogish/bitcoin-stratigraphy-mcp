@@ -76,33 +76,29 @@ const expectedMcpOverview =
   "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.";
 const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
-    "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error. Use this to retrieve retained proofs or signed receipts by identifier without re-verifying them; for active Groth16 or OTS verification, use `proof.verify` instead.",
+    "Retrieve a stored historical verification receipt or proof record by hash.",
   "payment.get_info":
-    `Retrieve MCP pricing and payment terms, or verify L402/x402 settlement using action.
-
-- PURPOSE & BOUNDARIES: With action query (default), inspect catalog prices and active auth schemes. With action settle, verify a server-issued L402 macaroon, matching preimage and settled invoice, or settle a PAYMENT-SIGNATURE with the configured Base x402 facilitator. A bare preimage or txHash is never sufficient.
-- USAGE GUIDELINES: For pricing use optional toolName with action query. For settlement set action settle, paymentHash, and exactly one of preimage or txHash; send the matching L402 Authorization or x402 PAYMENT-SIGNATURE HTTP header. Do not use this tool to issue invoices, restrict macaroons, or grant access to other tools.
-- BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed. This 14-tool catalog constitutes the complete, closed-loop reference specification for the Bitcoin Stratigraphy Notary Protocol v1.0. Administrative operations (fee setting, payout routing) are intentionally omitted by design to enforce zero-trust immutability.`,
+    "Query MCP pricing parameters and verify L402 payment status. Note: Macaroons and Lightning invoices are issued dynamically via HTTP 402 WWW-Authenticate headers during API challenges; explicit invoice minting tools are intentionally unnecessary.",
   "stratigraphy.list":
-    "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.get_diff`, or `stratigraphy.get_range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
+    "List available stratum heights and catalog metadata. Primary discovery tool for valid query targets.",
   "stratigraphy.get_range":
-    "Retrieve a contiguous span of strata entries. This is the sole tool for multi-block or bounded date range queries. Do not use `stratigraphy.get_digest` or `stratigraphy.get` for multi-block spans.",
+    "Retrieve a contiguous span of strata entries across a bounded height or time range.",
   "proof.attenuate":
     "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
   "stratigraphy.get_diff":
-    "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.get_digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.get_range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead.",
+    "Compute and return parameter delta variances between two distinct stratum heights.",
   "stratigraphy.get_digest":
-    "Get a lightweight compressed cryptographic summary for a single stratum height. Use strictly for single-stratum digest lookups. For multi-strata or bounded time ranges, use `stratigraphy.get_range` instead.",
+    "Fetch a lightweight, highly compressed cryptographic header summary for a single stratum height.",
   "proof.ground":
     "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
   "proof.verify":
-    "PURPOSE & BOUNDARIES: Verify Groth16 telemetry or drift zk-SNARK proofs, or a complete OpenTimestamps (OTS) receipt against its SHA-256 targetHash and Bitcoin block attestation; pending calendar receipts are not verified Bitcoin attestations. USAGE GUIDELINES: Set proofType to ots with otsProof and targetHash for Bitcoin-attested OTS verification; omit proofType (default groth16) for existing telemetry or drift proof inputs. Use proof.submit only to register an attestation. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402/x402; invalid or pending OTS proofs return unverified, while provider outages fail closed. Groth16 telemetry verification is offline; drift and OTS verification require external Bitcoin providers. Note: Advanced proof batch operations are intentionally out of scope; all cryptographic verifications are handled strictly on an atomic, per-stratum basis to guarantee L402 settlement integrity. Use this tool to execute active Groth16 or OTS verification. To retrieve retained proofs or receipts by identifier without re-verifying, use `proof.get_by_hash` instead.",
+    "Execute active cryptographic ZK-SNARK or OpenTimestamps verification on a proof payload.",
   "proof.submit":
     "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
   "mesh.broadcast":
     "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
   "stratigraphy.get":
-    "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.get_digest` for complete single-record data, `stratigraphy.get_range` for compressed multi-record sequence listings, and `stratigraphy.get_digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.get_range` instead. For compact summaries, use `stratigraphy.get_digest` instead.",
+    "Fetch a single stratum record by height or hash. Primary lookup tool for individual block data.",
   "mesh.get_status":
     "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated.",
 };
@@ -1722,18 +1718,19 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    if (candidate.name === "stratigraphy.get_digest" || candidate.name === "stratigraphy.get_range") {
+    if ([
+      "payment.get_info", "stratigraphy.get", "stratigraphy.list",
+      "stratigraphy.get_range", "stratigraphy.get_digest", "stratigraphy.get_diff",
+      "proof.verify", "proof.get_by_hash",
+    ].includes(candidate.name)) {
       assert.equal(candidate.description, expectedMcpToolDescriptions[candidate.name]);
     } else {
-    assert.match(candidate.description,
-      candidate.name === "payment.get_info"
-        ? /^Retrieve MCP pricing and payment terms,.*\n\n- PURPOSE & BOUNDARIES: .+/
-        : /^PURPOSE & BOUNDARIES: .+/,
-      `${candidate.name} must identify its purpose`);
-    assert.match(candidate.description, /USAGE GUIDELINES: .+/,
-      `${candidate.name} must explain when to use it`);
-    assert.match(candidate.description, /BEHAVIOR & CONSEQUENCES: .+/,
-      `${candidate.name} must explain cost and failures`);
+      assert.match(candidate.description, /^PURPOSE & BOUNDARIES: .+/,
+        `${candidate.name} must identify its purpose`);
+      assert.match(candidate.description, /USAGE GUIDELINES: .+/,
+        `${candidate.name} must explain when to use it`);
+      assert.match(candidate.description, /BEHAVIOR & CONSEQUENCES: .+/,
+        `${candidate.name} must explain cost and failures`);
     }
     if (candidate.name === "proof.list") {
       assert.match(candidate.description, /costs 10 sats.*JSON-RPC -32602/);
@@ -1866,7 +1863,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${name} must not append the generic immutability note to its exact description`,
     );
   }
-  assert.match(documentedTool("stratigraphy.list").description, /Free and read-only/);
+  assert.match(documentedTool("stratigraphy.list").description, /^List available stratum heights and catalog metadata\./);
   assert.match(documentedTool("proof.list").description, /costs 10 sats/);
   assert.match(documentedTool("mesh.broadcast").inputSchema.properties.payload.description,
     /date selector.*not a caller-supplied record/i);

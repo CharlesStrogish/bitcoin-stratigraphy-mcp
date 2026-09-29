@@ -1169,7 +1169,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Retrieve full indexed telemetry stratum records by date or indexed height, including single-target and bounded multi-record queries. Use `stratigraphy.get_range` for compact contiguous multi-record summaries instead.",
+      "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only, HTTP rate-limited and L402-paid. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1395,7 +1395,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "Retrieve a contiguous span of compressed indexed stratum summaries across an inclusive height or date range. Primary tool for compact multi-record span queries; use `stratigraphy.get` for full telemetry record bodies.",
+      "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only, HTTP rate-limited and L402-paid; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1447,7 +1447,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "List available stratum heights and catalog metadata. Primary discovery tool for valid query targets.",
+      "Discover indexed height and UTC date bounds, available metrics, and catalog metadata. Free, parameterless, read-only discovery entry point for selecting valid strata. Once bounds are known, use `stratigraphy.get` for full record bodies, `stratigraphy.get_range` for compact contiguous spans, or `stratigraphy.get_digest` for lightweight source-record fingerprints.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

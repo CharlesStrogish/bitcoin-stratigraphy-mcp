@@ -82,9 +82,9 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "payment.get_info":
     "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted.",
   "stratigraphy.list":
-    "List available stratum heights and catalog metadata. Primary discovery tool for valid query targets.",
+    "Discover indexed height and UTC date bounds, available metrics, and catalog metadata. Free, parameterless, read-only discovery entry point for selecting valid strata. Once bounds are known, use `stratigraphy.get` for full record bodies, `stratigraphy.get_range` for compact contiguous spans, or `stratigraphy.get_digest` for lightweight source-record fingerprints.",
   "stratigraphy.get_range":
-    "Retrieve a contiguous span of compressed indexed stratum summaries across an inclusive height or date range. Primary tool for compact multi-record span queries; use `stratigraphy.get` for full telemetry record bodies.",
+    "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only, HTTP rate-limited and L402-paid; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries.",
   "proof.attenuate":
     "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
   "stratigraphy.get_diff":
@@ -100,7 +100,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "mesh.broadcast":
     "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
   "stratigraphy.get":
-    "Retrieve full indexed telemetry stratum records by date or indexed height, including single-target and bounded multi-record queries. Use `stratigraphy.get_range` for compact contiguous multi-record summaries instead.",
+    "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only, HTTP rate-limited and L402-paid. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds.",
   "mesh.get_status":
     "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Free, read-only status; use `mesh.broadcast` to distribute a snapshot. Note: Mesh consensus is automated; this tool does not administer peers or edit topology. No internal peer-administration HTTP tool is advertised.",
 };
@@ -1865,7 +1865,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${name} must not append the generic immutability note to its exact description`,
     );
   }
-  assert.match(documentedTool("stratigraphy.list").description, /^List available stratum heights and catalog metadata\./);
+  assert.match(documentedTool("stratigraphy.list").description, /^Discover indexed height and UTC date bounds, available metrics, and catalog metadata\./);
   assert.match(documentedTool("proof.list").description, /costs 10 sats/);
   assert.match(documentedTool("mesh.broadcast").inputSchema.properties.payload.description,
     /date selector.*not a caller-supplied record/i);

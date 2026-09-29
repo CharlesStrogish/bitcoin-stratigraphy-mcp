@@ -1,0 +1,15 @@
+Please execute a targeted description update for exactly three tools (stratigraphy.get, stratigraphy.list, stratigraphy.get_range) to address Glama's specific behavior, parameter interaction, and sibling-routing evaluator flags. Do not modify any other tools or schemas:
+
+1. UPDATE `stratigraphy.get`:
+   "Retrieve the complete telemetry record body for a single indexed stratum entry by height or UTC ISO date. Read-only, stateless, L402 rate-limited operation returning full dataset payload fields. Primary tool for single-entry deep inspection. Use `stratigraphy.get_range` for multi-record spans, `stratigraphy.get_digest` for lightweight header summaries, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover valid height/date bounds."
+
+2. UPDATE `stratigraphy.list`:
+   "Discover available dataset height bounds, supported date ranges, and catalog metadata. Parameterless, read-only discovery entry point to execute before querying specific strata. Once target heights or date bounds are identified, invoke `stratigraphy.get` for single full record bodies, `stratigraphy.get_range` for contiguous spans, or `stratigraphy.get_digest` for lightweight summaries."
+
+3. UPDATE `stratigraphy.get_range`:
+   "Retrieve a contiguous span of multi-record strata entries across a bounded height or date range. Read-only, L402 rate-limited query with automatic truncation at maximum limit caps when range bounds exceed max capacity. Primary tool for multi-record span queries. Use `stratigraphy.get` for single full bodies, `stratigraphy.get_digest` for compact header fingerprints, and `stratigraphy.get_diff` for parameter variance deltas."
+
+4. VERIFY:
+   - Synchronize OpenAPI metadata and contract tests for these three tools.
+   - Adjust any wording where necessary to maintain 100% code-exact accuracy with backend handlers (e.g. actual truncation limit mechanics or rate-limit headers).
+   - Run workspace typecheck and API test suite to verify all 14 tools compile and pass cleanly.

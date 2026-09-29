@@ -1082,8 +1082,9 @@ function normalizedAttenuationCaveats(
       const names = value.split(",").map((name) => name.trim());
       if (names.length > 16 || names.some((name) =>
         !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/.test(name) ||
-        !baseMcpToolDefinitions.some((tool) => tool.name === name)
-      )) throw new RangeError("allowed_tools must list canonical MCP tools");
+        (!baseMcpToolDefinitions.some((tool) => tool.name === name) &&
+          !Object.hasOwn(legacyToolNames, name))
+      )) throw new RangeError("allowed_tools must list registered MCP tools or supported legacy aliases");
       return `allowed_tools=${names.join(",")}`;
     }
     if (key === "time_before" && value.length === 10) {
@@ -1108,19 +1109,20 @@ async function withinMcpTargetBound(
   args: unknown,
   maxTarget: number,
 ): Promise<boolean> {
+  name = canonicalToolName(name);
   const records = await getStratigraphyData();
   const heightAt = (index: number) => snapshotBlock(index, records.length);
   if (name === "stratigraphy.get") {
     const selected = await queryStratigraphy(stratigraphyInputSchema.parse(args));
     return selected.length > 0 && selected.every((record) => heightAt(record.day - 1) <= maxTarget);
   }
-  if (name === "stratigraphy.diff") {
+  if (name === "stratigraphy.get_diff") {
     const { fromTarget, toTarget } = stratigraphyDiffInputSchema.parse(args);
     return [fromTarget, toTarget].every((target) =>
       heightAt(indexedStratumIndex(target, records)) <= maxTarget
     );
   }
-  if (name === "stratigraphy.range") {
+  if (name === "stratigraphy.get_range") {
     const { startTarget, endTarget } = stratigraphyRangeInputSchema.parse(args);
     try {
       const start = indexedStratumIndex(startTarget, records);
@@ -1132,7 +1134,7 @@ async function withinMcpTargetBound(
       throw error;
     }
   }
-  if (name === "stratigraphy.digest") {
+  if (name === "stratigraphy.get_digest") {
     const { target } = stratigraphyDigestInputSchema.parse(args);
     if (!target.includes("..")) {
       return heightAt(indexedStratumIndex(target, records)) <= maxTarget;
@@ -1167,7 +1169,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.digest` for complete single-record data, `stratigraphy.range` for compressed multi-record sequence listings, and `stratigraphy.digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.range` instead. For compact summaries, use `stratigraphy.digest` instead.",
+      "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.get_digest` for complete single-record data, `stratigraphy.get_range` for compressed multi-record sequence listings, and `stratigraphy.get_digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.get_range` instead. For compact summaries, use `stratigraphy.get_digest` instead.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1276,10 +1278,10 @@ const baseMcpToolDefinitions = [
     },
   },
   {
-    name: "stratigraphy.digest",
+    name: "stratigraphy.get_digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.range` for compressed per-record batches or `stratigraphy.diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs. Use this for compact summaries of one indexed day or a bounded date range, not cryptographic proofs. For full stratum body payloads, use `stratigraphy.get` instead.",
+      "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.get_range` for compressed per-record batches or `stratigraphy.get_diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs. Use this for compact summaries of one indexed day or a bounded date range, not cryptographic proofs. For full stratum body payloads, use `stratigraphy.get` instead.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1329,10 +1331,10 @@ const baseMcpToolDefinitions = [
     },
   },
   {
-    name: "stratigraphy.diff",
+    name: "stratigraphy.get_diff",
     title: "Compare Stratigraphy Strata",
     description:
-      "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead.",
+      "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.get_digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.get_range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1390,10 +1392,10 @@ const baseMcpToolDefinitions = [
     },
   },
   {
-    name: "stratigraphy.range",
+    name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.digest` for a single compact summary or `stratigraphy.diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences. Use this for bounded, ascending batches of compressed daily records selected by indexed height or date, not raw contiguous Bitcoin block queries. For full stratum lookups, use `stratigraphy.get` instead.",
+      "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.get_digest` for a single compact summary or `stratigraphy.get_diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences. Use this for bounded, ascending batches of compressed daily records selected by indexed height or date, not raw contiguous Bitcoin block queries. For full stratum lookups, use `stratigraphy.get` instead.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1445,7 +1447,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
+      "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.get_diff`, or `stratigraphy.get_range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1539,7 +1541,7 @@ const baseMcpToolDefinitions = [
     name: "proof.attenuate",
     title: "Attenuate a Macaroon",
     description:
-      "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
+      "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1549,11 +1551,11 @@ const baseMcpToolDefinitions = [
     inputSchema: {
       type: "object",
       description: "Provide an authentic parent macaroon, an array of restrictions, and optional TTL; child caveats intersect with inherited constraints and no payment invoice is issued.",
-      examples: [{ macaroon: "base64url-parent-macaroon", caveats: ["allowed_tools = stratigraphy.get,stratigraphy.digest", "max_target = 870000"], ttlSeconds: 3600 }],
+      examples: [{ macaroon: "base64url-parent-macaroon", caveats: ["allowed_tools = stratigraphy.get,stratigraphy.get_digest", "max_target = 870000"], ttlSeconds: 3600 }],
       additionalProperties: false,
       properties: {
         macaroon: field("string", "Required authentic, unexpired parent L402 macaroon (1-8192 characters); caveats and ttlSeconds can only narrow its scope.", ["base64url-parent-macaroon"], { minLength: 1, maxLength: 8192 }),
-        caveats: field("array", "List of restriction caveats to append (e.g. ['time_before = 2026-12-31', 'max_target = 870000', 'allowed_tools = stratigraphy.get,stratigraphy.digest']). Existing allowed_path and max_requests restrictions are also supported.", [["time_before = 2026-12-31", "max_target = 870000", "allowed_tools = stratigraphy.get,stratigraphy.digest"]], {
+        caveats: field("array", "List of restriction caveats to append (e.g. ['time_before = 2026-12-31', 'max_target = 870000', 'allowed_tools = stratigraphy.get,stratigraphy.get_digest']). Existing allowed_path and max_requests restrictions are also supported.", [["time_before = 2026-12-31", "max_target = 870000", "allowed_tools = stratigraphy.get,stratigraphy.get_digest"]], {
           maxItems: 16,
           items: field("string", "One supported restriction caveat.", ["max_target = 870000"], { minLength: 1, maxLength: 256 }),
         }),
@@ -2435,13 +2437,13 @@ const baseMcpToolDefinitions = [
     },
   },
   {
-    name: "payment.info",
+    name: "payment.get_info",
     title: "Get MCP Payment Information",
     description:
       `Retrieve configured MCP pricing, Lightning invoice rules, and optional Base USDC x402 terms.
 
-- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.info\` instead of calling paid tools blindly when checking pricing upfront.
-- USAGE GUIDELINES: Use \`payment.info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
+- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.get_info\` instead of calling paid tools blindly when checking pricing upfront.
+- USAGE GUIDELINES: Use \`payment.get_info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.get_info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
 - BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns Lightning rates and invoice expiry limits; Base USDC x402 terms appear only when authenticated settlement is ready. Passing an unknown \`toolName\` returns a validation error.`,
     annotations: {
       readOnlyHint: true,
@@ -2452,10 +2454,10 @@ const baseMcpToolDefinitions = [
     inputSchema: {
       type: "object",
       description: "Pass an optional canonical toolName to narrow the returned price map; omit it for all advertised prices. This free request does not issue an invoice.",
-      examples: [{}, { toolName: "stratigraphy.digest" }],
+      examples: [{}, { toolName: "stratigraphy.get_digest" }],
       additionalProperties: false,
       properties: {
-        toolName: field("string", "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.digest' or 'proof.verify'). When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name string.", ["stratigraphy.digest"], { minLength: 1 }),
+        toolName: field("string", "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.get_digest' or 'proof.verify'); supported legacy aliases are also accepted and resolve to canonical names. When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name or supported legacy alias.", ["stratigraphy.get_digest"], { minLength: 1 }),
       },
       required: [],
     },
@@ -2463,7 +2465,7 @@ const baseMcpToolDefinitions = [
       type: "object",
       description: "Configured MCP prices in sats (zero denotes a free tool), Lightning L402 rules, and optional Base USDC x402 terms. No live invoice is created by this tool.",
       examples: [{
-        standardInvoiceSats: 250, perToolSats: { "stratigraphy.digest": 250 },
+        standardInvoiceSats: 250, perToolSats: { "stratigraphy.get_digest": 250 },
         acceptedPaymentMethods: ["Lightning L402"], invoiceExpirySeconds: 3600,
         challenge: { httpStatus: 402, header: "WWW-Authenticate", fields: ["macaroon", "invoice", "payment_hash", "amount_sats"] },
         activeAuthSchemes: ["L402"],
@@ -2474,7 +2476,7 @@ const baseMcpToolDefinitions = [
         standardInvoiceSats: field("integer", "Standard paid MCP execution price. Catalog and status lookups may cost less; free tools cost zero.", [250], { const: 250 }),
         perToolSats: {
           type: "object", description: "Current advertised canonical tool prices in sats; optional toolName narrows this map.",
-          examples: [{ "stratigraphy.digest": 250 }],
+          examples: [{ "stratigraphy.get_digest": 250 }],
           additionalProperties: { type: "integer", minimum: 0 },
           properties: {},
         },
@@ -2491,7 +2493,7 @@ const baseMcpToolDefinitions = [
           },
           required: ["httpStatus", "header", "fields"],
         },
-        activeAuthSchemes: field("array", "Authentication scheme for paid MCP calls; free discovery and payment.info require none.", [["L402"]], { items: field("string", "MCP paid-call scheme.", ["L402"]) }),
+        activeAuthSchemes: field("array", "Authentication scheme for paid MCP calls; free discovery and payment.get_info require none.", [["L402"]], { items: field("string", "MCP paid-call scheme.", ["L402"]) }),
         x402: {
           type: "object",
           description: "Base mainnet USDC x402 exact terms; present only when authenticated CDP settlement is configured.",
@@ -2710,9 +2712,9 @@ const paymentSettlementMetadata = {
 };
 const exactDescriptionToolNames = new Set([
   "stratigraphy.get",
-  "stratigraphy.digest",
-  "stratigraphy.diff",
-  "stratigraphy.range",
+  "stratigraphy.get_digest",
+  "stratigraphy.get_diff",
+  "stratigraphy.get_range",
   "stratigraphy.list",
   "proof.attenuate",
   "proof.get_by_hash",
@@ -2766,7 +2768,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
             ],
           },
         }
-      : tool.name === "payment.info"
+      : tool.name === "payment.get_info"
       ? {
           ...tool,
           title: "Query MCP Prices or Verify Payment Settlement",
@@ -2866,6 +2868,10 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
 const paidTools = {
   "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
   "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
+  "stratigraphy.get_digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
+  "stratigraphy.get_diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
+  "stratigraphy.get_range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
+  // Keep the original scope and invoice description for already-issued L402 credentials.
   "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
   "stratigraphy.diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
   "stratigraphy.range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
@@ -2883,11 +2889,26 @@ const mcpToolPrices = Object.fromEntries(mcpToolDefinitions.map((tool) => [
 ])) as Record<string, number>;
 
 const legacyToolNames = {
+  "payment.info": "payment.get_info",
+  "stratigraphy.digest": "stratigraphy.get_digest",
+  "stratigraphy.diff": "stratigraphy.get_diff",
+  "stratigraphy.range": "stratigraphy.get_range",
   "mesh.status": "mesh.get_status",
 } as const;
 
 function canonicalToolName(name: string): string {
   return legacyToolNames[name as keyof typeof legacyToolNames] ?? name;
+}
+
+function toolNamesForAuthorization(name: string): string[] {
+  const canonicalName = canonicalToolName(name);
+  return [
+    name,
+    ...(canonicalName === name ? [] : [canonicalName]),
+    ...Object.entries(legacyToolNames)
+      .filter(([, canonical]) => canonical === canonicalName)
+      .map(([legacy]) => legacy),
+  ];
 }
 
 function createBitcoinStratigraphyMcpServer(
@@ -2972,7 +2993,7 @@ function createBitcoinStratigraphyMcpServer(
         };
       }
     }
-    if (request.params.name === "stratigraphy.digest") {
+    if (name === "stratigraphy.get_digest") {
       const parsed = stratigraphyDigestInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid digest target or format");
@@ -2988,7 +3009,7 @@ function createBitcoinStratigraphyMcpServer(
         throw error;
       }
     }
-    if (request.params.name === "stratigraphy.diff") {
+    if (name === "stratigraphy.get_diff") {
       const parsed = stratigraphyDiffInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid diff targets");
@@ -3004,7 +3025,7 @@ function createBitcoinStratigraphyMcpServer(
         throw error;
       }
     }
-    if (request.params.name === "stratigraphy.range") {
+    if (name === "stratigraphy.get_range") {
       const parsed = stratigraphyRangeInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid range bounds, limit or format");
@@ -3095,7 +3116,7 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent,
       };
     }
-    if (name === "payment.info") {
+    if (name === "payment.get_info") {
       const parsed = paymentInfoInputSchema.safeParse(args);
       if (!parsed.success) throw new McpError(ErrorCode.InvalidParams, "Invalid payment info request");
       if (parsed.data.action === "settle") {
@@ -3105,7 +3126,9 @@ function createBitcoinStratigraphyMcpServer(
           structuredContent,
         };
       }
-      const toolName = parsed.data.toolName;
+      const toolName = parsed.data.toolName
+        ? canonicalToolName(parsed.data.toolName)
+        : undefined;
       if (toolName && !Object.hasOwn(mcpToolPrices, toolName)) {
         throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
       }
@@ -3430,7 +3453,8 @@ export function registerMcpRoute(
     next();
   }, async (req, res, next) => {
     const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
-    if (body?.method !== "tools/call" || body.params?.name !== "payment.info") {
+    if (body?.method !== "tools/call" ||
+      (body.params?.name !== "payment.get_info" && body.params?.name !== "payment.info")) {
       next();
       return;
     }
@@ -3604,6 +3628,7 @@ export function registerMcpRoute(
       next();
       return;
     }
+    const canonicalName = canonicalToolName(name);
     const tool = paidTools[name as keyof typeof paidTools];
     if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
       next();
@@ -3628,9 +3653,11 @@ export function registerMcpRoute(
       ? verifySubscriptionMacaroon(authorization.macaroon, secret, Math.floor(Date.now() / 1_000))
       : null;
     if (pass && (
-      pass.allowedToolSets.some((set) => !set.includes(name)) ||
+      pass.allowedToolSets.some((set) =>
+        !toolNamesForAuthorization(name).some((allowedName) => set.includes(allowedName))
+      ) ||
       (pass.maxTarget !== undefined &&
-        !(await withinMcpTargetBound(name, body?.params?.arguments ?? {}, pass.maxTarget)))
+        !(await withinMcpTargetBound(canonicalName, body?.params?.arguments ?? {}, pass.maxTarget)))
     )) {
       res.status(403).json({
         jsonrpc: "2.0", id: body?.id ?? null,
@@ -3638,11 +3665,13 @@ export function registerMcpRoute(
       });
       return;
     }
-    if (name === "stratigraphy.digest" || name === "stratigraphy.diff" || name === "stratigraphy.range") {
+    if (canonicalName === "stratigraphy.get_digest" ||
+      canonicalName === "stratigraphy.get_diff" ||
+      canonicalName === "stratigraphy.get_range") {
       try {
-        if (name === "stratigraphy.digest") {
+        if (canonicalName === "stratigraphy.get_digest") {
           await queryStratigraphyDigest(stratigraphyDigestInputSchema.parse(body?.params?.arguments ?? {}));
-        } else if (name === "stratigraphy.range") {
+        } else if (canonicalName === "stratigraphy.get_range") {
           await queryStratigraphyRange(stratigraphyRangeInputSchema.parse(body?.params?.arguments ?? {}));
         } else {
           await queryStratigraphyDiff(stratigraphyDiffInputSchema.parse(body?.params?.arguments ?? {}));

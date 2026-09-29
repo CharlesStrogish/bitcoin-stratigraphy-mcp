@@ -40,7 +40,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "stratigraphy.digest",
+        name: "stratigraphy.get_digest",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -50,7 +50,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "stratigraphy.diff",
+        name: "stratigraphy.get_diff",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -60,7 +60,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "stratigraphy.range",
+        name: "stratigraphy.get_range",
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -140,7 +140,7 @@ export const mcpServerCard = {
         },
       },
       {
-        name: "payment.info",
+        name: "payment.get_info",
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,

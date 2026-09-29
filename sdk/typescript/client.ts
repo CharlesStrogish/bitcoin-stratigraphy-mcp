@@ -109,6 +109,23 @@ export type McpToolArguments = {
     limit?: number;
   };
   "stratigraphy.list": Record<string, never>;
+  "stratigraphy.get_digest": {
+    target?: string;
+    format?: "compact" | "minimal" | "kv";
+  };
+  "stratigraphy.get_diff": { fromTarget: string; toTarget?: string };
+  "stratigraphy.get_range": {
+    startTarget: string;
+    endTarget?: string;
+    limit?: number;
+    format?: "compact" | "minimal" | "kv";
+  };
+  /** @deprecated Use stratigraphy.get_digest. */
+  "stratigraphy.digest": McpToolArguments["stratigraphy.get_digest"];
+  /** @deprecated Use stratigraphy.get_diff. */
+  "stratigraphy.diff": McpToolArguments["stratigraphy.get_diff"];
+  /** @deprecated Use stratigraphy.get_range. */
+  "stratigraphy.range": McpToolArguments["stratigraphy.get_range"];
   "proof.verify":
     | {
     proofType?: "groth16";
@@ -118,12 +135,14 @@ export type McpToolArguments = {
     data: Record<string, unknown> | Record<string, unknown>[];
   }
     | { proofType: "ots"; otsProof: string; targetHash: string };
-  "payment.info":
+  "payment.get_info":
     | { action?: "query"; toolName?: string }
     | ({ action: "settle" } & (
       | { paymentHash: string; preimage: string; txHash?: never }
       | { paymentHash: string; txHash: string; preimage?: never }
     ));
+  /** @deprecated Use payment.get_info. */
+  "payment.info": McpToolArguments["payment.get_info"];
   "proof.get_status":
     | { proofHash: string; snapshotDigest?: never; receiptHash?: never }
     | { snapshotDigest: string; proofHash?: never; receiptHash?: never }
@@ -173,6 +192,15 @@ export type McpToolResponses = {
     availableMetrics: string[];
     dateBounds: { startDate: string; endDate: string };
   };
+  "stratigraphy.get_digest": Record<string, unknown>;
+  "stratigraphy.get_diff": Record<string, unknown>;
+  "stratigraphy.get_range": Record<string, unknown>;
+  /** @deprecated Use stratigraphy.get_digest. */
+  "stratigraphy.digest": McpToolResponses["stratigraphy.get_digest"];
+  /** @deprecated Use stratigraphy.get_diff. */
+  "stratigraphy.diff": McpToolResponses["stratigraphy.get_diff"];
+  /** @deprecated Use stratigraphy.get_range. */
+  "stratigraphy.range": McpToolResponses["stratigraphy.get_range"];
   "proof.verify": {
     valid: boolean;
     verifiedAt: string;
@@ -184,7 +212,7 @@ export type McpToolResponses = {
     blockHeight: number | null;
     bitcoinHeaderHash: string | null;
   };
-  "payment.info": {
+  "payment.get_info": {
     standardInvoiceSats: number;
     perToolSats: Record<string, number>;
     acceptedPaymentMethods: string[];
@@ -203,6 +231,8 @@ export type McpToolResponses = {
       settledAt: string;
     } | null;
   };
+  /** @deprecated Use payment.get_info. */
+  "payment.info": McpToolResponses["payment.get_info"];
   "proof.get_status": {
     status: ProofLifecycle;
     verifiedAt: string;
@@ -347,6 +377,15 @@ export class BitcoinStratigraphyClient {
     return this.callTool("stratigraphy.get", args);
   }
   listStratigraphy() { return this.callTool("stratigraphy.list", {}); }
+  getStratigraphyDigest(args: McpToolArguments["stratigraphy.get_digest"] = {}) {
+    return this.callTool("stratigraphy.get_digest", args);
+  }
+  getStratigraphyDiff(args: McpToolArguments["stratigraphy.get_diff"]) {
+    return this.callTool("stratigraphy.get_diff", args);
+  }
+  getStratigraphyRange(args: McpToolArguments["stratigraphy.get_range"]) {
+    return this.callTool("stratigraphy.get_range", args);
+  }
   verifyProof(args: McpToolArguments["proof.verify"]) {
     return this.callTool("proof.verify", args);
   }
@@ -354,10 +393,10 @@ export class BitcoinStratigraphyClient {
     return this.callTool("proof.verify", { proofType: "ots", ...args });
   }
   getPaymentInfo(args: { toolName?: string } = {}) {
-    return this.callTool("payment.info", args);
+    return this.callTool("payment.get_info", args);
   }
   settlePayment(args: { paymentHash: string; preimage: string; txHash?: never } | { paymentHash: string; txHash: string; preimage?: never }) {
-    return this.callTool("payment.info", { action: "settle", ...args });
+    return this.callTool("payment.get_info", { action: "settle", ...args });
   }
   getProofStatus(args: McpToolArguments["proof.get_status"]) {
     return this.callTool("proof.get_status", args);

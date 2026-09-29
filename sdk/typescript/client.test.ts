@@ -131,6 +131,31 @@ test("free tools work without a wallet and return structured JSON", async () => 
   assert.equal(result.topologyHealth, "isolated");
 });
 
+test("SDK convenience methods call canonical renamed tools", async () => {
+  const names: string[] = [];
+  const client = new BitcoinStratigraphyClient(
+    "https://example.test/mcp",
+    undefined,
+    (async (_url, init) => {
+      const request = JSON.parse(String(init?.body));
+      names.push(request.params.name);
+      return rpc({ structuredContent: {} }, request.id);
+    }) as typeof fetch,
+  );
+
+  await client.getPaymentInfo();
+  await client.getStratigraphyDigest({ target: "latest" });
+  await client.getStratigraphyDiff({ fromTarget: "2026-09-01" });
+  await client.getStratigraphyRange({ startTarget: "2026-09-01" });
+
+  assert.deepEqual(names, [
+    "payment.get_info",
+    "stratigraphy.get_digest",
+    "stratigraphy.get_diff",
+    "stratigraphy.get_range",
+  ]);
+});
+
 test("issues epistemic receipts using the canonical MCP tool name", async () => {
   const signedReceipt = {
     schema: "bitcoin-stratigraphy/cryptographic-attestation/v1",

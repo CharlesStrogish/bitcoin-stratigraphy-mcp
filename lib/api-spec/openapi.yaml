@@ -63,7 +63,8 @@ x-mcp-tools:
         otsProof: { type: string, format: byte, description: Base64-encoded serialized .ots receipt when available }
         otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
       required: [kind, hash, status, timestamp, provenanceVerified]
-  payment.info:
+  payment.get_info:
+    legacyNames: [payment.info]
     description: |-
       Retrieve MCP pricing and payment terms, or verify L402/x402 settlement using action.
 
@@ -74,7 +75,7 @@ x-mcp-tools:
       type: object
       additionalProperties: false
       properties:
-        toolName: { type: string, minLength: 1, description: "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.digest' or 'proof.verify'). When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name string." }
+        toolName: { type: string, minLength: 1, description: "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.get_digest' or 'proof.verify'); supported legacy aliases are also accepted and resolve to canonical names. When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name or supported legacy alias." }
         action: { type: string, enum: [query, settle], default: query }
         paymentHash: { type: string, pattern: "^(0x)?[0-9a-fA-F]{64}$" }
         preimage: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
@@ -155,8 +156,9 @@ x-mcp-tools:
       oneOf:
         - required: [standardInvoiceSats, perToolSats, acceptedPaymentMethods, invoiceExpirySeconds, challenge, activeAuthSchemes, macaroonRequirements]
         - required: [verified, settlementToken]
-  stratigraphy.range:
-    description: "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.digest` for a single compact summary or `stratigraphy.diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences. Use this for bounded, ascending batches of compressed daily records selected by indexed height or date, not raw contiguous Bitcoin block queries. For full stratum lookups, use `stratigraphy.get` instead."
+  stratigraphy.get_range:
+    legacyNames: [stratigraphy.range]
+    description: "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.get_digest` for a single compact summary or `stratigraphy.get_diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences. Use this for bounded, ascending batches of compressed daily records selected by indexed height or date, not raw contiguous Bitcoin block queries. For full stratum lookups, use `stratigraphy.get` instead."
     inputSchema:
       type: object
       additionalProperties: false
@@ -193,7 +195,7 @@ x-mcp-tools:
           items: { type: [string, array, object] }
       required: [range, count, format, records]
   proof.attenuate:
-    description: "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened."
+    description: "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened."
     inputSchema:
       type: object
       additionalProperties: false
@@ -217,8 +219,9 @@ x-mcp-tools:
           items: { type: string }
         issuedAt: { type: string, format: date-time }
       required: [status, attenuatedMacaroon, appliedCaveats, issuedAt]
-  stratigraphy.diff:
-    description: "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead."
+  stratigraphy.get_diff:
+    legacyNames: [stratigraphy.diff]
+    description: "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.get_digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.get_range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead."
     inputSchema:
       type: object
       additionalProperties: false
@@ -256,8 +259,9 @@ x-mcp-tools:
             timeSpanDays: { type: integer }
           required: [heightDelta, multiplierDelta, percentageChange, timeSpanDays]
       required: [from, to, delta]
-  stratigraphy.digest:
-    description: "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.range` for compressed per-record batches or `stratigraphy.diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs. Use this for compact summaries of one indexed day or a bounded date range, not cryptographic proofs. For full stratum body payloads, use `stratigraphy.get` instead."
+  stratigraphy.get_digest:
+    legacyNames: [stratigraphy.digest]
+    description: "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.get_range` for compressed per-record batches or `stratigraphy.get_diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs. Use this for compact summaries of one indexed day or a bounded date range, not cryptographic proofs. For full stratum body payloads, use `stratigraphy.get` instead."
     inputSchema:
       type: object
       additionalProperties: false
@@ -541,9 +545,9 @@ x-mcp-tools:
   mesh.broadcast:
     description: "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors."
   stratigraphy.get:
-    description: "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.digest` for complete single-record data, `stratigraphy.range` for compressed multi-record sequence listings, and `stratigraphy.digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.range` instead. For compact summaries, use `stratigraphy.digest` instead."
+    description: "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.get_digest` for complete single-record data, `stratigraphy.get_range` for compressed multi-record sequence listings, and `stratigraphy.get_digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.get_range` instead. For compact summaries, use `stratigraphy.get_digest` instead."
   stratigraphy.list:
-    description: "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602."
+    description: "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.get_diff`, or `stratigraphy.get_range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602."
 security:
   - L402: []
 paths:

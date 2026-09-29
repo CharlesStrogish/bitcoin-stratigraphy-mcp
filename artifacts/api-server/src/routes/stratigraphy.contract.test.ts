@@ -77,22 +77,22 @@ const expectedMcpOverview =
 const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error. Use this to retrieve retained proofs or signed receipts by identifier without re-verifying them; for active Groth16 or OTS verification, use `proof.verify` instead.",
-  "payment.info":
+  "payment.get_info":
     `Retrieve MCP pricing and payment terms, or verify L402/x402 settlement using action.
 
 - PURPOSE & BOUNDARIES: With action query (default), inspect catalog prices and active auth schemes. With action settle, verify a server-issued L402 macaroon, matching preimage and settled invoice, or settle a PAYMENT-SIGNATURE with the configured Base x402 facilitator. A bare preimage or txHash is never sufficient.
 - USAGE GUIDELINES: For pricing use optional toolName with action query. For settlement set action settle, paymentHash, and exactly one of preimage or txHash; send the matching L402 Authorization or x402 PAYMENT-SIGNATURE HTTP header. Do not use this tool to issue invoices, restrict macaroons, or grant access to other tools.
 - BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed. This 14-tool catalog constitutes the complete, closed-loop reference specification for the Bitcoin Stratigraphy Notary Protocol v1.0.`,
   "stratigraphy.list":
-    "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
-  "stratigraphy.range":
-    "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.digest` for a single compact summary or `stratigraphy.diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences. Use this for bounded, ascending batches of compressed daily records selected by indexed height or date, not raw contiguous Bitcoin block queries. For full stratum lookups, use `stratigraphy.get` instead.",
+    "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.get_diff`, or `stratigraphy.get_range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
+  "stratigraphy.get_range":
+    "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.get_digest` for a single compact summary or `stratigraphy.get_diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences. Use this for bounded, ascending batches of compressed daily records selected by indexed height or date, not raw contiguous Bitcoin block queries. For full stratum lookups, use `stratigraphy.get` instead.",
   "proof.attenuate":
-    "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
-  "stratigraphy.diff":
-    "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead.",
-  "stratigraphy.digest":
-    "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.range` for compressed per-record batches or `stratigraphy.diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs. Use this for compact summaries of one indexed day or a bounded date range, not cryptographic proofs. For full stratum body payloads, use `stratigraphy.get` instead.",
+    "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
+  "stratigraphy.get_diff":
+    "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.get_digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.get_range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead.",
+  "stratigraphy.get_digest":
+    "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.get_range` for compressed per-record batches or `stratigraphy.get_diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs. Use this for compact summaries of one indexed day or a bounded date range, not cryptographic proofs. For full stratum body payloads, use `stratigraphy.get` instead.",
   "proof.ground":
     "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
   "proof.verify":
@@ -102,7 +102,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "mesh.broadcast":
     "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
   "stratigraphy.get":
-    "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.digest` for complete single-record data, `stratigraphy.range` for compressed multi-record sequence listings, and `stratigraphy.digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.range` instead. For compact summaries, use `stratigraphy.digest` instead.",
+    "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.get_digest` for complete single-record data, `stratigraphy.get_range` for compressed multi-record sequence listings, and `stratigraphy.get_digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.get_range` instead. For compact summaries, use `stratigraphy.get_digest` instead.",
   "mesh.get_status":
     "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security.",
 };
@@ -637,7 +637,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       inputSchema: { oneOf?: Array<Record<string, any>> };
     }>;
     assert.equal(listedTools.length, 14);
-    const paymentTool = listedTools.find(({ name }) => name === "payment.info");
+    const paymentTool = listedTools.find(({ name }) => name === "payment.get_info");
     assert.ok(paymentTool);
     assert.equal(paymentTool.inputSchema.oneOf?.length, 2);
     assert.deepEqual(paymentTool.inputSchema.oneOf?.[1].required, ["action", "paymentHash"]);
@@ -684,18 +684,33 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     assert.equal(catalog.response.headers.get("payment-required"), null);
     assert.equal(catalog.body.result?.structuredContent.totalSnapshots, 422);
     const paymentInfo = await mcpRequest("tools/call", {
-      name: "payment.info", arguments: {},
+      name: "payment.get_info", arguments: {},
     }, url);
     const prices = paymentInfo.result?.structuredContent.perToolSats;
     assert.equal(Object.keys(prices).length, 14);
     assert.equal(prices["proof.verify"], 250);
-    assert.equal(prices["payment.info"], 0);
+    assert.equal(prices["payment.get_info"], 0);
+    assert.equal(Object.hasOwn(prices, "payment.info"), false);
+    for (const [name, legacyName] of [
+      ["stratigraphy.get_digest", "stratigraphy.digest"],
+      ["stratigraphy.get_diff", "stratigraphy.diff"],
+      ["stratigraphy.get_range", "stratigraphy.range"],
+    ]) {
+      assert.equal(prices[name], 250);
+      assert.equal(Object.hasOwn(prices, legacyName), false);
+    }
     assert.equal(Object.hasOwn(prices, "proof.verify_ots"), false);
     assert.equal(Object.hasOwn(prices, "payment.settle"), false);
     const bareSettlement = await mcpRequest("tools/call", {
       name: "payment.info", arguments: { action: "settle", paymentHash, preimage },
     }, url);
     assert.deepEqual(bareSettlement.result?.structuredContent, {
+      verified: false, settlementToken: null,
+    });
+    const canonicalBareSettlement = await mcpRequest("tools/call", {
+      name: "payment.get_info", arguments: { action: "settle", paymentHash, preimage },
+    }, url);
+    assert.deepEqual(canonicalBareSettlement.result?.structuredContent, {
       verified: false, settlementToken: null,
     });
     const unchargedOts = await mcpRequestAt(url, "tools/call", {
@@ -730,7 +745,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     assert.equal(prices["proof.get_by_hash"], 250);
     assert.equal(Object.hasOwn(prices, "proof.get_status"), false);
     assert.equal(Object.hasOwn(prices, "proof.issue_receipt"), false);
-    assert.equal(prices["payment.info"], 0);
+    assert.equal(prices["payment.get_info"], 0);
     assert.equal(prices["stratigraphy.list"], 0);
     assert.equal(prices["proof.list"], 10);
     assert.equal(prices["mesh.get_status"], 0);
@@ -1428,7 +1443,7 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
     "proof.ground",
     "proof.submit",
     "proof.verify",
-    "payment.info",
+    "payment.get_info",
   ];
   const schemaEntries = Object.entries(xMcpTools).filter(([, candidate]) => {
     assert.ok(
@@ -1490,9 +1505,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
     [
       "stratigraphy.get",
-      "stratigraphy.digest",
-      "stratigraphy.diff",
-      "stratigraphy.range",
+      "stratigraphy.get_digest",
+      "stratigraphy.get_diff",
+      "stratigraphy.get_range",
       "stratigraphy.list",
       "proof.attenuate",
       "proof.verify",
@@ -1500,7 +1515,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "proof.list",
       "proof.submit",
       "proof.ground",
-      "payment.info",
+      "payment.get_info",
       "mesh.get_status",
       "mesh.broadcast",
     ],
@@ -1528,7 +1543,23 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   const listedToolNames = new Set(
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
   );
+  for (const legacyName of [
+    "payment.info",
+    "stratigraphy.digest",
+    "stratigraphy.diff",
+    "stratigraphy.range",
+  ]) {
+    assert.equal(listedToolNames.has(legacyName), false, `${legacyName} must remain hidden`);
+  }
   const openApiTools = openApiDocument["x-mcp-tools"] as Record<string, unknown>;
+  for (const legacyName of [
+    "payment.info",
+    "stratigraphy.digest",
+    "stratigraphy.diff",
+    "stratigraphy.range",
+  ]) {
+    assert.equal(Object.hasOwn(openApiTools, legacyName), false, `${legacyName} must not be advertised in OpenAPI`);
+  }
   for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt", "proof.verify_ots", "payment.settle"]) {
     assert.equal(Object.hasOwn(openApiTools, unregisteredTool), false);
   }
@@ -1692,7 +1723,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   };
   for (const candidate of listed.result?.tools ?? []) {
     assert.match(candidate.description,
-      candidate.name === "payment.info"
+      candidate.name === "payment.get_info"
         ? /^Retrieve MCP pricing and payment terms,.*\n\n- PURPOSE & BOUNDARIES: .+/
         : /^PURPOSE & BOUNDARIES: .+/,
       `${candidate.name} must identify its purpose`);
@@ -1730,13 +1761,13 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "stratigraphy.get": {
       keys: ["records"], readOnly: true, idempotent: true, openWorld: false,
     },
-    "stratigraphy.digest": {
+    "stratigraphy.get_digest": {
       keys: ["result", "proofAvailable"], readOnly: true, idempotent: true, openWorld: false,
     },
-    "stratigraphy.diff": {
+    "stratigraphy.get_diff": {
       keys: ["from", "to", "delta"], readOnly: true, idempotent: true, openWorld: false,
     },
-    "stratigraphy.range": {
+    "stratigraphy.get_range": {
       keys: ["range", "count", "format", "records"],
       readOnly: true, idempotent: true, openWorld: false,
     },
@@ -1766,7 +1797,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         "meshQuorum", "proofPayload", "provenanceVerified", "provenanceMerkleRoot", "otsProof", "otsStatus"],
       readOnly: true, idempotent: true, openWorld: false,
     },
-    "payment.info": {
+    "payment.get_info": {
       keys: ["standardInvoiceSats", "perToolSats", "acceptedPaymentMethods",
         "invoiceExpirySeconds", "challenge", "activeAuthSchemes", "macaroonRequirements", "verified", "settlementToken"],
       readOnly: false, idempotent: false, openWorld: true,
@@ -1784,12 +1815,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     const expected = expectedContracts[candidate.name];
     assert.ok(expected, `${candidate.name} must have a documented runtime contract`);
     assert.equal(candidate.outputSchema.additionalProperties, false);
-    const outputKeys = candidate.name === "payment.info"
+    const outputKeys = candidate.name === "payment.get_info"
       ? [...expected.keys, "x402"]
       : expected.keys;
     assert.deepEqual(Object.keys(candidate.outputSchema.properties).sort(), [...outputKeys].sort(),
       `${candidate.name} outputSchema must describe the returned JSON fields`);
-    const expectedRequired = candidate.name === "payment.info"
+    const expectedRequired = candidate.name === "payment.get_info"
       ? []
       : candidate.name === "proof.verify"
         ? ["valid"]
@@ -1807,7 +1838,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       assert.equal(payloadExample.kind, "zk-proof");
       assert.ok(Object.hasOwn(payloadExample, "proofPayload"));
       assert.ok(Object.hasOwn(payloadExample, "timestamp"));
-    } else if (candidate.name !== "payment.info" && candidate.name !== "proof.verify") {
+    } else if (candidate.name !== "payment.get_info" && candidate.name !== "proof.verify") {
       assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expectedRequired].sort());
     }
     assert.equal(candidate.annotations.readOnlyHint, expected.readOnly);
@@ -1824,7 +1855,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${name} description must exactly match the public MCP contract`,
     );
   }
-  for (const name of ["mesh.get_status", "proof.get_by_hash", "payment.info"]) {
+  for (const name of ["mesh.get_status", "proof.get_by_hash", "payment.get_info"]) {
     assert.doesNotMatch(
       documentedTool(name).description,
       /Note: Stratigraphy records and zk-SNARK proofs are append-only/,
@@ -2431,7 +2462,7 @@ test("returns a paid digest of stored records without inventing a block hash or 
   try {
   const listed = (await mcpRequestAt(digestBase, "tools/list")).body;
   const tool = listed.result?.tools.find(
-    (candidate: { name: string }) => candidate.name === "stratigraphy.digest",
+    (candidate: { name: string }) => candidate.name === "stratigraphy.get_digest",
   );
   assert.ok(tool);
   assert.equal(tool.inputSchema.properties.format.default, "compact");
@@ -2450,19 +2481,46 @@ test("returns a paid digest of stored records without inventing a block hash or 
   ])).digest("hex");
   const multiplier = source.quantitative_alpha.target_multiplier;
   const compact = `HEIGHT:920000|DATE:2026-09-09|TM:${multiplier}|HASH:${expectedHash}`;
-  const callDigest = async (args: Record<string, unknown>) => {
-    const params = { name: "stratigraphy.digest", arguments: args };
+  const callDigest = async (
+    args: Record<string, unknown>,
+    invokedName = "stratigraphy.get_digest",
+    assertAliasScope = false,
+  ) => {
+    const params = { name: invokedName, arguments: args };
     const challenge = await mcpRequestAt(digestBase, "tools/call", params);
     assert.equal(challenge.response.status, 402);
     const offer = challenge.body as unknown as { amount_sats: number; macaroon: string; payment_hash: string };
     assert.equal(offer.amount_sats, 250);
+    const verified = verifySubscriptionMacaroon(
+      offer.macaroon, "contract-mcp-secret", Math.floor(Date.now() / 1000),
+    );
+    assert.ok(verified);
+    assert.deepEqual(verified.allowedPaths, [`/mcp/tools/${invokedName}`]);
     const payment = mcpInvoices.get(offer.payment_hash);
     assert.ok(payment);
+    if (assertAliasScope) {
+      const otherName = invokedName === "stratigraphy.get_digest"
+        ? "stratigraphy.digest"
+        : "stratigraphy.get_digest";
+      const bypass = await mcpRequestAt(
+        digestBase, "tools/call", { name: otherName, arguments: args }, undefined,
+        `L402 ${offer.macaroon}:${payment.preimage}`,
+      );
+      assert.equal(bypass.response.status, 402);
+      assert.notEqual((bypass.body as { payment_hash?: string }).payment_hash, offer.payment_hash);
+    }
     const paid = await mcpRequestAt(digestBase, "tools/call", params, undefined,
       `L402 ${offer.macaroon}:${payment.preimage}`);
     assert.equal(paid.response.status, 200);
     return paid.body;
   };
+  const canonicalDigest = await callDigest({}, "stratigraphy.get_digest", true);
+  const legacyDigest = await callDigest({}, "stratigraphy.digest", true);
+  assert.deepEqual(
+    legacyDigest.result?.structuredContent,
+    canonicalDigest.result?.structuredContent,
+    "legacy and canonical digest calls must both be functional at the same price",
+  );
   for (const [args, expected] of [
     [{}, compact],
     [{ target: "920000", format: "minimal" }, [920000, "2026-09-09", multiplier, expectedHash]],
@@ -2487,7 +2545,7 @@ test("returns a paid digest of stored records without inventing a block hash or 
   }
   for (const target of ["2026-09-27", "862401", "2026-09-09..2026-09-08"]) {
     const invalid = await mcpRequestAt(digestBase, "tools/call", {
-      name: "stratigraphy.digest", arguments: { target },
+      name: "stratigraphy.get_digest", arguments: { target },
     });
     assert.ok([200, 400].includes(invalid.response.status));
     assert.equal(invalid.body.error?.code, -32602);
@@ -2513,7 +2571,7 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
   try {
     const listed = (await mcpRequestAt(diffBase, "tools/list")).body;
     const tool = listed.result?.tools.find(
-      (candidate: { name: string }) => candidate.name === "stratigraphy.diff",
+      (candidate: { name: string }) => candidate.name === "stratigraphy.get_diff",
     );
     assert.ok(tool);
     assert.deepEqual(tool.inputSchema.required, ["fromTarget"]);
@@ -2534,14 +2592,34 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
         timeSpanDays: 1,
       },
     };
-    const paidDiff = async (args: Record<string, unknown>) => {
-      const params = { name: "stratigraphy.diff", arguments: args };
+    const paidDiff = async (
+      args: Record<string, unknown>,
+      invokedName = "stratigraphy.get_diff",
+      assertAliasScope = false,
+    ) => {
+      const params = { name: invokedName, arguments: args };
       const challenge = await mcpRequestAt(diffBase, "tools/call", params);
       assert.equal(challenge.response.status, 402);
       const offer = challenge.body as unknown as { amount_sats: number; macaroon: string; payment_hash: string };
       assert.equal(offer.amount_sats, 250);
+      const verified = verifySubscriptionMacaroon(
+        offer.macaroon, "contract-mcp-secret", Math.floor(Date.now() / 1000),
+      );
+      assert.ok(verified);
+      assert.deepEqual(verified.allowedPaths, [`/mcp/tools/${invokedName}`]);
       const payment = mcpInvoices.get(offer.payment_hash);
       assert.ok(payment);
+      if (assertAliasScope) {
+        const otherName = invokedName === "stratigraphy.get_diff"
+          ? "stratigraphy.diff"
+          : "stratigraphy.get_diff";
+        const bypass = await mcpRequestAt(
+          diffBase, "tools/call", { name: otherName, arguments: args }, undefined,
+          `L402 ${offer.macaroon}:${payment.preimage}`,
+        );
+        assert.equal(bypass.response.status, 402);
+        assert.notEqual((bypass.body as { payment_hash?: string }).payment_hash, offer.payment_hash);
+      }
       const paid = await mcpRequestAt(diffBase, "tools/call", params, undefined,
         `L402 ${offer.macaroon}:${payment.preimage}`);
       assert.equal(paid.response.status, 200);
@@ -2550,6 +2628,15 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
       assert.deepEqual(paid.body.result?.structuredContent, result);
       return result;
     };
+    assert.deepEqual(
+      await paidDiff({ fromTarget: "919856" }, "stratigraphy.get_diff", true),
+      expected,
+    );
+    assert.deepEqual(
+      await paidDiff({ fromTarget: "919856" }, "stratigraphy.diff", true),
+      expected,
+      "legacy and canonical diff calls must both be functional at the same price",
+    );
     assert.deepEqual(await paidDiff({ fromTarget: "919856" }), expected);
     assert.deepEqual(await paidDiff({ fromTarget: "2026-09-08", toTarget: "2026-09-09" }), expected);
     const reverse = await paidDiff({ fromTarget: "920000", toTarget: "919856" });
@@ -2575,7 +2662,7 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
     ]) {
       const invoiceCount = mcpInvoiceCount;
       const invalid = await mcpRequestAt(diffBase, "tools/call", {
-        name: "stratigraphy.diff", arguments: args,
+        name: "stratigraphy.get_diff", arguments: args,
       });
       assert.ok([200, 400].includes(invalid.response.status));
       assert.equal(invalid.body.error?.code, -32602);
@@ -2601,7 +2688,7 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
   const rangeBase = `http://127.0.0.1:${(rangeServer.address() as AddressInfo).port}`;
   try {
     const tools = (await mcpRequestAt(rangeBase, "tools/list")).body.result?.tools;
-    const tool = tools.find((candidate: { name: string }) => candidate.name === "stratigraphy.range");
+    const tool = tools.find((candidate: { name: string }) => candidate.name === "stratigraphy.get_range");
     assert.ok(tool);
     assert.deepEqual(tool.inputSchema.required, ["startTarget"]);
     assert.equal(tool.inputSchema.properties.endTarget.default, "latest");
@@ -2631,14 +2718,34 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
       if (format === "kv") return { h: height, ts: date, tm, hash };
       return `HEIGHT:${height}|DATE:${date}|TM:${tm}|HASH:${hash}`;
     };
-    const paidRange = async (args: Record<string, unknown>) => {
-      const params = { name: "stratigraphy.range", arguments: args };
+    const paidRange = async (
+      args: Record<string, unknown>,
+      invokedName = "stratigraphy.get_range",
+      assertAliasScope = false,
+    ) => {
+      const params = { name: invokedName, arguments: args };
       const challenge = await mcpRequestAt(rangeBase, "tools/call", params);
       assert.equal(challenge.response.status, 402);
       const offer = challenge.body as unknown as { amount_sats: number; macaroon: string; payment_hash: string };
       assert.equal(offer.amount_sats, 250);
+      const verified = verifySubscriptionMacaroon(
+        offer.macaroon, "contract-mcp-secret", Math.floor(Date.now() / 1000),
+      );
+      assert.ok(verified);
+      assert.deepEqual(verified.allowedPaths, [`/mcp/tools/${invokedName}`]);
       const payment = mcpInvoices.get(offer.payment_hash);
       assert.ok(payment);
+      if (assertAliasScope) {
+        const otherName = invokedName === "stratigraphy.get_range"
+          ? "stratigraphy.range"
+          : "stratigraphy.get_range";
+        const bypass = await mcpRequestAt(
+          rangeBase, "tools/call", { name: otherName, arguments: args }, undefined,
+          `L402 ${offer.macaroon}:${payment.preimage}`,
+        );
+        assert.equal(bypass.response.status, 402);
+        assert.notEqual((bypass.body as { payment_hash?: string }).payment_hash, offer.payment_hash);
+      }
       const paid = await mcpRequestAt(rangeBase, "tools/call", params, undefined,
         `L402 ${offer.macaroon}:${payment.preimage}`);
       assert.equal(paid.response.status, 200);
@@ -2647,6 +2754,18 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
       assert.deepEqual(paid.body.result?.structuredContent, result);
       return result;
     };
+    const sampleRangeArgs = { startTarget: "919712" };
+    const canonicalRange = await paidRange(
+      sampleRangeArgs, "stratigraphy.get_range", true,
+    );
+    const legacyRange = await paidRange(
+      sampleRangeArgs, "stratigraphy.range", true,
+    );
+    assert.deepEqual(
+      legacyRange,
+      canonicalRange,
+      "legacy and canonical range calls must both be functional at the same price",
+    );
     assert.deepEqual(await paidRange({ startTarget: "919712" }), {
       range: { start: "919712", end: "latest" },
       count: 3, format: "compact",
@@ -2684,7 +2803,7 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
     ]) {
       const invoiceCount = mcpInvoiceCount;
       const invalid = await mcpRequestAt(rangeBase, "tools/call", {
-        name: "stratigraphy.range", arguments: args,
+        name: "stratigraphy.get_range", arguments: args,
       });
       assert.ok([200, 400].includes(invalid.response.status));
       assert.equal(invalid.body.error?.code, -32602);
@@ -2692,7 +2811,7 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
       assert.equal(mcpInvoiceCount, invoiceCount);
     }
     const params = {
-      name: "stratigraphy.range",
+      name: "stratigraphy.get_range",
       arguments: { startTarget: "919856", endTarget: "latest" },
     };
     const challenge = await mcpRequestAt(rangeBase, "tools/call", params);
@@ -2706,7 +2825,7 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
       `L402 ${bounded}:${payment.preimage}`);
     assert.equal(forbidden.response.status, 403);
     const permitted = await mcpRequestAt(rangeBase, "tools/call", {
-      name: "stratigraphy.range",
+      name: "stratigraphy.get_range",
       arguments: { startTarget: "919856", endTarget: "919856" },
     }, undefined, `L402 ${bounded}:${payment.preimage}`);
     assert.equal(permitted.response.status, 200);

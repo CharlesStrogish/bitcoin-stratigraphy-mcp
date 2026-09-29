@@ -7,9 +7,9 @@
 ## Agent Quickstart
 
 Public MCP endpoint: `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` (Streamable HTTP).
-Discovery with `stratigraphy.list` and `payment.info` is free. These connection
+Discovery with `stratigraphy.list` and `payment.get_info` is free. These connection
 examples do **not** provide a wallet or pay L402 invoices automatically. Check
-`payment.info` for current per-tool prices before enabling paid calls; the
+`payment.get_info` for current per-tool prices before enabling paid calls; the
 published price for most paid tools is 250 sats, not 10 sats.
 
 ### Claude Desktop
@@ -70,7 +70,7 @@ export const character: Character = {
       },
     },
   },
-  system: "Inspect payment.info before requesting paid Bitcoin Stratigraphy tools.",
+  system: "Inspect payment.get_info before requesting paid Bitcoin Stratigraphy tools.",
 };
 ```
 

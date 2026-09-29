@@ -2,7 +2,7 @@ name: bitcoin-stratigraphy
 displayName: Bitcoin Stratigraphy Notary
 description: >-
   Discover indexed Bitcoin strata for free. Paid MCP telemetry and Groth16
-  proof verification use per-tool L402 challenges; check payment.info for
+  proof verification use per-tool L402 challenges; check payment.get_info for
   current prices and x402 availability before attempting settlement.
 tags:
   - bitcoin
@@ -28,7 +28,7 @@ connection:
     <macaroon>:<preimage> for paid tools; this file contains no wallet secrets.
 pricing:
   freeDiscovery:
-    tools: [stratigraphy.list, payment.info]
+    tools: [stratigraphy.list, payment.get_info]
     priceSats: 0
   microMeteredExecution:
     targetPrice:
@@ -39,7 +39,7 @@ pricing:
   currentPublishedL402:
     standardPaidCallSats: 250
     proof.listSats: 10
-    note: Call payment.info for current per-tool prices and payment availability.
+    note: Call payment.get_info for current per-tool prices and payment availability.
 configSchema:
   type: object
   additionalProperties: false

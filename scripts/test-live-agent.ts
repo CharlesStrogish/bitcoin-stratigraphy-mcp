@@ -107,7 +107,7 @@ async function checkPaidChallenge(): Promise<void> {
 
 async function main(): Promise<void> {
   const checks = [
-    { name: "Free payment.info", run: () => checkFreeTool(1, "payment.info", (data) => {
+    { name: "Free payment.get_info", run: () => checkFreeTool(1, "payment.get_info", (data) => {
       assert.ok(Array.isArray(data.acceptedPaymentMethods), "Missing payment methods");
       assert.ok(object(data.perToolSats, "perToolSats")["stratigraphy.list"] === 0, "Catalog must be free");
       assert.ok(object(data.perToolSats, "perToolSats")["stratigraphy.get"] === 250, "Missing paid tool price");

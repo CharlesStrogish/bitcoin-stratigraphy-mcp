@@ -8,7 +8,7 @@
   "tags": ["bitcoin", "l402", "x402", "lightning", "base", "zk-snark", "thermodynamic", "mcp"],
   "pricing": {
     "freeDiscovery": {
-      "tools": ["stratigraphy.list", "payment.info"],
+      "tools": ["stratigraphy.list", "payment.get_info"],
       "priceSats": 0
     },
     "microMeteredExecution": {
@@ -18,7 +18,7 @@
     "currentPublishedL402": {
       "standardPaidCallSats": 250,
       "proof.listSats": 10,
-      "note": "Prices differ by tool. Call payment.info before payment; x402 settlement is conditional on live availability."
+      "note": "Prices differ by tool. Call payment.get_info before payment; x402 settlement is conditional on live availability."
     }
   }
 }

@@ -3357,12 +3357,12 @@ async function handleMcpRequest(
 
 export function registerMcpRequestGuard(app: Express): void {
   app.use("/mcp", (req, res, next) => {
-    // Never log Authorization, cookies, or session identifiers.
+    // Never log Authorization, cookies, session identifiers, or query strings.
     console.log("[MCP Request]", req.method, {
       accept: req.headers.accept,
       "content-type": req.headers["content-type"],
       origin: req.headers.origin,
-    }, req.url);
+    }, req.path);
     next();
   });
 }
@@ -3425,17 +3425,20 @@ export function registerMcpRoute(
               res.status(503).json({ error: "x402 settlement is not configured" });
               return;
             }
-            createX402PaymentMiddleware({ resourceServer: server })(
-              req, res, () => next(),
+            await createX402PaymentMiddleware({ resourceServer: server })(
+              req, res, next,
             );
             return;
           }
            // An unauthenticated challenge is only a quote. It does not grant
            // tool access; a signed x402 request still requires live settlement.
            const server = x402Ready ? await x402ResourceServer : undefined;
-          createX402PaymentMiddleware({ resourceServer: server })(
-            req, res, () =>
-               l402(req, res, next),
+          await createX402PaymentMiddleware({ resourceServer: server })(
+            req, res, (error?: unknown) => {
+              if (error) return next(error);
+              // Express cannot observe a promise returned by a nested next callback.
+              void Promise.resolve().then(() => l402(req, res, next)).catch(next);
+            },
           );
         };
       })(),

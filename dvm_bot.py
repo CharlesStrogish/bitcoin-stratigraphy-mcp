@@ -1,42 +1,17 @@
-const http = require('http');
+"""Generate a local Bitcoin Stratigraphy teaser without publishing a Nostr event."""
 
-const options = {
-  hostname: '127.0.0.1',
-  port: 5000,
-  path: '/api/latest',
-  method: 'GET',
-  headers: {
-    'Connection': 'close'
-  }
-};
+import json
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 
-const req = http.request(options, (res) => {
-  let rawData = '';
-  res.on('data', (chunk) => { rawData += chunk; });
-  res.on('end', () => {
-    try {
-      const data = JSON.parse(rawData);
-      publishTeaser(data);
-    } catch (e) {
-      publishTeaser({});
-    }
-  });
-});
 
-req.on('error', (e) => {
-  console.log("Could not reach local server directly. Generating teaser snapshot fallback...\n");
-  publishTeaser({});
-});
-
-req.end();
-
-function publishTeaser(metrics) {
-  const content = `
+def publish_teaser(metrics):
+    content = f"""
 ⚡ Bitcoin Stratigraphy Daily Update ⚡
 
-Latest Thermodynamic Scarcity Ratio: ${metrics.thermodynamic_scarcity_ratio || '0.9842'}
-Hal Finney Horizon Progress: ${metrics.hal_finney_horizon_progress || '4.23%'}
-Network Status: ${metrics.network_resilience || 'Optimal'}
+Latest Thermodynamic Scarcity Ratio: {metrics.get("thermodynamic_scarcity_ratio") or "0.9842"}
+Hal Finney Horizon Progress: {metrics.get("hal_finney_horizon_progress") or "4.23%"}
+Network Status: {metrics.get("network_resilience") or "Optimal"}
 
 🤖 Autonomous Agents & Developers:
 • Query daily micro-update (10 sats): /api/latest
@@ -44,11 +19,28 @@ Network Status: ${metrics.network_resilience || 'Optimal'}
 
 🔗 Live Endpoint: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app
 ⚡ Zaps appreciated via CRSTROGISH@COINOS.IO
-`;
+"""
+    print("=== Daily Nostr Teaser Payload ===")
+    print(content.strip())
+    print("===================================")
+    print("\n[SUCCESS] Daily Nostr teaser generated and ready for broadcast!")
 
-  console.log("=== Daily Nostr Teaser Payload ===");
-  console.log(content.trim());
-  console.log("===================================");
-  console.log("\n[SUCCESS] Daily Nostr teaser generated and ready for broadcast!");
-  process.exit(0);
-}
+
+def main():
+    request = Request(
+        "http://127.0.0.1:5000/api/latest",
+        headers={"Connection": "close"},
+    )
+    try:
+        with urlopen(request, timeout=5) as response:
+            metrics = json.load(response)
+        if not isinstance(metrics, dict):
+            metrics = {}
+    except (URLError, ValueError, OSError):
+        print("Could not reach local server directly. Generating teaser snapshot fallback...\n")
+        metrics = {}
+    publish_teaser(metrics)
+
+
+if __name__ == "__main__":
+    main()

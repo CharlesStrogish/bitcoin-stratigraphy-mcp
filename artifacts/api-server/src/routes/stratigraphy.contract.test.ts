@@ -2283,6 +2283,74 @@ test("MCP quotes both rails without a facilitator but refuses signed x402 reques
   }
 });
 
+test("MCP request logging excludes query-string credentials", () => {
+  let guard: express.RequestHandler | undefined;
+  registerMcpRequestGuard({
+    use: (_path: string, middleware: express.RequestHandler) => {
+      guard = middleware;
+    },
+  } as unknown as express.Express);
+  assert.ok(guard);
+  const entries: unknown[][] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { entries.push(args); };
+  try {
+    guard({
+      method: "POST",
+      headers: {},
+      path: "/",
+      url: "/?api_key=credential-sentinel",
+    } as unknown as express.Request, {} as express.Response, () => undefined);
+  } finally {
+    console.log = originalLog;
+  }
+  assert.equal(entries[0]?.at(-1), "/");
+  assert.doesNotMatch(JSON.stringify(entries), /credential-sentinel/);
+});
+
+test("MCP forwards failed L402 usage accounting to its JSON error handler", async () => {
+  const isolatedApp = express();
+  isolatedApp.use(express.json());
+  registerMcpRoute(isolatedApp, {
+    settlementRouter: mcpSettlementRouter,
+    sessionSecret: "contract-usage-failure-secret",
+    x402ResourceServer: null,
+    usageStore: {
+      consume: async () => { throw new Error("Usage store unavailable"); },
+    },
+  });
+  const server = isolatedApp.listen(0, "127.0.0.1");
+  try {
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const args = { name: "stratigraphy.get", arguments: { days: 1 } };
+    const challenge = await mcpRequestAt(url, "tools/call", args);
+    assert.equal(challenge.response.status, 402);
+    const offer = challenge.body as unknown as { macaroon: string; payment_hash: string };
+    const payment = mcpInvoices.get(offer.payment_hash);
+    assert.ok(payment);
+    const paid = await fetch(`${url}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        Authorization: `L402 ${offer.macaroon}:${payment.preimage}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0", id: 1, method: "tools/call", params: args,
+      }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    assert.equal(paid.status, 500);
+    const body = await paid.json() as { error?: { code: number; message: string } };
+    assert.equal(body.error?.code, -32603);
+    assert.equal(body.error?.message, "Internal server error");
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test("MCP paid tools issue dual challenges and settle x402 before execution", async () => {
   let facilitatorSettlesPayment = true;
   let verifyCalls = 0;

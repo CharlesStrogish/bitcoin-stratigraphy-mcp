@@ -1334,7 +1334,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_diff",
     title: "Compare Stratigraphy Strata",
     description:
-      "Compute and return parameter delta variances between two distinct stratum heights.",
+      "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to HTTP rate limiting and L402 payment; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,

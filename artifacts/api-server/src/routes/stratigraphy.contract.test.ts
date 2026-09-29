@@ -88,7 +88,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.attenuate":
     "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
   "stratigraphy.get_diff":
-    "Compute and return parameter delta variances between two distinct stratum heights.",
+    "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to HTTP rate limiting and L402 payment; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool.",
   "stratigraphy.get_digest":
     "Fetch a compact fingerprint and metadata summary for an indexed stratum height or date, or a bounded date range. Returns no full telemetry record body; the source-record fingerprint is not a Bitcoin block-header hash.",
   "proof.ground":

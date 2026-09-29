@@ -1541,7 +1541,7 @@ const baseMcpToolDefinitions = [
     name: "proof.attenuate",
     title: "Attenuate a Macaroon",
     description:
-      "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
+      "Attenuate an authentic, unexpired L402 parent `macaroon` by appending supported restrictive `caveats` (tool, target, expiration, path, or request-count limits) and optionally `ttlSeconds`. The `caveats` array is required but may be empty when `ttlSeconds` is supplied; at least one restriction is required. Appended caveats can only narrow inherited permissions, never widen token authority. Free to call; returns a restricted child macaroon without issuing an invoice, and the parent's payment proof is still required for later redemption. Invalid parents or unsupported caveats return an error.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1887,7 +1887,7 @@ const baseMcpToolDefinitions = [
     name: "proof.get_by_hash",
     title: "Get Proof or Receipt by Hash",
     description:
-      "Retrieve one retained proof payload, signed receipt, or verification status by a known hash, CID, snapshot digest, or submission job ID. Requires a known identifier; use `proof.list` to discover proof hashes. Missing payloads cannot be reconstructed.",
+      "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1946,7 +1946,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "Discover, filter by status, and paginate recent proof attestation lifecycle summaries from bounded process memory. Does not retrieve full proof payloads or receipts by specific hash; use `proof.get_by_hash` for exact lookup. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
+      "Discover, filter, and paginate recent zk-proof attestation lifecycle summaries from bounded process-local memory. Use `limit` (1-100, default 20), zero-based `offset` (0-1000, default 0), and optional `status` (`verified`, `cached`, `pending`, or `invalid`); cursor pagination is not supported. Returns newest-first bounded summaries, not full proof payloads or receipts. Use `proof.get_by_hash` for an individual retained proof or receipt by known ID. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

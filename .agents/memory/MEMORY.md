@@ -41,3 +41,4 @@
 - [x402 paid MCP settlement](x402-paid-mcp-settlement.md) — quote both rails without credentials, but mark x402 unavailable and require upfront settlement before tool execution.
 - [Standalone server-source imports](standalone-server-source-imports.md) — bundled API asset URLs and package-local dependencies may not resolve when a root script imports server TypeScript directly.
 - [Registry pricing claims](registry-pricing-claims.md) — requested 10-sat/$0.001 listing tier is illustrative; use live payment.info for actual tool charges.
+- [API suite rate-limit timing](api-suite-rate-limit-timing.md) — an unrelated per-IP budget assertion can intermittently read 59 instead of 60; confirm before changing limiter behavior.

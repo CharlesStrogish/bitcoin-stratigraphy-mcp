@@ -76,9 +76,9 @@ const expectedMcpOverview =
   "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.";
 const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
-    "Retrieve one retained proof payload, signed receipt, or verification status by a known hash, CID, snapshot digest, or submission job ID. Requires a known identifier; use `proof.list` to discover proof hashes. Missing payloads cannot be reconstructed.",
+    "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs.",
   "proof.list":
-    "Discover, filter by status, and paginate recent proof attestation lifecycle summaries from bounded process memory. Does not retrieve full proof payloads or receipts by specific hash; use `proof.get_by_hash` for exact lookup. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
+    "Discover, filter, and paginate recent zk-proof attestation lifecycle summaries from bounded process-local memory. Use `limit` (1-100, default 20), zero-based `offset` (0-1000, default 0), and optional `status` (`verified`, `cached`, `pending`, or `invalid`); cursor pagination is not supported. Returns newest-first bounded summaries, not full proof payloads or receipts. Use `proof.get_by_hash` for an individual retained proof or receipt by known ID. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
   "payment.get_info":
     "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted.",
   "stratigraphy.list":
@@ -86,7 +86,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "stratigraphy.get_range":
     "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only, HTTP rate-limited and L402-paid; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries.",
   "proof.attenuate":
-    "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
+    "Attenuate an authentic, unexpired L402 parent `macaroon` by appending supported restrictive `caveats` (tool, target, expiration, path, or request-count limits) and optionally `ttlSeconds`. The `caveats` array is required but may be empty when `ttlSeconds` is supplied; at least one restriction is required. Appended caveats can only narrow inherited permissions, never widen token authority. Free to call; returns a restricted child macaroon without issuing an invoice, and the parent's payment proof is still required for later redemption. Invalid parents or unsupported caveats return an error.",
   "stratigraphy.get_diff":
     "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to HTTP rate limiting and L402 payment; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool.",
   "stratigraphy.get_digest":
@@ -1723,7 +1723,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     if ([
       "payment.get_info", "stratigraphy.get", "stratigraphy.list",
       "stratigraphy.get_range", "stratigraphy.get_digest", "stratigraphy.get_diff",
-      "proof.verify", "proof.get_by_hash", "proof.list", "mesh.get_status",
+      "proof.verify", "proof.get_by_hash", "proof.list", "proof.attenuate", "mesh.get_status",
     ].includes(candidate.name)) {
       assert.equal(candidate.description, expectedMcpToolDescriptions[candidate.name]);
     } else {

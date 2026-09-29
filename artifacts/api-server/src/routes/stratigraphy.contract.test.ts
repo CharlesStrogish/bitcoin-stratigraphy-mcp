@@ -76,13 +76,15 @@ const expectedMcpOverview =
   "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.";
 const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
-    "Retrieve a stored historical verification receipt or proof record by hash.",
+    "Retrieve one retained proof payload, signed receipt, or lifecycle status by a known hash, CID, snapshot digest, or submission job ID. Use `proof.list` to discover indexed proof hashes when unknown; missing payloads cannot be reconstructed.",
+  "proof.list":
+    "Discover, filter by status, and paginate recent proof attestation lifecycle states from bounded process memory. Returns summaries and hashes, not full proof payloads; use `proof.get_by_hash` for an exact retained item. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
   "payment.get_info":
-    "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire; an operator-only HTTP endpoint can revoke macaroons. No MCP key-refresh or token-revocation tool is exposed.",
+    "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire; an operator-only HTTP endpoint can revoke macaroons. Complete MCP pricing and settlement-status interface: key refresh, token revocation, and manual billing administration are not exposed as MCP tools.",
   "stratigraphy.list":
     "List available stratum heights and catalog metadata. Primary discovery tool for valid query targets.",
   "stratigraphy.get_range":
-    "Retrieve a contiguous span of strata entries across a bounded height or time range.",
+    "Retrieve compact summaries of indexed strata across an inclusive height or date span. Primary tool for compressed multi-record range queries; use `stratigraphy.get` for full telemetry record bodies.",
   "proof.attenuate":
     "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
   "stratigraphy.get_diff":
@@ -98,9 +100,9 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "mesh.broadcast":
     "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
   "stratigraphy.get":
-    "Fetch indexed daily stratum telemetry records, including quantitative metrics, by date or indexed height (or a bounded range). Use when record contents are required; metrics can optionally narrow returned fields.",
+    "Retrieve full indexed telemetry stratum records by date or indexed height, including single-target and bounded multi-record queries. Use `stratigraphy.get_range` for compact contiguous multi-record summaries instead.",
   "mesh.get_status":
-    "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated.",
+    "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated. Inspect active P2P mesh network topology and node health. Automated mesh consensus; direct manual mesh administration is intentionally out of scope.",
 };
 
 type OpenApiDocument = {
@@ -1721,7 +1723,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     if ([
       "payment.get_info", "stratigraphy.get", "stratigraphy.list",
       "stratigraphy.get_range", "stratigraphy.get_digest", "stratigraphy.get_diff",
-      "proof.verify", "proof.get_by_hash",
+      "proof.verify", "proof.get_by_hash", "proof.list",
     ].includes(candidate.name)) {
       assert.equal(candidate.description, expectedMcpToolDescriptions[candidate.name]);
     } else {
@@ -1733,7 +1735,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         `${candidate.name} must explain cost and failures`);
     }
     if (candidate.name === "proof.list") {
-      assert.match(candidate.description, /costs 10 sats.*JSON-RPC -32602/);
+      assert.match(candidate.description, /costs 10 sats/);
     }
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);

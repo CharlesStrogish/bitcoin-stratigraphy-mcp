@@ -1169,7 +1169,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Fetch indexed daily stratum telemetry records, including quantitative metrics, by date or indexed height (or a bounded range). Use when record contents are required; metrics can optionally narrow returned fields.",
+      "Retrieve full indexed telemetry stratum records by date or indexed height, including single-target and bounded multi-record queries. Use `stratigraphy.get_range` for compact contiguous multi-record summaries instead.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1395,7 +1395,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "Retrieve a contiguous span of strata entries across a bounded height or time range.",
+      "Retrieve compact summaries of indexed strata across an inclusive height or date span. Primary tool for compressed multi-record range queries; use `stratigraphy.get` for full telemetry record bodies.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1887,7 +1887,7 @@ const baseMcpToolDefinitions = [
     name: "proof.get_by_hash",
     title: "Get Proof or Receipt by Hash",
     description:
-      "Retrieve a stored historical verification receipt or proof record by hash.",
+      "Retrieve one retained proof payload, signed receipt, or lifecycle status by a known hash, CID, snapshot digest, or submission job ID. Use `proof.list` to discover indexed proof hashes when unknown; missing payloads cannot be reconstructed.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1946,7 +1946,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "PURPOSE & BOUNDARIES: List recent proof attestation states newest-first from bounded process memory, with total before pagination; this does not retrieve full proof payloads. USAGE GUIDELINES: Use this to discover hashes before `proof.get_by_hash`; do not use it to submit proofs (`proof.submit`) or anchor context (`proof.ground`). BEHAVIOR & CONSEQUENCES: Read-only; costs 10 sats via HTTP L402 without valid credentials and shares a 60-requests-per-minute IP limit. Invalid status or pagination filters return JSON-RPC -32602.",
+      "Discover, filter by status, and paginate recent proof attestation lifecycle states from bounded process memory. Returns summaries and hashes, not full proof payloads; use `proof.get_by_hash` for an exact retained item. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2531,7 +2531,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated.",
+      "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated. Inspect active P2P mesh network topology and node health. Automated mesh consensus; direct manual mesh administration is intentionally out of scope.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2718,6 +2718,7 @@ const exactDescriptionToolNames = new Set([
   "stratigraphy.list",
   "proof.attenuate",
   "proof.get_by_hash",
+  "proof.list",
   "proof.ground",
   "proof.verify",
   "proof.submit",
@@ -2772,7 +2773,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Query MCP Prices or Verify Payment Settlement",
-          description: "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire; an operator-only HTTP endpoint can revoke macaroons. No MCP key-refresh or token-revocation tool is exposed.",
+          description: "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire; an operator-only HTTP endpoint can revoke macaroons. Complete MCP pricing and settlement-status interface: key refresh, token revocation, and manual billing administration are not exposed as MCP tools.",
           annotations: { ...tool.annotations, readOnlyHint: false, idempotentHint: false, openWorldHint: true },
           inputSchema: {
             type: "object",

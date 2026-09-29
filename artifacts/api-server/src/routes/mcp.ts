@@ -2529,7 +2529,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error.",
+      "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2730,7 +2730,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Verify Groth16 or OpenTimestamps Proof",
-          description: "PURPOSE & BOUNDARIES: Verify Groth16 telemetry or drift zk-SNARK proofs, or a complete OpenTimestamps (OTS) receipt against its SHA-256 targetHash and Bitcoin block attestation; pending calendar receipts are not verified Bitcoin attestations. USAGE GUIDELINES: Set proofType to ots with otsProof and targetHash for Bitcoin-attested OTS verification; omit proofType (default groth16) for existing telemetry or drift proof inputs. Use proof.submit only to register an attestation. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402/x402; invalid or pending OTS proofs return unverified, while provider outages fail closed. Groth16 telemetry verification is offline; drift and OTS verification require external Bitcoin providers.",
+          description: "PURPOSE & BOUNDARIES: Verify Groth16 telemetry or drift zk-SNARK proofs, or a complete OpenTimestamps (OTS) receipt against its SHA-256 targetHash and Bitcoin block attestation; pending calendar receipts are not verified Bitcoin attestations. USAGE GUIDELINES: Set proofType to ots with otsProof and targetHash for Bitcoin-attested OTS verification; omit proofType (default groth16) for existing telemetry or drift proof inputs. Use proof.submit only to register an attestation. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402/x402; invalid or pending OTS proofs return unverified, while provider outages fail closed. Groth16 telemetry verification is offline; drift and OTS verification require external Bitcoin providers. Note: Advanced proof batch operations are intentionally out of scope; all cryptographic verifications are handled strictly on an atomic, per-stratum basis to guarantee L402 settlement integrity.",
           annotations: { ...tool.annotations, openWorldHint: true },
           inputSchema: {
             type: "object", description: "Select groth16 (default) or ots, supplying only fields for the selected verification path.",

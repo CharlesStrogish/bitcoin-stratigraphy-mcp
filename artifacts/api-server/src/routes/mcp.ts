@@ -1281,7 +1281,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "Fetch a compact fingerprint and metadata summary for an indexed stratum height or date, or a bounded date range. Returns no full telemetry record body; the source-record fingerprint is not a Bitcoin block-header hash.",
+      "Fetch compact source-record fingerprints and metadata for an indexed stratum height, date, or bounded date range. Returns no full record telemetry or Bitcoin block-header hash; the fingerprint is not a verification receipt. Use this tool instead of `stratigraphy.get` when a compact fingerprint is enough; use `stratigraphy.get_range` for contiguous multi-record summaries and `stratigraphy.list` for catalog discovery.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2733,7 +2733,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Verify Groth16 or OpenTimestamps Proof",
-          description: "Execute active cryptographic ZK-SNARK or OpenTimestamps verification on a proof payload. This tool verifies supplied proofs; it does not revoke proofs or refresh verification keys. Verification status and retained payloads are bounded, not permanent attestations.",
+          description: "Execute cryptographic verification for supplied Groth16 telemetry or drift zk-SNARK proofs, or OpenTimestamps receipts. Returns proof validity; verification can update a bounded in-memory lifecycle index, and drift checks require a Bitcoin block provider. Use this tool to verify supplied proofs; use `proof.submit` to register new Groth16 proofs and `proof.get_by_hash` to retrieve retained proofs or signed receipts by a known identifier.",
           annotations: { ...tool.annotations, openWorldHint: true },
           inputSchema: {
             type: "object", description: "Select groth16 (default) or ots, supplying only fields for the selected verification path.",
@@ -2773,7 +2773,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...tool,
           title: "Query MCP Prices or Verify Payment Settlement",
-          description: "Query MCP pricing parameters and verify L402 payment status. Macaroons and Lightning invoices are issued via HTTP 402 challenges and expire. Note: Operator-only macaroon revocation is available over HTTP; key refresh and fee updates are not exposed as public MCP tools.",
+          description: "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted.",
           annotations: { ...tool.annotations, readOnlyHint: false, idempotentHint: false, openWorldHint: true },
           inputSchema: {
             type: "object",

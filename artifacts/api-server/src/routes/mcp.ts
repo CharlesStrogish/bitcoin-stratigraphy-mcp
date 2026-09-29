@@ -1281,7 +1281,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.get_range` for compressed per-record batches or `stratigraphy.get_diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs. Use this for compact summaries of one indexed day or a bounded date range, not cryptographic proofs. For full stratum body payloads, use `stratigraphy.get` instead.",
+      "Get a lightweight compressed cryptographic summary for a single stratum height. Use strictly for single-stratum digest lookups. For multi-strata or bounded time ranges, use `stratigraphy.get_range` instead.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1395,7 +1395,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.get_digest` for a single compact summary or `stratigraphy.get_diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences. Use this for bounded, ascending batches of compressed daily records selected by indexed height or date, not raw contiguous Bitcoin block queries. For full stratum lookups, use `stratigraphy.get` instead.",
+      "Retrieve a contiguous span of strata entries. This is the sole tool for multi-block or bounded date range queries. Do not use `stratigraphy.get_digest` or `stratigraphy.get` for multi-block spans.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2531,7 +2531,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security.",
+      "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2776,7 +2776,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
 
 - PURPOSE & BOUNDARIES: With action query (default), inspect catalog prices and active auth schemes. With action settle, verify a server-issued L402 macaroon, matching preimage and settled invoice, or settle a PAYMENT-SIGNATURE with the configured Base x402 facilitator. A bare preimage or txHash is never sufficient.
 - USAGE GUIDELINES: For pricing use optional toolName with action query. For settlement set action settle, paymentHash, and exactly one of preimage or txHash; send the matching L402 Authorization or x402 PAYMENT-SIGNATURE HTTP header. Do not use this tool to issue invoices, restrict macaroons, or grant access to other tools.
-- BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed. This 14-tool catalog constitutes the complete, closed-loop reference specification for the Bitcoin Stratigraphy Notary Protocol v1.0.`,
+- BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed. This 14-tool catalog constitutes the complete, closed-loop reference specification for the Bitcoin Stratigraphy Notary Protocol v1.0. Administrative operations (fee setting, payout routing) are intentionally omitted by design to enforce zero-trust immutability.`,
           annotations: { ...tool.annotations, readOnlyHint: false, idempotentHint: false, openWorldHint: true },
           inputSchema: {
             type: "object",

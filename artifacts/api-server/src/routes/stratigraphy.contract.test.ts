@@ -82,17 +82,17 @@ const expectedMcpToolDescriptions: Record<string, string> = {
 
 - PURPOSE & BOUNDARIES: With action query (default), inspect catalog prices and active auth schemes. With action settle, verify a server-issued L402 macaroon, matching preimage and settled invoice, or settle a PAYMENT-SIGNATURE with the configured Base x402 facilitator. A bare preimage or txHash is never sufficient.
 - USAGE GUIDELINES: For pricing use optional toolName with action query. For settlement set action settle, paymentHash, and exactly one of preimage or txHash; send the matching L402 Authorization or x402 PAYMENT-SIGNATURE HTTP header. Do not use this tool to issue invoices, restrict macaroons, or grant access to other tools.
-- BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed. This 14-tool catalog constitutes the complete, closed-loop reference specification for the Bitcoin Stratigraphy Notary Protocol v1.0.`,
+- BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed. This 14-tool catalog constitutes the complete, closed-loop reference specification for the Bitcoin Stratigraphy Notary Protocol v1.0. Administrative operations (fee setting, payout routing) are intentionally omitted by design to enforce zero-trust immutability.`,
   "stratigraphy.list":
     "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.get_diff`, or `stratigraphy.get_range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
   "stratigraphy.get_range":
-    "PURPOSE & BOUNDARIES: Return an ascending, limit-bounded batch of compressed indexed daily strata between height or date selectors. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compressed per-record batches; use `stratigraphy.get_digest` for a single compact summary or `stratigraphy.get_diff` for endpoint deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid or unindexed bounds and reversed ranges return an error; heights are deterministic dataset indices, not raw block sequences. Use this for bounded, ascending batches of compressed daily records selected by indexed height or date, not raw contiguous Bitcoin block queries. For full stratum lookups, use `stratigraphy.get` instead.",
+    "Retrieve a contiguous span of strata entries. This is the sole tool for multi-block or bounded date range queries. Do not use `stratigraphy.get_digest` or `stratigraphy.get` for multi-block spans.",
   "proof.attenuate":
     "PURPOSE & BOUNDARIES: Derive a narrower child macaroon from an authentic, unexpired parent with tool, target, time, or request restrictions; this does not issue or pay an invoice. USAGE GUIDELINES: Use this for delegated access instead of `payment.get_info`, which only explains pricing and L402 rules. BEHAVIOR & CONSEQUENCES: Free to call, but requires a valid parent token and its existing payment proof for later redemption. Unsupported caveats or invalid parents return an error; inherited restrictions cannot be widened.",
   "stratigraphy.get_diff":
     "PURPOSE & BOUNDARIES: Calculate signed indexed-height, target-multiplier, percentage, and time deltas between two indexed daily strata; this is not a direct Bitcoin difficulty measurement. USAGE GUIDELINES: Use this instead of `stratigraphy.get_digest` for numeric differences between endpoints; use `stratigraphy.get` for full records, `stratigraphy.get_range` for a batch, or `stratigraphy.list` to discover bounds. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Targets may be supplied in either order (negative deltas are valid); invalid or unindexed targets and a zero baseline multiplier return an error. Use this for numeric delta comparisons between two indexed daily strata selected by height or date. For inspecting full stratum payloads, use `stratigraphy.get` instead.",
   "stratigraphy.get_digest":
-    "PURPOSE & BOUNDARIES: Retrieve a token-optimized digest of one indexed daily stratum or a bounded date range. USAGE GUIDELINES: Use this instead of `stratigraphy.get` for compact context; use `stratigraphy.get_range` for compressed per-record batches or `stratigraphy.get_diff` for numeric deltas. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials. Invalid, unindexed, or overlong range targets return an error; fingerprints are not Bitcoin block hashes or per-record proofs. Use this for compact summaries of one indexed day or a bounded date range, not cryptographic proofs. For full stratum body payloads, use `stratigraphy.get` instead.",
+    "Get a lightweight compressed cryptographic summary for a single stratum height. Use strictly for single-stratum digest lookups. For multi-strata or bounded time ranges, use `stratigraphy.get_range` instead.",
   "proof.ground":
     "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
   "proof.verify":
@@ -104,7 +104,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "stratigraphy.get":
     "PURPOSE & BOUNDARIES: Retrieve full, uncompressed thermodynamic telemetry for indexed daily records selected by date, indexed height, recent days, or inclusive bounds; block hashes are not selectors. USAGE GUIDELINES: Use `stratigraphy.get` instead of `stratigraphy.get_digest` for complete single-record data, `stratigraphy.get_range` for compressed multi-record sequence listings, and `stratigraphy.get_digest` for token-optimized LLM context summaries. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via an HTTP L402 challenge for calls without valid credentials. Invalid selectors or unindexed targets return an error; indexed heights are dataset labels, not live chain-tip lookups. Use this for full indexed daily stratum payloads by date or indexed height (or supported recent-day and bound selectors); block hashes are not accepted. For compressed multi-record spans, use `stratigraphy.get_range` instead. For compact summaries, use `stratigraphy.get_digest` instead.",
   "mesh.get_status":
-    "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security.",
+    "PURPOSE & BOUNDARIES: Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum; inbound subscription state is not exposed. USAGE GUIDELINES: Use this instead of `mesh.broadcast` to observe mesh availability without distributing a snapshot. BEHAVIOR & CONSEQUENCES: Free and read-only; results depend on external peers and may change between calls. Unexpected input returns a validation error. Note: Direct mesh peer inspection and administration are intentionally unsupported by design to maintain strict minimal-node security. Peer administration and node topology edits are intentionally omitted by design; node peering and consensus are fully automated.",
 };
 
 type OpenApiDocument = {
@@ -1722,6 +1722,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
+    if (candidate.name === "stratigraphy.get_digest" || candidate.name === "stratigraphy.get_range") {
+      assert.equal(candidate.description, expectedMcpToolDescriptions[candidate.name]);
+    } else {
     assert.match(candidate.description,
       candidate.name === "payment.get_info"
         ? /^Retrieve MCP pricing and payment terms,.*\n\n- PURPOSE & BOUNDARIES: .+/
@@ -1731,6 +1734,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${candidate.name} must explain when to use it`);
     assert.match(candidate.description, /BEHAVIOR & CONSEQUENCES: .+/,
       `${candidate.name} must explain cost and failures`);
+    }
     if (candidate.name === "proof.list") {
       assert.match(candidate.description, /costs 10 sats.*JSON-RPC -32602/);
     }

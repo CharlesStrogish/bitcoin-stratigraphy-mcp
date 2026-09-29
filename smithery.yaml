@@ -1,95 +1,45 @@
 name: bitcoin-stratigraphy
-displayName: Bitcoin Stratigraphy
+displayName: Bitcoin Stratigraphy Notary
 description: >-
-  Query validated day-by-day Bitcoin stratigraphy records with Zero-Knowledge
-  Data Integrity (Groth16/Poseidon zk-SNARKs), L402 multi-asset payments, and
-  Nostr NIP-78 attestations. Paid JSON and SSE responses include `zkProof`
-  payloads verifiable through `POST /api/v1/zk/verify` in under 10ms for proofs
-  emitted by this API.
+  Discover indexed Bitcoin strata for free. Paid MCP telemetry and Groth16
+  proof verification use per-tool L402 challenges; check payment.info for
+  current prices and x402 availability before attempting settlement.
 tags:
-  - zero-knowledge-data-integrity
-  - zk-snarks
-  - groth16
-  - poseidon
+  - bitcoin
   - l402
-  - multi-asset-payments
-  - nostr
-  - nip-78
-homepage: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app
-
+  - x402
+  - lightning
+  - base
+  - zk-snark
+  - thermodynamic
+  - mcp
+homepage: https://bitcoin-stratigraphy-dashboard.replit.app
 transport:
-  type: sse
-  url: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/mcp
-
-tools:
-  - name: stratigraphy.get
-    title: Get Bitcoin Stratigraphy
-    description: >-
-      Returns validated Bitcoin Stratigraphy entries with Nostr NIP-78
-      attestations and Zero-Knowledge Data Integrity. Paid API payloads include
-      `zkProof` data backed by Groth16/Poseidon zk-SNARKs and verifiable through
-      `POST /api/v1/zk/verify` in under 10ms for proofs emitted by this API.
-      Use days for the most recent entries or date for one exact dataset date.
-      If neither parameter is supplied, the complete dataset is returned.
-    inputSchema:
-      type: object
-      additionalProperties: false
-      properties:
-        days:
-          type: integer
-          minimum: 1
-          maximum: 422
-          description: Number of most recent day entries to return.
-        date:
-          type: string
-          format: date
-          description: Exact dataset date to return in YYYY-MM-DD format.
-      allOf:
-        - not:
-            required:
-              - days
-              - date
-    outputSchema:
-      type: object
-      required:
-        - records
-      properties:
-        records:
-          type: array
-          description: Validated stratigraphy day entries with quantitative alpha.
-          items:
-            type: object
-            required:
-              - day
-              - title
-              - video_id
-              - transcript_summary
-              - quantitative_alpha
-            properties:
-              day:
-                type: integer
-              title:
-                type: string
-              video_id:
-                type: string
-              transcript_summary:
-                type: string
-              quantitative_alpha:
-                type: object
-                required:
-                  - target_multiplier
-                  - difficulty_epoch_progress
-                  - thermodynamic_signal
-                properties:
-                  target_multiplier:
-                    type: number
-                    format: float
-                  difficulty_epoch_progress:
-                    type: string
-                    description: Percentage-formatted difficulty epoch progress.
-                  thermodynamic_signal:
-                    type: string
-
+  type: streamable-http
+  url: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+connection:
+  sdk: "@modelcontextprotocol/sdk"
+  clientTransportImport: "@modelcontextprotocol/sdk/client/streamableHttp.js"
+  clientTransportClass: StreamableHTTPClientTransport
+  url: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+  note: >-
+    No connection-time credentials are required for discovery. A wallet-enabled
+    client must handle HTTP 402 and retry with Authorization: L402
+    <macaroon>:<preimage> for paid tools; this file contains no wallet secrets.
+pricing:
+  freeDiscovery:
+    tools: [stratigraphy.list, payment.info]
+    priceSats: 0
+  microMeteredExecution:
+    targetPrice:
+      usdc: "0.001"
+      sats: 10
+      per: call
+    status: illustrative target, not the published charge
+  currentPublishedL402:
+    standardPaidCallSats: 250
+    proof.listSats: 10
+    note: Call payment.info for current per-tool prices and payment availability.
 configSchema:
   type: object
   additionalProperties: false

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": ["charlesstrogish"],
+  "name": "Bitcoin Stratigraphy Notary",
+  "description": "Bitcoin stratigraphy discovery, paid telemetry, and Groth16 proof verification over Streamable HTTP MCP. Paid calls use L402; x402 availability depends on the live server configuration.",
+  "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+  "transport": "streamable-http",
+  "tags": ["bitcoin", "l402", "x402", "lightning", "base", "zk-snark", "thermodynamic", "mcp"],
+  "pricing": {
+    "freeDiscovery": {
+      "tools": ["stratigraphy.list", "payment.info"],
+      "priceSats": 0
+    },
+    "microMeteredExecution": {
+      "targetPrice": { "usdc": "0.001", "sats": 10, "per": "call" },
+      "status": "illustrative target, not the published charge"
+    },
+    "currentPublishedL402": {
+      "standardPaidCallSats": 250,
+      "proof.listSats": 10,
+      "note": "Prices differ by tool. Call payment.info before payment; x402 settlement is conditional on live availability."
+    }
+  }
+}

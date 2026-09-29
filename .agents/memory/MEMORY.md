@@ -39,3 +39,4 @@
 - [OTS pool receipt calendars](ots-pool-receipt-calendars.md) — public pools can return underlying calendar URLs; inspect real receipts before tightening the accepted issuer list.
 - [x402 paid MCP settlement](x402-paid-mcp-settlement.md) — quote both rails without credentials, but mark x402 unavailable and require upfront settlement before tool execution.
 - [Standalone server-source imports](standalone-server-source-imports.md) — bundled API asset URLs and package-local dependencies may not resolve when a root script imports server TypeScript directly.
+- [Registry pricing claims](registry-pricing-claims.md) — requested 10-sat/$0.001 listing tier is illustrative; use live payment.info for actual tool charges.

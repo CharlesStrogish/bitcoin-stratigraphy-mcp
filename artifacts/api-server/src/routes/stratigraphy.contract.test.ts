@@ -618,6 +618,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
   registerMcpRoute(isolatedApp, {
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-secret",
+    revocationStore: createMemoryMacaroonRevocationStore(),
     readBitcoinTip: async () => ({
       height: 920001, hash: "ab".repeat(32), source: "contract-test",
     }),
@@ -635,7 +636,13 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: string;
       inputSchema: { oneOf?: Array<Record<string, any>> };
     }>;
-    assert.equal(listedTools.length, 14);
+    assert.equal(listedTools.length, 16);
+    const otsTool = listedTools.find(({ name }) => name === "proof.verify_ots");
+    const settleTool = listedTools.find(({ name }) => name === "payment.settle");
+    assert.ok(otsTool && settleTool);
+    assert.deepEqual((otsTool.inputSchema as { required: string[] }).required, ["otsProof", "targetHash"]);
+    assert.deepEqual((settleTool.inputSchema as { required: string[] }).required, ["paymentHash"]);
+    assert.equal(settleTool.inputSchema.oneOf?.length, 2);
     const verifyTool = listedTools.find(({ name }) => name === "proof.verify");
     assert.ok(verifyTool);
     assert.equal(verifyTool.inputSchema.oneOf?.length, 2);
@@ -680,7 +687,43 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: "payment.info", arguments: {},
     }, url);
     const prices = paymentInfo.result?.structuredContent.perToolSats;
-    assert.equal(Object.keys(prices).length, 14);
+    assert.equal(Object.keys(prices).length, 16);
+    assert.equal(prices["proof.verify_ots"], 250);
+    assert.equal(prices["payment.settle"], 0);
+    const bareSettlement = await mcpRequest("tools/call", {
+      name: "payment.settle", arguments: { paymentHash, preimage },
+    }, url);
+    assert.deepEqual(bareSettlement.result?.structuredContent, {
+      verified: false, settlementToken: null,
+    });
+    const unchargedOts = await mcpRequestAt(url, "tools/call", {
+      name: "proof.verify_ots",
+      arguments: { otsProof: "AQID", targetHash: "ab".repeat(32) },
+    });
+    assert.equal(unchargedOts.response.status, 402);
+    const originalPayment = await mcpRequestAt(url, "tools/call", {
+      name: "stratigraphy.get", arguments: { days: 1 },
+    });
+    assert.equal(originalPayment.response.status, 402);
+    const offer = originalPayment.body as unknown as {
+      macaroon: string; payment_hash: string;
+    };
+    const invoiceProof = mcpInvoices.get(offer.payment_hash);
+    assert.ok(invoiceProof);
+    const confirmed = await mcpRequestAt(url, "tools/call", {
+      name: "payment.settle", arguments: {
+        paymentHash: offer.payment_hash, preimage: invoiceProof.preimage,
+      },
+    }, undefined, `L402 ${offer.macaroon}:${invoiceProof.preimage}`);
+    assert.equal(confirmed.response.status, 200);
+    assert.deepEqual(confirmed.body.result?.structuredContent.verified, true);
+    assert.deepEqual(confirmed.body.result?.structuredContent.settlementToken.scope, "/mcp/tools/stratigraphy.get");
+    const mismatched = await mcpRequestAt(url, "tools/call", {
+      name: "payment.settle", arguments: {
+        paymentHash: "dd".repeat(32), preimage: invoiceProof.preimage,
+      },
+    }, undefined, `L402 ${offer.macaroon}:${invoiceProof.preimage}`);
+    assert.deepEqual(mismatched.body.result?.structuredContent, { verified: false, settlementToken: null });
     assert.equal(paymentInfo.result?.structuredContent.standardInvoiceSats, 250);
     assert.equal(prices["proof.get_by_hash"], 250);
     assert.equal(Object.hasOwn(prices, "proof.get_status"), false);
@@ -1384,6 +1427,8 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
     "proof.submit",
     "proof.verify",
     "payment.info",
+    "proof.verify_ots",
+    "payment.settle",
   ];
   const schemaEntries = Object.entries(xMcpTools).filter(([, candidate]) => {
     assert.ok(
@@ -1458,6 +1503,8 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "payment.info",
       "mesh.get_status",
       "mesh.broadcast",
+      "proof.verify_ots",
+      "payment.settle",
     ],
   );
   for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt"]) {
@@ -1649,6 +1696,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     assert.match(candidate.description,
       candidate.name === "payment.info"
         ? /^Retrieve configured MCP pricing,.*\n\n- PURPOSE & BOUNDARIES: .+/
+        : candidate.name === "proof.verify_ots"
+          ? /^Verify an OpenTimestamps \(OTS\) proof record and attestation path against the Bitcoin block header chain\.\n\n- PURPOSE & BOUNDARIES: .+/
+        : candidate.name === "payment.settle"
+          ? /^Execute direct payment settlement verification by validating an L402 Lightning preimage or x402 Base transaction hash\.\n\n- PURPOSE & BOUNDARIES: .+/
         : /^PURPOSE & BOUNDARIES: .+/,
       `${candidate.name} must identify its purpose`);
     assert.match(candidate.description, /USAGE GUIDELINES: .+/,
@@ -1729,6 +1780,14 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "proof.verify": {
       keys: ["valid", "verifiedAt", "computationTimeMs"],
       readOnly: false, idempotent: false, openWorld: false,
+    },
+    "proof.verify_ots": {
+      keys: ["valid", "status", "blockHeight", "bitcoinHeaderHash"],
+      readOnly: true, idempotent: true, openWorld: true,
+    },
+    "payment.settle": {
+      keys: ["verified", "settlementToken"],
+      readOnly: false, idempotent: false, openWorld: true,
     },
     "proof.submit": {
       keys: ["proofHash", "jobId", "status", "submittedAt", "attestationStatus"],
@@ -2339,6 +2398,28 @@ test("MCP paid tools issue dual challenges and settle x402 before execution", as
     }
     assert.equal(verifyCalls, 0);
     assert.equal(settleCalls, 3);
+    const baseTxHash = "0x" + "ab".repeat(32);
+    const mismatch = await mcpRequestAt(
+      baseUrl, "tools/call", {
+        name: "payment.settle",
+        arguments: { paymentHash: "0x" + "cd".repeat(32), txHash: baseTxHash },
+      }, undefined, undefined, paymentSignature,
+    );
+    assert.deepEqual(mismatch.body.result?.structuredContent, {
+      verified: false, settlementToken: null,
+    });
+    assert.equal(settleCalls, 3, "Mismatched payment references must not trigger settlement");
+    facilitatorSettlesPayment = true;
+    const baseSettlement = await mcpRequestAt(
+      baseUrl, "tools/call", {
+        name: "payment.settle",
+        arguments: { paymentHash: baseTxHash, txHash: baseTxHash },
+      }, undefined, undefined, paymentSignature,
+    );
+    assert.equal(baseSettlement.body.result?.structuredContent.verified, true);
+    assert.equal(baseSettlement.body.result?.structuredContent.settlementToken.paymentHash, baseTxHash);
+    assert.equal(baseSettlement.body.result?.structuredContent.settlementToken.scope, "/mcp");
+    assert.equal(settleCalls, 4);
   } finally {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => error ? reject(error) : resolve()));

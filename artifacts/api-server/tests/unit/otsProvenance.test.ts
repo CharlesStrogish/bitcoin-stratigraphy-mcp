@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   createOtsProvenanceService,
+  verifyOtsProofRecord,
   type ProvenanceAnchor,
 } from "../../src/services/otsProvenance";
 
@@ -11,6 +12,30 @@ const merkleRoot = "22".repeat(32);
 const rootDigest = createHash("sha256")
   .update(Buffer.from(merkleRoot, "hex"))
   .digest("hex");
+
+test("verifies OTS digest, Bitcoin attestation, and canonical header without trusting calendar receipts", async () => {
+  const proof = Buffer.from([0x4f, 0x54, 0x53, 1]).toString("base64");
+  const called = { verify: 0, header: 0 };
+  const dependencies = {
+    inspectDigest: async () => rootDigest,
+    verifyDigest: async () => { called.verify++; return true; },
+    inspectHeights: async () => [920_000],
+    readHeaderHash: async () => { called.header++; return "ab".repeat(32); },
+  };
+  assert.deepEqual(await verifyOtsProofRecord({ otsProof: proof, targetHash: rootDigest }, dependencies), {
+    valid: true, status: "bitcoin_block_attested",
+    blockHeight: 920_000, bitcoinHeaderHash: "ab".repeat(32),
+  });
+  assert.deepEqual(await verifyOtsProofRecord({ otsProof: proof, targetHash: "cd".repeat(32) }, dependencies), {
+    valid: false, status: "unverified", blockHeight: null, bitcoinHeaderHash: null,
+  });
+  assert.equal(called.verify, 1, "Mismatched target must not proceed to Bitcoin lookup");
+  assert.equal(called.header, 1);
+  assert.equal((await verifyOtsProofRecord({ otsProof: proof, targetHash: rootDigest }, {
+    ...dependencies, verifyDigest: async () => false,
+  })).valid, false, "A pending calendar proof must not pass");
+  await assert.rejects(verifyOtsProofRecord({ otsProof: "not a receipt", targetHash: rootDigest }), TypeError);
+});
 
 function makeService(verify: boolean | (() => boolean) = false) {
   type Row = {

@@ -169,6 +169,25 @@ export const mcpServerCard = {
           },
         },
       },
+      {
+        name: "proof.verify_ots",
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+          l402: { amountSats: 250 },
+        },
+      },
+      {
+        name: "payment.settle",
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
     ],
   },
 } as const;

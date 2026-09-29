@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -56,7 +57,7 @@ import {
 import { verifyDriftProof } from "../services/zkDriftService";
 import { getStratigraphyData, readDataset } from "./stratigraphy";
 import { buildProvenanceChain } from "../services/provenanceChain";
-import { getProvenanceAnchor } from "../services/otsProvenance";
+import { getProvenanceAnchor, verifyOtsProofRecord, type OtsVerificationResult } from "../services/otsProvenance";
 import {
   createHttpRateLimitMiddleware,
   createSlidingWindowRateLimiter,
@@ -415,6 +416,39 @@ const verifyProofInputSchema = z.union([
   verifySnapshotProofInputSchema,
   driftProofInputSchema,
 ]);
+
+const verifyOtsInputSchema = z.object({
+  otsProof: z.string().min(1).max(1_048_576).describe(
+    "Complete serialized .ots record in canonical base64 or even-length hex (up to 512 KiB decoded); calendar-only receipts do not count as Bitcoin attestations.",
+  ),
+  targetHash: z.string().regex(/^[0-9a-fA-F]{64}$/).describe(
+    "SHA-256 file digest in the OpenTimestamps receipt, as 64 hexadecimal characters; not a Bitcoin block or provenance stratum hash.",
+  ),
+}).strict();
+
+const settleInputSchema = z.object({
+  paymentHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$/).describe(
+    "For L402, the challenged 32-byte Lightning payment hash; for x402, the Base transaction hash (same value as txHash).",
+  ),
+  preimage: z.string().regex(/^[0-9a-fA-F]{64}$/).optional().describe(
+    "L402 32-byte hex preimage. Also send the server-issued L402 macaroon and the same preimage in the Authorization header.",
+  ),
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional().describe(
+    "Base transaction hash; requires a valid PAYMENT-SIGNATURE settled upfront by the x402 facilitator on this request.",
+  ),
+}).strict().refine((value) => Number(value.preimage !== undefined) + Number(value.txHash !== undefined) === 1, {
+  message: "Provide exactly one of preimage or txHash",
+});
+
+type SettlementCheck = {
+  verified: boolean;
+  settlementToken: null | {
+    scheme: "L402" | "x402";
+    paymentHash: string;
+    scope: string;
+    settledAt: string;
+  };
+};
 
 const proofStatusInputSchema = z.object({
   proofHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$|^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[a-z2-7]{20,}$/).optional().describe(
@@ -2612,6 +2646,88 @@ const baseMcpToolDefinitions = [
 
 const immutabilityNote =
   "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.";
+const verificationToolDefinitions = [
+  {
+    name: "proof.verify_ots",
+    title: "Verify OpenTimestamps Bitcoin Attestation",
+    description: `Verify an OpenTimestamps (OTS) proof record and attestation path against the Bitcoin block header chain.
+
+- PURPOSE & BOUNDARIES: Check that a serialized OTS receipt commits the exact targetHash, that the OTS CLI verifies its Bitcoin block attestation, and that the attested height resolves to a canonical Bitcoin header hash. A pending calendar receipt or a signed Bitcoin-tip receipt is not a verified OTS attestation.
+- USAGE GUIDELINES: Use this for a complete .ots record; this tool is not for Groth16 proofs (use proof.verify instead). Pass the SHA-256 file digest embedded in the .ots record, not a stratum hash. A public Bitcoin header provider and the OTS CLI must be available.
+- BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats through the standard L402/x402 MCP gate. Invalid or pending proofs return valid false; provider outages fail closed. This does not itself validate every Bitcoin header locally.`,
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    inputSchema: {
+      type: "object",
+      description: "Serialized OTS receipt and the exact 32-byte SHA-256 digest it stamps.",
+      examples: [{ otsProof: "AQID", targetHash: "ab".repeat(32) }],
+      additionalProperties: false,
+      properties: {
+        otsProof: field("string", "Canonical base64 or even-length hex serialized .ots receipt (maximum 512 KiB decoded).", ["AQID"], { minLength: 1, maxLength: 1_048_576 }),
+        targetHash: field("string", "64-character SHA-256 digest recorded by the receipt; not a Bitcoin header hash.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
+      },
+      required: ["otsProof", "targetHash"],
+    },
+    outputSchema: {
+      type: "object",
+      description: "OTS verification outcome. Bitcoin height and header hash are null unless a matching Bitcoin block attestation was verified.",
+      examples: [{ valid: true, status: "bitcoin_block_attested", blockHeight: 920000, bitcoinHeaderHash: "ab".repeat(32) }],
+      additionalProperties: false,
+      properties: {
+        valid: field("boolean", "True only for a digest-matching, Bitcoin-attested OTS record with a valid chain-header lookup.", [true]),
+        status: field("string", "Whether the OTS record is Bitcoin-attested; calendar-only receipts are unverified.", ["bitcoin_block_attested"], { enum: ["bitcoin_block_attested", "unverified"] }),
+        blockHeight: field(["integer", "null"], "Bitcoin attestation height, or null if not verified.", [920000]),
+        bitcoinHeaderHash: field(["string", "null"], "Canonical Bitcoin block header hash at the attested height, or null if not verified.", ["ab".repeat(32)]),
+      },
+      required: ["valid", "status", "blockHeight", "bitcoinHeaderHash"],
+    },
+  },
+  {
+    name: "payment.settle",
+    title: "Verify Direct MCP Payment Settlement",
+    description: `Execute direct payment settlement verification by validating an L402 Lightning preimage or x402 Base transaction hash.
+
+- PURPOSE & BOUNDARIES: L402 requires a valid, unexpired server-issued macaroon in the Authorization header, matching preimage, and a settled invoice verified against its original provider, amount, and tool scope. x402 requires a PAYMENT-SIGNATURE that the configured facilitator settles upfront on this request; a bare txHash is never proof.
+- USAGE GUIDELINES: Provide paymentHash and exactly one of preimage or txHash. For Base, paymentHash equals txHash. Use payment.info to discover prices and payment availability, and the target paid tool's 402 response to obtain L402 credentials. This tool is not for minting invoices or granting access to other tools, and it charges no separate fee.
+- BEHAVIOR & CONSEQUENCES: Free verification. x402 settlement may transfer funds if a valid unsigned-before-settlement payment authorization is supplied. Returns only a non-transferable statement of the verified payment; no new bearer credential is minted.`,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    inputSchema: {
+      type: "object",
+      description: "Payment identifier and one payment proof; the matching signed L402 or x402 credential must be supplied in HTTP headers.",
+      examples: [{ paymentHash: "ab".repeat(32), preimage: "cd".repeat(32) }, { paymentHash: "0x" + "ab".repeat(32), txHash: "0x" + "ab".repeat(32) }],
+      additionalProperties: false,
+      properties: {
+        paymentHash: field("string", "L402 SHA-256 invoice hash, or Base tx hash when using x402.", ["ab".repeat(32)], { pattern: "^(0x)?[0-9a-fA-F]{64}$" }),
+        preimage: field("string", "L402 32-byte hex preimage; also send Authorization: L402 <server-issued macaroon>:<preimage>.", ["cd".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
+        txHash: field("string", "Base mainnet transaction hash, accepted only after facilitator settlement of PAYMENT-SIGNATURE.", ["0x" + "ab".repeat(32)], { pattern: "^0x[0-9a-fA-F]{64}$" }),
+      },
+      required: ["paymentHash"],
+      oneOf: [{ required: ["preimage"] }, { required: ["txHash"] }],
+    },
+    outputSchema: {
+      type: "object",
+      description: "Non-transferable verification claims; never a newly issued payment capability.",
+      examples: [{ verified: true, settlementToken: { scheme: "L402", paymentHash: "ab".repeat(32), scope: "/mcp/tools/stratigraphy.get", settledAt: "2026-09-28T12:00:00.000Z" } }],
+      additionalProperties: false,
+      properties: {
+        verified: field("boolean", "Whether the signed, server-bound payment was verified or settled.", [true]),
+        settlementToken: {
+          type: ["object", "null"],
+          description: "Verified payment claims, not a bearer token or a grant of tool access.",
+          examples: [{ scheme: "L402", paymentHash: "ab".repeat(32), scope: "/mcp/tools/stratigraphy.get", settledAt: "2026-09-28T12:00:00.000Z" }],
+          additionalProperties: false,
+          properties: {
+            scheme: field("string", "Settlement rail.", ["L402"], { enum: ["L402", "x402"] }),
+            paymentHash: field("string", "Verified Lightning invoice hash or Base transaction hash.", ["ab".repeat(32)]),
+            scope: field("string", "Original L402 tool path or x402 MCP resource path; this receipt cannot expand access.", ["/mcp/tools/stratigraphy.get"]),
+            settledAt: field("string", "Settlement verification time as ISO 8601 UTC.", ["2026-09-28T12:00:00.000Z"], { format: "date-time" }),
+          },
+          required: ["scheme", "paymentHash", "scope", "settledAt"],
+        },
+      },
+      required: ["verified", "settlementToken"],
+    },
+  },
+];
 const exactDescriptionToolNames = new Set([
   "stratigraphy.get",
   "stratigraphy.digest",
@@ -2627,7 +2743,7 @@ const exactDescriptionToolNames = new Set([
   "mesh.broadcast",
 ]);
 const datasetReceiptDefinition = baseMcpToolDefinitions.find((tool) => tool.name === "proof.issue_receipt")!;
-const mcpToolDefinitions = baseMcpToolDefinitions
+const mcpToolDefinitions = [...baseMcpToolDefinitions
   .filter((tool) => tool.name !== "proof.get_status" && tool.name !== "proof.issue_receipt")
   .map((tool) => {
     const merged = tool.name === "proof.ground"
@@ -2674,7 +2790,7 @@ const mcpToolDefinitions = baseMcpToolDefinitions
             : `${tool.description} ${immutabilityNote}`,
         }
       : merged;
-  });
+  }), ...verificationToolDefinitions];
 
 const paidTools = {
   "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
@@ -2684,6 +2800,7 @@ const paidTools = {
   "stratigraphy.range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
   "proof.get_by_hash": { amountSats: 250, schema: proofByHashInputSchema },
   "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
+  "proof.verify_ots": { amountSats: 250, schema: verifyOtsInputSchema },
   "proof.ground": { amountSats: 250, schema: proofGroundInputSchema },
   "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
   "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
@@ -2716,6 +2833,7 @@ function createBitcoinStratigraphyMcpServer(
   archivedProof?: ArchivedProofLookup,
   driftVerification?: { valid: boolean; startedAt: number },
   x402Configured = false,
+  paymentSettlement?: SettlementCheck,
 ) {
   const server = new McpServer(
     {
@@ -2879,6 +2997,25 @@ function createBitcoinStratigraphyMcpServer(
             : performance.now() - startedAt
         ).toFixed(3)),
       };
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    }
+    if (request.params.name === "proof.verify_ots") {
+      const parsed = verifyOtsInputSchema.safeParse(args);
+      if (!parsed.success) throw new McpError(ErrorCode.InvalidParams, "Invalid OTS proof payload");
+      const structuredContent = await verifyOtsProofRecord(parsed.data);
+      return {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent,
+      };
+    }
+    if (request.params.name === "payment.settle") {
+      if (!settleInputSchema.safeParse(args).success) {
+        throw new McpError(ErrorCode.InvalidParams, "Invalid settlement proof");
+      }
+      const structuredContent = paymentSettlement ?? { verified: false, settlementToken: null };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
@@ -3085,6 +3222,7 @@ async function handleMcpRequest(
     res.locals.archivedProof as ArchivedProofLookup | undefined,
     res.locals.driftVerification as { valid: boolean; startedAt: number } | undefined,
     Boolean(res.locals.x402Configured),
+    res.locals.paymentSettlement as SettlementCheck | undefined,
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -3225,6 +3363,106 @@ export function registerMcpRoute(
       return;
     }
     next();
+  }, async (req, res, next) => {
+    const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
+    if (body?.method !== "tools/call" || body.params?.name !== "payment.settle") {
+      next();
+      return;
+    }
+    const parsed = settleInputSchema.safeParse(body.params.arguments ?? {});
+    if (!parsed.success) {
+      next();
+      return;
+    }
+    const input = parsed.data;
+    const invalid: SettlementCheck = { verified: false, settlementToken: null };
+    res.locals.paymentSettlement = invalid;
+    const paymentHash = input.paymentHash.replace(/^0x/i, "").toLowerCase();
+    if (input.preimage !== undefined) {
+      const authorization = parseL402Header(req.header("Authorization"));
+      const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+      const pass = authorization && secret
+        ? verifySubscriptionMacaroon(authorization.macaroon, secret, Math.floor(Date.now() / 1_000))
+        : null;
+      const originalPath = pass?.allowedPaths[0];
+      const originalTool = originalPath?.startsWith("/mcp/tools/")
+        ? originalPath.slice("/mcp/tools/".length)
+        : "";
+      if (!authorization || !pass || authorization.preimage !== input.preimage.toLowerCase() ||
+        pass.paymentHash !== paymentHash ||
+        createHash("sha256").update(Buffer.from(input.preimage, "hex")).digest("hex") !== paymentHash ||
+        pass.paymentAsset !== "btc-lightning" || !pass.paymentProvider ||
+        pass.allowedPaths.length !== 1 || !Object.hasOwn(paidTools, originalTool) ||
+        pass.amountMsats !== paidTools[originalTool as keyof typeof paidTools].amountSats * 1_000) {
+        next();
+        return;
+      }
+      try {
+        if (await revocationStore.isRevoked(pass.tokenId)) {
+          next();
+          return;
+        }
+        const verified = await settlementRouter.verifyPayment({
+          paymentHash,
+          preimage: input.preimage.toLowerCase(),
+          expectedAmountMsats: pass.amountMsats,
+          expectedDescription: `Bitcoin Stratigraphy MCP ${originalTool} execution`,
+          expectedProvider: pass.paymentProvider,
+          asset: "btc-lightning",
+        });
+        if (verified === "unavailable") {
+          res.status(503).json({ error: "Payment verifier unavailable" });
+          return;
+        }
+        if (verified !== "invalid" && verified.provider === pass.paymentProvider &&
+          (verified.asset === undefined || verified.asset === "btc-lightning")) {
+          res.locals.paymentSettlement = {
+            verified: true,
+            settlementToken: {
+              scheme: "L402",
+              paymentHash,
+              scope: originalPath!,
+              settledAt: new Date(verified.settledAt < 10_000_000_000
+                ? verified.settledAt * 1_000 : verified.settledAt).toISOString(),
+            },
+          } satisfies SettlementCheck;
+        }
+      } catch (error) {
+        req.log?.warn({ err: error }, "MCP settlement verification unavailable");
+        res.status(503).json({ error: "Payment verifier unavailable" });
+        return;
+      }
+      next();
+      return;
+    }
+    if (!req.header("PAYMENT-SIGNATURE") ||
+      input.txHash!.slice(2).toLowerCase() !== paymentHash) {
+      next();
+      return;
+    }
+    const server = await x402ResourceServer;
+    if (!server) {
+      res.status(503).json({ error: "x402 settlement is not configured" });
+      return;
+    }
+    await createX402PaymentMiddleware({ resourceServer: server })(req, res, () => {
+      const settled = res.locals.x402 as {
+        transaction?: string; network?: string;
+      } | undefined;
+      if (settled?.network === "eip155:8453" &&
+        settled.transaction?.toLowerCase() === input.txHash!.toLowerCase()) {
+        res.locals.paymentSettlement = {
+          verified: true,
+          settlementToken: {
+            scheme: "x402",
+            paymentHash: input.txHash!.toLowerCase(),
+            scope: "/mcp",
+            settledAt: new Date().toISOString(),
+          },
+        } satisfies SettlementCheck;
+      }
+      next();
+    });
   }, async (req, res, next) => {
     if (Array.isArray(req.body)) {
       if (req.body.some((item: unknown) =>

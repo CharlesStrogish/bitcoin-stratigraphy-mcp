@@ -23,6 +23,79 @@ tags:
   - name: mesh
     description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
 x-mcp-tools:
+  proof.verify_ots:
+    description: |-
+      Verify an OpenTimestamps (OTS) proof record and attestation path against the Bitcoin block header chain.
+
+      - PURPOSE & BOUNDARIES: Check that a serialized OTS receipt commits the exact targetHash, that the OTS CLI verifies its Bitcoin block attestation, and that the attested height resolves to a canonical Bitcoin header hash. A pending calendar receipt or a signed Bitcoin-tip receipt is not a verified OTS attestation.
+      - USAGE GUIDELINES: Use this for a complete .ots record; this tool is not for Groth16 proofs (use proof.verify instead). Pass the SHA-256 file digest embedded in the .ots record, not a stratum hash. A public Bitcoin header provider and the OTS CLI must be available.
+      - BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats through the standard L402/x402 MCP gate. Invalid or pending proofs return valid false; provider outages fail closed. This does not itself validate every Bitcoin header locally.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        otsProof:
+          type: string
+          minLength: 1
+          maxLength: 1048576
+          description: Canonical base64 or even-length hex serialized .ots receipt (maximum 512 KiB decoded).
+        targetHash:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          description: SHA-256 fingerprint of the stamped file, 64 hexadecimal characters.
+      required: [otsProof, targetHash]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        valid: { type: boolean, description: True only when the digest and Bitcoin attestation verify. }
+        status: { type: string, enum: [bitcoin_block_attested, unverified], description: Confirmation status of this OTS receipt. }
+        blockHeight: { type: [integer, "null"], description: Bitcoin block height or null when unverified. }
+        bitcoinHeaderHash: { type: [string, "null"], description: Canonical Bitcoin header hash or null when unverified. }
+      required: [valid, status, blockHeight, bitcoinHeaderHash]
+  payment.settle:
+    description: |-
+      Execute direct payment settlement verification by validating an L402 Lightning preimage or x402 Base transaction hash.
+
+      - PURPOSE & BOUNDARIES: L402 requires a valid, unexpired server-issued macaroon in the Authorization header, matching preimage, and a settled invoice verified against its original provider, amount, and tool scope. x402 requires a PAYMENT-SIGNATURE that the configured facilitator settles upfront on this request; a bare txHash is never proof.
+      - USAGE GUIDELINES: Provide paymentHash and exactly one of preimage or txHash. For Base, paymentHash equals txHash. Use payment.info to discover prices and payment availability, and the target paid tool's 402 response to obtain L402 credentials. This tool is not for minting invoices or granting access to other tools, and it charges no separate fee.
+      - BEHAVIOR & CONSEQUENCES: Free verification. x402 settlement may transfer funds if a valid unsigned-before-settlement payment authorization is supplied. Returns only a non-transferable statement of the verified payment; no new bearer credential is minted.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        paymentHash:
+          type: string
+          pattern: "^(0x)?[0-9a-fA-F]{64}$"
+          description: Lightning invoice hash or Base transaction hash.
+        preimage:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          description: L402 Lightning preimage (requires matching signed Authorization header).
+        txHash:
+          type: string
+          pattern: "^0x[0-9a-fA-F]{64}$"
+          description: Base mainnet transaction hash (requires upfront x402 facilitator settlement).
+      required: [paymentHash]
+      oneOf:
+        - required: [preimage]
+        - required: [txHash]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        verified: { type: boolean, description: Whether server-bound settlement was verified. }
+        settlementToken:
+          type: [object, "null"]
+          description: Non-transferable settlement claims; not an access credential.
+          additionalProperties: false
+          properties:
+            scheme: { type: string, enum: [L402, x402], description: Settlement rail. }
+            paymentHash: { type: string, description: Verified payment reference. }
+            scope: { type: string, description: Original paid MCP tool or x402 request resource. }
+            settledAt: { type: string, format: date-time, description: Settlement verification timestamp in UTC. }
+          required: [scheme, paymentHash, scope, settledAt]
+      required: [verified, settlementToken]
   proof.get_by_hash:
     description: "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error."
     inputSchema:

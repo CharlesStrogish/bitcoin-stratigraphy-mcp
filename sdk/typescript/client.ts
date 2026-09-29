@@ -115,6 +115,10 @@ export type McpToolArguments = {
     verificationKeyId: string;
     data: Record<string, unknown> | Record<string, unknown>[];
   };
+  "proof.verify_ots": { otsProof: string; targetHash: string };
+  "payment.settle":
+    | { paymentHash: string; preimage: string; txHash?: never }
+    | { paymentHash: string; txHash: string; preimage?: never };
   "proof.get_status":
     | { proofHash: string; snapshotDigest?: never; receiptHash?: never }
     | { snapshotDigest: string; proofHash?: never; receiptHash?: never }
@@ -169,6 +173,22 @@ export type McpToolResponses = {
     verifiedAt: string;
     computationTimeMs: number;
     error?: string;
+  };
+  "proof.verify_ots": {
+    valid: boolean;
+    status: "bitcoin_block_attested" | "unverified";
+    blockHeight: number | null;
+    bitcoinHeaderHash: string | null;
+  };
+  "payment.settle": {
+    verified: boolean;
+    /** Non-transferable claims, not a new bearer credential. */
+    settlementToken: {
+      scheme: "L402" | "x402";
+      paymentHash: string;
+      scope: string;
+      settledAt: string;
+    } | null;
   };
   "proof.get_status": {
     status: ProofLifecycle;
@@ -316,6 +336,12 @@ export class BitcoinStratigraphyClient {
   listStratigraphy() { return this.callTool("stratigraphy.list", {}); }
   verifyProof(args: McpToolArguments["proof.verify"]) {
     return this.callTool("proof.verify", args);
+  }
+  verifyOtsProof(args: McpToolArguments["proof.verify_ots"]) {
+    return this.callTool("proof.verify_ots", args);
+  }
+  settlePayment(args: McpToolArguments["payment.settle"]) {
+    return this.callTool("payment.settle", args);
   }
   getProofStatus(args: McpToolArguments["proof.get_status"]) {
     return this.callTool("proof.get_status", args);

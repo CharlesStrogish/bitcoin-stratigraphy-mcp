@@ -200,6 +200,92 @@ const otsCli: OtsCli = {
   },
 };
 
+export type OtsVerificationResult = {
+  valid: boolean;
+  status: "bitcoin_block_attested" | "unverified";
+  blockHeight: number | null;
+  bitcoinHeaderHash: string | null;
+};
+
+/** Verify the SHA-256 digest committed by a serialized OTS receipt. A
+ * calendar-only receipt is never reported as Bitcoin-attested. */
+export async function verifyOtsProofRecord(
+  input: { otsProof: string; targetHash: string },
+  dependencies: {
+    inspectDigest?: (proof: Buffer) => Promise<string>;
+    verifyDigest?: (proof: Buffer, digest: string) => Promise<boolean>;
+    inspectHeights?: (proof: Buffer) => Promise<number[]>;
+    readHeaderHash?: (height: number) => Promise<string>;
+  } = {},
+): Promise<OtsVerificationResult> {
+  const targetHash = input.targetHash.toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(targetHash)) {
+    throw new TypeError("targetHash must be a 32-byte SHA-256 hex digest");
+  }
+  const encoded = input.otsProof;
+  const hex = /^(?:[0-9a-fA-F]{2})+$/.test(encoded);
+  if (!hex && (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0)) {
+    throw new TypeError("otsProof must be a base64 or hex-encoded OTS receipt");
+  }
+  const proof = checkedProof(Buffer.from(encoded, hex ? "hex" : "base64"));
+  if (!hex && proof.toString("base64") !== encoded) {
+    throw new TypeError("otsProof is not canonical base64");
+  }
+  const inspectDigest = dependencies.inspectDigest ?? otsCli.inspectDigest;
+  const verifyDigest = dependencies.verifyDigest ?? otsCli.verifyDigest;
+  const digest = await inspectDigest(proof);
+  const unverified: OtsVerificationResult = {
+    valid: false, status: "unverified", blockHeight: null, bitcoinHeaderHash: null,
+  };
+  if (digest.toLowerCase() !== targetHash || !(await verifyDigest(proof, targetHash))) {
+    return unverified;
+  }
+  const inspectHeights = dependencies.inspectHeights ?? (async (bytes: Buffer) =>
+    inTempDirectory(async (directory) => {
+      const proofPath = join(directory, "anchor.ots");
+      await writeFile(proofPath, bytes, { flag: "wx" });
+      const info = await runOts(["info", proofPath], directory, VERIFY_TIMEOUT_MS);
+      return [...info.matchAll(/BitcoinBlockHeaderAttestation\((\d+)\)/g)]
+        .map((match) => Number(match[1]));
+    }));
+  const heights = [...new Set(await inspectHeights(proof))];
+  if (heights.length !== 1 || !Number.isSafeInteger(heights[0]) || heights[0]! <= 0) {
+    return unverified;
+  }
+  const height = heights[0]!;
+  const readHeaderHash = dependencies.readHeaderHash ?? (async (blockHeight: number) => {
+    const response = await fetch(`https://mempool.space/api/block-height/${blockHeight}`, {
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) throw new Error("Bitcoin header provider is unavailable");
+    if (!response.body) throw new Error("Bitcoin header provider returned no body");
+    const reader = response.body.getReader();
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > 128) throw new Error("Bitcoin header response exceeds size limit");
+        chunks.push(Buffer.from(value));
+      }
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+    const value = Buffer.concat(chunks).toString("utf8").trim().toLowerCase();
+    if (value.length > 64) throw new Error("Bitcoin header response exceeds size limit");
+    return value;
+  });
+  const bitcoinHeaderHash = (await readHeaderHash(height)).toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(bitcoinHeaderHash)) {
+    throw new Error("Bitcoin header provider returned an invalid hash");
+  }
+  return {
+    valid: true, status: "bitcoin_block_attested", blockHeight: height, bitcoinHeaderHash,
+  };
+}
+
 const postgresStore: AnchorStore = {
   async get(headHash) {
     const [{ db, otsProvenanceAnchorsTable }, { eq }] = await Promise.all([

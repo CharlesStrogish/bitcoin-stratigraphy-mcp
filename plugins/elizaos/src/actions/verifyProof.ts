@@ -24,7 +24,7 @@ function proofRequest(input: Record<string, unknown>): McpToolArguments["proof.v
     proof: input.proof,
     publicInputs: publicInputs as PublicInputs,
     verificationKeyId: input.verificationKeyId,
-    data: data as McpToolArguments["proof.verify"]["data"],
+    data: data as Extract<McpToolArguments["proof.verify"], { proofType?: "groth16" }>["data"],
   };
 }
 

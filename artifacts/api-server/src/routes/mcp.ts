@@ -413,18 +413,14 @@ const driftProofInputSchema = z.object({
 }).strict();
 
 const verifyProofInputSchema = z.union([
-  verifySnapshotProofInputSchema,
-  driftProofInputSchema,
+  verifySnapshotProofInputSchema.extend({ proofType: z.literal("groth16").optional() }),
+  driftProofInputSchema.extend({ proofType: z.literal("groth16").optional() }),
+  z.object({
+    proofType: z.literal("ots"),
+    otsProof: z.string().min(1).max(1_048_576),
+    targetHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  }).strict(),
 ]);
-
-const verifyOtsInputSchema = z.object({
-  otsProof: z.string().min(1).max(1_048_576).describe(
-    "Complete serialized .ots record in canonical base64 or even-length hex (up to 512 KiB decoded); calendar-only receipts do not count as Bitcoin attestations.",
-  ),
-  targetHash: z.string().regex(/^[0-9a-fA-F]{64}$/).describe(
-    "SHA-256 file digest in the OpenTimestamps receipt, as 64 hexadecimal characters; not a Bitcoin block or provenance stratum hash.",
-  ),
-}).strict();
 
 const settleInputSchema = z.object({
   paymentHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$/).describe(
@@ -436,9 +432,7 @@ const settleInputSchema = z.object({
   txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional().describe(
     "Base transaction hash; requires a valid PAYMENT-SIGNATURE settled upfront by the x402 facilitator on this request.",
   ),
-}).strict().refine((value) => Number(value.preimage !== undefined) + Number(value.txHash !== undefined) === 1, {
-  message: "Provide exactly one of preimage or txHash",
-});
+}).strict();
 
 type SettlementCheck = {
   verified: boolean;
@@ -481,8 +475,12 @@ const proofByHashInputSchema = z.object({
 });
 
 const paymentInfoInputSchema = z.object({
+  action: z.literal("query").optional(),
   toolName: z.string().min(1).optional(),
-}).strict();
+}).strict().or(settleInputSchema.extend({ action: z.literal("settle") }).refine(
+  (value) => Number(value.preimage !== undefined) + Number(value.txHash !== undefined) === 1,
+  "Provide exactly one of preimage or txHash",
+));
 
 type ArchivedProofLookup = {
   kind: "zk-proof" | "dataset-receipt" | "context-receipt" | "zk-proof-status";
@@ -2646,16 +2644,7 @@ const baseMcpToolDefinitions = [
 
 const immutabilityNote =
   "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.";
-const verificationToolDefinitions = [
-  {
-    name: "proof.verify_ots",
-    title: "Verify OpenTimestamps Bitcoin Attestation",
-    description: `Verify an OpenTimestamps (OTS) proof record and attestation path against the Bitcoin block header chain.
-
-- PURPOSE & BOUNDARIES: Check that a serialized OTS receipt commits the exact targetHash, that the OTS CLI verifies its Bitcoin block attestation, and that the attested height resolves to a canonical Bitcoin header hash. A pending calendar receipt or a signed Bitcoin-tip receipt is not a verified OTS attestation.
-- USAGE GUIDELINES: Use this for a complete .ots record; this tool is not for Groth16 proofs (use proof.verify instead). Pass the SHA-256 file digest embedded in the .ots record, not a stratum hash. A public Bitcoin header provider and the OTS CLI must be available.
-- BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats through the standard L402/x402 MCP gate. Invalid or pending proofs return valid false; provider outages fail closed. This does not itself validate every Bitcoin header locally.`,
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+const otsVerificationMetadata = {
     inputSchema: {
       type: "object",
       description: "Serialized OTS receipt and the exact 32-byte SHA-256 digest it stamps.",
@@ -2680,16 +2669,8 @@ const verificationToolDefinitions = [
       },
       required: ["valid", "status", "blockHeight", "bitcoinHeaderHash"],
     },
-  },
-  {
-    name: "payment.settle",
-    title: "Verify Direct MCP Payment Settlement",
-    description: `Execute direct payment settlement verification by validating an L402 Lightning preimage or x402 Base transaction hash.
-
-- PURPOSE & BOUNDARIES: L402 requires a valid, unexpired server-issued macaroon in the Authorization header, matching preimage, and a settled invoice verified against its original provider, amount, and tool scope. x402 requires a PAYMENT-SIGNATURE that the configured facilitator settles upfront on this request; a bare txHash is never proof.
-- USAGE GUIDELINES: Provide paymentHash and exactly one of preimage or txHash. For Base, paymentHash equals txHash. Use payment.info to discover prices and payment availability, and the target paid tool's 402 response to obtain L402 credentials. This tool is not for minting invoices or granting access to other tools, and it charges no separate fee.
-- BEHAVIOR & CONSEQUENCES: Free verification. x402 settlement may transfer funds if a valid unsigned-before-settlement payment authorization is supplied. Returns only a non-transferable statement of the verified payment; no new bearer credential is minted.`,
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+};
+const paymentSettlementMetadata = {
     inputSchema: {
       type: "object",
       description: "Payment identifier and one payment proof; the matching signed L402 or x402 credential must be supplied in HTTP headers.",
@@ -2726,8 +2707,7 @@ const verificationToolDefinitions = [
       },
       required: ["verified", "settlementToken"],
     },
-  },
-];
+};
 const exactDescriptionToolNames = new Set([
   "stratigraphy.get",
   "stratigraphy.digest",
@@ -2746,7 +2726,98 @@ const datasetReceiptDefinition = baseMcpToolDefinitions.find((tool) => tool.name
 const mcpToolDefinitions = [...baseMcpToolDefinitions
   .filter((tool) => tool.name !== "proof.get_status" && tool.name !== "proof.issue_receipt")
   .map((tool) => {
-    const merged = tool.name === "proof.ground"
+    const merged = tool.name === "proof.verify"
+      ? {
+          ...tool,
+          title: "Verify Groth16 or OpenTimestamps Proof",
+          description: "PURPOSE & BOUNDARIES: Verify Groth16 telemetry or drift zk-SNARK proofs, or a complete OpenTimestamps (OTS) receipt against its SHA-256 targetHash and Bitcoin block attestation; pending calendar receipts are not verified Bitcoin attestations. USAGE GUIDELINES: Set proofType to ots with otsProof and targetHash for Bitcoin-attested OTS verification; omit proofType (default groth16) for existing telemetry or drift proof inputs. Use proof.submit only to register an attestation. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402/x402; invalid or pending OTS proofs return unverified, while provider outages fail closed. Groth16 telemetry verification is offline; drift and OTS verification require external Bitcoin providers.",
+          annotations: { ...tool.annotations, openWorldHint: true },
+          inputSchema: {
+            type: "object", description: "Select groth16 (default) or ots, supplying only fields for the selected verification path.",
+            examples: [...tool.inputSchema.examples, { proofType: "ots", otsProof: "AQID", targetHash: "ab".repeat(32) }],
+            oneOf: [
+              ...(tool.inputSchema as { oneOf: Array<{ properties: Record<string, unknown> }> }).oneOf.map((branch) => ({
+                ...branch,
+                properties: {
+                  ...branch.properties,
+                  proofType: field("string", "Groth16 verification (default).", ["groth16"], { const: "groth16", default: "groth16" }),
+                },
+              })),
+              {
+                ...otsVerificationMetadata.inputSchema,
+                description: "OTS mode requires proofType ots, a complete receipt, and its SHA-256 file digest.",
+                properties: {
+                  proofType: field("string", "OpenTimestamps Bitcoin verification.", ["ots"], { const: "ots" }),
+                  ...otsVerificationMetadata.inputSchema.properties,
+                },
+                required: ["proofType", "otsProof", "targetHash"],
+              },
+            ],
+          },
+          outputSchema: {
+            ...tool.outputSchema,
+            description: "Groth16 verification timing or OTS Bitcoin attestation result, depending on proofType.",
+            examples: [...tool.outputSchema.examples, ...otsVerificationMetadata.outputSchema.examples],
+            properties: { ...tool.outputSchema.properties, ...otsVerificationMetadata.outputSchema.properties },
+            required: ["valid"],
+            oneOf: [
+              { required: ["verifiedAt", "computationTimeMs"] },
+              { required: ["status", "blockHeight", "bitcoinHeaderHash"] },
+            ],
+          },
+        }
+      : tool.name === "payment.info"
+      ? {
+          ...tool,
+          title: "Query MCP Prices or Verify Payment Settlement",
+          description: `Retrieve MCP pricing and payment terms, or verify L402/x402 settlement using action.
+
+- PURPOSE & BOUNDARIES: With action query (default), inspect catalog prices and active auth schemes. With action settle, verify a server-issued L402 macaroon, matching preimage and settled invoice, or settle a PAYMENT-SIGNATURE with the configured Base x402 facilitator. A bare preimage or txHash is never sufficient.
+- USAGE GUIDELINES: For pricing use optional toolName with action query. For settlement set action settle, paymentHash, and exactly one of preimage or txHash; send the matching L402 Authorization or x402 PAYMENT-SIGNATURE HTTP header. Do not use this tool to issue invoices, restrict macaroons, or grant access to other tools.
+- BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed.`,
+          annotations: { ...tool.annotations, readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+          inputSchema: {
+            type: "object",
+            description: "Query pricing (default) or settle a matching authenticated Lightning or Base payment.",
+            examples: [{}, { action: "settle", paymentHash: "ab".repeat(32), preimage: "cd".repeat(32) }],
+            additionalProperties: false,
+            properties: {
+              ...tool.inputSchema.properties,
+              action: field("string", "query (default) discovers prices; settle verifies authenticated payment.", ["query"], { enum: ["query", "settle"], default: "query" }),
+              ...paymentSettlementMetadata.inputSchema.properties,
+            },
+            required: [],
+            oneOf: [
+              {
+                type: "object", additionalProperties: false,
+                properties: {
+                  ...tool.inputSchema.properties,
+                  action: field("string", "Pricing query (default).", ["query"], { const: "query", default: "query" }),
+                },
+              },
+              {
+                ...paymentSettlementMetadata.inputSchema,
+                properties: {
+                  action: field("string", "Verify or execute payment settlement.", ["settle"], { const: "settle" }),
+                  ...paymentSettlementMetadata.inputSchema.properties,
+                },
+                required: ["action", "paymentHash"],
+              },
+            ],
+          },
+          outputSchema: {
+            ...tool.outputSchema,
+            description: "Pricing details for query, or non-transferable payment verification claims for settle.",
+            examples: [...tool.outputSchema.examples, ...paymentSettlementMetadata.outputSchema.examples],
+            properties: { ...tool.outputSchema.properties, ...paymentSettlementMetadata.outputSchema.properties },
+            required: [],
+            oneOf: [
+              { required: tool.outputSchema.required },
+              { required: ["verified", "settlementToken"] },
+            ],
+          },
+        }
+      : tool.name === "proof.ground"
       ? {
           ...tool,
           inputSchema: {
@@ -2786,11 +2857,11 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
       ? {
           ...merged,
           description: exactDescriptionToolNames.has(tool.name)
-            ? tool.description
-            : `${tool.description} ${immutabilityNote}`,
+             ? merged.description
+             : `${merged.description} ${immutabilityNote}`,
         }
       : merged;
-  }), ...verificationToolDefinitions];
+  })];
 
 const paidTools = {
   "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
@@ -2800,7 +2871,6 @@ const paidTools = {
   "stratigraphy.range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
   "proof.get_by_hash": { amountSats: 250, schema: proofByHashInputSchema },
   "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
-  "proof.verify_ots": { amountSats: 250, schema: verifyOtsInputSchema },
   "proof.ground": { amountSats: 250, schema: proofGroundInputSchema },
   "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
   "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
@@ -2974,6 +3044,13 @@ function createBitcoinStratigraphyMcpServer(
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid proof payload");
       }
+      if (parsed.data.proofType === "ots") {
+        const structuredContent = await verifyOtsProofRecord(parsed.data);
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+          structuredContent,
+        };
+      }
       let valid: boolean;
       const startedAt = performance.now();
       if ("circuit" in parsed.data) {
@@ -3002,25 +3079,6 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent,
       };
     }
-    if (request.params.name === "proof.verify_ots") {
-      const parsed = verifyOtsInputSchema.safeParse(args);
-      if (!parsed.success) throw new McpError(ErrorCode.InvalidParams, "Invalid OTS proof payload");
-      const structuredContent = await verifyOtsProofRecord(parsed.data);
-      return {
-        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
-        structuredContent,
-      };
-    }
-    if (request.params.name === "payment.settle") {
-      if (!settleInputSchema.safeParse(args).success) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid settlement proof");
-      }
-      const structuredContent = paymentSettlement ?? { verified: false, settlementToken: null };
-      return {
-        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
-        structuredContent,
-      };
-    }
     if (name === "proof.get_by_hash") {
       if (!proofByHashInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid proof or receipt hash");
@@ -3040,6 +3098,13 @@ function createBitcoinStratigraphyMcpServer(
     if (name === "payment.info") {
       const parsed = paymentInfoInputSchema.safeParse(args);
       if (!parsed.success) throw new McpError(ErrorCode.InvalidParams, "Invalid payment info request");
+      if (parsed.data.action === "settle") {
+        const structuredContent = paymentSettlement ?? { verified: false, settlementToken: null };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+          structuredContent,
+        };
+      }
       const toolName = parsed.data.toolName;
       if (toolName && !Object.hasOwn(mcpToolPrices, toolName)) {
         throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
@@ -3365,12 +3430,12 @@ export function registerMcpRoute(
     next();
   }, async (req, res, next) => {
     const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
-    if (body?.method !== "tools/call" || body.params?.name !== "payment.settle") {
+    if (body?.method !== "tools/call" || body.params?.name !== "payment.info") {
       next();
       return;
     }
-    const parsed = settleInputSchema.safeParse(body.params.arguments ?? {});
-    if (!parsed.success) {
+    const parsed = paymentInfoInputSchema.safeParse(body.params.arguments ?? {});
+    if (!parsed.success || parsed.data.action !== "settle") {
       next();
       return;
     }

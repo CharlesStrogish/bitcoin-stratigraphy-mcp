@@ -78,11 +78,11 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "PURPOSE & BOUNDARIES: Retrieve an exact retained proof or signed receipt by hash, CID, digest, or job ID; lifecycle-only matches do not reconstruct unavailable payloads. USAGE GUIDELINES: Use `proof.list` to discover identifiers, `proof.submit` to submit a new proof, or `proof.ground` to create an anchor. BEHAVIOR & CONSEQUENCES: Read-only; costs 250 sats via HTTP L402 without valid credentials, but unknown identifiers return 404 before payment. Invalid or conflicting selectors return an error.",
   "payment.info":
-    `Retrieve configured MCP pricing, Lightning invoice rules, and optional Base USDC x402 terms.
+    `Retrieve MCP pricing and payment terms, or verify L402/x402 settlement using action.
 
-- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.info\` instead of calling paid tools blindly when checking pricing upfront.
-- USAGE GUIDELINES: Use \`payment.info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
-- BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns Lightning rates and invoice expiry limits; Base USDC x402 terms appear only when authenticated settlement is ready. Passing an unknown \`toolName\` returns a validation error.`,
+- PURPOSE & BOUNDARIES: With action query (default), inspect catalog prices and active auth schemes. With action settle, verify a server-issued L402 macaroon, matching preimage and settled invoice, or settle a PAYMENT-SIGNATURE with the configured Base x402 facilitator. A bare preimage or txHash is never sufficient.
+- USAGE GUIDELINES: For pricing use optional toolName with action query. For settlement set action settle, paymentHash, and exactly one of preimage or txHash; send the matching L402 Authorization or x402 PAYMENT-SIGNATURE HTTP header. Do not use this tool to issue invoices, restrict macaroons, or grant access to other tools.
+- BEHAVIOR & CONSEQUENCES: Free query or verification; an authenticated x402 settle call may transfer funds. Settlement returns non-transferable claims, not a bearer credential. Invalid proofs return verified false and provider outages fail closed.`,
   "stratigraphy.list":
     "PURPOSE & BOUNDARIES: Discover indexed catalog heights, dates, and metric keys; returns metadata, not telemetry records. USAGE GUIDELINES: Use this before `stratigraphy.get`, `stratigraphy.diff`, or `stratigraphy.range` to select available targets; do not use it to fetch telemetry records. BEHAVIOR & CONSEQUENCES: Free and read-only; shares a 60-requests-per-minute IP limit. Pass an empty object; unexpected arguments return JSON-RPC -32602.",
   "stratigraphy.range":
@@ -96,7 +96,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.ground":
     "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
   "proof.verify":
-    "PURPOSE & BOUNDARIES: Verify cryptographic integrity of a Groth16 telemetry or drift zk-SNARK proof without modifying proof registry state; this does not verify OTS records. Telemetry verification is offline, while drift checks consult a Bitcoin block provider. USAGE GUIDELINES: Use `proof.verify` instead of `proof.submit` for read-only validation of existing proofs, and use `proof.submit` exclusively when registering a new proof attestation. Use `proof.ground` when a signed Bitcoin-tip receipt is needed. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed or mismatched proof inputs fail validation, and drift verification requires a reachable block provider.",
+    "PURPOSE & BOUNDARIES: Verify Groth16 telemetry or drift zk-SNARK proofs, or a complete OpenTimestamps (OTS) receipt against its SHA-256 targetHash and Bitcoin block attestation; pending calendar receipts are not verified Bitcoin attestations. USAGE GUIDELINES: Set proofType to ots with otsProof and targetHash for Bitcoin-attested OTS verification; omit proofType (default groth16) for existing telemetry or drift proof inputs. Use proof.submit only to register an attestation. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402/x402; invalid or pending OTS proofs return unverified, while provider outages fail closed. Groth16 telemetry verification is offline; drift and OTS verification require external Bitcoin providers.",
   "proof.submit":
     "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
   "mesh.broadcast":
@@ -636,19 +636,19 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: string;
       inputSchema: { oneOf?: Array<Record<string, any>> };
     }>;
-    assert.equal(listedTools.length, 16);
-    const otsTool = listedTools.find(({ name }) => name === "proof.verify_ots");
-    const settleTool = listedTools.find(({ name }) => name === "payment.settle");
-    assert.ok(otsTool && settleTool);
-    assert.deepEqual((otsTool.inputSchema as { required: string[] }).required, ["otsProof", "targetHash"]);
-    assert.deepEqual((settleTool.inputSchema as { required: string[] }).required, ["paymentHash"]);
-    assert.equal(settleTool.inputSchema.oneOf?.length, 2);
+    assert.equal(listedTools.length, 14);
+    const paymentTool = listedTools.find(({ name }) => name === "payment.info");
+    assert.ok(paymentTool);
+    assert.equal(paymentTool.inputSchema.oneOf?.length, 2);
+    assert.deepEqual(paymentTool.inputSchema.oneOf?.[1].required, ["action", "paymentHash"]);
+    assert.equal(paymentTool.inputSchema.oneOf?.[1].oneOf?.length, 2);
     const verifyTool = listedTools.find(({ name }) => name === "proof.verify");
     assert.ok(verifyTool);
-    assert.equal(verifyTool.inputSchema.oneOf?.length, 2);
+    assert.equal(verifyTool.inputSchema.oneOf?.length, 3);
     assert.deepEqual(verifyTool.inputSchema.oneOf?.map((branch) => branch.required), [
       ["proof", "publicInputs", "verificationKeyId", "data"],
       ["circuit", "sessionContextHash", "targetBlockHeight", "entropyThreshold", "proof"],
+      ["proofType", "otsProof", "targetHash"],
     ]);
     assert.equal(verifyTool.inputSchema.oneOf?.every(
       (branch) => branch.additionalProperties === false,
@@ -687,18 +687,20 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: "payment.info", arguments: {},
     }, url);
     const prices = paymentInfo.result?.structuredContent.perToolSats;
-    assert.equal(Object.keys(prices).length, 16);
-    assert.equal(prices["proof.verify_ots"], 250);
-    assert.equal(prices["payment.settle"], 0);
+    assert.equal(Object.keys(prices).length, 14);
+    assert.equal(prices["proof.verify"], 250);
+    assert.equal(prices["payment.info"], 0);
+    assert.equal(Object.hasOwn(prices, "proof.verify_ots"), false);
+    assert.equal(Object.hasOwn(prices, "payment.settle"), false);
     const bareSettlement = await mcpRequest("tools/call", {
-      name: "payment.settle", arguments: { paymentHash, preimage },
+      name: "payment.info", arguments: { action: "settle", paymentHash, preimage },
     }, url);
     assert.deepEqual(bareSettlement.result?.structuredContent, {
       verified: false, settlementToken: null,
     });
     const unchargedOts = await mcpRequestAt(url, "tools/call", {
-      name: "proof.verify_ots",
-      arguments: { otsProof: "AQID", targetHash: "ab".repeat(32) },
+      name: "proof.verify",
+      arguments: { proofType: "ots", otsProof: "AQID", targetHash: "ab".repeat(32) },
     });
     assert.equal(unchargedOts.response.status, 402);
     const originalPayment = await mcpRequestAt(url, "tools/call", {
@@ -711,16 +713,16 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     const invoiceProof = mcpInvoices.get(offer.payment_hash);
     assert.ok(invoiceProof);
     const confirmed = await mcpRequestAt(url, "tools/call", {
-      name: "payment.settle", arguments: {
-        paymentHash: offer.payment_hash, preimage: invoiceProof.preimage,
+      name: "payment.info", arguments: {
+        action: "settle", paymentHash: offer.payment_hash, preimage: invoiceProof.preimage,
       },
     }, undefined, `L402 ${offer.macaroon}:${invoiceProof.preimage}`);
     assert.equal(confirmed.response.status, 200);
     assert.deepEqual(confirmed.body.result?.structuredContent.verified, true);
     assert.deepEqual(confirmed.body.result?.structuredContent.settlementToken.scope, "/mcp/tools/stratigraphy.get");
     const mismatched = await mcpRequestAt(url, "tools/call", {
-      name: "payment.settle", arguments: {
-        paymentHash: "dd".repeat(32), preimage: invoiceProof.preimage,
+      name: "payment.info", arguments: {
+        action: "settle", paymentHash: "dd".repeat(32), preimage: invoiceProof.preimage,
       },
     }, undefined, `L402 ${offer.macaroon}:${invoiceProof.preimage}`);
     assert.deepEqual(mismatched.body.result?.structuredContent, { verified: false, settlementToken: null });
@@ -1427,8 +1429,6 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
     "proof.submit",
     "proof.verify",
     "payment.info",
-    "proof.verify_ots",
-    "payment.settle",
   ];
   const schemaEntries = Object.entries(xMcpTools).filter(([, candidate]) => {
     assert.ok(
@@ -1503,11 +1503,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "payment.info",
       "mesh.get_status",
       "mesh.broadcast",
-      "proof.verify_ots",
-      "payment.settle",
     ],
   );
-  for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt"]) {
+  for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt", "proof.verify_ots", "payment.settle"]) {
     assert.equal(
       listed.result?.tools.some((candidate: { name: string }) =>
         candidate.name === unregisteredTool
@@ -1531,7 +1529,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     listed.result?.tools.map((candidate: { name: string }) => candidate.name),
   );
   const openApiTools = openApiDocument["x-mcp-tools"] as Record<string, unknown>;
-  for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt"]) {
+  for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt", "proof.verify_ots", "payment.settle"]) {
     assert.equal(Object.hasOwn(openApiTools, unregisteredTool), false);
   }
   for (const alias of ["mesh.status", "proof.status", "proof.epistemic_receipt"]) {
@@ -1695,11 +1693,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   for (const candidate of listed.result?.tools ?? []) {
     assert.match(candidate.description,
       candidate.name === "payment.info"
-        ? /^Retrieve configured MCP pricing,.*\n\n- PURPOSE & BOUNDARIES: .+/
-        : candidate.name === "proof.verify_ots"
-          ? /^Verify an OpenTimestamps \(OTS\) proof record and attestation path against the Bitcoin block header chain\.\n\n- PURPOSE & BOUNDARIES: .+/
-        : candidate.name === "payment.settle"
-          ? /^Execute direct payment settlement verification by validating an L402 Lightning preimage or x402 Base transaction hash\.\n\n- PURPOSE & BOUNDARIES: .+/
+        ? /^Retrieve MCP pricing and payment terms,.*\n\n- PURPOSE & BOUNDARIES: .+/
         : /^PURPOSE & BOUNDARIES: .+/,
       `${candidate.name} must identify its purpose`);
     assert.match(candidate.description, /USAGE GUIDELINES: .+/,
@@ -1774,19 +1768,11 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
     "payment.info": {
       keys: ["standardInvoiceSats", "perToolSats", "acceptedPaymentMethods",
-        "invoiceExpirySeconds", "challenge", "activeAuthSchemes", "macaroonRequirements"],
-      readOnly: true, idempotent: true, openWorld: false,
+        "invoiceExpirySeconds", "challenge", "activeAuthSchemes", "macaroonRequirements", "verified", "settlementToken"],
+      readOnly: false, idempotent: false, openWorld: true,
     },
     "proof.verify": {
-      keys: ["valid", "verifiedAt", "computationTimeMs"],
-      readOnly: false, idempotent: false, openWorld: false,
-    },
-    "proof.verify_ots": {
-      keys: ["valid", "status", "blockHeight", "bitcoinHeaderHash"],
-      readOnly: true, idempotent: true, openWorld: true,
-    },
-    "payment.settle": {
-      keys: ["verified", "settlementToken"],
+      keys: ["valid", "verifiedAt", "computationTimeMs", "status", "blockHeight", "bitcoinHeaderHash"],
       readOnly: false, idempotent: false, openWorld: true,
     },
     "proof.submit": {
@@ -1803,7 +1789,11 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       : expected.keys;
     assert.deepEqual(Object.keys(candidate.outputSchema.properties).sort(), [...outputKeys].sort(),
       `${candidate.name} outputSchema must describe the returned JSON fields`);
-    const expectedRequired = candidate.name === "proof.get_by_hash"
+    const expectedRequired = candidate.name === "payment.info"
+      ? []
+      : candidate.name === "proof.verify"
+        ? ["valid"]
+        : candidate.name === "proof.get_by_hash"
       ? ["kind", "hash", "status", "timestamp", "provenanceVerified"]
       : candidate.name === "mesh.broadcast"
         ? expected.keys.filter((key) => key !== "agentPubkey")
@@ -1817,7 +1807,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       assert.equal(payloadExample.kind, "zk-proof");
       assert.ok(Object.hasOwn(payloadExample, "proofPayload"));
       assert.ok(Object.hasOwn(payloadExample, "timestamp"));
-    } else {
+    } else if (candidate.name !== "payment.info" && candidate.name !== "proof.verify") {
       assert.deepEqual(Object.keys(candidate.outputSchema.examples[0]).sort(), [...expectedRequired].sort());
     }
     assert.equal(candidate.annotations.readOnlyHint, expected.readOnly);
@@ -2401,8 +2391,8 @@ test("MCP paid tools issue dual challenges and settle x402 before execution", as
     const baseTxHash = "0x" + "ab".repeat(32);
     const mismatch = await mcpRequestAt(
       baseUrl, "tools/call", {
-        name: "payment.settle",
-        arguments: { paymentHash: "0x" + "cd".repeat(32), txHash: baseTxHash },
+        name: "payment.info",
+        arguments: { action: "settle", paymentHash: "0x" + "cd".repeat(32), txHash: baseTxHash },
       }, undefined, undefined, paymentSignature,
     );
     assert.deepEqual(mismatch.body.result?.structuredContent, {
@@ -2412,8 +2402,8 @@ test("MCP paid tools issue dual challenges and settle x402 before execution", as
     facilitatorSettlesPayment = true;
     const baseSettlement = await mcpRequestAt(
       baseUrl, "tools/call", {
-        name: "payment.settle",
-        arguments: { paymentHash: baseTxHash, txHash: baseTxHash },
+        name: "payment.info",
+        arguments: { action: "settle", paymentHash: baseTxHash, txHash: baseTxHash },
       }, undefined, undefined, paymentSignature,
     );
     assert.equal(baseSettlement.body.result?.structuredContent.verified, true);

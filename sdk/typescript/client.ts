@@ -109,16 +109,21 @@ export type McpToolArguments = {
     limit?: number;
   };
   "stratigraphy.list": Record<string, never>;
-  "proof.verify": {
+  "proof.verify":
+    | {
+    proofType?: "groth16";
     proof: string;
     publicInputs: PublicInputs;
     verificationKeyId: string;
     data: Record<string, unknown> | Record<string, unknown>[];
-  };
-  "proof.verify_ots": { otsProof: string; targetHash: string };
-  "payment.settle":
-    | { paymentHash: string; preimage: string; txHash?: never }
-    | { paymentHash: string; txHash: string; preimage?: never };
+  }
+    | { proofType: "ots"; otsProof: string; targetHash: string };
+  "payment.info":
+    | { action?: "query"; toolName?: string }
+    | ({ action: "settle" } & (
+      | { paymentHash: string; preimage: string; txHash?: never }
+      | { paymentHash: string; txHash: string; preimage?: never }
+    ));
   "proof.get_status":
     | { proofHash: string; snapshotDigest?: never; receiptHash?: never }
     | { snapshotDigest: string; proofHash?: never; receiptHash?: never }
@@ -173,14 +178,22 @@ export type McpToolResponses = {
     verifiedAt: string;
     computationTimeMs: number;
     error?: string;
-  };
-  "proof.verify_ots": {
+  } | {
     valid: boolean;
     status: "bitcoin_block_attested" | "unverified";
     blockHeight: number | null;
     bitcoinHeaderHash: string | null;
   };
-  "payment.settle": {
+  "payment.info": {
+    standardInvoiceSats: number;
+    perToolSats: Record<string, number>;
+    acceptedPaymentMethods: string[];
+    invoiceExpirySeconds: number;
+    challenge: { httpStatus: number; header: string; fields: string[] };
+    activeAuthSchemes: string[];
+    x402?: { network: string; scheme: string; asset: string; amount: string; payTo: string };
+    macaroonRequirements: { authorizationHeader: string; scope: string; maxRequests: number };
+  } | {
     verified: boolean;
     /** Non-transferable claims, not a new bearer credential. */
     settlementToken: {
@@ -337,11 +350,14 @@ export class BitcoinStratigraphyClient {
   verifyProof(args: McpToolArguments["proof.verify"]) {
     return this.callTool("proof.verify", args);
   }
-  verifyOtsProof(args: McpToolArguments["proof.verify_ots"]) {
-    return this.callTool("proof.verify_ots", args);
+  verifyOtsProof(args: { otsProof: string; targetHash: string }) {
+    return this.callTool("proof.verify", { proofType: "ots", ...args });
   }
-  settlePayment(args: McpToolArguments["payment.settle"]) {
-    return this.callTool("payment.settle", args);
+  getPaymentInfo(args: { toolName?: string } = {}) {
+    return this.callTool("payment.info", args);
+  }
+  settlePayment(args: { paymentHash: string; preimage: string; txHash?: never } | { paymentHash: string; txHash: string; preimage?: never }) {
+    return this.callTool("payment.info", { action: "settle", ...args });
   }
   getProofStatus(args: McpToolArguments["proof.get_status"]) {
     return this.callTool("proof.get_status", args);

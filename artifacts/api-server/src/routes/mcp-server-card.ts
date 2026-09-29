@@ -93,7 +93,7 @@ export const mcpServerCard = {
           readOnlyHint: false,
           destructiveHint: false,
           idempotentHint: false,
-          openWorldHint: false,
+          openWorldHint: true,
         },
       },
       {
@@ -142,10 +142,10 @@ export const mcpServerCard = {
       {
         name: "payment.info",
         annotations: {
-          readOnlyHint: true,
+          readOnlyHint: false,
           destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
         },
       },
       {
@@ -167,25 +167,6 @@ export const mcpServerCard = {
           l402: {
             amountSats: 250,
           },
-        },
-      },
-      {
-        name: "proof.verify_ots",
-        annotations: {
-          readOnlyHint: true,
-          destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: true,
-          l402: { amountSats: 250 },
-        },
-      },
-      {
-        name: "payment.settle",
-        annotations: {
-          readOnlyHint: false,
-          destructiveHint: false,
-          idempotentHint: false,
-          openWorldHint: true,
         },
       },
     ],

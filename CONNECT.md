@@ -92,7 +92,7 @@ The MCP client configurations above discover tools, but **do not automatically s
 
 ## Tool catalog and pricing
 
-The MCP `tools/list` response contains **16 tools** after this change is published. The prices below describe the server code; ask `payment.info` at runtime rather than treating this table as a price guarantee.
+The MCP `tools/list` response contains **14 tools** after this change is published. The prices below describe the server code; ask `payment.info` at runtime rather than treating this table as a price guarantee.
 
 | Tool | Advertised sats | Use |
 | --- | ---: | --- |
@@ -102,18 +102,16 @@ The MCP `tools/list` response contains **16 tools** after this change is publish
 | `stratigraphy.range` | 250 | Compressed records across a bounded sequence. |
 | `stratigraphy.list` | 0 | Discover dataset bounds and metrics. |
 | `proof.attenuate` | 0 | Narrow an existing valid macaroon; does not pay an invoice. |
-| `proof.verify` | 250 | Validate an existing Groth16 proof without registering it; not an OTS-record verifier. |
-| `proof.verify_ots` | 250 | Verify a complete OTS receipt against its SHA-256 file digest and Bitcoin block attestation; returns the block height and canonical header hash only when verified. |
+| `proof.verify` | 250 | Validate an existing Groth16 proof (default), or set `proofType: "ots"` with `otsProof` and `targetHash` to verify a complete OTS receipt and its Bitcoin attestation. |
 | `proof.get_by_hash` | 250 | Look up a retained proof or signed receipt. |
 | `proof.list` | 10 | List indexed proof attestations. |
 | `proof.submit` | 250 | Register a submitted proof and attempt an attestation; changes state. |
 | `proof.ground` | 250 | Issue a signed Bitcoin-tip context/dataset receipt. |
-| `payment.info` | 0 | Inspect advertised prices and L402 rules; no invoice is issued. |
-| `payment.settle` | 0 | Verify an existing server-issued L402 credential against its settled invoice or settle an authenticated x402 signature; a bare preimage or transaction hash is not enough. Returns non-transferable settlement claims, not a new bearer token. |
+| `payment.info` | 0 | Query prices (default) or set `action: "settle"` to verify a server-issued L402 credential or settle an authenticated x402 signature. Bare preimages and hashes are not enough; settlement claims are not bearer tokens. |
 | `mesh.get_status` | 0 | Read peer and quorum health. |
 | `mesh.broadcast` | 250 | Sign and distribute a stored snapshot to mesh peers; has side effects. |
 
-Call `payment.info` with `{}` for the complete `perToolSats` map, or `{"toolName":"stratigraphy.digest"}` to narrow it to one **case-sensitive, canonical** tool name. Unknown names fail validation. Its result includes `acceptedPaymentMethods: ["Lightning L402"]`, `invoiceExpirySeconds`, and challenge metadata. It is a free preflight request, **not** a payment, invoice, or macaroon restriction. The actual invoice is issued only when a paid `tools/call` receives HTTP **402**. Do not substitute `proof.attenuate` for pricing discovery. `payment.settle` verifies an already authenticated payment; it does not create one or authorize access to another tool.
+Call `payment.info` with `{}` (equivalent to `{"action":"query"}`) for the complete `perToolSats` map, or `{"toolName":"stratigraphy.digest"}` to narrow it to one **case-sensitive, canonical** tool name. Unknown names fail validation. The query result includes accepted methods, invoice expiry, and challenge metadata. It does not issue an invoice; the actual invoice is issued only when a paid `tools/call` receives HTTP **402**. Use `{"action":"settle","paymentHash":"…","preimage":"…"}` with matching L402 Authorization, or `{"action":"settle","paymentHash":"0x…","txHash":"0x…"}` with PAYMENT-SIGNATURE for Base. Settlement does not authorize access to another tool.
 
 For direct HTTP clients, a preflight request looks like:
 

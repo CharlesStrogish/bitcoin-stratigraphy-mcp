@@ -1,3 +1,8 @@
+# Remote MCP connection metadata for the existing externally hosted server.
+# No Docker build, local start command, wallet secrets, or server changes needed.
+# Smithery currently registers remote servers by URL, not by deploying this YAML:
+# https://smithery.ai/docs/build/publish
+# smithery mcp publish "https://bitcoin-stratigraphy-dashboard.replit.app/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
 name: bitcoin-stratigraphy
 displayName: Bitcoin Stratigraphy Notary
 description: >-
@@ -11,10 +16,13 @@ tags:
   - lightning
   - base
   - zk-snark
+  - groth16
   - thermodynamic
   - mcp
+  - streamable-http
 homepage: https://bitcoin-stratigraphy-dashboard.replit.app
 transport:
+  # MCP 2025-11-25 negotiated successfully at this public endpoint.
   type: streamable-http
   url: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
 connection:

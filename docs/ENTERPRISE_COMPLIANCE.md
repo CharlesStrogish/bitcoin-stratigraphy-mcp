@@ -2,7 +2,7 @@
 
 **System:** Bitcoin Stratigraphy Data Engine  
 **Review date:** September 30, 2026  
-**Scope:** The 14 canonical MCP tools, their payment boundary, cryptographic evidence, and enterprise auditor procedures.
+**Scope:** The 14 canonical MCP tools, separately scoped REST payment/stream surfaces, cryptographic evidence, and enterprise auditor procedures.
 
 > This is a control framework and implementation assessment, not a certification,
 > legal opinion, regulatory approval, or assertion that every enterprise obligation
@@ -27,6 +27,21 @@ The service exposes indexed Bitcoin telemetry, Groth16 proof verification,
 Bitcoin-tip receipts, and optional Nostr mesh operations through MCP. Enterprises
 can use these controls to assemble checkable evidence for an agent's data access,
 verification decisions, state references, and authorized spending.
+
+The broader capability overview also includes macaroon attenuation with TTL and
+request-count controls; REST settlement routing for `btc-lightning`, `l-btc`,
+and `taproot-assets` where available; conditional Base USDC x402 for MCP only
+when explicitly enabled; a separate paid REST SSE feed at
+`GET /api/v1/stratigraphy/stream` (30-second refresh, not MCP transport); drift
+proof verification alongside Groth16/Poseidon BN254 telemetry; and separate
+OpenTimestamps receipt verification. `/api/v1/cost` reports current REST prices
+and settlement availability. MCP paid-call credentials and REST subscription
+credentials have distinct scopes and are not interchangeable.
+
+Historical daily index heights are not live Bitcoin-tip readings or native
+per-record block provenance. Nostr peers are pinned and reciprocal; broadcast
+and quorum provide peer-consistency signals, not source truth. The signed
+context/CID receipts described below are off-chain.
 
 Three boundaries are fundamental:
 

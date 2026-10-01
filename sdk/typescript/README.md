@@ -11,9 +11,18 @@ const client = new BitcoinStratigraphyClient({
 const latest = await client.getLatest();
 ```
 
-The SDK discovers current prices, pays the selected subscription invoice through
-the supplied wallet, caches the returned macaroon and preimage until expiry, and
-reuses them for dataset and SSE requests.
+This is the REST SDK. It discovers current terms, pays the selected L402
+subscription invoice through the supplied wallet, caches the returned macaroon
+and preimage until expiry, and reuses them for dataset and REST SSE requests.
+
+The REST router supports `btc-lightning`, `l-btc`, and `taproot-assets` only
+when enabled by server configuration; call `getCost()` (`/api/v1/cost`) to
+inspect current available assets and terms. This REST client does not provide
+Base USDC x402, and its rail support should not be inferred for MCP clients.
+`subscribeStream()` connects to the paid REST
+`/api/v1/stratigraphy/stream` SSE route, whose feed refreshes every 30 seconds;
+that route is not an MCP transport, and no Base x402 support is promised for
+SSE.
 
 ## Distribution
 

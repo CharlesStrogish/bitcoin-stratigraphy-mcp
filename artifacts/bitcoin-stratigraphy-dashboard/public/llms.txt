@@ -1,22 +1,51 @@
-# Bitcoin Stratigraphy - Thermodynamic Notary & L402 Data Engine
+# Bitcoin Stratigraphy — Bitcoin Analytics, Proofs, and Agent Receipts
 
-> Quantitative Bitcoin stratigraphy dataset and a Thermodynamic Notary for autonomous AI agents. Groth16 zk-SNARK verification, signed Bitcoin-tip receipts, Nostr state attestations, and 14 canonical MCP tools are available through an L402 Lightning-micropayment API. Created and architected by Charles R. Strogish.
+> Bitcoin Stratigraphy serves indexed Bitcoin telemetry and agent-oriented
+> analytics, paid REST and MCP interfaces, cryptographic verification, and
+> off-chain Bitcoin-tip receipts. Historical index data is not live-tip data or
+> native per-record Bitcoin block provenance.
 
 ## Agent entry points
 - [Complete tool schemas and TypeScript SDK usage](https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt)
 - [MCP Streamable HTTP endpoint](https://bitcoin-stratigraphy-dashboard.replit.app/mcp): POST JSON-RPC 2.0 requests, starting with `tools/list`; this is a protocol endpoint, not a browsable HTML page.
 - [Pre-flight price discovery](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost): GET the current L402 tiers, prices and supported settlement assets before requesting a paid tool.
+- [Paid REST telemetry stream](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/stratigraphy/stream): `GET` Server-Sent Events with a 30-second refresh interval. This is a separate REST transport, not MCP; consult `/api/v1/cost` for the current price and assets.
 - [OpenAPI document](https://bitcoin-stratigraphy-dashboard.replit.app/openapi.json)
 - [MCP server card](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json)
 - [Health](https://bitcoin-stratigraphy-dashboard.replit.app/api/healthz)
 - [Public Hugging Face JSONL dataset export](/api/export/huggingface): source-grounded instruction/response records; use `?format=json&limit=100` for a JSON array.
 - [Machine-readable LLM schema manifest](/.well-known/llm-schema.json): export parameters, field definitions, domain constraints, and verification protocols.
 
-## Access
-Public metadata, health, MCP tool discovery, and the Hugging Face export need no payment. Other paid REST operations start at 5 sats; MCP tool calls currently range from 10 to 250 sats. A paid call without credentials receives an HTTP 402 L402 challenge. Prices can vary by endpoint and policy: always query `/api/v1/cost` and use the challenge actually returned; do not assume a fixed 5-sat price for every MCP tool. The TypeScript SDK supports NWC wallet payments and credential reuse.
+## Access and settlement
+
+Public metadata, health, MCP tool discovery, and the Hugging Face export need
+no payment. Paid operations use endpoint-specific prices and return the
+applicable challenge; query `/api/v1/cost` and use the actual challenge rather
+than relying on a static price. The L402 router supports `btc-lightning`,
+`l-btc`, and `taproot-assets` where available. MCP supports Lightning L402;
+Base USDC x402 is conditional and only applies to MCP when explicitly reported
+available. Do not infer Base USDC availability for REST or the SSE stream.
+
+The SDK's REST client may use a REST-scoped subscription credential according
+to its own path, request, and expiry restrictions. That behavior does not make
+an MCP paid-call credential reusable: MCP authorizations are scoped to the
+requested operation and must not be carried across tools or REST routes.
+
+## Capabilities and trust boundaries
+
+- `proof.attenuate` narrows an existing valid macaroon with enforced caveats,
+  including TTL and request-count limits; it does not create a paid parent
+  entitlement.
+- Proof workflows include Groth16/Poseidon BN254 telemetry verification and a
+  separate drift proof path. OpenTimestamps receipt verification is a distinct
+  mode, not a telemetry proof or a Bitcoin-tip receipt.
+- `proof.ground` issues off-chain Schnorr-signed Bitcoin-tip receipts for agent
+  context or dataset CIDs. It does not broadcast a Bitcoin transaction.
+- The Nostr NIP-01/78 mesh uses pinned reciprocal peers for signed broadcasts
+  and quorum checks. Peer agreement is not source truth.
 
 ## Scope
-Use `stratigraphy.get`/`stratigraphy.list` for the indexed telemetry dataset, `stratigraphy.get_digest` for token-optimized record summaries (record hash, not block hash or ZK proof), `stratigraphy.get_diff` to compare two indexed entries' target multipliers, dates, and derived height labels, and `stratigraphy.get_range` for an ascending, inclusive batch of up to 100 indexed entries with one 250-sat payment. Use `proof.attenuate` to derive narrower delegation macaroons from an authentic unexpired parent (no new invoice; the parent's payment proof remains necessary). Use `proof.verify`/`proof.submit` for Groth16 proof workflows, `proof.get_by_hash`/`proof.list` for process-memory proof and attestation lookups (including context receipts indexed by `contextHash`), and `proof.ground` for Bitcoin-tip grounding of either agent context or a dataset CID. A signed dataset-tip receipt is not a ZK proof or proof of work.
+Use `stratigraphy.get`/`stratigraphy.list` for the indexed telemetry dataset, `stratigraphy.get_digest` for token-optimized record summaries (record hash, not block hash or ZK proof), `stratigraphy.get_diff` to compare two indexed entries' target multipliers, dates, and derived height labels, and `stratigraphy.get_range` for bounded indexed records. Daily heights are deterministic dataset indexes, not observed per-record Bitcoin blocks or the live Bitcoin tip. Use `proof.attenuate` to derive narrower delegation macaroons from an authentic unexpired parent (no new invoice; the parent's payment proof remains necessary). Use `proof.verify`/`proof.submit` for Groth16 telemetry/drift proof workflows, `proof.get_by_hash`/`proof.list` for process-memory proof and attestation lookups (including context receipts indexed by `contextHash`), and `proof.ground` for off-chain Bitcoin-tip grounding of either agent context or a dataset CID. A signed dataset-tip receipt is not a ZK proof, proof of work, or on-chain commitment.
 
 ## License and access
 The dataset metadata declares CC BY 4.0; access to paid API data is separately governed by L402. "Open/L402" describes discovery and payment access, not a replacement copyright license.

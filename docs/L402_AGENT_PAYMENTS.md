@@ -17,6 +17,15 @@ operator's wallet, or cause a standard MCP client to pay automatically.
 > are not needed to pay a challenge. Use only an agent-owned, dedicated payer
 > connection. No live payments or secret reads are part of this guide.
 
+This guide covers the MCP **Lightning L402** path only. MCP can also offer
+Base USDC x402 when that settlement path is configured, but it uses a distinct
+payment flow and is not implemented by the Lightning examples below. The
+separate REST router may advertise `btc-lightning`, `l-btc`, or
+`taproot-assets` according to configuration reported by `/api/v1/cost`; that
+does not make those rails available in this MCP flow. Current MCP price
+examples are 250 sats for most paid tools and 10 sats for `proof.list`; check
+`payment.get_info` for authoritative live prices.
+
 ## What happens during an L402 call
 
 1. An agent makes an ordinary MCP `tools/call` over Streamable HTTP.

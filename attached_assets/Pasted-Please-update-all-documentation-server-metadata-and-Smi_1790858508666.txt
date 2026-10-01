@@ -1,0 +1,24 @@
+Please update all documentation, server metadata, and Smithery configuration files across the project to reflect our recent engine upgrades.
+
+Here are the specific updates to apply:
+
+1. Update `README.md` and `smithery.yaml` (or `smithery.json`):
+   - Replace the project summary and capabilities with the following text:
+
+"Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.
+
+Key Capabilities:
+- L402 Micropayments & Macaroon Attenuations: Programmatic pay-per-query settlement in satoshis with zero API keys. Supports parent macaroon caveat scoping (proof.attenuate) with TTLs and rate controls.
+- Multi-Asset Settlement Router: Native payment support across Base-layer Lightning (btc-lightning), Liquid Bitcoin (l-btc), Taproot Assets (taproot-assets), and Base USDC (x402).
+- Groth16 ZK-SNARK & OTS Proof Verification: Execute cryptographic verification for supplied Groth16/Poseidon BN254 telemetry proofs, drift zk-SNARKs, and OpenTimestamps (OTS) Bitcoin block-header receipts.
+- Agent Context State Grounding: Anchor autonomous agent prompt executions, CIDs, and dataset context hashes directly into signed Bitcoin-tip receipts (proof.ground).
+- Autonomous P2P Mesh Network: Nostr-backed (NIP-01/78) peer topology broadcasting with automated quorum validation, cross-validation metrics, and node public-key provenance.
+- Stratigraphy Strata Analytics: High-speed differential comparisons (stratigraphy.get_diff) and compressed record digests designed specifically for LLM context window efficiency.
+- Real-Time SSE Streaming: Live Server-Sent Events (/api/v1/stratigraphy/stream) for continuous telemetry feeds."
+
+2. Update Server Code Metadata:
+   - Check the main MCP server entry point (e.g., `index.ts`, `server.ts`, or `mcp.ts`) where the server description and capabilities are declared upon initialization.
+   - Update the server description string to match the updated capability overview above so that Smithery and connecting client swarms receive the full feature set on handshake.
+
+3. Verify Smithery Sync:
+   - Ensure tool annotations and module groupings (`stratigraphy.*`, `proof.*`, `mesh.*`, `payment.*`) in the OpenAPI or MCP schema exports are clean, readable, and fully synced.

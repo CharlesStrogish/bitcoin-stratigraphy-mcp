@@ -1,7 +1,30 @@
-# Bitcoin Stratigraphy 422-Day Dataset
-> 422 consecutive days of Bitcoin structural network metrics, thermodynamic production cost floors, and price models toward $10M.
+# Bitcoin Stratigraphy
 
-## Machine Payment Gateway
-- Access Price: 100 Satoshis (Lightning / L402)
-- Checkout URL: [PASTE YOUR COINSNAP PAYMENT LINK HERE]
-- Target Dataset URL: https://bitcoin-stratigraphy-dashboard--charlesstrogish.replit.app/
+> Indexed Bitcoin stratigraphy analytics, agent-context receipts, proof
+> verification, and L402-gated REST and MCP services. This root-level file is
+> an informational mirror; the maintained public machine-readable overview is
+> [`/llms.txt`](https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt),
+> with the complete MCP reference at
+> [`/llms-full.txt`](https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt).
+
+## Current service overview
+
+- MCP Streamable HTTP: `https://bitcoin-stratigraphy-dashboard.replit.app/mcp`.
+  It exposes tool discovery and calls; client configuration does not supply a
+  wallet or settle invoices.
+- `GET /api/v1/cost` reports current pricing and settlement availability. The
+  L402 router supports `btc-lightning`, `l-btc`, and `taproot-assets` where
+  enabled. MCP uses Lightning L402; Base USDC x402 is conditional for MCP only
+  and must be explicitly reported available.
+- Paid REST `GET /api/v1/stratigraphy/stream` is a distinct SSE endpoint with a
+  30-second refresh interval, not an MCP transport. It uses L402 assets shown
+  by `/api/v1/cost`; Base USDC availability is not promised for this endpoint.
+- MCP capabilities include indexed telemetry digests and diffs, macaroon
+  attenuation with TTL/request controls, Groth16/Poseidon BN254 telemetry and
+  drift verification, separate OTS receipt verification, off-chain Schnorr
+  Bitcoin-tip context/CID receipts, and pinned reciprocal Nostr NIP-01/78 peer
+  broadcasting and quorum checks.
+
+Historical daily index entries are not live-tip readings or native Bitcoin
+block provenance. Nostr quorum is not source truth. Prices and payment assets
+can vary; consult `/api/v1/cost` and the actual challenge before payment.

@@ -17,6 +17,7 @@ import {
   mcpServerCard,
   registerMcpServerCardRoute,
 } from "./mcp-server-card";
+import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { registerOpenApiRoute } from "./openapi";
 import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { registerLlmExportRoutes } from "./llm-export";
@@ -72,8 +73,7 @@ process.env.MACAROON_OPERATOR_SECRET = operatorSecret;
 const fullDatasetAmountMsats = 422_000;
 const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
-const expectedMcpOverview =
-  "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.";
+const expectedMcpOverview = ENGINE_DESCRIPTION;
 const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs.",
@@ -1393,17 +1393,30 @@ test("reports public peer mesh status without payment", async () => {
 });
 
 test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity", async () => {
-  const sharedDocument = parse(
-    await readFile(
+  const [sharedYaml, smitheryYaml, glamaJson] = await Promise.all([
+    readFile(
       resolve(process.cwd(), "../../lib/api-spec/openapi.yaml"),
       "utf8",
     ),
-  ) as { "x-mcp-tools"?: Record<string, unknown> };
+    readFile(resolve(process.cwd(), "../../smithery.yaml"), "utf8"),
+    readFile(resolve(process.cwd(), "../../glama.json"), "utf8"),
+  ]);
+  const sharedDocument = parse(sharedYaml) as {
+    "x-mcp-tools"?: Record<string, unknown>;
+    "x-mcp-tool-groups"?: unknown;
+    info?: { description?: unknown };
+  };
+  const smitheryMetadata = parse(smitheryYaml) as { description?: unknown };
+  const glamaMetadata = JSON.parse(glamaJson) as { description?: unknown };
   const xMcpTools = sharedDocument["x-mcp-tools"];
   assert.ok(
     xMcpTools && typeof xMcpTools === "object" && !Array.isArray(xMcpTools),
     "Shared OpenAPI document must define x-mcp-tools",
   );
+  assert.equal(sharedDocument.info?.description, ENGINE_DESCRIPTION);
+  assert.equal(smitheryMetadata.description, ENGINE_DESCRIPTION);
+  assert.equal(glamaMetadata.description, ENGINE_DESCRIPTION);
+  assert.equal(mcpServerCard.description, ENGINE_DESCRIPTION);
 
   const listed = await mcpRequest("tools/list");
   const listedTools = listed.result?.tools as Array<{
@@ -1412,6 +1425,32 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
     inputSchema: unknown;
     outputSchema: unknown;
   }>;
+  assert.deepEqual(sharedDocument["x-mcp-tool-groups"], MCP_TOOL_GROUPS);
+  assert.deepEqual(mcpServerCard.capabilities.toolGroups, MCP_TOOL_GROUPS);
+  const groupedToolNames = Object.values(MCP_TOOL_GROUPS).flatMap(
+    ({ tools }) => [...tools],
+  );
+  assert.equal(
+    new Set(groupedToolNames).size,
+    groupedToolNames.length,
+    "Each canonical MCP tool must occur in exactly one group",
+  );
+  assert.deepEqual(
+    [...groupedToolNames].sort(),
+    listedTools.map(({ name }) => name).sort(),
+    "MCP tool groups must cover exactly the listed canonical tools",
+  );
+  for (const cardTool of mcpServerCard.capabilities.tools) {
+    const openApiTool = xMcpTools[cardTool.name] as {
+      annotations?: unknown;
+    } | undefined;
+    assert.ok(openApiTool, `OpenAPI x-mcp-tools must define ${cardTool.name}`);
+    assert.deepEqual(
+      openApiTool.annotations,
+      cardTool.annotations,
+      `${cardTool.name} card and OpenAPI annotations must match`,
+    );
+  }
   for (const [name, expectedDescription] of Object.entries(
     expectedMcpToolDescriptions,
   )) {
@@ -1495,6 +1534,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     clientInfo: { name: "contract-test", version: "1.0.0" },
   });
   assert.equal(initialized.result?.serverInfo.name, "bitcoin-stratigraphy");
+  assert.equal(initialized.result?.serverInfo.description, ENGINE_DESCRIPTION);
   assert.equal(initialized.result?.instructions, expectedMcpOverview);
   assert.equal(mcpServerCard.description, expectedMcpOverview);
 

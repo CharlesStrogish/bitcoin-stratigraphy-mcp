@@ -11,6 +11,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Express, NextFunction, Request, Response } from "express";
 import { z } from "zod";
+import { ENGINE_DESCRIPTION } from "../lib/engine-metadata";
 import { digestRecord, snapshotBlock, snapshotDate } from "./stratigraphy-index";
 import {
   attenuateSubscriptionMacaroon,
@@ -2927,10 +2928,10 @@ function createBitcoinStratigraphyMcpServer(
     {
       name: "bitcoin-stratigraphy",
       version: "1.0.0",
+      description: ENGINE_DESCRIPTION,
     },
     {
-      instructions:
-        "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.",
+      instructions: ENGINE_DESCRIPTION,
       capabilities: {
         prompts: {},
         resources: {},

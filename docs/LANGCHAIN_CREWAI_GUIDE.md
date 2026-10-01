@@ -13,6 +13,12 @@ calls, access wallet credentials, or settle invoices. The endpoint's advertised
 prices may change; check `payment.get_info` at runtime before designing any
 paid workflow.
 
+The MCP server supports Lightning L402 and conditional Base USDC x402 only
+when the latter is configured. The wrapper examples here do not pay either
+scheme automatically. This differs from the separate REST payment router,
+whose configured settlement assets are reported by `/api/v1/cost`; neither REST
+asset selection nor its paid SSE feed is a capability of the MCP transport.
+
 ## Tool catalog
 
 The following catalog is transcribed from [`CONNECT.md`](../CONNECT.md). Its
@@ -23,25 +29,33 @@ published MCP catalog currently contains 14 canonical tools.
 | Canonical MCP tool | Advertised sats | Use |
 | --- | ---: | --- |
 | `stratigraphy.get` | 250 | Full indexed daily telemetry (date, indexed height, or bounded selection); not a block-hash lookup. |
-| `stratigraphy.get_digest` | 250 | Token-optimized telemetry summary. |
-| `stratigraphy.get_diff` | 250 | Differences between indexed strata. |
+| `stratigraphy.get_digest` | 250 | Compact summary of indexed historical telemetry; not live block provenance. |
+| `stratigraphy.get_diff` | 250 | Differences between indexed historical strata; not a block-hash lookup. |
 | `stratigraphy.get_range` | 250 | Compressed records across a bounded sequence. |
 | `stratigraphy.list` | 0 | Discover dataset bounds and metrics. |
-| `proof.attenuate` | 0 | Narrow an existing valid macaroon; does not pay an invoice. |
-| `proof.verify` | 250 | Validate an existing Groth16 proof by default, or verify a complete OTS receipt and Bitcoin attestation with the documented OTS arguments. |
+| `proof.attenuate` | 0 | Narrow an existing parent macaroon using supported caveats; does not pay an invoice. |
+| `proof.verify` | 250 | Verify supplied Groth16 telemetry or drift proofs, or supplied OTS receipts; validates evidence, not source-data truth. |
 | `proof.get_by_hash` | 250 | Look up a retained proof or signed receipt. |
 | `proof.list` | 10 | List indexed proof attestations. |
 | `proof.submit` | 250 | Register a submitted proof and attempt an attestation; changes state. |
-| `proof.ground` | 250 | Issue a signed Bitcoin-tip context/dataset receipt. |
-| `payment.get_info` | 0 | Query prices or verify/settle payment with the required HTTP authentication; this is not an invoice issuer. |
-| `mesh.get_status` | 0 | Read peer and quorum health. |
-| `mesh.broadcast` | 250 | Sign and distribute a stored snapshot to mesh peers; has side effects. |
+| `proof.ground` | 250 | Issue an off-chain, Schnorr-signed Bitcoin-tip context/dataset receipt, not an on-chain proof. |
+| `payment.get_info` | 0 | Query MCP prices or verify/settle payment with required authentication; MCP payment is Lightning L402 with conditional Base USDC x402 when configured, not an invoice issuer. |
+| `mesh.get_status` | 0 | Read configured pinned-peer and quorum health; quorum is not source truth. |
+| `mesh.broadcast` | 250 | Sign and distribute a stored snapshot to configured pinned peers; quorum is a cross-validation signal, and the call has side effects. |
 
 Do not hard-code any input signatures from this table. The MCP server's live
 `tools/list` response is the source of truth for names, descriptions, and
 schemas. The wrappers below derive **all 14** schemas from that response,
 including tools whose use is paid or side-effecting. For an agent, only expose
 the tools it is authorized to use.
+
+The catalog currently lists **250 sats for most paid calls** and **10 sats for
+`proof.list`**; these are documented examples, not a price guarantee. The live
+`payment.get_info` response is authoritative. Separately, the REST router
+supports `btc-lightning`, `l-btc`, and `taproot-assets` only when configured;
+do not infer those REST rails from MCP support. REST
+`/api/v1/stratigraphy/stream` is paid SSE refreshed every 30 seconds, not an
+MCP transport, and no Base x402 support is promised on that route.
 
 ## Install in your own Python project
 

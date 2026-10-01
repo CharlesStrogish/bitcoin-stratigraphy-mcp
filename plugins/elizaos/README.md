@@ -5,6 +5,15 @@ actions: `FETCH_BITCOIN_STRATIGRAPHY` (formerly `GET_BITCOIN_STRATIGRAPHY_TELEME
 `VERIFY_BITCOIN_STRATIGRAPHY_PROOF`, and
 `BROADCAST_BITCOIN_STRATIGRAPHY_MESH`. It targets `@elizaos/core` 1.x.
 
+These actions are a deliberately narrow MCP integration, not an adapter for
+every engine feature or payment rail. Paid calls use the configured Lightning
+L402 wallet callback; the REST router's `btc-lightning`, `l-btc`, and
+`taproot-assets` options and conditional MCP Base USDC x402 are not wired by
+this plugin. The MCP server's `proof.verify` also supports supplied drift
+proofs and OTS receipts, but this plugin action's documented structured input
+is for Groth16 telemetry proofs. Mesh broadcasts require configured trusted
+peers and a peer receipt; quorum is cross-validation, not source truth.
+
 ## Register in `elizaConfig.ts`
 
 In a project that uses ElizaOS `Project`/`ProjectAgent` configuration:

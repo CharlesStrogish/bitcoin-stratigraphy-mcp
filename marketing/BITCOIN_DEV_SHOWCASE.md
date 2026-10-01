@@ -15,7 +15,8 @@ The public endpoint is:
 **https://bitcoin-stratigraphy-dashboard.replit.app/mcp**
 
 It exposes 14 tools over Streamable HTTP, supports MCP `2025-11-25`, and uses
-L402 Lightning payments for paid execution. The catalog has a Glama
+Lightning L402 plus conditional Base USDC x402 when that settlement path is
+configured. The catalog has a Glama
 tool-definition quality rating of **A, 4.4/5.0**, checked September 30, 2026.
 That rating measures tool-definition quality; it is not a cryptographic
 security audit or a guarantee about every individual tool.
@@ -27,6 +28,33 @@ retain evidence that can be checked independently of its generated answer?
 The answer is a set of distinct layers—not a claim that cryptography makes
 every source value true or every model interpretation correct.
 
+### Capability reference across interfaces
+
+- **L402 and credential scope:** MCP paid calls use Lightning L402; `proof.attenuate`
+  can narrow a parent macaroon's scope. Standard MCP clients do not pay
+  automatically.
+- **Settlement routing:** the REST API's configured router supports
+  `btc-lightning`, `l-btc`, and `taproot-assets`; query `/api/v1/cost` for
+  current availability and terms. MCP uses Lightning L402 and conditionally
+  Base USDC x402 when that settlement path is configured. Do not infer that
+  every client or interface supports every rail.
+- **Proof verification:** `proof.verify` checks supplied Groth16 telemetry or
+  drift zk-SNARK proofs, or supplied OpenTimestamps (OTS) receipts. It verifies
+  evidence against its defined statement; it does not establish the truth of
+  source data.
+- **Agent-context grounding:** `proof.ground` returns an off-chain,
+  Schnorr-signed receipt tied to an observed Bitcoin tip. It is not an
+  on-chain transaction or proof of Bitcoin consensus.
+- **P2P mesh:** Nostr broadcasts go to configured, pinned peers and report
+  cross-validation/quorum for a snapshot. Peer agreement is a dissemination
+  signal, not a source of truth.
+- **Stratigraphy analytics:** `stratigraphy.get_diff` and
+  `stratigraphy.get_digest` summarize indexed historical records; they are not
+  live block-provenance queries.
+- **REST streaming:** `/api/v1/stratigraphy/stream` is a paid REST SSE feed with
+  a 30-second refresh cadence, not an MCP transport. No Base x402 support is
+  promised for this SSE route.
+
 ### 1. The MCP execution surface
 
 The 14 canonical tools are grouped into four namespaces:
@@ -35,7 +63,7 @@ The 14 canonical tools are grouped into four namespaces:
 | --- | --- | --- |
 | `stratigraphy.*` | `stratigraphy.list`, `stratigraphy.get`, `stratigraphy.get_digest`, `stratigraphy.get_diff`, `stratigraphy.get_range` | Discover coverage and retrieve indexed records, compact summaries, comparisons, or bounded ranges. |
 | `proof.*` | `proof.attenuate`, `proof.verify`, `proof.get_by_hash`, `proof.list`, `proof.submit`, `proof.ground` | Restrict credentials, verify/register proofs, retrieve retained evidence, and issue signed state receipts. |
-| `mesh.*` | `mesh.get_status`, `mesh.broadcast` | Inspect peer/quorum health or sign and distribute a stored telemetry snapshot. |
+| `mesh.*` | `mesh.get_status`, `mesh.broadcast` | Inspect peer/quorum health or sign and distribute a stored telemetry snapshot to configured pinned peers. Quorum is not source truth. |
 | `payment.*` | `payment.get_info` | Discover current prices or use an authenticated payment-verification/settlement mode. |
 
 The server does not advertise a `proof.generate` MCP tool. Generation is an
@@ -50,7 +78,7 @@ prompt that says to behave carefully.
 
 ### 2. L402 authentication: an invoice-bound access credential
 
-For a paid `tools/call` without a valid credential, the server returns
+For a paid `tools/call` using the L402 path without a valid credential, the server returns
 **HTTP 402 Payment Required** before protected tool execution. The response
 includes:
 
@@ -159,9 +187,9 @@ trusted verification key. A server response saying `verified: true` or a
 cached lifecycle status is not a substitute for retaining and checking the
 evidence.
 
-`proof.verify` also has a separate OpenTimestamps receipt-verification mode.
-That mode requires a real receipt and target hash; it should not be confused
-with generating a new timestamp or broadcasting a Bitcoin transaction.
+`proof.verify` also verifies supported drift zk-SNARK inputs and supplied
+OpenTimestamps receipts. The OTS mode requires the actual receipt and target
+hash; it does not generate a timestamp or broadcast a Bitcoin transaction.
 
 ### 5. Stratum notary: state grounding is not an on-chain transaction
 
@@ -170,8 +198,8 @@ After verification, an agent may independently choose to invoke
 effect of `proof.verify`.
 
 Grounding binds a supported execution context or dataset CID/hash and dataset
-provenance to an observed Bitcoin height and block hash. The notary signs the
-receipt and self-verifies its signature.
+provenance to an observed Bitcoin height and block hash. The notary Schnorr-signs
+the off-chain receipt and self-verifies its signature.
 
 The result is an **off-chain signed Bitcoin-tip receipt**. It is not a Groth16
 proof, a proof-of-work validity proof, or a transaction committed to Bitcoin.

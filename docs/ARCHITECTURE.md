@@ -8,6 +8,24 @@ currently exposes **14 tools**. Discover the live catalog with `tools/list` and
 query `payment.get_info` for current prices rather than relying on static
 diagrams as a contract.
 
+The service has distinct MCP and REST interfaces. MCP exposes the canonical
+tool catalog; paid REST operations include price discovery and a separate
+`GET /api/v1/stratigraphy/stream` Server-Sent Events (SSE) feed refreshed every
+30 seconds. That stream is not an MCP transport. `/api/v1/cost` is authoritative
+for current prices and settlement assets: the L402 router supports
+`btc-lightning`, `l-btc`, and `taproot-assets` where enabled. MCP uses Lightning
+L402; Base USDC x402 is conditional and MCP-only when explicitly available.
+No Base USDC support is promised for the SSE route.
+
+The seven overview capability areas are macaroon attenuation with TTL/request
+controls; multi-asset settlement routing; Groth16/Poseidon BN254 telemetry and
+drift verification plus separate OTS receipt verification; off-chain
+Schnorr-signed Bitcoin-tip context/CID receipts; pinned reciprocal Nostr
+NIP-01/78 peer broadcasts and quorum checks; indexed diffs/digests for efficient
+context; and the separate paid SSE feed. These are capability groupings, not
+seven additional MCP tools. Indexed historical heights are not live-tip data or
+native per-record Bitcoin block provenance, and peer quorum is not source truth.
+
 ## Reading and interacting with the diagrams
 
 - Open this document in a Mermaid-capable Markdown viewer, such as GitHub or a
@@ -37,11 +55,14 @@ flowchart LR
     ZK["Groth16 prover and verifier<br/>Poseidon / BN254"]
     Notary["Signed receipt notary<br/>Bitcoin-tip context binding"]
     Tip["Bitcoin chain-state provider<br/>Current height and block hash"]
-    Mesh["Pinned Nostr mesh peers<br/>Signed outbound attestations"]
+    Mesh["Pinned reciprocal Nostr NIP-01/78 peers<br/>Signed broadcast and quorum"]
     Issuer["Service invoice provider<br/>Incoming payment verification"]
+    Rest["Paid REST routes<br/>Cost discovery and SSE"]
+    Stream["Stratigraphy SSE<br/>30-second refresh"]
 
     Agent --> Policy
     Policy -->|"Approved MCP request"| Gateway
+    Policy -->|"Separately scoped REST request"| Rest
     Policy -->|"Pay exact challenged invoice"| Payer
     Gateway --> Gate
     Gate <-->|"Issue invoice / check settlement"| Issuer
@@ -51,6 +72,9 @@ flowchart LR
     Tools --> Notary
     Notary -->|"Read chain state; no transaction broadcast"| Tip
     Tools -->|"mesh.broadcast"| Mesh
+    Mesh <-->|"Pinned peer exchange"| Tools
+    Rest -->|"L402-gated GET"| Stream
+    Stream --> Data
 
     classDef agent fill:#eef2ff,stroke:#4338ca,color:#111827;
     classDef service fill:#ecfeff,stroke:#0e7490,color:#111827;
@@ -67,6 +91,8 @@ payment preimages. A model's proposed action is not spending authorization.
 
 The overview groups dependencies by responsibility. It does not imply that
 every tool invokes every dependency or that free discovery requires settlement.
+The mesh is a reciprocal peer network; quorum is not authoritative telemetry
+provenance or a substitute for validating the indexed source data.
 
 ## 2. L402 Micro-Payment Loop
 
@@ -127,7 +153,8 @@ sequenceDiagram
   or CoinOS internal-payment UUID is not a Lightning preimage.
 - Retry the original JSON-RPC body and request ID once with the original
   macaroon. Do not treat MCP paid-call credentials as a reusable subscription
-  or as permission to run another tool.
+  or as permission to run another tool. REST subscription credentials have
+  distinct REST scopes and cannot be transferred to MCP calls or other routes.
 - A payment timeout is ambiguous. Reconcile the original payment hash before
   considering another attempt; never infer non-payment from a network error.
 - HTTP success does not guarantee tool success: inspect JSON-RPC errors and
@@ -194,13 +221,15 @@ sequenceDiagram
   service capability used by supported proof-producing paths. Inspect the
   actual response and published schemas; do not invent a generation tool or
   assume every `stratigraphy.*` response contains a proof.
-- `proof.verify` supports Groth16 verification and, through its separate
-  documented mode, OpenTimestamps receipt verification. The diagram focuses
-  on the telemetry Groth16 path, not every verifier mode.
+- `proof.verify` supports Groth16/Poseidon BN254 telemetry verification,
+  separate drift-proof verification, and a distinct OpenTimestamps receipt
+  verification mode. The diagram focuses on the telemetry Groth16 path, not
+  every verifier mode.
 - `proof.ground` accepts its published context or dataset-identifier input
   variants. It does not accept arbitrary Groth16 coordinates as an invented
   anchoring API, nor does it enforce that `proof.verify` was called first.
-- The `proof.ground` result is an **off-chain signed Bitcoin-tip receipt**.
+- The `proof.ground` result is an **off-chain Schnorr-signed Bitcoin-tip
+  context/CID receipt**.
   It binds execution context or dataset identity and provenance to observed
   chain state. It is not itself a Groth16 proof, a Bitcoin proof-of-work
   validity proof, or a newly mined on-chain commitment.
@@ -301,7 +330,7 @@ Always check current payment availability and prices at runtime.
 | --- | --- | --- |
 | `stratigraphy.*` | `list`, `get`, `get_digest`, `get_diff`, `get_range` | Read indexed historical data. No advertised ingest, update, or delete tool. |
 | `proof.*` | `attenuate`, `verify`, `get_by_hash`, `list`, `submit`, `ground` | Verify/register proofs, retrieve retained payloads, constrain credentials, and issue signed state receipts. Grounding is not on-chain transaction submission. |
-| `mesh.*` | `get_status`, `broadcast` | Inspect mesh health and broadcast stored snapshots. No inbound peer-administration or subscription tool is advertised. |
+| `mesh.*` | `get_status`, `broadcast` | Inspect pinned reciprocal Nostr peer/quorum health and broadcast stored snapshots. Quorum is not source truth. No inbound peer-administration or subscription tool is advertised. |
 | `payment.*` | `get_info` | Discover payment terms or use the authenticated settlement mode. Price queries do not create invoices or authorize spending. |
 
 All tool-reference links are also available from the

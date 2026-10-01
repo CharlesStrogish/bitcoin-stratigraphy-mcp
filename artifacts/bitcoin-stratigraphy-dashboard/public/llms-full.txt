@@ -10,7 +10,24 @@ Indexed heights and dates are deterministic daily labels, not observed per-recor
 
 ## Protocol and payment
 
-Use Streamable HTTP: POST JSON-RPC 2.0 to `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`, and `MCP-Protocol-Version: 2025-03-26`. List tools using `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`; call one using `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mesh.get_status","arguments":{}}}`. `mesh.get_status`, `payment.get_info`, `stratigraphy.list`, and `tools/list` are free. Paid calls return an HTTP 402 L402 invoice challenge before they can return their tool result. `proof.list` costs 10 sats and the other paid MCP tools cost 250 sats; separate REST operations can start at 5 sats. Confirm the current policy with `payment.get_info`, GET https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost, and the actual L402 challenge. Never send a wallet secret in an MCP request.
+Use Streamable HTTP: POST JSON-RPC 2.0 to `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`, and `MCP-Protocol-Version: 2025-11-25`. List tools using `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`; call one using `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mesh.get_status","arguments":{}}}`. `mesh.get_status`, `payment.get_info`, `stratigraphy.list`, and `tools/list` are free. Paid calls return an HTTP 402 L402 invoice challenge before they can return their tool result. Prices and supported assets are endpoint- and policy-dependent: confirm MCP terms with `payment.get_info`, REST prices/assets with GET `https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost`, and use the actual challenge. Never send a wallet secret in an MCP request.
+
+The L402 router supports `btc-lightning`, `l-btc`, and `taproot-assets` where
+enabled. MCP uses Lightning L402; Base USDC x402 is conditional and applies
+only to MCP when explicitly reported available. Do not infer Base USDC support
+for REST. The paid REST route `GET /api/v1/stratigraphy/stream` is a separate
+Server-Sent Events (SSE) transport with a 30-second refresh interval, not an
+MCP transport. It uses L402 assets reported by `/api/v1/cost`; Base USDC is not
+promised for this stream.
+
+The seven capability areas are macaroon attenuation (including TTL/request
+limits), multi-asset payment routing, Groth16/Poseidon BN254 telemetry and
+drift verification plus separate OTS receipt verification, off-chain Schnorr
+Bitcoin-tip context/CID receipts, pinned reciprocal Nostr NIP-01/78 peer
+broadcast and quorum, indexed stratigraphy diffs/digests for efficient context,
+and the separate paid SSE stream. Nostr quorum is not source truth. Indexed
+historical daily heights are not live-tip readings or native per-record
+Bitcoin block provenance.
 
 Input schemas (JSON Schema objects; descriptive fields and sample values are shortened, but validation constraints match the published tool definitions):
 
@@ -64,7 +81,7 @@ Derive a narrower child from an authentic, unexpired subscription macaroon. The 
 
 ## 7. proof.verify — 250 sats
 
-Perform offline/stateless zk-SNARK verification. Do NOT use to anchor state to the Bitcoin tip (use `proof.ground`). Verify an encoded Groth16/BN254 proof against committed public inputs and the supplied telemetry snapshot; verification is distinct from attestation submission. The output requires `valid` (boolean), `verifiedAt` (ISO 8601 timestamp), and `computationTimeMs` (non-negative number).
+Perform offline/stateless proof verification. The telemetry path verifies an encoded Groth16/Poseidon BN254 proof against committed public inputs and the supplied telemetry snapshot; the separate drift circuit is not described by the telemetry schema below. A distinct OTS mode verifies a complete OpenTimestamps receipt and Bitcoin attestation; neither proof-verification mode creates an off-chain Bitcoin-tip context/CID receipt (use `proof.ground`) or submits a Bitcoin transaction. Verification is distinct from attestation submission. The output requires `valid` (boolean), `verifiedAt` (ISO 8601 timestamp), and `computationTimeMs` (non-negative number).
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"proof":{"type":"string","minLength":1},"publicInputs":{"type":"object","additionalProperties":false,"properties":{"blockHeight":{"type":"integer","minimum":0},"snapshotDigest":{"type":"string","minLength":1},"thermodynamicHash":{"type":"string","minLength":1},"timestamp":{"type":"integer","minimum":0},"valuationSat":{"type":"integer","minimum":0}},"required":["blockHeight","snapshotDigest","thermodynamicHash","timestamp","valuationSat"]},"verificationKeyId":{"type":"string","minLength":1},"data":{"type":["object","array"]}},"required":["proof","publicInputs","verificationKeyId","data"]}
@@ -96,7 +113,7 @@ Submit new ZK proof instances to process memory. Do NOT use to verify existing p
 
 ## 11. proof.ground — 250 sats
 
-Anchor agent context into Bitcoin state and issue an anchored receipt. Do NOT use for stateless proof verification without anchoring (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`). The input accepts either agent context (`contextHash`, `agentId`, optional `metadata`) or a dataset anchor (`cid`, optional `nostrEventId` and `context`). The output nests the result under `receipt`. For CID input, `receipt` is the original dataset wrapper with `receiptHash`, `blockTip`, `blockHash`, `ipfsCid`, `attestation: {proofPayload, verified: true}`, and `timestamp`; parse the original signed dataset payload with `JSON.parse(receipt.attestation.proofPayload)`. Context grounding receipts are also indexed under their `contextHash` for `proof.get_by_hash`. These anchors are not Groth16 proofs. Context metadata must fit the server's 16 KiB serialized limit.
+Issue an off-chain Schnorr-signed receipt binding agent context or a dataset CID to an observed Bitcoin tip. This is not a Bitcoin transaction or on-chain anchor. Do NOT use for stateless proof verification (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`). The input accepts either agent context (`contextHash`, `agentId`, optional `metadata`) or a dataset identifier (`cid`, optional `nostrEventId` and `context`). The output nests the result under `receipt`. For CID input, `receipt` is the original dataset wrapper with `receiptHash`, `blockTip`, `blockHash`, `ipfsCid`, `attestation: {proofPayload, verified: true}`, and `timestamp`; parse the original signed dataset payload with `JSON.parse(receipt.attestation.proofPayload)`. Context grounding receipts are also indexed under their `contextHash` for `proof.get_by_hash`. These receipts are not Groth16 proofs or proof of work. Context metadata must fit the server's 16 KiB serialized limit.
 
 ```json
 {"type":"object","oneOf":[{"type":"object","additionalProperties":false,"properties":{"contextHash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$","minLength":64,"maxLength":64},"agentId":{"type":"string","minLength":1,"maxLength":256},"metadata":{"type":"object","additionalProperties":true}},"required":["contextHash","agentId"]},{"type":"object","additionalProperties":false,"properties":{"cid":{"type":"string","pattern":"^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$","maxLength":256},"nostrEventId":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"},"context":{"type":"object","additionalProperties":true}},"required":["cid"]}]}
@@ -128,7 +145,7 @@ Broadcast a freshly signed existing telemetry record to configured mesh peers. T
 
 ## TypeScript SDK
 
-The repository's TypeScript SDK supplies an L402-aware REST client and an NWC wallet adapter. Pass an NWC client obtained by your application; never hardcode a pairing URI, private key or invoice preimage in source.
+The repository's TypeScript SDK supplies an L402-aware REST client and an NWC wallet adapter. Pass an NWC client obtained by your application; never hardcode a pairing URI, private key or invoice preimage in source. REST subscription credentials have REST-specific path/request/expiry scope; they are distinct from MCP paid-call authorizations and cannot be carried across scopes.
 
 ```ts
 import { BitcoinStratigraphyClient, NwcWalletAdapter } from "@bitcoin-stratigraphy/sdk";
@@ -142,4 +159,4 @@ const latest = await client.getLatest();
 console.log(latest);
 ```
 
-The SDK discovers pre-flight prices, pays the selected subscription invoice with the supplied wallet, and reuses its macaroon and preimage until expiry. The package also exports an MCP entry point (`@bitcoin-stratigraphy/sdk/mcp`); consult the package's README for install and export details. The SDK's REST `getLatest()` example is not a substitute for a paid MCP `tools/call` request. For plain MCP discovery, use the free `tools/list` request above.
+The SDK's REST client discovers pre-flight prices, pays the selected REST subscription invoice with the supplied wallet, and may reuse that REST-scoped macaroon and preimage within its enforced scope until expiry. This behavior does not make MCP paid-call credentials reusable. The package also exports an MCP entry point (`@bitcoin-stratigraphy/sdk/mcp`); consult the package's README for install and export details. The SDK's REST `getLatest()` example is not a substitute for a paid MCP `tools/call` request. For plain MCP discovery, use the free `tools/list` request above.

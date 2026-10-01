@@ -5,15 +5,15 @@
 Publish one paragraph per post, in order.
 
 ```text
-Bitcoin Stratigraphy Data Engine: 14 MCP tools, catalog rated Glama A (4.4/5). Indexed telemetry, L402 Lightning payments, Groth16/Poseidon BN254 verification. Try free stratigraphy.list + payment.get_info: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+Bitcoin Stratigraphy Data Engine: 14 MCP tools; Glama A (4.4/5) is a dated tool-definition rating, not an audit. Indexed telemetry, L402, Groth16/Poseidon BN254. Free: stratigraphy.list + payment.get_info: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
 
 Bitcoin Stratigraphy MCP exposes stratigraphy.{list,get,get_digest,get_diff,get_range}: discover bounds; read indexed records, compact digests, differences, and bounded ranges. Start free with stratigraphy.list: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
 
 Bitcoin Stratigraphy MCP proof tools: proof.{attenuate,verify,get_by_hash,list,submit,ground}. Groth16/Poseidon BN254 verification checks a submitted proof against its statement and snapshot; it cannot establish source accuracy or an LLM's interpretation.
 
-Bitcoin Stratigraphy MCP uses HTTP 402 L402: an agent reviews and pays the exact Lightning invoice, verifies its preimage, then retries the scoped call. proof.ground returns a signed off-chain Bitcoin-tip receipt, not a Groth16 proof, PoW proof, or on-chain transaction.
+On Lightning L402 MCP calls, an agent pays the exact invoice, verifies its preimage, then retries. proof.ground returns an off-chain Bitcoin-tip receipt, not a Groth16, PoW, or on-chain proof.
 
-Bitcoin Stratigraphy MCP: mesh.{get_status,broadcast} checks peer/quorum health and distributes a stored snapshot; payment.get_info queries prices. Published example: most paid tools 250 sats; proof.list 10 sats. Check live prices; free discovery: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+MCP mesh.get_status reports peer/quorum health; mesh.broadcast sends snapshots to configured peers. Check payment.get_info: most paid tools 250 sats, proof.list 10. Free discovery: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
 ```
 
 ## Nostr thread
@@ -47,8 +47,30 @@ Bitcoin Stratigraphy paid MCP calls use L402: a call receives an HTTP 402 challe
 ### Post 5
 
 ```text
-Bitcoin Stratigraphy proof.ground reads Bitcoin chain state and returns a signed, off-chain tip-context/dataset receipt. It is not a Groth16 proof, proof-of-work validity proof, or on-chain transaction, and a signature does not make caller-supplied claims true. Groth16 verification checks a cryptographic relation for an exact statement; it cannot promise zero hallucinations. The Glama A (4.4/5) figure is a tool-definition quality snapshot checked Sep 30, 2026, not an audit or a grade for every tool. Try free discovery at https://bitcoin-stratigraphy-dashboard.replit.app/mcp.
+Bitcoin Stratigraphy proof.ground returns an off-chain Schnorr-signed Bitcoin-tip receipt, not an on-chain proof. Groth16 checks a supplied statement, not source truth or zero hallucinations. Glama A (4.4/5) rates tool definitions, not security or every tool. https://bitcoin-stratigraphy-dashboard.replit.app/mcp
 ```
+
+## Capability reference — not part of the X or Nostr posts
+
+- **L402:** MCP `proof.attenuate` narrows a parent macaroon; ordinary clients
+  do not settle invoices automatically.
+- **Settlement:** the REST router supports `btc-lightning`, `l-btc`, and
+  `taproot-assets` subject to `/api/v1/cost` configuration. MCP supports
+  Lightning L402 and conditional Base USDC x402 only when configured; a rail
+  supported on one interface is not implied on another.
+- **Proofs:** `proof.verify` checks supplied Groth16 telemetry or drift proofs
+  and supplied OTS receipts. `proof.ground` returns an off-chain,
+  Schnorr-signed Bitcoin-tip receipt, not an on-chain proof.
+- **Mesh and analytics:** Nostr broadcasts go to pinned peers; quorum is a
+  cross-validation signal, not source truth. Diffs and digests summarize
+  indexed history, not live block provenance.
+- **Streaming:** `/api/v1/stratigraphy/stream` is a paid REST SSE feed with
+  30-second refresh, not MCP transport; no Base x402 support is promised for
+  SSE.
+- **Prices and rating:** check live prices with `payment.get_info` (current
+  examples: 250 sats for most paid tools, 10 sats for `proof.list`). Glama A
+  (4.4/5) is a dated tool-definition rating, not a security audit or a grade
+  for every tool.
 
 ## Internal editor checklist — do not publish
 

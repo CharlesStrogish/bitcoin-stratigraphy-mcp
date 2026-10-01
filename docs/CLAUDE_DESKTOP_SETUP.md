@@ -10,7 +10,20 @@ installing or changing the server.
 | Supported protocol | MCP `2025-11-25` |
 | Tool catalog | 14 tools; retrieve the current catalog from the server |
 | Connection-time wallet requirement | None |
-| Paid execution | L402 Lightning micropayments; requires a separate payment integration |
+| Paid execution | Lightning L402; conditional Base USDC x402 only when configured, with a separate payment integration |
+
+The MCP catalog covers indexed-history retrieval/diffs/digests, supplied-proof
+verification, off-chain context grounding, and configured Nostr peer broadcasts.
+`proof.verify` accepts supported supplied Groth16 telemetry or drift proofs and
+OpenTimestamps receipts; `proof.ground` returns an off-chain, Schnorr-signed
+Bitcoin-tip receipt, not an on-chain proof. Mesh quorum is cross-validation,
+not source truth, and indexed analytics do not establish live block provenance.
+
+Payment rails depend on the interface: REST `/api/v1/cost` reports whether
+`btc-lightning`, `l-btc`, or `taproot-assets` are enabled; this MCP connection
+uses Lightning L402 and may use Base USDC x402 only when configured. The REST
+`/api/v1/stratigraphy/stream` is a separate paid SSE feed refreshed every
+30 seconds, not an MCP transport; no Base x402 support is promised for SSE.
 
 The configuration below starts a local **stdio-to-HTTP bridge** called
 `mcp-remote`. The actual MCP server remains hosted at the public URL. A wallet

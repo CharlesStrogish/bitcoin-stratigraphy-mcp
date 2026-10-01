@@ -2,6 +2,31 @@
 
 The public MCP endpoint is **`https://bitcoin-stratigraphy-dashboard.replit.app/mcp`** (Streamable HTTP). It exposes discovery and tool calls over JSON-RPC. The examples below configure the same server; they do **not** give an agent a wallet or permission to spend. Set a spending limit and use an L402-capable wallet client before enabling paid calls.
 
+## Capability and service boundaries
+
+Bitcoin Stratigraphy provides indexed stratigraphy analytics and compressed
+digests/diffs for efficient agent context; `proof.attenuate` can narrow an
+existing valid macaroon with caveats including TTL and request-count limits.
+The MCP proof workflow includes Groth16/Poseidon BN254 telemetry and drift
+verification, plus a separate OpenTimestamps (OTS) receipt-verification mode.
+`proof.ground` issues off-chain Schnorr-signed Bitcoin-tip receipts for context
+or dataset CIDs; it does not publish a Bitcoin transaction or prove native
+block provenance for the historical dataset.
+
+The pinned Nostr NIP-01/78 mesh supports reciprocal peer exchange, signed
+broadcasts, and quorum checks. Peer agreement is an availability/consistency
+signal, not source truth or independent proof of the underlying telemetry.
+
+The REST API is separate from MCP. `GET /api/v1/cost` reports current prices
+and available settlement assets, including the L402 router's `btc-lightning`,
+`l-btc`, and `taproot-assets` where enabled. MCP accepts Lightning L402; Base
+USDC x402 is conditional and must be explicitly shown as available. Do not
+assume Base USDC is available on REST. The paid REST endpoint
+`GET /api/v1/stratigraphy/stream` is a separate Server-Sent Events (SSE)
+transport with a 30-second refresh interval, not an MCP transport. It uses
+L402 assets as reported by `/api/v1/cost`; Base USDC support is not promised
+for this stream.
+
 ## MCP clients
 
 ### Claude Desktop
@@ -92,7 +117,7 @@ The MCP client configurations above discover tools, but **do not automatically s
 
 ## Tool catalog and pricing
 
-The MCP `tools/list` response contains **14 tools** after this change is published. The prices below describe the server code; ask `payment.get_info` at runtime rather than treating this table as a price guarantee.
+The MCP `tools/list` response currently contains **14 canonical tools**. The prices below describe the server code; ask `payment.get_info` at runtime rather than treating this table as a price guarantee.
 
 | Tool | Advertised sats | Use |
 | --- | ---: | --- |
@@ -111,7 +136,7 @@ The MCP `tools/list` response contains **14 tools** after this change is publish
 | `mesh.get_status` | 0 | Read peer and quorum health. |
 | `mesh.broadcast` | 250 | Sign and distribute a stored snapshot to mesh peers; has side effects. |
 
-Call `payment.get_info` with `{}` (equivalent to `{"action":"query"}`) for the complete `perToolSats` map, or `{"toolName":"stratigraphy.get_digest"}` to narrow it to one **case-sensitive, canonical** tool name. Unknown names fail validation. The query result includes accepted methods, invoice expiry, and challenge metadata. It does not issue an invoice; the actual invoice is issued only when a paid `tools/call` receives HTTP **402**. Use `{"action":"settle","paymentHash":"…","preimage":"…"}` with matching L402 Authorization, or `{"action":"settle","paymentHash":"0x…","txHash":"0x…"}` with PAYMENT-SIGNATURE for Base. Settlement does not authorize access to another tool.
+Call `payment.get_info` with `{}` (equivalent to `{"action":"query"}`) for the complete `perToolSats` map, or `{"toolName":"stratigraphy.get_digest"}` to narrow it to one **case-sensitive, canonical** tool name. Unknown names fail validation. The query result includes accepted methods, invoice expiry, and challenge metadata. It does not issue an invoice; the actual invoice is issued only when a paid `tools/call` receives HTTP **402**. Use `{"action":"settle","paymentHash":"…","preimage":"…"}` with matching L402 Authorization, or, only when MCP Base USDC x402 is currently enabled, `{"action":"settle","paymentHash":"0x…","txHash":"0x…"}` with PAYMENT-SIGNATURE. Settlement does not authorize access to another tool.
 
 For direct HTTP clients, a preflight request looks like:
 
@@ -119,7 +144,7 @@ For direct HTTP clients, a preflight request looks like:
 POST /mcp HTTP/1.1
 Content-Type: application/json
 Accept: application/json, text/event-stream
-MCP-Protocol-Version: 2025-03-26
+MCP-Protocol-Version: 2025-11-25
 
 {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"payment.get_info","arguments":{"toolName":"stratigraphy.get_digest"}}}
 ```
@@ -128,7 +153,7 @@ Read the price from `result.structuredContent.perToolSats["stratigraphy.get_dige
 
 ## TypeScript: handle an L402 challenge
 
-The server responds to an unauthenticated paid call with HTTP 402, `WWW-Authenticate: L402 macaroon="...", invoice="..."`, and JSON containing `macaroon`, `invoice`, `payment_hash`, and `amount_sats`. Pay **that exact invoice**, verify that the wallet's 32-byte preimage hashes to `payment_hash`, then retry the **same** JSON-RPC call once with `Authorization: L402 <macaroon>:<preimage>`. The credential is scoped to a paid call and must not be cached or reused. The wallet callback below must be connected to a real wallet with its own authorization and spending policy; it is deliberately not a hard-coded credential.
+The server responds to an unauthenticated paid call with HTTP 402, `WWW-Authenticate: L402 macaroon="...", invoice="..."`, and JSON containing `macaroon`, `invoice`, `payment_hash`, and `amount_sats`. Pay **that exact invoice**, verify that the wallet's 32-byte preimage hashes to `payment_hash`, then retry the **same** JSON-RPC call once with `Authorization: L402 <macaroon>:<preimage>`. MCP paid-call credentials are tool/request-scoped; do not reuse one to authorize another tool or REST scope. This differs from any REST subscription credential, whose reuse is governed by its own path, request, and expiry caveats. The wallet callback below must be connected to a real wallet with its own authorization and spending policy; it is deliberately not a hard-coded credential.
 
 ```ts
 const endpoint = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
@@ -155,7 +180,7 @@ async function send(id: number, name: string, args: object, authorization?: stri
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
-      "MCP-Protocol-Version": "2025-03-26",
+      "MCP-Protocol-Version": "2025-11-25",
       ...(authorization ? { Authorization: authorization } : {}),
     },
     body: JSON.stringify({

@@ -1,14 +1,15 @@
 import type { Express } from "express";
+import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 
 export const mcpServerCard = {
   name: "bitcoin-stratigraphy",
-  description:
-    "Quantitative Bitcoin stratigraphy dataset featuring thermodynamic signals, Groth16 zk-SNARK verification, and P2P mesh consensus accessible via L402 micropayments. Proof revocation is intentionally omitted: stratigraphy records and proof attestations are append-only, while Merkle roots commit dataset provenance and mesh attestations. Inbound P2P subscriptions are not exposed; mesh state is distributed through outbound broadcasts.",
+  description: ENGINE_DESCRIPTION,
   transport: {
-    type: "sse",
+    type: "streamable-http",
     url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
   },
   capabilities: {
+    toolGroups: MCP_TOOL_GROUPS,
     tags: [
       "zero-knowledge-data-integrity",
       "zk-snarks",
@@ -34,8 +35,6 @@ export const mcpServerCard = {
             included: true,
             scheme: "Groth16/Poseidon BN254",
             verificationEndpoint: "POST /api/v1/zk/verify",
-            targetVerificationTime:
-              "sub-10ms for proofs emitted by this API",
           },
         },
       },
@@ -137,6 +136,8 @@ export const mcpServerCard = {
           },
           attestationType: "Signed-Bitcoin-Tip-Anchor",
           verificationEndpoint: "POST /api/v1/zk/verify",
+          verificationInput:
+            "Send { attestation: receipt } for an agent-context receipt. For a dataset receipt, parse receipt.attestation.proofPayload and send { attestation: parsedReceipt }. This verifies the signed receipt, not a Groth16 proof or Bitcoin proof-of-work.",
         },
       },
       {

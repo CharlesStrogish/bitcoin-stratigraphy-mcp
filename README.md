@@ -6,9 +6,45 @@
 [![Zero-Knowledge: Groth16 ZK-SNARK Verified](https://img.shields.io/badge/Zero--Knowledge-Groth16_ZK--SNARK_Verified-blueviolet)](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json)
 [![Smithery: MCP Listing](https://img.shields.io/badge/Smithery-MCP_Listing-blue)](https://smithery.ai/servers/crstrogish/bitcoin-stratigraphy-mcp)
 
-Bitcoin telemetry and indexed stratigraphy discovery for AI agents, with
-Streamable HTTP MCP, L402 Lightning micropayments, and Groth16/Poseidon BN254
-proof verification.
+Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.
+
+## Key Capabilities
+
+- L402 Micropayments & Macaroon Attenuations: Programmatic pay-per-query settlement in satoshis with zero API keys. Supports parent macaroon caveat scoping (proof.attenuate) with TTLs and rate controls.
+- Multi-Asset Settlement Router: Native payment support across Base-layer Lightning (btc-lightning), Liquid Bitcoin (l-btc), Taproot Assets (taproot-assets), and Base USDC (x402).
+- Groth16 ZK-SNARK & OTS Proof Verification: Execute cryptographic verification for supplied Groth16/Poseidon BN254 telemetry proofs, drift zk-SNARKs, and OpenTimestamps (OTS) Bitcoin block-header receipts.
+- Agent Context State Grounding: Anchor autonomous agent prompt executions, CIDs, and dataset context hashes directly into signed Bitcoin-tip receipts (proof.ground).
+- Autonomous P2P Mesh Network: Nostr-backed (NIP-01/78) peer topology broadcasting with automated quorum validation, cross-validation metrics, and node public-key provenance.
+- Stratigraphy Strata Analytics: High-speed differential comparisons (stratigraphy.get_diff) and compressed record digests designed specifically for LLM context window efficiency.
+- Real-Time SSE Streaming: Live Server-Sent Events (/api/v1/stratigraphy/stream) for continuous telemetry feeds.
+
+### Operational boundaries
+
+- **Payment rails are surface- and configuration-dependent.** The REST L402 router
+  supports `btc-lightning`, `l-btc`, and `taproot-assets`; Liquid and Taproot Assets
+  need configured providers. Check `/api/v1/cost` for availability. MCP paid tools
+  use Lightning L402 plus Base USDC x402 only when configured; `payment.get_info`
+  reports their current terms, not all REST router assets. Lightning is Bitcoin's
+  payment-channel layer; Base USDC is a separate EVM rail.
+- **API-keyless does not mean unauthenticated paid execution.** Wallet
+  authorization, exact payment proofs, scoped credentials, and client spending
+  limits remain required. Macaroon TTL/request budgets and HTTP rate limits are
+  separate controls.
+- **Live streaming and historical indexing are different.** MCP uses Streamable
+  HTTP at `/mcp`. The paid REST SSE feed at `/api/v1/stratigraphy/stream` refreshes
+  snapshots on a 30-second cadence and supports configured L402 router assets,
+  not a promised Base USDC SSE rail. Historical strata remain indexed daily
+  records, not native block provenance.
+- **Cryptographic checks have defined trust boundaries.** Groth16 verifies an
+  exact statement/payload, not source truth or every agent reasoning step.
+  Grounding receipts are off-chain Schnorr-signed Bitcoin-tip attestations, not
+  on-chain transactions or ZK/PoW validity proofs. OTS verification requires an
+  actual receipt and matching target digest; calendar acceptance is not Bitcoin
+  confirmation.
+- **Mesh consensus is scoped.** Broadcasts and quorum checks use configured,
+  pinned peers; peer agreement does not establish source truth. Enterprise use
+  still requires organizational supervision and durable evidence retention; see
+  [the compliance framework](docs/ENTERPRISE_COMPLIANCE.md).
 
 The Glama badge is a static snapshot of the **A (4.4/5.0)** tool-definition
 quality score, checked on September 30, 2026; follow its link for current results.

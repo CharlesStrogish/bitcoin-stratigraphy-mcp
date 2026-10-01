@@ -7,6 +7,17 @@ It does not use a mock proof or claim that an attestation catalog entry contains
 proof bytes. The paid dataset supplies the exact `zkProof` and `data` that the
 worker sends to `proof.verify`.
 
+This starter uses a narrow split: REST L402 for the dataset and MCP L402 for
+proof verification and mesh operations. It does not select the REST router's
+optional `l-btc`/`taproot-assets` rails, use MCP Base USDC x402, or consume the
+REST SSE stream. The broader REST router can support `btc-lightning`, `l-btc`,
+and `taproot-assets` when configured (check `/api/v1/cost`); MCP supports
+Lightning L402 and conditional Base USDC x402 only when configured. Proof
+verification checks supplied evidence for its statement, not upstream source
+truth. Mesh quorum is a cross-validation signal, not source truth, and
+`proof.ground` receipts are off-chain Schnorr-signed attestations, not on-chain
+proofs.
+
 ## Run on Replit
 
 1. Copy or fork **this directory as the root of its own Repl**. Its versioned

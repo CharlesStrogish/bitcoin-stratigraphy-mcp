@@ -50,6 +50,7 @@ import type {
   MacaroonAttenuationResponse,
   MacaroonRevocationRequest,
   MacaroonRevocationResponse,
+  McpDiscoveryManifest,
   MeshAttestRequest,
   MeshAttestResponse,
   MeshStatus,
@@ -103,6 +104,84 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetMcpDiscoveryManifestUrl = () => {
+
+
+
+
+  return `/api/.well-known/mcp.json`
+}
+
+/**
+ * Public, unmetered JSON discovery document with wildcard CORS. Its declared version values are manifest metadata and do not configure MCP negotiation.
+ * @summary Public MCP auto-discovery manifest
+ */
+export const getMcpDiscoveryManifest = async ( options?: Parameters<typeof customFetch>[1]): Promise<McpDiscoveryManifest> => {
+
+  return customFetch<McpDiscoveryManifest>(getGetMcpDiscoveryManifestUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMcpDiscoveryManifestQueryKey = () => {
+    return [
+    `/api/.well-known/mcp.json`
+    ] as const;
+    }
+
+
+export const getGetMcpDiscoveryManifestQueryOptions = <TData = Awaited<ReturnType<typeof getMcpDiscoveryManifest>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpDiscoveryManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMcpDiscoveryManifestQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMcpDiscoveryManifest>>> = ({ signal }) => getMcpDiscoveryManifest({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMcpDiscoveryManifest>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMcpDiscoveryManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getMcpDiscoveryManifest>>>
+export type GetMcpDiscoveryManifestQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public MCP auto-discovery manifest
+ */
+
+export function useGetMcpDiscoveryManifest<TData = Awaited<ReturnType<typeof getMcpDiscoveryManifest>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpDiscoveryManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMcpDiscoveryManifestQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getVerifyNostrAgentIdentityUrl = () => {
 

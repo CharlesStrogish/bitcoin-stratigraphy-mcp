@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
+import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 
 export const mcpServerCard = {
   name: "bitcoin-stratigraphy",
@@ -180,6 +181,13 @@ export const glamaConnector = {
 } as const;
 
 export function registerMcpServerCardRoute(app: Express): void {
+  app.get("/.well-known/mcp.json", (_req, res): void => {
+    res.set("Access-Control-Allow-Origin", "*");
+    // Wildcard public discovery is intentionally not a credentialed CORS route.
+    res.removeHeader("Access-Control-Allow-Credentials");
+    res.status(200).json(mcpDiscoveryManifest);
+  });
+
   for (const path of [
     "/smithery-verification",
     "/.well-known/smithery-verification",

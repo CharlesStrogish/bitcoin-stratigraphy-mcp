@@ -621,6 +621,29 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /.well-known/mcp.json:
+    get:
+      operationId: getMcpDiscoveryManifest
+      tags: [metadata]
+      summary: Public MCP auto-discovery manifest
+      description: >-
+        Public, unmetered JSON discovery document with wildcard CORS. Its declared
+        version values are manifest metadata and do not configure MCP negotiation.
+      servers:
+        - url: /
+      security: []
+      responses:
+        "200":
+          description: MCP discovery manifest
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+                enum: ["*"]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpDiscoveryManifest"
   /nostr/verify-identity:
     post:
       operationId: verifyNostrAgentIdentity
@@ -1334,6 +1357,87 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    McpDiscoveryManifest:
+      type: object
+      required: [$schema, name, version, description, author, homepage, mcp, pricing, verification]
+      properties:
+        $schema:
+          type: string
+          format: uri
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        author:
+          type: object
+          required: [name, url]
+          properties:
+            name:
+              type: string
+            url:
+              type: string
+              format: uri
+        homepage:
+          type: string
+          format: uri
+        mcp:
+          type: object
+          required: [version, transports, capabilities]
+          properties:
+            version:
+              type: string
+            transports:
+              type: array
+              items:
+                type: object
+                required: [type, endpoint]
+                properties:
+                  type:
+                    type: string
+                    enum: [streamable-http]
+                  endpoint:
+                    type: string
+                    format: uri
+            capabilities:
+              type: object
+              required: [tools, prompts, resources]
+              properties:
+                tools:
+                  type: object
+                  required: [count, namespaces]
+                  properties:
+                    count:
+                      type: integer
+                    namespaces:
+                      type: array
+                      items:
+                        type: string
+                prompts:
+                  type: boolean
+                resources:
+                  type: boolean
+        pricing:
+          type: object
+          required: [model, cost_discovery_endpoint]
+          properties:
+            model:
+              type: string
+            cost_discovery_endpoint:
+              type: string
+        verification:
+          type: object
+          required: [zk_proving_system, curve, time_anchor, mesh_consensus]
+          properties:
+            zk_proving_system:
+              type: string
+            curve:
+              type: string
+            time_anchor:
+              type: string
+            mesh_consensus:
+              type: string
     HuggingFaceExportRecord:
       type: object
       additionalProperties: false

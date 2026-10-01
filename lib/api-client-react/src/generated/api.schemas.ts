@@ -21,6 +21,64 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export type McpDiscoveryManifestAuthor = {
+  name: string;
+  url: string;
+};
+
+export type McpDiscoveryManifestMcpTransportsItemType = typeof McpDiscoveryManifestMcpTransportsItemType[keyof typeof McpDiscoveryManifestMcpTransportsItemType];
+
+
+export const McpDiscoveryManifestMcpTransportsItemType = {
+  'streamable-http': 'streamable-http',
+} as const;
+
+export type McpDiscoveryManifestMcpTransportsItem = {
+  type: McpDiscoveryManifestMcpTransportsItemType;
+  endpoint: string;
+};
+
+export type McpDiscoveryManifestMcpCapabilitiesTools = {
+  count: number;
+  namespaces: string[];
+};
+
+export type McpDiscoveryManifestMcpCapabilities = {
+  tools: McpDiscoveryManifestMcpCapabilitiesTools;
+  prompts: boolean;
+  resources: boolean;
+};
+
+export type McpDiscoveryManifestMcp = {
+  version: string;
+  transports: McpDiscoveryManifestMcpTransportsItem[];
+  capabilities: McpDiscoveryManifestMcpCapabilities;
+};
+
+export type McpDiscoveryManifestPricing = {
+  model: string;
+  cost_discovery_endpoint: string;
+};
+
+export type McpDiscoveryManifestVerification = {
+  zk_proving_system: string;
+  curve: string;
+  time_anchor: string;
+  mesh_consensus: string;
+};
+
+export interface McpDiscoveryManifest {
+  $schema: string;
+  name: string;
+  version: string;
+  description: string;
+  author: McpDiscoveryManifestAuthor;
+  homepage: string;
+  mcp: McpDiscoveryManifestMcp;
+  pricing: McpDiscoveryManifestPricing;
+  verification: McpDiscoveryManifestVerification;
+}
+
 /**
  * No per-record ZK proof is present in the source dataset
  */

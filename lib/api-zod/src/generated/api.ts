@@ -25,6 +25,48 @@ import * as zod from 'zod';
 
 
 /**
+ * Public, unmetered JSON discovery document with wildcard CORS. Its declared version values are manifest metadata and do not configure MCP negotiation.
+ * @summary Public MCP auto-discovery manifest
+ */
+export const GetMcpDiscoveryManifestResponse = zod.object({
+  "$schema": zod.string().url(),
+  "name": zod.string(),
+  "version": zod.string(),
+  "description": zod.string(),
+  "author": zod.object({
+  "name": zod.string(),
+  "url": zod.string().url()
+}),
+  "homepage": zod.string().url(),
+  "mcp": zod.object({
+  "version": zod.string(),
+  "transports": zod.array(zod.object({
+  "type": zod.enum(['streamable-http']),
+  "endpoint": zod.string().url()
+})),
+  "capabilities": zod.object({
+  "tools": zod.object({
+  "count": zod.number().int(),
+  "namespaces": zod.array(zod.string())
+}),
+  "prompts": zod.boolean(),
+  "resources": zod.boolean()
+})
+}),
+  "pricing": zod.object({
+  "model": zod.string(),
+  "cost_discovery_endpoint": zod.string()
+}),
+  "verification": zod.object({
+  "zk_proving_system": zod.string(),
+  "curve": zod.string(),
+  "time_anchor": zod.string(),
+  "mesh_consensus": zod.string()
+})
+})
+
+
+/**
  * A bare npub/hex key identifies an account but does not prove key possession. A standalone Schnorr signature cannot be checked without its complete NIP-01 event. Trust is earned only from signed, network-bound kind 30079 p-tag vouchers by pinned mesh nodes, or one further signed introduction hop.
  * @summary Verify NIP-01 agent identity and mesh-signed web-of-trust attestations
  */

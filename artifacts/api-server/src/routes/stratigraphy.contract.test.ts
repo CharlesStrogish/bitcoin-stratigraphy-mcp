@@ -18,6 +18,7 @@ import {
   registerMcpServerCardRoute,
 } from "./mcp-server-card";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
+import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 import { registerOpenApiRoute } from "./openapi";
 import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { registerLlmExportRoutes } from "./llm-export";
@@ -3550,6 +3551,27 @@ test("offers SSE transport without changing the public OpenAPI route", async () 
   const openApiResponse = await fetch(`${baseUrl}/openapi.json`);
   assert.equal(openApiResponse.status, 200);
   assert.equal(openApiResponse.headers.get("www-authenticate"), null);
+});
+
+test("serves the public MCP discovery manifest with wildcard CORS and no payment", async () => {
+  const requestsBefore = invoiceRequestCount;
+  const cases: Record<string, string>[] = [
+    {},
+    { Origin: "https://discovery-client.example" },
+    { Origin: "https://discovery-client.example", Authorization: "L402 malformed" },
+  ];
+  for (const headers of cases) {
+    const response = await fetch(`${baseUrl}/.well-known/mcp.json`, { headers });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.equal(response.headers.get("access-control-allow-credentials"), null);
+    assert.equal(response.headers.get("www-authenticate"), null);
+    assert.deepEqual(await response.json(), mcpDiscoveryManifest);
+  }
+  assert.equal(invoiceRequestCount, requestsBefore);
+  assert.equal(mcpDiscoveryManifest.mcp.capabilities.tools.count, mcpServerCard.capabilities.tools.length);
+  assert.deepEqual(mcpDiscoveryManifest.mcp.capabilities.tools.namespaces, Object.keys(MCP_TOOL_GROUPS));
 });
 
 test("serves the public MCP server card without an L402 challenge", async () => {

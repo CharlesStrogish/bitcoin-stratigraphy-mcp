@@ -239,9 +239,82 @@ export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).mi
 
 
 /**
- * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization. Clients may send a NIP-98 event as `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted prices.
+ * Public, read-only quote with wildcard CORS. Returns itemized fixed MCP execution prices, a total in sats, and per-tool L402 invoice-generation details. No invoice is created or settled by this endpoint. Each paid tools/call obtains its own HTTP 402 challenge; the aggregate total is not a batch credential. Descriptive pricing selectors stratigraphy.get_latest and proof.verify_zk_proof resolve to stratigraphy.get and proof.verify for quotes only, not MCP execution. Existing executable legacy aliases retain their original paid scopes. Prices are the same as payment.get_info and the actual MCP gates; REST subscription-tier prices and discounts are separate.
+ * @summary Quote a batch of MCP tool prices in satoshis
+ */
+export const quoteMcpToolCostsBodyToolsItemMax = 128;
+
+export const quoteMcpToolCostsBodyToolsMax = 32;
+
+
+
+export const QuoteMcpToolCostsBody = zod.object({
+  "tools": zod.array(zod.string().min(1).max(quoteMcpToolCostsBodyToolsItemMax)).min(1).max(quoteMcpToolCostsBodyToolsMax)
+})
+
+export const quoteMcpToolCostsResponsePerToolSatsMinOne = 0;
+
+export const quoteMcpToolCostsResponseItemsItemPriceSatsMin = 0;
+
+
+
+export const quoteMcpToolCostsResponseItemsMax = 32;
+
+export const quoteMcpToolCostsResponseTotalSatsMin = 0;
+
+
+
+
+export const QuoteMcpToolCostsResponse = zod.object({
+  "protocol": zod.literal("L402"),
+  "currency": zod.literal("sats"),
+  "perToolSats": zod.record(zod.string(), zod.number().int().min(quoteMcpToolCostsResponsePerToolSatsMinOne)),
+  "items": zod.array(zod.object({
+  "tool": zod.string().describe('Original requested name or pricing selector'),
+  "canonical_tool": zod.string(),
+  "price_sats": zod.number().int().min(quoteMcpToolCostsResponseItemsItemPriceSatsMin),
+  "payment_required": zod.boolean(),
+  "invoice_generation": zod.union([zod.object({
+  "method": zod.literal("POST"),
+  "endpoint": zod.literal("/mcp"),
+  "jsonrpc_method": zod.literal("tools/call"),
+  "tool": zod.string(),
+  "amount_sats": zod.number().int().min(1),
+  "description": zod.string(),
+  "scope_path": zod.string(),
+  "expiry_seconds": zod.number().int().min(1)
+}),zod.null()])
+})).min(1).max(quoteMcpToolCostsResponseItemsMax),
+  "total_sats": zod.number().int().min(quoteMcpToolCostsResponseTotalSatsMin),
+  "l402": zod.object({
+  "settlement_asset": zod.literal("btc-lightning"),
+  "invoice_generated": zod.literal(false),
+  "aggregate_invoice_supported": zod.literal(false),
+  "invoice_expiry_seconds": zod.number().int().min(1),
+  "generation_trigger": zod.string(),
+  "challenge_status": zod.literal(402),
+  "challenge_header": zod.literal("WWW-Authenticate"),
+  "challenge_format": zod.string(),
+  "challenge_body_fields": zod.array(zod.string()),
+  "authorization_format": zod.string(),
+  "credential_scope": zod.string(),
+  "max_requests": zod.literal(1)
+})
+})
+
+
+/**
+ * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization. Clients may send a NIP-98 event as `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted prices. An optional tool query selects one fixed MCP execution quote in addition to the unchanged tier and dataset metadata. It accepts canonical tools, existing executable aliases, and the two descriptive POST pricing selectors. It does not create an invoice.
  * @summary Inspect dataset access costs and schemas
  */
+export const getStratigraphyCostQueryToolMax = 128;
+
+
+
+export const GetStratigraphyCostQueryParams = zod.object({
+  "tool": zod.coerce.string().min(1).max(getStratigraphyCostQueryToolMax).optional().describe('Optional MCP tool or descriptive pricing selector, e.g. stratigraphy.get_latest')
+})
+
 export const GetStratigraphyCostHeader = zod.object({
   "X-Settlement-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Preferred settlement asset. Accept-Asset is supported as an alias.'),
   "Accept-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Alias for X-Settlement-Asset.')

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { QuoteMcpToolCostsResponse, type McpBatchCostQuote } from "@workspace/api-zod";
 import { createHash, createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -3639,6 +3640,112 @@ test("serves the root OpenAPI document as raw JSON", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.doesNotMatch(response.headers.get("content-type") ?? "", /text\/html/);
   assert.deepEqual(await response.json(), openApiDocument);
+});
+
+test("quotes batch MCP costs with itemized invoice details and wildcard CORS without invoices", async () => {
+  const before = invoiceRequestCount;
+  const response = await fetch(`${baseUrl}/api/v1/cost`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "https://agent.example" },
+    body: JSON.stringify({ tools: ["stratigraphy.get_latest", "proof.verify_zk_proof"] }),
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("access-control-allow-origin"), "*");
+  assert.equal(response.headers.get("access-control-allow-credentials"), null);
+  assert.equal(response.headers.get("www-authenticate"), null);
+  const quote = QuoteMcpToolCostsResponse.parse(await response.json());
+  assert.equal(quote.protocol, "L402");
+  assert.equal(quote.currency, "sats");
+  assert.deepEqual(quote.perToolSats, {
+    "stratigraphy.get_latest": 250, "proof.verify_zk_proof": 250,
+  });
+  assert.equal(quote.total_sats, 500);
+  assert.deepEqual(quote.items.map((item: { canonical_tool: string }) => item.canonical_tool), [
+    "stratigraphy.get", "proof.verify",
+  ]);
+  for (const item of quote.items) {
+    assert.ok(item.invoice_generation);
+    assert.equal(item.price_sats, 250);
+    assert.equal(item.payment_required, true);
+    assert.equal(item.invoice_generation.tool, item.canonical_tool);
+    assert.equal(item.invoice_generation.scope_path, `/mcp/tools/${item.canonical_tool}`);
+    assert.equal(item.invoice_generation.amount_sats, item.price_sats);
+    assert.equal(item.invoice_generation.endpoint, "/mcp");
+    assert.equal(item.invoice_generation.expiry_seconds, 3600);
+  }
+  assert.equal(quote.l402.invoice_generated, false);
+  assert.equal(quote.l402.aggregate_invoice_supported, false);
+  assert.equal(quote.l402.challenge_status, 402);
+  assert.equal(quote.l402.max_requests, 1);
+  assert.equal(invoiceRequestCount, before);
+});
+
+test("quotes free, reduced-fee and legacy MCP costs without changing paid alias scopes", async () => {
+  const before = invoiceRequestCount;
+  const response = await fetch(`${baseUrl}/api/v1/cost`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tools: ["payment.get_info", "proof.list", "stratigraphy.digest"] }),
+  });
+  assert.equal(response.status, 200);
+  const quote = QuoteMcpToolCostsResponse.parse(await response.json());
+  assert.deepEqual(quote.perToolSats, {
+    "payment.get_info": 0, "proof.list": 10, "stratigraphy.digest": 250,
+  });
+  assert.equal(quote.total_sats, 260);
+  assert.equal(quote.items[0].invoice_generation, null);
+  assert.equal(quote.items[0].payment_required, false);
+  assert.equal(quote.items[2].canonical_tool, "stratigraphy.get_digest");
+  assert.ok(quote.items[2].invoice_generation);
+  assert.equal(quote.items[2].invoice_generation.tool, "stratigraphy.digest");
+  assert.equal(quote.items[2].invoice_generation.scope_path, "/mcp/tools/stratigraphy.digest");
+  assert.equal(invoiceRequestCount, before);
+});
+
+test("rejects invalid batch cost selections without creating invoices", async () => {
+  const before = invoiceRequestCount;
+  for (const payload of [
+    {}, { tools: [] }, { tools: "proof.verify" }, { tools: [123] },
+    { tools: [""] }, { tools: ["unknown"] }, { tools: ["constructor"] },
+    { tools: ["__proto__"] }, { tools: ["proof.verify", "proof.verify"] },
+    { tools: ["proof.verify"], extra: true }, { tools: ["x".repeat(129)] },
+    { tools: Array.from({ length: 33 }, (_, index) => `tool${index}`) },
+  ]) {
+    const response = await fetch(`${baseUrl}/api/v1/cost`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://agent.example" },
+      body: JSON.stringify(payload),
+    });
+    assert.equal(response.status, 400, JSON.stringify(payload));
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.equal(response.headers.get("access-control-allow-credentials"), null);
+    assert.equal(typeof (await response.json() as { error: unknown }).error, "string");
+  }
+  assert.equal(invoiceRequestCount, before);
+});
+
+test("preserves GET cost metadata and supports single-tool query pricing", async () => {
+  const before = invoiceRequestCount;
+  const response = await fetch(`${baseUrl}/api/v1/cost?tool=stratigraphy.get_latest`, {
+    headers: { Origin: "https://agent.example" },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("access-control-allow-origin"), "*");
+  assert.equal(response.headers.get("access-control-allow-credentials"), null);
+  const quote = await response.json() as McpBatchCostQuote & {
+    dataset: { days: number }; access_tiers: unknown[];
+  };
+  assert.equal(quote.total_sats, 250);
+  assert.deepEqual(quote.perToolSats, { "stratigraphy.get_latest": 250 });
+  assert.equal(quote.items[0].canonical_tool, "stratigraphy.get");
+  assert.equal(quote.dataset.days, 422);
+  assert.equal(quote.access_tiers.length, 2);
+  for (const query of ["tool=unknown", "tool=", "tool=proof.verify&tool=proof.list"]) {
+    const invalid = await fetch(`${baseUrl}/api/v1/cost?${query}`);
+    assert.equal(invalid.status, 400);
+    assert.equal(typeof (await invalid.json() as { error: unknown }).error, "string");
+  }
+  assert.equal(invoiceRequestCount, before);
 });
 
 test("serves public pre-flight cost and schema metadata", async () => {

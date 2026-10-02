@@ -62,15 +62,22 @@ app.use(
 // Express 5 requires a regex for a catch-all route rather than the string "*".
 // Reflect requested headers: a literal "*" does not authorize credentialed
 // browser requests carrying Authorization.
+app.use("/api/v1/cost", (_req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.removeHeader("Access-Control-Allow-Credentials");
+  next();
+});
 app.options(/.*/, (req, res) => {
+  const publicCostRoute = /^\/api\/v1\/cost\/?$/.test(req.path);
   res.vary("Access-Control-Request-Headers");
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header("Access-Control-Allow-Origin", publicCostRoute ? "*" : req.headers.origin || "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
     req.headers["access-control-request-headers"] || "*",
   );
-  res.header("Access-Control-Allow-Credentials", "true");
+  if (publicCostRoute) res.removeHeader("Access-Control-Allow-Credentials");
+  else res.header("Access-Control-Allow-Credentials", "true");
   return res.sendStatus(200);
 });
 app.use(

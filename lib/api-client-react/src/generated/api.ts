@@ -40,6 +40,7 @@ import type {
   EpistemicGroundingRequest,
   ExportHuggingFaceDatasetParams,
   GetPaidStratigraphyParams,
+  GetStratigraphyCostParams,
   GroundEpistemicContext200,
   HeadPaidStratigraphyParams,
   HealthStatus,
@@ -50,7 +51,9 @@ import type {
   MacaroonAttenuationResponse,
   MacaroonRevocationRequest,
   MacaroonRevocationResponse,
+  McpBatchCostQuote,
   McpDiscoveryManifest,
+  McpToolCostSelection,
   MeshAttestRequest,
   MeshAttestResponse,
   MeshStatus,
@@ -63,6 +66,7 @@ import type {
   PaymentConfigurationError,
   ProvenanceAnchorStatus,
   ProvenanceChainStatus,
+  QuoteMcpToolCosts400,
   ReadinessStatus,
   SettlementAssetSelectionError,
   StratigraphyCost,
@@ -728,7 +732,7 @@ export function useGetStratigraphy<TData = Awaited<ReturnType<typeof getStratigr
 
 
 
-export const getGetStratigraphyCostUrl = () => {
+export const getQuoteMcpToolCostsUrl = () => {
 
 
 
@@ -737,12 +741,91 @@ export const getGetStratigraphyCostUrl = () => {
 }
 
 /**
- * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization. Clients may send a NIP-98 event as `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted prices.
+ * Public, read-only quote with wildcard CORS. Returns itemized fixed MCP execution prices, a total in sats, and per-tool L402 invoice-generation details. No invoice is created or settled by this endpoint. Each paid tools/call obtains its own HTTP 402 challenge; the aggregate total is not a batch credential. Descriptive pricing selectors stratigraphy.get_latest and proof.verify_zk_proof resolve to stratigraphy.get and proof.verify for quotes only, not MCP execution. Existing executable legacy aliases retain their original paid scopes. Prices are the same as payment.get_info and the actual MCP gates; REST subscription-tier prices and discounts are separate.
+ * @summary Quote a batch of MCP tool prices in satoshis
+ */
+export const quoteMcpToolCosts = async (mcpToolCostSelection: McpToolCostSelection, options?: Parameters<typeof customFetch>[1]): Promise<McpBatchCostQuote> => {
+
+  return customFetch<McpBatchCostQuote>(getQuoteMcpToolCostsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mcpToolCostSelection)
+  }
+);}
+
+
+
+
+
+export const getQuoteMcpToolCostsMutationOptions = <TError = ErrorType<QuoteMcpToolCosts400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof quoteMcpToolCosts>>, TError,{data: BodyType<McpToolCostSelection>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof quoteMcpToolCosts>>, TError,{data: BodyType<McpToolCostSelection>}, TContext> => {
+
+const mutationKey = ['quoteMcpToolCosts'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof quoteMcpToolCosts>>, {data: BodyType<McpToolCostSelection>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  quoteMcpToolCosts(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type QuoteMcpToolCostsMutationResult = NonNullable<Awaited<ReturnType<typeof quoteMcpToolCosts>>>
+    export type QuoteMcpToolCostsMutationBody = BodyType<McpToolCostSelection>
+    export type QuoteMcpToolCostsMutationError = ErrorType<QuoteMcpToolCosts400>
+
+    /**
+ * @summary Quote a batch of MCP tool prices in satoshis
+ */
+export const useQuoteMcpToolCosts = <TError = ErrorType<QuoteMcpToolCosts400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof quoteMcpToolCosts>>, TError,{data: BodyType<McpToolCostSelection>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof quoteMcpToolCosts>>,
+        TError,
+        {data: BodyType<McpToolCostSelection>},
+        TContext
+      > => {
+      return useMutation(getQuoteMcpToolCostsMutationOptions(options));
+    }
+
+export const getGetStratigraphyCostUrl = (params?: GetStratigraphyCostParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/cost?${stringifiedParams}` : `/api/v1/cost`
+}
+
+/**
+ * Returns public pre-flight metadata without creating an invoice or requiring L402 authorization. Clients may send a NIP-98 event as `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted prices. An optional tool query selects one fixed MCP execution quote in addition to the unchanged tier and dataset metadata. It accepts canonical tools, existing executable aliases, and the two descriptive POST pricing selectors. It does not create an invoice.
  * @summary Inspect dataset access costs and schemas
  */
-export const getStratigraphyCost = async ( options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyCost> => {
+export const getStratigraphyCost = async (params?: GetStratigraphyCostParams, options?: Parameters<typeof customFetch>[1]): Promise<StratigraphyCost> => {
 
-  return customFetch<StratigraphyCost>(getGetStratigraphyCostUrl(),
+  return customFetch<StratigraphyCost>(getGetStratigraphyCostUrl(params),
   {
     ...options,
     method: 'GET'
@@ -755,23 +838,23 @@ export const getStratigraphyCost = async ( options?: Parameters<typeof customFet
 
 
 
-export const getGetStratigraphyCostQueryKey = () => {
+export const getGetStratigraphyCostQueryKey = (params?: GetStratigraphyCostParams,) => {
     return [
-    `/api/v1/cost`
+    `/api/v1/cost`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetStratigraphyCostQueryOptions = <TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<SettlementAssetSelectionError | void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetStratigraphyCostQueryOptions = <TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<SettlementAssetSelectionError | void>>(params?: GetStratigraphyCostParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStratigraphyCostQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetStratigraphyCostQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStratigraphyCost>>> = ({ signal }) => getStratigraphyCost({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStratigraphyCost>>> = ({ signal }) => getStratigraphyCost(params, { signal, ...requestOptions });
 
 
 
@@ -789,11 +872,11 @@ export type GetStratigraphyCostQueryError = ErrorType<SettlementAssetSelectionEr
  */
 
 export function useGetStratigraphyCost<TData = Awaited<ReturnType<typeof getStratigraphyCost>>, TError = ErrorType<SettlementAssetSelectionError | void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetStratigraphyCostParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStratigraphyCost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetStratigraphyCostQueryOptions(options)
+  const queryOptions = getGetStratigraphyCostQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

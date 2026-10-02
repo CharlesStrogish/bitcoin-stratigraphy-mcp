@@ -46,3 +46,15 @@ with HTTP 400, even though a supported Streamable HTTP version worked.
 **How to apply:** Initialize with a supported protocol version, verify the
 negotiated response, and keep the MCP-Protocol-Version header consistent with it.
 Check the runtime SDK's supported versions before diagnosing a transport outage.
+
+Descriptive names explicitly requested for HTTP cost discovery may be accepted
+as quote-only selectors, but must not become callable MCP aliases implicitly.
+Batch totals are estimates for separate tool calls, not aggregate entitlements.
+
+**Why:** The requested cost payload uses descriptive operations while the public
+catalog must retain its 14 canonical tools. Paid credentials are path-bound and
+single-use, so a sum of prices cannot authorize multiple tool executions.
+
+**How to apply:** Return canonical execution names and per-tool L402 generation
+instructions. Keep quotes invoice-free, preserve original scopes for existing
+executable aliases, and distinguish the aggregate quote from actual settlement.

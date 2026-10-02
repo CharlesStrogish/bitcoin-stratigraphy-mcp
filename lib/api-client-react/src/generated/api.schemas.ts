@@ -21,6 +21,71 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export interface McpToolCostSelection {
+  /**
+     * @minItems 1
+     * @maxItems 32
+     * @items.minLength 1
+     * @items.maxLength 128
+     */
+  tools: string[];
+}
+
+export interface McpInvoiceGeneration {
+  method: 'POST';
+  endpoint: '/mcp';
+  jsonrpc_method: 'tools/call';
+  tool: string;
+  /** @minimum 1 */
+  amount_sats: number;
+  description: string;
+  scope_path: string;
+  /** @minimum 1 */
+  expiry_seconds: number;
+}
+
+export interface McpToolCostItem {
+  /** Original requested name or pricing selector */
+  tool: string;
+  canonical_tool: string;
+  /** @minimum 0 */
+  price_sats: number;
+  payment_required: boolean;
+  invoice_generation: McpInvoiceGeneration | null;
+}
+
+export type McpBatchCostQuotePerToolSats = {[key: string]: number};
+
+export type McpBatchCostQuoteL402 = {
+  settlement_asset: 'btc-lightning';
+  invoice_generated: false;
+  aggregate_invoice_supported: false;
+  /** @minimum 1 */
+  invoice_expiry_seconds: number;
+  generation_trigger: string;
+  challenge_status: 402;
+  challenge_header: 'WWW-Authenticate';
+  challenge_format: string;
+  challenge_body_fields: string[];
+  authorization_format: string;
+  credential_scope: string;
+  max_requests: 1;
+};
+
+export interface McpBatchCostQuote {
+  protocol: 'L402';
+  currency: 'sats';
+  perToolSats: McpBatchCostQuotePerToolSats;
+  /**
+     * @minItems 1
+     * @maxItems 32
+     */
+  items: McpToolCostItem[];
+  /** @minimum 0 */
+  total_sats: number;
+  l402: McpBatchCostQuoteL402;
+}
+
 export type McpDiscoveryManifestAuthor = {
   name: string;
   url: string;
@@ -1248,6 +1313,19 @@ export const ExportHuggingFaceDatasetFormat = {
   jsonl: 'jsonl',
   json: 'json',
 } as const;
+
+export type QuoteMcpToolCosts400 = {
+  error: string;
+};
+
+export type GetStratigraphyCostParams = {
+/**
+ * Optional MCP tool or descriptive pricing selector, e.g. stratigraphy.get_latest
+ * @minLength 1
+ * @maxLength 128
+ */
+tool?: string;
+};
 
 export type HeadPaidStratigraphyParams = {
 /**

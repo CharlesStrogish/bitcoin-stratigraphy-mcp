@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { canonicalToolName, legacyToolNames, mcpToolPrices, MCP_INVOICE_EXPIRY_SECONDS } from "../lib/mcp-pricing";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -2864,39 +2865,21 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
   })];
 
 const paidTools = {
-  "proof.list": { amountSats: 10, schema: listProofAttestationsInputSchema },
-  "stratigraphy.get": { amountSats: 250, schema: stratigraphyInputSchema },
-  "stratigraphy.get_digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
-  "stratigraphy.get_diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
-  "stratigraphy.get_range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
+  "proof.list": { amountSats: mcpToolPrices["proof.list"], schema: listProofAttestationsInputSchema },
+  "stratigraphy.get": { amountSats: mcpToolPrices["stratigraphy.get"], schema: stratigraphyInputSchema },
+  "stratigraphy.get_digest": { amountSats: mcpToolPrices["stratigraphy.get_digest"], schema: stratigraphyDigestInputSchema },
+  "stratigraphy.get_diff": { amountSats: mcpToolPrices["stratigraphy.get_diff"], schema: stratigraphyDiffInputSchema },
+  "stratigraphy.get_range": { amountSats: mcpToolPrices["stratigraphy.get_range"], schema: stratigraphyRangeInputSchema },
   // Keep the original scope and invoice description for already-issued L402 credentials.
-  "stratigraphy.digest": { amountSats: 250, schema: stratigraphyDigestInputSchema },
-  "stratigraphy.diff": { amountSats: 250, schema: stratigraphyDiffInputSchema },
-  "stratigraphy.range": { amountSats: 250, schema: stratigraphyRangeInputSchema },
-  "proof.get_by_hash": { amountSats: 250, schema: proofByHashInputSchema },
-  "proof.verify": { amountSats: 250, schema: verifyProofInputSchema },
-  "proof.ground": { amountSats: 250, schema: proofGroundInputSchema },
-  "proof.submit": { amountSats: 250, schema: submitProofInputSchema },
-  "mesh.broadcast": { amountSats: 250, schema: meshBroadcastInputSchema },
+  "stratigraphy.digest": { amountSats: mcpToolPrices["stratigraphy.get_digest"], schema: stratigraphyDigestInputSchema },
+  "stratigraphy.diff": { amountSats: mcpToolPrices["stratigraphy.get_diff"], schema: stratigraphyDiffInputSchema },
+  "stratigraphy.range": { amountSats: mcpToolPrices["stratigraphy.get_range"], schema: stratigraphyRangeInputSchema },
+  "proof.get_by_hash": { amountSats: mcpToolPrices["proof.get_by_hash"], schema: proofByHashInputSchema },
+  "proof.verify": { amountSats: mcpToolPrices["proof.verify"], schema: verifyProofInputSchema },
+  "proof.ground": { amountSats: mcpToolPrices["proof.ground"], schema: proofGroundInputSchema },
+  "proof.submit": { amountSats: mcpToolPrices["proof.submit"], schema: submitProofInputSchema },
+  "mesh.broadcast": { amountSats: mcpToolPrices["mesh.broadcast"], schema: meshBroadcastInputSchema },
 } as const;
-const mcpToolPrices = Object.fromEntries(mcpToolDefinitions.map((tool) => [
-  tool.name,
-  Object.hasOwn(paidTools, tool.name)
-    ? paidTools[tool.name as keyof typeof paidTools].amountSats
-    : 0,
-])) as Record<string, number>;
-
-const legacyToolNames = {
-  "payment.info": "payment.get_info",
-  "stratigraphy.digest": "stratigraphy.get_digest",
-  "stratigraphy.diff": "stratigraphy.get_diff",
-  "stratigraphy.range": "stratigraphy.get_range",
-  "mesh.status": "mesh.get_status",
-} as const;
-
-function canonicalToolName(name: string): string {
-  return legacyToolNames[name as keyof typeof legacyToolNames] ?? name;
-}
 
 function toolNamesForAuthorization(name: string): string[] {
   const canonicalName = canonicalToolName(name);
@@ -3132,11 +3115,11 @@ function createBitcoinStratigraphyMcpServer(
       }
       const structuredContent = {
         standardInvoiceSats: 250,
-        perToolSats: toolName ? { [toolName]: mcpToolPrices[toolName] } : mcpToolPrices,
+        perToolSats: toolName ? { [toolName]: mcpToolPrices[toolName as keyof typeof mcpToolPrices] } : mcpToolPrices,
         acceptedPaymentMethods: x402Configured
           ? ["Lightning L402", "x402 Exact (Base USDC)"]
           : ["Lightning L402"],
-        invoiceExpirySeconds: 3600,
+        invoiceExpirySeconds: MCP_INVOICE_EXPIRY_SECONDS,
         challenge: {
           httpStatus: 402,
           header: "WWW-Authenticate",
@@ -3407,6 +3390,7 @@ export function registerMcpRoute(
       (() => {
         const l402 = createL402Middleware({
         amountSats,
+        invoiceExpirySeconds: MCP_INVOICE_EXPIRY_SECONDS,
         description: `Bitcoin Stratigraphy MCP ${name} execution`,
         settlementRouter,
         sessionSecret: options.sessionSecret,

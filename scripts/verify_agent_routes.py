@@ -149,8 +149,8 @@ async def check_cost(client: httpx.AsyncClient) -> str:
     require(
         response.status_code == 200,
         f"POST /api/v1/cost returned HTTP {response.status_code}, expected 200. "
-        "The current GET-only tier quote is not a batch POST endpoint; requested "
-        "tool names correspond to canonical stratigraphy.get and proof.verify.",
+        "This check requires batch POST pricing, not a GET tier quote. Requested "
+        "pricing selectors correspond to canonical stratigraphy.get and proof.verify.",
     )
     body = response_object(response)
     prices = body.get("perToolSats", body.get("costs"))

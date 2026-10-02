@@ -787,6 +787,50 @@ paths:
                 items:
                   $ref: "#/components/schemas/StratigraphyEntry"
   /v1/cost:
+    post:
+      operationId: quoteMcpToolCosts
+      tags: [stratigraphy]
+      summary: Quote a batch of MCP tool prices in satoshis
+      description: >-
+        Public, read-only quote with wildcard CORS. Returns itemized fixed MCP
+        execution prices, a total in sats, and per-tool L402 invoice-generation
+        details. No invoice is created or settled by this endpoint. Each paid
+        tools/call obtains its own HTTP 402 challenge; the aggregate total is
+        not a batch credential. Descriptive pricing selectors
+        stratigraphy.get_latest and proof.verify_zk_proof resolve to
+        stratigraphy.get and proof.verify for quotes only, not MCP execution.
+        Existing executable legacy aliases retain their original paid scopes.
+        Prices are the same as payment.get_info and the actual MCP gates;
+        REST subscription-tier prices and discounts are separate.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpToolCostSelection"
+      responses:
+        "200":
+          description: Itemized satoshi costs and invoice-generation instructions
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+                const: "*"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpBatchCostQuote"
+        "400":
+          description: Invalid payload, duplicate names, or unknown tool/pricing selector
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
     get:
       operationId: getStratigraphyCost
       tags: [stratigraphy]
@@ -795,11 +839,21 @@ paths:
         Returns public pre-flight metadata without creating an invoice or
         requiring L402 authorization. Clients may send a NIP-98 event as
         `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted
-        prices.
+        prices. An optional tool query selects one fixed MCP execution quote
+        in addition to the unchanged tier and dataset metadata. It accepts
+        canonical tools, existing executable aliases, and the two descriptive
+        POST pricing selectors. It does not create an invoice.
       security:
         - {}
         - NIP98: []
       parameters:
+        - name: tool
+          in: query
+          description: Optional MCP tool or descriptive pricing selector, e.g. stratigraphy.get_latest
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
         - name: X-Settlement-Asset
           in: header
           description: Preferred settlement asset. Accept-Asset is supported as an alias.
@@ -823,7 +877,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/StratigraphyCost"
         "400":
-          description: Unsupported or conflicting settlement asset headers
+          description: Invalid tool selector or unsupported/conflicting settlement asset headers
           content:
             application/json:
               schema:
@@ -1357,6 +1411,130 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    McpToolCostSelection:
+      type: object
+      additionalProperties: false
+      required: [tools]
+      properties:
+        tools:
+          type: array
+          minItems: 1
+          maxItems: 32
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+          examples:
+            - [stratigraphy.get_latest, proof.verify_zk_proof]
+    McpInvoiceGeneration:
+      type: object
+      additionalProperties: false
+      required: [method, endpoint, jsonrpc_method, tool, amount_sats, description, scope_path, expiry_seconds]
+      properties:
+        method:
+          type: string
+          const: POST
+        endpoint:
+          type: string
+          const: /mcp
+        jsonrpc_method:
+          type: string
+          const: tools/call
+        tool:
+          type: string
+        amount_sats:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+        scope_path:
+          type: string
+        expiry_seconds:
+          type: integer
+          minimum: 1
+    McpToolCostItem:
+      type: object
+      additionalProperties: false
+      required: [tool, canonical_tool, price_sats, payment_required, invoice_generation]
+      properties:
+        tool:
+          type: string
+          description: Original requested name or pricing selector
+        canonical_tool:
+          type: string
+        price_sats:
+          type: integer
+          minimum: 0
+        payment_required:
+          type: boolean
+        invoice_generation:
+          anyOf:
+            - $ref: "#/components/schemas/McpInvoiceGeneration"
+            - type: "null"
+    McpBatchCostQuote:
+      type: object
+      additionalProperties: false
+      required: [protocol, currency, perToolSats, items, total_sats, l402]
+      properties:
+        protocol:
+          type: string
+          const: L402
+        currency:
+          type: string
+          const: sats
+        perToolSats:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        items:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/McpToolCostItem"
+        total_sats:
+          type: integer
+          minimum: 0
+        l402:
+          type: object
+          additionalProperties: false
+          required: [settlement_asset, invoice_generated, aggregate_invoice_supported, invoice_expiry_seconds, generation_trigger, challenge_status, challenge_header, challenge_format, challenge_body_fields, authorization_format, credential_scope, max_requests]
+          properties:
+            settlement_asset:
+              type: string
+              const: btc-lightning
+            invoice_generated:
+              type: boolean
+              const: false
+            aggregate_invoice_supported:
+              type: boolean
+              const: false
+            invoice_expiry_seconds:
+              type: integer
+              minimum: 1
+            generation_trigger:
+              type: string
+            challenge_status:
+              type: integer
+              const: 402
+            challenge_header:
+              type: string
+              const: WWW-Authenticate
+            challenge_format:
+              type: string
+            challenge_body_fields:
+              type: array
+              items:
+                type: string
+            authorization_format:
+              type: string
+            credential_scope:
+              type: string
+            max_requests:
+              type: integer
+              const: 1
     McpDiscoveryManifest:
       type: object
       required: [$schema, name, version, description, author, homepage, mcp, pricing, verification]

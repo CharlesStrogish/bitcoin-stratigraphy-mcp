@@ -1,5 +1,6 @@
 import {
   GetPaidStratigraphyResponse,
+  QuoteMcpToolCostsBody,
   ReadinessCheckResponse,
   VerifyZkProofBody,
   VerifyZkProofResponse,
@@ -10,6 +11,7 @@ import {
   type Response,
 } from "express";
 import { createL402Middleware } from "../middleware/l402";
+import { quoteMcpTools } from "../lib/mcp-pricing";
 import {
   createHash,
   createHmac,
@@ -1194,7 +1196,42 @@ export function registerStratigraphyRoutes(
     res.status(200).json(data.slice(-5));
   });
 
+  app.use("/api/v1/cost", (_req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.removeHeader("Access-Control-Allow-Credentials");
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+
+  app.post("/api/v1/cost", (req, res): void => {
+    const parsed = QuoteMcpToolCostsBody.strict().safeParse(req.body);
+    if (!parsed.success || new Set(parsed.data.tools).size !== parsed.data.tools.length) {
+      res.status(400).json({ error: "tools must contain 1–32 distinct nonempty tool names; no other body fields are accepted" });
+      return;
+    }
+    try {
+      res.status(200).json(quoteMcpTools(parsed.data.tools));
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   app.get("/api/v1/cost", async (req, res): Promise<void> => {
+    let selectedToolQuote: ReturnType<typeof quoteMcpTools> | undefined;
+    if (req.query.tool !== undefined) {
+      if (typeof req.query.tool !== "string" || !req.query.tool || req.query.tool.length > 128) {
+        res.status(400).json({ error: "tool must be one nonempty tool name" });
+        return;
+      }
+      try {
+        selectedToolQuote = quoteMcpTools([req.query.tool]);
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+        res.status(400).json({ error: error.message });
+        return;
+      }
+    }
     const assetSelection = requestSettlementAsset(req);
     if ("error" in assetSelection) {
       res.status(400).json({ error: assetSelection.error });
@@ -1225,6 +1262,7 @@ export function registerStratigraphyRoutes(
     );
     res.status(200).json({
       protocol: "L402",
+      ...selectedToolQuote,
       settlement_asset: assetSelection.asset,
       supported_assets: supportedSettlementAssets(settlementRouter),
       available_assets: availableSettlementAssets(settlementRouter),

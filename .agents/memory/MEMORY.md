@@ -36,6 +36,7 @@
 - [Vendored archive integrity](vendored-archive-integrity.md) — a repacked local SDK archive can make unrelated frozen installs fail after lockfile regeneration.
 - [Nested Replit config validation](nested-replit-config-validation.md) — the validator replaces the workspace root .replit even when its temp file lives in a subdirectory.
 - [Smithery badge reliability](smithery-badge-reliability.md) — the remote badge endpoint returned HTTP 500; prefer the local SVG fallback until a working dynamic endpoint is verified.
+- [Smithery discovery probes](smithery-discovery-probes.md) — preserve the requested static card independently of engine versions; GET/HEAD scanners must not open idle SSE streams.
 - [Public training export policy](public-training-export-policy.md) — crawler dataset exports stay open while interactive MCP queries remain L402-paid; describe index/proof limits plainly.
 - [OTS pool receipt calendars](ots-pool-receipt-calendars.md) — public pools can return underlying calendar URLs; inspect real receipts before tightening the accepted issuer list.
 - [x402 paid MCP settlement](x402-paid-mcp-settlement.md) — quote both rails without credentials, but mark x402 unavailable and require upfront settlement before tool execution.

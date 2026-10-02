@@ -2,6 +2,15 @@ import type { Express } from "express";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 
+/** Static Smithery discovery must not require an MCP connection or tool execution. */
+export const smitheryServerCard = {
+  name: "bitcoin-stratigraphy-mcp",
+  displayName: "Bitcoin Stratigraphy Data Engine",
+  description: "Provides thermodynamic data, proof verification, and L402 payments.",
+  version: "1.0.0",
+  url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+} as const;
+
 export const mcpServerCard = {
   name: "bitcoin-stratigraphy",
   description: ENGINE_DESCRIPTION,
@@ -202,7 +211,7 @@ export function registerMcpServerCardRoute(app: Express): void {
   }
 
   app.get("/.well-known/mcp/server-card.json", (_req, res): void => {
-    res.status(200).json(mcpServerCard);
+    res.status(200).json(smitheryServerCard);
   });
 
   for (const path of [

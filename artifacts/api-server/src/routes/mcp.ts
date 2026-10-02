@@ -3302,7 +3302,7 @@ async function handleMcpRequest(
     await server.connect(transport);
     // This transport is configured to return JSON for POSTs, but the SDK still
     // requires clients to advertise SSE. Allow JSON-only clients without
-    // changing the response format or the behavior of GET event streams.
+    // changing the JSON response format. GET/HEAD probes are handled separately.
     const accept = req.headers.accept;
     if (req.method === "POST" &&
         accept?.toLowerCase().includes("application/json") &&
@@ -3431,7 +3431,9 @@ export function registerMcpRoute(
   ) as Record<string, (req: Request, res: Response, next: NextFunction) => void | Promise<void>>;
   app.all("/mcp", rateLimit, (req, res, next) => {
     res.locals.x402Configured = x402Ready;
-    if (req.method === "GET" && !req.get("Accept")?.toLowerCase().includes("text/event-stream")) {
+    // This stateless endpoint returns JSON for POSTs. Discovery scanners can
+    // advertise SSE too, so never open an idle event stream for a GET or HEAD.
+    if (req.method === "GET" || req.method === "HEAD") {
       res.status(200).json({ status: "ok", service: "MCP Server" });
       return;
     }

@@ -3533,21 +3533,32 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
   assert.equal((await malformed.json() as { error: { code: number } }).error.code, -32700);
 });
 
-test("offers SSE transport without changing the public OpenAPI route", async () => {
-  const abortController = new AbortController();
-  const sseResponse = await fetch(`${baseUrl}/mcp`, {
-    headers: {
-      Accept: "text/event-stream",
-      "MCP-Protocol-Version": "2025-03-26",
-    },
-    signal: abortController.signal,
-  });
-  assert.equal(sseResponse.status, 200);
-  assert.match(
-    sseResponse.headers.get("content-type") ?? "",
-    /^text\/event-stream/,
-  );
-  abortController.abort();
+test("finishes MCP GET and HEAD probes even when scanners advertise SSE", async () => {
+  const requestsBefore = invoiceRequestCount;
+  for (const method of ["GET", "HEAD"]) {
+    for (const accept of ["*/*", "application/json", "text/event-stream", "application/json, text/event-stream"]) {
+      const response = await fetch(`${baseUrl}/mcp`, {
+        method,
+        headers: {
+          Accept: accept,
+          "User-Agent": "SmitheryBot",
+          "MCP-Protocol-Version": "2025-03-26",
+        },
+        // Covers reading the whole body, not just receiving the first headers.
+        signal: AbortSignal.timeout(2_000),
+      });
+      assert.equal(response.status, 200, `${method} ${accept}`);
+      assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
+      assert.equal(response.headers.get("www-authenticate"), null);
+      const body = await response.text();
+      if (method === "HEAD") {
+        assert.equal(body, "");
+      } else {
+        assert.deepEqual(JSON.parse(body), { status: "ok", service: "MCP Server" });
+      }
+    }
+  }
+  assert.equal(invoiceRequestCount, requestsBefore);
 
   const openApiResponse = await fetch(`${baseUrl}/openapi.json`);
   assert.equal(openApiResponse.status, 200);
@@ -3576,19 +3587,35 @@ test("serves the public MCP discovery manifest with wildcard CORS and no payment
 });
 
 test("serves the public MCP server card without an L402 challenge", async () => {
+  const requestsBefore = invoiceRequestCount;
   const response = await fetch(
     `${baseUrl}/.well-known/mcp/server-card.json`,
     {
       headers: {
         Authorization: `L402 ${paymentHash}:${preimage}`,
+        "User-Agent": "SmitheryBot",
       },
+      signal: AbortSignal.timeout(2_000),
     },
   );
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.equal(response.headers.get("www-authenticate"), null);
-  assert.deepEqual(await response.json(), mcpServerCard);
+  assert.deepEqual(await response.json(), {
+    name: "bitcoin-stratigraphy-mcp",
+    displayName: "Bitcoin Stratigraphy Data Engine",
+    description: "Provides thermodynamic data, proof verification, and L402 payments.",
+    version: "1.0.0",
+    url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+  });
+  const head = await fetch(`${baseUrl}/.well-known/mcp/server-card.json`, {
+    method: "HEAD",
+    signal: AbortSignal.timeout(2_000),
+  });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), "");
+  assert.equal(invoiceRequestCount, requestsBefore);
 });
 
 test("serves Smithery verification text at both public root paths", async () => {

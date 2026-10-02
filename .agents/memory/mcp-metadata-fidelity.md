@@ -36,3 +36,13 @@ the requested names included unregistered operations and new payment behaviors.
 **How to apply:** Load discovery schemas from the live server. Treat requested
 names as explanatory intent mappings where accurate, clearly label unsupported
 operations, and do not add API or payment behavior just to match a docs label.
+
+Do not assume a discovery manifest's protocol-version string is accepted by the
+runtime MCP transport.
+
+**Why:** Discovery advertised a date-like version the installed MCP SDK rejected
+with HTTP 400, even though a supported Streamable HTTP version worked.
+
+**How to apply:** Initialize with a supported protocol version, verify the
+negotiated response, and keep the MCP-Protocol-Version header consistent with it.
+Check the runtime SDK's supported versions before diagnosing a transport outage.

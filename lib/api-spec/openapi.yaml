@@ -1560,6 +1560,26 @@ components:
         homepage:
           type: string
           format: uri
+        documentation:
+          type: string
+          format: uri
+          description: Direct link to the interactive Developer Portal and Live Tool Explorer
+        links:
+          type: object
+          required: [documentation, cookbooks, python_sdk, pricing]
+          properties:
+            documentation:
+              type: string
+              format: uri
+            cookbooks:
+              type: string
+              format: uri
+            python_sdk:
+              type: string
+              format: uri
+            pricing:
+              type: string
+              format: uri
         mcp:
           type: object
           required: [version, transports, capabilities]
@@ -1604,6 +1624,14 @@ components:
               type: string
             cost_discovery_endpoint:
               type: string
+            cost_discovery_methods:
+              type: array
+              items:
+                type: string
+                enum: [GET, POST]
+            batch_quotes_create_invoices:
+              type: boolean
+              const: false
         verification:
           type: object
           required: [zk_proving_system, curve, time_anchor, mesh_consensus]

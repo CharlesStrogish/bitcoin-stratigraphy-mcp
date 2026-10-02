@@ -10,6 +10,7 @@ export function registerDocsRoutes(
 ): void {
   const docsRoot = path.join(publicRoot, "docs");
   app.get(/^\/docs\/?$/, docsController(docsRoot));
+  app.get(/^\/cookbooks\/?$/, docsController(path.join(publicRoot, "cookbooks")));
   app.use("/docs/assets", express.static(docsRoot, {
     index: false,
     dotfiles: "deny",

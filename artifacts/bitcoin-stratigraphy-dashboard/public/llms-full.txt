@@ -2,6 +2,15 @@
 
 > Static reference for the fourteen canonical tools returned by `tools/list` at https://bitcoin-stratigraphy-dashboard.replit.app/mcp. JSON Schemas below include every input property, type, required field, enum, range, pattern, and additional-properties rule. Human-readable examples and property descriptions are condensed; `tools/list` is authoritative for the live metadata and any later schema changes.
 
+## Developer portal, Python SDK and integration cookbooks
+
+- [Interactive Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs): inspect live schemas and manually test the 14 canonical MCP tools across 4 namespaces.
+- [Integration suite](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks): setup guide and CrewAI, LangChain and AutoGen examples.
+- [Python SDK/client source](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks/l402_client.py): HTTPX-based remote JSON-RPC client with bounded, explicit L402 Lightning payment callbacks. It never pays automatically.
+- [MCP discovery manifest](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json): direct documentation and SDK links.
+
+For free batch pricing, POST `{"tools":["stratigraphy.get_latest","proof.verify_zk_proof"]}` as JSON to `https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost`. The response includes `perToolSats`, itemized `items`, `total_sats` and `l402` invoice-generation details. These two descriptive pricing selectors resolve to canonical `stratigraphy.get` and `proof.verify` only for quoting; they are not new callable MCP tools. No invoice is created or paid by a quote, and the aggregate total is not a multi-tool credential. Each paid tools/call obtains its own path-bound, single-use L402 challenge. Existing GET tier/asset discovery remains available.
+
 ## Public dataset export for fine-tuning
 
 `GET /api/export/huggingface` requires no L402 authorization. It returns newline-delimited JSON (`application/x-ndjson`) by default, one Hugging Face instruction-tuning row per line. Use `?format=json` for a JSON array and `?limit=N` for the most recent N rows (1–500, default 500), returned oldest-to-newest. Each row has `height`, UTC `timestamp`, `target_multiplier`, `record_hash`, `zk_proof_status`, `instruction`, a formatted `prompt`, `response`, and the validated source fields needed to reproduce the fingerprint. `GET /.well-known/llm-schema.json` publishes the parameter definitions, JSON Schema, domain constraints, and hash/verification protocol for crawlers.

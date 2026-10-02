@@ -14,6 +14,7 @@ test("docs and cookbook routes serve only public assets and explicit examples", 
   await writeFile(path.join(root, "docs/portal.js"), "/* portal */");
   await writeFile(path.join(root, "cookbooks/l402_client.py"), "# Public client\n");
   await writeFile(path.join(root, "cookbooks/private.txt"), "Must never be served");
+  await writeFile(path.join(root, "cookbooks/index.html"), "<!doctype html><title>Python SDK &amp; Integration Cookbooks</title>");
   const app = express();
   registerDocsRoutes(app, root);
   const server = app.listen(0, "127.0.0.1");
@@ -30,6 +31,13 @@ test("docs and cookbook routes serve only public assets and explicit examples", 
       assert.match(await response.text(), /Developer portal/);
     }
     const asset = await fetch(base + "/docs/assets/portal.js");
+    for (const url of ["/cookbooks", "/cookbooks/"]) {
+      const directory = await fetch(base + url);
+      assert.equal(directory.status, 200);
+      assert.match(directory.headers.get("content-type")!, /text\/html/);
+      assert.match(directory.headers.get("content-security-policy")!, /script-src 'self'/);
+      assert.match(await directory.text(), /Python SDK &amp; Integration Cookbooks/);
+    }
     assert.equal(asset.status, 200);
     assert.match(await asset.text(), /portal/);
     const source = await fetch(base + "/cookbooks/l402_client.py");

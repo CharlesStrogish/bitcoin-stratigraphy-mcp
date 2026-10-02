@@ -25,6 +25,10 @@ async function buildAll() {
   );
   // Only publish the public integration examples, never the workspace itself.
   await mkdir(path.resolve(distDir, "public/cookbooks"), { recursive: true });
+  await cp(
+    path.resolve(artifactDir, "src/public/cookbooks/index.html"),
+    path.resolve(distDir, "public/cookbooks/index.html"),
+  );
   for (const filename of [
     "README.md", "requirements.txt", "l402_client.py",
     "langchain_example.py", "autogen_example.py", "crewai_example.py",

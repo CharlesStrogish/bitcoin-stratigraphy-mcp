@@ -91,6 +91,13 @@ export type McpDiscoveryManifestAuthor = {
   url: string;
 };
 
+export type McpDiscoveryManifestLinks = {
+  documentation: string;
+  cookbooks: string;
+  python_sdk: string;
+  pricing: string;
+};
+
 export type McpDiscoveryManifestMcpTransportsItemType = typeof McpDiscoveryManifestMcpTransportsItemType[keyof typeof McpDiscoveryManifestMcpTransportsItemType];
 
 
@@ -120,9 +127,19 @@ export type McpDiscoveryManifestMcp = {
   capabilities: McpDiscoveryManifestMcpCapabilities;
 };
 
+export type McpDiscoveryManifestPricingCostDiscoveryMethodsItem = typeof McpDiscoveryManifestPricingCostDiscoveryMethodsItem[keyof typeof McpDiscoveryManifestPricingCostDiscoveryMethodsItem];
+
+
+export const McpDiscoveryManifestPricingCostDiscoveryMethodsItem = {
+  GET: 'GET',
+  POST: 'POST',
+} as const;
+
 export type McpDiscoveryManifestPricing = {
   model: string;
   cost_discovery_endpoint: string;
+  cost_discovery_methods?: McpDiscoveryManifestPricingCostDiscoveryMethodsItem[];
+  batch_quotes_create_invoices?: false;
 };
 
 export type McpDiscoveryManifestVerification = {
@@ -139,6 +156,9 @@ export interface McpDiscoveryManifest {
   description: string;
   author: McpDiscoveryManifestAuthor;
   homepage: string;
+  /** Direct link to the interactive Developer Portal and Live Tool Explorer */
+  documentation?: string;
+  links?: McpDiscoveryManifestLinks;
   mcp: McpDiscoveryManifestMcp;
   pricing: McpDiscoveryManifestPricing;
   verification: McpDiscoveryManifestVerification;

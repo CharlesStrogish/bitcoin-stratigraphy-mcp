@@ -6,9 +6,12 @@
 > native per-record Bitcoin block provenance.
 
 ## Agent entry points
+- [Interactive Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs): live schemas and a manual playground for 14 MCP tools across 4 namespaces.
+- [Python SDK and integration cookbooks](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks): CrewAI, LangChain and AutoGen examples; [HTTPX Python SDK/client source](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks/l402_client.py). Payments require explicit callbacks.
+- [MCP auto-discovery manifest](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json): transport, documentation links, namespaces and pricing methods.
 - [Complete tool schemas and TypeScript SDK usage](https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt)
 - [MCP Streamable HTTP endpoint](https://bitcoin-stratigraphy-dashboard.replit.app/mcp): POST JSON-RPC 2.0 requests, starting with `tools/list`; this is a protocol endpoint, not a browsable HTML page.
-- [Pre-flight price discovery](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost): GET the current L402 tiers, prices and supported settlement assets before requesting a paid tool.
+- [Pre-flight price discovery](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost): GET REST tiers, prices and supported assets; POST `{"tools":["stratigraphy.get_latest","proof.verify_zk_proof"]}` for itemized MCP satoshi costs, a batch total and L402 Lightning invoice-generation instructions. The two descriptive selectors map to canonical `stratigraphy.get` and `proof.verify` for pricing only. Quotes create no invoices; paid MCP calls require separate path-bound, single-use payment proofs.
 - [Paid REST telemetry stream](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/stratigraphy/stream): `GET` Server-Sent Events with a 30-second refresh interval. This is a separate REST transport, not MCP; consult `/api/v1/cost` for the current price and assets.
 - [OpenAPI document](https://bitcoin-stratigraphy-dashboard.replit.app/openapi.json)
 - [MCP server card](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json)

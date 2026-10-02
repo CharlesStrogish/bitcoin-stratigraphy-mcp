@@ -1,5 +1,7 @@
 # Bitcoin Stratigraphy MCP Server
 
+**[Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks)**
+
 [![Glama TDQS](https://img.shields.io/badge/Glama-Grade%20A%20%284.4%2F5.0%29-10b981)](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
 [![Smithery Rating](https://img.shields.io/badge/Smithery-100%2F100-brightgreen)](https://smithery.ai/servers/crstrogish/bitcoin-stratigraphy-mcp)
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2025--11--25-orange)](https://modelcontextprotocol.io/specification/2025-11-25)
@@ -35,8 +37,11 @@ Lightning settlement / OTS receipts
 - **Clients:** Claude, GPT-based agents, Perplexity integrations, autonomous
   swarms, and custom MCP runners need a compatible client; naming a client here
   does not imply that it has automatic wallet or payment support.
-- **Discovery and gateway:** Public discovery identifies the MCP endpoint.
-  `/api/v1/cost` advertises REST prices and asset availability;
+- **Discovery and gateway:** Public discovery links directly to the `/docs`
+  portal and identifies the MCP endpoint. `GET /api/v1/cost` advertises REST
+  prices and asset availability; `POST /api/v1/cost` accepts a `tools` array
+  and returns free itemized MCP satoshi prices, a batch total, and per-tool
+  L402 invoice-generation instructions without creating or paying invoices.
   `payment.get_info` advertises MCP terms. Paid calls receive HTTP 402
   challenges, then redeem verified payment proofs and scoped macaroons.
 - **Tool routing:** The canonical catalog contains 5 `stratigraphy.*`,

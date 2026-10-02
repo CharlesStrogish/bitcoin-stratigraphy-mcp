@@ -38,6 +38,13 @@ export const GetMcpDiscoveryManifestResponse = zod.object({
   "url": zod.string().url()
 }),
   "homepage": zod.string().url(),
+  "documentation": zod.string().url().optional().describe('Direct link to the interactive Developer Portal and Live Tool Explorer'),
+  "links": zod.object({
+  "documentation": zod.string().url(),
+  "cookbooks": zod.string().url(),
+  "python_sdk": zod.string().url(),
+  "pricing": zod.string().url()
+}).optional(),
   "mcp": zod.object({
   "version": zod.string(),
   "transports": zod.array(zod.object({
@@ -55,7 +62,9 @@ export const GetMcpDiscoveryManifestResponse = zod.object({
 }),
   "pricing": zod.object({
   "model": zod.string(),
-  "cost_discovery_endpoint": zod.string()
+  "cost_discovery_endpoint": zod.string(),
+  "cost_discovery_methods": zod.array(zod.enum(['GET', 'POST'])).optional(),
+  "batch_quotes_create_invoices": zod.literal(false).optional()
 }),
   "verification": zod.object({
   "zk_proving_system": zod.string(),

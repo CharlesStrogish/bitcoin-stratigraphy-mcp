@@ -3,12 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context grounding to autonomous AI swarms across 14 MCP tools.</title>
-    <meta name="description" content="Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context grounding to autonomous AI swarms across 14 MCP tools." />
+    <title>Bitcoin Stratigraphy | 14 MCP Tools, Docs &amp; L402 Pricing</title>
+    <meta name="description" content="Explore 14 live MCP tools across 4 namespaces in the interactive /docs Developer Portal &amp; Live Tool Explorer. Integrate the Python SDK and /cookbooks suite for CrewAI, LangChain and AutoGen, with L402 Lightning micropayments and batch POST pricing." />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://bitcoin-stratigraphy-dashboard.replit.app/" />
-    <meta property="og:title" content="Bitcoin Stratigraphy | L402 Telemetry &amp; MCP Engine" />
-    <meta property="og:description" content="Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context grounding to autonomous AI swarms across 14 MCP tools." />
+    <meta property="og:title" content="Bitcoin Stratigraphy | 14 MCP Tools, Docs &amp; L402 Pricing" />
+    <meta property="og:description" content="Interactive /docs Developer Portal &amp; Live Tool Explorer: 14 live MCP tools across 4 namespaces. Discover the Python SDK and /cookbooks integration suite for CrewAI, LangChain and AutoGen, plus L402 Lightning micropayments and batch POST pricing." />
+    <meta property="og:site_name" content="Bitcoin Stratigraphy" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://bitcoin-stratigraphy-dashboard.replit.app/" />
     <meta property="og:image" content="https://bitcoin-stratigraphy-dashboard.replit.app/og-image.png" />
@@ -16,8 +17,10 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Bitcoin Stratigraphy indexed telemetry and MCP data engine" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Bitcoin Stratigraphy | L402 Telemetry &amp; MCP Engine" />
-    <meta name="twitter:description" content="Explore indexed Bitcoin thermodynamic telemetry, proof tools, signed tip anchors, and Nostr mesh data through Streamable HTTP MCP and separate REST APIs." />
+    <meta name="twitter:title" content="Bitcoin Stratigraphy | 14 MCP Tools, Docs &amp; L402 Pricing" />
+    <meta name="twitter:description" content="Interactive /docs Developer Portal &amp; Live Tool Explorer, 14 MCP tools across 4 namespaces, Python SDK, /cookbooks integrations for CrewAI, LangChain and AutoGen, and L402 Lightning micropayments with batch POST pricing." />
+    <link rel="help" href="https://bitcoin-stratigraphy-dashboard.replit.app/docs" />
+    <link rel="alternate" type="application/json" title="MCP discovery manifest" href="https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json" />
     <meta name="twitter:image" content="https://bitcoin-stratigraphy-dashboard.replit.app/og-image.png" />
     <meta name="twitter:image:alt" content="Bitcoin Stratigraphy indexed telemetry and MCP data engine" />
     <script type="application/ld+json">
@@ -41,17 +44,27 @@
         "@id": "https://bitcoin-stratigraphy-dashboard.replit.app/#creator"
       },
       "license": "https://creativecommons.org/licenses/by/4.0/",
-      "conditionsOfAccess": "MCP discovery includes free tools; paid MCP tools use current per-tool L402 prices. Base USDC x402 depends on live configuration; query payment.get_info for MCP availability and /api/v1/cost for REST pricing.",
+      "conditionsOfAccess": "MCP discovery includes free tools; paid MCP tools use current per-tool L402 Lightning prices. GET /api/v1/cost reports REST tiers; POST /api/v1/cost returns free itemized MCP quotes and batch totals without generating invoices. Base USDC x402 depends on live configuration; query payment.get_info for MCP availability.",
       "isAccessibleForFree": false
     },
     {
       "@type": "WebAPI",
       "@id": "https://bitcoin-stratigraphy-dashboard.replit.app/#mcp-api",
       "name": "Bitcoin Stratigraphy MCP and REST API",
-      "description": "A 14-tool Model Context Protocol server using Streamable HTTP at /mcp for indexed Bitcoin stratigraphy, supplied-proof verification, signed Bitcoin-tip anchor receipts, and Nostr mesh status and outbound broadcasts. Paid MCP calls use L402; Base USDC x402 is conditional on live configuration. The REST SSE stream at /api/v1/stratigraphy/stream is a separate endpoint and supports three L402 assets only. proof.ground receipts are not Groth16 proofs, on-chain confirmations, or Bitcoin-confirmed OpenTimestamps proofs; historical indexed records do not imply live block provenance.",
+      "description": "14 live MCP tools across 4 namespaces with an interactive /docs Developer Portal and Live Tool Explorer, a Python SDK/client and /cookbooks integrations for CrewAI, LangChain and AutoGen, and free batch POST pricing for L402 Lightning micropayments. Streamable HTTP at /mcp serves indexed Bitcoin stratigraphy, supplied-proof verification, signed Bitcoin-tip anchor receipts, and Nostr mesh status and outbound broadcasts. Base USDC x402 is conditional on live configuration. The REST SSE stream is separate and supports three L402 assets only. proof.ground receipts are not Groth16 proofs, on-chain confirmations, or Bitcoin-confirmed OpenTimestamps proofs; historical indexed records do not imply live block provenance.",
       "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
-      "documentation": "https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt",
+      "documentation": "https://bitcoin-stratigraphy-dashboard.replit.app/docs",
       "potentialAction": [
+        {
+          "@type": "Action",
+          "name": "Request free itemized MCP batch pricing in satoshis without generating invoices",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost",
+            "httpMethod": "POST",
+            "encodingType": "application/json"
+          }
+        },
         {
           "@type": "Action",
           "name": "Discover REST API pricing and configured payment assets",

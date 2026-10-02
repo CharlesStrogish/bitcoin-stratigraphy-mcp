@@ -22,6 +22,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { McpDiscoveryManifestAuthor } from './mcpDiscoveryManifestAuthor';
+import type { McpDiscoveryManifestLinks } from './mcpDiscoveryManifestLinks';
 import type { McpDiscoveryManifestMcp } from './mcpDiscoveryManifestMcp';
 import type { McpDiscoveryManifestPricing } from './mcpDiscoveryManifestPricing';
 import type { McpDiscoveryManifestVerification } from './mcpDiscoveryManifestVerification';
@@ -33,6 +34,9 @@ export interface McpDiscoveryManifest {
   description: string;
   author: McpDiscoveryManifestAuthor;
   homepage: string;
+  /** Direct link to the interactive Developer Portal and Live Tool Explorer */
+  documentation?: string;
+  links?: McpDiscoveryManifestLinks;
   mcp: McpDiscoveryManifestMcp;
   pricing: McpDiscoveryManifestPricing;
   verification: McpDiscoveryManifestVerification;

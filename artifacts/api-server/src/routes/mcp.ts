@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { frameMcpErrors, validateMcpEnvelope } from "../middleware/mcpJsonRpc";
 import { canonicalToolName, legacyToolNames, mcpToolPrices, MCP_INVOICE_EXPIRY_SECONDS } from "../lib/mcp-pricing";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -3318,7 +3319,7 @@ async function handleMcpRequest(
       });
     }
   } catch (error) {
-    req.log.error({ err: error }, "MCP request failed");
+    req.log?.error({ err: error }, "MCP request failed");
     if (!res.headersSent) {
       res.status(500).json({
         jsonrpc: "2.0",
@@ -3327,14 +3328,14 @@ async function handleMcpRequest(
       });
     }
   } finally {
-    if (!res.headersSent || req.method !== "GET") {
-      await transport.close();
-      await server.close();
-    } else {
-      res.on("close", () => {
-        void transport.close();
-        void server.close();
-      });
+    // GET/HEAD are finite probes handled before this function. Always settle
+    // both cleanup promises, including when one close operation rejects.
+    for (const close of [() => transport.close(), () => server.close()]) {
+      try {
+        await close();
+      } catch (error) {
+        req.log?.warn({ err: error }, "MCP cleanup failed");
+      }
     }
   }
 }
@@ -3364,6 +3365,7 @@ export function registerMcpRoute(
     revocationStore?: MacaroonRevocationStore;
   } = {},
 ): void {
+  app.use("/mcp", frameMcpErrors);
   const rateLimit = createHttpRateLimitMiddleware(
     createSlidingWindowRateLimiter({ limit: 60, windowMs: 60_000 }),
   );
@@ -3438,7 +3440,7 @@ export function registerMcpRoute(
       return;
     }
     next();
-  }, async (req, res, next) => {
+  }, validateMcpEnvelope, async (req, res, next) => {
     const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
     if (body?.method !== "tools/call" ||
       (body.params?.name !== "payment.get_info" && body.params?.name !== "payment.info")) {
@@ -3706,7 +3708,7 @@ export function registerMcpRoute(
         }
       }
     }
-    gates[name](req, res, next);
+    await gates[name](req, res, next);
   }, async (req, res, next) => {
     const body = req.body as { id?: unknown; method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
     if (body?.method !== "tools/call" || body.params?.name !== "proof.verify") {

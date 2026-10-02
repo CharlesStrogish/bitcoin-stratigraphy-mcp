@@ -25,6 +25,14 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
         seen = []
 
         def handle(request):
+            if request.url.path == "/.well-known/mcp/server-card.json":
+                return httpx.Response(200, headers={"access-control-allow-origin": "*"}, json={
+                    "name": "broken" if fault == "card" else "bitcoin-stratigraphy-mcp",
+                    "displayName": "Bitcoin Stratigraphy Data Engine",
+                    "description": "Provides thermodynamic data, proof verification, and L402 payments.",
+                    "version": "1.0.0",
+                    "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+                })
             seen.append(request)
             self.assertNotIn("authorization", request.headers)
             if request.url.path == "/.well-known/mcp.json":
@@ -82,7 +90,7 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
 
         async with httpx.AsyncClient(base_url="https://test.invalid", transport=httpx.MockTransport(handle)) as client:
             results = await run_checks(client)
-        self.assertEqual(len(results), 4)
+        self.assertEqual(len(results), 5)
         return results, seen
 
     async def test_json_success(self):
@@ -97,7 +105,7 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
     async def test_failed_checks_do_not_skip_other_probes(self):
         for fault, index in [
             ("cors", 0), ("namespace", 0), ("catalog", 0),
-            ("cost404", 1), ("price", 1), ("challenge", 2),
+            ("cost404", 1), ("price", 1), ("challenge", 2), ("card", 4),
             ("macaroon", 2), ("invoice", 2), ("timeout", 2), ("rpc_error", 3),
         ]:
             with self.subTest(fault=fault):

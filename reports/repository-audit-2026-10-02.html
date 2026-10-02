@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bitcoin Stratigraphy — Repository Audit</title>
+<style>
+body{margin:0;background:#f4f6f8;color:#17212b;font:16px/1.6 system-ui,sans-serif}main{max-width:960px;margin:auto;padding:36px 24px 64px}h1{line-height:1.2}h2{margin-top:32px}table{width:100%;border-collapse:collapse;background:white}th,td{text-align:left;border:1px solid #d8dfe6;padding:10px 14px}th{background:#eaf0f5}code{font-size:13px;overflow-wrap:anywhere}.notice{border-left:4px solid #b87700;background:#fff6df;padding:14px 18px}.pass{color:#116438;font-weight:600}li{margin:5px 0}
+</style>
+</head>
+<body><main>
+<h1>Bitcoin Stratigraphy<br>Repository audit and AI discoverability</h1>
+<p>Completed October 2, 2026. Verification covers the workspace and its running development preview, not a newly published release.</p>
+<h2>Verification results</h2>
+<table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Workspace test suite</td><td class="pass">313 / 313 passed; zero failed, skipped or cancelled</td></tr>
+<tr><td>Separate docs regression</td><td class="pass">1 / 1 passed</td></tr>
+<tr><td>Python checker regressions</td><td class="pass">4 / 4 passed</td></tr>
+<tr><td>Total offline tests</td><td class="pass">318 / 318 passed</td></tr>
+<tr><td>Live agent-route checker</td><td class="pass">5 / 5 passed on the development host</td></tr>
+<tr><td>TypeScript</td><td class="pass">All workspace type checks passed</td></tr>
+<tr><td>Syntax and dependencies</td><td class="pass">17 tracked JavaScript files and 14 tracked Python files passed syntax checks; workspace builds and required checker imports succeeded</td></tr>
+<tr><td>OpenAPI</td><td class="pass">Validated and regenerated consumers; 14 canonical MCP tool definitions and 30 HTTP paths</td></tr>
+<tr><td>Dependency vulnerability rescan</td><td class="pass">Zero vulnerabilities at all reported severities</td></tr>
+<tr><td>Static security rescan</td><td class="pass">Zero findings</td></tr>
+<tr><td>Dataflow security rescan</td><td>One reported critical finding, manually reviewed as a false positive: public signed Nostr announcement logging, not private-key logging</td></tr>
+<tr><td>Documentation preview</td><td class="pass">Rendered successfully; live catalog displayed 14 tools across four namespaces</td></tr>
+</tbody></table>
+<h2>Corrections</h2>
+<ul>
+<li>Rejected malformed JSON-RPC envelopes before invoice creation, entitlement checks or tool side effects.</li>
+<li>Framed MCP payment/provider, rate-limit and other HTTP failures as JSON-RPC 2.0 errors, preserving challenge fields and payment headers. Preserved parse, invalid-request, invalid-parameter and internal-error distinctions and request IDs.</li>
+<li>Awaited paid-tool middleware promises and handled both transport and server cleanup failures explicitly.</li>
+<li>Added 42 unexpected-argument probes across all 14 tools plus malformed-envelope regressions. Existing tool-specific validation and execution contracts also passed.</li>
+<li>Isolated scanner-test request budgets rather than weakening the production limiter. Corrected paid-batch fixtures to include valid JSON-RPC version fields.</li>
+<li>Added the exact static Smithery card, finite GET/HEAD probes, POST JSON-RPC contract, browser preflights and missing public metadata/status routes to OpenAPI.</li>
+<li>Explicitly permitted SmitheryBot alongside existing AI crawler rules.</li>
+<li>Extended the Python live checker and offline regressions to enforce the canonical five-field static card.</li>
+<li>Removed the vulnerable development-only fast-glob → micromatch → braces dependency chain. Used built-in Node file discovery, preserving underscore and hidden-file exclusions; preview build and workflow startup succeeded.</li>
+</ul>
+<h2>CORS and timing</h2>
+<p>Verified wildcard origins, methods <code>GET, POST, OPTIONS</code> and wildcard request headers. Authorization is explicitly included when requested because Fetch does not include it in wildcard matching. Credentialed cookie CORS remains disabled. Preflights terminate before JSON parsing or payment processing.</p>
+<table><thead><tr><th>60 local preflight samples</th><th>Milliseconds</th></tr></thead><tbody>
+<tr><td>Median</td><td>0.85</td></tr><tr><td>95th percentile</td><td>2.74</td></tr><tr><td>Maximum</td><td>3.28</td></tr>
+</tbody></table>
+<p>These measurements were collected against the local API on <code>/mcp</code> and <code>/.well-known/mcp/server-card.json</code>. They are not a guarantee of remote network latency.</p>
+<h2>Live checks</h2>
+<ol>
+<li>Manifest and live schemas: exactly 14 tools across stratigraphy (5), proof (6), mesh (2) and payment (1).</li>
+<li>Batch costs: both requested selectors returned positive integer satoshi prices.</li>
+<li>L402: the protected call returned HTTP 402 with quoted macaroon and checksum-valid BOLT11 invoice.</li>
+<li>Transport: initialize and ping negotiated the requested protocol and returned valid results.</li>
+<li>Static card: HTTP 200, wildcard CORS and the exact requested five-field canonical response.</li>
+</ol>
+<div class="notice"><strong>Limits:</strong> The live checker created an unpaid invoice; no invoice was paid. Paid execution and side effects were verified with controlled fixtures, not live wallet settlement or external mesh broadcasts. The static card remains version 1.0.0 independently of engine and protocol versions. No publishing was performed. Optional Python framework examples were syntax-checked, not executed with external model accounts. Passing checks do not guarantee every possible runtime condition or crawler indexing.</div>
+<h2>Changed files</h2>
+<ul>
+<li><code>artifacts/api-server/src/middleware/mcpJsonRpc.ts</code> — new framing and envelope validation.</li>
+<li><code>artifacts/api-server/src/routes/mcp.ts</code> — boundary integration and promise/cleanup handling.</li>
+<li><code>artifacts/api-server/src/routes/stratigraphy.contract.test.ts</code> — regression coverage and fixture isolation.</li>
+<li><code>artifacts/bitcoin-stratigraphy-dashboard/public/robots.txt</code> — explicit SmitheryBot rule.</li>
+<li><code>artifacts/mockup-sandbox/mockupPreviewPlugin.ts</code>, <code>artifacts/mockup-sandbox/package.json</code>, <code>pnpm-lock.yaml</code> — dependency remediation.</li>
+<li><code>lib/api-spec/openapi.yaml</code> — HTTP contracts and schemas.</li>
+<li><code>lib/api-client-react/src/generated/api.ts</code> and <code>api.schemas.ts</code> — regenerated client and models.</li>
+<li><code>lib/api-zod/src/generated/api.ts</code>, <code>types/index.ts</code> and 11 new generated models — regenerated validators and types.</li>
+<li><code>scripts/verify_agent_routes.py</code>, <code>scripts/test_verify_agent_routes.py</code> — static-card verification.</li>
+<li><code>.agents/memory/MEMORY.md</code>, <code>openapi-zod-codegen.md</code> — documented generator constraints, without credentials.</li>
+<li><code>reports/repository-audit-2026-10-02.html</code> — this report.</li>
+</ul>
+<h2>Security finding disposition</h2>
+<p>The dataflow scanner marks <code>scripts/broadcast-nostr.ts</code> dry-run output as “Auth Token sent to Standard Output.” The printed event is a public announcement with its public key and signature. The private signing key is supplied to the signer, not serialized into the output. This remains a scanner-reported finding, not a confirmed credential leak; the useful dry-run output was preserved.</p>
+</main></body></html>

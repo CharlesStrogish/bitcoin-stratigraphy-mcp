@@ -621,6 +621,228 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /:
+    get:
+      operationId: getApiDiscovery
+      tags: [discovery]
+      summary: API entry point and agent discovery links
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+  /openapi.json:
+    servers:
+      - url: /
+    get:
+      operationId: getOpenApiDocument
+      tags: [discovery]
+      summary: Public OpenAPI document including all 14 MCP schemas and REST operations
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+  /v1/system/health:
+    get:
+      operationId: getRuntimeSystemHealth
+      tags: [discovery]
+      summary: Worker, relay pool, queue, pricing and memory health
+      description: Returns HTTP 200 with status ok, degraded or unhealthy; HTTP success alone is not readiness.
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+  /v1/analytics/revenue:
+    get:
+      operationId: getRevenueAnalytics
+      tags: [discovery]
+      summary: Aggregate paid volume, channel breakdown and daily goal progress
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+        "503":
+          description: Revenue ledger unavailable
+  /v1/analytics/audit:
+    get:
+      operationId: getRevenueAudit
+      tags: [discovery]
+      summary: Sanitized recent settlement records
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+        "400":
+          description: Invalid limit
+        "503":
+          description: Revenue ledger unavailable
+  /v1/nostr/info:
+    get:
+      operationId: getNostrDiscoveryInfo
+      tags: [discovery]
+      summary: Public Nostr discovery and announcement status
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+  /.well-known/nostr.json:
+    servers:
+      - url: /
+    get:
+      operationId: getNip05Identity
+      tags: [discovery]
+      summary: Public NIP-05 name-to-pubkey mapping when configured
+      security: []
+      parameters:
+        - name: name
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+        "404":
+          description: Identity or requested name is not configured
+  /.well-known/mcp/server-card.json:
+    servers:
+      - url: /
+    get:
+      operationId: getSmitheryServerCard
+      tags: [discovery]
+      summary: Static Smithery server discovery
+      description: Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
+      security: []
+      responses:
+        "200":
+          description: Exact public Smithery card
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: "#/components/headers/PublicCorsOrigin"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmitheryServerCard"
+    options:
+      operationId: preflightSmitheryServerCard
+      tags: [discovery]
+      summary: Immediate public browser preflight
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicPreflight"
+  /mcp:
+    servers:
+      - url: /
+    get:
+      operationId: getMcpProbe
+      tags: [discovery]
+      summary: Finite MCP scanner probe, not an idle SSE stream
+      security: []
+      responses:
+        "200":
+          description: Endpoint is reachable; this is not tool execution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpProbe"
+    head:
+      operationId: headMcpProbe
+      tags: [discovery]
+      summary: Finite MCP scanner probe without a response body
+      security: []
+      responses:
+        "200":
+          description: Endpoint is reachable
+    options:
+      operationId: preflightMcp
+      tags: [discovery]
+      summary: Immediate public browser preflight before parsing or payment checks
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicPreflight"
+    post:
+      operationId: executeMcpRequest
+      tags: [discovery]
+      summary: JSON-RPC discovery and execution of the 14 canonical MCP tools
+      description: >-
+        Call initialize, ping, tools/list or tools/call. All fourteen input and output
+        schemas, namespaces, side effects and prices are described in x-mcp-tools
+        and x-mcp-tool-groups. tools/list is the live authoritative catalog.
+        Tool calls use params.name and params.arguments. Paid calls require a
+        scoped L402 Authorization credential obtained from the HTTP 402
+        WWW-Authenticate challenge. A cost quote grants no tool entitlement.
+        SDK clients may advertise application/json and text/event-stream, but
+        POST returns finite JSON. Cookies are not used for cross-origin auth.
+      security: []
+      parameters:
+        - name: MCP-Protocol-Version
+          in: header
+          schema:
+            type: string
+          description: Negotiated MCP protocol version, for example 2025-11-25
+        - name: Authorization
+          in: header
+          schema:
+            type: string
+          description: "For paid calls: L402 <macaroon>:<preimage>. Discovery needs no credential."
+        - name: PAYMENT-SIGNATURE
+          in: header
+          schema:
+            type: string
+          description: Optional x402 proof, accepted only when live settlement is configured
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpJsonRpcRequest"
+      responses:
+        "200":
+          description: JSON-RPC result or tool error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "400":
+          description: Invalid request, parameters or JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "402":
+          description: Unpaid scoped tool execution; separate challenge per call
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+              description: 'L402 macaroon="<base64>", invoice="<BOLT11>"'
+            PAYMENT-REQUIRED:
+              schema:
+                type: string
+              description: Base64 x402 quote only when the configured settlement rail supports it
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "429":
+          description: Request budget exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "503":
+          description: Required payment, chain-state, proof or signing provider unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
   /.well-known/mcp.json:
     get:
       operationId: getMcpDiscoveryManifest
@@ -1391,6 +1613,35 @@ paths:
         "422":
           description: Snapshot digest, source signatures, freshness, or mesh network binding failed validation
 components:
+  headers:
+    PublicCorsOrigin:
+      schema:
+        type: string
+        const: "*"
+      description: Public token-based CORS; credentialed cookie access is not enabled
+  responses:
+    PublicMetadata:
+      description: Public JSON metadata; inspect the returned object for current runtime status
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/PublicCorsOrigin"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/PublicMetadata"
+    PublicPreflight:
+      description: Empty, finite successful preflight
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/PublicCorsOrigin"
+        Access-Control-Allow-Methods:
+          schema:
+            type: string
+            const: "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers:
+          schema:
+            type: string
+          description: Wildcard; Authorization is also explicitly listed when requested because Fetch excludes it from the wildcard
   securitySchemes:
     operatorBearer:
       type: http
@@ -1411,6 +1662,79 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    PublicMetadata:
+      type: object
+      additionalProperties: true
+    SmitheryServerCard:
+      type: object
+      additionalProperties: false
+      required: [name, displayName, description, version, url]
+      properties:
+        name:
+          type: string
+          const: bitcoin-stratigraphy-mcp
+        displayName:
+          type: string
+          const: Bitcoin Stratigraphy Data Engine
+        description:
+          type: string
+          const: Provides thermodynamic data, proof verification, and L402 payments.
+        version:
+          type: string
+          const: "1.0.0"
+        url:
+          type: string
+          const: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+    McpProbe:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          const: ok
+        service:
+          type: string
+          const: MCP Server
+    McpJsonRpcRequest:
+      type: object
+      required: [jsonrpc, method]
+      properties:
+        jsonrpc:
+          type: string
+          const: "2.0"
+        id:
+          type: [string, number, "null"]
+        method:
+          type: string
+        params:
+          type: [object, array]
+          additionalProperties: true
+          items: {}
+    McpJsonRpcResponse:
+      type: object
+      required: [jsonrpc, id]
+      additionalProperties: true
+      properties:
+        jsonrpc:
+          type: string
+          const: "2.0"
+        id:
+          type: [string, number, "null"]
+        result: {}
+        error:
+          $ref: "#/components/schemas/McpJsonRpcError"
+      oneOf:
+        - required: [result]
+        - required: [error]
+    McpJsonRpcError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data: {}
     McpToolCostSelection:
       type: object
       additionalProperties: false

@@ -1,4 +1,5 @@
 User-agent: *
+User-agent: SmitheryBot
 User-agent: GPTBot
 User-agent: OAI-SearchBot
 User-agent: ChatGPT-User

@@ -39,7 +39,9 @@ import type {
   DatasetHealthStatus,
   EpistemicGroundingRequest,
   ExportHuggingFaceDatasetParams,
+  GetNip05IdentityParams,
   GetPaidStratigraphyParams,
+  GetRevenueAuditParams,
   GetStratigraphyCostParams,
   GroundEpistemicContext200,
   HeadPaidStratigraphyParams,
@@ -53,6 +55,9 @@ import type {
   MacaroonRevocationResponse,
   McpBatchCostQuote,
   McpDiscoveryManifest,
+  McpJsonRpcRequest,
+  McpJsonRpcResponse,
+  McpProbe,
   McpToolCostSelection,
   MeshAttestRequest,
   MeshAttestResponse,
@@ -66,9 +71,12 @@ import type {
   PaymentConfigurationError,
   ProvenanceAnchorStatus,
   ProvenanceChainStatus,
+  PublicMetadataResponse,
+  PublicPreflightResponse,
   QuoteMcpToolCosts400,
   ReadinessStatus,
   SettlementAssetSelectionError,
+  SmitheryServerCard,
   StratigraphyCost,
   StratigraphyEntry,
   TokenRevocationServiceUnavailableError,
@@ -108,6 +116,1000 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetApiDiscoveryUrl = () => {
+
+
+
+
+  return `/api/`
+}
+
+/**
+ * @summary API entry point and agent discovery links
+ */
+export const getApiDiscovery = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
+
+  return customFetch<PublicMetadataResponse>(getGetApiDiscoveryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetApiDiscoveryQueryKey = () => {
+    return [
+    `/api/`
+    ] as const;
+    }
+
+
+export const getGetApiDiscoveryQueryOptions = <TData = Awaited<ReturnType<typeof getApiDiscovery>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getApiDiscovery>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetApiDiscoveryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getApiDiscovery>>> = ({ signal }) => getApiDiscovery({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getApiDiscovery>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetApiDiscoveryQueryResult = NonNullable<Awaited<ReturnType<typeof getApiDiscovery>>>
+export type GetApiDiscoveryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary API entry point and agent discovery links
+ */
+
+export function useGetApiDiscovery<TData = Awaited<ReturnType<typeof getApiDiscovery>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getApiDiscovery>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetApiDiscoveryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetOpenApiDocumentUrl = () => {
+
+
+
+
+  return `/api/openapi.json`
+}
+
+/**
+ * @summary Public OpenAPI document including all 14 MCP schemas and REST operations
+ */
+export const getOpenApiDocument = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
+
+  return customFetch<PublicMetadataResponse>(getGetOpenApiDocumentUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOpenApiDocumentQueryKey = () => {
+    return [
+    `/api/openapi.json`
+    ] as const;
+    }
+
+
+export const getGetOpenApiDocumentQueryOptions = <TData = Awaited<ReturnType<typeof getOpenApiDocument>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOpenApiDocument>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOpenApiDocumentQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOpenApiDocument>>> = ({ signal }) => getOpenApiDocument({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOpenApiDocument>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOpenApiDocumentQueryResult = NonNullable<Awaited<ReturnType<typeof getOpenApiDocument>>>
+export type GetOpenApiDocumentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public OpenAPI document including all 14 MCP schemas and REST operations
+ */
+
+export function useGetOpenApiDocument<TData = Awaited<ReturnType<typeof getOpenApiDocument>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOpenApiDocument>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOpenApiDocumentQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRuntimeSystemHealthUrl = () => {
+
+
+
+
+  return `/api/v1/system/health`
+}
+
+/**
+ * Returns HTTP 200 with status ok, degraded or unhealthy; HTTP success alone is not readiness.
+ * @summary Worker, relay pool, queue, pricing and memory health
+ */
+export const getRuntimeSystemHealth = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
+
+  return customFetch<PublicMetadataResponse>(getGetRuntimeSystemHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRuntimeSystemHealthQueryKey = () => {
+    return [
+    `/api/v1/system/health`
+    ] as const;
+    }
+
+
+export const getGetRuntimeSystemHealthQueryOptions = <TData = Awaited<ReturnType<typeof getRuntimeSystemHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRuntimeSystemHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRuntimeSystemHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRuntimeSystemHealth>>> = ({ signal }) => getRuntimeSystemHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRuntimeSystemHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRuntimeSystemHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getRuntimeSystemHealth>>>
+export type GetRuntimeSystemHealthQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Worker, relay pool, queue, pricing and memory health
+ */
+
+export function useGetRuntimeSystemHealth<TData = Awaited<ReturnType<typeof getRuntimeSystemHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRuntimeSystemHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRuntimeSystemHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRevenueAnalyticsUrl = () => {
+
+
+
+
+  return `/api/v1/analytics/revenue`
+}
+
+/**
+ * @summary Aggregate paid volume, channel breakdown and daily goal progress
+ */
+export const getRevenueAnalytics = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
+
+  return customFetch<PublicMetadataResponse>(getGetRevenueAnalyticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRevenueAnalyticsQueryKey = () => {
+    return [
+    `/api/v1/analytics/revenue`
+    ] as const;
+    }
+
+
+export const getGetRevenueAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getRevenueAnalytics>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRevenueAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRevenueAnalyticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRevenueAnalytics>>> = ({ signal }) => getRevenueAnalytics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRevenueAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRevenueAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getRevenueAnalytics>>>
+export type GetRevenueAnalyticsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Aggregate paid volume, channel breakdown and daily goal progress
+ */
+
+export function useGetRevenueAnalytics<TData = Awaited<ReturnType<typeof getRevenueAnalytics>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRevenueAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRevenueAnalyticsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRevenueAuditUrl = (params?: GetRevenueAuditParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/analytics/audit?${stringifiedParams}` : `/api/v1/analytics/audit`
+}
+
+/**
+ * @summary Sanitized recent settlement records
+ */
+export const getRevenueAudit = async (params?: GetRevenueAuditParams, options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
+
+  return customFetch<PublicMetadataResponse>(getGetRevenueAuditUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRevenueAuditQueryKey = (params?: GetRevenueAuditParams,) => {
+    return [
+    `/api/v1/analytics/audit`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetRevenueAuditQueryOptions = <TData = Awaited<ReturnType<typeof getRevenueAudit>>, TError = ErrorType<void>>(params?: GetRevenueAuditParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRevenueAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRevenueAuditQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRevenueAudit>>> = ({ signal }) => getRevenueAudit(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRevenueAudit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRevenueAuditQueryResult = NonNullable<Awaited<ReturnType<typeof getRevenueAudit>>>
+export type GetRevenueAuditQueryError = ErrorType<void>
+
+
+/**
+ * @summary Sanitized recent settlement records
+ */
+
+export function useGetRevenueAudit<TData = Awaited<ReturnType<typeof getRevenueAudit>>, TError = ErrorType<void>>(
+ params?: GetRevenueAuditParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRevenueAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRevenueAuditQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetNostrDiscoveryInfoUrl = () => {
+
+
+
+
+  return `/api/v1/nostr/info`
+}
+
+/**
+ * @summary Public Nostr discovery and announcement status
+ */
+export const getNostrDiscoveryInfo = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
+
+  return customFetch<PublicMetadataResponse>(getGetNostrDiscoveryInfoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNostrDiscoveryInfoQueryKey = () => {
+    return [
+    `/api/v1/nostr/info`
+    ] as const;
+    }
+
+
+export const getGetNostrDiscoveryInfoQueryOptions = <TData = Awaited<ReturnType<typeof getNostrDiscoveryInfo>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNostrDiscoveryInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNostrDiscoveryInfoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNostrDiscoveryInfo>>> = ({ signal }) => getNostrDiscoveryInfo({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNostrDiscoveryInfo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNostrDiscoveryInfoQueryResult = NonNullable<Awaited<ReturnType<typeof getNostrDiscoveryInfo>>>
+export type GetNostrDiscoveryInfoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public Nostr discovery and announcement status
+ */
+
+export function useGetNostrDiscoveryInfo<TData = Awaited<ReturnType<typeof getNostrDiscoveryInfo>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNostrDiscoveryInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNostrDiscoveryInfoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetNip05IdentityUrl = (params?: GetNip05IdentityParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/.well-known/nostr.json?${stringifiedParams}` : `/api/.well-known/nostr.json`
+}
+
+/**
+ * @summary Public NIP-05 name-to-pubkey mapping when configured
+ */
+export const getNip05Identity = async (params?: GetNip05IdentityParams, options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
+
+  return customFetch<PublicMetadataResponse>(getGetNip05IdentityUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNip05IdentityQueryKey = (params?: GetNip05IdentityParams,) => {
+    return [
+    `/api/.well-known/nostr.json`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetNip05IdentityQueryOptions = <TData = Awaited<ReturnType<typeof getNip05Identity>>, TError = ErrorType<void>>(params?: GetNip05IdentityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNip05Identity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNip05IdentityQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNip05Identity>>> = ({ signal }) => getNip05Identity(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNip05Identity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNip05IdentityQueryResult = NonNullable<Awaited<ReturnType<typeof getNip05Identity>>>
+export type GetNip05IdentityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Public NIP-05 name-to-pubkey mapping when configured
+ */
+
+export function useGetNip05Identity<TData = Awaited<ReturnType<typeof getNip05Identity>>, TError = ErrorType<void>>(
+ params?: GetNip05IdentityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNip05Identity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNip05IdentityQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetSmitheryServerCardUrl = () => {
+
+
+
+
+  return `/api/.well-known/mcp/server-card.json`
+}
+
+/**
+ * Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
+ * @summary Static Smithery server discovery
+ */
+export const getSmitheryServerCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<SmitheryServerCard> => {
+
+  return customFetch<SmitheryServerCard>(getGetSmitheryServerCardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSmitheryServerCardQueryKey = () => {
+    return [
+    `/api/.well-known/mcp/server-card.json`
+    ] as const;
+    }
+
+
+export const getGetSmitheryServerCardQueryOptions = <TData = Awaited<ReturnType<typeof getSmitheryServerCard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSmitheryServerCard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSmitheryServerCardQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSmitheryServerCard>>> = ({ signal }) => getSmitheryServerCard({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSmitheryServerCard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSmitheryServerCardQueryResult = NonNullable<Awaited<ReturnType<typeof getSmitheryServerCard>>>
+export type GetSmitheryServerCardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Static Smithery server discovery
+ */
+
+export function useGetSmitheryServerCard<TData = Awaited<ReturnType<typeof getSmitheryServerCard>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSmitheryServerCard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSmitheryServerCardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreflightSmitheryServerCardUrl = () => {
+
+
+
+
+  return `/api/.well-known/mcp/server-card.json`
+}
+
+/**
+ * @summary Immediate public browser preflight
+ */
+export const preflightSmitheryServerCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicPreflightResponse> => {
+
+  return customFetch<PublicPreflightResponse>(getPreflightSmitheryServerCardUrl(),
+  {
+    ...options,
+    method: 'OPTIONS'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreflightSmitheryServerCardMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightSmitheryServerCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof preflightSmitheryServerCard>>, TError,void, TContext> => {
+
+const mutationKey = ['preflightSmitheryServerCard'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preflightSmitheryServerCard>>, void> = () => {
+
+
+          return  preflightSmitheryServerCard(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreflightSmitheryServerCardMutationResult = NonNullable<Awaited<ReturnType<typeof preflightSmitheryServerCard>>>
+
+    export type PreflightSmitheryServerCardMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Immediate public browser preflight
+ */
+export const usePreflightSmitheryServerCard = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightSmitheryServerCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof preflightSmitheryServerCard>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPreflightSmitheryServerCardMutationOptions(options));
+    }
+
+export const getGetMcpProbeUrl = () => {
+
+
+
+
+  return `/api/mcp`
+}
+
+/**
+ * @summary Finite MCP scanner probe, not an idle SSE stream
+ */
+export const getMcpProbe = async ( options?: Parameters<typeof customFetch>[1]): Promise<McpProbe> => {
+
+  return customFetch<McpProbe>(getGetMcpProbeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMcpProbeQueryKey = () => {
+    return [
+    `/api/mcp`
+    ] as const;
+    }
+
+
+export const getGetMcpProbeQueryOptions = <TData = Awaited<ReturnType<typeof getMcpProbe>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpProbe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMcpProbeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMcpProbe>>> = ({ signal }) => getMcpProbe({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMcpProbe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMcpProbeQueryResult = NonNullable<Awaited<ReturnType<typeof getMcpProbe>>>
+export type GetMcpProbeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Finite MCP scanner probe, not an idle SSE stream
+ */
+
+export function useGetMcpProbe<TData = Awaited<ReturnType<typeof getMcpProbe>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpProbe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMcpProbeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getHeadMcpProbeUrl = () => {
+
+
+
+
+  return `/api/mcp`
+}
+
+/**
+ * @summary Finite MCP scanner probe without a response body
+ */
+export const headMcpProbe = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getHeadMcpProbeUrl(),
+  {
+    ...options,
+    method: 'HEAD'
+
+
+  }
+);}
+
+
+
+
+
+export const getHeadMcpProbeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headMcpProbe>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof headMcpProbe>>, TError,void, TContext> => {
+
+const mutationKey = ['headMcpProbe'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof headMcpProbe>>, void> = () => {
+
+
+          return  headMcpProbe(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type HeadMcpProbeMutationResult = NonNullable<Awaited<ReturnType<typeof headMcpProbe>>>
+
+    export type HeadMcpProbeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Finite MCP scanner probe without a response body
+ */
+export const useHeadMcpProbe = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headMcpProbe>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof headMcpProbe>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getHeadMcpProbeMutationOptions(options));
+    }
+
+export const getPreflightMcpUrl = () => {
+
+
+
+
+  return `/api/mcp`
+}
+
+/**
+ * @summary Immediate public browser preflight before parsing or payment checks
+ */
+export const preflightMcp = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicPreflightResponse> => {
+
+  return customFetch<PublicPreflightResponse>(getPreflightMcpUrl(),
+  {
+    ...options,
+    method: 'OPTIONS'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreflightMcpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightMcp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof preflightMcp>>, TError,void, TContext> => {
+
+const mutationKey = ['preflightMcp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preflightMcp>>, void> = () => {
+
+
+          return  preflightMcp(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreflightMcpMutationResult = NonNullable<Awaited<ReturnType<typeof preflightMcp>>>
+
+    export type PreflightMcpMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Immediate public browser preflight before parsing or payment checks
+ */
+export const usePreflightMcp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightMcp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof preflightMcp>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPreflightMcpMutationOptions(options));
+    }
+
+export const getExecuteMcpRequestUrl = () => {
+
+
+
+
+  return `/api/mcp`
+}
+
+/**
+ * Call initialize, ping, tools/list or tools/call. All fourteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * @summary JSON-RPC discovery and execution of the 14 canonical MCP tools
+ */
+export const executeMcpRequest = async (mcpJsonRpcRequest: McpJsonRpcRequest, options?: Parameters<typeof customFetch>[1]): Promise<McpJsonRpcResponse> => {
+
+  return customFetch<McpJsonRpcResponse>(getExecuteMcpRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mcpJsonRpcRequest)
+  }
+);}
+
+
+
+
+
+export const getExecuteMcpRequestMutationOptions = <TError = ErrorType<McpJsonRpcResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeMcpRequest>>, TError,{data: BodyType<McpJsonRpcRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof executeMcpRequest>>, TError,{data: BodyType<McpJsonRpcRequest>}, TContext> => {
+
+const mutationKey = ['executeMcpRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof executeMcpRequest>>, {data: BodyType<McpJsonRpcRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  executeMcpRequest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExecuteMcpRequestMutationResult = NonNullable<Awaited<ReturnType<typeof executeMcpRequest>>>
+    export type ExecuteMcpRequestMutationBody = BodyType<McpJsonRpcRequest>
+    export type ExecuteMcpRequestMutationError = ErrorType<McpJsonRpcResponse>
+
+    /**
+ * @summary JSON-RPC discovery and execution of the 14 canonical MCP tools
+ */
+export const useExecuteMcpRequest = <TError = ErrorType<McpJsonRpcResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeMcpRequest>>, TError,{data: BodyType<McpJsonRpcRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof executeMcpRequest>>,
+        TError,
+        {data: BodyType<McpJsonRpcRequest>},
+        TContext
+      > => {
+      return useMutation(getExecuteMcpRequestMutationOptions(options));
+    }
 
 export const getGetMcpDiscoveryManifestUrl = () => {
 

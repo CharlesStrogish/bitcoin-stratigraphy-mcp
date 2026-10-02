@@ -21,6 +21,48 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export interface PublicMetadata { [key: string]: unknown }
+
+export const SmitheryServerCardValue = {
+  name: 'bitcoin-stratigraphy-mcp',
+  displayName: 'Bitcoin Stratigraphy Data Engine',
+  description: 'Provides thermodynamic data, proof verification, and L402 payments.',
+  version: '1.0.0',
+  url: 'https://bitcoin-stratigraphy-dashboard.replit.app/mcp',
+} as const;
+export type SmitheryServerCard = typeof SmitheryServerCardValue;
+
+export const McpProbeValue = {
+  status: 'ok',
+  service: 'MCP Server',
+} as const;
+export type McpProbe = typeof McpProbeValue;
+
+export type McpJsonRpcRequestParams = { [key: string]: unknown } | unknown[];
+
+export interface McpJsonRpcRequest {
+  jsonrpc: '2.0';
+  /** @nullable */
+  id?: string | number | null;
+  method: string;
+  params?: McpJsonRpcRequestParams;
+}
+
+export interface McpJsonRpcError {
+  code: number;
+  message: string;
+  data?: unknown;
+}
+
+export type McpJsonRpcResponse = (unknown & ({
+  jsonrpc: '2.0';
+  /** @nullable */
+  id: string | number | null;
+  result?: unknown;
+  error?: McpJsonRpcError;
+  [key: string]: unknown;
+ }));
+
 export interface McpToolCostSelection {
   /**
      * @minItems 1
@@ -1312,6 +1354,28 @@ export const WalletGatewayErrorError = {
 export interface WalletGatewayError {
   error: WalletGatewayErrorError;
 }
+
+/**
+ * Public JSON metadata; inspect the returned object for current runtime status
+ */
+export type PublicMetadataResponse = PublicMetadata;
+
+/**
+ * Empty, finite successful preflight
+ */
+export type PublicPreflightResponse = void;
+
+export type GetRevenueAuditParams = {
+/**
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+};
+
+export type GetNip05IdentityParams = {
+name?: string;
+};
 
 export type ExportHuggingFaceDatasetParams = {
 /**

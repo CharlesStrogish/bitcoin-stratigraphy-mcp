@@ -997,6 +997,7 @@ test("MCP proof.ground reads and signs Bitcoin receipts only after L402 settles"
 test("rejects canonical paid tool calls in JSON-RPC batches before execution", async () => {
   const requests = [
     {
+      jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
       params: {
@@ -1005,6 +1006,7 @@ test("rejects canonical paid tool calls in JSON-RPC batches before execution", a
       },
     },
     {
+      jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
       params: {
@@ -1017,6 +1019,7 @@ test("rejects canonical paid tool calls in JSON-RPC batches before execution", a
     ...requests.map((request) => [request]),
     [
       {
+        jsonrpc: "2.0",
         id: 5,
         method: "tools/call",
        params: { name: "mesh.status", arguments: {} },
@@ -3289,7 +3292,9 @@ test("enforces independent 60-per-minute per-IP limits for MCP and REST", async 
     assert.equal(mcpLimited.response.status, 429);
     assert.equal(mcpLimited.response.headers.get("retry-after"), "60");
     assert.deepEqual(mcpLimited.body, {
-      error: "Too many requests",
+      jsonrpc: "2.0",
+      id: 1,
+      error: { code: -32029, message: "Too many requests" },
       code: "rate_limit_exceeded",
       retry_after: 60,
     });
@@ -3569,6 +3574,7 @@ test("finishes MCP GET and HEAD probes even when scanners advertise SSE", async 
           Accept: accept,
           "User-Agent": "SmitheryBot",
           "MCP-Protocol-Version": "2025-03-26",
+          "X-Forwarded-For": "198.51.100.80",
         },
         // Covers reading the whole body, not just receiving the first headers.
         signal: AbortSignal.timeout(2_000),
@@ -3610,6 +3616,47 @@ test("serves the public MCP discovery manifest with wildcard CORS and no payment
   assert.equal(invoiceRequestCount, requestsBefore);
   assert.equal(mcpDiscoveryManifest.mcp.capabilities.tools.count, mcpServerCard.capabilities.tools.length);
   assert.deepEqual(mcpDiscoveryManifest.mcp.capabilities.tools.namespaces, Object.keys(MCP_TOOL_GROUPS));
+});
+
+test("rejects malformed envelopes and unexpected arguments for all 14 tools without payment", async () => {
+  const invoicesBefore = mcpInvoiceCount;
+  const names = mcpServerCard.capabilities.tools.map((tool) => tool.name);
+  assert.equal(names.length, 14);
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "X-Forwarded-For": "198.51.100.81",
+  };
+  for (const name of names) {
+    for (const argumentsValue of ["unexpected", 123, []]) {
+      const id = `invalid-${name}-${typeof argumentsValue}`;
+      const response = await fetch(`${baseUrl}/mcp`, {
+        method: "POST", headers,
+        body: JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: argumentsValue } }),
+        signal: AbortSignal.timeout(2_000),
+      });
+      const body = await response.json() as { jsonrpc: string; id: string; error: { code: number; message: string } };
+      assert.equal(body.jsonrpc, "2.0", name);
+      assert.equal(body.id, id, name);
+      assert.equal(typeof body.error.code, "number", name);
+      assert.equal(typeof body.error.message, "string", name);
+      assert.notEqual(response.status, 500, name);
+      assert.equal(response.headers.get("www-authenticate"), null, name);
+    }
+  }
+  for (const envelope of [
+    { jsonrpc: "1.0", id: "bad-version", method: "tools/call", params: { name: "stratigraphy.get", arguments: { days: 1 } } },
+    { jsonrpc: "2.0", id: {}, method: "tools/call", params: { name: "stratigraphy.get", arguments: { days: 1 } } },
+    { jsonrpc: "2.0", id: 5, method: 12 },
+  ]) {
+    const response = await fetch(`${baseUrl}/mcp`, { method: "POST", headers, body: JSON.stringify(envelope) });
+    assert.equal(response.status, 400);
+    const body = await response.json() as { jsonrpc: string; id: unknown; error: { code: number } };
+    assert.equal(body.jsonrpc, "2.0");
+    assert.equal(body.error.code, -32600);
+    assert.equal(body.id, typeof envelope.id === "object" ? null : envelope.id);
+  }
+  assert.equal(mcpInvoiceCount, invoicesBefore);
 });
 
 test("serves the public MCP server card without an L402 challenge", async () => {

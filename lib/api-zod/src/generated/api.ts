@@ -25,6 +25,131 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary API entry point and agent discovery links
+ */
+export const GetApiDiscoveryResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Public OpenAPI document including all 14 MCP schemas and REST operations
+ */
+export const GetOpenApiDocumentResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * Returns HTTP 200 with status ok, degraded or unhealthy; HTTP success alone is not readiness.
+ * @summary Worker, relay pool, queue, pricing and memory health
+ */
+export const GetRuntimeSystemHealthResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Aggregate paid volume, channel breakdown and daily goal progress
+ */
+export const GetRevenueAnalyticsResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Sanitized recent settlement records
+ */
+export const getRevenueAuditQueryLimitDefault = 100;
+export const getRevenueAuditQueryLimitMax = 500;
+
+
+
+export const GetRevenueAuditQueryParams = zod.object({
+  "limit": zod.coerce.number().int().min(1).max(getRevenueAuditQueryLimitMax).default(getRevenueAuditQueryLimitDefault)
+})
+
+export const GetRevenueAuditResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Public Nostr discovery and announcement status
+ */
+export const GetNostrDiscoveryInfoResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Public NIP-05 name-to-pubkey mapping when configured
+ */
+export const GetNip05IdentityQueryParams = zod.object({
+  "name": zod.coerce.string().optional()
+})
+
+export const GetNip05IdentityResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
+ * @summary Static Smithery server discovery
+ */
+export const GetSmitheryServerCardResponse = zod.object({
+  "name": zod.literal("bitcoin-stratigraphy-mcp"),
+  "displayName": zod.literal("Bitcoin Stratigraphy Data Engine"),
+  "description": zod.literal("Provides thermodynamic data, proof verification, and L402 payments."),
+  "version": zod.literal("1.0.0"),
+  "url": zod.literal("https://bitcoin-stratigraphy-dashboard.replit.app/mcp")
+})
+
+
+/**
+ * @summary Immediate public browser preflight
+ */
+export const PreflightSmitheryServerCardResponse = zod.unknown()
+
+
+/**
+ * @summary Finite MCP scanner probe, not an idle SSE stream
+ */
+export const GetMcpProbeResponse = zod.object({
+  "status": zod.literal("ok"),
+  "service": zod.literal("MCP Server")
+})
+
+
+/**
+ * @summary Finite MCP scanner probe without a response body
+ */
+export const HeadMcpProbeResponse = zod.unknown()
+
+
+/**
+ * @summary Immediate public browser preflight before parsing or payment checks
+ */
+export const PreflightMcpResponse = zod.unknown()
+
+
+/**
+ * Call initialize, ping, tools/list or tools/call. All fourteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * @summary JSON-RPC discovery and execution of the 14 canonical MCP tools
+ */
+export const ExecuteMcpRequestHeader = zod.object({
+  "MCP-Protocol-Version": zod.string().optional().describe('Negotiated MCP protocol version, for example 2025-11-25'),
+  "Authorization": zod.string().optional().describe('For paid calls: L402 <macaroon>:<preimage>. Discovery needs no credential.'),
+  "PAYMENT-SIGNATURE": zod.string().optional().describe('Optional x402 proof, accepted only when live settlement is configured')
+})
+
+export const ExecuteMcpRequestBody = zod.object({
+  "jsonrpc": zod.literal("2.0"),
+  "id": zod.union([zod.string(),zod.number()]).nullish(),
+  "method": zod.string(),
+  "params": zod.union([zod.record(zod.string(), zod.unknown()),zod.array(zod.unknown())]).optional()
+})
+
+export const ExecuteMcpRequestResponse = zod.union([zod.unknown(),zod.unknown()]).and(zod.object({
+  "jsonrpc": zod.literal("2.0"),
+  "id": zod.union([zod.string(),zod.number()]).nullable(),
+  "result": zod.unknown().optional(),
+  "error": zod.object({
+  "code": zod.number().int(),
+  "message": zod.string(),
+  "data": zod.unknown().optional()
+}).optional()
+}))
+
+
+/**
  * Public, unmetered JSON discovery document with wildcard CORS. Its declared version values are manifest metadata and do not configure MCP negotiation.
  * @summary Public MCP auto-discovery manifest
  */

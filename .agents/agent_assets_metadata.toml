@@ -14,3 +14,17 @@ mtime_ms = 1790632871623
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/c0c9f8d9-1dcb-45f2-be84-08bfc0df6468/77ac682c-7a88-4468-95e3-c5703f6f3f76"
 storage_version_token = "1790632981892193"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "KwaxtXGDHQsMbIINmEjgR"
+uri = "file://reports/repository-audit-2026-10-02.html"
+type = "html"
+title = "Repository audit and verification report"
+description = "318 offline tests, five live route checks, changes, security disposition and publishing limits."
+logical_id = "78d348fc-55fa-4bc8-8360-0fbca65916d0"
+content_hash = "sha256:c8a3b7aa6a7e88a184da5987a2c295c360c0ac812154c2d38b0f229389419863"
+size = 7594
+mtime_ms = 1790983168909
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/78d348fc-55fa-4bc8-8360-0fbca65916d0/925773fa-7d55-4986-bbe1-1af5afb2e2be"
+storage_version_token = "1790983232796457"
+content_type = "text/html"

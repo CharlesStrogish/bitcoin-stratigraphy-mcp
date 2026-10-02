@@ -105,6 +105,20 @@ async def rpc(client: httpx.AsyncClient, method: str, request_id: str, params: d
     return rpc_result(response, request_id)
 
 
+async def check_server_card(client: httpx.AsyncClient) -> str:
+    response = await client.get("/.well-known/mcp/server-card.json")
+    require(response.status_code == 200, "Static server card must return HTTP 200")
+    require(response.headers.get("access-control-allow-origin") == "*", "Server card must allow public CORS")
+    require(response_object(response) == {
+        "name": "bitcoin-stratigraphy-mcp",
+        "displayName": "Bitcoin Stratigraphy Data Engine",
+        "description": "Provides thermodynamic data, proof verification, and L402 payments.",
+        "version": "1.0.0",
+        "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+    }, "Static server card differs from the canonical five-field contract")
+    return "HTTP 200; exact canonical Smithery card; wildcard CORS"
+
+
 async def check_manifest(client: httpx.AsyncClient) -> str:
     response = await client.get("/.well-known/mcp.json", headers={
         "Origin": "https://agent-health-check.invalid",
@@ -247,6 +261,7 @@ async def run_checks(client: httpx.AsyncClient) -> list[tuple[str, bool, str]]:
         run("Batch satoshi costs", check_cost),
         run("Unpaid L402 challenge", check_l402),
         run("Streamable HTTP transport", check_transport),
+        run("Static server card", check_server_card),
     )
 
 

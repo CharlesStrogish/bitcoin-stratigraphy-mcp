@@ -2,7 +2,17 @@
 name = "repl-nix-workspace"
 version = "0.1.0"
 description = "Add your description here"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
+    "autogen-agentchat==0.7.5",
+    "autogen-ext[openai]==0.7.5",
+    "crewai==1.15.23",
+    "httpx==0.28.1",
+    "langchain-mcp-adapters==0.3.2",
+    "langchain-openai>=1,<2",
+    "langgraph==1.2.12",
+    "mcp>=1.28.1,<1.29",
+    "openai>=2.45,<3",
     "opentimestamps-client>=0.7.2",
+    "pydantic>=2.11,<3",
 ]

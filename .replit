@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "python-3.11", "postgresql-16"]
+modules = ["nodejs-24", "postgresql-16", "python-base-3.13"]
 run = "PORT=5000 pnpm --filter @workspace/api-server dev"
 
 [deployment]
@@ -58,4 +58,4 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
-packages = ["opentimestamps-client"]
+packages = ["libxcrypt", "opentimestamps-client"]

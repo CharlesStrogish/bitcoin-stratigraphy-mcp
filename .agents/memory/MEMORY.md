@@ -43,3 +43,4 @@
 - [Registry pricing claims](registry-pricing-claims.md) — requested 10-sat/$0.001 listing tier is illustrative; use live payment.info for actual tool charges.
 - [API suite rate-limit timing](api-suite-rate-limit-timing.md) — an unrelated per-IP budget assertion can intermittently read 59 instead of 60; confirm before changing limiter behavior.
 - [MCP request log redaction](mcp-request-log-redaction.md) — request query strings can contain credentials; log only paths and treat older raw-URL logs as potentially sensitive.
+- [Python environment checks](python-environment-checks.md) — package installs and shell Python can use different interpreters; verify project imports and system TLS roots.

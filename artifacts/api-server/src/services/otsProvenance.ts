@@ -75,12 +75,21 @@ function checkedProof(proof: Buffer): Buffer {
   return proof;
 }
 
+export function otsCliEnvironment(inherited: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env = { ...inherited };
+  // The Nix CLI must use its own dependency closure, not workspace Python packages.
+  delete env.PYTHONPATH;
+  delete env.PYTHONHOME;
+  return env;
+}
+
 function runOts(args: string[], cwd: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn("ots", ["--no-cache", ...args], {
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
+      env: otsCliEnvironment(),
     });
     let stdout = "";
     let stderr = "";

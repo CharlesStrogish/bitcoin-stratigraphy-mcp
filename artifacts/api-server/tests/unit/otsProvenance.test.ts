@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   createOtsProvenanceService,
+  otsCliEnvironment,
   verifyOtsProofRecord,
   type ProvenanceAnchor,
 } from "../../src/services/otsProvenance";
@@ -12,6 +13,23 @@ const merkleRoot = "22".repeat(32);
 const rootDigest = createHash("sha256")
   .update(Buffer.from(merkleRoot, "hex"))
   .digest("hex");
+
+test("isolates the Nix OTS CLI from workspace Python imports without changing other settings", () => {
+  const inherited = {
+    PATH: "/nix/bin",
+    PYTHONPATH: "/workspace/python-packages",
+    PYTHONHOME: "/workspace/python",
+    NODE_ENV: "test",
+    KEEP_SETTING: "unchanged",
+  };
+  assert.deepEqual(otsCliEnvironment(inherited), {
+    PATH: "/nix/bin",
+    NODE_ENV: "test",
+    KEEP_SETTING: "unchanged",
+  });
+  assert.equal(inherited.PYTHONPATH, "/workspace/python-packages");
+  assert.equal(inherited.PYTHONHOME, "/workspace/python");
+});
 
 test("verifies OTS digest, Bitcoin attestation, and canonical header without trusting calendar receipts", async () => {
   const proof = Buffer.from([0x4f, 0x54, 0x53, 1]).toString("base64");

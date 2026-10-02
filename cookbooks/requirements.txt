@@ -1,0 +1,13 @@
+# Complete framework suite: use Python 3.11–3.13 (3.13 for this repository).
+# The fast, model-free quickstart only needs HTTPX and langchain-mcp-adapters.
+httpx==0.28.1
+pydantic>=2.11,<3
+crewai==1.15.23
+langchain-mcp-adapters==0.3.2
+langgraph==1.2.12
+langchain-openai>=1.6.7,<2
+autogen-agentchat==0.7.5
+autogen-ext[openai]==0.7.5
+# Compatible shared versions for CrewAI and the LangChain adapter.
+mcp>=1.28.1,<1.29
+openai>=2.45,<3

@@ -1,5 +1,4 @@
 import express, { type Express, type Request } from "express";
-import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { registerStratigraphyRoutes } from "./routes/stratigraphy";
@@ -24,6 +23,7 @@ import { registerLlmExportRoutes } from "./routes/llm-export";
 import { registerProvenanceRoutes } from "./routes/provenance";
 import { createMeshGossipService } from "./services/meshGossipService";
 import { registerZkDriftRoute } from "./routes/zk-drift";
+import { registerPublicCors } from "./middleware/publicCors";
 
 const app: Express = express();
 const meshService = createMeshGossipService();
@@ -39,47 +39,7 @@ const l402RateLimiter = createSlidingWindowRateLimiter({
 
 app.set("trust proxy", 1);
 
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["*"],
-    preflightContinue: true,
-    exposedHeaders: [
-      "*",
-      "WWW-Authenticate",
-      "X-L402-Receipt",
-      "X-Stratigraphy-Records",
-      "X-Stratigraphy-First-Day",
-      "X-Stratigraphy-Last-Day",
-      "X-L402-Cost-Sats",
-      "X-L402-Minimum-Cost-Sats",
-      "X-L402-Subscription-Tiers",
-    ],
-  }),
-);
-// Express 5 requires a regex for a catch-all route rather than the string "*".
-// Reflect requested headers: a literal "*" does not authorize credentialed
-// browser requests carrying Authorization.
-app.use("/api/v1/cost", (_req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.removeHeader("Access-Control-Allow-Credentials");
-  next();
-});
-app.options(/.*/, (req, res) => {
-  const publicCostRoute = /^\/api\/v1\/cost\/?$/.test(req.path);
-  res.vary("Access-Control-Request-Headers");
-  res.header("Access-Control-Allow-Origin", publicCostRoute ? "*" : req.headers.origin || "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header(
-    "Access-Control-Allow-Headers",
-    req.headers["access-control-request-headers"] || "*",
-  );
-  if (publicCostRoute) res.removeHeader("Access-Control-Allow-Credentials");
-  else res.header("Access-Control-Allow-Credentials", "true");
-  return res.sendStatus(200);
-});
+registerPublicCors(app);
 app.use(
   pinoHttp({
     logger,

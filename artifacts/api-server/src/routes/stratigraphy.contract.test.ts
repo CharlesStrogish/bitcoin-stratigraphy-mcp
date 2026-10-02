@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { after, before, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express from "express";
-import cors from "cors";
+import { registerPublicCors } from "../middleware/publicCors";
 import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
@@ -437,21 +437,7 @@ function agentAuthorization(
   );
   return `Nostr ${Buffer.from(JSON.stringify(event)).toString("base64")}`;
 }
-app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["*"],
-  exposedHeaders: ["*", "WWW-Authenticate"],
-  preflightContinue: true,
-}));
-app.options(/.*/, (req, res) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", req.headers["access-control-request-headers"] || "*");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.sendStatus(200);
-});
+registerPublicCors(app);
 registerMcpRequestGuard(app);
 app.use(
   express.json({
@@ -3475,17 +3461,17 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
     },
   });
   assert.equal(preflight.status, 200);
-  assert.equal(preflight.headers.get("access-control-allow-origin"), "https://glama.ai");
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
   assert.equal(preflight.headers.get("access-control-allow-methods"), "GET, POST, OPTIONS");
-  assert.equal(preflight.headers.get("access-control-allow-headers"), "Content-Type, Authorization, mcp-session-id");
-  assert.equal(preflight.headers.get("access-control-allow-credentials"), "true");
+  assert.equal(preflight.headers.get("access-control-allow-headers"), "*, Authorization");
+  assert.equal(preflight.headers.get("access-control-allow-credentials"), null);
 
   const otherPreflight = await fetch(`${baseUrl}/api/healthz`, {
     method: "OPTIONS",
     headers: { Origin: "https://glama.ai", "Access-Control-Request-Method": "POST" },
   });
   assert.equal(otherPreflight.status, 200);
-  assert.equal(otherPreflight.headers.get("access-control-allow-origin"), "https://glama.ai");
+  assert.equal(otherPreflight.headers.get("access-control-allow-origin"), "*");
 
   const list = await fetch(`${baseUrl}/mcp`, {
     method: "POST",
@@ -3498,8 +3484,8 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
   });
   assert.equal(list.status, 200);
-  assert.equal(list.headers.get("access-control-allow-origin"), "https://glama.ai");
-  assert.equal(list.headers.get("access-control-allow-credentials"), "true");
+  assert.equal(list.headers.get("access-control-allow-origin"), "*");
+  assert.equal(list.headers.get("access-control-allow-credentials"), null);
   assert.match(list.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.ok(Array.isArray((await list.json() as { result: { tools: unknown[] } }).result.tools));
 
@@ -3528,9 +3514,49 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
     body: "{",
   });
   assert.equal(malformed.status, 400);
-  assert.equal(malformed.headers.get("access-control-allow-origin"), "https://glama.ai");
+  assert.equal(malformed.headers.get("access-control-allow-origin"), "*");
   assert.match(malformed.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.equal((await malformed.json() as { error: { code: number } }).error.code, -32700);
+});
+
+test("serves wildcard CORS on success and errors and immediately finishes Smithery preflights", async () => {
+  const requestsBefore = invoiceRequestCount;
+  const mcpRequestsBefore = mcpInvoiceCount;
+  for (const path of ["/mcp", "/.well-known/mcp/server-card.json", "/api/healthz", "/missing-public-route"]) {
+    const response = await fetch(baseUrl + path, {
+      headers: { Origin: "https://smithery.ai" },
+      signal: AbortSignal.timeout(2_000),
+    });
+    assert.equal(response.headers.get("access-control-allow-origin"), "*", path);
+    assert.equal(response.headers.get("access-control-allow-methods"), "GET, POST, OPTIONS", path);
+    assert.equal(response.headers.get("access-control-allow-headers"), "*", path);
+    assert.equal(response.headers.get("access-control-allow-credentials"), null, path);
+    await response.text();
+    for (const requestedHeaders of ["Content-Type, MCP-Protocol-Version, MCP-Session-Id", "authorization, Content-Type", ""]) {
+      const preflight = await fetch(baseUrl + path, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://smithery.ai",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": requestedHeaders,
+          "Content-Type": "application/json",
+        },
+        // Invalid JSON must never reach the body parser during a preflight.
+        body: "{",
+        signal: AbortSignal.timeout(2_000),
+      });
+      assert.equal(preflight.status, 200, path);
+      assert.equal(preflight.headers.get("access-control-allow-origin"), "*", path);
+      assert.equal(preflight.headers.get("access-control-allow-methods"), "GET, POST, OPTIONS", path);
+      assert.equal(preflight.headers.get("access-control-allow-headers"),
+        requestedHeaders.includes("authorization") ? "*, Authorization" : "*", path);
+      assert.equal(preflight.headers.get("access-control-allow-credentials"), null, path);
+      assert.equal(preflight.headers.get("www-authenticate"), null, path);
+      assert.equal(await preflight.text(), "", path);
+    }
+  }
+  assert.equal(invoiceRequestCount, requestsBefore);
+  assert.equal(mcpInvoiceCount, mcpRequestsBefore);
 });
 
 test("finishes MCP GET and HEAD probes even when scanners advertise SSE", async () => {

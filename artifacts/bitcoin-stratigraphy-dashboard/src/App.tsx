@@ -175,6 +175,9 @@ function Header({
           </div>
         </div>
         <div className="header-actions">
+          <a className="control-button" href={`${import.meta.env.BASE_URL}docs`}>
+            <FileText size={14} /> Developer docs
+          </a>
           <button className="control-button" onClick={onRefresh} disabled={refreshing}>
             <RefreshCw size={14} className={refreshing ? "spin" : ""} /> Refresh
           </button>

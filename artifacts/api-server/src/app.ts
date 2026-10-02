@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { registerStratigraphyRoutes } from "./routes/stratigraphy";
 import { registerOpenApiRoute } from "./routes/openapi";
+import { registerDocsRoutes } from "./routes/docs";
 import { registerMcpRequestGuard, registerMcpRoute } from "./routes/mcp";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
 import { logger } from "./lib/logger";
@@ -105,6 +106,7 @@ app.use(express.urlencoded({ extended: true }));
 const macaroonUsageStore = createPostgresMacaroonUsageStore();
 
 registerOpenApiRoute(app);
+registerDocsRoutes(app);
 registerMcpServerCardRoute(app);
 registerMcpRoute(app, { usageStore: macaroonUsageStore, ledger: revenueLedger, meshService });
 registerNostrStatusRoute(app);

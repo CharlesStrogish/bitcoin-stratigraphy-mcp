@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { cp, rm } from "node:fs/promises";
+import { cp, mkdir, rm } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -18,6 +18,22 @@ async function buildAll() {
     path.resolve(distDir, "zk/artifacts"),
     { recursive: true },
   );
+  await cp(
+    path.resolve(artifactDir, "src/public/docs"),
+    path.resolve(distDir, "public/docs"),
+    { recursive: true },
+  );
+  // Only publish the public integration examples, never the workspace itself.
+  await mkdir(path.resolve(distDir, "public/cookbooks"), { recursive: true });
+  for (const filename of [
+    "README.md", "requirements.txt", "l402_client.py",
+    "langchain_example.py", "autogen_example.py", "crewai_example.py",
+  ]) {
+    await cp(
+      path.resolve(artifactDir, "../../cookbooks", filename),
+      path.resolve(distDir, "public/cookbooks", filename),
+    );
+  }
 
   await esbuild({
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],

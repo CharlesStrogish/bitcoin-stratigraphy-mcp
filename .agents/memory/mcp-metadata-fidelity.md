@@ -26,3 +26,13 @@ When evaluator-suggested wording conflicts with real credential or payload behav
 **Why:** Security claims such as non-expiring, non-revocable credentials and payload claims such as raw block bodies or header-only digests could mislead callers even if they improve a rubric score.
 
 **How to apply:** Verify claimed revocation, expiration, retention, and payload semantics against handlers and schemas before publishing metadata; ask for clarification when exact requested copy would be false.
+
+The developer portal must document the existing canonical tool catalog, not
+introduce the descriptive tool names from the initial portal request as aliases.
+
+**Why:** The user explicitly selected the existing 14 live tools after being told
+the requested names included unregistered operations and new payment behaviors.
+
+**How to apply:** Load discovery schemas from the live server. Treat requested
+names as explanatory intent mappings where accurate, clearly label unsupported
+operations, and do not add API or payment behavior just to match a docs label.

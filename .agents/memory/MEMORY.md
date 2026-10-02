@@ -44,3 +44,4 @@
 - [API suite rate-limit timing](api-suite-rate-limit-timing.md) — an unrelated per-IP budget assertion can intermittently read 59 instead of 60; confirm before changing limiter behavior.
 - [MCP request log redaction](mcp-request-log-redaction.md) — request query strings can contain credentials; log only paths and treat older raw-URL logs as potentially sensitive.
 - [Python environment checks](python-environment-checks.md) — package installs and shell Python can use different interpreters; verify project imports and system TLS roots.
+- [Cookbook dependency security](cookbook-dependency-security.md) — optional client frameworks must not introduce vulnerable dependencies into the publishable project.

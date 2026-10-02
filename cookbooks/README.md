@@ -37,9 +37,8 @@ This calls free `payment.get_info`. The default API URL can be changed with
 
 ### Dependencies for actual agent execution
 
-Use **Python 3.11–3.13**; this repository's Python project requires **3.13+**, so
-**3.13** supports the entire suite. CrewAI currently excludes Python 3.14.
-Install the complete suite before opting into agent execution:
+Use **Python 3.11–3.13**; this repository's Python project requires **3.13**.
+Install the supported LangChain/AutoGen dependencies before opting into agent execution:
 
 ```sh
 python -m pip install -r cookbooks/requirements.txt
@@ -48,9 +47,6 @@ python -m pip install -r cookbooks/requirements.txt
 Alternatively, install only the framework you use:
 
 ```sh
-# CrewAI paid task wrappers and native MCPServerHTTP example
-python -m pip install "crewai==1.15.23"
-
 # LangGraph ReAct agent (in addition to quickstart dependencies)
 python -m pip install "langgraph==1.2.12" "langchain-openai>=1.6.7,<2"
 
@@ -58,13 +54,19 @@ python -m pip install "langgraph==1.2.12" "langchain-openai>=1.6.7,<2"
 python -m pip install "autogen-agentchat==0.7.5" "autogen-ext[openai]==0.7.5"
 ```
 
-The complete requirements constrain shared MCP/OpenAI versions to remain
-compatible with CrewAI. Full framework installation can take longer than the
-lightweight discovery quickstart.
+Full framework installation can take longer than the lightweight discovery quickstart.
+
+**CrewAI execution is temporarily unavailable in this workspace.** CrewAI's
+dependency chain brings in ChromaDB releases with unresolved critical
+vulnerabilities, including the latest release checked on October 2, 2026.
+CrewAI and ChromaDB are therefore excluded from the shared project dependencies
+and this requirements file. Do not reinstall that chain or bypass the publishing
+security check. The CrewAI source example and free-discovery mode remain
+available; native/paid execution needs a future safe upstream release.
 
 ### Run in this Replit workspace
 
-The complete dependency set is already registered in `pyproject.toml` and
+The supported dependency set is already registered in `pyproject.toml` and
 `uv.lock`, with a Python 3.13 project runtime. Use the project interpreter rather
 than a different `python` binary that may still be on the shell's PATH:
 
@@ -79,7 +81,8 @@ uv run --no-sync python -m unittest cookbooks.test_l402_client -v
 
 ### CrewAI: latest indexed telemetry and supplied ZK proof
 
-`crewai_example.py` constructs two agents and two sequential tasks:
+The preserved `crewai_example.py` demonstrates two agents and two sequential tasks.
+Native/paid execution requires a safe CrewAI release, which is currently unavailable:
 
 1. Call **`stratigraphy.get`** with `days=1`, selecting the latest indexed record.
 2. Call **`proof.verify`** with the exact arguments from `--proof-file`.
@@ -90,7 +93,7 @@ actual canonical names, without adding server aliases.
 
 CrewAI's native remote integration is demonstrated with
 `Agent(mcps=[MCPServerHTTP(url=..., streamable=True, ...)])` and a free-only tool
-filter. `--native-discovery` constructs that agent when CrewAI and a model key
+filter. `--native-discovery` constructs that agent when a safe CrewAI release and a model key
 are configured; it does not run the paid tasks.
 
 Native `MCPServerHTTP` does not expose a documented custom HTTPX-client factory.

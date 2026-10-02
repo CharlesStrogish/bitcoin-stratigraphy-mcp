@@ -6,8 +6,6 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "autogen-agentchat==0.7.5",
     "autogen-ext[openai]==0.7.5",
-    "chromadb==1.5.9",
-    "crewai==1.15.23",
     "httpx==0.28.1",
     "langchain-mcp-adapters==0.3.2",
     "langchain-openai>=1,<2",
@@ -17,8 +15,3 @@ dependencies = [
     "opentimestamps-client>=0.7.2",
     "pydantic>=2.11,<3",
 ]
-
-[tool.uv]
-# CrewAI still declares the deployment-blocked ChromaDB 1.1 series.
-# Keep its unused-by-the-cookbooks vector backend on the current release.
-override-dependencies = ["chromadb==1.5.9"]

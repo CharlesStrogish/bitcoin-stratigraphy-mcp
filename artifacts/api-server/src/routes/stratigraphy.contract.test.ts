@@ -642,7 +642,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: string;
       inputSchema: { oneOf?: Array<Record<string, any>> };
     }>;
-    assert.equal(listedTools.length, 14);
+    assert.equal(listedTools.length, 15);
     const paymentTool = listedTools.find(({ name }) => name === "payment.get_info");
     assert.ok(paymentTool);
     assert.equal(paymentTool.inputSchema.oneOf?.length, 2);
@@ -693,7 +693,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: "payment.get_info", arguments: {},
     }, url);
     const prices = paymentInfo.result?.structuredContent.perToolSats;
-    assert.equal(Object.keys(prices).length, 14);
+    assert.equal(Object.keys(prices).length, 15);
     assert.equal(prices["proof.verify"], 250);
     assert.equal(prices["payment.get_info"], 250);
     assert.equal(Object.hasOwn(prices, "payment.info"), false);
@@ -1486,6 +1486,7 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
   }
 
   const requiredSchemaTools = [
+    "proof.notarize",
     "mesh.get_status",
     "proof.get_by_hash",
     "proof.ground",
@@ -1567,6 +1568,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "payment.get_info",
       "mesh.get_status",
       "mesh.broadcast",
+      "proof.notarize",
     ],
   );
   for (const unregisteredTool of ["proof.get_status", "proof.issue_receipt", "proof.verify_ots", "payment.settle"]) {
@@ -1862,6 +1864,10 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
     "proof.submit": {
       keys: ["proofHash", "jobId", "status", "submittedAt", "attestationStatus"],
+      readOnly: false, idempotent: false, openWorld: true,
+    },
+    "proof.notarize": {
+      keys: ["hash", "otsProofHex", "otsStatus"],
       readOnly: false, idempotent: false, openWorld: true,
     },
   };
@@ -3638,10 +3644,10 @@ test("serves the public MCP discovery manifest with wildcard CORS and no payment
   assert.deepEqual(mcpDiscoveryManifest.mcp.capabilities.tools.namespaces, Object.keys(MCP_TOOL_GROUPS));
 });
 
-test("rejects malformed envelopes and unexpected arguments for all 14 tools without payment", async () => {
+test("rejects malformed envelopes and unexpected arguments for all 15 tools without payment", async () => {
   const invoicesBefore = mcpInvoiceCount;
   const names = mcpServerCard.capabilities.tools.map((tool) => tool.name);
-  assert.equal(names.length, 14);
+  assert.equal(names.length, 15);
   const headers = {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -3690,10 +3696,10 @@ test("exactly two canonical sandbox tools and their aliases execute without invo
   assert.equal(mcpInvoiceCount, before);
   const catalog = await mcpRequestAt(baseUrl, "tools/list", {}, "198.51.100.82");
   const tools = catalog.body.result?.tools as Array<{ name: string; annotations: { l402: { amountSats: number } } }>;
-  assert.equal(tools.length, 14);
+  assert.equal(tools.length, 15);
   assert.deepEqual(tools.filter((tool) => tool.annotations.l402.amountSats === 0).map((tool) => tool.name).sort(),
     ["proof.list", "stratigraphy.list"]);
-  assert.equal(tools.filter((tool) => tool.annotations.l402.amountSats > 0).length, 12);
+  assert.equal(tools.filter((tool) => tool.annotations.l402.amountSats > 0).length, 13);
   for (const name of ["mesh.get_status", "payment.get_info"]) {
     const response = await fetch(`${baseUrl}/mcp`, {
       method: "POST",

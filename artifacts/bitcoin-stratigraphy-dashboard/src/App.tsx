@@ -167,7 +167,7 @@ function Header({
       <div className="header-main">
         <div>
           <h1>Bitcoin <span>Stratigraphy</span></h1>
-          <p className="subtitle">Quantitative Bitcoin thermodynamic dataset, Groth16 ZK-SNARK engine, Nostr P2P mesh consensus, and L402 micropayment oracle powering 14 MCP tools — Created &amp; Architected by Charles R. Strogish.</p>
+          <p className="subtitle">Quantitative Bitcoin thermodynamic dataset, Groth16 ZK-SNARK engine, Nostr P2P mesh consensus, and L402 micropayment oracle powering 15 MCP tools — Created &amp; Architected by Charles R. Strogish.</p>
           <div className="source-row">
             <span className="source-badge"><Database size={12} /> Uploaded JSON</span>
             <span className="source-caption">{rowCount ? `${rowCount} records in view` : "Awaiting dataset"}</span>

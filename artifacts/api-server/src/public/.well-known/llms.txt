@@ -5,7 +5,7 @@
 ## Public discovery
 
 - [MCP catalog and transport](/mcp): use JSON-RPC 2.0 initialize and tools/list without payment.
-- [OpenAPI](/openapi.json): REST contracts and the fourteen canonical MCP tools.
+- [OpenAPI](/openapi.json): REST contracts and the fifteen canonical MCP tools.
 - [Price quotes](/api/v1/cost): public HTTP GET/POST quotes; quotes do not create invoices.
 - [Server card](/.well-known/mcp/server-card.json): public machine discovery.
 - [Dataset export](/api/export/huggingface): public training records, separate from paid interactive queries.
@@ -32,9 +32,19 @@ Exactly two canonical tools execute without payment or invoice creation:
 - `stratigraphy.list` (alias `stratigraphy.latest`): discover indexed height and UTC date bounds. The daily block index is not a live Bitcoin tip.
 - `proof.list` (alias `proof.status`): discover proof lifecycle states and retained attestation metadata; status is not a proof archive or cryptographic verification.
 
-The remaining twelve canonical tools require L402 authorization, including
+The remaining thirteen canonical tools require L402 authorization, including
 `payment.get_info`, `mesh.get_status`, and `proof.attenuate`.
 Use public HTTP price quotes and tools/list to bootstrap payment.
+
+## AI notary
+
+`proof.notarize` accepts exactly `{ "hash": "<64-character SHA256 hex>" }`.
+It returns `hash`, `otsProofHex` (decode as binary to save a detached `.ots`
+file), and `otsStatus: "pending_calendar"`. The original digest is timestamped
+directly, not hashed again. A randomized commitment is submitted to public
+OpenTimestamps calendars; calendar acceptance is not immediate Bitcoin
+confirmation. Upgrade and independently verify the receipt later.
+This is a paid tool and supports the 100-call L402 batch below.
 
 ## Macro-Macaroon batches
 

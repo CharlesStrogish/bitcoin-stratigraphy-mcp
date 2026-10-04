@@ -10,6 +10,7 @@ export const mcpToolPrices = Object.freeze({
   "proof.get_by_hash": 250,
   "proof.list": 0,
   "proof.submit": 250,
+  "proof.notarize": 250,
   "proof.ground": 250,
   "mesh.get_status": 250,
   "mesh.broadcast": 250,

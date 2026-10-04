@@ -25,6 +25,7 @@ const outputs = [
   "./dist/orchestrator.test.js",
   "./dist/epistemicGrounding.test.js",
   "./dist/otsProvenance.test.js",
+  "./dist/otsNotarization.test.js",
 ];
 
 const provenancePersistenceTest = `
@@ -142,6 +143,7 @@ await build({
     "orchestrator.test": "../../tests/orchestrator.test.ts",
     "epistemicGrounding.test": "../../tests/epistemicGrounding.test.ts",
     "otsProvenance.test": "./tests/unit/otsProvenance.test.ts",
+    "otsNotarization.test": "./tests/unit/otsNotarization.test.ts",
   },
   outdir: "./dist",
   bundle: true,

@@ -6,7 +6,7 @@
 > native per-record Bitcoin block provenance.
 
 ## Agent entry points
-- [Interactive Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs): live schemas and a manual playground for 14 MCP tools across 4 namespaces.
+- [Interactive Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs): live schemas and a manual playground for 15 MCP tools across 4 namespaces, including OpenTimestamps notarization.
 - [Python SDK and integration cookbooks](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks): CrewAI, LangChain and AutoGen examples; [HTTPX Python SDK/client source](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks/l402_client.py). Payments require explicit callbacks.
 - [MCP auto-discovery manifest](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json): transport, documentation links, namespaces and pricing methods.
 - [Complete tool schemas and TypeScript SDK usage](https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt)
@@ -25,7 +25,7 @@ Agents MUST use an L402-capable wrapper such as Lightning Labs `lnget` or
 `lightning-enable-mcp` to settle paid MCP calls. See
 [the canonical payment and sandbox guide](/.well-known/llms.txt).
 Only `stratigraphy.list` (alias `stratigraphy.latest`) and `proof.list`
-(alias `proof.status`) are free canonical tools. The remaining twelve require
+(alias `proof.status`) are free canonical tools. The remaining thirteen require
 payment. For 100 calls to one paid tool, request its challenge with
 `X-L402-Batch-Size: 100`, pay the 100x invoice once, and reuse that credential
 within its expiry and quota. Delegation does not reset the quota.

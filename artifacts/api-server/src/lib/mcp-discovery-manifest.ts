@@ -4,7 +4,7 @@ export const mcpDiscoveryManifest = {
   name: "bitcoin-stratigraphy-mcp",
   version: "2.0.0",
   description:
-    "Bitcoin Stratigraphy: 14 live MCP tools across 4 namespaces, an interactive Developer Portal and Live Tool Explorer, Python SDK/client and CrewAI, LangChain and AutoGen cookbooks, and L402 Lightning micropayments with free batch POST pricing.",
+    "Bitcoin Stratigraphy: 15 live MCP tools across 4 namespaces, including OpenTimestamps notarization, an interactive Developer Portal and Live Tool Explorer, Python SDK/client and CrewAI, LangChain and AutoGen cookbooks, and L402 Lightning micropayments with free batch POST pricing.",
   author: {
     name: "Charles R. Strogish",
     url: "https://bitcoin-stratigraphy-dashboard.replit.app",
@@ -27,7 +27,7 @@ export const mcpDiscoveryManifest = {
     ],
     capabilities: {
       tools: {
-        count: 14,
+        count: 15,
         namespaces: ["stratigraphy", "proof", "mesh", "payment"],
       },
       prompts: true,

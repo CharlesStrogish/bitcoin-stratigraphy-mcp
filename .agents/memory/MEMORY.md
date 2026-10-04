@@ -49,3 +49,4 @@
 - [OpenAPI Zod generation](openapi-zod-codegen.md) — URI formats on literals and item-less array unions produce invalid generated Zod validators.
 - [MCP freemium policy](mcp-freemium-policy.md) — exactly two free sandbox capabilities; all other canonical tools require paid access.
 - [Macro payment caching](macro-payment-caching.md) — share exact invoice proofs across descendants, but never cache away expiry, revocation, or inherited quotas.
+- [OpenTimestamps dependency choice](opentimestamps-dependency-choice.md) — use the official Python library; the latest JavaScript package was blocked by vulnerable legacy dependencies.

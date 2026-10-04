@@ -50,6 +50,7 @@ export const MCP_TOOL_GROUPS = {
       "proof.get_by_hash",
       "proof.list",
       "proof.submit",
+      "proof.notarize",
       "proof.ground",
     ],
   },

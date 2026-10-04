@@ -50,6 +50,7 @@ x-mcp-tool-groups:
       - proof.get_by_hash
       - proof.list
       - proof.submit
+      - proof.notarize
       - proof.ground
   mesh:
     description: "Configured peer health, quorum status, and outbound signed snapshot distribution."
@@ -61,6 +62,53 @@ x-mcp-tool-groups:
     tools:
       - payment.get_info
 x-mcp-tools:
+  proof.notarize:
+    description: "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats."
+    annotations:
+      readOnlyHint: false
+      destructiveHint: false
+      idempotentHint: false
+      openWorldHint: true
+      l402: { amountSats: 250, batchSize: 100, batchHeader: X-L402-Batch-Size }
+    inputSchema:
+      type: object
+      description: A SHA256 digest to timestamp directly, without hashing its bytes again.
+      additionalProperties: false
+      examples: [{ hash: "abababababababababababababababababababababababababababababababab" }]
+      properties:
+        hash:
+          type: string
+          description: Exactly 64 hexadecimal characters representing a SHA256 digest; no 0x prefix.
+          pattern: "^[0-9a-fA-F]{64}$"
+          minLength: 64
+          maxLength: 64
+          examples: ["abababababababababababababababababababababababababababababababab"]
+      required: [hash]
+    outputSchema:
+      type: object
+      description: Portable detached .ots binary encoded as hexadecimal; calendar acceptance is not Bitcoin confirmation.
+      additionalProperties: false
+      examples:
+        - { hash: "abababababababababababababababababababababababababababababababab", otsProofHex: "004f70656e54696d657374616d70730000", otsStatus: pending_calendar }
+      properties:
+        hash:
+          type: string
+          description: Original SHA256 digest normalized to lowercase.
+          pattern: "^[0-9a-f]{64}$"
+          examples: ["abababababababababababababababababababababababababababababababab"]
+        otsProofHex:
+          type: string
+          description: Hex-encoded detached .ots file; decode as binary to save, upgrade and verify with OpenTimestamps.
+          pattern: "^(?:[0-9a-f]{2})+$"
+          minLength: 2
+          maxLength: 1048576
+          examples: ["004f70656e54696d657374616d70730000"]
+        otsStatus:
+          type: string
+          description: Calendar receipt only; Bitcoin inclusion must be independently upgraded and verified later.
+          const: pending_calendar
+          examples: [pending_calendar]
+      required: [hash, otsProofHex, otsStatus]
   proof.get_by_hash:
     description: "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs."
     annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}

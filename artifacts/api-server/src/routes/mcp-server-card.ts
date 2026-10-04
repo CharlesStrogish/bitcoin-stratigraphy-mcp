@@ -181,6 +181,16 @@ const baseServerCard = {
           },
         },
       },
+      {
+        name: "proof.notarize",
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+          l402: { amountSats: 250 },
+        },
+      },
     ],
   },
 } as const;

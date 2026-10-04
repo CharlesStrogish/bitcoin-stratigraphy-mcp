@@ -58,6 +58,7 @@ import {
   verifyZkProofForSnapshot,
 } from "../services/zkProofService";
 import { verifyDriftProof } from "../services/zkDriftService";
+import { notarizeHash, notarizeInputSchema } from "../services/otsNotarization";
 import { getStratigraphyData, readDataset } from "./stratigraphy";
 import { buildProvenanceChain } from "../services/provenanceChain";
 import { getProvenanceAnchor, verifyOtsProofRecord, type OtsVerificationResult } from "../services/otsProvenance";
@@ -2719,6 +2720,7 @@ const paymentSettlementMetadata = {
     },
 };
 const exactDescriptionToolNames = new Set([
+  "proof.notarize",
   "stratigraphy.get",
   "stratigraphy.get_digest",
   "stratigraphy.get_diff",
@@ -2734,7 +2736,32 @@ const exactDescriptionToolNames = new Set([
   "mesh.broadcast",
 ]);
 const datasetReceiptDefinition = baseMcpToolDefinitions.find((tool) => tool.name === "proof.issue_receipt")!;
-const mcpToolDefinitions = [...baseMcpToolDefinitions
+const notarizeToolDefinition = {
+  name: "proof.notarize",
+  title: "Notarize a SHA256 Digest with OpenTimestamps",
+  description: "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats.",
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  inputSchema: {
+    type: "object", description: "A SHA256 digest to timestamp directly, without hashing its bytes again.",
+    examples: [{ hash: "ab".repeat(32) }], additionalProperties: false,
+    properties: {
+      hash: field("string", "Exactly 64 hexadecimal characters representing the agent state or data SHA256 digest; no 0x prefix.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 }),
+    },
+    required: ["hash"],
+  },
+  outputSchema: {
+    type: "object", description: "Portable detached .ots binary encoded as lowercase hexadecimal; calendar acceptance is not Bitcoin confirmation.",
+    examples: [{ hash: "ab".repeat(32), otsProofHex: "004f70656e54696d657374616d70730000", otsStatus: "pending_calendar" }],
+    additionalProperties: false,
+    properties: {
+      hash: field("string", "The original SHA256 digest, normalized to lowercase.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+      otsProofHex: field("string", "Hex-encoded detached .ots file. Decode as binary and upgrade or verify later with official OpenTimestamps tools.", ["004f70656e54696d657374616d70730000"], { pattern: "^(?:[0-9a-f]{2})+$", minLength: 2, maxLength: 1048576 }),
+      otsStatus: field("string", "Calendar receipt only; Bitcoin inclusion must be independently upgraded and verified later.", ["pending_calendar"], { const: "pending_calendar" }),
+    },
+    required: ["hash", "otsProofHex", "otsStatus"],
+  },
+};
+const mcpToolDefinitions = [...[...baseMcpToolDefinitions, notarizeToolDefinition]
   .filter((tool) => tool.name !== "proof.get_status" && tool.name !== "proof.issue_receipt")
   .map((tool) => {
     const merged = tool.name === "proof.verify"
@@ -2883,6 +2910,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
   }))];
 
 const paidTools = {
+  "proof.notarize": { amountSats: mcpToolPrices["proof.notarize"], schema: notarizeInputSchema },
   "proof.attenuate": { amountSats: mcpToolPrices["proof.attenuate"], schema: attenuateInputSchema },
   "mesh.get_status": { amountSats: mcpToolPrices["mesh.get_status"], schema: meshStatusInputSchema },
   "mesh.status": { amountSats: mcpToolPrices["mesh.get_status"], schema: meshStatusInputSchema },
@@ -2928,6 +2956,7 @@ function createBitcoinStratigraphyMcpServer(
   driftVerification?: { valid: boolean; startedAt: number },
   x402Configured = false,
   paymentSettlement?: SettlementCheck,
+  notary: typeof notarizeHash = notarizeHash,
 ) {
   const server = new McpServer(
     {
@@ -2960,6 +2989,16 @@ function createBitcoinStratigraphyMcpServer(
     const name = canonicalToolName(request.params.name);
     if (!mcpToolDefinitions.some((tool) => tool.name === name)) {
       throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
+    }
+    if (name === "proof.notarize") {
+      const parsed = notarizeInputSchema.safeParse(args);
+      if (!parsed.success) throw new McpError(ErrorCode.InvalidParams, "hash must be exactly 64 hexadecimal characters");
+      try {
+        const receipt = await notary(parsed.data.hash);
+        return { content: [{ type: "text" as const, text: JSON.stringify(receipt) }], structuredContent: receipt };
+      } catch {
+        throw new McpError(ErrorCode.InternalError, "OpenTimestamps notarization unavailable; retry later");
+      }
     }
     if (name === "stratigraphy.get") {
       const parsed = stratigraphyInputSchema.safeParse(args);
@@ -3314,6 +3353,7 @@ async function handleMcpRequest(
     res.locals.driftVerification as { valid: boolean; startedAt: number } | undefined,
     Boolean(res.locals.x402Configured),
     res.locals.paymentSettlement as SettlementCheck | undefined,
+    res.locals.notarizeHash as typeof notarizeHash | undefined,
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -3384,9 +3424,14 @@ export function registerMcpRoute(
     readBitcoinTip?: () => Promise<BitcoinTip>;
     meshService?: Pick<MeshGossipService, "status" | "createConsensus">;
     revocationStore?: MacaroonRevocationStore;
+    notarizeHash?: typeof notarizeHash;
   } = {},
 ): void {
   app.use("/mcp", frameMcpErrors);
+  app.use("/mcp", (_req, res, next) => {
+    res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;
+    next();
+  });
   const rateLimit = createHttpRateLimitMiddleware(
     createSlidingWindowRateLimiter({ limit: 60, windowMs: 60_000 }),
   );
@@ -3425,6 +3470,14 @@ export function registerMcpRoute(
         requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
         });
         return async (req: Request, res: Response, next: NextFunction) => {
+          if (name === "proof.notarize") {
+            if (req.header("PAYMENT-SIGNATURE")) {
+              res.status(400).json({ error: "proof.notarize requires Lightning L402; x402 is not accepted" });
+              return;
+            }
+            await l402(req, res, next);
+            return;
+          }
           if (req.header("X-L402-Batch-Size")) {
             if (req.header("PAYMENT-SIGNATURE")) {
               res.status(400).json({ error: "Macro-Macaroons support Lightning L402 only" });

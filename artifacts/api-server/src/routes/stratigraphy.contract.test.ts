@@ -16,6 +16,7 @@ import type { SettlementRouter } from "../services/settlement";
 import {
   glamaConnector,
   mcpServerCard,
+  smitheryServerCard,
   registerMcpServerCardRoute,
 } from "./mcp-server-card";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
@@ -1425,8 +1426,8 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
     "Shared OpenAPI document must define x-mcp-tools",
   );
   assert.equal(sharedDocument.info?.description, ENGINE_DESCRIPTION);
-  assert.equal(smitheryMetadata.description, ENGINE_DESCRIPTION);
-  assert.equal(glamaMetadata.description, ENGINE_DESCRIPTION);
+  assert.equal(smitheryMetadata.description, `${smitheryServerCard.description}\n\n${ENGINE_DESCRIPTION}`);
+  assert.equal(glamaMetadata.description, `${smitheryServerCard.description}\n\n${ENGINE_DESCRIPTION}`);
   assert.equal(mcpServerCard.description, ENGINE_DESCRIPTION);
 
   const listed = await mcpRequest("tools/list");
@@ -3727,13 +3728,15 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/);
   assert.equal(response.headers.get("www-authenticate"), null);
-  assert.deepEqual(await response.json(), {
-    name: "bitcoin-stratigraphy-mcp",
-    displayName: "Bitcoin Stratigraphy Data Engine",
-    description: "Provides thermodynamic data, proof verification, and L402 payments.",
-    version: "1.0.0",
-    url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
-  });
+  const card = await response.json();
+  assert.deepEqual(card, smitheryServerCard);
+  assert.equal(card.version, "1.1.0");
+  assert.equal(card.serverInfo.version, "1.1.0");
+  assert.equal(card.toolCount, 15);
+  assert.equal(card.capabilities.tools.length, card.toolCount);
+  assert.ok(card.capabilities.tools.some((tool: { name: string }) => tool.name === "proof.notarize"));
+  assert.match(card.description, /100-call Macro-Macaroons/);
+  assert.match(card.description, /Free Sandbox available/);
   const head = await fetch(`${baseUrl}/.well-known/mcp/server-card.json`, {
     method: "HEAD",
     signal: AbortSignal.timeout(2_000),

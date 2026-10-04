@@ -4,8 +4,11 @@
 # https://smithery.ai/docs/build/publish
 # smithery mcp publish "https://bitcoin-stratigraphy-dashboard.replit.app/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
 name: bitcoin-stratigraphy
+version: "1.1.0"
 displayName: Bitcoin Stratigraphy Notary
 description: |-
+  OpenTimestamps AI Notary Hub: 15 L402-gated tools (13 paid, 2 free sandbox tools), LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and Free Sandbox available through stratigraphy.list and proof.list.
+
   Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.
 
   Key Capabilities:
@@ -50,7 +53,7 @@ connection:
     <macaroon>:<preimage> for paid tools; this file contains no wallet secrets.
 pricing:
   freeDiscovery:
-    tools: [stratigraphy.list, payment.get_info]
+    tools: [stratigraphy.list, proof.list]
     priceSats: 0
   microMeteredExecution:
     targetPrice:
@@ -60,7 +63,10 @@ pricing:
     status: illustrative target, not the published charge
   currentPublishedL402:
     standardPaidCallSats: 250
-    proof.listSats: 10
+    proof.listSats: 0
+    notarizationCallSats: 250
+    notarizationBatchCalls: 100
+    notarizationBatchSats: 25000
     note: Call payment.get_info for current MCP per-tool prices and availability; x402 depends on live configuration.
 configSchema:
   type: object

@@ -3,14 +3,11 @@ import { mcpToolPrices } from "../lib/mcp-pricing";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 
-/** Static Smithery discovery must not require an MCP connection or tool execution. */
-export const smitheryServerCard = {
-  name: "bitcoin-stratigraphy-mcp",
-  displayName: "Bitcoin Stratigraphy Data Engine",
-  description: "Provides thermodynamic data, proof verification, and L402 payments.",
-  version: "1.0.0",
-  url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
-} as const;
+export const MCP_RELEASE_VERSION = "1.1.0";
+export const MCP_RELEASE_DESCRIPTION =
+  "OpenTimestamps AI Notary Hub: 15 L402-gated tools (13 paid, 2 free sandbox tools), " +
+  "LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and " +
+  "Free Sandbox available through stratigraphy.list and proof.list.";
 
 const baseServerCard = {
   name: "bitcoin-stratigraphy",
@@ -211,6 +208,24 @@ export const mcpServerCard = {
     })),
   },
 };
+
+/** Static registry discovery never opens an MCP session or executes tools. */
+export const smitheryServerCard = {
+  name: "bitcoin-stratigraphy-mcp",
+  displayName: "Bitcoin Stratigraphy Data Engine",
+  description: MCP_RELEASE_DESCRIPTION,
+  version: MCP_RELEASE_VERSION,
+  serverInfo: {
+    name: "bitcoin-stratigraphy-mcp",
+    version: MCP_RELEASE_VERSION,
+  },
+  url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+  toolCount: mcpServerCard.capabilities.tools.length,
+  capabilities: {
+    ...mcpServerCard.capabilities,
+    toolCount: mcpServerCard.capabilities.tools.length,
+  },
+} as const;
 
 export const glamaConnector = {
   $schema: "https://glama.ai/mcp/schemas/connector.json",

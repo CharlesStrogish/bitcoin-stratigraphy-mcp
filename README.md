@@ -2,12 +2,33 @@
 
 **[Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks)**
 
+## v1.1.0 — 15 Canonical Tools
+
+**OpenTimestamps AI Notary Hub · LangChain/LlamaIndex Native · 100-call Macro-Macaroons · Free Sandbox available**
+
+Use [`proof.notarize`](cookbooks/frameworks/README.md#what-the-agent-reports)
+to obtain a portable OpenTimestamps receipt for a SHA-256 hash.
+Explore the **[native framework quickstarts in `/cookbooks/frameworks`](cookbooks/frameworks/)**:
+[LangChain](cookbooks/frameworks/langchain_agent.py) and
+[LlamaIndex](cookbooks/frameworks/llamaindex_agent.py).
+
+[![LangChain Ready](https://img.shields.io/badge/LangChain-Ready-1C3C3C)](cookbooks/frameworks/langchain_agent.py)
+[![LlamaIndex Ready](https://img.shields.io/badge/LlamaIndex-Ready-6366F1)](cookbooks/frameworks/llamaindex_agent.py)
+[![OpenTimestamps Integrated](https://img.shields.io/badge/OpenTimestamps-Integrated-F7931A)](https://opentimestamps.org/)
+
+The catalog contains **13 paid tools and 2 free sandbox tools**:
+`stratigraphy.list` and `proof.list`. A notarization Macro-Macaroon authorizes
+100 tool-scoped calls for 25,000 sats at the current 250-sat base price.
+Calendar acceptance is not Bitcoin confirmation; upgrade and independently
+verify `.ots` receipts later. Native clients require prepaid L402 headers or
+a trusted, budget-controlled wallet proxy; they do not pay automatically.
+
 [![Glama TDQS](https://img.shields.io/badge/Glama-Grade%20A%20%284.4%2F5.0%29-10b981)](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
 [![Smithery Rating](https://img.shields.io/badge/Smithery-100%2F100-brightgreen)](https://smithery.ai/servers/crstrogish/bitcoin-stratigraphy-mcp)
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2025--11--25-orange)](https://modelcontextprotocol.io/specification/2025-11-25)
 [![L402 Enabled](https://img.shields.io/badge/Monetization-L402%20Lightning-yellow)](https://l402.org)
 
-Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **14 production tools**.
+Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **15 Canonical Tools**.
 
 ## Architecture Overview
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Native LlamaIndex MCP / ReAct quickstart.
 
-Install requirements-llamaindex.txt in a separate consumer Python project.
+Installation is temporarily unavailable: LlamaIndex requires vulnerable NLTK.
+This source is preserved for a future safe release; use langchain_agent.py now.
 Default execution only discovers tools; --run opts into LLM and paid tool calls.
 See README.md for obtaining a tool-scoped 100-call Macro-Macaroon.
 """

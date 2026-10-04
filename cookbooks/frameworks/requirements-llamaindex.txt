@@ -1,4 +1,5 @@
-# Optional consumer dependencies, NOT the deployed API's Python dependencies.
-llama-index-tools-mcp==0.6.0
-llama-index-core==0.14.25
-llama-index-llms-openai==0.8.2
+# LlamaIndex installation is temporarily unavailable.
+# llama-index-core requires NLTK, whose latest release (3.10.3) is affected by
+# GHSA-8mgp-746c-j5xp with no patched release available.
+# Keep this manifest dependency-free; use requirements-langchain.txt instead.
+# Restore dependencies only after auditing the complete resolved dependency tree.

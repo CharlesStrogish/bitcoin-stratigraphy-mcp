@@ -4,31 +4,38 @@ All **15 canonical tools** are discovered through Streamable HTTP MCP at:
 
 `https://bitcoin-stratigraphy-dashboard.replit.app/mcp`
 
-The examples connect natively, without the older custom Python client:
+The examples demonstrate native connections, without the older custom Python client:
 
 - `langchain_agent.py`: official `langchain.mcp.MCPAdapter`, FastMCP transport,
   and LangChain's current `create_agent` ReAct loop.
 - `llamaindex_agent.py`: official `llama-index-tools-mcp` `BasicMCPClient`,
-  `McpToolSpec`, and LlamaIndex workflow `ReActAgent`.
+  `McpToolSpec`, and LlamaIndex workflow `ReActAgent` (source only; installation
+  temporarily unavailable).
+
+**LlamaIndex installation is temporarily unavailable.** Its core dependency
+requires NLTK, and the latest NLTK release (3.10.3) is affected by the high-severity
+file-sandbox bypass [GHSA-8mgp-746c-j5xp](https://github.com/nltk/nltk/security/advisories/GHSA-8mgp-746c-j5xp).
+No patched release is available. `requirements-llamaindex.txt` intentionally
+contains no dependencies and will not install a working LlamaIndex environment.
+The example source remains for future use; use the supported LangChain quickstart
+below instead. Restore LlamaIndex only after auditing a safe resolved dependency
+tree, not by bypassing the package security checks.
 
 ## Install and discover safely
 
 Use a **separate consumer Python project** (Python 3.11 or newer). These optional
 framework versions use MCP SDK 2.x; do not install them over the repository's
 older MCP 1.x cookbook environment. The deployed Node API does not need them.
-Install just the framework you intend to use:
+Install the supported LangChain framework:
 
 ```sh
 python -m pip install -r requirements-langchain.txt
 python langchain_agent.py
-
-# Or, in your LlamaIndex consumer project:
-python -m pip install -r requirements-llamaindex.txt
-python llamaindex_agent.py
 ```
 
 Download the matching script and requirements from `/cookbooks/frameworks/`.
-Both scripts are standalone: no repository-local helper imports are required.
+Both scripts' source is standalone: no repository-local helper imports are required.
+Only the LangChain installation is currently supported.
 Default execution lists the public catalog only. It makes no model requests,
 calls no paid tools, and pays no invoices. If discovery reports a missing
 notarization tool or an older catalog, publish Phase 1 before running the demo,
@@ -62,7 +69,6 @@ after configuring valid per-tool credentials or a budget-controlled wallet proxy
 
 ```sh
 python langchain_agent.py --run --hash <your-sha256-hex>
-python llamaindex_agent.py --run --hash <your-sha256-hex>
 ```
 
 Omit `--hash` to use the SHA256 of the documented quickstart sample text.
@@ -79,7 +85,6 @@ batch requests, and the correct credential for each paid tool:
 
 ```sh
 python langchain_agent.py --proxy-url http://127.0.0.1:8000/mcp --run
-python llamaindex_agent.py --proxy-url http://127.0.0.1:8000/mcp --run
 ```
 
 `L402_PROXY_URL` is the equivalent configuration variable. This toolkit does

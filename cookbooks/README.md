@@ -3,8 +3,9 @@
 ## Native framework toolkits (Phase 2)
 
 For the 15-tool server and `proof.notarize`, use the standalone
-[LangChain MCPAdapter](frameworks/langchain_agent.py) and
-[LlamaIndex MCP](frameworks/llamaindex_agent.py) quickstarts.
+[LangChain MCPAdapter](frameworks/langchain_agent.py) quickstart.
+The [LlamaIndex MCP](frameworks/llamaindex_agent.py) source is preserved, but
+installation is temporarily unavailable because it requires vulnerable NLTK.
 The [framework setup guide](frameworks/README.md) documents separate optional
 dependencies, prepaid 100-call L402 Macro-Macaroon headers, local wallet proxies,
 safe discovery mode, and explicit agent execution.

@@ -5,20 +5,22 @@ export const mcpToolPrices = Object.freeze({
   "stratigraphy.get_diff": 250,
   "stratigraphy.get_range": 250,
   "stratigraphy.list": 0,
-  "proof.attenuate": 0,
+  "proof.attenuate": 250,
   "proof.verify": 250,
   "proof.get_by_hash": 250,
-  "proof.list": 10,
+  "proof.list": 0,
   "proof.submit": 250,
   "proof.ground": 250,
-  "mesh.get_status": 0,
+  "mesh.get_status": 250,
   "mesh.broadcast": 250,
-  "payment.get_info": 0,
+  "payment.get_info": 250,
 });
 
 export const MCP_INVOICE_EXPIRY_SECONDS = 3600;
 
 export const legacyToolNames = {
+  "stratigraphy.latest": "stratigraphy.list",
+  "proof.status": "proof.list",
   "payment.info": "payment.get_info",
   "stratigraphy.digest": "stratigraphy.get_digest",
   "stratigraphy.diff": "stratigraphy.get_diff",
@@ -85,6 +87,13 @@ export function quoteMcpTools(tools: string[]) {
       authorization_format: "L402 <macaroon>:<preimage>",
       credential_scope: "exact MCP tool path",
       max_requests: 1,
+      batch: {
+        request_header: "X-L402-Batch-Size",
+        header_value: "100",
+        max_requests: 100,
+        price_multiplier: 100,
+        credential_scope: "exact MCP tool path",
+      },
     },
   };
 }

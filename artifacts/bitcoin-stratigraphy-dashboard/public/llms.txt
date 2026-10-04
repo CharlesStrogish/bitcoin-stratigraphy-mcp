@@ -11,7 +11,7 @@
 - [MCP auto-discovery manifest](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json): transport, documentation links, namespaces and pricing methods.
 - [Complete tool schemas and TypeScript SDK usage](https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt)
 - [MCP Streamable HTTP endpoint](https://bitcoin-stratigraphy-dashboard.replit.app/mcp): POST JSON-RPC 2.0 requests, starting with `tools/list`; this is a protocol endpoint, not a browsable HTML page.
-- [Pre-flight price discovery](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost): GET REST tiers, prices and supported assets; POST `{"tools":["stratigraphy.get_latest","proof.verify_zk_proof"]}` for itemized MCP satoshi costs, a batch total and L402 Lightning invoice-generation instructions. The two descriptive selectors map to canonical `stratigraphy.get` and `proof.verify` for pricing only. Quotes create no invoices; paid MCP calls require separate path-bound, single-use payment proofs.
+- [Pre-flight price discovery](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost): GET REST tiers; POST `{"tools":["stratigraphy.get_latest","proof.verify_zk_proof"]}` for itemized MCP prices. These selectors map to canonical `stratigraphy.get` and `proof.verify` for pricing only. Quotes create no invoices. Paid MCP credentials are tool-scoped: one call by default, or 100 calls with an explicit 100x-priced batch purchase.
 - [Paid REST telemetry stream](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/stratigraphy/stream): `GET` Server-Sent Events with a 30-second refresh interval. This is a separate REST transport, not MCP; consult `/api/v1/cost` for the current price and assets.
 - [OpenAPI document](https://bitcoin-stratigraphy-dashboard.replit.app/openapi.json)
 - [MCP server card](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json)
@@ -20,6 +20,15 @@
 - [Machine-readable LLM schema manifest](/.well-known/llm-schema.json): export parameters, field definitions, domain constraints, and verification protocols.
 
 ## Access and settlement
+
+Agents MUST use an L402-capable wrapper such as Lightning Labs `lnget` or
+`lightning-enable-mcp` to settle paid MCP calls. See
+[the canonical payment and sandbox guide](/.well-known/llms.txt).
+Only `stratigraphy.list` (alias `stratigraphy.latest`) and `proof.list`
+(alias `proof.status`) are free canonical tools. The remaining twelve require
+payment. For 100 calls to one paid tool, request its challenge with
+`X-L402-Batch-Size: 100`, pay the 100x invoice once, and reuse that credential
+within its expiry and quota. Delegation does not reset the quota.
 
 Public metadata, health, MCP tool discovery, and the Hugging Face export need
 no payment. Paid operations use endpoint-specific prices and return the
@@ -30,9 +39,9 @@ Base USDC x402 is conditional and only applies to MCP when explicitly reported
 available. Do not infer Base USDC availability for REST or the SSE stream.
 
 The SDK's REST client may use a REST-scoped subscription credential according
-to its own path, request, and expiry restrictions. That behavior does not make
-an MCP paid-call credential reusable: MCP authorizations are scoped to the
-requested operation and must not be carried across tools or REST routes.
+to its own path, request, and expiry restrictions. MCP credentials are scoped
+to one operation: default credentials allow one call, while explicit batch
+credentials allow 100 calls. Neither may cross tools or REST routes.
 
 ## Capabilities and trust boundaries
 

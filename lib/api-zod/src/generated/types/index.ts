@@ -66,6 +66,7 @@ export * from './macaroonRevocationRequest';
 export * from './macaroonRevocationResponse';
 export * from './mcpBatchCostQuote';
 export * from './mcpBatchCostQuoteL402';
+export * from './mcpBatchCostQuoteL402Batch';
 export * from './mcpBatchCostQuotePerToolSats';
 export * from './mcpDiscoveryManifest';
 export * from './mcpDiscoveryManifestAuthor';

@@ -80,7 +80,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs.",
   "proof.list":
-    "Discover, filter, and paginate recent zk-proof attestation lifecycle summaries from bounded process-local memory. Use `limit` (1-100, default 20), zero-based `offset` (0-1000, default 0), and optional `status` (`verified`, `cached`, `pending`, or `invalid`); cursor pagination is not supported. Returns newest-first bounded summaries, not full proof payloads or receipts. Use `proof.get_by_hash` for an individual retained proof or receipt by known ID. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
+    "Freely discover, filter, and paginate recent zk-proof attestation lifecycle summaries. Use limit (1-100), offset (0-1000), and optional status (verified, cached, pending, invalid). Returns bounded summaries, not full proofs or receipts. Alias: proof.status. No invoice is created.",
   "payment.get_info":
     "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted.",
   "stratigraphy.list":
@@ -88,7 +88,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "stratigraphy.get_range":
     "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only, HTTP rate-limited and L402-paid; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries.",
   "proof.attenuate":
-    "Attenuate an authentic, unexpired L402 parent `macaroon` by appending supported restrictive `caveats` (tool, target, expiration, path, or request-count limits) and optionally `ttlSeconds`. The `caveats` array is required but may be empty when `ttlSeconds` is supplied; at least one restriction is required. Appended caveats can only narrow inherited permissions, never widen token authority. Free to call; returns a restricted child macaroon without issuing an invoice, and the parent's payment proof is still required for later redemption. Invalid parents or unsupported caveats return an error.",
+    "Attenuate an authentic, unexpired L402 parent `macaroon` by appending restrictive `caveats` and optionally `ttlSeconds`. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota.",
   "stratigraphy.get_diff":
     "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to HTTP rate limiting and L402 payment; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool.",
   "stratigraphy.get_digest":
@@ -104,7 +104,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "stratigraphy.get":
     "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only, HTTP rate-limited and L402-paid. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds.",
   "mesh.get_status":
-    "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Free, read-only status; use `mesh.broadcast` to distribute a snapshot. Note: Mesh consensus is automated; this tool does not administer peers or edit topology. No internal peer-administration HTTP tool is advertised.",
+    "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Requires L402 authorization; use mesh.broadcast to distribute a snapshot. This tool does not administer peers or edit topology.",
 };
 
 type OpenApiDocument = {
@@ -572,7 +572,7 @@ async function mcpRequestAt(
   authorization?: string,
   paymentSignature?: string,
 ) {
-  const response = await fetch(`${targetBaseUrl}/mcp`, {
+  let response = await fetch(`${targetBaseUrl}/mcp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -589,6 +589,26 @@ async function mcpRequestAt(
       ...(params ? { params } : {}),
     }),
   });
+  // Execution-oriented legacy fixtures now pay formerly-free control tools.
+  // Dedicated paywall regressions use raw fetch to inspect unpaid challenges.
+  if (response.status === 402 && method === "tools/call" &&
+    ["payment.info", "payment.get_info", "mesh.status", "mesh.get_status", "proof.attenuate"].includes(String(params?.name))) {
+    const offer = await response.json() as { macaroon: string; payment_hash: string };
+    const payment = mcpInvoices.get(offer.payment_hash);
+    assert.ok(payment);
+    const retryParams = authorization && params?.arguments && ["payment.info", "payment.get_info"].includes(String(params.name))
+      ? { ...params, arguments: { ...(params.arguments as object), paymentMacaroon: /^L402\s+([^:\s]+):/.exec(authorization)?.[1] } }
+      : params;
+    response = await fetch(`${targetBaseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json", Accept: "application/json, text/event-stream",
+        ...(forwardedFor ? { "X-Forwarded-For": forwardedFor } : {}),
+        Authorization: `L402 ${offer.macaroon}:${payment.preimage}`,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, ...(retryParams ? { params: retryParams } : {}) }),
+    });
+  }
   const body = await response.json() as {
     result?: Record<string, any>;
     error?: { code: number; message: string };
@@ -675,7 +695,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     const prices = paymentInfo.result?.structuredContent.perToolSats;
     assert.equal(Object.keys(prices).length, 14);
     assert.equal(prices["proof.verify"], 250);
-    assert.equal(prices["payment.get_info"], 0);
+    assert.equal(prices["payment.get_info"], 250);
     assert.equal(Object.hasOwn(prices, "payment.info"), false);
     for (const [name, legacyName] of [
       ["stratigraphy.get_digest", "stratigraphy.digest"],
@@ -731,10 +751,10 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
     assert.equal(prices["proof.get_by_hash"], 250);
     assert.equal(Object.hasOwn(prices, "proof.get_status"), false);
     assert.equal(Object.hasOwn(prices, "proof.issue_receipt"), false);
-    assert.equal(prices["payment.get_info"], 0);
+    assert.equal(prices["payment.get_info"], 250);
     assert.equal(prices["stratigraphy.list"], 0);
-    assert.equal(prices["proof.list"], 10);
-    assert.equal(prices["mesh.get_status"], 0);
+    assert.equal(prices["proof.list"], 0);
+    assert.equal(prices["mesh.get_status"], 250);
     assert.equal(paymentInfo.result?.structuredContent.invoiceExpirySeconds, 3600);
     assert.deepEqual(paymentInfo.result?.structuredContent.activeAuthSchemes, ["L402"]);
     const onePrice = await mcpRequest("tools/call", {
@@ -857,22 +877,22 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
   }
 });
 
-test("MCP L402 challenges bind price and tool, while discovery and mesh stay free", async () => {
+test("MCP L402 challenges bind price and tool, while discovery and sandbox stay free", async () => {
   for (const [method, params] of [
     ["initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "pricing-test", version: "1" } }],
     ["tools/list", {}],
-    ["tools/call", { name: "mesh.get_status", arguments: {} }],
-    ["tools/call", { name: "mesh.status", arguments: {} }],
+    ["tools/call", { name: "stratigraphy.list", arguments: {} }],
+    ["tools/call", { name: "proof.status", arguments: {} }],
   ] as const) {
     const { response } = await mcpRequestAt(baseUrl, method, params);
     assert.equal(response.status, 200, method);
     assert.equal(response.headers.get("www-authenticate"), null);
   }
 
-  const lowArgs = { name: "proof.list", arguments: { limit: 10 } };
+  const lowArgs = { name: "stratigraphy.get", arguments: { days: 1 } };
   const { response: lowResponse, body: lowChallenge } = await mcpRequestAt(baseUrl, "tools/call", lowArgs);
   assert.equal(lowResponse.status, 402);
-  assert.equal((lowChallenge as any).amount_sats, 10);
+  assert.equal((lowChallenge as any).amount_sats, 250);
   assert.match(lowResponse.headers.get("www-authenticate") ?? "", /L402 macaroon=".+", invoice="ln.+"/);
   const lowPayment = mcpInvoices.get((lowChallenge as any).payment_hash);
   assert.ok(lowPayment);
@@ -913,11 +933,11 @@ test("MCP L402 challenges bind price and tool, while discovery and mesh stay fre
   );
   assert.equal(replay.status, 429);
 
-  for (const name of ["proof.status", "proof.epistemic_receipt"]) {
+  for (const name of ["proof.unknown_status", "proof.epistemic_receipt"]) {
     const invoicesBefore = mcpInvoiceCount;
     const { response, body } = await mcpRequestAt(baseUrl, "tools/call", {
       name,
-      arguments: name === "proof.status"
+      arguments: name === "proof.unknown_status"
         ? { snapshotDigest: "1" }
         : { cid: "ef".repeat(32) },
     });
@@ -1766,7 +1786,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         `${candidate.name} must explain cost and failures`);
     }
     if (candidate.name === "proof.list") {
-      assert.match(candidate.description, /costs 10 sats/);
+      assert.match(candidate.description, /free|no invoice/i);
     }
     assertDocumentedSchema(candidate.inputSchema, `${candidate.name}.inputSchema`);
     assertValidDefault(candidate.inputSchema, `${candidate.name}.inputSchema`);
@@ -1897,7 +1917,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     );
   }
   assert.match(documentedTool("stratigraphy.list").description, /^Discover indexed height and UTC date bounds, available metrics, and catalog metadata\./);
-  assert.match(documentedTool("proof.list").description, /costs 10 sats/);
+  assert.match(documentedTool("proof.list").description, /free|no invoice/i);
   assert.match(documentedTool("mesh.broadcast").inputSchema.properties.payload.description,
     /date selector.*not a caller-supplied record/i);
   assert.match(documentedTool("proof.list").inputSchema.properties.offset.description,
@@ -2049,6 +2069,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     "thermodynamic_signal",
   ]);
   assert.deepEqual(tool.annotations, {
+    l402: { amountSats: 250, batchSize: 100, batchHeader: "X-L402-Batch-Size" },
     readOnlyHint: true,
     destructiveHint: false,
     idempotentHint: true,
@@ -2437,7 +2458,7 @@ test("MCP paid tools issue dual challenges and settle x402 before execution", as
     assert.equal(catalog.response.headers.get("payment-required"), null);
     assert.equal(catalog.body.result?.structuredContent.totalSnapshots, 422);
 
-    const params = { name: "proof.list", arguments: {} };
+    const params = { name: "stratigraphy.get", arguments: { days: 1 } };
     const challenge = await mcpRequestAt(baseUrl, "tools/call", params);
     assert.equal(challenge.response.status, 402);
     assert.match(challenge.response.headers.get("www-authenticate") ?? "", /^L402 /);
@@ -2457,7 +2478,7 @@ test("MCP paid tools issue dual challenges and settle x402 before execution", as
       (paymentRequired.accepts[0]?.extra as { paymentFlow?: string }).paymentFlow,
       "upfront",
     );
-    assert.equal((challenge.body as { amount_sats?: number }).amount_sats, 10);
+    assert.equal((challenge.body as { amount_sats?: number }).amount_sats, 250);
     const payload: PaymentPayload = {
       x402Version: 2,
       resource: paymentRequired.resource,
@@ -2528,9 +2549,8 @@ test("MCP paid tools issue dual challenges and settle x402 before execution", as
         arguments: { action: "settle", paymentHash: "0x" + "cd".repeat(32), txHash: baseTxHash },
       }, undefined, undefined, paymentSignature,
     );
-    assert.deepEqual(mismatch.body.result?.structuredContent, {
-      verified: false, settlementToken: null,
-    });
+    assert.equal(mismatch.response.status, 400);
+    assert.equal(mismatch.body.error?.code, -32602);
     assert.equal(settleCalls, 3, "Mismatched payment references must not trigger settlement");
     facilitatorSettlesPayment = true;
     const baseSettlement = await mcpRequestAt(
@@ -3659,6 +3679,32 @@ test("rejects malformed envelopes and unexpected arguments for all 14 tools with
   assert.equal(mcpInvoiceCount, invoicesBefore);
 });
 
+test("exactly two canonical sandbox tools and their aliases execute without invoices", async () => {
+  const before = mcpInvoiceCount;
+  for (const name of ["stratigraphy.list", "stratigraphy.latest", "proof.list", "proof.status"]) {
+    const { response, body } = await mcpRequestAt(baseUrl, "tools/call", { name, arguments: {} }, "198.51.100.82");
+    assert.equal(response.status, 200, name);
+    assert.ok(body.result?.structuredContent, name);
+    assert.equal(response.headers.get("www-authenticate"), null, name);
+  }
+  assert.equal(mcpInvoiceCount, before);
+  const catalog = await mcpRequestAt(baseUrl, "tools/list", {}, "198.51.100.82");
+  const tools = catalog.body.result?.tools as Array<{ name: string; annotations: { l402: { amountSats: number } } }>;
+  assert.equal(tools.length, 14);
+  assert.deepEqual(tools.filter((tool) => tool.annotations.l402.amountSats === 0).map((tool) => tool.name).sort(),
+    ["proof.list", "stratigraphy.list"]);
+  assert.equal(tools.filter((tool) => tool.annotations.l402.amountSats > 0).length, 12);
+  for (const name of ["mesh.get_status", "payment.get_info"]) {
+    const response = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", "X-Forwarded-For": "198.51.100.82" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: name, method: "tools/call", params: { name, arguments: {} } }),
+    });
+    assert.equal(response.status, 402, name);
+    await response.arrayBuffer();
+  }
+});
+
 test("serves the public MCP server card without an L402 challenge", async () => {
   const requestsBefore = invoiceRequestCount;
   const response = await fetch(
@@ -3780,7 +3826,7 @@ test("quotes batch MCP costs with itemized invoice details and wildcard CORS wit
   assert.equal(invoiceRequestCount, before);
 });
 
-test("quotes free, reduced-fee and legacy MCP costs without changing paid alias scopes", async () => {
+test("quotes free and paid legacy MCP costs without changing paid alias scopes", async () => {
   const before = invoiceRequestCount;
   const response = await fetch(`${baseUrl}/api/v1/cost`, {
     method: "POST",
@@ -3790,11 +3836,11 @@ test("quotes free, reduced-fee and legacy MCP costs without changing paid alias 
   assert.equal(response.status, 200);
   const quote = QuoteMcpToolCostsResponse.parse(await response.json());
   assert.deepEqual(quote.perToolSats, {
-    "payment.get_info": 0, "proof.list": 10, "stratigraphy.digest": 250,
+    "payment.get_info": 250, "proof.list": 0, "stratigraphy.digest": 250,
   });
-  assert.equal(quote.total_sats, 260);
-  assert.equal(quote.items[0].invoice_generation, null);
-  assert.equal(quote.items[0].payment_required, false);
+  assert.equal(quote.total_sats, 500);
+  assert.equal(quote.items[1].invoice_generation, null);
+  assert.equal(quote.items[1].payment_required, false);
   assert.equal(quote.items[2].canonical_tool, "stratigraphy.get_digest");
   assert.ok(quote.items[2].invoice_generation);
   assert.equal(quote.items[2].invoice_generation.tool, "stratigraphy.digest");

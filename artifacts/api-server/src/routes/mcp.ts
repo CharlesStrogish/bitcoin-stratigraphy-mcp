@@ -480,7 +480,12 @@ const proofByHashInputSchema = z.object({
 const paymentInfoInputSchema = z.object({
   action: z.literal("query").optional(),
   toolName: z.string().min(1).optional(),
-}).strict().or(settleInputSchema.extend({ action: z.literal("settle") }).refine(
+}).strict().or(settleInputSchema.extend({
+  action: z.literal("settle"),
+  paymentMacaroon: z.string().min(1).max(8192).optional().describe(
+    "Original invoice macaroon for settlement checks, separate from this tool's paid Authorization credential.",
+  ),
+}).refine(
   (value) => Number(value.preimage !== undefined) + Number(value.txHash !== undefined) === 1,
   "Provide exactly one of preimage or txHash",
 ));
@@ -1544,7 +1549,7 @@ const baseMcpToolDefinitions = [
     name: "proof.attenuate",
     title: "Attenuate a Macaroon",
     description:
-      "Attenuate an authentic, unexpired L402 parent `macaroon` by appending supported restrictive `caveats` (tool, target, expiration, path, or request-count limits) and optionally `ttlSeconds`. The `caveats` array is required but may be empty when `ttlSeconds` is supplied; at least one restriction is required. Appended caveats can only narrow inherited permissions, never widen token authority. Free to call; returns a restricted child macaroon without issuing an invoice, and the parent's payment proof is still required for later redemption. Invalid parents or unsupported caveats return an error.",
+      "Attenuate an authentic, unexpired L402 parent `macaroon` by appending restrictive `caveats` and optionally `ttlSeconds`. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1949,7 +1954,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "Discover, filter, and paginate recent zk-proof attestation lifecycle summaries from bounded process-local memory. Use `limit` (1-100, default 20), zero-based `offset` (0-1000, default 0), and optional `status` (`verified`, `cached`, `pending`, or `invalid`); cursor pagination is not supported. Returns newest-first bounded summaries, not full proof payloads or receipts. Use `proof.get_by_hash` for an individual retained proof or receipt by known ID. Read-only; costs 10 sats via HTTP L402 without valid credentials.",
+      "Freely discover, filter, and paginate recent zk-proof attestation lifecycle summaries. Use limit (1-100), offset (0-1000), and optional status (verified, cached, pending, invalid). Returns bounded summaries, not full proofs or receipts. Alias: proof.status. No invoice is created.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2447,7 +2452,7 @@ const baseMcpToolDefinitions = [
 
 - PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.get_info\` instead of calling paid tools blindly when checking pricing upfront.
 - USAGE GUIDELINES: Use \`payment.get_info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.get_info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
-- BEHAVIOR & CONSEQUENCES: Free, read-only, and idempotent. Returns Lightning rates and invoice expiry limits; Base USDC x402 terms appear only when authenticated settlement is ready. Passing an unknown \`toolName\` returns a validation error.`,
+- BEHAVIOR & CONSEQUENCES: Requires L402 authorization. Public HTTP cost quotes remain free. Returns Lightning rates and invoice expiry limits; Base USDC x402 terms appear only when authenticated settlement is ready. Passing an unknown \`toolName\` returns a validation error.`,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2456,7 +2461,7 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Pass an optional canonical toolName to narrow the returned price map; omit it for all advertised prices. This free request does not issue an invoice.",
+      description: "Pass an optional canonical toolName to narrow the returned price map; omit it for all advertised prices. This tool requires L402; public HTTP cost quotes remain free.",
       examples: [{}, { toolName: "stratigraphy.get_digest" }],
       additionalProperties: false,
       properties: {
@@ -2496,7 +2501,7 @@ const baseMcpToolDefinitions = [
           },
           required: ["httpStatus", "header", "fields"],
         },
-        activeAuthSchemes: field("array", "Authentication scheme for paid MCP calls; free discovery and payment.get_info require none.", [["L402"]], { items: field("string", "MCP paid-call scheme.", ["L402"]) }),
+        activeAuthSchemes: field("array", "Authentication schemes for paid MCP calls. Only stratigraphy.list and proof.list execute free.", [["L402"]], { items: field("string", "MCP paid-call scheme.", ["L402"]) }),
         x402: {
           type: "object",
           description: "Base mainnet USDC x402 exact terms; present only when authenticated CDP settlement is configured.",
@@ -2516,13 +2521,13 @@ const baseMcpToolDefinitions = [
           required: ["network", "scheme", "asset", "amount", "payTo"],
         },
         macaroonRequirements: {
-          type: "object", description: "A valid payment proof must match the bound invoice, provider, amount, path, expiry and single-use restriction. proof.attenuate is free but requires a valid parent token.",
+          type: "object", description: "A valid payment proof must match the bound invoice, provider, amount, path, expiry and request quota. proof.attenuate requires payment and a valid parent token.",
           examples: [{ authorizationHeader: "L402 <macaroon>:<preimage>", scope: "exact MCP tool path", maxRequests: 1 }],
           additionalProperties: false,
           properties: {
             authorizationHeader: field("string", "Authorization header form for redeeming a settled challenge.", ["L402 <macaroon>:<preimage>"]),
             scope: field("string", "Issued macaroons are bound to the challenged MCP tool path.", ["exact MCP tool path"]),
-            maxRequests: field("integer", "Each issued paid-tool macaroon is single-use.", [1], { const: 1 }),
+            maxRequests: field("integer", "Default credentials allow one call; X-L402-Batch-Size: 100 buys a tool-scoped 100-call credential.", [1, 100], { enum: [1, 100] }),
           },
           required: ["authorizationHeader", "scope", "maxRequests"],
         },
@@ -2534,7 +2539,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Free, read-only status; use `mesh.broadcast` to distribute a snapshot. Note: Mesh consensus is automated; this tool does not administer peers or edit topology. No internal peer-administration HTTP tool is advertised.",
+      "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Requires L402 authorization; use mesh.broadcast to distribute a snapshot. This tool does not administer peers or edit topology.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2787,6 +2792,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
               ...tool.inputSchema.properties,
               action: field("string", "query (default) discovers prices; settle verifies authenticated payment.", ["query"], { enum: ["query", "settle"], default: "query" }),
               ...paymentSettlementMetadata.inputSchema.properties,
+              paymentMacaroon: field("string", "Original invoice macaroon, separate from this tool's paid access credential.", ["eyJtYWNhcm9vbiI6ImV4YW1wbGUifQ"], { minLength: 1, maxLength: 8192 }),
             },
             required: [],
             oneOf: [
@@ -2802,6 +2808,7 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
                 properties: {
                   action: field("string", "Verify or execute payment settlement.", ["settle"], { const: "settle" }),
                   ...paymentSettlementMetadata.inputSchema.properties,
+                  paymentMacaroon: field("string", "Original invoice macaroon, separate from this tool's paid access credential.", ["eyJtYWNhcm9vbiI6ImV4YW1wbGUifQ"], { minLength: 1, maxLength: 8192 }),
                 },
                 required: ["action", "paymentHash"],
               },
@@ -2863,10 +2870,24 @@ const mcpToolDefinitions = [...baseMcpToolDefinitions
              : `${merged.description} ${immutabilityNote}`,
         }
       : merged;
-  })];
+  }).map((tool) => ({
+    ...tool,
+    annotations: {
+      ...tool.annotations,
+      l402: {
+        amountSats: mcpToolPrices[tool.name as keyof typeof mcpToolPrices],
+        ...(mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0
+          ? { batchSize: 100, batchHeader: "X-L402-Batch-Size" } : {}),
+      },
+    },
+  }))];
 
 const paidTools = {
-  "proof.list": { amountSats: mcpToolPrices["proof.list"], schema: listProofAttestationsInputSchema },
+  "proof.attenuate": { amountSats: mcpToolPrices["proof.attenuate"], schema: attenuateInputSchema },
+  "mesh.get_status": { amountSats: mcpToolPrices["mesh.get_status"], schema: meshStatusInputSchema },
+  "mesh.status": { amountSats: mcpToolPrices["mesh.get_status"], schema: meshStatusInputSchema },
+  "payment.get_info": { amountSats: mcpToolPrices["payment.get_info"], schema: paymentInfoInputSchema },
+  "payment.info": { amountSats: mcpToolPrices["payment.get_info"], schema: paymentInfoInputSchema },
   "stratigraphy.get": { amountSats: mcpToolPrices["stratigraphy.get"], schema: stratigraphyInputSchema },
   "stratigraphy.get_digest": { amountSats: mcpToolPrices["stratigraphy.get_digest"], schema: stratigraphyDigestInputSchema },
   "stratigraphy.get_diff": { amountSats: mcpToolPrices["stratigraphy.get_diff"], schema: stratigraphyDiffInputSchema },
@@ -2940,7 +2961,7 @@ function createBitcoinStratigraphyMcpServer(
     if (!mcpToolDefinitions.some((tool) => tool.name === name)) {
       throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
     }
-    if (request.params.name === "stratigraphy.get") {
+    if (name === "stratigraphy.get") {
       const parsed = stratigraphyInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(ErrorCode.InvalidParams, "Invalid stratigraphy query");
@@ -3023,7 +3044,7 @@ function createBitcoinStratigraphyMcpServer(
         throw error;
       }
     }
-    if (request.params.name === "stratigraphy.list") {
+    if (name === "stratigraphy.list") {
       if (!stratigraphyCatalogInputSchema.safeParse(args).success) {
         throw new McpError(ErrorCode.InvalidParams, "Catalog takes no arguments");
       }
@@ -3147,7 +3168,7 @@ function createBitcoinStratigraphyMcpServer(
         structuredContent,
       };
     }
-    if (request.params.name === "proof.list") {
+    if (name === "proof.list") {
       const parsed = listProofAttestationsInputSchema.safeParse(args);
       if (!parsed.success) {
         throw new McpError(
@@ -3392,6 +3413,7 @@ export function registerMcpRoute(
       (() => {
         const l402 = createL402Middleware({
         amountSats,
+        allowBatch: true,
         invoiceExpirySeconds: MCP_INVOICE_EXPIRY_SECONDS,
         description: `Bitcoin Stratigraphy MCP ${name} execution`,
         settlementRouter,
@@ -3403,6 +3425,14 @@ export function registerMcpRoute(
         requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
         });
         return async (req: Request, res: Response, next: NextFunction) => {
+          if (req.header("X-L402-Batch-Size")) {
+            if (req.header("PAYMENT-SIGNATURE")) {
+              res.status(400).json({ error: "Macro-Macaroons support Lightning L402 only" });
+              return;
+            }
+            await l402(req, res, next);
+            return;
+          }
           if (req.header("PAYMENT-SIGNATURE")) {
             const server = await x402ResourceServer;
             if (!server) {
@@ -3441,6 +3471,55 @@ export function registerMcpRoute(
     }
     next();
   }, validateMcpEnvelope, async (req, res, next) => {
+    // Previously-free operations must authorize before settlement/delegation
+    // side effects. Invalid schemas still go to normal JSON-RPC validation.
+    const name = req.body?.method === "tools/call" ? req.body.params?.name : undefined;
+    let semanticInputValid = true;
+    if (name === "proof.attenuate") {
+      const parsed = attenuateInputSchema.safeParse(req.body.params.arguments ?? {});
+      if (parsed.success) {
+        const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+        semanticInputValid = Boolean(secret && verifySubscriptionMacaroon(parsed.data.macaroon, secret, Math.floor(Date.now() / 1_000)));
+        try { normalizedAttenuationCaveats(parsed.data, Date.now()); }
+        catch { semanticInputValid = false; }
+      }
+    }
+    if (name === "payment.get_info" || name === "payment.info") {
+      const args = req.body.params.arguments;
+      if (args?.action === "settle" && typeof args.txHash === "string" && typeof args.paymentHash === "string" &&
+        args.txHash.replace(/^0x/i, "").toLowerCase() !== args.paymentHash.replace(/^0x/i, "").toLowerCase()) {
+        res.status(400).json({ jsonrpc: "2.0", id: req.body.id ?? null,
+          error: { code: -32602, message: "Payment hash must match the settlement transaction" } });
+        return;
+      }
+      const requestedTool = req.body.params.arguments?.toolName;
+      if (typeof requestedTool === "string" && !Object.hasOwn(mcpToolPrices, canonicalToolName(requestedTool))) {
+        res.status(200).json({ jsonrpc: "2.0", id: req.body.id ?? null, error: { code: -32602, message: "Unknown MCP tool" } });
+        return;
+      }
+    }
+    if (semanticInputValid && typeof name === "string" &&
+      ["proof.attenuate", "mesh.get_status", "mesh.status", "payment.get_info", "payment.info"].includes(name) &&
+      paidTools[name as keyof typeof paidTools].schema.safeParse(req.body.params.arguments ?? {}).success) {
+      const authorization = parseL402Header(req.header("Authorization"));
+      const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+      const pass = authorization && secret
+        ? verifySubscriptionMacaroon(authorization.macaroon, secret, Math.floor(Date.now() / 1_000)) : null;
+      if (pass && (pass.allowedToolSets.some((set) =>
+        !toolNamesForAuthorization(name).some((allowedName) => set.includes(allowedName))) ||
+        (pass.maxTarget !== undefined && !(await withinMcpTargetBound(canonicalToolName(name), req.body.params.arguments ?? {}, pass.maxTarget))))) {
+        res.status(403).json({ jsonrpc: "2.0", id: req.body.id ?? null,
+          error: { code: -32602, message: "Macaroon tool or target caveat forbids this request" } });
+        return;
+      }
+      await gates[name](req, res, (error?: unknown) => {
+        if (!error) res.locals.earlyL402Authorized = true;
+        next(error);
+      });
+      return;
+    }
+    next();
+  }, async (req, res, next) => {
     const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
     if (body?.method !== "tools/call" ||
       (body.params?.name !== "payment.get_info" && body.params?.name !== "payment.info")) {
@@ -3457,7 +3536,9 @@ export function registerMcpRoute(
     res.locals.paymentSettlement = invalid;
     const paymentHash = input.paymentHash.replace(/^0x/i, "").toLowerCase();
     if (input.preimage !== undefined) {
-      const authorization = parseL402Header(req.header("Authorization"));
+      const authorization = input.paymentMacaroon
+        ? { macaroon: input.paymentMacaroon, preimage: input.preimage.toLowerCase() }
+        : parseL402Header(req.header("Authorization"));
       const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
       const pass = authorization && secret
         ? verifySubscriptionMacaroon(authorization.macaroon, secret, Math.floor(Date.now() / 1_000))
@@ -3471,7 +3552,8 @@ export function registerMcpRoute(
         createHash("sha256").update(Buffer.from(input.preimage, "hex")).digest("hex") !== paymentHash ||
         pass.paymentAsset !== "btc-lightning" || !pass.paymentProvider ||
         pass.allowedPaths.length !== 1 || !Object.hasOwn(paidTools, originalTool) ||
-        pass.amountMsats !== paidTools[originalTool as keyof typeof paidTools].amountSats * 1_000) {
+        pass.amountMsats !== paidTools[originalTool as keyof typeof paidTools].amountSats * 1_000 *
+          (pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1)) {
         next();
         return;
       }
@@ -3484,7 +3566,7 @@ export function registerMcpRoute(
           paymentHash,
           preimage: input.preimage.toLowerCase(),
           expectedAmountMsats: pass.amountMsats,
-          expectedDescription: `Bitcoin Stratigraphy MCP ${originalTool} execution`,
+          expectedDescription: `Bitcoin Stratigraphy MCP ${originalTool} execution${pass.requestLimits[0]?.maxRequests === 100 ? " (100-call batch)" : ""}`,
           expectedProvider: pass.paymentProvider,
           asset: "btc-lightning",
         });
@@ -3523,7 +3605,7 @@ export function registerMcpRoute(
       res.status(503).json({ error: "x402 settlement is not configured" });
       return;
     }
-    await createX402PaymentMiddleware({ resourceServer: server })(req, res, () => {
+    const finishSettlement = () => {
       const settled = res.locals.x402 as {
         transaction?: string; network?: string;
       } | undefined;
@@ -3540,7 +3622,9 @@ export function registerMcpRoute(
         } satisfies SettlementCheck;
       }
       next();
-    });
+    };
+    if (res.locals.x402) finishSettlement();
+    else await createX402PaymentMiddleware({ resourceServer: server })(req, res, finishSettlement);
   }, async (req, res, next) => {
     if (Array.isArray(req.body)) {
       if (req.body.some((item: unknown) =>
@@ -3708,6 +3792,7 @@ export function registerMcpRoute(
         }
       }
     }
+    if (res.locals.earlyL402Authorized) return next();
     await gates[name](req, res, next);
   }, async (req, res, next) => {
     const body = req.body as { id?: unknown; method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;

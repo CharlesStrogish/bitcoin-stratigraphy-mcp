@@ -98,6 +98,14 @@ export interface McpToolCostItem {
 
 export type McpBatchCostQuotePerToolSats = {[key: string]: number};
 
+export type McpBatchCostQuoteL402Batch = {
+  request_header: 'X-L402-Batch-Size';
+  header_value: '100';
+  max_requests: 100;
+  price_multiplier: 100;
+  credential_scope: 'exact MCP tool path';
+};
+
 export type McpBatchCostQuoteL402 = {
   settlement_asset: 'btc-lightning';
   invoice_generated: false;
@@ -112,6 +120,7 @@ export type McpBatchCostQuoteL402 = {
   authorization_format: string;
   credential_scope: string;
   max_requests: 1;
+  batch?: McpBatchCostQuoteL402Batch;
 };
 
 export interface McpBatchCostQuote {

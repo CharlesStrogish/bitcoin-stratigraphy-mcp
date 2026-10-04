@@ -9,6 +9,12 @@ export function registerDocsRoutes(
   publicRoot = fileURLToPath(new URL("./public/", import.meta.url)),
 ): void {
   const docsRoot = path.join(publicRoot, "docs");
+  app.get("/.well-known/llms.txt", (_req, res, next) => {
+    res.type("text/plain").set("Cache-Control", "public, max-age=300");
+    res.sendFile(path.join(publicRoot, ".well-known", "llms.txt"), { dotfiles: "allow" }, (error) => {
+      if (error) next(error);
+    });
+  });
   app.get(/^\/docs\/?$/, docsController(docsRoot));
   app.get(/^\/cookbooks\/?$/, docsController(path.join(publicRoot, "cookbooks")));
   app.use("/docs/assets", express.static(docsRoot, {

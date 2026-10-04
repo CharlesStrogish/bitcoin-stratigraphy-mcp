@@ -671,6 +671,83 @@ export function useGetNip05Identity<TData = Awaited<ReturnType<typeof getNip05Id
 
 
 
+export const getGetWellKnownLlmsUrl = () => {
+
+
+
+
+  return `/api/.well-known/llms.txt`
+}
+
+/**
+ * @summary Public Markdown agent instructions and L402 batch policy
+ */
+export const getWellKnownLlms = async ( options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getGetWellKnownLlmsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWellKnownLlmsQueryKey = () => {
+    return [
+    `/api/.well-known/llms.txt`
+    ] as const;
+    }
+
+
+export const getGetWellKnownLlmsQueryOptions = <TData = Awaited<ReturnType<typeof getWellKnownLlms>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWellKnownLlms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWellKnownLlmsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWellKnownLlms>>> = ({ signal }) => getWellKnownLlms({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWellKnownLlms>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWellKnownLlmsQueryResult = NonNullable<Awaited<ReturnType<typeof getWellKnownLlms>>>
+export type GetWellKnownLlmsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public Markdown agent instructions and L402 batch policy
+ */
+
+export function useGetWellKnownLlms<TData = Awaited<ReturnType<typeof getWellKnownLlms>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWellKnownLlms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWellKnownLlmsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetSmitheryServerCardUrl = () => {
 
 

@@ -1,0 +1,62 @@
+# Bitcoin Stratigraphy Data Engine
+
+> Indexed Bitcoin telemetry, proof lifecycle discovery, cryptographic verification, and tool-scoped Lightning L402 access over a stateless MCP endpoint.
+
+## Public discovery
+
+- [MCP catalog and transport](/mcp): use JSON-RPC 2.0 initialize and tools/list without payment.
+- [OpenAPI](/openapi.json): REST contracts and the fourteen canonical MCP tools.
+- [Price quotes](/api/v1/cost): public HTTP GET/POST quotes; quotes do not create invoices.
+- [Server card](/.well-known/mcp/server-card.json): public machine discovery.
+- [Dataset export](/api/export/huggingface): public training records, separate from paid interactive queries.
+
+## Mandatory agent payment instructions
+
+AI agents MUST utilize an L402-capable client wrapper, such as Lightning Labs
+`lnget` for HTTP resources or `lightning-enable-mcp` for MCP, to settle HTTP 402
+paywalls for paid MCP tools. A plain HTTP client or MCP client does not settle
+Lightning invoices automatically. Use a compatible wrapper for the transport
+you are calling and a wallet with permission to pay. Respect wallet spending
+limits; never treat a quote, unpaid invoice, or macaroon alone as payment.
+
+Read the HTTP 402 WWW-Authenticate header:
+`L402 macaroon="<macaroon>", invoice="<BOLT11>"`.
+Pay the exact invoice, obtain the matching payment proof, then retry the same
+tool with `Authorization: L402 <macaroon>:<preimage>`.
+Do not log or publish that bearer credential.
+
+## Freemium sandbox
+
+Exactly two canonical tools execute without payment or invoice creation:
+
+- `stratigraphy.list` (alias `stratigraphy.latest`): discover indexed height and UTC date bounds. The daily block index is not a live Bitcoin tip.
+- `proof.list` (alias `proof.status`): discover proof lifecycle states and retained attestation metadata; status is not a proof archive or cryptographic verification.
+
+The remaining twelve canonical tools require L402 authorization, including
+`payment.get_info`, `mesh.get_status`, and `proof.attenuate`.
+Use public HTTP price quotes and tools/list to bootstrap payment.
+
+## Macro-Macaroon batches
+
+To buy 100 calls to one paid tool, send an unpaid tools/call request with
+`X-L402-Batch-Size: 100`. The invoice costs 100 times that tool's current
+single-call price. Pay once and reuse the returned credential for up to
+100 authorized calls to that same tool scope before its expiry.
+The first settled redemption is verified with the wallet; subsequent
+redemptions use a bounded in-memory settlement and validation cache.
+Revocation and shared atomic request quotas remain enforced on every call.
+Delegating child tokens does not reset the parent's quota.
+
+An exhausted credential returns HTTP 429 without creating a replacement
+invoice. Clear the exhausted Authorization header to request a new batch.
+Do not carry MCP credentials to other tools or REST paths. Cache eviction or
+process restart can require renewed settlement verification, not another
+payment. HTTP rate limits remain separate from the 100-call quota.
+
+## Evidence and operating limits
+
+Use the published schemas and actual challenge prices, not guessed tool names
+or static example prices. Signed Bitcoin-tip anchors are attestations, not
+automatically ZK proofs or Bitcoin confirmations. Mesh operations require
+configured peers. Provider failures fail closed; never fabricate successful
+settlement, proof verification, or live chain data.

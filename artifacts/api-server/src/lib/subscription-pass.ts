@@ -37,6 +37,8 @@ export type VerifiedSubscriptionMacaroon = {
   tier: SubscriptionTier;
   validUntil: number;
   allowedPaths: string[];
+  /** Effective authorization deadline including descendant time_before caveats. */
+  expiresAt?: number;
   allowedToolSets: string[][];
   maxTarget?: number;
   maxRequests?: number;
@@ -264,6 +266,7 @@ export function verifySubscriptionMacaroon(
       paymentHash,
       tier,
       validUntil,
+      expiresAt: Math.min(validUntil * 1_000, timeBefore ?? Infinity),
       allowedPaths,
       allowedToolSets,
       maxTarget,

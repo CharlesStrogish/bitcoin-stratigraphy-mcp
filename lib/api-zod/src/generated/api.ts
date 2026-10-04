@@ -81,6 +81,12 @@ export const GetNip05IdentityResponse = zod.record(zod.string(), zod.unknown())
 
 
 /**
+ * @summary Public Markdown agent instructions and L402 batch policy
+ */
+export const GetWellKnownLlmsResponse = zod.string()
+
+
+/**
  * Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
  * @summary Static Smithery server discovery
  */
@@ -432,7 +438,14 @@ export const QuoteMcpToolCostsResponse = zod.object({
   "challenge_body_fields": zod.array(zod.string()),
   "authorization_format": zod.string(),
   "credential_scope": zod.string(),
-  "max_requests": zod.literal(1)
+  "max_requests": zod.literal(1),
+  "batch": zod.object({
+  "request_header": zod.literal("X-L402-Batch-Size"),
+  "header_value": zod.literal("100"),
+  "max_requests": zod.literal(100),
+  "price_multiplier": zod.literal(100),
+  "credential_scope": zod.literal("exact MCP tool path")
+}).optional()
 })
 })
 

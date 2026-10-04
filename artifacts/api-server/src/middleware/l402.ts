@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { L402EdgeCache } from "../lib/l402-edge-cache";
 import type { RequestHandler } from "express";
 import {
   attenuateSubscriptionMacaroon,
@@ -38,6 +39,7 @@ export type L402MiddlewareOptions = {
   ledger?: RevenueLedger;
   revocationStore?: MacaroonRevocationStore;
   requestKind?: RevenueRequestKind;
+  allowBatch?: boolean;
 };
 
 export function parseL402Header(
@@ -86,6 +88,8 @@ export function createL402Middleware(
   if (typeof options.amountSats === "number") resolveAmountSats();
   const invoiceExpirySeconds = options.invoiceExpirySeconds ?? 3_600;
   const now = options.now ?? Date.now;
+  const credentialCache = new L402EdgeCache<NonNullable<ReturnType<typeof verifySubscriptionMacaroon>>>(now);
+  const settlementCache = new L402EdgeCache<Awaited<ReturnType<SettlementRouter["verifyPayment"]>>>(now);
   const usageStore = options.usageStore ?? createMemoryMacaroonUsageStore(now);
   const maxChallengesPerMinute = options.maxChallengesPerMinute ?? 10;
   const challengeWindows = new Map<string, { startedAt: number; count: number }>();
@@ -136,11 +140,18 @@ export function createL402Middleware(
       return;
     }
     try {
-      const amountSats = resolveAmountSats();
+      const requestedBatch = req.get("X-L402-Batch-Size");
+      if (requestedBatch && (!options.allowBatch || requestedBatch !== "100")) {
+        res.status(400).json({ error: "X-L402-Batch-Size must be 100 on a batch-capable route" });
+        return;
+      }
+      const batchSize = requestedBatch ? 100 : 1;
+      const amountSats = resolveAmountSats() * batchSize;
+      if (!Number.isSafeInteger(amountSats * 1_000)) throw new RangeError("Batch price exceeds safe range");
       const amountMsats = amountSats * 1_000;
       const invoice = await options.settlementRouter.createInvoice({
         amountMsats,
-        description: options.description,
+        description: batchSize === 100 ? `${options.description} (100-call batch)` : options.description,
         expirySeconds: invoiceExpirySeconds,
         asset: "btc-lightning",
       });
@@ -163,7 +174,7 @@ export function createL402Middleware(
       });
       const macaroon = attenuateSubscriptionMacaroon(rootMacaroon, [
         `allowed_path=${options.scopePath ?? req.path}`,
-        "max_requests=1",
+        `max_requests=${batchSize}`,
       ]);
       if (!macaroon) throw new Error("Unable to attenuate L402 macaroon");
       res.setHeader(
@@ -177,6 +188,7 @@ export function createL402Middleware(
         invoice: invoice.invoice,
         payment_hash: invoice.paymentHash,
         amount_sats: amountSats,
+        max_requests: batchSize,
       });
     } catch (error) {
       req.log?.error({ err: error }, "L402 invoice creation failed");
@@ -188,12 +200,14 @@ export function createL402Middleware(
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
     const authorization = parseL402Header(req.header("Authorization"));
     if (secret && authorization) {
-      const pass = verifySubscriptionMacaroon(
+      const credentialKey = L402EdgeCache.key(secret, authorization.macaroon);
+      const pass = credentialCache.get(credentialKey) ?? verifySubscriptionMacaroon(
         authorization.macaroon,
         secret,
         Math.floor(now() / 1_000),
       );
       if (pass) {
+        credentialCache.set(credentialKey, pass, pass.expiresAt ?? pass.validUntil * 1_000);
         if (!options.scopePath?.startsWith("/mcp/tools/") &&
           (pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined)) {
           res.status(403).json({ error: "Macaroon tool or target caveat forbids this route" });
@@ -224,7 +238,8 @@ export function createL402Middleware(
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
         (typeof options.amountSats !== "number" ||
-          pass.amountMsats === options.amountSats * 1_000) &&
+          pass.amountMsats === options.amountSats * 1_000 *
+            (options.allowBatch && pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1)) &&
         pass.paymentAsset === "btc-lightning" &&
         pass.paymentProvider &&
         pass.allowedPaths.length > 0 &&
@@ -232,14 +247,20 @@ export function createL402Middleware(
       ) {
         let verification;
         try {
-          verification = await options.settlementRouter.verifyPayment({
+          const batch = options.allowBatch && pass.requestLimits[0]?.maxRequests === 100;
+          const description = batch ? `${options.description} (100-call batch)` : options.description;
+          const expectedAmountMsats = pass.amountMsats;
+          const settlementKey = L402EdgeCache.key(secret, pass.paymentHash, authorization.preimage,
+            pass.paymentProvider, String(pass.amountMsats), description, options.scopePath ?? req.path);
+          verification = await settlementCache.resolve(settlementKey, pass.validUntil * 1_000, () =>
+            options.settlementRouter.verifyPayment({
             paymentHash: pass.paymentHash,
             preimage: authorization.preimage,
-            expectedAmountMsats: pass.amountMsats,
-            expectedDescription: options.description,
+            expectedAmountMsats,
+            expectedDescription: description,
             expectedProvider: pass.paymentProvider,
             asset: "btc-lightning",
-          });
+          }), (value) => typeof value === "object" && value !== null);
         } catch (error) {
           req.log?.error({ err: error }, "L402 payment verification failed");
           res.status(502).json({ error: "Unable to verify payment" });
@@ -250,6 +271,10 @@ export function createL402Middleware(
           return;
         }
         if (typeof verification === "object") {
+          if ((pass.expiresAt ?? pass.validUntil * 1_000) <= now()) {
+            res.status(401).json({ error: "L402 macaroon expired during verification" });
+            return;
+          }
           if (
             pass.maxRequests !== undefined &&
             !(await usageStore.consume(pass.requestLimits, pass.validUntil))

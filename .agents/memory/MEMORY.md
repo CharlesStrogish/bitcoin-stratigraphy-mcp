@@ -47,3 +47,5 @@
 - [Python environment checks](python-environment-checks.md) — package installs and shell Python can use different interpreters; verify project imports and system TLS roots.
 - [Cookbook dependency security](cookbook-dependency-security.md) — optional client frameworks must not introduce vulnerable dependencies into the publishable project.
 - [OpenAPI Zod generation](openapi-zod-codegen.md) — URI formats on literals and item-less array unions produce invalid generated Zod validators.
+- [MCP freemium policy](mcp-freemium-policy.md) — exactly two free sandbox capabilities; all other canonical tools require paid access.
+- [Macro payment caching](macro-payment-caching.md) — share exact invoice proofs across descendants, but never cache away expiry, revocation, or inherited quotas.

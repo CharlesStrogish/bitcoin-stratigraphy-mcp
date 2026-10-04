@@ -19,6 +19,11 @@ async function buildAll() {
     { recursive: true },
   );
   await cp(
+    path.resolve(artifactDir, "src/public/.well-known"),
+    path.resolve(distDir, "public/.well-known"),
+    { recursive: true },
+  );
+  await cp(
     path.resolve(artifactDir, "src/public/docs"),
     path.resolve(distDir, "public/docs"),
     { recursive: true },

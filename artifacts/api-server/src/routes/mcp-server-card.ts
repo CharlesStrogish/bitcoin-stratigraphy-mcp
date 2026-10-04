@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { mcpToolPrices } from "../lib/mcp-pricing";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 
@@ -11,7 +12,7 @@ export const smitheryServerCard = {
   url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
 } as const;
 
-export const mcpServerCard = {
+const baseServerCard = {
   name: "bitcoin-stratigraphy",
   description: ENGINE_DESCRIPTION,
   transport: {
@@ -183,6 +184,23 @@ export const mcpServerCard = {
     ],
   },
 } as const;
+
+export const mcpServerCard = {
+  ...baseServerCard,
+  capabilities: {
+    ...baseServerCard.capabilities,
+    tools: baseServerCard.capabilities.tools.map((tool) => ({
+      ...tool,
+      annotations: {
+        ...tool.annotations,
+        l402: {
+          amountSats: mcpToolPrices[tool.name as keyof typeof mcpToolPrices],
+          ...(mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0 ? { batchSize: 100, batchHeader: "X-L402-Batch-Size" } : {}),
+        },
+      },
+    })),
+  },
+};
 
 export const glamaConnector = {
   $schema: "https://glama.ai/mcp/schemas/connector.json",

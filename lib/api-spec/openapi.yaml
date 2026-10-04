@@ -63,7 +63,7 @@ x-mcp-tool-groups:
 x-mcp-tools:
   proof.get_by_hash:
     description: "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs."
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false, l402: { amountSats: 250 } }
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       additionalProperties: false
@@ -103,12 +103,13 @@ x-mcp-tools:
         otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
       required: [kind, hash, status, timestamp, provenanceVerified]
   proof.list:
-    description: "Discover, filter, and paginate recent zk-proof attestation lifecycle summaries from bounded process-local memory. Use `limit` (1-100, default 20), zero-based `offset` (0-1000, default 0), and optional `status` (`verified`, `cached`, `pending`, or `invalid`); cursor pagination is not supported. Returns newest-first bounded summaries, not full proof payloads or receipts. Use `proof.get_by_hash` for an individual retained proof or receipt by known ID. Read-only; costs 10 sats via HTTP L402 without valid credentials."
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    legacyNames: [proof.status]
+    description: "Freely discover, filter, and paginate recent zk-proof attestation lifecycle summaries. Use limit (1-100), offset (0-1000), and optional status (verified, cached, pending, invalid). Returns bounded summaries, not full proofs or receipts. Alias: proof.status. No invoice is created."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":0}}
   payment.get_info:
     legacyNames: [payment.info]
     description: "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted."
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true }
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       additionalProperties: false
@@ -117,6 +118,7 @@ x-mcp-tools:
         action: { type: string, enum: [query, settle], default: query }
         paymentHash: { type: string, pattern: "^(0x)?[0-9a-fA-F]{64}$" }
         preimage: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+        paymentMacaroon: { type: string, minLength: 1, maxLength: 8192, description: "Original invoice macaroon for settlement checks; separate from this paid tool's Authorization credential." }
         txHash: { type: string, pattern: "^0x[0-9a-fA-F]{64}$" }
       required: []
       oneOf:
@@ -131,6 +133,7 @@ x-mcp-tools:
             action: { type: string, const: settle }
             paymentHash: { type: string, pattern: "^(0x)?[0-9a-fA-F]{64}$" }
             preimage: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+            paymentMacaroon: { type: string, minLength: 1, maxLength: 8192 }
             txHash: { type: string, pattern: "^0x[0-9a-fA-F]{64}$" }
           required: [action, paymentHash]
           oneOf:
@@ -178,7 +181,7 @@ x-mcp-tools:
           properties:
             authorizationHeader: { type: string }
             scope: { type: string }
-            maxRequests: { type: integer, const: 1 }
+            maxRequests: { type: integer, enum: [1, 100] }
           required: [authorizationHeader, scope, maxRequests]
         verified: { type: boolean }
         settlementToken:
@@ -197,7 +200,7 @@ x-mcp-tools:
   stratigraphy.get_range:
     legacyNames: [stratigraphy.range]
     description: "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only, HTTP rate-limited and L402-paid; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries."
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false, l402: { amountSats: 250 } }
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       additionalProperties: false
@@ -234,8 +237,8 @@ x-mcp-tools:
           items: { type: [string, array, object] }
       required: [range, count, format, records]
   proof.attenuate:
-    description: "Attenuate an authentic, unexpired L402 parent `macaroon` by appending supported restrictive `caveats` (tool, target, expiration, path, or request-count limits) and optionally `ttlSeconds`. The `caveats` array is required but may be empty when `ttlSeconds` is supplied; at least one restriction is required. Appended caveats can only narrow inherited permissions, never widen token authority. Free to call; returns a restricted child macaroon without issuing an invoice, and the parent's payment proof is still required for later redemption. Invalid parents or unsupported caveats return an error."
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    description: "Attenuate an authentic, unexpired L402 parent `macaroon` by appending restrictive `caveats` and optionally `ttlSeconds`. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       additionalProperties: false
@@ -262,7 +265,7 @@ x-mcp-tools:
   stratigraphy.get_diff:
     legacyNames: [stratigraphy.diff]
     description: "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to HTTP rate limiting and L402 payment; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool."
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false, l402: { amountSats: 250 } }
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       additionalProperties: false
@@ -303,7 +306,7 @@ x-mcp-tools:
   stratigraphy.get_digest:
     legacyNames: [stratigraphy.digest]
     description: "Fetch compact source-record fingerprints and metadata for an indexed stratum height, date, or bounded date range. Returns no full record telemetry or Bitcoin block-header hash; the fingerprint is not a verification receipt. Use this tool instead of `stratigraphy.get` when a compact fingerprint is enough; use `stratigraphy.get_range` for contiguous multi-record summaries and `stratigraphy.list` for catalog discovery."
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false, l402: { amountSats: 250 } }
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       additionalProperties: false
@@ -332,9 +335,9 @@ x-mcp-tools:
           description: False because indexed source entries do not store per-record ZK proofs.
       required: [result, proofAvailable]
   mesh.get_status:
-    description: "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Free, read-only status; use `mesh.broadcast` to distribute a snapshot. Note: Mesh consensus is automated; this tool does not administer peers or edit topology. No internal peer-administration HTTP tool is advertised."
+    description: "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Requires L402 authorization; use mesh.broadcast to distribute a snapshot. This tool does not administer peers or edit topology."
     legacyNames: [mesh.status]
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       additionalProperties: false
@@ -353,17 +356,7 @@ x-mcp-tools:
       required: [nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, quorumThreshold]
   proof.ground:
     description: "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required."
-    annotations:
-      readOnlyHint: false
-      destructiveHint: false
-      idempotentHint: false
-      openWorldHint: true
-      l402:
-        endpoint: POST /mcp
-        amountSats: 250
-      attestationType: Signed-Bitcoin-Tip-Anchor
-      verificationEndpoint: POST /api/v1/zk/verify
-      verificationInput: "Send { attestation: receipt } for an agent-context receipt. For a dataset receipt, parse receipt.attestation.proofPayload and send { attestation: parsedReceipt }. This verifies the signed receipt, not a Groth16 proof or Bitcoin proof-of-work."
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"},"attestationType":"Signed-Bitcoin-Tip-Anchor","verificationEndpoint":"POST /api/v1/zk/verify","verificationInput":"Send { attestation: receipt } for an agent-context receipt. For a dataset receipt, parse receipt.attestation.proofPayload and send { attestation: parsedReceipt }. This verifies the signed receipt, not a Groth16 proof or Bitcoin proof-of-work."}
     inputSchema:
       type: object
       additionalProperties: false
@@ -460,7 +453,7 @@ x-mcp-tools:
       required: [receipt, provenanceVerified]
   proof.verify:
     description: "Execute cryptographic verification for supplied Groth16 telemetry or drift zk-SNARK proofs, or OpenTimestamps receipts. Returns proof validity; verification can update a bounded in-memory lifecycle index, and drift checks require a Bitcoin block provider. Use this tool to verify supplied proofs; use `proof.submit` to register new Groth16 proofs and `proof.get_by_hash` to retrieve retained proofs or signed receipts by a known identifier."
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true }
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       description: Verify either a telemetry snapshot proof or a zk.drift.v1 context-drift proof.
@@ -550,7 +543,7 @@ x-mcp-tools:
         - required: [status, blockHeight, bitcoinHeaderHash]
   proof.submit:
     description: "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately."
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true }
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
       additionalProperties: false
@@ -600,24 +593,13 @@ x-mcp-tools:
       required: [proofHash, jobId, status, submittedAt, attestationStatus]
   mesh.broadcast:
     description: "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors."
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true, l402: { amountSats: 250 } }
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
   stratigraphy.get:
     description: "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only, HTTP rate-limited and L402-paid. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds."
-    annotations:
-      readOnlyHint: true
-      destructiveHint: false
-      idempotentHint: true
-      openWorldHint: false
-      readOnly: true
-      audience: [assistant]
-      priority: 1
-      zkProof:
-        included: true
-        scheme: Groth16/Poseidon BN254
-        verificationEndpoint: POST /api/v1/zk/verify
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"readOnly":true,"audience":["assistant"],"priority":1,"zkProof":{"included":true,"scheme":"Groth16/Poseidon BN254","verificationEndpoint":"POST /api/v1/zk/verify"},"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
   stratigraphy.list:
     description: "Discover indexed height and UTC date bounds, available metrics, and catalog metadata. Free, parameterless, read-only discovery entry point for selecting valid strata. Once bounds are known, use `stratigraphy.get` for full record bodies, `stratigraphy.get_range` for compact contiguous spans, or `stratigraphy.get_digest` for lightweight source-record fingerprints."
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":0}}
 security:
   - L402: []
 paths:
@@ -705,6 +687,21 @@ paths:
           $ref: "#/components/responses/PublicMetadata"
         "404":
           description: Identity or requested name is not configured
+  /.well-known/llms.txt:
+    servers:
+      - url: /
+    get:
+      operationId: getWellKnownLlms
+      tags: [discovery]
+      summary: Public Markdown agent instructions and L402 batch policy
+      security: []
+      responses:
+        "200":
+          description: Standard llms.txt Markdown
+          content:
+            text/plain:
+              schema:
+                type: string
   /.well-known/mcp/server-card.json:
     servers:
       - url: /
@@ -1859,6 +1856,16 @@ components:
             max_requests:
               type: integer
               const: 1
+            batch:
+              type: object
+              additionalProperties: false
+              required: [request_header, header_value, max_requests, price_multiplier, credential_scope]
+              properties:
+                request_header: { type: string, const: X-L402-Batch-Size }
+                header_value: { type: string, const: "100" }
+                max_requests: { type: integer, const: 100 }
+                price_multiplier: { type: integer, const: 100 }
+                credential_scope: { type: string, const: exact MCP tool path }
     McpDiscoveryManifest:
       type: object
       required: [$schema, name, version, description, author, homepage, mcp, pricing, verification]

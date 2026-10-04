@@ -44,6 +44,18 @@ async function buildAll() {
     );
   }
 
+  // Publish only the standalone, explicitly public framework quickstarts.
+  await mkdir(path.resolve(distDir, "public/cookbooks/frameworks"), { recursive: true });
+  for (const filename of [
+    "langchain_agent.py", "llamaindex_agent.py", "README.md",
+    "requirements-langchain.txt", "requirements-llamaindex.txt",
+  ]) {
+    await cp(
+      path.resolve(artifactDir, "../../cookbooks/frameworks", filename),
+      path.resolve(distDir, "public/cookbooks/frameworks", filename),
+    );
+  }
+
   await esbuild({
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
     platform: "node",

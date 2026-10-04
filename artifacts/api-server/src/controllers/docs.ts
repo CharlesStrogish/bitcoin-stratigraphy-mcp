@@ -10,6 +10,14 @@ export const cookbookFiles = new Set([
   "crewai_example.py",
 ]);
 
+export const frameworkCookbookFiles = new Set([
+  "langchain_agent.py",
+  "llamaindex_agent.py",
+  "README.md",
+  "requirements-langchain.txt",
+  "requirements-llamaindex.txt",
+]);
+
 export function docsController(directory: string): RequestHandler {
   return (_req, res, next) => {
     res.set({
@@ -26,10 +34,10 @@ export function docsController(directory: string): RequestHandler {
   };
 }
 
-export function cookbookController(directory: string): RequestHandler {
+export function cookbookController(directory: string, allowedFiles = cookbookFiles): RequestHandler {
   return (req, res, next) => {
     const filename = String(req.params.filename);
-    if (!cookbookFiles.has(filename)) {
+    if (!allowedFiles.has(filename)) {
       res.status(404).type("text/plain").send("Cookbook not found");
       return;
     }

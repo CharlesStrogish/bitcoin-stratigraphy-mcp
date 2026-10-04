@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bitcoin Stratigraphy | Python SDK &amp; Agent Cookbooks</title>
-  <meta name="description" content="Integrate Bitcoin Stratigraphy's Python SDK/client with CrewAI, LangChain and AutoGen. Explore 14 live MCP tools across 4 namespaces, L402 Lightning micropayments and free batch POST pricing in the Developer Portal.">
+  <meta name="description" content="Connect native LangChain and LlamaIndex agents to Bitcoin Stratigraphy's 15 MCP tools across 4 namespaces, with L402 Macro-Macaroon batch-payment support and Python SDK examples.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks">
   <link rel="alternate" type="application/json" title="MCP discovery manifest" href="https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json">
   <meta property="og:title" content="Bitcoin Stratigraphy | Python SDK &amp; Agent Cookbooks">
-  <meta property="og:description" content="Python SDK/client and CrewAI, LangChain and AutoGen integration examples for 14 live MCP tools across 4 namespaces, with explicit L402 Lightning payment callbacks and free batch POST pricing.">
+  <meta property="og:description" content="Native LangChain MCPAdapter and LlamaIndex ReActAgent quickstarts for 15 MCP tools, with explicit L402 credentials, 100-call batches and local wallet proxy guidance.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks">
   <meta property="og:image" content="https://bitcoin-stratigraphy-dashboard.replit.app/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bitcoin Stratigraphy | Python SDK &amp; Agent Cookbooks">
-  <meta name="twitter:description" content="Python SDK, CrewAI, LangChain and AutoGen examples with explicit L402 payment callbacks, 14 MCP tools and free batch POST pricing.">
+  <meta name="twitter:description" content="Native LangChain and LlamaIndex agent quickstarts, 15 MCP tools and L402 Macro-Macaroon batch payments.">
   <meta name="twitter:image" content="https://bitcoin-stratigraphy-dashboard.replit.app/og-image.png">
   <link rel="stylesheet" href="/docs/assets/portal.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -35,7 +35,7 @@
     <header>
       <p class="eyebrow">BITCOIN STRATIGRAPHY / INTEGRATION SUITE</p>
       <h1>Python SDK &amp; Agent Cookbooks</h1>
-      <p>Integrate 14 live MCP tools across 4 namespaces with CrewAI, LangChain and AutoGen.
+      <p>Integrate 15 live MCP tools across 4 namespaces with LangChain, LlamaIndex, CrewAI and AutoGen.
         The HTTPX-based Python SDK/client supports JSON-RPC discovery and explicit,
         bounded L402 Lightning payment callbacks. Download the source and examples below.</p>
       <nav aria-label="Developer resources">
@@ -45,6 +45,21 @@
         <a class="btn" href="/openapi.json">OpenAPI</a>
       </nav>
     </header>
+    <section aria-labelledby="frameworks">
+      <h2 id="frameworks">Framework Integration: native MCP agents</h2>
+      <p>All 15 canonical tools plug into LangChain and LlamaIndex with L402 batch-payment support:
+        100 tool-scoped calls for 25,000 sats. Inject prepaid Macro-Macaroon headers or connect
+        to a trusted local wallet proxy. Discovery is free; the adapters never pay automatically.</p>
+      <ul>
+        <li><h2><a href="/cookbooks/frameworks/langchain_agent.py">Native LangChain agent</a></h2>
+          <p>Official langchain.mcp MCPAdapter and a ReAct tool-calling loop.
+            <a href="/cookbooks/frameworks/requirements-langchain.txt">Dependencies</a></p></li>
+        <li><h2><a href="/cookbooks/frameworks/llamaindex_agent.py">Native LlamaIndex agent</a></h2>
+          <p>BasicMCPClient, McpToolSpec and ReActAgent.
+            <a href="/cookbooks/frameworks/requirements-llamaindex.txt">Dependencies</a></p></li>
+        <li><a href="/cookbooks/frameworks/README.md">Native framework setup, credentials and proxy guide</a></li>
+      </ul>
+    </section>
     <section aria-labelledby="examples">
       <h2 id="examples">SDK, setup guide and framework examples</h2>
       <ul>

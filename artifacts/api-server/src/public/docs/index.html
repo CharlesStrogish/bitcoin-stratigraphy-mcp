@@ -4,18 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bitcoin Stratigraphy Developer Portal | Live MCP Explorer</title>
-<meta name="description" content="Interactive Developer Portal &amp; Live Tool Explorer for 14 live MCP tools across 4 namespaces. Discover the Python SDK, CrewAI, LangChain and AutoGen cookbooks, L402 Lightning micropayments and free batch POST pricing.">
+<meta name="description" content="Interactive Developer Portal &amp; Live Tool Explorer for 15 live MCP tools across 4 namespaces. Discover native LangChain and LlamaIndex agent cookbooks, the Python SDK, and L402 Lightning batch payments.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://bitcoin-stratigraphy-dashboard.replit.app/docs">
 <link rel="alternate" type="application/json" title="MCP discovery manifest" href="https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json">
 <meta property="og:title" content="Bitcoin Stratigraphy Developer Portal | Live MCP Explorer">
-<meta property="og:description" content="Explore 14 live MCP tools across 4 namespaces, inspect schemas and L402 challenges, and integrate the Python SDK and CrewAI, LangChain and AutoGen cookbooks with free batch POST pricing.">
+<meta property="og:description" content="Explore 15 live MCP tools across 4 namespaces, inspect schemas and L402 challenges, and connect native LangChain and LlamaIndex agents with 100-call Macro-Macaroons.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://bitcoin-stratigraphy-dashboard.replit.app/docs">
 <meta property="og:image" content="https://bitcoin-stratigraphy-dashboard.replit.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bitcoin Stratigraphy Developer Portal | Live MCP Explorer">
-<meta name="twitter:description" content="14 live MCP tools, 4 namespaces, Python SDK, integration cookbooks and L402 Lightning micropayments with free batch POST pricing.">
+<meta name="twitter:description" content="15 live MCP tools, 4 namespaces, native LangChain and LlamaIndex agent cookbooks, and L402 Lightning batch-payment support.">
 <meta name="twitter:image" content="https://bitcoin-stratigraphy-dashboard.replit.app/og-image.png">
 <meta name="color-scheme" content="dark light">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -49,6 +49,26 @@
     <div class="quick-item"><span class="k">Production MCP URL</span><code id="q-mcp">https://bitcoin-stratigraphy-dashboard.replit.app/mcp</code><button class="btn sm" type="button" data-copy-text="https://bitcoin-stratigraphy-dashboard.replit.app/mcp">Copy</button></div>
     <div class="quick-item"><span class="k">Production OpenAPI</span><code>https://bitcoin-stratigraphy-dashboard.replit.app/openapi.json</code><button class="btn sm" type="button" data-copy-text="https://bitcoin-stratigraphy-dashboard.replit.app/openapi.json">Copy</button></div>
     <div class="quick-item"><span class="k">This host MCP URL</span><code id="q-here"></code><button class="btn sm" type="button" id="copy-here">Copy</button></div>
+  </section>
+
+  <section class="panel pad" aria-labelledby="framework-title" style="margin-bottom:20px">
+    <div class="kicker">Framework-native agents</div>
+    <h2 id="framework-title">Framework Integration</h2>
+    <p>All <strong>15 canonical MCP tools</strong> plug into <strong>LangChain</strong> and
+      <strong>LlamaIndex</strong> with <strong>L402 batch-payment support</strong>.
+      The quickstarts combine <code>proof.notarize</code> with free stratigraphy height discovery.</p>
+    <div class="row">
+      <a class="btn primary" href="/cookbooks/frameworks/langchain_agent.py?download=1">Download LangChain agent</a>
+      <a class="btn primary" href="/cookbooks/frameworks/llamaindex_agent.py?download=1">Download LlamaIndex agent</a>
+      <a class="btn" href="/cookbooks/frameworks/README.md">Setup &amp; L402 payment guide</a>
+    </div>
+    <p class="caption">Use a prepaid, tool-scoped 100-call Macro-Macaroon (25,000 sats),
+      or a trusted local L402 wallet proxy with spending limits. The adapters do not pay automatically.
+      Discovery is free; agent execution requires <code>--run</code>.</p>
+    <div class="row">
+      <a class="btn sm" href="/cookbooks/frameworks/requirements-langchain.txt">LangChain dependencies</a>
+      <a class="btn sm" href="/cookbooks/frameworks/requirements-llamaindex.txt">LlamaIndex dependencies</a>
+    </div>
   </section>
 
   <div class="tabs" role="tablist" aria-label="Portal sections" id="tabs">

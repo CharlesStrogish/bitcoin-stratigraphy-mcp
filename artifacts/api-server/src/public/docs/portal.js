@@ -377,7 +377,7 @@
   $('#rest-copy').addEventListener('click', function (e) { if (!restText) return toast('Run a check first', true); copyText(restText, e.currentTarget, 'Result copied'); });
 
   /* Cookbooks */
-  var COOKS = ['l402_client.py', 'langchain_example.py', 'autogen_example.py', 'crewai_example.py', 'README.md', 'requirements.txt'];
+  var COOKS = ['frameworks/langchain_agent.py', 'frameworks/llamaindex_agent.py', 'frameworks/README.md', 'frameworks/requirements-langchain.txt', 'frameworks/requirements-llamaindex.txt', 'l402_client.py', 'langchain_example.py', 'autogen_example.py', 'crewai_example.py', 'README.md', 'requirements.txt'];
   var cookText = '';
   var cl = $('#cook-list');
   COOKS.forEach(function (f) {

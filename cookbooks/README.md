@@ -1,5 +1,14 @@
 # Python framework cookbooks
 
+## Native framework toolkits (Phase 2)
+
+For the 15-tool server and `proof.notarize`, use the standalone
+[LangChain MCPAdapter](frameworks/langchain_agent.py) and
+[LlamaIndex MCP](frameworks/llamaindex_agent.py) quickstarts.
+The [framework setup guide](frameworks/README.md) documents separate optional
+dependencies, prepaid 100-call L402 Macro-Macaroon headers, local wallet proxies,
+safe discovery mode, and explicit agent execution.
+
 Connect Python agents to the remote Bitcoin Stratigraphy server at
 **https://bitcoin-stratigraphy-dashboard.replit.app/mcp**. No local server is
 needed. MCP uses **Streamable HTTP**, not a legacy `/sse` transport.

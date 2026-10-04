@@ -1,7 +1,7 @@
 import express, { type Express } from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { cookbookController, docsController } from "../controllers/docs";
+import { cookbookController, docsController, frameworkCookbookFiles } from "../controllers/docs";
 
 // The server build copies both folders alongside the bundled entry point.
 export function registerDocsRoutes(
@@ -26,4 +26,7 @@ export function registerDocsRoutes(
     },
   }));
   app.get("/cookbooks/:filename", cookbookController(path.join(publicRoot, "cookbooks")));
+  app.get("/cookbooks/frameworks/:filename", cookbookController(
+    path.join(publicRoot, "cookbooks", "frameworks"), frameworkCookbookFiles,
+  ));
 }

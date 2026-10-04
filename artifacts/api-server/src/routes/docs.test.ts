@@ -10,6 +10,14 @@ test("docs and cookbook routes serve only public assets and explicit examples", 
   const root = await mkdtemp(path.join(tmpdir(), "stratigraphy-docs-"));
   await mkdir(path.join(root, "docs"));
   await mkdir(path.join(root, "cookbooks"));
+  await mkdir(path.join(root, "cookbooks/frameworks"));
+  for (const filename of [
+    "langchain_agent.py", "llamaindex_agent.py", "README.md",
+    "requirements-langchain.txt", "requirements-llamaindex.txt",
+  ]) {
+    await writeFile(path.join(root, "cookbooks/frameworks", filename), "# Public framework quickstart\n");
+  }
+  await writeFile(path.join(root, "cookbooks/frameworks/private.py"), "Must never be served");
   await writeFile(path.join(root, "docs/index.html"), "<!doctype html><title>Developer portal</title>");
   await writeFile(path.join(root, "docs/portal.js"), "/* portal */");
   await writeFile(path.join(root, "cookbooks/l402_client.py"), "# Public client\n");
@@ -46,9 +54,24 @@ test("docs and cookbook routes serve only public assets and explicit examples", 
     const download = await fetch(base + "/cookbooks/l402_client.py?download=1");
     assert.match(download.headers.get("content-disposition")!, /attachment; filename="l402_client.py"/);
     assert.equal(await download.text(), "# Public client\n");
+    for (const filename of [
+      "langchain_agent.py", "llamaindex_agent.py", "README.md",
+      "requirements-langchain.txt", "requirements-llamaindex.txt",
+    ]) {
+      const framework = await fetch(base + "/cookbooks/frameworks/" + filename);
+      assert.equal(framework.status, 200);
+      assert.match(framework.headers.get("content-type")!, /text\/plain/);
+      assert.equal(await framework.text(), "# Public framework quickstart\n");
+      const saved = await fetch(base + "/cookbooks/frameworks/" + filename + "?download=1");
+      assert.equal(saved.status, 200);
+      assert.match(saved.headers.get("content-disposition")!, /attachment/);
+      await saved.arrayBuffer();
+    }
     for (const url of [
       "/cookbooks/private.txt", "/cookbooks/.env",
       "/cookbooks/%2e%2e%2fprivate.txt", "/docs/assets/.env",
+      "/cookbooks/frameworks/private.py", "/cookbooks/frameworks/.env",
+      "/cookbooks/frameworks/%2e%2e%2fprivate.txt",
     ]) {
       const response = await fetch(base + url);
       assert.equal(response.status, 404, url);

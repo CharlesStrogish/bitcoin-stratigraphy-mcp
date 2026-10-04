@@ -104,13 +104,12 @@ async function preflight(endpoint: string, openapi: string) {
   }
 }
 
-export function buildAnnouncement(
-  secretKey: Uint8Array,
+export function buildAnnouncementTemplate(
   apiBaseUrl = DEFAULT_API_BASE_URL,
   createdAt = Math.floor(Date.now() / 1000),
-): VerifiedEvent {
+): EventTemplate {
   const { endpoint, openapi } = apiUrls(apiBaseUrl);
-  const template: EventTemplate = {
+  return {
     kind: 1,
     created_at: createdAt,
     content: [
@@ -134,7 +133,14 @@ export function buildAnnouncement(
     ],
   };
 
-  return finalizeEvent(template, secretKey);
+}
+
+export function buildAnnouncement(
+  secretKey: Uint8Array,
+  apiBaseUrl = DEFAULT_API_BASE_URL,
+  createdAt = Math.floor(Date.now() / 1000),
+): VerifiedEvent {
+  return finalizeEvent(buildAnnouncementTemplate(apiBaseUrl, createdAt), secretKey);
 }
 
 async function main() {
@@ -144,16 +150,14 @@ async function main() {
   const { endpoint, preflightEndpoint, openapi } = apiUrls(baseUrl);
   if (!dryRun) await preflight(preflightEndpoint, openapi);
 
-  const secretKey = requiredSecretKey(process.env.NOSTR_PRIVATE_KEY);
-  const event = buildAnnouncement(secretKey, baseUrl);
-
   if (dryRun) {
     console.log(
       JSON.stringify(
         {
           dryRun: true,
           relays,
-          event,
+          // Preview only public, unsigned content; do not load signing secrets.
+          event: buildAnnouncementTemplate(baseUrl),
           endpoint,
           openapi,
         },
@@ -164,6 +168,8 @@ async function main() {
     return;
   }
 
+  const secretKey = requiredSecretKey(process.env.NOSTR_PRIVATE_KEY);
+  const event = buildAnnouncement(secretKey, baseUrl);
   const pool = new SimplePool();
   try {
     const acknowledgements = await Promise.allSettled(

@@ -310,3 +310,10 @@ unless you explicitly run a sandbox or agent entrypoint.
 
 MIT. See [LICENSE](LICENSE). Frameworks and optional dependencies retain their own
 licenses and terms.
+## 🤖 CrewAI Integration
+
+The Bitcoin Stratigraphy Data Engine natively supports CrewAI's `MCPServerAdapter`. Drop this snippet into your workflow to instantly equip your agents with thermodynamic tools and OpenTimestamps state anchoring:
+
+`pip install crewai-tools[mcp]`
+
+Check `crewai_cookbook.py` for the full agent execution script.

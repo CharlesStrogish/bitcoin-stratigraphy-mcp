@@ -1,0 +1,5 @@
+# LlamaIndex installation is temporarily unavailable.
+# llama-index-core requires NLTK, whose latest release (3.10.3) is affected by
+# GHSA-8mgp-746c-j5xp with no patched release available.
+# Keep this manifest dependency-free; use requirements-langchain.txt instead.
+# Restore dependencies only after auditing the complete resolved dependency tree.

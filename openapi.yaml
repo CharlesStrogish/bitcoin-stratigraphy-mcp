@@ -1,0 +1,3401 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: |-
+    Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.
+
+    Key Capabilities:
+    - L402 Micropayments & Macaroon Attenuations: Programmatic pay-per-query settlement in satoshis with zero API keys. Supports parent macaroon caveat scoping (proof.attenuate) with TTLs and rate controls.
+    - Multi-Asset Settlement Router: Native payment support across Base-layer Lightning (btc-lightning), Liquid Bitcoin (l-btc), Taproot Assets (taproot-assets), and Base USDC (x402).
+    - Groth16 ZK-SNARK & OTS Proof Verification: Execute cryptographic verification for supplied Groth16/Poseidon BN254 telemetry proofs, drift zk-SNARKs, and OpenTimestamps (OTS) Bitcoin block-header receipts.
+    - Agent Context State Grounding: Anchor autonomous agent prompt executions, CIDs, and dataset context hashes directly into signed Bitcoin-tip receipts (proof.ground).
+    - Autonomous P2P Mesh Network: Nostr-backed (NIP-01/78) peer topology broadcasting with automated quorum validation, cross-validation metrics, and node public-key provenance.
+    - Stratigraphy Strata Analytics: High-speed differential comparisons (stratigraphy.get_diff) and compressed record digests designed specifically for LLM context window efficiency.
+    - Real-Time SSE Streaming: Live Server-Sent Events (/api/v1/stratigraphy/stream) for continuous telemetry feeds.
+
+    Operational Boundaries:
+    - The three-asset L402 router serves supported REST surfaces; Liquid and Taproot Assets require configured providers. Check /api/v1/cost for supported versus currently available assets. Lightning is Bitcoin's payment-channel layer; Base USDC is a separate EVM x402 rail.
+    - MCP paid tools accept Lightning L402 and, only when configured, Base USDC x402. Query payment.get_info for current prices and advertised methods, not REST router availability. Wallet authorization and payment proofs are still required even though no API key is needed.
+    - MCP uses Streamable HTTP at /mcp. The paid REST SSE feed at /api/v1/stratigraphy/stream is separate, refreshes snapshots on a 30-second cadence, and supports the three configured L402 router assets, not a promised Base USDC SSE payment path. Historical strata remain indexed daily data, not native block provenance.
+    - Grounding receipts are off-chain, Schnorr-signed Bitcoin-tip attestations, not on-chain transactions, Groth16 proofs, or Bitcoin proof-of-work validity proofs. Groth16 verifies a defined statement bound to exact evidence; OTS verification requires an actual receipt and matching target digest, with Bitcoin attestation checked separately from calendar acceptance.
+    - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: stratigraphy
+    description: Bitcoin stratigraphy dataset with zkProof payloads, L402 multi-asset payments, and Nostr NIP-78 attestations
+  - name: zero-knowledge
+    description: Groth16/Poseidon BN254 zk-SNARK verification for zkProof payloads
+  - name: mesh
+    description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
+x-mcp-tool-groups:
+  stratigraphy:
+    description: "Indexed telemetry discovery, records, differences, digests, and bounded ranges."
+    tools:
+      - stratigraphy.list
+      - stratigraphy.get
+      - stratigraphy.get_digest
+      - stratigraphy.get_diff
+      - stratigraphy.get_range
+  proof:
+    description: "Macaroon attenuation, Groth16/OTS verification, retained evidence, and signed tip receipts."
+    tools:
+      - proof.attenuate
+      - proof.verify
+      - proof.get_by_hash
+      - proof.list
+      - proof.submit
+      - proof.notarize
+      - proof.ground
+  mesh:
+    description: "Configured peer health, quorum status, and outbound signed snapshot distribution."
+    tools:
+      - mesh.get_status
+      - mesh.broadcast
+  payment:
+    description: "MCP price discovery and authenticated Lightning or configured Base USDC settlement checks."
+    tools:
+      - payment.get_info
+x-mcp-tools:
+  proof.notarize:
+    description: "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats."
+    annotations:
+      readOnlyHint: false
+      destructiveHint: false
+      idempotentHint: false
+      openWorldHint: true
+      l402: { amountSats: 250, batchSize: 100, batchHeader: X-L402-Batch-Size }
+    inputSchema:
+      type: object
+      description: A SHA256 digest to timestamp directly, without hashing its bytes again.
+      additionalProperties: false
+      examples: [{ hash: "abababababababababababababababababababababababababababababababab" }]
+      properties:
+        hash:
+          type: string
+          description: Exactly 64 hexadecimal characters representing a SHA256 digest; no 0x prefix.
+          pattern: "^[0-9a-fA-F]{64}$"
+          minLength: 64
+          maxLength: 64
+          examples: ["abababababababababababababababababababababababababababababababab"]
+      required: [hash]
+    outputSchema:
+      type: object
+      description: Portable detached .ots binary encoded as hexadecimal; calendar acceptance is not Bitcoin confirmation.
+      additionalProperties: false
+      examples:
+        - { hash: "abababababababababababababababababababababababababababababababab", otsProofHex: "004f70656e54696d657374616d70730000", otsStatus: pending_calendar }
+      properties:
+        hash:
+          type: string
+          description: Original SHA256 digest normalized to lowercase.
+          pattern: "^[0-9a-f]{64}$"
+          examples: ["abababababababababababababababababababababababababababababababab"]
+        otsProofHex:
+          type: string
+          description: Hex-encoded detached .ots file; decode as binary to save, upgrade and verify with OpenTimestamps.
+          pattern: "^(?:[0-9a-f]{2})+$"
+          minLength: 2
+          maxLength: 1048576
+          examples: ["004f70656e54696d657374616d70730000"]
+        otsStatus:
+          type: string
+          description: Calendar receipt only; Bitcoin inclusion must be independently upgraded and verified later.
+          const: pending_calendar
+          examples: [pending_calendar]
+      required: [hash, otsProofHex, otsStatus]
+  proof.get_by_hash:
+    description: "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        hash:
+          type: string
+          pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+          description: Required when jobId is absent; accepts a proof/receipt 64-hex hash (optional 0x), decimal snapshot digest, IPFS CID, or UUID submission job ID; unknown identifiers return 404 before payment.
+        jobId:
+          type: string
+          format: uuid
+          description: UUID returned by proof.submit; use instead of hash, never together.
+      required: []
+      oneOf:
+        - required: [hash]
+        - required: [jobId]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        kind: { type: string, enum: [zk-proof, dataset-receipt, context-receipt, zk-proof-status] }
+        hash: { type: string }
+        jobId: { type: string, format: uuid }
+        status: { type: string, enum: [verified, cached, pending, invalid] }
+        timestamp: { type: string, format: date-time }
+        attestationCount: { type: integer, minimum: 0 }
+        meshQuorum: { type: boolean }
+        proofPayload:
+          type: object
+          additionalProperties: true
+          properties: {}
+        provenanceVerified:
+          type: boolean
+          description: True only if this receipt cryptographically binds the current verified dataset chain; this does not imply an OTS Bitcoin attestation.
+        provenanceMerkleRoot: { type: string, pattern: "^[0-9a-f]{64}$" }
+        otsProof: { type: string, format: byte, description: Base64-encoded serialized .ots receipt when available }
+        otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
+      required: [kind, hash, status, timestamp, provenanceVerified]
+  proof.list:
+    legacyNames: [proof.status]
+    description: "Freely discover, filter, and paginate recent zk-proof attestation lifecycle summaries. Use limit (1-100), offset (0-1000), and optional status (verified, cached, pending, invalid). Returns bounded summaries, not full proofs or receipts. Alias: proof.status. No invoice is created."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":0}}
+  payment.get_info:
+    legacyNames: [payment.info]
+    description: "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted."
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        toolName: { type: string, minLength: 1, description: "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.get_digest' or 'proof.verify'); supported legacy aliases are also accepted and resolve to canonical names. When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name or supported legacy alias." }
+        action: { type: string, enum: [query, settle], default: query }
+        paymentHash: { type: string, pattern: "^(0x)?[0-9a-fA-F]{64}$" }
+        preimage: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+        paymentMacaroon: { type: string, minLength: 1, maxLength: 8192, description: "Original invoice macaroon for settlement checks; separate from this paid tool's Authorization credential." }
+        txHash: { type: string, pattern: "^0x[0-9a-fA-F]{64}$" }
+      required: []
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            toolName: { type: string, minLength: 1 }
+            action: { type: string, const: query, default: query }
+        - type: object
+          additionalProperties: false
+          properties:
+            action: { type: string, const: settle }
+            paymentHash: { type: string, pattern: "^(0x)?[0-9a-fA-F]{64}$" }
+            preimage: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+            paymentMacaroon: { type: string, minLength: 1, maxLength: 8192 }
+            txHash: { type: string, pattern: "^0x[0-9a-fA-F]{64}$" }
+          required: [action, paymentHash]
+          oneOf:
+            - required: [preimage]
+            - required: [txHash]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        standardInvoiceSats: { type: integer, const: 250 }
+        perToolSats:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+          properties: {}
+        acceptedPaymentMethods:
+          type: array
+          items: { type: string }
+        invoiceExpirySeconds: { type: integer, minimum: 1 }
+        challenge:
+          type: object
+          additionalProperties: false
+          properties:
+            httpStatus: { type: integer, const: 402 }
+            header: { type: string }
+            fields:
+              type: array
+              items: { type: string }
+          required: [httpStatus, header, fields]
+        activeAuthSchemes:
+          type: array
+          items: { type: string }
+        x402:
+          type: object
+          additionalProperties: false
+          properties:
+            network: { type: string }
+            scheme: { type: string }
+            asset: { type: string }
+            amount: { type: string }
+            payTo: { type: string }
+          required: [network, scheme, asset, amount, payTo]
+        macaroonRequirements:
+          type: object
+          additionalProperties: false
+          properties:
+            authorizationHeader: { type: string }
+            scope: { type: string }
+            maxRequests: { type: integer, enum: [1, 100] }
+          required: [authorizationHeader, scope, maxRequests]
+        verified: { type: boolean }
+        settlementToken:
+          type: [object, "null"]
+          additionalProperties: false
+          properties:
+            scheme: { type: string, enum: [L402, x402] }
+            paymentHash: { type: string }
+            scope: { type: string }
+            settledAt: { type: string, format: date-time }
+          required: [scheme, paymentHash, scope, settledAt]
+      required: []
+      oneOf:
+        - required: [standardInvoiceSats, perToolSats, acceptedPaymentMethods, invoiceExpirySeconds, challenge, activeAuthSchemes, macaroonRequirements]
+        - required: [verified, settlementToken]
+  stratigraphy.get_range:
+    legacyNames: [stratigraphy.range]
+    description: "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only, HTTP rate-limited and L402-paid; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        startTarget:
+          type: string
+          pattern: "^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
+          description: Required inclusive starting indexed height (e.g. '850000') or UTC ISO date (e.g. '2026-01-01'); must resolve no later than endTarget.
+        endTarget:
+          type: string
+          pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
+          default: latest
+          description: Optional inclusive ending indexed height, UTC ISO date, or 'latest' (default latest indexed entry, not live tip); must resolve no earlier than startTarget.
+        limit: { type: number, minimum: 1, maximum: 100, default: 50, description: "Maximum compressed records returned from startTarget toward endTarget, 1-100 (default 50); smaller limits truncate the batch." }
+        format: { type: string, enum: [compact, minimal, kv], default: compact, description: "Compression of every returned record; does not change selected bounds." }
+      required: [startTarget]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        range:
+          type: object
+          additionalProperties: false
+          properties:
+            start: { type: string }
+            end: { type: string }
+          required: [start, end]
+        count: { type: integer, minimum: 1, maximum: 100 }
+        format: { type: string, enum: [compact, minimal, kv] }
+        records:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: [string, array, object] }
+      required: [range, count, format, records]
+  proof.attenuate:
+    description: "Attenuate an authentic, unexpired L402 parent `macaroon` by appending restrictive `caveats` and optionally `ttlSeconds`. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        macaroon: { type: string, minLength: 1, maxLength: 8192, description: "Required authentic, unexpired parent L402 macaroon (1-8192 characters); restrictions can only narrow its scope." }
+        caveats:
+          type: array
+          maxItems: 16
+          description: "Required list of 0-16 supported restrictions such as max_target=870000 or allowed_tools=stratigraphy.get; combines with inherited parent caveats."
+          items: { type: string, minLength: 1, maxLength: 256 }
+        ttlSeconds: { type: number, minimum: 1, maximum: 2592000, description: "Optional integer TTL of 1-2592000 seconds; adds an expiry caveat without extending the parent's expiry." }
+      required: [macaroon, caveats]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, const: attenuated }
+        attenuatedMacaroon: { type: string }
+        appliedCaveats:
+          type: array
+          items: { type: string }
+        issuedAt: { type: string, format: date-time }
+      required: [status, attenuatedMacaroon, appliedCaveats, issuedAt]
+  stratigraphy.get_diff:
+    legacyNames: [stratigraphy.diff]
+    description: "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to HTTP rate limiting and L402 payment; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        fromTarget:
+          type: string
+          pattern: "^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
+          description: "Required baseline indexed height (e.g. '850000') or UTC ISO date (e.g. '2026-01-01'); compared with toTarget to calculate signed deltas. Either chronological order is allowed; only indexed entries resolve."
+        toTarget:
+          type: string
+          pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"
+          default: latest
+          description: "Optional comparison indexed height (e.g. '919856'), UTC ISO date (e.g. '2026-09-01'), or 'latest' (default); deltas are toTarget minus fromTarget. 'latest' is the latest dataset entry, not the live Bitcoin tip."
+      required: [fromTarget]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        from: &diffStratum
+          type: object
+          additionalProperties: false
+          properties:
+            height: { type: integer }
+            date: { type: string, format: date }
+            target_multiplier: { type: number }
+          required: [height, date, target_multiplier]
+        to: *diffStratum
+        delta:
+          type: object
+          additionalProperties: false
+          properties:
+            heightDelta: { type: integer }
+            multiplierDelta: { type: number }
+            percentageChange: { type: string }
+            timeSpanDays: { type: integer }
+          required: [heightDelta, multiplierDelta, percentageChange, timeSpanDays]
+      required: [from, to, delta]
+  stratigraphy.get_digest:
+    legacyNames: [stratigraphy.digest]
+    description: "Fetch compact source-record fingerprints and metadata for an indexed stratum height, date, or bounded date range. Returns no full record telemetry or Bitcoin block-header hash; the fingerprint is not a verification receipt. Use this tool instead of `stratigraphy.get` when a compact fingerprint is enough; use `stratigraphy.get_range` for contiguous multi-record summaries and `stratigraphy.list` for catalog discovery."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        target:
+          type: string
+          pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2}(?:\\.\\.\\d{4}-\\d{2}-\\d{2})?)$"
+          default: latest
+          description: Indexed height, ISO date or inclusive ISO date range joined with '..'; latest means the newest indexed dataset entry, not the live tip.
+        format:
+          type: string
+          enum: [compact, minimal, kv]
+          default: compact
+          description: Return a delimited string, raw metric array or terse key-value object.
+      required: []
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        result:
+          type: [string, array, object]
+          description: A compressed result, or an array of results for a date range; hash is a deterministic source-record fingerprint, not a Bitcoin block hash or ZK proof.
+        proofAvailable:
+          type: boolean
+          const: false
+          description: False because indexed source entries do not store per-record ZK proofs.
+      required: [result, proofAvailable]
+  mesh.get_status:
+    description: "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Requires L402 authorization; use mesh.broadcast to distribute a snapshot. This tool does not administer peers or edit topology."
+    legacyNames: [mesh.status]
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        nodePubkey: { type: string }
+        activePeerCount: { type: integer, minimum: 1 }
+        configuredPeerCount: { type: integer, minimum: 0 }
+        topologyHealth: { type: string, enum: [healthy, degraded, isolated] }
+        crossValidationSuccessRate: { type: number, minimum: 0, maximum: 1 }
+        averagePropagationLatencyMs: { type: number, minimum: 0 }
+        quorumThreshold: { type: integer, minimum: 1 }
+      required: [nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, quorumThreshold]
+  proof.ground:
+    description: "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required."
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"},"attestationType":"Signed-Bitcoin-Tip-Anchor","verificationEndpoint":"POST /api/v1/zk/verify","verificationInput":"Send { attestation: receipt } for an agent-context receipt. For a dataset receipt, parse receipt.attestation.proofPayload and send { attestation: parsedReceipt }. This verifies the signed receipt, not a Groth16 proof or Bitcoin proof-of-work."}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        contextHash:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          minLength: 64
+          maxLength: 64
+          description: 64-character hexadecimal SHA-256 digest binding the agent's prompt or execution state to the current block tip; normalized to lowercase.
+        agentId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Unique, trimmed caller-controlled agent instance identifier from 1 to 256 characters, named in the signed receipt.
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Optional non-secret JSON key-value metadata bound to the signed receipt; serialized size must not exceed 16 KiB.
+        cid:
+          type: string
+          maxLength: 256
+          pattern: "^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$"
+          description: IPFS CIDv0/CIDv1 or 32-byte hexadecimal dataset hash to bind into the signed receipt.
+        nostrEventId:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          description: Optional 32-byte hexadecimal Nostr event ID to bind into the signed receipt; this tool does not publish it.
+        context:
+          type: object
+          additionalProperties: true
+          description: Optional non-secret JSON context bound to the signed receipt (maximum 16 KiB together with the other metadata).
+      required: []
+      oneOf:
+        - required: [contextHash, agentId]
+        - required: [cid]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        receipt:
+          type: object
+          oneOf:
+            - type: object
+              description: Signed agent-context anchor, returned unchanged for verification.
+              additionalProperties: true
+              properties:
+                receiptSchema: { type: string }
+                contextHash: { type: string }
+                agentId: { type: string }
+                blockHeight: { type: integer }
+                blockHash: { type: string }
+                merkleRoot: { type: string }
+                timestamp: { type: integer }
+                schema: { type: string }
+                payload:
+                  type: object
+                  additionalProperties: true
+                proof:
+                  type: object
+                  additionalProperties: true
+                signature:
+                  type: object
+                  additionalProperties: true
+                nostrSignature:
+                  type: object
+                  additionalProperties: true
+              required: [agentId, blockHash, blockHeight, contextHash, merkleRoot, nostrSignature, payload, proof, receiptSchema, schema, signature, timestamp]
+            - type: object
+              description: Signed dataset receipt; retains the existing signed-receipt fields.
+              additionalProperties: false
+              properties:
+                receiptHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+                blockTip: { type: integer, minimum: 1 }
+                blockHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+                ipfsCid: { type: string }
+                nostrEventId: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+                attestation:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    type: { type: string, const: Signed-Bitcoin-Tip-Anchor }
+                    proofPayload: { type: string }
+                    verified: { type: boolean }
+                  required: [proofPayload, type, verified]
+                timestamp: { type: string, format: date-time }
+              required: [receiptHash, blockTip, blockHash, ipfsCid, attestation, timestamp]
+        provenanceVerified:
+          type: boolean
+          description: True only when the signed receipt binds the currently validated dataset strata chain; independent of Bitcoin OTS confirmation.
+        provenanceMerkleRoot: { type: string, pattern: "^[0-9a-f]{64}$" }
+        otsProof: { type: string, format: byte, description: Base64-encoded serialized .ots receipt when available }
+        otsStatus: { type: string, enum: [pending_calendar, bitcoin_block_attested] }
+      required: [receipt, provenanceVerified]
+  proof.verify:
+    description: "Execute cryptographic verification for supplied Groth16 telemetry or drift zk-SNARK proofs, or OpenTimestamps receipts. Returns proof validity; verification can update a bounded in-memory lifecycle index, and drift checks require a Bitcoin block provider. Use this tool to verify supplied proofs; use `proof.submit` to register new Groth16 proofs and `proof.get_by_hash` to retrieve retained proofs or signed receipts by a known identifier."
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      description: Verify either a telemetry snapshot proof or a zk.drift.v1 context-drift proof.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            proofType: { type: string, const: groth16, default: groth16 }
+            proof:
+              type: string
+              minLength: 1
+              description: Base64url-encoded Groth16/Poseidon BN254 proof string without padding.
+            publicInputs:
+              type: object
+              description: Public constants committed by the telemetry proof; must match the data snapshot.
+              additionalProperties: false
+              properties:
+                blockHeight: { type: integer, minimum: 0 }
+                snapshotDigest: { type: string, minLength: 1 }
+                thermodynamicHash: { type: string, minLength: 1 }
+                timestamp: { type: integer, minimum: 0 }
+                valuationSat: { type: integer, minimum: 0 }
+              required: [blockHeight, snapshotDigest, thermodynamicHash, timestamp, valuationSat]
+            verificationKeyId: { type: string, minLength: 1 }
+            data:
+              type: [object, array]
+              description: Telemetry snapshot payload object or array of objects containing canonical state values.
+          required: [proof, publicInputs, verificationKeyId, data]
+        - type: object
+          additionalProperties: false
+          properties:
+            proofType: { type: string, const: groth16, default: groth16 }
+            circuit: { type: string, const: "zk.drift.v1" }
+            sessionContextHash: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+            targetBlockHeight: { type: integer, minimum: 0, maximum: 4294967295 }
+            entropyThreshold: { type: number, minimum: 0, maximum: 1 }
+            proof:
+              type: object
+              additionalProperties: false
+              properties:
+                circuit: { type: string, const: "zk.drift.v1" }
+                pi_a: { type: array, minItems: 3, maxItems: 3, items: { type: string, minLength: 1 } }
+                pi_b:
+                  type: array
+                  minItems: 3
+                  maxItems: 3
+                  items: { type: array, minItems: 2, maxItems: 2, items: { type: string, minLength: 1 } }
+                pi_c: { type: array, minItems: 3, maxItems: 3, items: { type: string, minLength: 1 } }
+                publicSignals: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+                verificationKeyId: { type: string, minLength: 1 }
+              required: [circuit, pi_a, pi_b, pi_c, publicSignals, verificationKeyId]
+            driftScore: { type: number }
+            isAligned: { type: boolean }
+            thermodynamicEntropyBits: { type: number, minimum: 0 }
+            blockHash: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+            compactTarget: { type: integer, minimum: 0, maximum: 4294967295 }
+          required: [circuit, sessionContextHash, targetBlockHeight, entropyThreshold, proof]
+        - type: object
+          additionalProperties: false
+          properties:
+            proofType: { type: string, const: ots }
+            otsProof: { type: string, minLength: 1, maxLength: 1048576 }
+            targetHash: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+          required: [proofType, otsProof, targetHash]
+    outputSchema:
+      type: object
+      description: Cryptographic proof verification result.
+      additionalProperties: false
+      properties:
+        valid:
+          type: boolean
+          description: Whether the proof is valid and bound to the snapshot.
+        verifiedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 UTC time when this verification finished.
+        computationTimeMs:
+          type: number
+          minimum: 0
+          description: Server-side proof verification duration in milliseconds.
+        status: { type: string, enum: [bitcoin_block_attested, unverified] }
+        blockHeight: { type: [integer, "null"] }
+        bitcoinHeaderHash: { type: [string, "null"] }
+      required: [valid]
+      oneOf:
+        - required: [verifiedAt, computationTimeMs]
+        - required: [status, blockHeight, bitcoinHeaderHash]
+  proof.submit:
+    description: "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately."
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        proof:
+          type: object
+          additionalProperties: false
+          properties:
+            piA:
+              type: array
+              minItems: 3
+              maxItems: 3
+              items: { type: string, pattern: "^\\d+$" }
+            piB:
+              type: array
+              minItems: 3
+              maxItems: 3
+              items:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items: { type: string, pattern: "^\\d+$" }
+            piC:
+              type: array
+              minItems: 3
+              maxItems: 3
+              items: { type: string, pattern: "^\\d+$" }
+          required: [piA, piB, piC]
+        publicSignals:
+          type: array
+          minItems: 5
+          maxItems: 5
+          items: { type: string, pattern: "^\\d+$" }
+        snapshotDigest:
+          type: string
+          pattern: "^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"
+      required: [proof, publicSignals]
+    outputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        proofHash: { type: string }
+        jobId: { type: string, format: uuid }
+        status: { type: string, enum: [verified, invalid] }
+        submittedAt: { type: string, format: date-time }
+        attestationStatus: { type: string }
+      required: [proofHash, jobId, status, submittedAt, attestationStatus]
+  mesh.broadcast:
+    description: "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors."
+    annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+  stratigraphy.get:
+    description: "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only, HTTP rate-limited and L402-paid. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"readOnly":true,"audience":["assistant"],"priority":1,"zkProof":{"included":true,"scheme":"Groth16/Poseidon BN254","verificationEndpoint":"POST /api/v1/zk/verify"},"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
+  stratigraphy.list:
+    description: "Discover indexed height and UTC date bounds, available metrics, and catalog metadata. Free, parameterless, read-only discovery entry point for selecting valid strata. Once bounds are known, use `stratigraphy.get` for full record bodies, `stratigraphy.get_range` for compact contiguous spans, or `stratigraphy.get_digest` for lightweight source-record fingerprints."
+    annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":0}}
+security:
+  - L402: []
+paths:
+  /:
+    get:
+      operationId: getApiDiscovery
+      tags: [discovery]
+      summary: API entry point and agent discovery links
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+  /openapi.json:
+    servers:
+      - url: /
+    get:
+      operationId: getOpenApiDocument
+      tags: [discovery]
+      summary: Public OpenAPI document including all 14 MCP schemas and REST operations
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+  /v1/system/health:
+    get:
+      operationId: getRuntimeSystemHealth
+      tags: [discovery]
+      summary: Worker, relay pool, queue, pricing and memory health
+      description: Returns HTTP 200 with status ok, degraded or unhealthy; HTTP success alone is not readiness.
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+  /v1/analytics/revenue:
+    get:
+      operationId: getRevenueAnalytics
+      tags: [discovery]
+      summary: Aggregate paid volume, channel breakdown and daily goal progress
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+        "503":
+          description: Revenue ledger unavailable
+  /v1/analytics/audit:
+    get:
+      operationId: getRevenueAudit
+      tags: [discovery]
+      summary: Sanitized recent settlement records
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+        "400":
+          description: Invalid limit
+        "503":
+          description: Revenue ledger unavailable
+  /v1/nostr/info:
+    get:
+      operationId: getNostrDiscoveryInfo
+      tags: [discovery]
+      summary: Public Nostr discovery and announcement status
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+  /.well-known/nostr.json:
+    servers:
+      - url: /
+    get:
+      operationId: getNip05Identity
+      tags: [discovery]
+      summary: Public NIP-05 name-to-pubkey mapping when configured
+      security: []
+      parameters:
+        - name: name
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicMetadata"
+        "404":
+          description: Identity or requested name is not configured
+  /.well-known/llms.txt:
+    servers:
+      - url: /
+    get:
+      operationId: getWellKnownLlms
+      tags: [discovery]
+      summary: Public Markdown agent instructions and L402 batch policy
+      security: []
+      responses:
+        "200":
+          description: Standard llms.txt Markdown
+          content:
+            text/plain:
+              schema:
+                type: string
+  /.well-known/mcp/server-card.json:
+    servers:
+      - url: /
+    get:
+      operationId: getSmitheryServerCard
+      tags: [discovery]
+      summary: Static Smithery server discovery
+      description: Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
+      security: []
+      responses:
+        "200":
+          description: Exact public Smithery card
+          headers:
+            Access-Control-Allow-Origin:
+              $ref: "#/components/headers/PublicCorsOrigin"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmitheryServerCard"
+    options:
+      operationId: preflightSmitheryServerCard
+      tags: [discovery]
+      summary: Immediate public browser preflight
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicPreflight"
+  /mcp:
+    servers:
+      - url: /
+    get:
+      operationId: getMcpProbe
+      tags: [discovery]
+      summary: Finite MCP scanner probe, not an idle SSE stream
+      security: []
+      responses:
+        "200":
+          description: Endpoint is reachable; this is not tool execution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpProbe"
+    head:
+      operationId: headMcpProbe
+      tags: [discovery]
+      summary: Finite MCP scanner probe without a response body
+      security: []
+      responses:
+        "200":
+          description: Endpoint is reachable
+    options:
+      operationId: preflightMcp
+      tags: [discovery]
+      summary: Immediate public browser preflight before parsing or payment checks
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/PublicPreflight"
+    post:
+      operationId: executeMcpRequest
+      tags: [discovery]
+      summary: JSON-RPC discovery and execution of the 14 canonical MCP tools
+      description: >-
+        Call initialize, ping, tools/list or tools/call. All fourteen input and output
+        schemas, namespaces, side effects and prices are described in x-mcp-tools
+        and x-mcp-tool-groups. tools/list is the live authoritative catalog.
+        Tool calls use params.name and params.arguments. Paid calls require a
+        scoped L402 Authorization credential obtained from the HTTP 402
+        WWW-Authenticate challenge. A cost quote grants no tool entitlement.
+        SDK clients may advertise application/json and text/event-stream, but
+        POST returns finite JSON. Cookies are not used for cross-origin auth.
+      security: []
+      parameters:
+        - name: MCP-Protocol-Version
+          in: header
+          schema:
+            type: string
+          description: Negotiated MCP protocol version, for example 2025-11-25
+        - name: Authorization
+          in: header
+          schema:
+            type: string
+          description: "For paid calls: L402 <macaroon>:<preimage>. Discovery needs no credential."
+        - name: PAYMENT-SIGNATURE
+          in: header
+          schema:
+            type: string
+          description: Optional x402 proof, accepted only when live settlement is configured
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpJsonRpcRequest"
+      responses:
+        "200":
+          description: JSON-RPC result or tool error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "400":
+          description: Invalid request, parameters or JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "402":
+          description: Unpaid scoped tool execution; separate challenge per call
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+              description: 'L402 macaroon="<base64>", invoice="<BOLT11>"'
+            PAYMENT-REQUIRED:
+              schema:
+                type: string
+              description: Base64 x402 quote only when the configured settlement rail supports it
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "429":
+          description: Request budget exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "503":
+          description: Required payment, chain-state, proof or signing provider unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+  /.well-known/mcp.json:
+    get:
+      operationId: getMcpDiscoveryManifest
+      tags: [metadata]
+      summary: Public MCP auto-discovery manifest
+      description: >-
+        Public, unmetered JSON discovery document with wildcard CORS. Its declared
+        version values are manifest metadata and do not configure MCP negotiation.
+      servers:
+        - url: /
+      security: []
+      responses:
+        "200":
+          description: MCP discovery manifest
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+                enum: ["*"]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpDiscoveryManifest"
+  /nostr/verify-identity:
+    post:
+      operationId: verifyNostrAgentIdentity
+      tags: [mesh]
+      summary: Verify NIP-01 agent identity and mesh-signed web-of-trust attestations
+      description: >-
+        A bare npub/hex key identifies an account but does not prove key possession.
+        A standalone Schnorr signature cannot be checked without its complete NIP-01 event.
+        Trust is earned only from signed, network-bound kind 30079 p-tag vouchers
+        by pinned mesh nodes, or one further signed introduction hop.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NostrIdentityInput"
+      responses:
+        "200":
+          description: Signature and mesh trust assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NostrAgentIdentity"
+        "400":
+          description: Invalid identity input or signature without a NIP-01 event
+        "429":
+          description: Identity lookup rate limit exceeded
+        "503":
+          description: Nostr relay identity lookup unavailable
+  /export/huggingface:
+    get:
+      operationId: exportHuggingFaceDataset
+      tags: [stratigraphy]
+      summary: Public Hugging Face instruction-tuning dataset export
+      description: >-
+        Export the most recent indexed entries in chronological order. Heights and
+        timestamps are deterministic daily index labels, not observed Bitcoin blocks.
+        A record hash fingerprints validated source fields, not a block or ZK proof;
+        source entries have no per-record ZK proofs. No L402 authorization is required.
+      security: []
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 500 }
+          description: Maximum number of most recent records; returned in ascending order.
+        - in: query
+          name: format
+          schema: { type: string, enum: [jsonl, json], default: jsonl }
+          description: JSONL is one JSON object per line; JSON returns an array.
+      responses:
+        "200":
+          description: Hugging Face-ready export
+          content:
+            application/x-ndjson:
+              schema: { type: string, description: Newline-delimited HuggingFaceExportRecord JSON objects }
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/HuggingFaceExportRecord" }
+        "400":
+          description: Invalid query parameter
+  /.well-known/llm-schema.json:
+    get:
+      operationId: getLlmSchemaManifest
+      tags: [stratigraphy]
+      summary: Public machine-readable dataset export schema and verification rules
+      servers:
+        - url: /
+      security: []
+      responses:
+        "200":
+          description: Public autonomous crawler schema manifest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmSchemaManifest"
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      security: []
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /v1/health:
+    get:
+      operationId: datasetHealthCheck
+      tags: [health]
+      summary: Public dataset health check
+      description: Reports dataset availability and the paid-access protocol without requiring payment
+      security: []
+      responses:
+        "200":
+          description: Dataset API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetHealthStatus"
+  /readyz:
+    get:
+      operationId: readinessCheck
+      tags: [health]
+      summary: Payment readiness check
+      description: Reports whether the dependencies required to sell the paid dataset are available
+      security: []
+      responses:
+        "200":
+          description: Ready to accept paid dataset requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessStatus"
+        "503":
+          description: One or more payment dependencies are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessStatus"
+  /v1/stratigraphy/sample:
+    get:
+      operationId: getStratigraphy
+      tags: [stratigraphy]
+      summary: Get the free five-record sample
+      security: []
+      responses:
+        "200":
+          description: Latest five stratigraphy records
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 5
+                maxItems: 5
+                items:
+                  $ref: "#/components/schemas/StratigraphyEntry"
+  /v1/cost:
+    post:
+      operationId: quoteMcpToolCosts
+      tags: [stratigraphy]
+      summary: Quote a batch of MCP tool prices in satoshis
+      description: >-
+        Public, read-only quote with wildcard CORS. Returns itemized fixed MCP
+        execution prices, a total in sats, and per-tool L402 invoice-generation
+        details. No invoice is created or settled by this endpoint. Each paid
+        tools/call obtains its own HTTP 402 challenge; the aggregate total is
+        not a batch credential. Descriptive pricing selectors
+        stratigraphy.get_latest and proof.verify_zk_proof resolve to
+        stratigraphy.get and proof.verify for quotes only, not MCP execution.
+        Existing executable legacy aliases retain their original paid scopes.
+        Prices are the same as payment.get_info and the actual MCP gates;
+        REST subscription-tier prices and discounts are separate.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpToolCostSelection"
+      responses:
+        "200":
+          description: Itemized satoshi costs and invoice-generation instructions
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+                const: "*"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpBatchCostQuote"
+        "400":
+          description: Invalid payload, duplicate names, or unknown tool/pricing selector
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+    get:
+      operationId: getStratigraphyCost
+      tags: [stratigraphy]
+      summary: Inspect dataset access costs and schemas
+      description: >-
+        Returns public pre-flight metadata without creating an invoice or
+        requiring L402 authorization. Clients may send a NIP-98 event as
+        `Authorization: Nostr <base64_event>` to receive pubkey-tier-adjusted
+        prices. An optional tool query selects one fixed MCP execution quote
+        in addition to the unchanged tier and dataset metadata. It accepts
+        canonical tools, existing executable aliases, and the two descriptive
+        POST pricing selectors. It does not create an invoice.
+      security:
+        - {}
+        - NIP98: []
+      parameters:
+        - name: tool
+          in: query
+          description: Optional MCP tool or descriptive pricing selector, e.g. stratigraphy.get_latest
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+        - name: X-Settlement-Asset
+          in: header
+          description: Preferred settlement asset. Accept-Asset is supported as an alias.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+        - name: Accept-Asset
+          in: header
+          description: Alias for X-Settlement-Asset.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+      responses:
+        "200":
+          description: Dataset access, MCP parameter, and response schema metadata
+          headers:
+            X-L402-Subscription-Tiers:
+              description: Current dynamic tier prices in satoshis
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StratigraphyCost"
+        "400":
+          description: Invalid tool selector or unsupported/conflicting settlement asset headers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementAssetSelectionError"
+        "401":
+          description: Invalid NIP-98 authorization
+  /v1/nostr/status:
+    get:
+      operationId: getNostrHeartbeatStatus
+      tags: [health]
+      summary: Get the latest Nostr heartbeat status
+      security: []
+      responses:
+        "200":
+          description: Latest signed event and relay acknowledgement status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NostrHeartbeatStatus"
+  /v1/macaroon/attenuate:
+    post:
+      operationId: attenuateMacaroon
+      tags: [stratigraphy]
+      summary: Create a more restrictive child subscription macaroon
+      description: Requires a valid paid parent macaroon and preimage in the L402 Authorization header. Appends allowed_path and max_requests first-party caveats without exposing the server signing secret.
+      security:
+        - L402: []
+      parameters:
+        - name: X-Nostr-Authorization
+          in: header
+          description: Required NIP-98 identity for an agent-bound parent. The event payload tag must contain the SHA-256 of the exact request body.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MacaroonAttenuationRequest"
+      responses:
+        "200":
+          description: Cryptographically attenuated child macaroon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MacaroonAttenuationResponse"
+        "400":
+          description: Invalid request or caveat
+        "401":
+          description: Invalid or unpaid parent macaroon
+        "502":
+          description: Wallet payment verification unavailable
+        "503":
+          description: Token revocation lookup unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenRevocationServiceUnavailableError"
+  /v1/macaroon/revoke:
+    post:
+      operationId: revokeMacaroon
+      tags: [stratigraphy]
+      summary: Revoke a subscription macaroon immediately
+      description: Adds a macaroon's final signature identifier to the shared revocation index. Requires the dedicated operator bearer secret.
+      security:
+        - MacaroonOperator: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MacaroonRevocationRequest"
+      responses:
+        "200":
+          description: Token is revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MacaroonRevocationResponse"
+        "400":
+          description: Invalid macaroon or signature identifier
+        "401":
+          description: Operator authorization failed
+        "503":
+          description: Revocation is not configured or storage is unavailable
+  /v1/stratigraphy:
+    head:
+      operationId: headPaidStratigraphy
+      tags: [stratigraphy]
+      summary: Inspect selected dataset size and cost
+      description: Returns public dataset range and cost headers without creating an invoice or requiring L402 authorization.
+      security: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 422
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Selected dataset metadata
+          headers:
+            X-Stratigraphy-Records:
+              schema:
+                type: integer
+            X-Stratigraphy-First-Day:
+              schema:
+                type: integer
+            X-Stratigraphy-Last-Day:
+              schema:
+                type: integer
+            X-L402-Cost-Sats:
+              schema:
+                type: integer
+            X-L402-Minimum-Cost-Sats:
+              schema:
+                type: integer
+            X-L402-Subscription-Tiers:
+              schema:
+                type: string
+        "400":
+          description: Invalid or conflicting range parameters
+    get:
+      operationId: getPaidStratigraphy
+      tags: [stratigraphy]
+      summary: Get the complete L402-protected dataset
+      description: Returns the selected range and its `zkProof` payload after payment. Verify the Groth16/Poseidon BN254 zk-SNARK with `POST /api/v1/zk/verify`; proofs emitted by this API are pre-verified for sub-10ms verification. Legacy single-query pricing remains 1 satoshi per requested day with a 5-satoshi minimum. Reusable 24-hour passes are dynamically priced from 5 to 15 sats and 30-day passes from 100 to 250 sats; inspect /v1/cost or the issued L402 challenge for the current exact price.
+      parameters:
+        - name: days
+          in: query
+          description: Number of most recent days to return. Cannot be combined with from.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 422
+        - name: from
+          in: query
+          description: First date to include, using the daily series anchored at day 422 on 2026-09-09. Cannot be combined with days.
+          schema:
+            type: string
+            format: date
+        - name: X-Nostr-Authorization
+          in: header
+          description: Required NIP-98 identity when presenting an agent-bound L402 macaroon because Authorization carries the L402 credential.
+          schema:
+            type: string
+        - name: X-Settlement-Asset
+          in: header
+          description: Preferred settlement asset for a new challenge. Accept-Asset is supported as an alias.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+        - name: Accept-Asset
+          in: header
+          description: Alias for X-Settlement-Asset.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+      security:
+        - L402: []
+      responses:
+        "200":
+          description: Complete stratigraphy dataset after payment
+          headers:
+            X-L402-Receipt:
+              description: JSON receipt containing the exact response-body hash, verified payment hash, delivery timestamp, and HMAC-SHA256 signature
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaidStratigraphyResponse"
+        "402":
+          description: Payment in the selected settlement asset is required
+          headers:
+            WWW-Authenticate:
+              description: L402 challenges for the legacy single query plus tiered 1-day and 30-day subscription passes
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/L402Challenge"
+        "400":
+          description: Invalid range or settlement asset selection
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/InvalidRangeError"
+                  - $ref: "#/components/schemas/SettlementAssetSelectionError"
+        "401":
+          description: Invalid NIP-98 authorization or agent identity mismatch
+        "429":
+          description: Payment invoice creation is temporarily limited
+          headers:
+            Retry-After:
+              description: Seconds until the client may request another payment invoice
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentChallengeRateLimitError"
+        "500":
+          description: The selected settlement asset is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentConfigurationError"
+        "502":
+          description: The wallet could not create or verify a payment invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletGatewayError"
+        "503":
+          description: Payment challenge coordination or token revocation lookup is unavailable
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PaymentChallengeServiceUnavailableError"
+                  - $ref: "#/components/schemas/TokenRevocationServiceUnavailableError"
+  /v1/stratigraphy/stream:
+    get:
+      operationId: streamStratigraphyTelemetry
+      tags: [stratigraphy]
+      summary: Stream live Bitcoin stratigraphy telemetry
+      description: Opens a persistent Server-Sent Events stream after validating a paid subscription macaroon and its settlement proof. Telemetry events contain block, difficulty, sats/USD, and thermodynamic signals. Each telemetry SSE event's JSON envelope has `data` and `zkProof` fields and is described by ZkTelemetryEventEnvelope. Lightweight SSE comment heartbeats are emitted every 15 seconds.
+      parameters:
+        - name: X-Nostr-Authorization
+          in: header
+          description: Required NIP-98 identity when presenting an agent-bound L402 macaroon.
+          schema:
+            type: string
+        - name: X-Settlement-Asset
+          in: header
+          description: Preferred settlement asset for a new challenge.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+        - name: Accept-Asset
+          in: header
+          description: Alias for X-Settlement-Asset.
+          schema:
+            $ref: "#/components/schemas/SettlementAsset"
+      security:
+        - L402: []
+      responses:
+        "200":
+          description: Authenticated telemetry event stream
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-cache
+            Connection:
+              schema:
+                type: string
+                const: keep-alive
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ZkTelemetryEventEnvelope"
+                description: SSE telemetry messages plus lightweight comment heartbeats. Each telemetry event is a JSON ZkTelemetryEventEnvelope.
+        "402":
+          description: Payment in the selected settlement asset is required
+          headers:
+            WWW-Authenticate:
+              description: L402 challenges including tiered subscription passes
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/L402Challenge"
+        "401":
+          description: Invalid NIP-98 authorization or agent identity mismatch
+        "400":
+          description: Unsupported or conflicting settlement asset headers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementAssetSelectionError"
+        "403":
+          description: The macaroon path caveat does not permit this stream
+        "429":
+          description: Payment invoice creation or macaroon usage is limited
+        "500":
+          description: The selected settlement asset or server signing is not configured
+        "502":
+          description: Wallet payment verification is unavailable
+        "503":
+          description: Payment challenge coordination or token revocation lookup is unavailable
+  /zk/drift:
+    post:
+      operationId: generateZkDriftProof
+      tags: [zero-knowledge]
+      summary: Prove a context-hash bit-density drift score against a Bitcoin block
+      description: >-
+        Computes an explicitly defined bit-density proxy: context and Bitcoin block
+        hash Hamming weights, the context hash's leading-zero run, and the leading-zero
+        count of the block's compact difficulty target. A Groth16 proof constrains
+        the score and alignment threshold against block data from a public Bitcoin
+        provider, not independently validated consensus. thermodynamicEntropyBits
+        is a hash bit-balance proxy (twice the smaller of zero/one bit counts), not
+        measured physical entropy. The proof does not establish Bitcoin consensus
+        or PoW in-circuit. Its locally generated Groth16 key has a single-party
+        setup, not an independently verified multiparty ceremony.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZkDriftRequest"
+      responses:
+        "200":
+          description: Verified Groth16 drift proof and bound score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZkDriftResponse"
+        "400":
+          description: Malformed hash, block height, or threshold
+        "429":
+          description: Proof-generation capacity or request rate exceeded
+        "503":
+          description: Bitcoin block data or proof generation is unavailable
+  /v1/zk/verify:
+    post:
+      operationId: verifyZkProof
+      tags: [stratigraphy, zero-knowledge]
+      summary: Verify a Groth16/Poseidon zkProof payload
+      description: Public `POST /api/v1/zk/verify` endpoint for Zero-Knowledge Data Integrity. Verifies the Groth16/Poseidon BN254 zk-SNARK and binds the supplied data payload to its semantic public inputs. Proofs emitted by this API are pre-verified and complete verification in under 10ms.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZkVerifyInput"
+      responses:
+        "200":
+          description: Proof verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZkVerifyResponse"
+        "400":
+          description: Malformed proof verification request
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  error:
+                    type: string
+                required: [error]
+        "503":
+          description: Zero-knowledge verifier is overloaded and temporarily unable to process the request
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  error:
+                    type: string
+                    const: Zero-knowledge verifier overloaded
+                required: [error]
+  /v1/zk/ground:
+    post:
+      operationId: groundEpistemicContext
+      tags: [stratigraphy, zero-knowledge, payments]
+      summary: Anchor an agent context to the current Bitcoin tip
+      description: Paid `POST /api/v1/zk/ground` endpoint. After a fixed 5-sat L402 settlement, fetches the current Bitcoin block height and hash, binds them to the canonical context hash, caller identifier, optional metadata, and server timestamp, then returns a Nostr-signed Epistemic Anchor Receipt. Submit the returned receipt unchanged to `POST /api/v1/zk/verify`.
+      security:
+        - L402: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EpistemicGroundingRequest"
+      responses:
+        "200":
+          description: Context anchored to current Bitcoin state
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  receipt:
+                    $ref: "#/components/schemas/EpistemicAnchorReceipt"
+                required: [receipt]
+        "400":
+          description: Invalid context hash, agent identifier, metadata, or unsupported field
+        "402":
+          description: Fixed 5-sat L402 settlement required
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/L402Challenge"
+        "429":
+          description: Grounding request rate limit exceeded
+        "502":
+          description: Settlement provider could not create or verify the payment
+        "503":
+          description: Current Bitcoin tip lookup or server signing is unavailable
+  /provenance/chain:
+    get:
+      operationId: getProvenanceChain
+      tags: [stratigraphy]
+      summary: Inspect the deterministic cumulative strata chain
+      description: Historical strata are linked in dataset order; synthetic indexed heights are not native Bitcoin block heights. The root commits to all linked records, while OTS status separately describes external timestamp progress.
+      security: []
+      responses:
+        "200":
+          description: Current validated provenance state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvenanceChainStatus"
+        "503":
+          description: Provenance state or stored anchor is unavailable
+  /provenance/anchor:
+    get:
+      operationId: getProvenanceAnchor
+      tags: [stratigraphy]
+      summary: Read the latest serialized OpenTimestamps receipt
+      security: []
+      responses:
+        "200":
+          description: Current head's anchored receipt or not_anchored state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvenanceAnchorStatus"
+        "409":
+          description: Stored anchor conflicts with the current verified chain
+        "503":
+          description: Provenance state or stored anchor is unavailable
+    post:
+      operationId: anchorProvenance
+      tags: [stratigraphy]
+      summary: Stamp or upgrade the current Merkle-root timestamp
+      description: Requires an operator Bearer token; the background job also stamps and periodically upgrades pending calendar receipts. An OTS calendar receipt is not Bitcoin block attestation until independently verified.
+      security:
+        - operatorBearer: []
+      responses:
+        "200":
+          description: Serialized OTS receipt bound to the current strata root
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvenanceAnchorStatus"
+        "401":
+          description: Operator authorization required
+        "429":
+          description: Anchor request rate limit exceeded
+        "503":
+          description: Operator auth configuration, calendar, or storage unavailable
+  /v1/mesh/status:
+    get:
+      operationId: getMeshStatus
+      tags: [mesh]
+      summary: Inspect peer mesh health
+      description: Returns active and configured peer counts, topology health, cryptographic cross-validation success rate, propagation latency, and the local Nostr node pubkey.
+      security: []
+      responses:
+        "200":
+          description: Current mesh status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeshStatus"
+  /v1/mesh/attest:
+    post:
+      operationId: attestMeshSnapshot
+      tags: [mesh]
+      summary: Cross-attest a gossiped snapshot digest
+      description: Node-to-node protocol endpoint that returns a Nostr Schnorr event bound to the exact SHA-256 snapshot digest.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeshAttestRequest"
+      responses:
+        "200":
+          description: Signed snapshot-digest attestation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeshAttestResponse"
+        "400":
+          description: Malformed snapshot digest
+        "422":
+          description: Snapshot digest, source signatures, freshness, or mesh network binding failed validation
+components:
+  headers:
+    PublicCorsOrigin:
+      schema:
+        type: string
+        const: "*"
+      description: Public token-based CORS; credentialed cookie access is not enabled
+  responses:
+    PublicMetadata:
+      description: Public JSON metadata; inspect the returned object for current runtime status
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/PublicCorsOrigin"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/PublicMetadata"
+    PublicPreflight:
+      description: Empty, finite successful preflight
+      headers:
+        Access-Control-Allow-Origin:
+          $ref: "#/components/headers/PublicCorsOrigin"
+        Access-Control-Allow-Methods:
+          schema:
+            type: string
+            const: "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers:
+          schema:
+            type: string
+          description: Wildcard; Authorization is also explicitly listed when requested because Fetch excludes it from the wildcard
+  securitySchemes:
+    operatorBearer:
+      type: http
+      scheme: bearer
+      description: Operator-only provenance stamping using the configured operator secret.
+    L402:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "Legacy: L402 <payment_hash>:<preimage>. Subscription: L402 <signed_macaroon>:<preimage>."
+    NIP98:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "Optional agent identity during discovery or challenge issuance: Nostr <base64_event>. When Authorization carries L402, provide the NIP-98 value in X-Nostr-Authorization."
+    MacaroonOperator:
+      type: http
+      scheme: bearer
+      description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
+  schemas:
+    PublicMetadata:
+      type: object
+      additionalProperties: true
+    SmitheryServerCard:
+      type: object
+      additionalProperties: false
+      required: [name, displayName, description, version, url]
+      properties:
+        name:
+          type: string
+          const: bitcoin-stratigraphy-mcp
+        displayName:
+          type: string
+          const: Bitcoin Stratigraphy Data Engine
+        description:
+          type: string
+          const: Provides thermodynamic data, proof verification, and L402 payments.
+        version:
+          type: string
+          const: "1.0.0"
+        url:
+          type: string
+          const: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+    McpProbe:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          const: ok
+        service:
+          type: string
+          const: MCP Server
+    McpJsonRpcRequest:
+      type: object
+      required: [jsonrpc, method]
+      properties:
+        jsonrpc:
+          type: string
+          const: "2.0"
+        id:
+          type: [string, number, "null"]
+        method:
+          type: string
+        params:
+          type: [object, array]
+          additionalProperties: true
+          items: {}
+    McpJsonRpcResponse:
+      type: object
+      required: [jsonrpc, id]
+      additionalProperties: true
+      properties:
+        jsonrpc:
+          type: string
+          const: "2.0"
+        id:
+          type: [string, number, "null"]
+        result: {}
+        error:
+          $ref: "#/components/schemas/McpJsonRpcError"
+      oneOf:
+        - required: [result]
+        - required: [error]
+    McpJsonRpcError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data: {}
+    McpToolCostSelection:
+      type: object
+      additionalProperties: false
+      required: [tools]
+      properties:
+        tools:
+          type: array
+          minItems: 1
+          maxItems: 32
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+          examples:
+            - [stratigraphy.get_latest, proof.verify_zk_proof]
+    McpInvoiceGeneration:
+      type: object
+      additionalProperties: false
+      required: [method, endpoint, jsonrpc_method, tool, amount_sats, description, scope_path, expiry_seconds]
+      properties:
+        method:
+          type: string
+          const: POST
+        endpoint:
+          type: string
+          const: /mcp
+        jsonrpc_method:
+          type: string
+          const: tools/call
+        tool:
+          type: string
+        amount_sats:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+        scope_path:
+          type: string
+        expiry_seconds:
+          type: integer
+          minimum: 1
+    McpToolCostItem:
+      type: object
+      additionalProperties: false
+      required: [tool, canonical_tool, price_sats, payment_required, invoice_generation]
+      properties:
+        tool:
+          type: string
+          description: Original requested name or pricing selector
+        canonical_tool:
+          type: string
+        price_sats:
+          type: integer
+          minimum: 0
+        payment_required:
+          type: boolean
+        invoice_generation:
+          anyOf:
+            - $ref: "#/components/schemas/McpInvoiceGeneration"
+            - type: "null"
+    McpBatchCostQuote:
+      type: object
+      additionalProperties: false
+      required: [protocol, currency, perToolSats, items, total_sats, l402]
+      properties:
+        protocol:
+          type: string
+          const: L402
+        currency:
+          type: string
+          const: sats
+        perToolSats:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        items:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/McpToolCostItem"
+        total_sats:
+          type: integer
+          minimum: 0
+        l402:
+          type: object
+          additionalProperties: false
+          required: [settlement_asset, invoice_generated, aggregate_invoice_supported, invoice_expiry_seconds, generation_trigger, challenge_status, challenge_header, challenge_format, challenge_body_fields, authorization_format, credential_scope, max_requests]
+          properties:
+            settlement_asset:
+              type: string
+              const: btc-lightning
+            invoice_generated:
+              type: boolean
+              const: false
+            aggregate_invoice_supported:
+              type: boolean
+              const: false
+            invoice_expiry_seconds:
+              type: integer
+              minimum: 1
+            generation_trigger:
+              type: string
+            challenge_status:
+              type: integer
+              const: 402
+            challenge_header:
+              type: string
+              const: WWW-Authenticate
+            challenge_format:
+              type: string
+            challenge_body_fields:
+              type: array
+              items:
+                type: string
+            authorization_format:
+              type: string
+            credential_scope:
+              type: string
+            max_requests:
+              type: integer
+              const: 1
+            batch:
+              type: object
+              additionalProperties: false
+              required: [request_header, header_value, max_requests, price_multiplier, credential_scope]
+              properties:
+                request_header: { type: string, const: X-L402-Batch-Size }
+                header_value: { type: string, const: "100" }
+                max_requests: { type: integer, const: 100 }
+                price_multiplier: { type: integer, const: 100 }
+                credential_scope: { type: string, const: exact MCP tool path }
+    McpDiscoveryManifest:
+      type: object
+      required: [$schema, name, version, description, author, homepage, mcp, pricing, verification]
+      properties:
+        $schema:
+          type: string
+          format: uri
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        author:
+          type: object
+          required: [name, url]
+          properties:
+            name:
+              type: string
+            url:
+              type: string
+              format: uri
+        homepage:
+          type: string
+          format: uri
+        documentation:
+          type: string
+          format: uri
+          description: Direct link to the interactive Developer Portal and Live Tool Explorer
+        links:
+          type: object
+          required: [documentation, cookbooks, python_sdk, pricing]
+          properties:
+            documentation:
+              type: string
+              format: uri
+            cookbooks:
+              type: string
+              format: uri
+            python_sdk:
+              type: string
+              format: uri
+            pricing:
+              type: string
+              format: uri
+        mcp:
+          type: object
+          required: [version, transports, capabilities]
+          properties:
+            version:
+              type: string
+            transports:
+              type: array
+              items:
+                type: object
+                required: [type, endpoint]
+                properties:
+                  type:
+                    type: string
+                    enum: [streamable-http]
+                  endpoint:
+                    type: string
+                    format: uri
+            capabilities:
+              type: object
+              required: [tools, prompts, resources]
+              properties:
+                tools:
+                  type: object
+                  required: [count, namespaces]
+                  properties:
+                    count:
+                      type: integer
+                    namespaces:
+                      type: array
+                      items:
+                        type: string
+                prompts:
+                  type: boolean
+                resources:
+                  type: boolean
+        pricing:
+          type: object
+          required: [model, cost_discovery_endpoint]
+          properties:
+            model:
+              type: string
+            cost_discovery_endpoint:
+              type: string
+            cost_discovery_methods:
+              type: array
+              items:
+                type: string
+                enum: [GET, POST]
+            batch_quotes_create_invoices:
+              type: boolean
+              const: false
+        verification:
+          type: object
+          required: [zk_proving_system, curve, time_anchor, mesh_consensus]
+          properties:
+            zk_proving_system:
+              type: string
+            curve:
+              type: string
+            time_anchor:
+              type: string
+            mesh_consensus:
+              type: string
+    HuggingFaceExportRecord:
+      type: object
+      additionalProperties: false
+      required: [height, timestamp, target_multiplier, record_hash, zk_proof_status, instruction, prompt, response, day, title, video_id, transcript_summary, difficulty_epoch_progress, thermodynamic_signal]
+      properties:
+        height: { type: integer, description: Deterministic daily 144-block index label; not a measured block height }
+        timestamp: { type: string, format: date-time, description: UTC midnight for the indexed source date }
+        target_multiplier: { type: number, description: Source title-derived target-distance proxy; not measured energy }
+        record_hash: { type: string, pattern: "^[0-9a-f]{64}$", description: SHA-256 of the validated source fields }
+        zk_proof_status: { type: string, enum: [unavailable], description: No per-record ZK proof is present in the source dataset }
+        instruction: { type: string, description: Instruction-tuning question about Bitcoin Stratigraphy terms and this entry }
+        prompt: { type: string, description: Formatted instruction prompt with a response marker for text-generation training }
+        response: { type: string, description: Source-grounded answer that distinguishes proxies from physical measurements }
+        day: { type: integer, description: One-based source record day }
+        title: { type: string, description: Validated source title }
+        video_id: { type: string, description: Source video identifier }
+        transcript_summary: { type: string, description: Validated source transcript summary }
+        difficulty_epoch_progress: { type: string, description: Source or derived estimated 14-day epoch progress }
+        thermodynamic_signal: { type: string, description: Source or derived qualitative target-distance band }
+    LlmSchemaManifest:
+      type: object
+      description: Machine-readable export parameters, record schema, domain constraints, and verification protocols.
+      required: [schema_version, dataset, endpoints, parameters, record_schema, domain_constraints, verification_protocols, access_policy]
+      properties:
+        schema_version: { type: string }
+        dataset: { type: string }
+        endpoints: { type: object, additionalProperties: true }
+        parameters: { type: object, additionalProperties: true }
+        record_schema: { type: object, additionalProperties: true }
+        domain_constraints: { type: object, additionalProperties: true }
+        verification_protocols: { type: object, additionalProperties: true }
+        access_policy: { type: object, additionalProperties: true }
+    ZkDriftRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        sessionContextHash:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          description: Exactly 32 bytes of digest, hex encoded; not raw session text.
+        blockHeight:
+          oneOf:
+            - { type: integer, minimum: 0 }
+            - { type: string, pattern: "^(0|[1-9][0-9]*)$" }
+          description: Optional Bitcoin height; omitted means the latest block returned by the public block API.
+        entropyThreshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.85
+          description: Maximum permitted driftScore; 0.85 when omitted.
+      required: [sessionContextHash]
+    ZkDriftProof:
+      type: object
+      additionalProperties: false
+      properties:
+        circuit: { type: string, const: "zk.drift.v1" }
+        pi_a:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items: { type: string }
+        pi_b:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items: { type: string }
+        pi_c:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items: { type: string }
+        publicSignals:
+          type: array
+          minItems: 1
+          items: { type: string }
+          description: Ordered public commitments and circuit outputs required for independent Groth16 verification.
+        verificationKeyId:
+          type: string
+          description: Digest identifying the drift-specific Groth16 verification key.
+      required: [circuit, pi_a, pi_b, pi_c, publicSignals, verificationKeyId]
+    ZkDriftResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        driftScore:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: (Hamming-weight gap + leading-zero difficulty gap) divided by 512; lower means closer.
+        isAligned:
+          type: boolean
+          description: True exactly when driftScore is no greater than entropyThreshold.
+        targetBlockHeight: { type: integer, minimum: 0 }
+        proof:
+          $ref: "#/components/schemas/ZkDriftProof"
+        thermodynamicEntropyBits:
+          type: integer
+          minimum: 0
+          maximum: 256
+          description: Bit-balance proxy 2 × min(one bits, zero bits) of the context digest, not physical thermodynamic entropy.
+        blockHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Bitcoin block hash returned by the public block API and bound into the proof.
+        compactTarget:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+          description: Compact nBits field returned for the targeted block, used to derive difficulty leading-zero bits.
+        entropyInterpretation:
+          type: string
+          description: States that thermodynamicEntropyBits is a digest bit-balance proxy rather than physical entropy.
+        proofInterpretation:
+          type: string
+          description: States the public block-provider and single-party setup trust limits of the circuit proof.
+      required: [driftScore, isAligned, targetBlockHeight, proof, thermodynamicEntropyBits, blockHash, compactTarget, entropyInterpretation, proofInterpretation]
+    ZkPublicInputs:
+      type: object
+      additionalProperties: false
+      properties:
+        blockHeight:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+        thermodynamicHash:
+          type: string
+          pattern: "^[0-9]+$"
+          maxLength: 77
+        snapshotDigest:
+          type: string
+          pattern: "^[0-9]+$"
+          maxLength: 77
+          description: Decimal BN254 field element digest for the bound telemetry snapshot (0 through the BN254 field modulus)
+        timestamp:
+          type: integer
+          minimum: 0
+          maximum: 281474976710655
+        valuationSat:
+          type: integer
+          minimum: 0
+          maximum: 281474976710655
+      required: [blockHeight, thermodynamicHash, snapshotDigest, timestamp, valuationSat]
+    ZkProof:
+      type: object
+      additionalProperties: false
+      properties:
+        proof:
+          type: string
+          description: Serialized zero-knowledge proof
+        publicInputs:
+          $ref: "#/components/schemas/ZkPublicInputs"
+        verificationKeyId:
+          type: string
+      required: [proof, publicInputs, verificationKeyId]
+    ZkTelemetryEventEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+          description: Telemetry payload
+        zkProof:
+          $ref: "#/components/schemas/ZkProof"
+        meshConsensus:
+          $ref: "#/components/schemas/MeshConsensus"
+      required: [data, zkProof, meshConsensus]
+    PaidStratigraphyResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/StratigraphyEntry"
+        zkProof:
+          $ref: "#/components/schemas/ZkProof"
+        meshConsensus:
+          $ref: "#/components/schemas/MeshConsensus"
+      required: [data, zkProof, meshConsensus]
+    ZkVerifyRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        proof:
+          type: string
+        publicInputs:
+          $ref: "#/components/schemas/ZkPublicInputs"
+        verificationKeyId:
+          type: string
+          description: Verification-key identifier used by the verifier
+        data:
+          description: Telemetry data to bind to the proof. Supplying this required payload enables binding verification; proof and publicInputs provide the cryptographic verification inputs.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+      required: [proof, publicInputs, verificationKeyId, data]
+    ZkVerifyInput:
+      description: Accepted request bodies for proof verification, including direct and wrapped epistemic-anchor receipts.
+      oneOf:
+        - $ref: "#/components/schemas/ZkVerifyRequest"
+        - $ref: "#/components/schemas/EpistemicAnchorReceipt"
+        - type: object
+          additionalProperties: false
+          properties:
+            attestation:
+              $ref: "#/components/schemas/EpistemicAnchorReceipt"
+            data:
+              not: {}
+          required: [attestation]
+    ZkVerifyResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        valid:
+          type: boolean
+        verifiedAt:
+          type: string
+          format: date-time
+        computationTimeMs:
+          type: number
+          minimum: 0
+      required: [valid, verifiedAt, computationTimeMs]
+    EpistemicGroundingRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        contextHash:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+          description: SHA-256 digest of the agent context
+        agentId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable caller-controlled agent identifier
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Optional non-secret JSON metadata included in the signed anchor
+      required: [contextHash, agentId]
+    EpistemicAnchorReceipt:
+      type: object
+      description: Canonical SHA-256/Merkle attestation signed as a Nostr NIP-78 event and bound to the current Bitcoin tip
+      additionalProperties: true
+      properties:
+        schema:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        proof:
+          type: object
+          additionalProperties: true
+        signature:
+          $ref: "#/components/schemas/NostrAttestation"
+        receiptSchema:
+          type: string
+          const: bitcoin-stratigraphy/epistemic-anchor/v1
+        contextHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        agentId:
+          type: string
+        blockHeight:
+          type: integer
+          minimum: 1
+        blockHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        merkleRoot:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        timestamp:
+          type: integer
+          minimum: 0
+        nostrSignature:
+          $ref: "#/components/schemas/NostrAttestation"
+        data:
+          description: Arbitrary extension data is already permitted on this receipt.
+      required:
+        - schema
+        - payload
+        - proof
+        - signature
+        - receiptSchema
+        - contextHash
+        - agentId
+        - blockHeight
+        - blockHash
+        - merkleRoot
+        - timestamp
+        - nostrSignature
+    MeshPeerAttestation:
+      type: object
+      additionalProperties: false
+      properties:
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        signature:
+          type: string
+          pattern: "^[0-9a-f]{128}$"
+        eventId:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        createdAt:
+          type: integer
+          minimum: 0
+        roundTripLatencyMs:
+          type: number
+          minimum: 0
+      required: [pubkey, signature, eventId, createdAt, roundTripLatencyMs]
+    MeshConsensus:
+      type: object
+      additionalProperties: false
+      description: Multi-node certificate over the exact emitted data snapshot. In isolation mode the certificate contains only the local node attestation.
+      properties:
+        quorumScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        peerAttestations:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/MeshPeerAttestation"
+        merkleRoot:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        snapshotDigest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        threshold:
+          type: integer
+          minimum: 1
+        isolationMode:
+          type: boolean
+        networkId:
+          type: string
+          minLength: 1
+      required: [quorumScore, peerAttestations, merkleRoot, snapshotDigest, threshold, isolationMode, networkId]
+    MeshStatus:
+      type: object
+      description: Output of MCP tool mesh.get_status; mesh.status is a legacy tool name.
+      additionalProperties: false
+      properties:
+        nodePubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        activePeerCount:
+          type: integer
+          minimum: 1
+        configuredPeerCount:
+          type: integer
+          minimum: 0
+        topologyHealth:
+          type: string
+          enum: [healthy, degraded, isolated]
+        crossValidationSuccessRate:
+          type: number
+          minimum: 0
+          maximum: 1
+        averagePropagationLatencyMs:
+          type: number
+          minimum: 0
+        quorumThreshold:
+          type: integer
+          minimum: 1
+      required: [nodePubkey, activePeerCount, configuredPeerCount, topologyHealth, crossValidationSuccessRate, averagePropagationLatencyMs, quorumThreshold]
+    NostrIdentityInput:
+      type: object
+      additionalProperties: false
+      properties:
+        pubkey: { type: string, description: Lowercase hex or npub }
+        event: { $ref: "#/components/schemas/NostrIdentityEvent" }
+        signature: { type: string, pattern: "^[0-9a-f]{128}$", description: Optional cross-check against event.sig; not valid alone }
+      anyOf:
+        - required: [pubkey]
+        - required: [event]
+    NostrIdentityEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: "^[0-9a-f]{64}$" }
+        pubkey: { type: string, pattern: "^[0-9a-f]{64}$" }
+        sig: { type: string, pattern: "^[0-9a-f]{128}$" }
+        kind: { type: integer }
+        created_at: { type: integer }
+        tags:
+          type: array
+          items:
+            type: array
+            items: { type: string }
+        content: { type: string }
+      required: [id, pubkey, sig, kind, created_at, tags, content]
+    NostrAgentIdentity:
+      type: object
+      additionalProperties: false
+      properties:
+        pubkey: { type: string, pattern: "^[0-9a-f]{64}$" }
+        isValidSignature: { type: boolean, description: False for a bare key or invalid signed event }
+        attestationCount: { type: integer, minimum: 0, description: Unique trusted signers across one or two hops }
+        trustScore: { type: number, minimum: 0, maximum: 1, description: "0.6 per direct trusted vouch; 0.2 per second-hop vouch, capped at 1; pinned mesh keys score 1" }
+        firstSeenTimestamp: { type: ["integer", "null"], description: "Earliest valid caller or NIP-01 kind 0 profile event, seconds since epoch" }
+        attestationDepth: { type: ["integer", "null"], description: "0 for pinned mesh key, 1 direct, 2 via signed introduction" }
+        metadata:
+          type: object
+          additionalProperties: false
+          properties:
+            name: { type: string }
+            about: { type: string }
+      required: [pubkey, isValidSignature, attestationCount, trustScore, firstSeenTimestamp, attestationDepth, metadata]
+    MeshAttestRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        snapshotDigest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        networkId:
+          type: string
+          minLength: 1
+        originPubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        agentSession:
+          type: object
+          additionalProperties: false
+          description: >-
+            Optional agent-signed kind 20079 NIP-01 event. For direct attestation,
+            event.content is JSON.stringify({networkId,snapshotDigest}). With
+            date, it is JSON.stringify({networkId,date}) and the peer also
+            compares the supplied signed snapshot against the selected source record.
+            The signer must have a pinned-node, network-bound kind 30079 trust path.
+          properties:
+            event: { $ref: "#/components/schemas/NostrIdentityEvent" }
+            date: { type: string, format: date }
+          required: [event]
+        snapshot:
+          description: Complete Nostr-attested snapshot. The peer recomputes its canonical digest and verifies source attestations before signing.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              minItems: 1
+              items:
+                type: object
+                additionalProperties: true
+      required: [snapshotDigest, networkId, originPubkey, snapshot]
+    MeshSignedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        created_at:
+          type: integer
+        kind:
+          type: integer
+          const: 20078
+        tags:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        content:
+          type: string
+        sig:
+          type: string
+          pattern: "^[0-9a-f]{128}$"
+      required: [id, pubkey, created_at, kind, tags, content, sig]
+    MeshAttestResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        event:
+          $ref: "#/components/schemas/MeshSignedEvent"
+        agentIdentity:
+          $ref: "#/components/schemas/NostrAgentIdentity"
+      required: [event]
+    SettlementAsset:
+      type: string
+      enum: [btc-lightning, l-btc, taproot-assets]
+    MacaroonRevocationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        macaroon:
+          type: string
+        signature_id:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+        reason:
+          type: string
+          maxLength: 500
+      oneOf:
+        - required: [macaroon]
+        - required: [signature_id]
+    MacaroonRevocationResponse:
+      type: object
+      properties:
+        signature_id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        revoked_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+      required:
+        - signature_id
+        - revoked_at
+    TokenRevocationServiceUnavailableError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: Token revocation service unavailable
+      required:
+        - error
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    DatasetHealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          const: ok
+        datasetLength:
+          type: integer
+          const: 422
+        protocol:
+          type: string
+          const: L402
+      required:
+        - status
+        - datasetLength
+        - protocol
+    ReadinessStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ready
+            - not_ready
+        dependencies:
+          type: object
+          properties:
+            wallet_configuration:
+              type: string
+              description: Availability of either the primary Coinos or fallback Alby/NWC settlement configuration
+              enum:
+                - available
+                - unavailable
+            challenge_coordination:
+              type: string
+              enum:
+                - available
+                - unavailable
+          required:
+            - wallet_configuration
+            - challenge_coordination
+      required:
+        - status
+        - dependencies
+    StratigraphyCost:
+      type: object
+      properties:
+        protocol:
+          type: string
+          const: L402
+        settlement_asset:
+          $ref: "#/components/schemas/SettlementAsset"
+        supported_assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettlementAsset"
+          minItems: 1
+          uniqueItems: true
+        available_assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettlementAsset"
+          uniqueItems: true
+        access_tiers:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                enum: [1-day, 30-day]
+              duration_days:
+                type: integer
+              price_sats:
+                type: integer
+              original_price_sats:
+                type: integer
+              discount_sats:
+                type: integer
+              discount_percent:
+                type: number
+              base_price_sats:
+                type: integer
+              max_price_sats:
+                type: integer
+              multiplier:
+                type: number
+            required:
+              - id
+              - duration_days
+              - price_sats
+              - original_price_sats
+              - discount_sats
+              - discount_percent
+              - base_price_sats
+              - max_price_sats
+              - multiplier
+        dynamic_pricing:
+          type: object
+          properties:
+            difficulty_epoch_progress:
+              type: number
+              minimum: 0
+              maximum: 100
+            request_velocity_rpm:
+              type: number
+              minimum: 0
+            calculated_at:
+              type: string
+              format: date-time
+          required:
+            - difficulty_epoch_progress
+            - request_velocity_rpm
+            - calculated_at
+        agent:
+          $ref: "#/components/schemas/AgentReputationMetadata"
+        legacy_query_pricing:
+          type: object
+          properties:
+            sats_per_day:
+              type: integer
+              const: 1
+            minimum_sats:
+              type: integer
+              const: 5
+          required: [sats_per_day, minimum_sats]
+        dataset:
+          type: object
+          properties:
+            days:
+              type: integer
+              minimum: 422
+            first_day:
+              type: integer
+              const: 1
+            last_day:
+              type: integer
+              minimum: 422
+            grows_over_time:
+              type: boolean
+              const: true
+          required: [days, first_day, last_day, grows_over_time]
+        mcp_tool:
+          type: object
+          properties:
+            name:
+              type: string
+              const: stratigraphy.get
+            parameters:
+              type: object
+              properties:
+                days:
+                  $ref: "#/components/schemas/McpToolParameter"
+                date:
+                  $ref: "#/components/schemas/McpToolParameter"
+                blockHeight:
+                  $ref: "#/components/schemas/McpToolParameter"
+                metrics:
+                  $ref: "#/components/schemas/McpToolParameter"
+                startDate:
+                  $ref: "#/components/schemas/McpToolParameter"
+                endDate:
+                  $ref: "#/components/schemas/McpToolParameter"
+                startBlock:
+                  $ref: "#/components/schemas/McpToolParameter"
+                endBlock:
+                  $ref: "#/components/schemas/McpToolParameter"
+                limit:
+                  $ref: "#/components/schemas/McpToolParameter"
+              required: [days, date, blockHeight, metrics, startDate, endDate, startBlock, endBlock, limit]
+          required: [name, parameters]
+        catalog_tool:
+          $ref: "#/components/schemas/StratigraphyCatalogMcpTool"
+        proof_by_hash_tool:
+          $ref: "#/components/schemas/ProofByHashMcpTool"
+        proof_attestations_tool:
+          $ref: "#/components/schemas/ListProofAttestationsMcpTool"
+        submit_proof_tool:
+          $ref: "#/components/schemas/SubmitZkProofMcpTool"
+        response_schema:
+          $ref: "#/components/schemas/JsonSchema"
+      required:
+        - protocol
+        - settlement_asset
+        - supported_assets
+        - available_assets
+        - access_tiers
+        - dynamic_pricing
+        - legacy_query_pricing
+        - dataset
+        - mcp_tool
+        - catalog_tool
+        - proof_by_hash_tool
+        - proof_attestations_tool
+        - submit_proof_tool
+        - response_schema
+    ListProofAttestationsMcpTool:
+      type: object
+      description: MCP proof-attestation discovery tool registered as proof.list.
+      properties:
+        name:
+          type: string
+          const: proof.list
+          description: Stable MCP tool name used with tools/call.
+          examples: [proof.list]
+        description:
+          type: string
+          description: Human-readable purpose of the attestation listing tool.
+          examples:
+            - Discover and paginate recent proof attestation lifecycle states by status without knowing a proof hash; full retained payloads require proof.get_by_hash.
+        parameters:
+          type: object
+          description: Optional filters accepted by the attestation listing tool.
+          properties:
+            limit:
+              $ref: "#/components/schemas/McpToolParameter"
+            status:
+              $ref: "#/components/schemas/McpToolParameter"
+          required: [limit, status]
+        exampleResult:
+          $ref: "#/components/schemas/ListProofAttestationsResult"
+      required: [name, description, parameters, exampleResult]
+    ListProofAttestationsResult:
+      type: object
+      description: Recent indexed proof attestations and the total matching count.
+      properties:
+        attestations:
+          type: array
+          description: Indexed proof attestations ordered from newest to oldest.
+          items:
+            $ref: "#/components/schemas/ProofAttestationRecord"
+        total:
+          type: integer
+          minimum: 0
+          description: Total matching records before the result limit is applied.
+          examples: [1]
+      required: [attestations, total]
+    ProofAttestationRecord:
+      type: object
+      description: One indexed zk-SNARK verification and Nostr attestation record.
+      properties:
+        proofHash:
+          type: string
+          description: Lowercase 0x-prefixed SHA-256 proof fingerprint.
+          examples:
+            - "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd"
+        snapshotDigest:
+          type: string
+          description: Snapshot CID or decimal Poseidon digest bound to the proof.
+          examples: ["1534979302823651498736582947365829473658294"]
+        status:
+          type: string
+          enum: [verified, cached, pending, invalid]
+          description: Current lifecycle verification state.
+          examples: [verified]
+        submittedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the proof entered the lifecycle index.
+          examples: ["2026-09-19T06:20:00.000Z"]
+        attestationCount:
+          type: integer
+          minimum: 0
+          description: Number of recorded Nostr NIP-78 attestations.
+          examples: [1]
+        meshQuorum:
+          type: boolean
+          description: Whether the attestation count meets the current mesh quorum.
+          examples: [true]
+      required:
+        - proofHash
+        - snapshotDigest
+        - status
+        - submittedAt
+        - attestationCount
+        - meshQuorum
+    SubmitZkProofMcpTool:
+      type: object
+      description: MCP proof ingestion tool registered as proof.submit.
+      properties:
+        name:
+          type: string
+          const: proof.submit
+          description: Stable MCP tool name used with tools/call.
+          examples: [proof.submit]
+        description:
+          type: string
+          description: Human-readable purpose of the proof ingestion tool.
+          examples:
+            - Submit a new Groth16/Poseidon zk-SNARK proof payload and public signals to the data engine for verification, lifecycle indexing, and Nostr NIP-78 attestation broadcast.
+        requiredInputs:
+          type: array
+          description: Input property names required for every submission.
+          examples:
+            - [proof, publicSignals]
+          items:
+            type: string
+            enum: [proof, publicSignals]
+        optionalInputs:
+          type: array
+          description: Optional input property names accepted by the submission.
+          examples:
+            - [snapshotDigest]
+          items:
+            type: string
+            enum: [snapshotDigest]
+        exampleResult:
+          $ref: "#/components/schemas/SubmitZkProofResult"
+      required: [name, description, requiredInputs, optionalInputs, exampleResult]
+    SubmitZkProofResult:
+      type: object
+      description: Immediate proof ingestion and Nostr publication result.
+      properties:
+        proofHash:
+          type: string
+          description: Lowercase 0x-prefixed SHA-256 fingerprint of the canonical proof.
+          examples:
+            - "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd"
+        jobId:
+          type: string
+          format: uuid
+          description: Server-generated submission job ID accepted by proof.get_by_hash.
+          examples: ["123e4567-e89b-42d3-a456-426614174000"]
+        status:
+          type: string
+          enum: [verified, invalid]
+          description: Immediate Groth16 verification result.
+          examples: [verified]
+        submittedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 proof submission timestamp.
+          examples: ["2026-09-19T06:20:00.000Z"]
+        attestationStatus:
+          type: string
+          description: Nostr NIP-78 broadcast confirmation state.
+          examples: [broadcast_confirmed]
+      required: [proofHash, jobId, status, submittedAt, attestationStatus]
+    ProofByHashMcpTool:
+      type: object
+      description: MCP proof and lifecycle lookup tool registered as proof.get_by_hash.
+      properties:
+        name:
+          type: string
+          const: proof.get_by_hash
+          description: Stable MCP tool name used with tools/call.
+          examples: [proof.get_by_hash]
+        description:
+          type: string
+          description: Human-readable purpose of the proof and lifecycle lookup.
+          examples:
+            - Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors.
+        identifiers:
+          type: array
+          description: Alternative lookup keys; provide either hash or jobId.
+          examples:
+            - [hash, jobId]
+          items:
+            type: string
+            enum: [hash, jobId]
+        exampleResult:
+          type: object
+          description: A status-only lookup result omits proofPayload when the payload is not retained.
+          properties:
+            kind:
+              type: string
+              enum: [zk-proof, dataset-receipt, context-receipt, zk-proof-status]
+              examples: [zk-proof]
+            hash:
+              type: string
+              examples: ["0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd"]
+            jobId:
+              type: string
+              format: uuid
+              description: Submission job ID when a proof payload is retained.
+            status:
+              type: string
+              enum: [verified, cached, pending, invalid]
+              examples: [pending]
+            timestamp:
+              type: string
+              format: date-time
+              examples: ["2026-09-19T05:54:39.835Z"]
+            attestationCount:
+              type: integer
+              minimum: 0
+              examples: [0]
+            meshQuorum:
+              type: boolean
+              examples: [false]
+            proofPayload:
+              type: object
+              description: Optional retained proof or signed receipt payload; omitted for status-only records.
+              additionalProperties: true
+          required: [kind, hash, status, timestamp]
+      required: [name, description, identifiers, exampleResult]
+    StratigraphyCatalogMcpTool:
+      type: object
+      description: MCP dataset discovery tool registered as stratigraphy.list.
+      properties:
+        name:
+          type: string
+          description: Stable MCP tool name used with tools/call.
+          const: stratigraphy.list
+          examples: [stratigraphy.list]
+        description:
+          type: string
+          description: Human-readable purpose of the catalog discovery tool.
+          examples:
+            - Discover available stratigraphy datasets, date ranges, total recorded epochs, block height bounds, and available telemetry metrics without requiring prior knowledge of exact snapshot parameters.
+        catalog:
+          $ref: "#/components/schemas/StratigraphyCatalog"
+      required: [name, description, catalog]
+    StratigraphyCatalog:
+      type: object
+      description: Discoverable bounds and metric inventory for the stratigraphy dataset.
+      properties:
+        totalSnapshots:
+          type: integer
+          minimum: 1
+          description: Total number of daily stratigraphy snapshots currently available.
+          examples: [422]
+        oldestBlock:
+          type: integer
+          minimum: 0
+          description: Lowest block height in the deterministic daily snapshot index.
+          examples: [859376]
+        newestBlock:
+          type: integer
+          minimum: 0
+          description: Highest block height in the deterministic daily snapshot index.
+          examples: [920000]
+        availableMetrics:
+          type: array
+          description: Dot-delimited telemetry metric paths available in each snapshot.
+          examples:
+            - [day, title, video_id, transcript_summary, quantitative_alpha.target_multiplier]
+          items:
+            type: string
+            description: Dot-delimited path of an available telemetry metric.
+            examples: [quantitative_alpha.target_multiplier]
+        dateBounds:
+          type: object
+          description: Inclusive ISO date bounds of the available snapshots.
+          properties:
+            startDate:
+              type: string
+              format: date
+              description: ISO 8601 date of the oldest available snapshot.
+              examples: ["2025-07-15"]
+            endDate:
+              type: string
+              format: date
+              description: ISO 8601 date of the newest available snapshot.
+              examples: ["2026-09-09"]
+          required: [startDate, endDate]
+      required: [totalSnapshots, oldestBlock, newestBlock, availableMetrics, dateBounds]
+    McpToolParameter:
+      type: object
+      properties:
+        type:
+          type: string
+          description: JSON Schema primitive type accepted by the tool parameter.
+        minimum:
+          type: integer
+          description: Inclusive minimum integer value when applicable.
+        maximum:
+          type: integer
+          description: Inclusive maximum integer value when applicable.
+        format:
+          type: string
+          description: JSON Schema string format when applicable.
+        description:
+          type: string
+          description: Detailed formatting and behavioral contract for the parameter.
+        example:
+          description: Concrete accepted parameter value.
+        allowedValues:
+          type: array
+          description: Allowed string values for an enum or array parameter.
+          items:
+            type: string
+        required:
+          type: boolean
+          description: Whether callers must provide this parameter.
+      required: [type, description, example, required]
+    JsonSchema:
+      type: object
+      properties:
+        type:
+          type: string
+        items:
+          type: object
+          additionalProperties: true
+        properties:
+          type: object
+          additionalProperties: true
+        required:
+          type: array
+          items:
+            type: string
+      required: [type]
+    MacaroonAttenuationRequest:
+      type: object
+      properties:
+        macaroon:
+          type: string
+        caveats:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            pattern: "^(allowed_path=/[^\\s]*|max_requests=[1-9]\\d*)$"
+      required: [macaroon, caveats]
+    MacaroonAttenuationResponse:
+      type: object
+      properties:
+        macaroon:
+          type: string
+        caveats:
+          type: object
+          properties:
+            allowed_path:
+              type: array
+              items:
+                type: string
+            max_requests:
+              type: integer
+              minimum: 1
+          required: [allowed_path]
+      required: [macaroon, caveats]
+    NostrHeartbeatStatus:
+      type: object
+      properties:
+        event_id:
+          type: [string, "null"]
+        pubkey:
+          type: [string, "null"]
+        published_at:
+          type: [string, "null"]
+          format: date-time
+        relays:
+          type: array
+          items:
+            type: object
+            properties:
+              relay:
+                type: string
+                format: uri
+              status:
+                type: string
+                enum: [pending, settled, failed]
+              message:
+                type: string
+            required: [relay, status]
+      required: [event_id, pubkey, published_at, relays]
+    StratigraphyEntry:
+      type: object
+      properties:
+        day:
+          type: integer
+        title:
+          type: string
+        video_id:
+          type: string
+        transcript_summary:
+          type: string
+        quantitative_alpha:
+          $ref: "#/components/schemas/QuantitativeAlpha"
+        prevHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: SHA-256 hash of the prior indexed stratum, or 64 zeroes for genesis; not a Bitcoin block hash.
+        stratumHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Domain-separated SHA-256 hash of this source-record fingerprint, index, and prevHash.
+        attestation:
+          $ref: "#/components/schemas/NostrAttestation"
+      required:
+        - day
+        - title
+        - video_id
+        - transcript_summary
+        - quantitative_alpha
+        - prevHash
+        - stratumHash
+    ProvenanceChainStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        totalDepth: { type: integer, minimum: 1 }
+        merkleRoot: { type: string, pattern: "^[0-9a-f]{64}$" }
+        latestOtsStatus: { type: string, enum: [not_anchored, pending_calendar, bitcoin_block_attested] }
+        genesisHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+        headHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+      required: [totalDepth, merkleRoot, latestOtsStatus, genesisHash, headHash]
+    ProvenanceAnchorStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        headHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+        merkleRoot: { type: string, pattern: "^[0-9a-f]{64}$" }
+        totalDepth: { type: integer, minimum: 1 }
+        otsStatus: { type: string, enum: [not_anchored, pending_calendar, bitcoin_block_attested] }
+        otsProof:
+          type: string
+          format: byte
+          description: Base64-encoded serialized .ots receipt, present after a successful calendar stamp.
+        updatedAt: { type: string, format: date-time }
+      required: [headHash, merkleRoot, totalDepth, otsStatus]
+    NostrAttestation:
+      type: object
+      description: NIP-01 signed NIP-78 attestation over the payload before this block was attached
+      properties:
+        protocol:
+          type: string
+          const: nostr
+        nip:
+          type: integer
+          const: 78
+        payload_sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        event:
+          $ref: "#/components/schemas/NostrSignedEvent"
+      required: [protocol, nip, payload_sha256, event]
+    NostrSignedEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        created_at:
+          type: integer
+        kind:
+          type: integer
+          const: 30078
+        tags:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        content:
+          type: string
+        sig:
+          type: string
+          pattern: "^[0-9a-f]{128}$"
+      required: [id, pubkey, created_at, kind, tags, content, sig]
+    QuantitativeAlpha:
+      type: object
+      properties:
+        target_multiplier:
+          type: number
+          format: float
+          description: Numeric distance multiplier parsed from the day's title
+        difficulty_epoch_progress:
+          type: string
+          pattern: "^(100(?:\\.0{1,2})?|\\d{1,2}(?:\\.\\d{1,2})?)%$"
+          description: Estimated progress through the current 14-day difficulty epoch
+        thermodynamic_signal:
+          type: string
+          description: Qualitative target-distance band derived from the multiplier
+      required:
+        - target_multiplier
+        - difficulty_epoch_progress
+        - thermodynamic_signal
+    L402Challenge:
+      type: object
+      properties:
+        invoice:
+          type: string
+          description: Invoice or payment request for the selected settlement asset
+        payment_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        settlement_asset:
+          $ref: "#/components/schemas/SettlementAsset"
+        supported_assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettlementAsset"
+          minItems: 1
+          uniqueItems: true
+        available_assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettlementAsset"
+          uniqueItems: true
+        agent:
+          $ref: "#/components/schemas/AgentReputationMetadata"
+        passes:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/L402SubscriptionPass"
+      required:
+        - invoice
+        - payment_hash
+        - settlement_asset
+        - supported_assets
+        - available_assets
+        - passes
+    L402SubscriptionPass:
+      type: object
+      properties:
+        tier:
+          type: string
+          enum: [1-day, 30-day]
+        invoice:
+          type: string
+          description: Asset-specific settlement invoice for this subscription tier
+        payment_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        macaroon:
+          type: string
+          description: Signed first-party macaroon containing payment hash, tier, validity, exact amount, payment asset, and issuing provider caveats
+        valid_until:
+          type: integer
+          description: Unix timestamp in seconds after which this pass is invalid
+        price_sats:
+          type: integer
+          description: Dynamic price bound into this pass and its invoice
+        original_price_sats:
+          type: integer
+          description: Dynamic scarcity price before the presenting agent's tier discount
+        discount_sats:
+          type: integer
+        discount_percent:
+          type: number
+        agent_tier:
+          type: string
+          enum: [STANDARD, VIP, SWARM]
+        payment_asset:
+          $ref: "#/components/schemas/SettlementAsset"
+      required:
+        - tier
+        - invoice
+        - payment_hash
+        - macaroon
+        - valid_until
+        - price_sats
+        - original_price_sats
+        - discount_sats
+        - discount_percent
+        - agent_tier
+        - payment_asset
+    AgentReputationMetadata:
+      type: object
+      properties:
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        tier:
+          type: string
+          enum: [STANDARD, VIP, SWARM]
+        discount_percent:
+          type: number
+        rate_limit_multiplier:
+          type: number
+      required: [pubkey, tier, discount_percent, rate_limit_multiplier]
+    InvalidRangeError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: Invalid stratigraphy range
+        detail:
+          type: string
+      required:
+        - error
+        - detail
+    SettlementAssetSelectionError:
+      type: object
+      properties:
+        error:
+          type: string
+          enum:
+            - Unsupported settlement asset
+            - Conflicting settlement asset headers
+      required:
+        - error
+    PaymentChallengeRateLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: Too many payment invoices requested
+        code:
+          type: string
+          const: payment_challenge_rate_limited
+        retry_after:
+          type: integer
+          minimum: 1
+          description: Seconds until the client may request another payment invoice
+      required:
+        - error
+        - code
+        - retry_after
+    PaymentConfigurationError:
+      type: object
+      properties:
+        error:
+          type: string
+          enum:
+            - NWC_URI is not configured
+            - Requested settlement asset is not configured
+      required:
+        - error
+    PaymentChallengeServiceUnavailableError:
+      type: object
+      properties:
+        error:
+          type: string
+          const: Payment challenge service unavailable
+      required:
+        - error
+    WalletGatewayError:
+      type: object
+      properties:
+        error:
+          type: string
+          enum:
+            - Unable to create payment invoice
+            - Unable to verify payment
+      required:
+        - error
+

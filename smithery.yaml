@@ -1,0 +1,75 @@
+# Remote MCP connection metadata for the existing externally hosted server.
+# No Docker build, local start command, wallet secrets, or server changes needed.
+# Smithery currently registers remote servers by URL, not by deploying this YAML:
+# https://smithery.ai/docs/build/publish
+# smithery mcp publish "https://bitcoin-stratigraphy-dashboard.replit.app/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
+name: bitcoin-stratigraphy
+version: "1.1.0"
+displayName: Bitcoin Stratigraphy Notary
+description: |-
+  OpenTimestamps AI Notary Hub: 15 L402-gated tools (13 paid, 2 free sandbox tools), LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and Free Sandbox available through stratigraphy.list and proof.list.
+
+  Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.
+
+  Key Capabilities:
+  - L402 Micropayments & Macaroon Attenuations: Programmatic pay-per-query settlement in satoshis with zero API keys. Supports parent macaroon caveat scoping (proof.attenuate) with TTLs and rate controls.
+  - Multi-Asset Settlement Router: Native payment support across Base-layer Lightning (btc-lightning), Liquid Bitcoin (l-btc), Taproot Assets (taproot-assets), and Base USDC (x402).
+  - Groth16 ZK-SNARK & OTS Proof Verification: Execute cryptographic verification for supplied Groth16/Poseidon BN254 telemetry proofs, drift zk-SNARKs, and OpenTimestamps (OTS) Bitcoin block-header receipts.
+  - Agent Context State Grounding: Anchor autonomous agent prompt executions, CIDs, and dataset context hashes directly into signed Bitcoin-tip receipts (proof.ground).
+  - Autonomous P2P Mesh Network: Nostr-backed (NIP-01/78) peer topology broadcasting with automated quorum validation, cross-validation metrics, and node public-key provenance.
+  - Stratigraphy Strata Analytics: High-speed differential comparisons (stratigraphy.get_diff) and compressed record digests designed specifically for LLM context window efficiency.
+  - Real-Time SSE Streaming: Live Server-Sent Events (/api/v1/stratigraphy/stream) for continuous telemetry feeds.
+
+  Operational Boundaries:
+  - The three-asset L402 router serves supported REST surfaces; Liquid and Taproot Assets require configured providers. Check /api/v1/cost for supported versus currently available assets. Lightning is Bitcoin's payment-channel layer; Base USDC is a separate EVM x402 rail.
+  - MCP paid tools accept Lightning L402 and, only when configured, Base USDC x402. Query payment.get_info for current prices and advertised methods, not REST router availability. Wallet authorization and payment proofs are still required even though no API key is needed.
+  - MCP uses Streamable HTTP at /mcp. The paid REST SSE feed at /api/v1/stratigraphy/stream is separate, refreshes snapshots on a 30-second cadence, and supports the three configured L402 router assets, not a promised Base USDC SSE payment path. Historical strata remain indexed daily data, not native block provenance.
+  - Grounding receipts are off-chain, Schnorr-signed Bitcoin-tip attestations, not on-chain transactions, Groth16 proofs, or Bitcoin proof-of-work validity proofs. Groth16 verifies a defined statement bound to exact evidence; OTS verification requires an actual receipt and matching target digest, with Bitcoin attestation checked separately from calendar acceptance.
+  - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
+tags:
+  - bitcoin
+  - l402
+  - x402
+  - lightning
+  - base
+  - zk-snark
+  - groth16
+  - thermodynamic
+  - mcp
+  - streamable-http
+homepage: https://bitcoin-stratigraphy-dashboard.replit.app
+transport:
+  # MCP 2025-11-25 negotiated successfully at this public endpoint.
+  type: streamable-http
+  url: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+connection:
+  sdk: "@modelcontextprotocol/sdk"
+  clientTransportImport: "@modelcontextprotocol/sdk/client/streamableHttp.js"
+  clientTransportClass: StreamableHTTPClientTransport
+  url: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+  note: >-
+    No connection-time credentials are required for discovery. A wallet-enabled
+    client must handle HTTP 402 and retry with Authorization: L402
+    <macaroon>:<preimage> for paid tools; this file contains no wallet secrets.
+pricing:
+  freeDiscovery:
+    tools: [stratigraphy.list, proof.list]
+    priceSats: 0
+  microMeteredExecution:
+    targetPrice:
+      usdc: "0.001"
+      sats: 10
+      per: call
+    status: illustrative target, not the published charge
+  currentPublishedL402:
+    standardPaidCallSats: 250
+    proof.listSats: 0
+    notarizationCallSats: 250
+    notarizationBatchCalls: 100
+    notarizationBatchSats: 25000
+    note: Call payment.get_info for current MCP per-tool prices and availability; x402 depends on live configuration.
+configSchema:
+  type: object
+  additionalProperties: false
+  properties: {}
+exampleConfig: {}

@@ -1,0 +1,25 @@
+{
+  "name": "bitcoin-stratigraphy-mcp",
+  "mcpName": "crstrogish/bitcoin-stratigraphy",
+  "version": "1.1.0",
+  "description": "Standalone remote MCP distribution and native framework toolkits",
+  "license": "MIT",
+  "type": "module",
+  "private": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sandbox": "node examples/free-sandbox.mjs",
+    "verify": "node scripts/verify-export.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "l402",
+    "opentimestamps",
+    "langchain",
+    "llamaindex",
+    "bitcoin"
+  ]
+}

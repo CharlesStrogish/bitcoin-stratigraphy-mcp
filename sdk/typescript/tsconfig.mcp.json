@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "rootDir": ".",
+    "outDir": "dist/mcp"
+  },
+  "include": ["client.ts"]
+}

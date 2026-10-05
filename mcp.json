@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "bitcoin-stratigraphy": {
+      "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+    }
+  }
+}

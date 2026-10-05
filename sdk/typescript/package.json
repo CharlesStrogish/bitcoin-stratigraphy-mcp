@@ -1,0 +1,51 @@
+{
+  "name": "@bitcoin-stratigraphy/sdk",
+  "version": "0.1.0",
+  "description": "L402 client SDK for the Bitcoin Stratigraphy Node",
+  "license": "MIT",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/client.d.ts",
+      "import": "./dist/mcp/client.js",
+      "default": "./dist/mcp/client.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b && tsc -p tsconfig.mcp.json",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "test": "tsx --test client.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.mcp.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "tsx": "^4.23.4",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "bitcoin",
+    "l402",
+    "lightning",
+    "nwc",
+    "ai-agents"
+  ]
+}

@@ -1,0 +1,4 @@
+# Optional consumer dependencies, NOT the deployed API's Python dependencies.
+# langchain.mcp is a beta API introduced in LangChain 1.4.
+langchain[mcp]==1.4.3
+langchain-openai>=1,<2

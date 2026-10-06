@@ -475,9 +475,9 @@ def make_verify_arguments(evidence, schema):
     ci = evidence["circuit_input"]
     Draft202012Validator(schema).validate(ci)
     values = [int(value) for value in ci["public_inputs"]]
-    coordinates = ci["pi_a"] + ci["pi_c"] + [
-        value for pair in ci["pi_b"] for value in pair
-    ]
+    coordinates = (
+        ci["pi_a"] + ci["pi_c"] + [value for pair in ci["pi_b"] for value in pair]
+    )
     if any(value >= R for value in values):
         raise ValueError("Public signal outside scalar field")
     if any(int(value) >= Q for value in coordinates):
@@ -487,9 +487,13 @@ def make_verify_arguments(evidence, schema):
         raise ValueError("Public integer outside circuit range")
     proof = {key: ci[key] for key in ("pi_a", "pi_b", "pi_c")}
     proof.update(protocol="groth16", curve="bn128")
-    encoded = base64.urlsafe_b64encode(
-        json.dumps(proof, separators=(",", ":")).encode("utf-8")
-    ).decode("ascii").rstrip("=")
+    encoded = (
+        base64.urlsafe_b64encode(
+            json.dumps(proof, separators=(",", ":")).encode("utf-8")
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
     key_id = evidence["verification_key_id"]
     if not isinstance(key_id, str) or not key_id.startswith("sha256:"):
         raise ValueError("Invalid verification key identifier")
@@ -517,9 +521,11 @@ async def call_once(endpoint, name, arguments, authorization):
         timeout=httpx.Timeout(60.0, read=120.0),
         follow_redirects=False,
     ) as http_client:
-        async with streamable_http_client(
-            endpoint, http_client=http_client
-        ) as (read, write, _):
+        async with streamable_http_client(endpoint, http_client=http_client) as (
+            read,
+            write,
+            _,
+        ):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(name, arguments=arguments)
@@ -527,7 +533,9 @@ async def call_once(endpoint, name, arguments, authorization):
                     raise RuntimeError("MCP tool reported an error")
                 value = result.structuredContent
                 if value is None:
-                    texts = [item.text for item in result.content if item.type == "text"]
+                    texts = [
+                        item.text for item in result.content if item.type == "text"
+                    ]
                     if len(texts) != 1:
                         raise RuntimeError("Unexpected MCP response encoding")
                     value = json.loads(texts[0])
@@ -552,9 +560,16 @@ def verify_receipt_event(record, trusted_issuer):
     if type(event["created_at"]) is not int:
         raise ValueError("Invalid Nostr event timestamp")
     canonical_event = json.dumps(
-        [0, event["pubkey"], event["created_at"], event["kind"],
-         event["tags"], event["content"]],
-        separators=(",", ":"), ensure_ascii=False,
+        [
+            0,
+            event["pubkey"],
+            event["created_at"],
+            event["kind"],
+            event["tags"],
+            event["content"],
+        ],
+        separators=(",", ":"),
+        ensure_ascii=False,
     ).encode("utf-8")
     event_id = hashlib.sha256(canonical_event).digest()
     if event_id.hex() != event["id"]:
@@ -568,7 +583,12 @@ def verify_receipt_event(record, trusted_issuer):
 
 async def audit(args):
     parsed = urlparse(args.endpoint)
-    if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+    ):
         raise ValueError("Use an approved HTTPS MCP endpoint without URL credentials")
     if not re.fullmatch(r"[0-9a-f]{64}", args.issuer):
         raise ValueError("Issuer must be a lowercase 32-byte x-only public key")
@@ -583,7 +603,9 @@ async def audit(args):
     if verification.get("valid") is not True:
         raise ValueError("Groth16 proof did not verify for the supplied snapshot")
     record = await call_once(
-        args.endpoint, "proof.get_by_hash", {"hash": args.receipt_id},
+        args.endpoint,
+        "proof.get_by_hash",
+        {"hash": args.receipt_id},
         credentials["proof.get_by_hash"],
     )
     signed = verify_receipt_event(record, args.issuer)
@@ -610,8 +632,18 @@ async def audit(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Audit a proof and existing state receipt")
-    for name in ("endpoint", "schema", "evidence", "credentials", "receipt-id", "issuer", "output"):
+    parser = argparse.ArgumentParser(
+        description="Audit a proof and existing state receipt"
+    )
+    for name in (
+        "endpoint",
+        "schema",
+        "evidence",
+        "credentials",
+        "receipt-id",
+        "issuer",
+        "output",
+    ):
         parser.add_argument("--" + name, required=True)
     args = parser.parse_args()
     try:

@@ -57,3 +57,4 @@
 - [Stdlib trace coverage](stdlib-trace-coverage.md) — trace can exit successfully despite wrapped test failures; confirm plain unittest independently.
 - [Enterprise SDK compatibility](enterprise-sdk-compatibility.md) — preserve legacy module identity for patches; verify staged audit workers independently of the checkout.
 - [Dashboard visual standards](dashboard-visual-standards.md) — global dark default, mobile containment and authentic trust-badge claims.
+- [Enterprise swarm traffic](enterprise-swarm-traffic.md) — paid MCP and notarization serve legitimate high-frequency swarm batches; avoid blanket IP ceilings.

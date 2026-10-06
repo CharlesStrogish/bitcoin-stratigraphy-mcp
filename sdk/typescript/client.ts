@@ -8,9 +8,7 @@ export const DEFAULT_MCP_SERVER_URL =
   "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
 
 export type WalletPayment =
-  | string
-  | { preimage: string }
-  | { payment_preimage: string };
+  string | { preimage: string } | { payment_preimage: string };
 /** Return a 32-byte Lightning preimage, or a CoinOS internal-payment UUID for server-side verification. */
 export type WalletHandler = (invoice: string) => Promise<WalletPayment>;
 
@@ -47,9 +45,7 @@ export type StratigraphyClientOptions = {
 };
 
 export type MetricName =
-  | "target_multiplier"
-  | "difficulty_epoch_progress"
-  | "thermodynamic_signal";
+  "target_multiplier" | "difficulty_epoch_progress" | "thermodynamic_signal";
 export type TelemetryRecord = {
   day: number;
   title: string;
@@ -130,19 +126,19 @@ export type McpToolArguments = {
   "stratigraphy.range": McpToolArguments["stratigraphy.get_range"];
   "proof.verify":
     | {
-    proofType?: "groth16";
-    proof: string;
-    publicInputs: PublicInputs;
-    verificationKeyId: string;
-    data: Record<string, unknown> | Record<string, unknown>[];
-  }
+        proofType?: "groth16";
+        proof: string;
+        publicInputs: PublicInputs;
+        verificationKeyId: string;
+        data: Record<string, unknown> | Record<string, unknown>[];
+      }
     | { proofType: "ots"; otsProof: string; targetHash: string };
   "payment.get_info":
     | { action?: "query"; toolName?: string }
     | ({ action: "settle" } & (
-      | { paymentHash: string; preimage: string; txHash?: never }
-      | { paymentHash: string; txHash: string; preimage?: never }
-    ));
+        | { paymentHash: string; preimage: string; txHash?: never }
+        | { paymentHash: string; txHash: string; preimage?: never }
+      ));
   /** @deprecated Use payment.get_info. */
   "payment.info": McpToolArguments["payment.get_info"];
   "proof.get_status":
@@ -203,36 +199,50 @@ export type McpToolResponses = {
   "stratigraphy.diff": McpToolResponses["stratigraphy.get_diff"];
   /** @deprecated Use stratigraphy.get_range. */
   "stratigraphy.range": McpToolResponses["stratigraphy.get_range"];
-  "proof.verify": {
-    valid: boolean;
-    verifiedAt: string;
-    computationTimeMs: number;
-    error?: string;
-  } | {
-    valid: boolean;
-    status: "bitcoin_block_attested" | "unverified";
-    blockHeight: number | null;
-    bitcoinHeaderHash: string | null;
-  };
-  "payment.get_info": {
-    standardInvoiceSats: number;
-    perToolSats: Record<string, number>;
-    acceptedPaymentMethods: string[];
-    invoiceExpirySeconds: number;
-    challenge: { httpStatus: number; header: string; fields: string[] };
-    activeAuthSchemes: string[];
-    x402?: { network: string; scheme: string; asset: string; amount: string; payTo: string };
-    macaroonRequirements: { authorizationHeader: string; scope: string; maxRequests: number };
-  } | {
-    verified: boolean;
-    /** Non-transferable claims, not a new bearer credential. */
-    settlementToken: {
-      scheme: "L402" | "x402";
-      paymentHash: string;
-      scope: string;
-      settledAt: string;
-    } | null;
-  };
+  "proof.verify":
+    | {
+        valid: boolean;
+        verifiedAt: string;
+        computationTimeMs: number;
+        error?: string;
+      }
+    | {
+        valid: boolean;
+        status: "bitcoin_block_attested" | "unverified";
+        blockHeight: number | null;
+        bitcoinHeaderHash: string | null;
+      };
+  "payment.get_info":
+    | {
+        standardInvoiceSats: number;
+        perToolSats: Record<string, number>;
+        acceptedPaymentMethods: string[];
+        invoiceExpirySeconds: number;
+        challenge: { httpStatus: number; header: string; fields: string[] };
+        activeAuthSchemes: string[];
+        x402?: {
+          network: string;
+          scheme: string;
+          asset: string;
+          amount: string;
+          payTo: string;
+        };
+        macaroonRequirements: {
+          authorizationHeader: string;
+          scope: string;
+          maxRequests: number;
+        };
+      }
+    | {
+        verified: boolean;
+        /** Non-transferable claims, not a new bearer credential. */
+        settlementToken: {
+          scheme: "L402" | "x402";
+          paymentHash: string;
+          scope: string;
+          settledAt: string;
+        } | null;
+      };
   /** @deprecated Use payment.get_info. */
   "payment.info": McpToolResponses["payment.get_info"];
   "proof.get_status": {
@@ -347,7 +357,8 @@ export class BitcoinStratigraphyClient {
 
   async listTools(): Promise<McpListedTool[]> {
     const result = await this.request<{ tools: McpListedTool[] }>("tools/list");
-    if (!Array.isArray(result.tools)) throw new Error("Invalid MCP tools/list response");
+    if (!Array.isArray(result.tools))
+      throw new Error("Invalid MCP tools/list response");
     return result.tools;
   }
 
@@ -367,9 +378,15 @@ export class BitcoinStratigraphyClient {
       content?: Array<{ type: string; text?: string }>;
     }>("tools/call", { name, arguments: args ?? {} });
     if (result.isError) {
-      throw new Error(result.content?.find((item) => item.type === "text")?.text ?? `${name} failed`);
+      throw new Error(
+        result.content?.find((item) => item.type === "text")?.text ??
+          `${name} failed`,
+      );
     }
-    if (!result.structuredContent || typeof result.structuredContent !== "object") {
+    if (
+      !result.structuredContent ||
+      typeof result.structuredContent !== "object"
+    ) {
       throw new Error(`Missing structuredContent from ${name}`);
     }
     return result.structuredContent;
@@ -378,8 +395,12 @@ export class BitcoinStratigraphyClient {
   getTelemetry(args: McpToolArguments["stratigraphy.get"] = {}) {
     return this.callTool("stratigraphy.get", args);
   }
-  listStratigraphy() { return this.callTool("stratigraphy.list", {}); }
-  getStratigraphyDigest(args: McpToolArguments["stratigraphy.get_digest"] = {}) {
+  listStratigraphy() {
+    return this.callTool("stratigraphy.list", {});
+  }
+  getStratigraphyDigest(
+    args: McpToolArguments["stratigraphy.get_digest"] = {},
+  ) {
     return this.callTool("stratigraphy.get_digest", args);
   }
   getStratigraphyDiff(args: McpToolArguments["stratigraphy.get_diff"]) {
@@ -397,7 +418,11 @@ export class BitcoinStratigraphyClient {
   getPaymentInfo(args: { toolName?: string } = {}) {
     return this.callTool("payment.get_info", args);
   }
-  settlePayment(args: { paymentHash: string; preimage: string; txHash?: never } | { paymentHash: string; txHash: string; preimage?: never }) {
+  settlePayment(
+    args:
+      | { paymentHash: string; preimage: string; txHash?: never }
+      | { paymentHash: string; txHash: string; preimage?: never },
+  ) {
     return this.callTool("payment.get_info", { action: "settle", ...args });
   }
   getProofStatus(args: McpToolArguments["proof.get_status"]) {
@@ -415,7 +440,9 @@ export class BitcoinStratigraphyClient {
   groundProof(args: McpToolArguments["proof.ground"]) {
     return this.callTool("proof.ground", args);
   }
-  getMeshStatus() { return this.callTool("mesh.get_status", {}); }
+  getMeshStatus() {
+    return this.callTool("mesh.get_status", {});
+  }
   broadcastMeshSignal(date: string) {
     return this.callTool("mesh.broadcast", {
       signalType: "telemetry_snapshot",
@@ -423,9 +450,17 @@ export class BitcoinStratigraphyClient {
     });
   }
 
-  protected async request<T>(method: string, params?: Record<string, unknown>): Promise<T> {
+  protected async request<T>(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<T> {
     const id = ++this.nextId;
-    const body = JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) });
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id,
+      method,
+      ...(params ? { params } : {}),
+    });
     const send = (authorization?: string) =>
       this.fetcher(this.serverUrl, {
         method: "POST",
@@ -452,24 +487,40 @@ export class BitcoinStratigraphyClient {
     send: (authorization?: string) => Promise<Response>,
   ): Promise<Response> {
     const challenge = await parseChallenge(response);
-    if (!this.wallet) throw new Error(`L402 payment required for ${method}; provide a wallet callback`);
+    if (!this.wallet)
+      throw new Error(
+        `L402 payment required for ${method}; provide a wallet callback`,
+      );
     const paid = await this.wallet(challenge.invoice);
-    const preimage = typeof paid === "string"
-      ? paid
-      : "preimage" in paid ? paid.preimage : paid.payment_preimage;
+    const preimage =
+      typeof paid === "string"
+        ? paid
+        : "preimage" in paid
+          ? paid.preimage
+          : paid.payment_preimage;
     if (/^[0-9a-fA-F]{64}$/.test(preimage)) {
-      const bytes = Uint8Array.from(preimage.match(/.{2}/g)!, (hex) => Number.parseInt(hex, 16));
+      const bytes = Uint8Array.from(preimage.match(/.{2}/g)!, (hex) =>
+        Number.parseInt(hex, 16),
+      );
       const digest = await crypto.subtle.digest("SHA-256", bytes);
       const hash = Array.from(new Uint8Array(digest), (byte) =>
-        byte.toString(16).padStart(2, "0")).join("");
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
       if (hash !== challenge.payment_hash.toLowerCase()) {
         throw new Error("Wallet preimage does not match the L402 payment hash");
       }
-    } else if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(preimage)) {
-      throw new Error("Wallet did not return a 32-byte hex payment preimage or CoinOS payment reference");
+    } else if (
+      !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(preimage)
+    ) {
+      throw new Error(
+        "Wallet did not return a 32-byte hex payment preimage or CoinOS payment reference",
+      );
     }
-    response = await send(`L402 ${challenge.macaroon}:${preimage.toLowerCase()}`);
-    if (response.status === 402) throw new Error("L402 payment was rejected; not paying again");
+    response = await send(
+      `L402 ${challenge.macaroon}:${preimage.toLowerCase()}`,
+    );
+    if (response.status === 402)
+      throw new Error("L402 payment was rejected; not paying again");
     return response;
   }
 }
@@ -491,11 +542,14 @@ export class StratigraphyClient extends BitcoinStratigraphyClient {
     this.x402Wallet = options.x402Wallet;
     if (options.maxPaymentMicroUsdc !== undefined) {
       const cap = String(options.maxPaymentMicroUsdc);
-      if (!/^\d+$/.test(cap)) throw new Error("maxPaymentMicroUsdc must be a non-negative integer");
+      if (!/^\d+$/.test(cap))
+        throw new Error("maxPaymentMicroUsdc must be a non-negative integer");
       this.maxPaymentMicroUsdc = BigInt(cap);
     }
     if (this.x402Wallet && this.maxPaymentMicroUsdc === undefined) {
-      throw new Error("maxPaymentMicroUsdc is required when an x402 wallet is configured");
+      throw new Error(
+        "maxPaymentMicroUsdc is required when an x402 wallet is configured",
+      );
     }
   }
 
@@ -504,7 +558,12 @@ export class StratigraphyClient extends BitcoinStratigraphyClient {
     params?: Record<string, unknown>,
   ): Promise<T> {
     const id = ++this.nextStratigraphyId;
-    const body = JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) });
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id,
+      method,
+      ...(params ? { params } : {}),
+    });
     const send = (paymentSignature?: string) =>
       this.fetcher(this.serverUrl, {
         method: "POST",
@@ -512,7 +571,9 @@ export class StratigraphyClient extends BitcoinStratigraphyClient {
           "Content-Type": "application/json",
           Accept: "application/json, text/event-stream",
           "MCP-Protocol-Version": "2025-03-26",
-          ...(paymentSignature ? { "PAYMENT-SIGNATURE": paymentSignature } : {}),
+          ...(paymentSignature
+            ? { "PAYMENT-SIGNATURE": paymentSignature }
+            : {}),
         },
         body,
         redirect: "error",
@@ -522,11 +583,16 @@ export class StratigraphyClient extends BitcoinStratigraphyClient {
     if (response.status === 402) {
       const requiredHeader = response.headers.get("PAYMENT-REQUIRED");
       if (requiredHeader !== null && this.x402Wallet) {
-        const terms = parseX402Requirements(requiredHeader, this.serverUrl, this.maxPaymentMicroUsdc);
+        const terms = parseX402Requirements(
+          requiredHeader,
+          this.serverUrl,
+          this.maxPaymentMicroUsdc,
+        );
         const signature = await this.x402Wallet(terms);
         validateX402Signature(signature, terms);
         response = await send(signature);
-        if (response.status === 402) throw new Error("x402 payment was rejected; not paying again");
+        if (response.status === 402)
+          throw new Error("x402 payment was rejected; not paying again");
       } else if (this.wallet) {
         response = await this.retryL402(response, method, (authorization) => {
           // Use the standard Authorization header for the backward-compatible L402 retry.
@@ -583,13 +649,17 @@ function parseX402Requirements(
   } catch {
     throw new Error("Invalid x402 resource URL");
   }
-  if (resourceUrl !== serverUrl) throw new Error("x402 resource URL does not match the MCP server URL");
+  if (resourceUrl !== serverUrl)
+    throw new Error("x402 resource URL does not match the MCP server URL");
   const accepted = value.accepts.find((candidate) => {
     if (!candidate || typeof candidate !== "object") return false;
     const item = candidate as Record<string, unknown>;
     return item.scheme === "exact" && item.network === "eip155:8453";
   }) as Record<string, unknown> | undefined;
-  if (!accepted) throw new Error("x402 challenge does not offer exact payments on eip155:8453");
+  if (!accepted)
+    throw new Error(
+      "x402 challenge does not offer exact payments on eip155:8453",
+    );
   if (
     typeof accepted.asset !== "string" ||
     accepted.asset.toLowerCase() !== BASE_USDC_ADDRESS
@@ -607,9 +677,12 @@ function parseX402Requirements(
     throw new Error("x402 challenge amount must be integer micro-USDC");
   }
   const amount = BigInt(accepted.amount);
-  if (amount === 0n) throw new Error("x402 challenge must require a non-zero payment");
+  if (amount === 0n)
+    throw new Error("x402 challenge must require a non-zero payment");
   if (maxAmount === undefined || amount > maxAmount) {
-    throw new Error("x402 challenge exceeds the configured maximum micro-USDC amount");
+    throw new Error(
+      "x402 challenge exceeds the configured maximum micro-USDC amount",
+    );
   }
   if (
     !Number.isSafeInteger(accepted.maxTimeoutSeconds) ||
@@ -621,7 +694,11 @@ function parseX402Requirements(
     throw new Error("x402 challenge is missing token payment metadata");
   }
   const extra = accepted.extra as Record<string, unknown>;
-  if (extra.paymentFlow !== "upfront" || extra.name !== "USD Coin" || extra.version !== "2") {
+  if (
+    extra.paymentFlow !== "upfront" ||
+    extra.name !== "USD Coin" ||
+    extra.version !== "2"
+  ) {
     throw new Error("x402 challenge has unsupported USDC payment metadata");
   }
   if (extra.settlementAvailable === false) {
@@ -645,12 +722,17 @@ function parseX402Requirements(
   };
 }
 
-function validateX402Signature(signature: string, terms: X402PaymentTerms): void {
+function validateX402Signature(
+  signature: string,
+  terms: X402PaymentTerms,
+): void {
   let payload: unknown;
   try {
     payload = JSON.parse(decodeBase64(signature));
   } catch {
-    throw new Error("Agent signer must return a base64 PAYMENT-SIGNATURE x402 payload");
+    throw new Error(
+      "Agent signer must return a base64 PAYMENT-SIGNATURE x402 payload",
+    );
   }
   if (!payload || typeof payload !== "object") {
     throw new Error("Invalid x402 PAYMENT-SIGNATURE payload");
@@ -668,7 +750,9 @@ function validateX402Signature(signature: string, terms: X402PaymentTerms): void
     throw new Error("Agent signer returned a mismatched x402 v2 version");
   }
   if (!jsonValuesEqual(envelope.accepted, terms.accepted)) {
-    throw new Error("Agent signer accepted terms do not match the x402 challenge");
+    throw new Error(
+      "Agent signer accepted terms do not match the x402 challenge",
+    );
   }
   if (
     !envelope.resource ||
@@ -678,18 +762,26 @@ function validateX402Signature(signature: string, terms: X402PaymentTerms): void
     throw new Error("Agent signer resource does not match the x402 challenge");
   }
   const payment = envelope.payload;
-  if (typeof payment?.signature !== "string" || payment.signature.length === 0) {
-    throw new Error("Agent signer returned an x402 payload without a signature");
+  if (
+    typeof payment?.signature !== "string" ||
+    payment.signature.length === 0
+  ) {
+    throw new Error(
+      "Agent signer returned an x402 payload without a signature",
+    );
   }
   const authorization = payment.authorization;
   if (
     !authorization ||
     typeof authorization.to !== "string" ||
     authorization.to.toLowerCase() !== terms.accepted.payTo.toLowerCase() ||
-    (typeof authorization.value !== "string" && typeof authorization.value !== "number") ||
+    (typeof authorization.value !== "string" &&
+      typeof authorization.value !== "number") ||
     String(authorization.value) !== terms.accepted.amount
   ) {
-    throw new Error("Agent signer payment authorization does not match accepted x402 terms");
+    throw new Error(
+      "Agent signer payment authorization does not match accepted x402 terms",
+    );
   }
 }
 
@@ -698,8 +790,10 @@ function jsonValuesEqual(left: unknown, right: unknown): boolean {
     if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
     if (value && typeof value === "object") {
       const record = value as Record<string, unknown>;
-      return `{${Object.keys(record).sort().map((key) =>
-        `${JSON.stringify(key)}:${stable(record[key])}`).join(",")}}`;
+      return `{${Object.keys(record)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${stable(record[key])}`)
+        .join(",")}}`;
     }
     return JSON.stringify(value);
   };
@@ -711,26 +805,33 @@ function decodeBase64(value: string): string {
     throw new Error("Invalid base64");
   }
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
   return atob(padded);
 }
 
 async function parseRpcResponse<T>(response: Response, id: number): Promise<T> {
-  if (!response.ok) throw new Error(`MCP HTTP ${response.status}: ${await response.text()}`);
-  const envelope = await response.json() as RpcResponse<T>;
+  if (!response.ok)
+    throw new Error(`MCP HTTP ${response.status}: ${await response.text()}`);
+  const envelope = (await response.json()) as RpcResponse<T>;
   if (envelope.jsonrpc !== "2.0" || envelope.id !== id) {
     throw new Error("Invalid MCP JSON-RPC response");
   }
-  if (envelope.error) throw new Error(`MCP ${envelope.error.code}: ${envelope.error.message}`);
-  if (envelope.result === undefined) throw new Error("MCP response has no result");
+  if (envelope.error)
+    throw new Error(`MCP ${envelope.error.code}: ${envelope.error.message}`);
+  if (envelope.result === undefined)
+    throw new Error("MCP response has no result");
   return envelope.result;
 }
 
 async function parseChallenge(response: Response): Promise<Challenge> {
   const header = response.headers.get("WWW-Authenticate") ?? "";
-  const match = /^L402\s+macaroon="([^"\r\n]+)",\s*invoice="([^"\r\n]+)"$/i.exec(header);
-  if (!match) throw new Error("HTTP 402 did not include an L402 WWW-Authenticate challenge");
-  const body = await response.json() as Partial<Challenge>;
+  const match =
+    /^L402\s+macaroon="([^"\r\n]+)",\s*invoice="([^"\r\n]+)"$/i.exec(header);
+  if (!match)
+    throw new Error(
+      "HTTP 402 did not include an L402 WWW-Authenticate challenge",
+    );
+  const body = (await response.json()) as Partial<Challenge>;
   if (
     body.macaroon !== match[1] ||
     body.invoice !== match[2] ||

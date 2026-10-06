@@ -63,6 +63,18 @@ export default defineConfig(({ command }) => {
     build: {
       outDir: path.resolve(import.meta.dirname, "dist/public"),
       emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("/node_modules/")) return;
+            if (/\/(recharts|d3-[^/]+|victory-vendor)\//.test(id))
+              return "charts";
+            if (/\/(@radix-ui|lucide-react)\//.test(id)) return "ui";
+            if (/\/(react|react-dom|scheduler)\//.test(id)) return "react";
+            return;
+          },
+        },
+      },
     },
     server: {
       port,

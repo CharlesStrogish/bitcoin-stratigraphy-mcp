@@ -7,6 +7,8 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && node scripts/build-workspace.mjs",
     "release:check": "node scripts/check-published-assets.mjs",
+    "format:check": "node scripts/check-format.mjs",
+    "lint:python": "uv run --no-sync ruff check",
     "test": "node --test test/*.test.mjs && pnpm -r --if-present run test",
     "test:e2e": "tsx scripts/test-e2e-master.ts",
     "test:l402": "pnpm exec tsx scripts/test-l402.ts",

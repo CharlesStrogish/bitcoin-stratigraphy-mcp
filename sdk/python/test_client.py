@@ -16,10 +16,14 @@ HASH = hashlib.sha256(bytes.fromhex(PREIMAGE)).hexdigest()
 MACAROON = "bound-macaroon"
 INVOICE = "lnbc123test"
 HEADER = f'L402 macaroon="{MACAROON}", invoice="{INVOICE}"'
-CHALLENGE = json.dumps({
-    "macaroon": MACAROON, "invoice": INVOICE,
-    "payment_hash": HASH, "amount_sats": 250,
-}).encode()
+CHALLENGE = json.dumps(
+    {
+        "macaroon": MACAROON,
+        "invoice": INVOICE,
+        "payment_hash": HASH,
+        "amount_sats": 250,
+    }
+).encode()
 
 
 class ClientTests(unittest.TestCase):
@@ -36,10 +40,13 @@ class ClientTests(unittest.TestCase):
                     data = CHALLENGE
                 else:
                     self.send_response(200)
-                    data = json.dumps({
-                        "jsonrpc": "2.0", "id": 1,
-                        "result": {"structuredContent": {"records": []}},
-                    }).encode()
+                    data = json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "result": {"structuredContent": {"records": []}},
+                        }
+                    ).encode()
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
@@ -55,7 +62,9 @@ class ClientTests(unittest.TestCase):
         try:
             client = BitcoinStratigraphyClient(
                 f"http://127.0.0.1:{server.server_port}/mcp",
-                wallet=lambda invoice: payments.append(invoice) or {"preimage": PREIMAGE},
+                wallet=lambda invoice: (
+                    payments.append(invoice) or {"preimage": PREIMAGE}
+                ),
             )
             self.assertEqual(client.get_telemetry(days=1), {"records": []})
         finally:
@@ -84,7 +93,9 @@ class ClientTests(unittest.TestCase):
 
     def test_missing_header_is_rejected_before_wallet_payment(self):
         payments = []
-        client = BitcoinStratigraphyClient(wallet=lambda invoice: payments.append(invoice) or PREIMAGE)
+        client = BitcoinStratigraphyClient(
+            wallet=lambda invoice: payments.append(invoice) or PREIMAGE
+        )
         client._send = lambda _data, authorization=None: (402, {}, CHALLENGE)
         with self.assertRaisesRegex(ValueError, "WWW-Authenticate"):
             client.get_telemetry()
@@ -92,9 +103,13 @@ class ClientTests(unittest.TestCase):
 
     def test_second_402_does_not_trigger_second_payment(self):
         payments = []
-        client = BitcoinStratigraphyClient(wallet=lambda invoice: payments.append(invoice) or PREIMAGE)
+        client = BitcoinStratigraphyClient(
+            wallet=lambda invoice: payments.append(invoice) or PREIMAGE
+        )
         client._send = lambda _data, authorization=None: (
-            402, {"WWW-Authenticate": HEADER}, CHALLENGE
+            402,
+            {"WWW-Authenticate": HEADER},
+            CHALLENGE,
         )
         with self.assertRaisesRegex(RuntimeError, "not paying again"):
             client.list_stratigraphy()
@@ -116,33 +131,57 @@ class ClientTests(unittest.TestCase):
         )
         client.get_mesh_status()
         client.broadcast_mesh_signal("2026-09-09")
-        self.assertEqual([name for name, _ in seen], [
-            "stratigraphy.get", "stratigraphy.list", "proof.verify",
-            "proof.get_status", "proof.list", "proof.submit", "proof.ground",
-            "proof.issue_receipt", "mesh.get_status", "mesh.broadcast",
-        ])
-        self.assertEqual(seen[7][1], {
-            "cid": "bafy-example", "nostrEventId": "ab" * 32,
-            "context": {"source": "test"},
-        })
-        self.assertEqual(seen[-1][1], {
-            "signalType": "telemetry_snapshot", "payload": {"date": "2026-09-09"},
-        })
+        self.assertEqual(
+            [name for name, _ in seen],
+            [
+                "stratigraphy.get",
+                "stratigraphy.list",
+                "proof.verify",
+                "proof.get_status",
+                "proof.list",
+                "proof.submit",
+                "proof.ground",
+                "proof.issue_receipt",
+                "mesh.get_status",
+                "mesh.broadcast",
+            ],
+        )
+        self.assertEqual(
+            seen[7][1],
+            {
+                "cid": "bafy-example",
+                "nostrEventId": "ab" * 32,
+                "context": {"source": "test"},
+            },
+        )
+        self.assertEqual(
+            seen[-1][1],
+            {
+                "signalType": "telemetry_snapshot",
+                "payload": {"date": "2026-09-09"},
+            },
+        )
 
     def test_proof_status_accepts_receipt_hash_as_a_selector(self):
         seen = []
         client = BitcoinStratigraphyClient()
-        client.call_tool = lambda name, arguments: seen.append((name, arguments)) or {
-            "status": "verified",
-        }
+        client.call_tool = lambda name, arguments: (
+            seen.append((name, arguments))
+            or {
+                "status": "verified",
+            }
+        )
 
         self.assertEqual(
             client.get_proof_status(receipt_hash="cd" * 32),
             {"status": "verified"},
         )
-        self.assertEqual(seen, [
-            ("proof.get_status", {"receiptHash": "cd" * 32}),
-        ])
+        self.assertEqual(
+            seen,
+            [
+                ("proof.get_status", {"receiptHash": "cd" * 32}),
+            ],
+        )
 
 
 if __name__ == "__main__":

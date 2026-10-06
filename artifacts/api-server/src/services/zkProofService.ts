@@ -82,7 +82,12 @@ const proofArchive = new Map<string, ArchivedZkProof>();
 const proofHashByJobId = new Map<string, string>();
 const MAX_PROOF_ARCHIVE_ENTRIES = 128;
 
-function indexZkProofPayload(hash: string, proofPayload: Record<string, unknown>, timestamp: string, jobId?: string): void {
+function indexZkProofPayload(
+  hash: string,
+  proofPayload: Record<string, unknown>,
+  timestamp: string,
+  jobId?: string,
+): void {
   // The HTTP JSON limit and snapshot verifier cap payloads; bound retained process memory too.
   if (Buffer.byteLength(JSON.stringify(proofPayload)) > 2_097_152) {
     throw new RangeError("Proof payload exceeds archive limit");
@@ -108,12 +113,17 @@ function indexZkProofPayload(hash: string, proofPayload: Record<string, unknown>
 }
 
 export function getZkProofRecord(hash: string): ArchivedZkProof | undefined {
-  const normalized = proofHashByJobId.get(hash.toLowerCase()) ??
+  const normalized =
+    proofHashByJobId.get(hash.toLowerCase()) ??
     `0x${hash.replace(/^0x/i, "").toLowerCase()}`;
   const archived = proofArchive.get(normalized);
   if (!archived) return undefined;
   const status = getZkProofStatus(normalized)?.status ?? archived.status;
-  return { ...archived, status, proofPayload: structuredClone(archived.proofPayload) };
+  return {
+    ...archived,
+    status,
+    proofPayload: structuredClone(archived.proofPayload),
+  };
 }
 const generatedProofCache = new Map<string, Promise<ZkProofPayload>>();
 const MAX_GENERATED_PROOF_CACHE_ENTRIES = 256;
@@ -171,7 +181,9 @@ function cacheProofStatus(
     proofStatusByIdentifier.set(identifier, status);
   }
   while (proofStatusByIdentifier.size > MAX_PROOF_STATUS_ENTRIES) {
-    proofStatusByIdentifier.delete(proofStatusByIdentifier.keys().next().value!);
+    proofStatusByIdentifier.delete(
+      proofStatusByIdentifier.keys().next().value!,
+    );
   }
 }
 
@@ -201,7 +213,9 @@ export function listZkProofAttestations(input: {
   status?: ZkProofLifecycleStatus["status"];
 }): { attestations: ZkProofAttestationRecord[]; total: number } {
   const matching = [...proofAttestationsByHash.values()]
-    .filter((record) => input.status === undefined || record.status === input.status)
+    .filter(
+      (record) => input.status === undefined || record.status === input.status,
+    )
     .reverse();
   return {
     attestations: matching
@@ -268,7 +282,7 @@ export async function submitZkProof(input: {
   const valid =
     input.publicSignals.length === 5 &&
     (input.snapshotDigest === undefined || input.snapshotDigest === snapshot) &&
-    await verifyZkProof(payload);
+    (await verifyZkProof(payload));
   let attestationStatus = "not_broadcast_invalid_proof";
   let attestationCount = 0;
   if (valid) {
@@ -292,11 +306,16 @@ export async function submitZkProof(input: {
     submittedAt,
     attestationCount,
   });
-  indexZkProofPayload(fingerprint, {
-    proof: input.proof,
-    publicSignals: input.publicSignals,
-    ...(input.snapshotDigest ? { snapshotDigest: input.snapshotDigest } : {}),
-  }, submittedAt, jobId);
+  indexZkProofPayload(
+    fingerprint,
+    {
+      proof: input.proof,
+      publicSignals: input.publicSignals,
+      ...(input.snapshotDigest ? { snapshotDigest: input.snapshotDigest } : {}),
+    },
+    submittedAt,
+    jobId,
+  );
   return {
     proofHash: fingerprint,
     jobId,
@@ -317,8 +336,10 @@ function canonicalize(value: unknown): string {
 }
 
 function sha256Field(value: string): bigint {
-  return BigInt(`0x${createHash("sha256").update(value).digest("hex")}`) %
-    FIELD_MODULUS;
+  return (
+    BigInt(`0x${createHash("sha256").update(value).digest("hex")}`) %
+    FIELD_MODULUS
+  );
 }
 
 export function zkSnapshotDigest(snapshot: unknown): string {
@@ -342,7 +363,8 @@ function base64UrlDecode(value: string): string | undefined {
     return undefined;
   }
   try {
-    const padded = value.replaceAll("-", "+").replaceAll("_", "/") +
+    const padded =
+      value.replaceAll("-", "+").replaceAll("_", "/") +
       "=".repeat((4 - (value.length % 4)) % 4);
     return Buffer.from(padded, "base64").toString("utf8");
   } catch {
@@ -392,9 +414,7 @@ function validGroth16Proof(value: unknown): value is Groth16Proof {
     proof.pi_b.length === 3 &&
     proof.pi_b.every(
       (pair) =>
-        Array.isArray(pair) &&
-        pair.length === 2 &&
-        pair.every(validCoordinate),
+        Array.isArray(pair) && pair.length === 2 && pair.every(validCoordinate),
     ) &&
     Array.isArray(proof.pi_c) &&
     proof.pi_c.length === 3 &&
@@ -414,18 +434,16 @@ async function prove(
   }
   lane.queued += 1;
   const run = lane.tail.then(() =>
-    groth16.fullProve(
-      witness,
-      wasmPath,
-      zkeyPath,
-      undefined,
-      undefined,
-      { singleThread: true },
-    )
+    groth16.fullProve(witness, wasmPath, zkeyPath, undefined, undefined, {
+      singleThread: true,
+    }),
   );
-  lane.tail = run.then(() => undefined, () => undefined);
+  lane.tail = run.then(
+    () => undefined,
+    () => undefined,
+  );
   try {
-    return await run as { proof: Groth16Proof };
+    return (await run) as { proof: Groth16Proof };
   } finally {
     lane.queued -= 1;
   }
@@ -452,7 +470,10 @@ async function verifyCryptographically(
       }
     }
   });
-  verifierTail = run.then(() => undefined, () => undefined);
+  verifierTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
   try {
     return await run;
   } finally {
@@ -477,8 +498,10 @@ async function verificationKey(): Promise<unknown> {
 }
 
 async function verificationKeyId(): Promise<string> {
-  verificationKeyIdPromise ??= readFile(verificationKeyUrl)
-    .then((raw) => `zk-telemetry-v1-${createHash("sha256").update(raw).digest("hex")}`);
+  verificationKeyIdPromise ??= readFile(verificationKeyUrl).then(
+    (raw) =>
+      `zk-telemetry-v1-${createHash("sha256").update(raw).digest("hex")}`,
+  );
   return verificationKeyIdPromise;
 }
 
@@ -502,7 +525,9 @@ async function generateZkProofUncached(input: {
   ) {
     throw new Error("Invalid zk telemetry proof inputs");
   }
-  const valuationMultiplierMicros = Math.round(input.valuationMultiplier * 1_000_000);
+  const valuationMultiplierMicros = Math.round(
+    input.valuationMultiplier * 1_000_000,
+  );
   const valuationSat = valuationMultiplierMicros * 100;
   const snapshotDigest = BigInt(zkSnapshotDigest(input.snapshot));
   const thermodynamicHash = poseidon5([
@@ -689,22 +714,20 @@ function semanticInputsMatch(
     if (snapshot.length === 0 || publicInputs.blockHeight !== 0) return false;
     const last = snapshot.at(-1) as Record<string, unknown> | undefined;
     const quantitative = last?.quantitative_alpha as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     if (
       publicInputs.valuationSat !==
-        multiplierToValuation(quantitative?.target_multiplier)
+      multiplierToValuation(quantitative?.target_multiplier)
     ) {
       return false;
     }
     const attestationTimes = snapshot.map((entry) => {
       if (!entry || typeof entry !== "object") return false;
       const attestation = (entry as Record<string, unknown>).attestation as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       const event = attestation?.event as Record<string, unknown> | undefined;
       return typeof event?.created_at === "number" &&
-          Number.isSafeInteger(event.created_at)
+        Number.isSafeInteger(event.created_at)
         ? event.created_at
         : false;
     });
@@ -731,8 +754,7 @@ function semanticInputsMatch(
       : 0;
   if (publicInputs.blockHeight !== expectedHeight) return false;
   const thermodynamic = record.thermodynamic as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
   return (
     publicInputs.valuationSat ===
     multiplierToValuation(thermodynamic?.target_multiplier)
@@ -750,27 +772,24 @@ export async function verifyZkProofForSnapshot(
   const proof = typeof candidate.proof === "string" ? candidate.proof : "";
   const fingerprint = proofHash(proof);
   const submittedAt = new Date().toISOString();
-  const identifiers = [
-    snapshotDigest,
-    fingerprint,
-  ];
+  const identifiers = [snapshotDigest, fingerprint];
   const wasPreviouslyVerified = identifiers.some((identifier) => {
     const prior = proofStatusByIdentifier.get(identifier);
     return prior?.status === "verified" || prior?.status === "cached";
   });
   const attestationCount = Array.isArray(snapshot)
     ? snapshot.filter((entry) =>
-      Boolean(
-        entry &&
+        Boolean(
+          entry &&
           typeof entry === "object" &&
           (entry as Record<string, unknown>).attestation,
-      )
-    ).length
+        ),
+      ).length
     : snapshot &&
         typeof snapshot === "object" &&
         (snapshot as Record<string, unknown>).attestation
-    ? 1
-    : 0;
+      ? 1
+      : 0;
   cacheProofStatus(identifiers, {
     status: "pending",
     verifiedAt: submittedAt,
@@ -785,7 +804,9 @@ export async function verifyZkProofForSnapshot(
   });
   const finish = (valid: boolean): boolean => {
     const status = valid
-      ? (wasPreviouslyVerified ? "cached" : "verified")
+      ? wasPreviouslyVerified
+        ? "cached"
+        : "verified"
       : "invalid";
     cacheProofStatus(identifiers, {
       status,
@@ -799,18 +820,20 @@ export async function verifyZkProofForSnapshot(
       submittedAt,
       attestationCount,
     });
-    indexZkProofPayload(fingerprint, {
-      proof: candidate.proof,
-      publicInputs: candidate.publicInputs,
-      verificationKeyId: candidate.verificationKeyId,
-      data: snapshot,
-    }, submittedAt);
+    indexZkProofPayload(
+      fingerprint,
+      {
+        proof: candidate.proof,
+        publicInputs: candidate.publicInputs,
+        verificationKeyId: candidate.verificationKeyId,
+        data: snapshot,
+      },
+      submittedAt,
+    );
     return valid;
   };
   try {
-    if (
-      zkSnapshotDigest(snapshot) !== snapshotDigest
-    ) {
+    if (zkSnapshotDigest(snapshot) !== snapshotDigest) {
       return finish(false);
     }
     if (!semanticInputsMatch(candidate.publicInputs, snapshot)) {
@@ -825,9 +848,9 @@ export async function verifyZkProofForSnapshot(
 export function isZkProofPayload(value: unknown): value is ZkProofPayload {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      typeof (value as ZkProofPayload).proof === "string" &&
-      validPublicInputs((value as ZkProofPayload).publicInputs) &&
-      typeof (value as ZkProofPayload).verificationKeyId === "string",
+    typeof value === "object" &&
+    typeof (value as ZkProofPayload).proof === "string" &&
+    validPublicInputs((value as ZkProofPayload).publicInputs) &&
+    typeof (value as ZkProofPayload).verificationKeyId === "string",
   );
 }

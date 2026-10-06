@@ -268,9 +268,8 @@ async function checkAssetsConcurrently(
   }
 
   await Promise.all(
-    Array.from(
-      { length: Math.min(assetConcurrency, assetUrls.length) },
-      () => worker(),
+    Array.from({ length: Math.min(assetConcurrency, assetUrls.length) }, () =>
+      worker(),
     ),
   );
 

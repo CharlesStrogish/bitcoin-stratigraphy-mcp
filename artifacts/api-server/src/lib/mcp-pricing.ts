@@ -51,28 +51,35 @@ export function quoteMcpTools(tools: string[]) {
     }
     const priceSats = mcpToolPrices[canonical as keyof typeof mcpToolPrices];
     // Existing executable aliases retain their original paid credential scope.
-    const executionTool = Object.hasOwn(legacyToolNames, tool) ? tool : canonical;
+    const executionTool = Object.hasOwn(legacyToolNames, tool)
+      ? tool
+      : canonical;
     return {
       tool,
       canonical_tool: canonical,
       price_sats: priceSats,
       payment_required: priceSats > 0,
-      invoice_generation: priceSats > 0 ? {
-        method: "POST" as const,
-        endpoint: "/mcp",
-        jsonrpc_method: "tools/call" as const,
-        tool: executionTool,
-        amount_sats: priceSats,
-        description: `Bitcoin Stratigraphy MCP ${executionTool} execution`,
-        scope_path: `/mcp/tools/${executionTool}`,
-        expiry_seconds: MCP_INVOICE_EXPIRY_SECONDS,
-      } : null,
+      invoice_generation:
+        priceSats > 0
+          ? {
+              method: "POST" as const,
+              endpoint: "/mcp",
+              jsonrpc_method: "tools/call" as const,
+              tool: executionTool,
+              amount_sats: priceSats,
+              description: `Bitcoin Stratigraphy MCP ${executionTool} execution`,
+              scope_path: `/mcp/tools/${executionTool}`,
+              expiry_seconds: MCP_INVOICE_EXPIRY_SECONDS,
+            }
+          : null,
     };
   });
   return {
     protocol: "L402" as const,
     currency: "sats" as const,
-    perToolSats: Object.fromEntries(items.map((item) => [item.tool, item.price_sats])),
+    perToolSats: Object.fromEntries(
+      items.map((item) => [item.tool, item.price_sats]),
+    ),
     items,
     total_sats: items.reduce((total, item) => total + item.price_sats, 0),
     l402: {
@@ -80,11 +87,17 @@ export function quoteMcpTools(tools: string[]) {
       invoice_generated: false,
       aggregate_invoice_supported: false,
       invoice_expiry_seconds: MCP_INVOICE_EXPIRY_SECONDS,
-      generation_trigger: "An unauthenticated tools/call to a paid tool generates its own invoice; include that tool's required arguments.",
+      generation_trigger:
+        "An unauthenticated tools/call to a paid tool generates its own invoice; include that tool's required arguments.",
       challenge_status: 402,
       challenge_header: "WWW-Authenticate",
       challenge_format: 'L402 macaroon="<macaroon>", invoice="<BOLT11>"',
-      challenge_body_fields: ["macaroon", "invoice", "payment_hash", "amount_sats"],
+      challenge_body_fields: [
+        "macaroon",
+        "invoice",
+        "payment_hash",
+        "amount_sats",
+      ],
       authorization_format: "L402 <macaroon>:<preimage>",
       credential_scope: "exact MCP tool path",
       max_requests: 1,

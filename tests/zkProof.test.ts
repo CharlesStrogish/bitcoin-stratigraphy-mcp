@@ -14,7 +14,10 @@ async function sampleProof() {
     snapshot: {
       observed_at: "2026-09-16T12:00:00.000Z",
       block: { height: 920_000 },
-      thermodynamic: { signal: "elevated-target-distance", target_multiplier: 110 },
+      thermodynamic: {
+        signal: "elevated-target-distance",
+        target_multiplier: 110,
+      },
     },
     blockHeight: 920_000,
     timestamp: Date.UTC(2026, 8, 16, 12),
@@ -117,9 +120,12 @@ test("warmed verification averages under 10ms", async () => {
     assert.equal(await verifyZkProof(payload), true);
     durations.push(performance.now() - startedAt);
   }
-  const average = durations.reduce((total, value) => total + value, 0) /
-    durations.length;
-  assert.ok(average < 10, `warmed verification averaged ${average.toFixed(3)}ms`);
+  const average =
+    durations.reduce((total, value) => total + value, 0) / durations.length;
+  assert.ok(
+    average < 10,
+    `warmed verification averaged ${average.toFixed(3)}ms`,
+  );
 });
 
 test("first verification after startup pre-warm completes under 10ms", async () => {
@@ -144,7 +150,10 @@ test("first verification after startup pre-warm completes under 10ms", async () 
     const startedAt = performance.now();
     assert.equal(await verifyZkProof(payload), true);
     const duration = performance.now() - startedAt;
-    assert.ok(duration < 10, `first warmed verification took ${duration.toFixed(3)}ms`);
+    assert.ok(
+      duration < 10,
+      `first warmed verification took ${duration.toFixed(3)}ms`,
+    );
   } finally {
     process.env.NODE_ENV = previousNodeEnv;
     await shutdownZkVerifier();

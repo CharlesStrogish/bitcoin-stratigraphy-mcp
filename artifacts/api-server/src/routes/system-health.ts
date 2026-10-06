@@ -2,7 +2,10 @@
 // Dual-licensed under AGPLv3 and Commercial terms.
 import type { Express } from "express";
 import type { PricingEngine } from "../services/pricing";
-import { getRuntimeSnapshot, runtimePricingLoad } from "../services/orchestrator";
+import {
+  getRuntimeSnapshot,
+  runtimePricingLoad,
+} from "../services/orchestrator";
 import { getRelayPoolHealth } from "../services/relayPool";
 
 export function registerSystemHealthRoute(

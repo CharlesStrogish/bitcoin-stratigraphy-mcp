@@ -14,10 +14,20 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).parent
 NAMES = [
-    "stratigraphy.get", "stratigraphy.get_digest", "stratigraphy.get_diff",
-    "stratigraphy.get_range", "stratigraphy.list", "proof.attenuate",
-    "proof.verify", "proof.get_by_hash", "proof.list", "proof.submit",
-    "proof.ground", "payment.get_info", "mesh.get_status", "mesh.broadcast",
+    "stratigraphy.get",
+    "stratigraphy.get_digest",
+    "stratigraphy.get_diff",
+    "stratigraphy.get_range",
+    "stratigraphy.list",
+    "proof.attenuate",
+    "proof.verify",
+    "proof.get_by_hash",
+    "proof.list",
+    "proof.submit",
+    "proof.ground",
+    "payment.get_info",
+    "mesh.get_status",
+    "mesh.broadcast",
     "proof.notarize",
 ]
 
@@ -87,8 +97,10 @@ def stubs():
 
     class Agent:
         def __init__(self, tools, **kwargs):
-            assert {getattr(t, "name") if "model" in kwargs else t.metadata.name
-                    for t in tools} == {"proof_notarize", "stratigraphy_list"}
+            assert {
+                getattr(t, "name") if "model" in kwargs else t.metadata.name
+                for t in tools
+            } == {"proof_notarize", "stratigraphy_list"}
             self.tools = tools
 
         async def ainvoke(self, messages, config):
@@ -121,10 +133,12 @@ class AgentQuickstartTests(unittest.TestCase):
     def execute(self, name, args=(), env=None):
         state, modules = stubs()
         module = load(name)
-        with patch.dict(os.environ, env or {}, clear=True), \
-                patch.dict("sys.modules", modules), \
-                patch("sys.argv", [name, *args]), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with (
+            patch.dict(os.environ, env or {}, clear=True),
+            patch.dict("sys.modules", modules),
+            patch("sys.argv", [name, *args]),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
             asyncio.run(module.main())
         return state
 
@@ -142,12 +156,19 @@ class AgentQuickstartTests(unittest.TestCase):
         credential = "L402 test-macaroon:" + "01" * 32
         for name in ("langchain_agent", "llamaindex_agent"):
             with self.subTest(name=name):
-                state = self.execute(name, ["--run"], {
-                    "L402_AUTHORIZATION": credential, "OPENAI_API_KEY": "offline-test",
-                })
+                state = self.execute(
+                    name,
+                    ["--run"],
+                    {
+                        "L402_AUTHORIZATION": credential,
+                        "OPENAI_API_KEY": "offline-test",
+                    },
+                )
                 self.assertEqual(state.headers["Authorization"], credential)
                 self.assertEqual(state.headers["X-L402-Batch-Size"], "100")
-                self.assertEqual(set(state.calls), {"proof.notarize", "stratigraphy.list"})
+                self.assertEqual(
+                    set(state.calls), {"proof.notarize", "stratigraphy.list"}
+                )
 
     def test_local_proxy_without_forwarding_direct_credentials(self):
         for name in ("langchain_agent", "llamaindex_agent"):
@@ -158,12 +179,17 @@ class AgentQuickstartTests(unittest.TestCase):
 
     def test_rejects_bad_hash_missing_payment_and_unsafe_urls(self):
         for name in ("langchain_agent", "llamaindex_agent"):
-            for args in (["--hash", "bad"], ["--run"],
-                         ["--url", "http://example.com/mcp"],
-                         ["--proxy-url", "https://example.com/mcp"]):
-                with self.subTest(name=name, args=args), \
-                        contextlib.redirect_stderr(io.StringIO()), \
-                        self.assertRaises(SystemExit):
+            for args in (
+                ["--hash", "bad"],
+                ["--run"],
+                ["--url", "http://example.com/mcp"],
+                ["--proxy-url", "https://example.com/mcp"],
+            ):
+                with (
+                    self.subTest(name=name, args=args),
+                    contextlib.redirect_stderr(io.StringIO()),
+                    self.assertRaises(SystemExit),
+                ):
                     self.execute(name, args)
 
 

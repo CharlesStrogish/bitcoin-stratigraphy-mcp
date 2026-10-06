@@ -7,12 +7,8 @@ import {
   createHttpRateLimitMiddleware,
   createSlidingWindowRateLimiter,
 } from "../artifacts/api-server/src/middleware/rateLimiter";
-import {
-  calculateJobPrice,
-} from "../artifacts/api-server/src/services/pricing";
-import {
-  createAutoHealingRelayPool,
-} from "../artifacts/api-server/src/services/relayPool";
+import { calculateJobPrice } from "../artifacts/api-server/src/services/pricing";
+import { createAutoHealingRelayPool } from "../artifacts/api-server/src/services/relayPool";
 
 test("sliding-window limiter rejects excess HTTP requests with Retry-After", async () => {
   let now = 1_000;
@@ -110,9 +106,9 @@ test("relay pool fails over, opens the circuit, and heals after backoff", async 
   try {
     await pool.publish(event);
     await pool.publish(event);
-    let failing = pool.health().relays.find((relay) =>
-      relay.relay.includes("failing")
-    );
+    let failing = pool
+      .health()
+      .relays.find((relay) => relay.relay.includes("failing"));
     assert.equal(failing?.circuitState, "OPEN");
     assert.equal(pool.health().healthyRelays, 1);
 
@@ -122,9 +118,9 @@ test("relay pool fails over, opens the circuit, and heals after backoff", async 
     failingRelayHealthy = true;
     now += 1_001;
     await pool.publish(event);
-    failing = pool.health().relays.find((relay) =>
-      relay.relay.includes("failing")
-    );
+    failing = pool
+      .health()
+      .relays.find((relay) => relay.relay.includes("failing"));
     assert.equal(failing?.circuitState, "CLOSED");
     assert.equal(failing?.consecutiveFailures, 0);
     assert.equal(pool.health().healthyRelays, 2);

@@ -9,7 +9,8 @@ import {
 const sourceRecords: ProvenanceSourceRecord[] = [
   {
     day: 1,
-    title: "82.2X away from 10 Million Bitcoin |  #bitcoinpriceprediction  #bitcoinnews #bitcoinprice",
+    title:
+      "82.2X away from 10 Million Bitcoin |  #bitcoinpriceprediction  #bitcoinnews #bitcoinprice",
     video_id: "kbn-YkkR0Kc",
     transcript_summary: "",
     quantitative_alpha: {
@@ -20,7 +21,8 @@ const sourceRecords: ProvenanceSourceRecord[] = [
   },
   {
     day: 2,
-    title: "85.49X away from 10 Million Bitcoin  | #bitcoinpredictions #bitcoins #10mil",
+    title:
+      "85.49X away from 10 Million Bitcoin  | #bitcoinpredictions #bitcoins #10mil",
     video_id: "nxqlOXFVG-4",
     transcript_summary: "",
     quantitative_alpha: {
@@ -31,7 +33,8 @@ const sourceRecords: ProvenanceSourceRecord[] = [
   },
   {
     day: 3,
-    title: "84.23X away from 10 Million Bitcoin | #bitcoinlegend #bitcoiner #bitcoinpredictions",
+    title:
+      "84.23X away from 10 Million Bitcoin | #bitcoinlegend #bitcoiner #bitcoinpredictions",
     video_id: "U4ZubXVNGRg",
     transcript_summary: "",
     quantitative_alpha: {
@@ -73,7 +76,9 @@ test("appending records preserves every historical stratum hash", () => {
   const appended = buildProvenanceChain(sourceRecords);
 
   assert.deepEqual(
-    appended.records.slice(0, firstTwo.totalDepth).map(({ stratumHash }) => stratumHash),
+    appended.records
+      .slice(0, firstTwo.totalDepth)
+      .map(({ stratumHash }) => stratumHash),
     firstTwo.records.map(({ stratumHash }) => stratumHash),
   );
   assert.equal(appended.genesisHash, firstTwo.genesisHash);
@@ -101,5 +106,8 @@ test("rejects empty, reordered, and hash-tampered datasets", () => {
 
   const tamperedGenesis = sourceRecords.map((record) => ({ ...record }));
   tamperedGenesis[0].title += " tampered";
-  assert.throws(() => buildProvenanceChain(tamperedGenesis), /pinned genesis hash/);
+  assert.throws(
+    () => buildProvenanceChain(tamperedGenesis),
+    /pinned genesis hash/,
+  );
 });

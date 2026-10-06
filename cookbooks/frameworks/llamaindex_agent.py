@@ -28,9 +28,13 @@ def configuration() -> tuple[argparse.Namespace, str, dict[str, str]]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default=os.getenv("STRATIGRAPHY_MCP_URL", MCP_URL))
     parser.add_argument("--proxy-url", default=os.getenv("L402_PROXY_URL"))
-    parser.add_argument("--hash", default=SAMPLE_HASH, help="Exactly 64 SHA-256 hex characters")
+    parser.add_argument(
+        "--hash", default=SAMPLE_HASH, help="Exactly 64 SHA-256 hex characters"
+    )
     parser.add_argument("--model", default="gpt-4.1-mini")
-    parser.add_argument("--run", action="store_true", help="Opt into LLM and paid notarization calls")
+    parser.add_argument(
+        "--run", action="store_true", help="Opt into LLM and paid notarization calls"
+    )
     args = parser.parse_args()
     if not re.fullmatch(r"[0-9a-fA-F]{64}", args.hash):
         parser.error("--hash must be exactly 64 hexadecimal characters")
@@ -38,9 +42,15 @@ def configuration() -> tuple[argparse.Namespace, str, dict[str, str]]:
     url = args.proxy_url or args.url
     parsed = urlsplit(url)
     loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
-    if (not parsed.hostname or parsed.username or parsed.password or parsed.query or
-            parsed.fragment or parsed.scheme not in {"http", "https"} or
-            (parsed.scheme == "http" and not loopback)):
+    if (
+        not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.scheme not in {"http", "https"}
+        or (parsed.scheme == "http" and not loopback)
+    ):
         parser.error("Use HTTPS, or loopback HTTP; do not put credentials in URLs")
     if args.proxy_url and not loopback:
         parser.error("--proxy-url must point to your trusted local L402 wallet proxy")
@@ -50,7 +60,9 @@ def configuration() -> tuple[argparse.Namespace, str, dict[str, str]]:
     if args.proxy_url and credential:
         parser.error("Choose a wallet proxy OR direct L402 credentials, not both")
     if args.run and not (credential or args.proxy_url):
-        parser.error("--run requires a prepaid proof.notarize credential or a wallet proxy")
+        parser.error(
+            "--run requires a prepaid proof.notarize credential or a wallet proxy"
+        )
     if args.run and not os.getenv("OPENAI_API_KEY"):
         parser.error("--run requires OPENAI_API_KEY in your consumer project's secrets")
 
@@ -80,10 +92,16 @@ async def main() -> None:
         tools = await spec.to_tool_list_async()
         names = {tool.metadata.name for tool in tools}
         if len(tools) != 15 or not DEMO_TOOLS.issubset(names):
-            raise RuntimeError("Expected the published 15-tool catalog; publish Phase 1 or check --url")
-        print(f"Discovered {len(tools)} canonical MCP tools: {', '.join(sorted(names))}")
+            raise RuntimeError(
+                "Expected the published 15-tool catalog; publish Phase 1 or check --url"
+            )
+        print(
+            f"Discovered {len(tools)} canonical MCP tools: {', '.join(sorted(names))}"
+        )
         if not args.run:
-            print("Discovery only: no LLM requests, paid tool calls, or invoice payments.")
+            print(
+                "Discovery only: no LLM requests, paid tool calls, or invoice payments."
+            )
             return
 
         from llama_index.core.agent.workflow import ReActAgent
@@ -125,8 +143,10 @@ if __name__ == "__main__":
         asyncio.run(main())
     except Exception as error:
         # Avoid dumping HTTP exceptions that can contain paid credentials.
-        print(f"Quickstart failed ({type(error).__name__}). Check framework dependencies, "
-              "the published 15-tool endpoint, and your L402 pass/proxy. "
-              "A 402 requires an explicitly funded or renewed tool-scoped pass.",
-              file=sys.stderr)
+        print(
+            f"Quickstart failed ({type(error).__name__}). Check framework dependencies, "
+            "the published 15-tool endpoint, and your L402 pass/proxy. "
+            "A 402 requires an explicitly funded or renewed tool-scoped pass.",
+            file=sys.stderr,
+        )
         raise SystemExit(1) from None

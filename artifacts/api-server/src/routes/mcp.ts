@@ -2,7 +2,12 @@
 // Dual-licensed under AGPLv3 and Commercial terms.
 import { createHash } from "node:crypto";
 import { frameMcpErrors, validateMcpEnvelope } from "../middleware/mcpJsonRpc";
-import { canonicalToolName, legacyToolNames, mcpToolPrices, MCP_INVOICE_EXPIRY_SECONDS } from "../lib/mcp-pricing";
+import {
+  canonicalToolName,
+  legacyToolNames,
+  mcpToolPrices,
+  MCP_INVOICE_EXPIRY_SECONDS,
+} from "../lib/mcp-pricing";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -13,10 +18,20 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { Express, NextFunction, Request, Response } from "express";
+import type {
+  Express,
+  NextFunction,
+  Request,
+  RequestHandler,
+  Response,
+} from "express";
 import { z } from "zod";
 import { ENGINE_DESCRIPTION } from "../lib/engine-metadata";
-import { digestRecord, snapshotBlock, snapshotDate } from "./stratigraphy-index";
+import {
+  digestRecord,
+  snapshotBlock,
+  snapshotDate,
+} from "./stratigraphy-index";
 import {
   attenuateSubscriptionMacaroon,
   getMacaroonSignatureId,
@@ -63,10 +78,13 @@ import { verifyDriftProof } from "../services/zkDriftService";
 import { notarizeHash, notarizeInputSchema } from "../services/otsNotarization";
 import { getStratigraphyData, readDataset } from "./stratigraphy";
 import { buildProvenanceChain } from "../services/provenanceChain";
-import { getProvenanceAnchor, verifyOtsProofRecord, type OtsVerificationResult } from "../services/otsProvenance";
 import {
-  createHttpRateLimitMiddleware,
-  createSlidingWindowRateLimiter,
+  getProvenanceAnchor,
+  verifyOtsProofRecord,
+} from "../services/otsProvenance";
+import {
+  createPublicRateLimitMiddleware,
+  type SlidingWindowRateLimiter,
 } from "../middleware/rateLimiter";
 
 const documented = <T extends z.ZodType>(
@@ -75,77 +93,36 @@ const documented = <T extends z.ZodType>(
   _examples: unknown[],
 ): T => schema.describe(description) as T;
 
-const quantitativeAlphaSchema = z.object({
-  target_multiplier: documented(
-    z.number(),
-    "Thermodynamic valuation multiplier derived for this day.",
-    [125.83],
-  ),
-  difficulty_epoch_progress: documented(
-    z.string().min(1),
-    "Bitcoin mining difficulty epoch progress formatted as a percentage.",
-    ["73.42%"],
-  ),
-  thermodynamic_signal: documented(
-    z.string().min(1),
-    "Human-readable thermodynamic market signal.",
-    ["accumulation"],
-  ),
-}).describe("Quantitative thermodynamic indicators for one stratigraphy entry");
-
-const entrySchema = z.object({
-  day: documented(
-    z.number().int(),
-    "One-based day number in the Bitcoin Stratigraphy dataset.",
-    [422],
-  ),
-  title: documented(
-    z.string(),
-    "Title of the source research episode.",
-    ["Bitcoin Stratigraphy Day 422"],
-  ),
-  video_id: documented(
-    z.string(),
-    "Source video identifier used to trace the research provenance.",
-    ["dQw4w9WgXcQ"],
-  ),
-  transcript_summary: documented(
-    z.string(),
-    "Concise summary of the source transcript and market interpretation.",
-    ["Mining economics and thermodynamic support strengthened."],
-  ),
-  quantitative_alpha: quantitativeAlphaSchema,
-}).describe("A validated Bitcoin Stratigraphy telemetry entry");
-
-const publicInputsSchema = z.object({
-  blockHeight: documented(
-    z.number().int().nonnegative(),
-    "Bitcoin block height committed into the proof.",
-    [920000],
-  ),
-  snapshotDigest: documented(
-    z.string().min(1),
-    "Poseidon field digest of the canonical snapshot payload.",
-    ["1534979302823651498736582947365829473658294736582947365829473658294"],
-  ),
-  thermodynamicHash: documented(
-    z.string().min(1),
-    "Poseidon field hash of the thermodynamic telemetry values.",
-    ["782365829473658294736582947365829473658294736582947365829473658294"],
-  ),
-  timestamp: documented(
-    z.number().int().nonnegative(),
-    "Unix timestamp in milliseconds committed into the proof.",
-    [1789776000000],
-  ),
-  valuationSat: documented(
-    z.number().int().nonnegative(),
-    "Satoshi valuation committed into the proof.",
-    [12583],
-  ),
-}).strict().describe(
-  "Public statement inputs committed by the Groth16/Poseidon proof.",
-);
+const publicInputsSchema = z
+  .object({
+    blockHeight: documented(
+      z.number().int().nonnegative(),
+      "Bitcoin block height committed into the proof.",
+      [920000],
+    ),
+    snapshotDigest: documented(
+      z.string().min(1),
+      "Poseidon field digest of the canonical snapshot payload.",
+      ["1534979302823651498736582947365829473658294736582947365829473658294"],
+    ),
+    thermodynamicHash: documented(
+      z.string().min(1),
+      "Poseidon field hash of the thermodynamic telemetry values.",
+      ["782365829473658294736582947365829473658294736582947365829473658294"],
+    ),
+    timestamp: documented(
+      z.number().int().nonnegative(),
+      "Unix timestamp in milliseconds committed into the proof.",
+      [1789776000000],
+    ),
+    valuationSat: documented(
+      z.number().int().nonnegative(),
+      "Satoshi valuation committed into the proof.",
+      [12583],
+    ),
+  })
+  .strict()
+  .describe("Public statement inputs committed by the Groth16/Poseidon proof.");
 
 const snapshotSchema = documented(
   z.union([
@@ -153,50 +130,16 @@ const snapshotSchema = documented(
     z.array(z.record(z.string(), z.unknown())),
   ]),
   "Telemetry snapshot payload whose canonical digest and semantic fields must match the proof.",
-  [[{
-    block: { height: 920000 },
-    observed_at: "2026-09-19T00:00:00.000Z",
-    thermodynamic: { target_multiplier: 125.83 },
-  }]],
+  [
+    [
+      {
+        block: { height: 920000 },
+        observed_at: "2026-09-19T00:00:00.000Z",
+        thermodynamic: { target_multiplier: 125.83 },
+      },
+    ],
+  ],
 );
-
-const meshStatusSchema = {
-  nodePubkey: documented(
-    z.string(),
-    "Lowercase hexadecimal Nostr public key identifying this mesh node.",
-    ["f72cc555ec2948fdc4b5b2c2778821499ea8ce2b8569b68675899e296d3ff253"],
-  ),
-  activePeerCount: documented(
-    z.number().int().min(1),
-    "Number of recently validated nodes, including the local node.",
-    [3],
-  ),
-  configuredPeerCount: documented(
-    z.number().int().nonnegative(),
-    "Number of remotely configured trusted peers.",
-    [2],
-  ),
-  topologyHealth: documented(
-    z.enum(["healthy", "degraded", "isolated"]),
-    "Current consensus topology health classification.",
-    ["healthy"],
-  ),
-  crossValidationSuccessRate: documented(
-    z.number().min(0).max(1),
-    "Lifetime ratio of successful peer cross-validation attempts.",
-    [0.98],
-  ),
-  averagePropagationLatencyMs: documented(
-    z.number().nonnegative(),
-    "Mean round-trip propagation latency for successful attestations.",
-    [42.7],
-  ),
-  quorumThreshold: documented(
-    z.number().int().min(1),
-    "Minimum number of unique node attestations required for consensus.",
-    [2],
-  ),
-};
 
 const readOnlyToolAnnotations = {
   readOnlyHint: true,
@@ -245,200 +188,328 @@ const thermodynamicMetricNames = [
   "thermodynamic_signal",
 ] as const;
 
-const stratigraphyInputSchema = z.object({
-  days: z.number().int().min(1).max(365).optional().describe(
-    "Count of recent days of telemetry to fetch.",
-  ),
-  date: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
-    "Calendar date selecting one telemetry day, formatted as YYYY-MM-DD.",
-  ),
-  blockHeight: z.number().int().min(0).optional().describe(
-    "Indexed Bitcoin block height selecting one telemetry record.",
-  ),
-  metrics: z.array(
-    z.enum(thermodynamicMetricNames).describe(
-      "Thermodynamic metric name to include in each returned record.",
-    ),
-  ).min(1).refine(
-    (values) => new Set(values).size === values.length,
-    "metrics must contain unique values",
-  ).optional().describe(
-    "Telemetry metrics projected into each returned record.",
-  ),
-  startDate: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
-    "Inclusive UTC lower date bound (YYYY-MM-DD); can be used alone or with endDate, but not with date or blockHeight.",
-  ),
-  endDate: z.string().min(1).regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe(
-    "Inclusive UTC upper date bound (YYYY-MM-DD); can be used alone or with startDate, but not with date or blockHeight.",
-  ),
-  startBlock: z.number().int().nonnegative().optional().describe(
-    "Inclusive lower bound of the daily block-height index; can be used alone or with endBlock, but not with date or blockHeight.",
-  ),
-  endBlock: z.number().int().nonnegative().optional().describe(
-    "Inclusive upper bound of the daily block-height index; can be used alone or with startBlock, but not with date or blockHeight.",
-  ),
-  limit: z.number().int().min(1).max(100).default(10).describe(
-    "Maximum number of records to return.",
-  ),
-}).strict().superRefine((input, context) => {
-  const legacySelectors = [
-    input.days !== undefined,
-    input.date !== undefined,
-    input.blockHeight !== undefined,
-  ].filter(Boolean).length;
-  const hasRangeSelector =
-    input.startDate !== undefined ||
-    input.endDate !== undefined ||
-    input.startBlock !== undefined ||
-    input.endBlock !== undefined;
-  if (legacySelectors > 1) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Provide only one of days, date, or blockHeight",
-    });
-  }
-  if (legacySelectors > 0 && hasRangeSelector) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Legacy selectors cannot be combined with range selectors",
-    });
-  }
-  if (
-    input.startDate !== undefined &&
-    input.endDate !== undefined &&
-    input.startDate > input.endDate
-  ) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "startDate must not be later than endDate",
-    });
-  }
-  if (
-    input.startBlock !== undefined &&
-    input.endBlock !== undefined &&
-    input.startBlock > input.endBlock
-  ) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "startBlock must not be greater than endBlock",
-    });
-  }
-}).describe("Validated raw stratigraphy telemetry query parameters.");
+const stratigraphyInputSchema = z
+  .object({
+    days: z
+      .number()
+      .int()
+      .min(1)
+      .max(365)
+      .optional()
+      .describe("Count of recent days of telemetry to fetch."),
+    date: z
+      .string()
+      .min(1)
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe(
+        "Calendar date selecting one telemetry day, formatted as YYYY-MM-DD.",
+      ),
+    blockHeight: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Indexed Bitcoin block height selecting one telemetry record."),
+    metrics: z
+      .array(
+        z
+          .enum(thermodynamicMetricNames)
+          .describe(
+            "Thermodynamic metric name to include in each returned record.",
+          ),
+      )
+      .min(1)
+      .refine(
+        (values) => new Set(values).size === values.length,
+        "metrics must contain unique values",
+      )
+      .optional()
+      .describe("Telemetry metrics projected into each returned record."),
+    startDate: z
+      .string()
+      .min(1)
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe(
+        "Inclusive UTC lower date bound (YYYY-MM-DD); can be used alone or with endDate, but not with date or blockHeight.",
+      ),
+    endDate: z
+      .string()
+      .min(1)
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe(
+        "Inclusive UTC upper date bound (YYYY-MM-DD); can be used alone or with startDate, but not with date or blockHeight.",
+      ),
+    startBlock: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe(
+        "Inclusive lower bound of the daily block-height index; can be used alone or with endBlock, but not with date or blockHeight.",
+      ),
+    endBlock: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe(
+        "Inclusive upper bound of the daily block-height index; can be used alone or with startBlock, but not with date or blockHeight.",
+      ),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(10)
+      .describe("Maximum number of records to return."),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    const legacySelectors = [
+      input.days !== undefined,
+      input.date !== undefined,
+      input.blockHeight !== undefined,
+    ].filter(Boolean).length;
+    const hasRangeSelector =
+      input.startDate !== undefined ||
+      input.endDate !== undefined ||
+      input.startBlock !== undefined ||
+      input.endBlock !== undefined;
+    if (legacySelectors > 1) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide only one of days, date, or blockHeight",
+      });
+    }
+    if (legacySelectors > 0 && hasRangeSelector) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Legacy selectors cannot be combined with range selectors",
+      });
+    }
+    if (
+      input.startDate !== undefined &&
+      input.endDate !== undefined &&
+      input.startDate > input.endDate
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "startDate must not be later than endDate",
+      });
+    }
+    if (
+      input.startBlock !== undefined &&
+      input.endBlock !== undefined &&
+      input.startBlock > input.endBlock
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "startBlock must not be greater than endBlock",
+      });
+    }
+  })
+  .describe("Validated raw stratigraphy telemetry query parameters.");
 
-const stratigraphyDigestInputSchema = z.object({
-  target: z.string().regex(/^(?:latest|(?:0|[1-9]\d*)|\d{4}-\d{2}-\d{2}(?:\.\.\d{4}-\d{2}-\d{2})?)$/).default("latest"),
-  format: z.enum(["compact", "minimal", "kv"]).default("compact"),
-}).strict().superRefine(({ target }, context) => {
-  if (target === "latest") return;
-  if (/^\d+$/.test(target)) {
-    if (Number.isSafeInteger(Number(target))) return;
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "target height is too large" });
-    return;
-  }
-  const dates = target.split("..");
-  for (const date of dates) {
-    const parsed = new Date(`${date}T00:00:00.000Z`);
-    if (!Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== date) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: "target must contain a valid ISO calendar date" });
+const stratigraphyDigestInputSchema = z
+  .object({
+    target: z
+      .string()
+      .regex(
+        /^(?:latest|(?:0|[1-9]\d*)|\d{4}-\d{2}-\d{2}(?:\.\.\d{4}-\d{2}-\d{2})?)$/,
+      )
+      .default("latest"),
+    format: z.enum(["compact", "minimal", "kv"]).default("compact"),
+  })
+  .strict()
+  .superRefine(({ target }, context) => {
+    if (target === "latest") return;
+    if (/^\d+$/.test(target)) {
+      if (Number.isSafeInteger(Number(target))) return;
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "target height is too large",
+      });
       return;
     }
-  }
-  if (dates.length === 2 && (
-    dates[0] > dates[1] ||
-    (Date.parse(dates[1]) - Date.parse(dates[0])) / DAY_MS >= 100
-  )) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "target range must be ascending and cover at most 100 days" });
-  }
-});
+    const dates = target.split("..");
+    for (const date of dates) {
+      const parsed = new Date(`${date}T00:00:00.000Z`);
+      if (
+        !Number.isFinite(parsed.valueOf()) ||
+        parsed.toISOString().slice(0, 10) !== date
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "target must contain a valid ISO calendar date",
+        });
+        return;
+      }
+    }
+    if (
+      dates.length === 2 &&
+      (dates[0] > dates[1] ||
+        (Date.parse(dates[1]) - Date.parse(dates[0])) / DAY_MS >= 100)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "target range must be ascending and cover at most 100 days",
+      });
+    }
+  });
 
 const diffTargetPattern = "^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$";
-const diffEndTargetPattern = "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$";
+const diffEndTargetPattern =
+  "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$";
 function validDiffTarget(target: string): boolean {
   if (target === "latest") return true;
   if (/^\d+$/.test(target)) return Number.isSafeInteger(Number(target));
   const parsed = new Date(`${target}T00:00:00.000Z`);
-  return Number.isFinite(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === target;
+  return (
+    Number.isFinite(parsed.valueOf()) &&
+    parsed.toISOString().slice(0, 10) === target
+  );
 }
-const stratigraphyDiffInputSchema = z.object({
-  fromTarget: z.string().regex(new RegExp(diffTargetPattern)).refine(validDiffTarget),
-  toTarget: z.string().regex(new RegExp(diffEndTargetPattern)).refine(validDiffTarget).default("latest"),
-}).strict();
+const stratigraphyDiffInputSchema = z
+  .object({
+    fromTarget: z
+      .string()
+      .regex(new RegExp(diffTargetPattern))
+      .refine(validDiffTarget),
+    toTarget: z
+      .string()
+      .regex(new RegExp(diffEndTargetPattern))
+      .refine(validDiffTarget)
+      .default("latest"),
+  })
+  .strict();
 
-const stratigraphyRangeInputSchema = z.object({
-  startTarget: z.string().regex(new RegExp(diffTargetPattern)).refine(validDiffTarget),
-  endTarget: z.string().regex(new RegExp(diffEndTargetPattern)).refine(validDiffTarget).default("latest"),
-  limit: z.number().int().min(1).max(100).default(50),
-  format: z.enum(["compact", "minimal", "kv"]).default("compact"),
-}).strict();
+const stratigraphyRangeInputSchema = z
+  .object({
+    startTarget: z
+      .string()
+      .regex(new RegExp(diffTargetPattern))
+      .refine(validDiffTarget),
+    endTarget: z
+      .string()
+      .regex(new RegExp(diffEndTargetPattern))
+      .refine(validDiffTarget)
+      .default("latest"),
+    limit: z.number().int().min(1).max(100).default(50),
+    format: z.enum(["compact", "minimal", "kv"]).default("compact"),
+  })
+  .strict();
 
-const attenuateInputSchema = z.object({
-  macaroon: z.string().min(1).max(8192),
-  caveats: z.array(z.string().min(1).max(256)).max(16),
-  ttlSeconds: z.number().int().positive().max(2_592_000).optional(),
-}).strict().refine(({ caveats, ttlSeconds }) => caveats.length > 0 || ttlSeconds !== undefined, {
-  message: "At least one caveat or ttlSeconds is required",
-});
+const attenuateInputSchema = z
+  .object({
+    macaroon: z.string().min(1).max(8192),
+    caveats: z.array(z.string().min(1).max(256)).max(16),
+    ttlSeconds: z.number().int().positive().max(2_592_000).optional(),
+  })
+  .strict()
+  .refine(
+    ({ caveats, ttlSeconds }) => caveats.length > 0 || ttlSeconds !== undefined,
+    {
+      message: "At least one caveat or ttlSeconds is required",
+    },
+  );
 
-const stratigraphyCatalogInputSchema = z.object({}).strict().describe(
-  "No input parameters required.",
-);
+const stratigraphyCatalogInputSchema = z
+  .object({})
+  .strict()
+  .describe("No input parameters required.");
 
-const verifySnapshotProofInputSchema = z.object({
-  proof: z.string().min(1).describe(
-    "Base64url-encoded Groth16/Poseidon BN254 proof emitted by this API, without padding.",
-  ),
-  publicInputs: publicInputsSchema.describe(
-    "Expected public constants committed by the proof; blockHeight, snapshotDigest, thermodynamicHash, timestamp, and valuationSat must match the telemetry payload in data.",
-  ),
-  verificationKeyId: z.string().min(1).describe(
-    "SHA-256 verification-key identifier using the sha256: prefix.",
-  ),
-  data: snapshotSchema,
-}).strict().describe(
-  "Input arguments containing an encoded Groth16 proof, typed public inputs, a verification-key identifier, and telemetry data.",
-);
+const verifySnapshotProofInputSchema = z
+  .object({
+    proof: z
+      .string()
+      .min(1)
+      .describe(
+        "Base64url-encoded Groth16/Poseidon BN254 proof emitted by this API, without padding.",
+      ),
+    publicInputs: publicInputsSchema.describe(
+      "Expected public constants committed by the proof; blockHeight, snapshotDigest, thermodynamicHash, timestamp, and valuationSat must match the telemetry payload in data.",
+    ),
+    verificationKeyId: z
+      .string()
+      .min(1)
+      .describe(
+        "SHA-256 verification-key identifier using the sha256: prefix.",
+      ),
+    data: snapshotSchema,
+  })
+  .strict()
+  .describe(
+    "Input arguments containing an encoded Groth16 proof, typed public inputs, a verification-key identifier, and telemetry data.",
+  );
 
-const driftProofInputSchema = z.object({
-  circuit: z.literal("zk.drift.v1"),
-  sessionContextHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
-  targetBlockHeight: z.number().int().nonnegative().max(0xffff_ffff),
-  entropyThreshold: z.number().min(0).max(1),
-  proof: z.object({
+const driftProofInputSchema = z
+  .object({
     circuit: z.literal("zk.drift.v1"),
-    pi_a: z.array(z.string().min(1)).length(3),
-    pi_b: z.array(z.array(z.string().min(1)).length(2)).length(3),
-    pi_c: z.array(z.string().min(1)).length(3),
-    publicSignals: z.array(z.string().min(1)).min(1),
-    verificationKeyId: z.string().min(1),
-  }).strict(),
-  driftScore: z.number().optional(),
-  isAligned: z.boolean().optional(),
-  thermodynamicEntropyBits: z.number().nonnegative().optional(),
-  blockHash: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
-  compactTarget: z.number().int().min(0).max(0xffff_ffff).optional(),
-}).strict();
+    sessionContextHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
+    targetBlockHeight: z.number().int().nonnegative().max(0xffff_ffff),
+    entropyThreshold: z.number().min(0).max(1),
+    proof: z
+      .object({
+        circuit: z.literal("zk.drift.v1"),
+        pi_a: z.array(z.string().min(1)).length(3),
+        pi_b: z.array(z.array(z.string().min(1)).length(2)).length(3),
+        pi_c: z.array(z.string().min(1)).length(3),
+        publicSignals: z.array(z.string().min(1)).min(1),
+        verificationKeyId: z.string().min(1),
+      })
+      .strict(),
+    driftScore: z.number().optional(),
+    isAligned: z.boolean().optional(),
+    thermodynamicEntropyBits: z.number().nonnegative().optional(),
+    blockHash: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/)
+      .optional(),
+    compactTarget: z.number().int().min(0).max(0xffff_ffff).optional(),
+  })
+  .strict();
 
 const verifyProofInputSchema = z.union([
-  verifySnapshotProofInputSchema.extend({ proofType: z.literal("groth16").optional() }),
+  verifySnapshotProofInputSchema.extend({
+    proofType: z.literal("groth16").optional(),
+  }),
   driftProofInputSchema.extend({ proofType: z.literal("groth16").optional() }),
-  z.object({
-    proofType: z.literal("ots"),
-    otsProof: z.string().min(1).max(1_048_576),
-    targetHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
-  }).strict(),
+  z
+    .object({
+      proofType: z.literal("ots"),
+      otsProof: z.string().min(1).max(1_048_576),
+      targetHash: z.string().regex(/^[0-9a-fA-F]{64}$/),
+    })
+    .strict(),
 ]);
 
-const settleInputSchema = z.object({
-  paymentHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$/).describe(
-    "For L402, the challenged 32-byte Lightning payment hash; for x402, the Base transaction hash (same value as txHash).",
-  ),
-  preimage: z.string().regex(/^[0-9a-fA-F]{64}$/).optional().describe(
-    "L402 32-byte hex preimage. Also send the server-issued L402 macaroon and the same preimage in the Authorization header.",
-  ),
-  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional().describe(
-    "Base transaction hash; requires a valid PAYMENT-SIGNATURE settled upfront by the x402 facilitator on this request.",
-  ),
-}).strict();
+const settleInputSchema = z
+  .object({
+    paymentHash: z
+      .string()
+      .regex(/^(?:0x)?[0-9a-fA-F]{64}$/)
+      .describe(
+        "For L402, the challenged 32-byte Lightning payment hash; for x402, the Base transaction hash (same value as txHash).",
+      ),
+    preimage: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/)
+      .optional()
+      .describe(
+        "L402 32-byte hex preimage. Also send the server-issued L402 macaroon and the same preimage in the Authorization header.",
+      ),
+    txHash: z
+      .string()
+      .regex(/^0x[0-9a-fA-F]{64}$/)
+      .optional()
+      .describe(
+        "Base transaction hash; requires a valid PAYMENT-SIGNATURE settled upfront by the x402 facilitator on this request.",
+      ),
+  })
+  .strict();
 
 type SettlementCheck = {
   verified: boolean;
@@ -450,22 +521,6 @@ type SettlementCheck = {
   };
 };
 
-const proofStatusInputSchema = z.object({
-  proofHash: z.string().regex(/^(?:0x)?[0-9a-fA-F]{64}$|^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[a-z2-7]{20,}$/).optional().describe(
-    "Primary lookup key for a proof lifecycle record (hex digest or CID); mutually exclusive with snapshotDigest.",
-  ),
-  snapshotDigest: z.string().regex(/^(?:\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
-    "Primary lookup key for a snapshot lifecycle record (decimal digest, hex digest, or CID); mutually exclusive with proofHash.",
-  ),
-  receiptHash: z.string().regex(/^[0-9a-f]{64}$/).optional().describe(
-    "SHA-256 digest returned by proof.issue_receipt; mutually exclusive with proofHash and snapshotDigest.",
-  ),
-}).strict().refine(
-  (input) => [input.proofHash, input.snapshotDigest, input.receiptHash]
-    .filter((value) => value !== undefined).length === 1,
-  "Provide exactly one of proofHash, snapshotDigest, or receiptHash",
-).describe("Input arguments for querying single proof attestation lifecycle status.");
-
 const proofLifecycleStates = [
   "verified",
   "cached",
@@ -473,25 +528,48 @@ const proofLifecycleStates = [
   "invalid",
 ] as const;
 
-const proofByHashInputSchema = z.object({
-  hash: z.string().regex(/^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/).optional(),
-  jobId: z.string().uuid().optional(),
-}).strict().refine(({ hash, jobId }) => (hash === undefined) !== (jobId === undefined), {
-  message: "Provide exactly one hash or jobId",
-});
+const proofByHashInputSchema = z
+  .object({
+    hash: z
+      .string()
+      .regex(
+        /^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/,
+      )
+      .optional(),
+    jobId: z.string().uuid().optional(),
+  })
+  .strict()
+  .refine(({ hash, jobId }) => (hash === undefined) !== (jobId === undefined), {
+    message: "Provide exactly one hash or jobId",
+  });
 
-const paymentInfoInputSchema = z.object({
-  action: z.literal("query").optional(),
-  toolName: z.string().min(1).optional(),
-}).strict().or(settleInputSchema.extend({
-  action: z.literal("settle"),
-  paymentMacaroon: z.string().min(1).max(8192).optional().describe(
-    "Original invoice macaroon for settlement checks, separate from this tool's paid Authorization credential.",
-  ),
-}).refine(
-  (value) => Number(value.preimage !== undefined) + Number(value.txHash !== undefined) === 1,
-  "Provide exactly one of preimage or txHash",
-));
+const paymentInfoInputSchema = z
+  .object({
+    action: z.literal("query").optional(),
+    toolName: z.string().min(1).optional(),
+  })
+  .strict()
+  .or(
+    settleInputSchema
+      .extend({
+        action: z.literal("settle"),
+        paymentMacaroon: z
+          .string()
+          .min(1)
+          .max(8192)
+          .optional()
+          .describe(
+            "Original invoice macaroon for settlement checks, separate from this tool's paid Authorization credential.",
+          ),
+      })
+      .refine(
+        (value) =>
+          Number(value.preimage !== undefined) +
+            Number(value.txHash !== undefined) ===
+          1,
+        "Provide exactly one of preimage or txHash",
+      ),
+  );
 
 type ArchivedProofLookup = {
   kind: "zk-proof" | "dataset-receipt" | "context-receipt" | "zk-proof-status";
@@ -504,71 +582,107 @@ type ArchivedProofLookup = {
   jobId?: string;
 };
 
-type BoundProvenance = { headHash: string; merkleRoot: string; totalDepth: number };
+type BoundProvenance = {
+  headHash: string;
+  merkleRoot: string;
+  totalDepth: number;
+};
 
 function boundProvenance(value: unknown): BoundProvenance | undefined {
   if (!value || typeof value !== "object") return undefined;
   const state = value as Record<string, unknown>;
   return /^[0-9a-f]{64}$/.test(String(state.headHash)) &&
     /^[0-9a-f]{64}$/.test(String(state.merkleRoot)) &&
-    Number.isSafeInteger(state.totalDepth) && (state.totalDepth as number) > 0
-    ? state as BoundProvenance : undefined;
+    Number.isSafeInteger(state.totalDepth) &&
+    (state.totalDepth as number) > 0
+    ? (state as BoundProvenance)
+    : undefined;
 }
 
 function receiptProvenance(value: unknown): BoundProvenance | undefined {
   if (!value || typeof value !== "object") return undefined;
   const receipt = value as Record<string, unknown>;
-  if (receipt.attestation && typeof (receipt.attestation as Record<string, unknown>).proofPayload === "string") {
+  if (
+    receipt.attestation &&
+    typeof (receipt.attestation as Record<string, unknown>).proofPayload ===
+      "string"
+  ) {
     try {
-      const signed = JSON.parse((receipt.attestation as { proofPayload: string }).proofPayload) as {
+      const signed = JSON.parse(
+        (receipt.attestation as { proofPayload: string }).proofPayload,
+      ) as {
         payload?: { metadata?: { context?: { datasetProvenance?: unknown } } };
       };
-      return boundProvenance(signed.payload?.metadata?.context?.datasetProvenance);
-    } catch { return undefined; }
+      return boundProvenance(
+        signed.payload?.metadata?.context?.datasetProvenance,
+      );
+    } catch {
+      return undefined;
+    }
   }
-  return boundProvenance((receipt.payload as { metadata?: { datasetProvenance?: unknown } } | undefined)
-    ?.metadata?.datasetProvenance);
+  return boundProvenance(
+    (
+      receipt.payload as
+        { metadata?: { datasetProvenance?: unknown } } | undefined
+    )?.metadata?.datasetProvenance,
+  );
 }
 
 async function provenanceForReceipt(receipt: unknown) {
   const bound = receiptProvenance(receipt);
   if (!bound) return { provenanceVerified: false };
   const chain = buildProvenanceChain(await readDataset());
-  if (chain.headHash !== bound.headHash || chain.merkleRoot !== bound.merkleRoot ||
-      chain.totalDepth !== bound.totalDepth || !chain.verified) {
+  if (
+    chain.headHash !== bound.headHash ||
+    chain.merkleRoot !== bound.merkleRoot ||
+    chain.totalDepth !== bound.totalDepth ||
+    !chain.verified
+  ) {
     return { provenanceVerified: false };
   }
   const anchor = await getProvenanceAnchor(bound.headHash);
-  if (anchor && (anchor.merkleRoot !== bound.merkleRoot || anchor.totalDepth !== bound.totalDepth)) {
+  if (
+    anchor &&
+    (anchor.merkleRoot !== bound.merkleRoot ||
+      anchor.totalDepth !== bound.totalDepth)
+  ) {
     return { provenanceVerified: false };
   }
   return {
     provenanceVerified: true,
     provenanceMerkleRoot: bound.merkleRoot,
-    ...(anchor ? { otsProof: anchor.otsProof, otsStatus: anchor.otsStatus } : {}),
+    ...(anchor
+      ? { otsProof: anchor.otsProof, otsStatus: anchor.otsStatus }
+      : {}),
   };
 }
 
-function findArchivedProof(hash: string, quorumThreshold: number): ArchivedProofLookup | undefined {
+function findArchivedProof(
+  hash: string,
+  quorumThreshold: number,
+): ArchivedProofLookup | undefined {
   const proof = getZkProofRecord(hash);
   if (proof) return proof;
   const receipt = getEpistemicDatasetReceiptByHash(hash);
-  if (receipt) return {
-    kind: "dataset-receipt",
-    hash: receipt.receiptHash,
-    status: "verified",
-    timestamp: receipt.timestamp,
-    proofPayload: receipt,
-  };
+  if (receipt)
+    return {
+      kind: "dataset-receipt",
+      hash: receipt.receiptHash,
+      status: "verified",
+      timestamp: receipt.timestamp,
+      proofPayload: receipt,
+    };
   const contextReceipt = getGroundedContextReceipt(hash);
-  if (contextReceipt) return {
-    kind: "context-receipt",
-    hash: contextReceipt.contextHash,
-    status: "verified",
-    timestamp: new Date(contextReceipt.timestamp).toISOString(),
-    proofPayload: contextReceipt,
-  };
-  const history = getZkProofStatus(hash) ??
+  if (contextReceipt)
+    return {
+      kind: "context-receipt",
+      hash: contextReceipt.contextHash,
+      status: "verified",
+      timestamp: new Date(contextReceipt.timestamp).toISOString(),
+      proofPayload: contextReceipt,
+    };
+  const history =
+    getZkProofStatus(hash) ??
     (/^(?:0x)?[0-9a-fA-F]{64}$/.test(hash)
       ? getZkProofStatus(`0x${hash.replace(/^0x/i, "").toLowerCase()}`)
       : undefined);
@@ -583,114 +697,237 @@ function findArchivedProof(hash: string, quorumThreshold: number): ArchivedProof
   };
 }
 
-const listProofAttestationsInputSchema = z.object({
-  limit: z.number().int().min(1).max(100).default(20).describe(
-    "Pagination window size, 1-100 records; use with offset to page through the bounded attestation index.",
-  ),
-  offset: z.number().int().min(0).max(1_000).default(0).describe(
-    "Zero-based pagination skip offset, 0-1000; increase by limit to page through historical attestations.",
-  ),
-  status: z.enum(proofLifecycleStates).optional().describe(
-    "Filter the attestation index to one lifecycle state: verified, cached, pending, or invalid.",
-  ),
-}).strict().describe(
-  "Input options for listing and discovering historical zk-SNARK proof attestations.",
-);
+const listProofAttestationsInputSchema = z
+  .object({
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe(
+        "Pagination window size, 1-100 records; use with offset to page through the bounded attestation index.",
+      ),
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .max(1_000)
+      .default(0)
+      .describe(
+        "Zero-based pagination skip offset, 0-1000; increase by limit to page through historical attestations.",
+      ),
+    status: z
+      .enum(proofLifecycleStates)
+      .optional()
+      .describe(
+        "Filter the attestation index to one lifecycle state: verified, cached, pending, or invalid.",
+      ),
+  })
+  .strict()
+  .describe(
+    "Input options for listing and discovering historical zk-SNARK proof attestations.",
+  );
 
-const proofPointASchema = z.array(
-  z.string().regex(/^\d+$/).describe("Decimal-encoded BN254 scalar-field coordinate in proof point A."),
-).length(3).describe("Groth16 BN254 proof A projective coordinates.");
-const proofPointBSchema = z.array(
-  z.array(
-    z.string().regex(/^\d+$/).describe("Decimal-encoded BN254 extension-field coordinate in proof point B."),
-  ).length(2),
-).length(3).describe("Groth16 BN254 proof B projective coordinates.");
-const proofPointCSchema = z.array(
-  z.string().regex(/^\d+$/).describe("Decimal-encoded BN254 scalar-field coordinate in proof point C."),
-).length(3).describe("Groth16 BN254 proof C projective coordinates.");
+const proofPointASchema = z
+  .array(
+    z
+      .string()
+      .regex(/^\d+$/)
+      .describe(
+        "Decimal-encoded BN254 scalar-field coordinate in proof point A.",
+      ),
+  )
+  .length(3)
+  .describe("Groth16 BN254 proof A projective coordinates.");
+const proofPointBSchema = z
+  .array(
+    z
+      .array(
+        z
+          .string()
+          .regex(/^\d+$/)
+          .describe(
+            "Decimal-encoded BN254 extension-field coordinate in proof point B.",
+          ),
+      )
+      .length(2),
+  )
+  .length(3)
+  .describe("Groth16 BN254 proof B projective coordinates.");
+const proofPointCSchema = z
+  .array(
+    z
+      .string()
+      .regex(/^\d+$/)
+      .describe(
+        "Decimal-encoded BN254 scalar-field coordinate in proof point C.",
+      ),
+  )
+  .length(3)
+  .describe("Groth16 BN254 proof C projective coordinates.");
 
-const submitProofInputSchema = z.object({
-  proof: z.union([
-    z.object({ piA: proofPointASchema, piB: proofPointBSchema, piC: proofPointCSchema }).strict(),
-    z.object({ pi_a: proofPointASchema, pi_b: proofPointBSchema, pi_c: proofPointCSchema }).strict(),
-  ]).describe(
-    "Groth16/Poseidon BN254 proof coordinates piA, piB, and piC (or legacy pi_a, pi_b, pi_c) for verification and optional NIP-78 publication.",
-  ),
-  publicSignals: z.array(
-    z.string().regex(/^\d+$/).describe(
-      "Decimal-encoded BN254 scalar-field element.",
-    ),
-  ).length(5).describe(
-    "Five ordered public signals: blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest; must align with the proof coordinates.",
-  ),
-  snapshotDigest: z.string().regex(/^(?:\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/).optional().describe(
-    "Decimal field digest or IPFS CID that must equal publicSignals[4] when supplied.",
-  ),
-}).strict().superRefine((input, context) => {
-  if (
-    input.snapshotDigest !== undefined &&
-    input.snapshotDigest !== input.publicSignals[4]
-  ) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["snapshotDigest"],
-      message: "snapshotDigest must equal publicSignals[4]",
-    });
-  }
-}).describe(
-  "Input payload containing Groth16 proof object and public signals for ingestion and Nostr NIP-78 attestation broadcast.",
-);
+const submitProofInputSchema = z
+  .object({
+    proof: z
+      .union([
+        z
+          .object({
+            piA: proofPointASchema,
+            piB: proofPointBSchema,
+            piC: proofPointCSchema,
+          })
+          .strict(),
+        z
+          .object({
+            pi_a: proofPointASchema,
+            pi_b: proofPointBSchema,
+            pi_c: proofPointCSchema,
+          })
+          .strict(),
+      ])
+      .describe(
+        "Groth16/Poseidon BN254 proof coordinates piA, piB, and piC (or legacy pi_a, pi_b, pi_c) for verification and optional NIP-78 publication.",
+      ),
+    publicSignals: z
+      .array(
+        z
+          .string()
+          .regex(/^\d+$/)
+          .describe("Decimal-encoded BN254 scalar-field element."),
+      )
+      .length(5)
+      .describe(
+        "Five ordered public signals: blockHeight, thermodynamicHash, timestamp, valuationSat, and snapshotDigest; must align with the proof coordinates.",
+      ),
+    snapshotDigest: z
+      .string()
+      .regex(/^(?:\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/)
+      .optional()
+      .describe(
+        "Decimal field digest or IPFS CID that must equal publicSignals[4] when supplied.",
+      ),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (
+      input.snapshotDigest !== undefined &&
+      input.snapshotDigest !== input.publicSignals[4]
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["snapshotDigest"],
+        message: "snapshotDigest must equal publicSignals[4]",
+      });
+    }
+  })
+  .describe(
+    "Input payload containing Groth16 proof object and public signals for ingestion and Nostr NIP-78 attestation broadcast.",
+  );
 
-const meshStatusInputSchema = z.object({}).strict().describe(
-  "No input parameters required.",
-);
+const meshStatusInputSchema = z
+  .object({})
+  .strict()
+  .describe("No input parameters required.");
 
-const meshBroadcastInputSchema = z.object({
-  signalType: z.literal("telemetry_snapshot").describe(
-    "Enforces the broadcast event schema; only telemetry_snapshot triggers peer validation for a freshly signed canonical record.",
-  ),
-  payload: z.object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe(
-      "UTC YYYY-MM-DD date of the existing stratigraphy record to broadcast.",
-    ),
-  }).strict().describe("UTC date selector for the existing telemetry record sent for peer attestation; arbitrary caller-supplied snapshots are not accepted."),
-  agentEvent: z.object({
-    id: z.string().regex(/^[0-9a-f]{64}$/),
-    pubkey: z.string().regex(/^[0-9a-f]{64}$/),
-    sig: z.string().regex(/^[0-9a-f]{128}$/),
-    kind: z.literal(20079),
-    created_at: z.number().int(),
-    tags: z.array(z.array(z.string())),
-    content: z.string(),
-  }).strict().optional().describe(
-    'Optional fresh NIP-01 agent session event. Sign JSON.stringify({networkId,date}) with kind 20079; the date must match payload.date. The agent must have a trusted mesh attestation.',
-  ),
-}).strict().describe("Request to broadcast one signed telemetry snapshot to configured, pinned mesh peers.");
+const meshBroadcastInputSchema = z
+  .object({
+    signalType: z
+      .literal("telemetry_snapshot")
+      .describe(
+        "Enforces the broadcast event schema; only telemetry_snapshot triggers peer validation for a freshly signed canonical record.",
+      ),
+    payload: z
+      .object({
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .describe(
+            "UTC YYYY-MM-DD date of the existing stratigraphy record to broadcast.",
+          ),
+      })
+      .strict()
+      .describe(
+        "UTC date selector for the existing telemetry record sent for peer attestation; arbitrary caller-supplied snapshots are not accepted.",
+      ),
+    agentEvent: z
+      .object({
+        id: z.string().regex(/^[0-9a-f]{64}$/),
+        pubkey: z.string().regex(/^[0-9a-f]{64}$/),
+        sig: z.string().regex(/^[0-9a-f]{128}$/),
+        kind: z.literal(20079),
+        created_at: z.number().int(),
+        tags: z.array(z.array(z.string())),
+        content: z.string(),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Optional fresh NIP-01 agent session event. Sign JSON.stringify({networkId,date}) with kind 20079; the date must match payload.date. The agent must have a trusted mesh attestation.",
+      ),
+  })
+  .strict()
+  .describe(
+    "Request to broadcast one signed telemetry snapshot to configured, pinned mesh peers.",
+  );
 
-const groundContextInputSchema = z.object({
-  contextHash: z.string().regex(/^[0-9a-fA-F]{64}$/).describe(
-    "64-character hexadecimal SHA-256 digest binding the agent's prompt or execution context to the current Bitcoin block tip.",
-  ),
-  agentId: z.string().trim().min(1).max(256).describe(
-    "Unique, trimmed caller-controlled agent instance identifier from 1 to 256 characters, named in the signed receipt.",
-  ),
-  metadata: z.record(z.string(), z.unknown()).optional().describe(
-    "Non-secret caller metadata bound into the context anchor.",
-  ),
-}).strict().describe("Paid epistemic context grounding request.");
+const groundContextInputSchema = z
+  .object({
+    contextHash: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/)
+      .describe(
+        "64-character hexadecimal SHA-256 digest binding the agent's prompt or execution context to the current Bitcoin block tip.",
+      ),
+    agentId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(256)
+      .describe(
+        "Unique, trimmed caller-controlled agent instance identifier from 1 to 256 characters, named in the signed receipt.",
+      ),
+    metadata: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Non-secret caller metadata bound into the context anchor."),
+  })
+  .strict()
+  .describe("Paid epistemic context grounding request.");
 
-const epistemicDatasetInputSchema = z.object({
-  cid: z.string().max(256).regex(/^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$/).describe(
-    "IPFS CIDv0/CIDv1 or 32-byte hexadecimal dataset hash to bind into the signed receipt.",
-  ),
-  nostrEventId: z.string().regex(/^[0-9a-fA-F]{64}$/).optional().describe(
-    "Optional 32-byte hexadecimal Nostr event ID to bind into the signed receipt; this tool does not publish it.",
-  ),
-  context: z.record(z.string(), z.unknown()).optional().describe(
-    "Optional non-secret JSON context bound to the signed receipt (maximum 16 KiB together with the other metadata).",
-  ),
-}).strict().describe("Dataset CID and optional publication context for a Bitcoin-tip signed receipt.");
-const proofGroundInputSchema = z.union([groundContextInputSchema, epistemicDatasetInputSchema]);
+const epistemicDatasetInputSchema = z
+  .object({
+    cid: z
+      .string()
+      .max(256)
+      .regex(
+        /^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$/,
+      )
+      .describe(
+        "IPFS CIDv0/CIDv1 or 32-byte hexadecimal dataset hash to bind into the signed receipt.",
+      ),
+    nostrEventId: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/)
+      .optional()
+      .describe(
+        "Optional 32-byte hexadecimal Nostr event ID to bind into the signed receipt; this tool does not publish it.",
+      ),
+    context: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        "Optional non-secret JSON context bound to the signed receipt (maximum 16 KiB together with the other metadata).",
+      ),
+  })
+  .strict()
+  .describe(
+    "Dataset CID and optional publication context for a Bitcoin-tip signed receipt.",
+  );
+const proofGroundInputSchema = z.union([
+  groundContextInputSchema,
+  epistemicDatasetInputSchema,
+]);
 
 const field = (
   type: string | string[],
@@ -699,10 +936,23 @@ const field = (
   extra: Record<string, unknown> = {},
 ) => {
   const constraints = [
-    ...(["minimum", "maximum", "minLength", "maxLength", "minItems", "maxItems", "format", "pattern"] as const)
+    ...(
+      [
+        "minimum",
+        "maximum",
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "format",
+        "pattern",
+      ] as const
+    )
       .filter((key) => extra[key] !== undefined)
       .map((key) => `${key}: ${extra[key]}`),
-    ...(Array.isArray(extra.enum) ? [`allowed values: ${extra.enum.join(", ")}`] : []),
+    ...(Array.isArray(extra.enum)
+      ? [`allowed values: ${extra.enum.join(", ")}`]
+      : []),
   ];
   return {
     type,
@@ -716,11 +966,13 @@ const field = (
 const quantitativeAlphaJsonSchema = {
   type: "object",
   description: "Quantitative thermodynamic indicators for one entry.",
-  examples: [{
-    target_multiplier: 125.83,
-    difficulty_epoch_progress: "73.42%",
-    thermodynamic_signal: "accumulation",
-  }],
+  examples: [
+    {
+      target_multiplier: 125.83,
+      difficulty_epoch_progress: "73.42%",
+      thermodynamic_signal: "accumulation",
+    },
+  ],
   additionalProperties: false,
   properties: {
     target_multiplier: field(
@@ -744,13 +996,16 @@ const quantitativeAlphaJsonSchema = {
 const entryJsonSchema = {
   type: "object",
   description: "A validated Bitcoin Stratigraphy telemetry entry.",
-  examples: [{
-    day: 422,
-    title: "Bitcoin Stratigraphy Day 422",
-    video_id: "dQw4w9WgXcQ",
-    transcript_summary: "Mining economics and thermodynamic support strengthened.",
-    quantitative_alpha: quantitativeAlphaJsonSchema.examples[0],
-  }],
+  examples: [
+    {
+      day: 422,
+      title: "Bitcoin Stratigraphy Day 422",
+      video_id: "dQw4w9WgXcQ",
+      transcript_summary:
+        "Mining economics and thermodynamic support strengthened.",
+      quantitative_alpha: quantitativeAlphaJsonSchema.examples[0],
+    },
+  ],
   additionalProperties: false,
   properties: {
     day: field(
@@ -786,13 +1041,17 @@ const publicInputsJsonSchema = {
   type: "object",
   description:
     "Exactly five public statement inputs committed by the Groth16/Poseidon proof: non-negative integer blockHeight, non-empty Poseidon snapshotDigest and thermodynamicHash strings, non-negative Unix-millisecond timestamp, and non-negative integer valuationSat. Example: blockHeight 920000 and valuationSat 12583.",
-  examples: [{
-    blockHeight: 920000,
-    snapshotDigest: "1534979302823651498736582947365829473658294736582947365829473658294",
-    thermodynamicHash: "782365829473658294736582947365829473658294736582947365829473658294",
-    timestamp: 1789776000000,
-    valuationSat: 12583,
-  }],
+  examples: [
+    {
+      blockHeight: 920000,
+      snapshotDigest:
+        "1534979302823651498736582947365829473658294736582947365829473658294",
+      thermodynamicHash:
+        "782365829473658294736582947365829473658294736582947365829473658294",
+      timestamp: 1789776000000,
+      valuationSat: 12583,
+    },
+  ],
   additionalProperties: false,
   properties: {
     blockHeight: field(
@@ -943,23 +1202,30 @@ async function queryStratigraphy(
   const allRecords = await getStratigraphyData();
   let records = hasLegacySelector
     ? input.blockHeight === undefined
-      ? (await getStratigraphyData({
-          days: input.days,
-          date: input.date,
-        })).slice(-input.limit)
-      : allRecords.filter((_record, index) =>
-          snapshotBlock(index, allRecords.length) === input.blockHeight
-        ).slice(0, input.limit)
-    : allRecords.filter((_record, index) => {
-      const date = snapshotDate(index, allRecords.length);
-      const block = snapshotBlock(index, allRecords.length);
-      return (
-        (input.startDate === undefined || date >= input.startDate) &&
-        (input.endDate === undefined || date <= input.endDate) &&
-        (input.startBlock === undefined || block >= input.startBlock) &&
-        (input.endBlock === undefined || block <= input.endBlock)
-      );
-    }).slice(0, input.limit);
+      ? (
+          await getStratigraphyData({
+            days: input.days,
+            date: input.date,
+          })
+        ).slice(-input.limit)
+      : allRecords
+          .filter(
+            (_record, index) =>
+              snapshotBlock(index, allRecords.length) === input.blockHeight,
+          )
+          .slice(0, input.limit)
+    : allRecords
+        .filter((_record, index) => {
+          const date = snapshotDate(index, allRecords.length);
+          const block = snapshotBlock(index, allRecords.length);
+          return (
+            (input.startDate === undefined || date >= input.startDate) &&
+            (input.endDate === undefined || date <= input.endDate) &&
+            (input.startBlock === undefined || block >= input.startBlock) &&
+            (input.endBlock === undefined || block <= input.endBlock)
+          );
+        })
+        .slice(0, input.limit);
 
   if (input.metrics !== undefined) {
     const selected = new Set(input.metrics);
@@ -967,7 +1233,7 @@ async function queryStratigraphy(
       ...record,
       quantitative_alpha: Object.fromEntries(
         Object.entries(record.quantitative_alpha).filter(([name]) =>
-          selected.has(name as typeof thermodynamicMetricNames[number])
+          selected.has(name as (typeof thermodynamicMetricNames)[number]),
         ),
       ) as typeof record.quantitative_alpha,
     }));
@@ -978,35 +1244,56 @@ async function queryStratigraphy(
 type StratumRecord = Awaited<ReturnType<typeof getStratigraphyData>>[number];
 
 function indexedStratumIndex(target: string, records: StratumRecord[]): number {
-  if (records.length === 0) throw new RangeError("No indexed stratigraphy records available");
+  if (records.length === 0)
+    throw new RangeError("No indexed stratigraphy records available");
   if (target === "latest") return records.length - 1;
   if (/^\d+$/.test(target)) {
     const height = Number(target);
-    if (!Number.isSafeInteger(height)) throw new RangeError("Target height is too large");
-    const index = records.findIndex((_record, i) => snapshotBlock(i, records.length) === height);
+    if (!Number.isSafeInteger(height))
+      throw new RangeError("Target height is too large");
+    const index = records.findIndex(
+      (_record, i) => snapshotBlock(i, records.length) === height,
+    );
     if (index >= 0) return index;
   } else {
-    const index = records.findIndex((_record, i) => snapshotDate(i, records.length) === target);
+    const index = records.findIndex(
+      (_record, i) => snapshotDate(i, records.length) === target,
+    );
     if (index >= 0) return index;
   }
   throw new RangeError(`No indexed stratum matches target: ${target}`);
 }
 
-function formatDigestRecord(record: StratumRecord, index: number, total: number, format: "compact" | "minimal" | "kv") {
-  const { height, date, targetMultiplier, recordHash } = digestRecord(record, index, total);
+function formatDigestRecord(
+  record: StratumRecord,
+  index: number,
+  total: number,
+  format: "compact" | "minimal" | "kv",
+) {
+  const { height, date, targetMultiplier, recordHash } = digestRecord(
+    record,
+    index,
+    total,
+  );
   if (format === "minimal") return [height, date, targetMultiplier, recordHash];
-  if (format === "kv") return { h: height, ts: date, tm: targetMultiplier, hash: recordHash };
+  if (format === "kv")
+    return { h: height, ts: date, tm: targetMultiplier, hash: recordHash };
   return `HEIGHT:${height}|DATE:${date}|TM:${targetMultiplier}|HASH:${recordHash}`;
 }
 
-async function queryStratigraphyDigest(
-  { target, format }: z.infer<typeof stratigraphyDigestInputSchema>,
-) {
+async function queryStratigraphyDigest({
+  target,
+  format,
+}: z.infer<typeof stratigraphyDigestInputSchema>) {
   const records = await getStratigraphyData();
-  if (records.length === 0) throw new RangeError("No indexed stratigraphy records available");
+  if (records.length === 0)
+    throw new RangeError("No indexed stratigraphy records available");
   const checkedDate = (date: string): string => {
     const parsed = new Date(`${date}T00:00:00.000Z`);
-    if (!Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== date) {
+    if (
+      !Number.isFinite(parsed.valueOf()) ||
+      parsed.toISOString().slice(0, 10) !== date
+    ) {
       throw new RangeError("target must contain a valid ISO calendar date");
     }
     return date;
@@ -1018,31 +1305,42 @@ async function queryStratigraphyDigest(
     indices = [indexedStratumIndex(target, records)];
   } else {
     const [start, end] = target.split("..").map(checkedDate);
-    if (end !== undefined && start > end) throw new RangeError("target range is reversed");
-    indices = end === undefined
-      ? [indexedStratumIndex(start, records)]
-      : records.flatMap((_record, i) => {
-        const date = snapshotDate(i, records.length);
-        return date >= start && date <= end ? [i] : [];
-      });
-    if (indices.length > 100) throw new RangeError("target range exceeds 100 records");
+    if (end !== undefined && start > end)
+      throw new RangeError("target range is reversed");
+    indices =
+      end === undefined
+        ? [indexedStratumIndex(start, records)]
+        : records.flatMap((_record, i) => {
+            const date = snapshotDate(i, records.length);
+            return date >= start && date <= end ? [i] : [];
+          });
+    if (indices.length > 100)
+      throw new RangeError("target range exceeds 100 records");
   }
-  if (indices.length === 0) throw new RangeError("No indexed stratum matches target");
+  if (indices.length === 0)
+    throw new RangeError("No indexed stratum matches target");
   const formatted = indices.map((index) =>
-    formatDigestRecord(records[index], index, records.length, format)
+    formatDigestRecord(records[index], index, records.length, format),
   );
   return target.includes("..") ? formatted : formatted[0];
 }
 
 async function queryStratigraphyRange({
-  startTarget, endTarget, limit, format,
+  startTarget,
+  endTarget,
+  limit,
+  format,
 }: z.infer<typeof stratigraphyRangeInputSchema>) {
   const records = await getStratigraphyData();
   const start = indexedStratumIndex(startTarget, records);
   const end = indexedStratumIndex(endTarget, records);
-  if (start > end) throw new RangeError("startTarget must not follow endTarget");
-  const formattedRecords = records.slice(start, Math.min(end + 1, start + limit))
-    .map((record, offset) => formatDigestRecord(record, start + offset, records.length, format));
+  if (start > end)
+    throw new RangeError("startTarget must not follow endTarget");
+  const formattedRecords = records
+    .slice(start, Math.min(end + 1, start + limit))
+    .map((record, offset) =>
+      formatDigestRecord(record, start + offset, records.length, format),
+    );
   return {
     range: { start: startTarget, end: endTarget },
     count: formattedRecords.length,
@@ -1051,9 +1349,10 @@ async function queryStratigraphyRange({
   };
 }
 
-async function queryStratigraphyDiff(
-  { fromTarget, toTarget }: z.infer<typeof stratigraphyDiffInputSchema>,
-) {
+async function queryStratigraphyDiff({
+  fromTarget,
+  toTarget,
+}: z.infer<typeof stratigraphyDiffInputSchema>) {
   const records = await getStratigraphyData();
   const fromIndex = indexedStratumIndex(fromTarget, records);
   const toIndex = indexedStratumIndex(toTarget, records);
@@ -1065,7 +1364,9 @@ async function queryStratigraphyDiff(
   const from = stratum(fromIndex);
   const to = stratum(toIndex);
   if (from.target_multiplier === 0) {
-    throw new RangeError("Cannot calculate percentage change from a zero starting multiplier");
+    throw new RangeError(
+      "Cannot calculate percentage change from a zero starting multiplier",
+    );
   }
   const multiplierDelta = to.target_multiplier - from.target_multiplier;
   return {
@@ -1091,26 +1392,41 @@ function normalizedAttenuationCaveats(
     const caveat = `${key}=${value}`;
     if (key === "allowed_tools") {
       const names = value.split(",").map((name) => name.trim());
-      if (names.length > 16 || names.some((name) =>
-        !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/.test(name) ||
-        (!baseMcpToolDefinitions.some((tool) => tool.name === name) &&
-          !Object.hasOwn(legacyToolNames, name))
-      )) throw new RangeError("allowed_tools must list registered MCP tools or supported legacy aliases");
+      if (
+        names.length > 16 ||
+        names.some(
+          (name) =>
+            !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/.test(name) ||
+            (!baseMcpToolDefinitions.some((tool) => tool.name === name) &&
+              !Object.hasOwn(legacyToolNames, name)),
+        )
+      )
+        throw new RangeError(
+          "allowed_tools must list registered MCP tools or supported legacy aliases",
+        );
       return `allowed_tools=${names.join(",")}`;
     }
     if (key === "time_before" && value.length === 10) {
       const time = Date.parse(`${value}T00:00:00.000Z`);
-      if (!Number.isFinite(time) || new Date(time).toISOString().slice(0, 10) !== value) {
+      if (
+        !Number.isFinite(time) ||
+        new Date(time).toISOString().slice(0, 10) !== value
+      ) {
         throw new RangeError("Invalid time_before UTC date");
       }
     }
     if (
-      !/^(?:allowed_path=\/[^\s]*|max_requests=[1-9]\d*|max_target=(?:0|[1-9]\d*)|time_before=(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z))$/.test(caveat)
-    ) throw new RangeError("Unsupported attenuation caveat");
+      !/^(?:allowed_path=\/[^\s]*|max_requests=[1-9]\d*|max_target=(?:0|[1-9]\d*)|time_before=(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z))$/.test(
+        caveat,
+      )
+    )
+      throw new RangeError("Unsupported attenuation caveat");
     return caveat;
   });
   if (input.ttlSeconds !== undefined) {
-    normalized.push(`time_before=${new Date(now + input.ttlSeconds * 1_000).toISOString()}`);
+    normalized.push(
+      `time_before=${new Date(now + input.ttlSeconds * 1_000).toISOString()}`,
+    );
   }
   return normalized;
 }
@@ -1124,13 +1440,18 @@ async function withinMcpTargetBound(
   const records = await getStratigraphyData();
   const heightAt = (index: number) => snapshotBlock(index, records.length);
   if (name === "stratigraphy.get") {
-    const selected = await queryStratigraphy(stratigraphyInputSchema.parse(args));
-    return selected.length > 0 && selected.every((record) => heightAt(record.day - 1) <= maxTarget);
+    const selected = await queryStratigraphy(
+      stratigraphyInputSchema.parse(args),
+    );
+    return (
+      selected.length > 0 &&
+      selected.every((record) => heightAt(record.day - 1) <= maxTarget)
+    );
   }
   if (name === "stratigraphy.get_diff") {
     const { fromTarget, toTarget } = stratigraphyDiffInputSchema.parse(args);
-    return [fromTarget, toTarget].every((target) =>
-      heightAt(indexedStratumIndex(target, records)) <= maxTarget
+    return [fromTarget, toTarget].every(
+      (target) => heightAt(indexedStratumIndex(target, records)) <= maxTarget,
     );
   }
   if (name === "stratigraphy.get_range") {
@@ -1138,8 +1459,11 @@ async function withinMcpTargetBound(
     try {
       const start = indexedStratumIndex(startTarget, records);
       const end = indexedStratumIndex(endTarget, records);
-      return start <= end &&
-        heightAt(start) <= maxTarget && heightAt(end) <= maxTarget;
+      return (
+        start <= end &&
+        heightAt(start) <= maxTarget &&
+        heightAt(end) <= maxTarget
+      );
     } catch (error) {
       if (error instanceof RangeError) return false;
       throw error;
@@ -1155,22 +1479,40 @@ async function withinMcpTargetBound(
       const date = snapshotDate(index, records.length);
       return date >= start && date <= end ? [index] : [];
     });
-    return selected.length > 0 && selected.every((index) => heightAt(index) <= maxTarget);
+    return (
+      selected.length > 0 &&
+      selected.every((index) => heightAt(index) <= maxTarget)
+    );
   }
   // Never silently ignore a target caveat on unrelated tools.
   return false;
 }
 
-const diffStratumExample = { height: 919856, date: "2026-09-08", target_multiplier: 125.5 };
+const diffStratumExample = {
+  height: 919856,
+  date: "2026-09-08",
+  target_multiplier: 125.5,
+};
 const diffStratumSchema = {
   type: "object",
-  description: "One indexed daily stratum; the height is a deterministic dataset index, not a live Bitcoin block height.",
+  description:
+    "One indexed daily stratum; the height is a deterministic dataset index, not a live Bitcoin block height.",
   examples: [diffStratumExample],
   additionalProperties: false,
   properties: {
-    height: field("integer", "Deterministic indexed height for the dataset day.", [919856]),
-    date: field("string", "Indexed UTC calendar date.", ["2026-09-08"], { format: "date" }),
-    target_multiplier: field("number", "Stored target multiplier; not a measured energy quantity.", [125.5]),
+    height: field(
+      "integer",
+      "Deterministic indexed height for the dataset day.",
+      [919856],
+    ),
+    date: field("string", "Indexed UTC calendar date.", ["2026-09-08"], {
+      format: "date",
+    }),
+    target_multiplier: field(
+      "number",
+      "Stored target multiplier; not a measured energy quantity.",
+      [125.5],
+    ),
   },
   required: ["height", "date", "target_multiplier"],
 };
@@ -1180,11 +1522,12 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only, HTTP rate-limited and L402-paid. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds.",
+      "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only and L402-paid, without HTTP IP rate limiting. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Choose recent days, one date/indexed height, or an inclusive date/height range; selector modes cannot be combined. Limit and metrics refine the selected records.",
+      description:
+        "Choose recent days, one date/indexed height, or an inclusive date/height range; selector modes cannot be combined. Limit and metrics refine the selected records.",
       examples: [
         { days: 7, limit: 7 },
         { date: "2026-09-09", limit: 1 },
@@ -1301,15 +1644,23 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Select a daily indexed stratum or bounded date range for compression.",
-      examples: [{ target: "latest", format: "compact" }, { target: "2026-09-01..2026-09-09", format: "kv" }],
+      description:
+        "Select a daily indexed stratum or bounded date range for compression.",
+      examples: [
+        { target: "latest", format: "compact" },
+        { target: "2026-09-01..2026-09-09", format: "kv" },
+      ],
       additionalProperties: false,
       properties: {
         target: field(
           "string",
           "Indexed Bitcoin height (e.g. '920000'), ISO date, or inclusive ISO date range joined with '..'. Defaults to the latest available dataset entry, not the live Bitcoin tip.",
           ["latest", "920000", "2026-09-09", "2026-09-01..2026-09-09"],
-          { pattern: "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2}(?:\\.\\.\\d{4}-\\d{2}-\\d{2})?)$", default: "latest" },
+          {
+            pattern:
+              "^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2}(?:\\.\\.\\d{4}-\\d{2}-\\d{2})?)$",
+            default: "latest",
+          },
         ),
         format: field(
           "string",
@@ -1322,8 +1673,15 @@ const baseMcpToolDefinitions = [
     },
     outputSchema: {
       type: "object",
-      description: "Compressed digest plus a flag indicating whether source entries carry per-record proofs; a date range returns an array of results in ascending date order.",
-      examples: [{ result: "HEIGHT:920000|DATE:2026-09-09|TM:125.83|HASH:0123456789abcdef", proofAvailable: false }],
+      description:
+        "Compressed digest plus a flag indicating whether source entries carry per-record proofs; a date range returns an array of results in ascending date order.",
+      examples: [
+        {
+          result:
+            "HEIGHT:920000|DATE:2026-09-09|TM:125.83|HASH:0123456789abcdef",
+          proofAvailable: false,
+        },
+      ],
       additionalProperties: false,
       properties: {
         result: field(
@@ -1345,7 +1703,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_diff",
     title: "Compare Stratigraphy Strata",
     description:
-      "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to HTTP rate limiting and L402 payment; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool.",
+      "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to L402 payment, without HTTP IP rate limiting; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1354,8 +1712,12 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Compare a required baseline indexed height or UTC date with an optional endpoint; either order is valid and produces signed deltas. latest refers to the latest indexed entry, not the live chain tip.",
-      examples: [{ fromTarget: "919856", toTarget: "latest" }, { fromTarget: "2026-09-08", toTarget: "2026-09-09" }],
+      description:
+        "Compare a required baseline indexed height or UTC date with an optional endpoint; either order is valid and produces signed deltas. latest refers to the latest indexed entry, not the live chain tip.",
+      examples: [
+        { fromTarget: "919856", toTarget: "latest" },
+        { fromTarget: "2026-09-08", toTarget: "2026-09-09" },
+      ],
       additionalProperties: false,
       properties: {
         fromTarget: field(
@@ -1375,28 +1737,65 @@ const baseMcpToolDefinitions = [
     },
     outputSchema: {
       type: "object",
-      description: "Signed difference between two indexed daily records. Percent change is rounded to two decimal places; source data provides a target multiplier, not a direct difficulty or energy measurement.",
-      examples: [{
-        from: diffStratumExample,
-        to: { height: 920000, date: "2026-09-09", target_multiplier: 125.83 },
-        delta: { heightDelta: 144, multiplierDelta: 0.33, percentageChange: "0.26%", timeSpanDays: 1 },
-      }],
+      description:
+        "Signed difference between two indexed daily records. Percent change is rounded to two decimal places; source data provides a target multiplier, not a direct difficulty or energy measurement.",
+      examples: [
+        {
+          from: diffStratumExample,
+          to: { height: 920000, date: "2026-09-09", target_multiplier: 125.83 },
+          delta: {
+            heightDelta: 144,
+            multiplierDelta: 0.33,
+            percentageChange: "0.26%",
+            timeSpanDays: 1,
+          },
+        },
+      ],
       additionalProperties: false,
       properties: {
         from: diffStratumSchema,
         to: diffStratumSchema,
         delta: {
           type: "object",
-          description: "Signed change from the starting indexed entry to the ending entry.",
-          examples: [{ heightDelta: 144, multiplierDelta: 0.33, percentageChange: "0.26%", timeSpanDays: 1 }],
+          description:
+            "Signed change from the starting indexed entry to the ending entry.",
+          examples: [
+            {
+              heightDelta: 144,
+              multiplierDelta: 0.33,
+              percentageChange: "0.26%",
+              timeSpanDays: 1,
+            },
+          ],
           additionalProperties: false,
           properties: {
-            heightDelta: field("integer", "Ending indexed height minus starting indexed height.", [144]),
-            multiplierDelta: field("number", "Ending stored target multiplier minus starting multiplier.", [0.33]),
-            percentageChange: field("string", "Multiplier change divided by starting multiplier, formatted as a percentage to two decimal places.", ["0.26%"]),
-            timeSpanDays: field("integer", "Signed number of UTC calendar days between indexed dates.", [1]),
+            heightDelta: field(
+              "integer",
+              "Ending indexed height minus starting indexed height.",
+              [144],
+            ),
+            multiplierDelta: field(
+              "number",
+              "Ending stored target multiplier minus starting multiplier.",
+              [0.33],
+            ),
+            percentageChange: field(
+              "string",
+              "Multiplier change divided by starting multiplier, formatted as a percentage to two decimal places.",
+              ["0.26%"],
+            ),
+            timeSpanDays: field(
+              "integer",
+              "Signed number of UTC calendar days between indexed dates.",
+              [1],
+            ),
           },
-          required: ["heightDelta", "multiplierDelta", "percentageChange", "timeSpanDays"],
+          required: [
+            "heightDelta",
+            "multiplierDelta",
+            "percentageChange",
+            "timeSpanDays",
+          ],
         },
       },
       required: ["from", "to", "delta"],
@@ -1406,7 +1805,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only, HTTP rate-limited and L402-paid; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries.",
+      "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only and L402-paid, without HTTP IP rate limiting; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1415,41 +1814,98 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Select an inclusive, ascending range of indexed daily strata. Bounds must match recorded heights or UTC dates; latest refers to the latest indexed entry, not the live Bitcoin tip.",
-      examples: [{ startTarget: "919712", endTarget: "latest", limit: 3, format: "kv" }, { startTarget: "2026-09-08", endTarget: "2026-09-09", format: "minimal" }],
+      description:
+        "Select an inclusive, ascending range of indexed daily strata. Bounds must match recorded heights or UTC dates; latest refers to the latest indexed entry, not the live Bitcoin tip.",
+      examples: [
+        { startTarget: "919712", endTarget: "latest", limit: 3, format: "kv" },
+        {
+          startTarget: "2026-09-08",
+          endTarget: "2026-09-09",
+          format: "minimal",
+        },
+      ],
       additionalProperties: false,
       properties: {
-        startTarget: field("string", "Required inclusive starting indexed height (e.g. '850000') or UTC ISO date (e.g. '2026-01-01'); must resolve no later than endTarget.", ["919712", "2026-09-07"], { pattern: diffTargetPattern }),
-        endTarget: field("string", "Optional inclusive ending indexed height, UTC ISO date, or 'latest' (default: latest indexed entry, not live tip); must resolve no earlier than startTarget.", ["latest", "920000", "2026-09-09"], { pattern: diffEndTargetPattern, default: "latest" }),
-        limit: field("number", "Maximum compressed records returned from startTarget toward endTarget, 1-100 (default 50); smaller limits truncate the batch.", [50], { minimum: 1, maximum: 100, default: 50 }),
-        format: field("string", "Compression of every returned record: compact (default), minimal, or kv; does not change selected bounds.", ["compact", "minimal", "kv"], { enum: ["compact", "minimal", "kv"], default: "compact" }),
+        startTarget: field(
+          "string",
+          "Required inclusive starting indexed height (e.g. '850000') or UTC ISO date (e.g. '2026-01-01'); must resolve no later than endTarget.",
+          ["919712", "2026-09-07"],
+          { pattern: diffTargetPattern },
+        ),
+        endTarget: field(
+          "string",
+          "Optional inclusive ending indexed height, UTC ISO date, or 'latest' (default: latest indexed entry, not live tip); must resolve no earlier than startTarget.",
+          ["latest", "920000", "2026-09-09"],
+          { pattern: diffEndTargetPattern, default: "latest" },
+        ),
+        limit: field(
+          "number",
+          "Maximum compressed records returned from startTarget toward endTarget, 1-100 (default 50); smaller limits truncate the batch.",
+          [50],
+          { minimum: 1, maximum: 100, default: 50 },
+        ),
+        format: field(
+          "string",
+          "Compression of every returned record: compact (default), minimal, or kv; does not change selected bounds.",
+          ["compact", "minimal", "kv"],
+          { enum: ["compact", "minimal", "kv"], default: "compact" },
+        ),
       },
       required: ["startTarget"],
     },
     outputSchema: {
       type: "object",
-      description: "Ascending indexed strata between inclusive bounds, truncated at limit. Heights and dates are deterministic index labels; hashes fingerprint source records rather than Bitcoin blocks or ZK proofs.",
-      examples: [{
-        range: { start: "919856", end: "919856" }, count: 1, format: "compact",
-        records: ["HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef"],
-      }],
+      description:
+        "Ascending indexed strata between inclusive bounds, truncated at limit. Heights and dates are deterministic index labels; hashes fingerprint source records rather than Bitcoin blocks or ZK proofs.",
+      examples: [
+        {
+          range: { start: "919856", end: "919856" },
+          count: 1,
+          format: "compact",
+          records: [
+            "HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef",
+          ],
+        },
+      ],
       additionalProperties: false,
       properties: {
         range: {
-          type: "object", description: "Requested bounds, including default latest if omitted.",
-          examples: [{ start: "919856", end: "latest" }], additionalProperties: false,
+          type: "object",
+          description: "Requested bounds, including default latest if omitted.",
+          examples: [{ start: "919856", end: "latest" }],
+          additionalProperties: false,
           properties: {
             start: field("string", "Requested starting target.", ["919856"]),
             end: field("string", "Requested ending target.", ["latest"]),
           },
           required: ["start", "end"],
         },
-        count: field("integer", "Number of records returned, at most limit.", [2], { minimum: 1, maximum: 100 }),
-        format: field("string", "Compression format of each record.", ["compact"], { enum: ["compact", "minimal", "kv"] }),
-        records: field("array", "Records in ascending indexed order; compact strings, minimal arrays, or terse key-value objects.", [["HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef"]], {
-          minItems: 1, maxItems: 100,
-          items: field(["string", "array", "object"], "One compressed source-record digest.", ["HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef"]),
-        }),
+        count: field(
+          "integer",
+          "Number of records returned, at most limit.",
+          [2],
+          { minimum: 1, maximum: 100 },
+        ),
+        format: field(
+          "string",
+          "Compression format of each record.",
+          ["compact"],
+          { enum: ["compact", "minimal", "kv"] },
+        ),
+        records: field(
+          "array",
+          "Records in ascending indexed order; compact strings, minimal arrays, or terse key-value objects.",
+          [["HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef"]],
+          {
+            minItems: 1,
+            maxItems: 100,
+            items: field(
+              ["string", "array", "object"],
+              "One compressed source-record digest.",
+              ["HEIGHT:919856|DATE:2026-09-08|TM:125.5|HASH:0123456789abcdef"],
+            ),
+          },
+        ),
       },
       required: ["range", "count", "format", "records"],
     },
@@ -1471,17 +1927,20 @@ const baseMcpToolDefinitions = [
     },
     outputSchema: {
       type: "object",
-      description: "Discoverable bounds and metrics for the stratigraphy dataset.",
-      examples: [{
-        totalSnapshots: 422,
-        oldestBlock: 859376,
-        newestBlock: 920000,
-        availableMetrics: [...catalogMetricNames],
-        dateBounds: {
-          startDate: "2025-07-15",
-          endDate: "2026-09-09",
+      description:
+        "Discoverable bounds and metrics for the stratigraphy dataset.",
+      examples: [
+        {
+          totalSnapshots: 422,
+          oldestBlock: 859376,
+          newestBlock: 920000,
+          availableMetrics: [...catalogMetricNames],
+          dateBounds: {
+            startDate: "2025-07-15",
+            endDate: "2026-09-09",
+          },
         },
-      }],
+      ],
       additionalProperties: false,
       properties: {
         totalSnapshots: field(
@@ -1517,10 +1976,12 @@ const baseMcpToolDefinitions = [
         dateBounds: {
           type: "object",
           description: "Inclusive ISO date bounds of the available snapshots.",
-          examples: [{
-            startDate: "2025-07-15",
-            endDate: "2026-09-09",
-          }],
+          examples: [
+            {
+              startDate: "2025-07-15",
+              endDate: "2026-09-09",
+            },
+          ],
           additionalProperties: false,
           properties: {
             startDate: field(
@@ -1561,33 +2022,99 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Provide an authentic parent macaroon, an array of restrictions, and optional TTL; child caveats intersect with inherited constraints and no payment invoice is issued.",
-      examples: [{ macaroon: "base64url-parent-macaroon", caveats: ["allowed_tools = stratigraphy.get,stratigraphy.get_digest", "max_target = 870000"], ttlSeconds: 3600 }],
+      description:
+        "Provide an authentic parent macaroon, an array of restrictions, and optional TTL; child caveats intersect with inherited constraints and no payment invoice is issued.",
+      examples: [
+        {
+          macaroon: "base64url-parent-macaroon",
+          caveats: [
+            "allowed_tools = stratigraphy.get,stratigraphy.get_digest",
+            "max_target = 870000",
+          ],
+          ttlSeconds: 3600,
+        },
+      ],
       additionalProperties: false,
       properties: {
-        macaroon: field("string", "Required authentic, unexpired parent L402 macaroon (1-8192 characters); caveats and ttlSeconds can only narrow its scope.", ["base64url-parent-macaroon"], { minLength: 1, maxLength: 8192 }),
-        caveats: field("array", "List of restriction caveats to append (e.g. ['time_before = 2026-12-31', 'max_target = 870000', 'allowed_tools = stratigraphy.get,stratigraphy.get_digest']). Existing allowed_path and max_requests restrictions are also supported.", [["time_before = 2026-12-31", "max_target = 870000", "allowed_tools = stratigraphy.get,stratigraphy.get_digest"]], {
-          maxItems: 16,
-          items: field("string", "One supported restriction caveat.", ["max_target = 870000"], { minLength: 1, maxLength: 256 }),
-        }),
-        ttlSeconds: field("number", "Optional positive integer TTL of 1-2592000 seconds (e.g. 3600); appends an expiration caveat without extending the parent's expiry.", [3600], {
-          minimum: 1, maximum: 2_592_000,
-        }),
+        macaroon: field(
+          "string",
+          "Required authentic, unexpired parent L402 macaroon (1-8192 characters); caveats and ttlSeconds can only narrow its scope.",
+          ["base64url-parent-macaroon"],
+          { minLength: 1, maxLength: 8192 },
+        ),
+        caveats: field(
+          "array",
+          "List of restriction caveats to append (e.g. ['time_before = 2026-12-31', 'max_target = 870000', 'allowed_tools = stratigraphy.get,stratigraphy.get_digest']). Existing allowed_path and max_requests restrictions are also supported.",
+          [
+            [
+              "time_before = 2026-12-31",
+              "max_target = 870000",
+              "allowed_tools = stratigraphy.get,stratigraphy.get_digest",
+            ],
+          ],
+          {
+            maxItems: 16,
+            items: field(
+              "string",
+              "One supported restriction caveat.",
+              ["max_target = 870000"],
+              { minLength: 1, maxLength: 256 },
+            ),
+          },
+        ),
+        ttlSeconds: field(
+          "number",
+          "Optional positive integer TTL of 1-2592000 seconds (e.g. 3600); appends an expiration caveat without extending the parent's expiry.",
+          [3600],
+          {
+            minimum: 1,
+            maximum: 2_592_000,
+          },
+        ),
       },
       required: ["macaroon", "caveats"],
     },
     outputSchema: {
       type: "object",
-      description: "New macaroon and canonical restrictions inherited from the parent plus those added by this call. The child still requires the parent's payment proof for use.",
-      examples: [{ status: "attenuated", attenuatedMacaroon: "base64url-child-macaroon", appliedCaveats: ["max_target=870000"], issuedAt: "2026-09-27T21:00:00.000Z" }],
+      description:
+        "New macaroon and canonical restrictions inherited from the parent plus those added by this call. The child still requires the parent's payment proof for use.",
+      examples: [
+        {
+          status: "attenuated",
+          attenuatedMacaroon: "base64url-child-macaroon",
+          appliedCaveats: ["max_target=870000"],
+          issuedAt: "2026-09-27T21:00:00.000Z",
+        },
+      ],
       additionalProperties: false,
       properties: {
-        status: field("string", "Successful attenuation status.", ["attenuated"], { const: "attenuated" }),
-        attenuatedMacaroon: field("string", "Encoded child subscription macaroon. Treat as a bearer credential.", ["base64url-child-macaroon"]),
-        appliedCaveats: field("array", "New canonical caveats appended to the parent; inherited caveats are preserved inside the token.", [["max_target=870000"]], {
-          items: field("string", "One appended canonical caveat.", ["max_target=870000"]),
-        }),
-        issuedAt: field("string", "UTC issuance timestamp.", ["2026-09-27T21:00:00.000Z"], { format: "date-time" }),
+        status: field(
+          "string",
+          "Successful attenuation status.",
+          ["attenuated"],
+          { const: "attenuated" },
+        ),
+        attenuatedMacaroon: field(
+          "string",
+          "Encoded child subscription macaroon. Treat as a bearer credential.",
+          ["base64url-child-macaroon"],
+        ),
+        appliedCaveats: field(
+          "array",
+          "New canonical caveats appended to the parent; inherited caveats are preserved inside the token.",
+          [["max_target=870000"]],
+          {
+            items: field("string", "One appended canonical caveat.", [
+              "max_target=870000",
+            ]),
+          },
+        ),
+        issuedAt: field(
+          "string",
+          "UTC issuance timestamp.",
+          ["2026-09-27T21:00:00.000Z"],
+          { format: "date-time" },
+        ),
       },
       required: ["status", "attenuatedMacaroon", "appliedCaveats", "issuedAt"],
     },
@@ -1607,11 +2134,13 @@ const baseMcpToolDefinitions = [
           proof: "eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0",
           publicInputs: publicInputsJsonSchema.examples[0],
           verificationKeyId: "sha256:4c095e183ea45a9d",
-          data: [{
-            block: { height: 920000 },
-            observed_at: "2026-09-19T00:00:00.000Z",
-            thermodynamic: { target_multiplier: 125.83 },
-          }],
+          data: [
+            {
+              block: { height: 920000 },
+              observed_at: "2026-09-19T00:00:00.000Z",
+              thermodynamic: { target_multiplier: 125.83 },
+            },
+          ],
         },
         {
           circuit: "zk.drift.v1",
@@ -1621,7 +2150,11 @@ const baseMcpToolDefinitions = [
           proof: {
             circuit: "zk.drift.v1",
             pi_a: ["1", "2", "1"],
-            pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+            pi_b: [
+              ["1", "2"],
+              ["3", "4"],
+              ["1", "0"],
+            ],
             pi_c: ["1", "2", "1"],
             publicSignals: ["1", "2"],
             verificationKeyId: "sha256:4c095e183ea45a9d",
@@ -1636,17 +2169,22 @@ const baseMcpToolDefinitions = [
       oneOf: [
         {
           type: "object",
-          description: "Legacy telemetry-bound Groth16 proof verification input. Example: provide a proof, public inputs, verification key, and telemetry data.",
-          examples: [{
-            proof: "eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0",
-            publicInputs: publicInputsJsonSchema.examples[0],
-            verificationKeyId: "sha256:4c095e183ea45a9d",
-            data: [{
-              block: { height: 920000 },
-              observed_at: "2026-09-19T00:00:00.000Z",
-              thermodynamic: { target_multiplier: 125.83 },
-            }],
-          }],
+          description:
+            "Legacy telemetry-bound Groth16 proof verification input. Example: provide a proof, public inputs, verification key, and telemetry data.",
+          examples: [
+            {
+              proof: "eyJwaV9hIjpbIjEyMyIsIjQ1NiIsIjEiXX0",
+              publicInputs: publicInputsJsonSchema.examples[0],
+              verificationKeyId: "sha256:4c095e183ea45a9d",
+              data: [
+                {
+                  block: { height: 920000 },
+                  observed_at: "2026-09-19T00:00:00.000Z",
+                  thermodynamic: { target_multiplier: 125.83 },
+                },
+              ],
+            },
+          ],
           additionalProperties: false,
           properties: {
             proof: field(
@@ -1669,117 +2207,228 @@ const baseMcpToolDefinitions = [
             data: field(
               ["object", "array"],
               "Telemetry snapshot payload object or array of objects containing canonical state values.",
-              [[{
-                block: { height: 920000 },
-                observed_at: "2026-09-19T00:00:00.000Z",
-                thermodynamic: { target_multiplier: 125.83 },
-              }]],
+              [
+                [
+                  {
+                    block: { height: 920000 },
+                    observed_at: "2026-09-19T00:00:00.000Z",
+                    thermodynamic: { target_multiplier: 125.83 },
+                  },
+                ],
+              ],
             ),
           },
           required: ["proof", "publicInputs", "verificationKeyId", "data"],
         },
         {
           type: "object",
-          description: "Native zk.drift.v1 proof verification input, optionally bound to the complete verifier response. Example: supply the circuit discriminator, session hash, target height, threshold, and proof.",
-          examples: [{
-            circuit: "zk.drift.v1",
-            sessionContextHash: "ab".repeat(32),
-            targetBlockHeight: 920000,
-            entropyThreshold: 0.75,
-            proof: {
+          description:
+            "Native zk.drift.v1 proof verification input, optionally bound to the complete verifier response. Example: supply the circuit discriminator, session hash, target height, threshold, and proof.",
+          examples: [
+            {
               circuit: "zk.drift.v1",
-              pi_a: ["1", "2", "1"],
-              pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
-              pi_c: ["1", "2", "1"],
-              publicSignals: ["1", "2"],
-              verificationKeyId: "sha256:4c095e183ea45a9d",
-            },
-            driftScore: 0.25,
-            isAligned: true,
-            thermodynamicEntropyBits: 0.5,
-            blockHash: "ab".repeat(32),
-            compactTarget: 486604799,
-          }],
-          additionalProperties: false,
-          properties: {
-            circuit: field("string", "Drift proof circuit discriminator.", ["zk.drift.v1"], { const: "zk.drift.v1" }),
-            sessionContextHash: field("string", "Hash binding this proof to its agent session context.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
-            targetBlockHeight: field("integer", "Bitcoin block height being evaluated.", [920000], { minimum: 0, maximum: 0xffff_ffff }),
-            entropyThreshold: field("number", "Maximum accepted thermodynamic entropy threshold.", [0.75], { minimum: 0, maximum: 1 }),
-            proof: {
-              type: "object",
-              description: "Groth16 proof points, public signals, and verification-key identifier for zk.drift.v1. Example: pi_a, pi_b, pi_c, and public signals.",
-              examples: [{
+              sessionContextHash: "ab".repeat(32),
+              targetBlockHeight: 920000,
+              entropyThreshold: 0.75,
+              proof: {
                 circuit: "zk.drift.v1",
                 pi_a: ["1", "2", "1"],
-                pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+                pi_b: [
+                  ["1", "2"],
+                  ["3", "4"],
+                  ["1", "0"],
+                ],
                 pi_c: ["1", "2", "1"],
                 publicSignals: ["1", "2"],
                 verificationKeyId: "sha256:4c095e183ea45a9d",
-              }],
+              },
+              driftScore: 0.25,
+              isAligned: true,
+              thermodynamicEntropyBits: 0.5,
+              blockHash: "ab".repeat(32),
+              compactTarget: 486604799,
+            },
+          ],
+          additionalProperties: false,
+          properties: {
+            circuit: field(
+              "string",
+              "Drift proof circuit discriminator.",
+              ["zk.drift.v1"],
+              { const: "zk.drift.v1" },
+            ),
+            sessionContextHash: field(
+              "string",
+              "Hash binding this proof to its agent session context.",
+              ["ab".repeat(32)],
+              { pattern: "^[0-9a-fA-F]{64}$" },
+            ),
+            targetBlockHeight: field(
+              "integer",
+              "Bitcoin block height being evaluated.",
+              [920000],
+              { minimum: 0, maximum: 0xffff_ffff },
+            ),
+            entropyThreshold: field(
+              "number",
+              "Maximum accepted thermodynamic entropy threshold.",
+              [0.75],
+              { minimum: 0, maximum: 1 },
+            ),
+            proof: {
+              type: "object",
+              description:
+                "Groth16 proof points, public signals, and verification-key identifier for zk.drift.v1. Example: pi_a, pi_b, pi_c, and public signals.",
+              examples: [
+                {
+                  circuit: "zk.drift.v1",
+                  pi_a: ["1", "2", "1"],
+                  pi_b: [
+                    ["1", "2"],
+                    ["3", "4"],
+                    ["1", "0"],
+                  ],
+                  pi_c: ["1", "2", "1"],
+                  publicSignals: ["1", "2"],
+                  verificationKeyId: "sha256:4c095e183ea45a9d",
+                },
+              ],
               additionalProperties: false,
               properties: {
-                circuit: field("string", "Proof circuit discriminator.", ["zk.drift.v1"], { const: "zk.drift.v1" }),
+                circuit: field(
+                  "string",
+                  "Proof circuit discriminator.",
+                  ["zk.drift.v1"],
+                  { const: "zk.drift.v1" },
+                ),
                 pi_a: {
                   type: "array",
-                  description: "Three Groth16 pi_a field elements. Example: [\"1\", \"2\", \"1\"].",
+                  description:
+                    'Three Groth16 pi_a field elements. Example: ["1", "2", "1"].',
                   examples: [["1", "2", "1"]],
                   minItems: 3,
                   maxItems: 3,
-                  items: field("string", "Groth16 pi_a field element.", ["1"], { minLength: 1 }),
+                  items: field("string", "Groth16 pi_a field element.", ["1"], {
+                    minLength: 1,
+                  }),
                 },
                 pi_b: {
                   type: "array",
-                  description: "Three pairs of Groth16 pi_b field elements. Example: [[\"1\", \"2\"], [\"3\", \"4\"], [\"1\", \"0\"]].",
-                  examples: [[["1", "2"], ["3", "4"], ["1", "0"]]],
+                  description:
+                    'Three pairs of Groth16 pi_b field elements. Example: [["1", "2"], ["3", "4"], ["1", "0"]].',
+                  examples: [
+                    [
+                      ["1", "2"],
+                      ["3", "4"],
+                      ["1", "0"],
+                    ],
+                  ],
                   minItems: 3,
                   maxItems: 3,
                   items: {
                     type: "array",
-                    description: "A pair of Groth16 pi_b field elements. Example: [\"1\", \"2\"].",
+                    description:
+                      'A pair of Groth16 pi_b field elements. Example: ["1", "2"].',
                     examples: [["1", "2"]],
                     minItems: 2,
                     maxItems: 2,
-                    items: field("string", "Groth16 pi_b field element.", ["1"], { minLength: 1 }),
+                    items: field(
+                      "string",
+                      "Groth16 pi_b field element.",
+                      ["1"],
+                      { minLength: 1 },
+                    ),
                   },
                 },
                 pi_c: {
                   type: "array",
-                  description: "Three Groth16 pi_c field elements. Example: [\"1\", \"2\", \"1\"].",
+                  description:
+                    'Three Groth16 pi_c field elements. Example: ["1", "2", "1"].',
                   examples: [["1", "2", "1"]],
                   minItems: 3,
                   maxItems: 3,
-                  items: field("string", "Groth16 pi_c field element.", ["1"], { minLength: 1 }),
+                  items: field("string", "Groth16 pi_c field element.", ["1"], {
+                    minLength: 1,
+                  }),
                 },
                 publicSignals: {
                   type: "array",
-                  description: "Public field elements bound to the drift proof. Example: [\"1\", \"2\"].",
+                  description:
+                    'Public field elements bound to the drift proof. Example: ["1", "2"].',
                   examples: [["1", "2"]],
                   minItems: 1,
-                  items: field("string", "Public signal field element.", ["1"], { minLength: 1 }),
+                  items: field(
+                    "string",
+                    "Public signal field element.",
+                    ["1"],
+                    { minLength: 1 },
+                  ),
                 },
-                verificationKeyId: field("string", "Identifier of the verification key to use.", ["sha256:4c095e183ea45a9d"], { minLength: 1 }),
+                verificationKeyId: field(
+                  "string",
+                  "Identifier of the verification key to use.",
+                  ["sha256:4c095e183ea45a9d"],
+                  { minLength: 1 },
+                ),
               },
-              required: ["circuit", "pi_a", "pi_b", "pi_c", "publicSignals", "verificationKeyId"],
+              required: [
+                "circuit",
+                "pi_a",
+                "pi_b",
+                "pi_c",
+                "publicSignals",
+                "verificationKeyId",
+              ],
             },
-            driftScore: field("number", "Drift score bound to the complete verifier response.", [0.25]),
-            isAligned: field("boolean", "Alignment result bound to the complete verifier response.", [true]),
-            thermodynamicEntropyBits: field("number", "Thermodynamic entropy value bound to the complete verifier response.", [0.5], { minimum: 0 }),
-            blockHash: field("string", "Bitcoin block hash bound to the complete verifier response.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
-            compactTarget: field("integer", "Raw compact target bits bound to the complete verifier response.", [486604799], { minimum: 0, maximum: 0xffff_ffff }),
+            driftScore: field(
+              "number",
+              "Drift score bound to the complete verifier response.",
+              [0.25],
+            ),
+            isAligned: field(
+              "boolean",
+              "Alignment result bound to the complete verifier response.",
+              [true],
+            ),
+            thermodynamicEntropyBits: field(
+              "number",
+              "Thermodynamic entropy value bound to the complete verifier response.",
+              [0.5],
+              { minimum: 0 },
+            ),
+            blockHash: field(
+              "string",
+              "Bitcoin block hash bound to the complete verifier response.",
+              ["ab".repeat(32)],
+              { pattern: "^[0-9a-fA-F]{64}$" },
+            ),
+            compactTarget: field(
+              "integer",
+              "Raw compact target bits bound to the complete verifier response.",
+              [486604799],
+              { minimum: 0, maximum: 0xffff_ffff },
+            ),
           },
-          required: ["circuit", "sessionContextHash", "targetBlockHeight", "entropyThreshold", "proof"],
+          required: [
+            "circuit",
+            "sessionContextHash",
+            "targetBlockHeight",
+            "entropyThreshold",
+            "proof",
+          ],
         },
       ],
     },
     outputSchema: {
       type: "object",
       description: "Cryptographic proof verification result.",
-      examples: [{
-        valid: true,
-        verifiedAt: "2026-09-19T01:41:36.458Z",
-        computationTimeMs: 3.284,
-      }],
+      examples: [
+        {
+          valid: true,
+          verifiedAt: "2026-09-19T01:41:36.458Z",
+          computationTimeMs: 3.284,
+        },
+      ],
       additionalProperties: false,
       properties: {
         valid: field(
@@ -1813,18 +2462,18 @@ const baseMcpToolDefinitions = [
       type: "object",
       description:
         "Input arguments for querying single proof attestation lifecycle status.",
-      examples: [{
-        proofHash:
-          "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
-      }],
+      examples: [
+        {
+          proofHash:
+            "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
+        },
+      ],
       additionalProperties: false,
       properties: {
         proofHash: field(
           "string",
           "Primary proof lifecycle lookup key (64-digit hex with optional 0x prefix or IPFS CID); mutually exclusive with snapshotDigest.",
-          [
-            "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
-          ],
+          ["186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e"],
           {
             pattern:
               "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
@@ -1833,9 +2482,7 @@ const baseMcpToolDefinitions = [
         snapshotDigest: field(
           "string",
           "Primary snapshot lifecycle lookup key (decimal field digest, 64-digit hex, or IPFS CID); mutually exclusive with proofHash.",
-          [
-            "186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e",
-          ],
+          ["186b68214d3bfa5566dde64f3c66746e1bad3fdad7a01e158e6e8a730023302e"],
           {
             pattern:
               "^(?:\\d+|[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
@@ -1859,12 +2506,14 @@ const baseMcpToolDefinitions = [
       type: "object",
       description:
         "Current verification, cache, Nostr attestation, and mesh quorum state.",
-      examples: [{
-        status: "verified",
-        verifiedAt: "2026-09-19T05:54:39.835Z",
-        attestationCount: 3,
-        meshQuorum: true,
-      }],
+      examples: [
+        {
+          status: "verified",
+          verifiedAt: "2026-09-19T05:54:39.835Z",
+          attestationCount: 3,
+          meshQuorum: true,
+        },
+      ],
       additionalProperties: false,
       properties: {
         status: field(
@@ -1907,45 +2556,131 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Supply exactly one of hash or jobId to retrieve an exact retained proof/receipt or lifecycle state. Unknown identifiers return HTTP 404 before payment.",
-      examples: [{ hash: `0x${"ab".repeat(32)}` }, { hash: "Qm" + "a".repeat(44) }],
+      description:
+        "Supply exactly one of hash or jobId to retrieve an exact retained proof/receipt or lifecycle state. Unknown identifiers return HTTP 404 before payment.",
+      examples: [
+        { hash: `0x${"ab".repeat(32)}` },
+        { hash: "Qm" + "a".repeat(44) },
+      ],
       additionalProperties: false,
       properties: {
         hash: field(
           "string",
           "Required when jobId is absent: proof/receipt 64-hex hash (optional 0x), decimal snapshot digest, IPFS CID, or UUID submission job ID; unknown identifiers return 404.",
           [`0x${"ab".repeat(32)}`, "Qm" + "a".repeat(44)],
-          { pattern: "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$" },
+          {
+            pattern:
+              "^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+          },
         ),
-        jobId: field("string", "UUID returned by proof.submit (e.g. '123e4567-e89b-42d3-a456-426614174000'); use instead of hash, never together.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
+        jobId: field(
+          "string",
+          "UUID returned by proof.submit (e.g. '123e4567-e89b-42d3-a456-426614174000'); use instead of hash, never together.",
+          ["123e4567-e89b-42d3-a456-426614174000"],
+          { format: "uuid" },
+        ),
       },
       oneOf: [{ required: ["hash"] }, { required: ["jobId"] }],
     },
     outputSchema: {
       type: "object",
-      description: "Exact retained proof or signed receipt, or lifecycle-only status when the original payload is unavailable. No payload is reconstructed from a digest.",
-      examples: [{
-        kind: "zk-proof", hash: `0x${"ab".repeat(32)}`, status: "verified",
-        timestamp: "2026-09-27T21:00:00.000Z",
-        proofPayload: { proof: { pi_a: ["1"] }, publicSignals: ["1", "2", "3", "4", "5"] },
-        provenanceVerified: false,
-      }],
+      description:
+        "Exact retained proof or signed receipt, or lifecycle-only status when the original payload is unavailable. No payload is reconstructed from a digest.",
+      examples: [
+        {
+          kind: "zk-proof",
+          hash: `0x${"ab".repeat(32)}`,
+          status: "verified",
+          timestamp: "2026-09-27T21:00:00.000Z",
+          proofPayload: {
+            proof: { pi_a: ["1"] },
+            publicSignals: ["1", "2", "3", "4", "5"],
+          },
+          provenanceVerified: false,
+        },
+      ],
       additionalProperties: false,
       properties: {
-        kind: field("string", "Distinguishes ZK proofs, signed receipts, and lifecycle-only status.", ["zk-proof"], { enum: ["zk-proof", "dataset-receipt", "context-receipt", "zk-proof-status"] }),
-        hash: field("string", "Canonical proof or receipt hash. CID lookups return the matching receipt hash.", [`0x${"ab".repeat(32)}`]),
-        status: field("string", "Current indexed lifecycle status.", ["verified"], { enum: ["verified", "cached", "pending", "invalid"] }),
-        timestamp: field("string", "Original submission, verification, or receipt creation time.", ["2026-09-27T21:00:00.000Z"], { format: "date-time" }),
-        jobId: field("string", "Submission job identifier when an exact submitted proof payload is retained.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
-        attestationCount: field("integer", "NIP-78 attestation count for lifecycle-only lookups.", [0], { minimum: 0 }),
-        meshQuorum: field("boolean", "Whether current mesh quorum is met for lifecycle-only lookups.", [false]),
-        provenanceVerified: field("boolean", "Whether this exact signed receipt binds the currently validated dataset strata chain; does not imply Bitcoin OTS confirmation.", [false]),
-        provenanceMerkleRoot: field("string", "Merkle root bound in the signed receipt when the current dataset chain matches.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-        otsProof: field("string", "Base64 serialized .ots proof for the bound dataset root bytes when a calendar receipt is available.", ["AQID"], { format: "byte" }),
-        otsStatus: field("string", "Calendar-only or independently Bitcoin-verified status of the bound OTS receipt.", ["pending_calendar"], { enum: ["pending_calendar", "bitcoin_block_attested"] }),
+        kind: field(
+          "string",
+          "Distinguishes ZK proofs, signed receipts, and lifecycle-only status.",
+          ["zk-proof"],
+          {
+            enum: [
+              "zk-proof",
+              "dataset-receipt",
+              "context-receipt",
+              "zk-proof-status",
+            ],
+          },
+        ),
+        hash: field(
+          "string",
+          "Canonical proof or receipt hash. CID lookups return the matching receipt hash.",
+          [`0x${"ab".repeat(32)}`],
+        ),
+        status: field(
+          "string",
+          "Current indexed lifecycle status.",
+          ["verified"],
+          { enum: ["verified", "cached", "pending", "invalid"] },
+        ),
+        timestamp: field(
+          "string",
+          "Original submission, verification, or receipt creation time.",
+          ["2026-09-27T21:00:00.000Z"],
+          { format: "date-time" },
+        ),
+        jobId: field(
+          "string",
+          "Submission job identifier when an exact submitted proof payload is retained.",
+          ["123e4567-e89b-42d3-a456-426614174000"],
+          { format: "uuid" },
+        ),
+        attestationCount: field(
+          "integer",
+          "NIP-78 attestation count for lifecycle-only lookups.",
+          [0],
+          { minimum: 0 },
+        ),
+        meshQuorum: field(
+          "boolean",
+          "Whether current mesh quorum is met for lifecycle-only lookups.",
+          [false],
+        ),
+        provenanceVerified: field(
+          "boolean",
+          "Whether this exact signed receipt binds the currently validated dataset strata chain; does not imply Bitcoin OTS confirmation.",
+          [false],
+        ),
+        provenanceMerkleRoot: field(
+          "string",
+          "Merkle root bound in the signed receipt when the current dataset chain matches.",
+          ["ab".repeat(32)],
+          { pattern: "^[0-9a-f]{64}$" },
+        ),
+        otsProof: field(
+          "string",
+          "Base64 serialized .ots proof for the bound dataset root bytes when a calendar receipt is available.",
+          ["AQID"],
+          { format: "byte" },
+        ),
+        otsStatus: field(
+          "string",
+          "Calendar-only or independently Bitcoin-verified status of the bound OTS receipt.",
+          ["pending_calendar"],
+          { enum: ["pending_calendar", "bitcoin_block_attested"] },
+        ),
         proofPayload: {
-          type: "object", description: "Exact retained proof input or signed receipt; do not infer missing snapshot data from a submitted proof.",
-          examples: [{ proof: { pi_a: ["1"] }, publicSignals: ["1", "2", "3", "4", "5"] }],
+          type: "object",
+          description:
+            "Exact retained proof input or signed receipt; do not infer missing snapshot data from a submitted proof.",
+          examples: [
+            {
+              proof: { pi_a: ["1"] },
+              publicSignals: ["1", "2", "3", "4", "5"],
+            },
+          ],
           additionalProperties: true,
           properties: {},
         },
@@ -1991,47 +2726,56 @@ const baseMcpToolDefinitions = [
       type: "object",
       description:
         "Recent proof attestation records and the total number matching the optional status filter.",
-      examples: [{
-        attestations: [{
-          proofHash:
-            "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
-          snapshotDigest: "1534979302823651498736582947365829473658294",
-          status: "verified",
-          submittedAt: "2026-09-19T06:20:00.000Z",
-          attestationCount: 1,
-          meshQuorum: true,
-        }],
-        total: 1,
-      }],
+      examples: [
+        {
+          attestations: [
+            {
+              proofHash:
+                "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+              snapshotDigest: "1534979302823651498736582947365829473658294",
+              status: "verified",
+              submittedAt: "2026-09-19T06:20:00.000Z",
+              attestationCount: 1,
+              meshQuorum: true,
+            },
+          ],
+          total: 1,
+        },
+      ],
       additionalProperties: false,
       properties: {
         attestations: field(
           "array",
           "Recent indexed proof attestations ordered from newest to oldest.",
-          [[{
-            proofHash:
-              "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
-            snapshotDigest: "1534979302823651498736582947365829473658294",
-            status: "verified",
-            submittedAt: "2026-09-19T06:20:00.000Z",
-            attestationCount: 1,
-            meshQuorum: true,
-          }]],
+          [
+            [
+              {
+                proofHash:
+                  "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+                snapshotDigest: "1534979302823651498736582947365829473658294",
+                status: "verified",
+                submittedAt: "2026-09-19T06:20:00.000Z",
+                attestationCount: 1,
+                meshQuorum: true,
+              },
+            ],
+          ],
           {
             items: {
               type: "object",
               description:
                 "One indexed zk-SNARK proof verification and Nostr attestation record.",
-              examples: [{
-                proofHash:
-                  "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
-                snapshotDigest:
-                  "1534979302823651498736582947365829473658294",
-                status: "verified",
-                submittedAt: "2026-09-19T06:20:00.000Z",
-                attestationCount: 1,
-                meshQuorum: true,
-              }],
+              examples: [
+                {
+                  proofHash:
+                    "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+                  snapshotDigest: "1534979302823651498736582947365829473658294",
+                  status: "verified",
+                  submittedAt: "2026-09-19T06:20:00.000Z",
+                  attestationCount: 1,
+                  meshQuorum: true,
+                },
+              ],
               additionalProperties: false,
               properties: {
                 proofHash: field(
@@ -2101,15 +2845,21 @@ const baseMcpToolDefinitions = [
       type: "object",
       description:
         "Input payload containing Groth16 proof object and public signals for ingestion and Nostr NIP-78 attestation broadcast.",
-      examples: [{
-        proof: {
-          piA: ["1", "2", "1"],
-          piB: [["1", "2"], ["3", "4"], ["1", "0"]],
-          piC: ["5", "6", "1"],
+      examples: [
+        {
+          proof: {
+            piA: ["1", "2", "1"],
+            piB: [
+              ["1", "2"],
+              ["3", "4"],
+              ["1", "0"],
+            ],
+            piC: ["5", "6", "1"],
+          },
+          publicSignals: ["920000", "1", "1789776000000", "12583", "1"],
+          snapshotDigest: "1",
         },
-        publicSignals: ["920000", "1", "1789776000000", "12583", "1"],
-        snapshotDigest: "1",
-      }],
+      ],
       additionalProperties: false,
       properties: {
         proof: {
@@ -2118,14 +2868,24 @@ const baseMcpToolDefinitions = [
             "Groth16/Poseidon BN254 proof coordinates for non-interactive validation: piA and piC are three decimal-string projective coordinates each, and piB is three pairs of decimal-string extension-field coordinates; for example, piA ['1','2','1'].",
           example: {
             piA: ["1", "2", "1"],
-            piB: [["1", "2"], ["3", "4"], ["1", "0"]],
+            piB: [
+              ["1", "2"],
+              ["3", "4"],
+              ["1", "0"],
+            ],
             piC: ["5", "6", "1"],
           },
-          examples: [{
-            piA: ["1", "2", "1"],
-            piB: [["1", "2"], ["3", "4"], ["1", "0"]],
-            piC: ["5", "6", "1"],
-          }],
+          examples: [
+            {
+              piA: ["1", "2", "1"],
+              piB: [
+                ["1", "2"],
+                ["3", "4"],
+                ["1", "0"],
+              ],
+              piC: ["5", "6", "1"],
+            },
+          ],
           additionalProperties: false,
           properties: {
             piA: field(
@@ -2146,7 +2906,13 @@ const baseMcpToolDefinitions = [
             piB: field(
               "array",
               "Exactly three Groth16 BN254 proof B extension-field coordinate pairs, each containing two decimal strings.",
-              [[["1", "2"], ["3", "4"], ["1", "0"]]],
+              [
+                [
+                  ["1", "2"],
+                  ["3", "4"],
+                  ["1", "0"],
+                ],
+              ],
               {
                 minItems: 3,
                 maxItems: 3,
@@ -2205,8 +2971,7 @@ const baseMcpToolDefinitions = [
           "Decimal field digest or IPFS CID that must equal publicSignals[4] when supplied.",
           ["1"],
           {
-            pattern:
-              "^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
+            pattern: "^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
           },
         ),
       },
@@ -2216,24 +2981,29 @@ const baseMcpToolDefinitions = [
       type: "object",
       description:
         "Immediate proof verification, lifecycle ingestion, and Nostr broadcast result.",
-      examples: [{
-        proofHash:
-          "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
-        jobId: "123e4567-e89b-42d3-a456-426614174000",
-        status: "verified",
-        submittedAt: "2026-09-19T06:20:00.000Z",
-        attestationStatus: "broadcast_confirmed",
-      }],
+      examples: [
+        {
+          proofHash:
+            "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+          jobId: "123e4567-e89b-42d3-a456-426614174000",
+          status: "verified",
+          submittedAt: "2026-09-19T06:20:00.000Z",
+          attestationStatus: "broadcast_confirmed",
+        },
+      ],
       additionalProperties: false,
       properties: {
         proofHash: field(
           "string",
           "0x-prefixed lowercase hexadecimal SHA-256 digest of the canonical proof.",
-          [
-            "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
-          ],
+          ["0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd"],
         ),
-        jobId: field("string", "Server-generated proof submission job ID for status lookup.", ["123e4567-e89b-42d3-a456-426614174000"], { format: "uuid" }),
+        jobId: field(
+          "string",
+          "Server-generated proof submission job ID for status lookup.",
+          ["123e4567-e89b-42d3-a456-426614174000"],
+          { format: "uuid" },
+        ),
         status: field(
           "string",
           "Immediate Groth16 verification result for the submitted proof and public signals.",
@@ -2269,13 +3039,16 @@ const baseMcpToolDefinitions = [
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Epistemic context grounding request for a directly returned signed anchor receipt after MCP settlement.",
-      examples: [{
-        contextHash:
-          "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
-        agentId: "research-agent-7",
-        metadata: { topic: "difficulty-adjustment" },
-      }],
+      description:
+        "Epistemic context grounding request for a directly returned signed anchor receipt after MCP settlement.",
+      examples: [
+        {
+          contextHash:
+            "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+          agentId: "research-agent-7",
+          metadata: { topic: "difficulty-adjustment" },
+        },
+      ],
       additionalProperties: false,
       properties: {
         contextHash: field(
@@ -2301,30 +3074,11 @@ const baseMcpToolDefinitions = [
     },
     outputSchema: {
       type: "object",
-      description: "Signed epistemic anchor receipt grounded against a Bitcoin tip.",
-      examples: [{
-        receipt: {
-          receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
-          contextHash:
-            "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
-          agentId: "research-agent-7",
-          blockHeight: 920001,
-          blockHash: "ab".repeat(32),
-          merkleRoot: "cd".repeat(32),
-          timestamp: 1789776000000,
-          schema: "bitcoin-stratigraphy/cryptographic-attestation/v1",
-          payload: { contextHash: "4f".repeat(32) },
-          proof: { algorithm: "sha256", merkleRoot: "cd".repeat(32) },
-          signature: { protocol: "nostr", nip: 78 },
-          nostrSignature: { protocol: "nostr", nip: 78 },
-        },
-      }],
-      additionalProperties: false,
-      properties: {
-        receipt: field(
-          "object",
-          "Full signed receipt; send unchanged to POST /api/v1/zk/verify as attestation.",
-          [{
+      description:
+        "Signed epistemic anchor receipt grounded against a Bitcoin tip.",
+      examples: [
+        {
+          receipt: {
             receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
             contextHash:
               "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
@@ -2338,24 +3092,105 @@ const baseMcpToolDefinitions = [
             proof: { algorithm: "sha256", merkleRoot: "cd".repeat(32) },
             signature: { protocol: "nostr", nip: 78 },
             nostrSignature: { protocol: "nostr", nip: 78 },
-          }],
+          },
+        },
+      ],
+      additionalProperties: false,
+      properties: {
+        receipt: field(
+          "object",
+          "Full signed receipt; send unchanged to POST /api/v1/zk/verify as attestation.",
+          [
+            {
+              receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+              contextHash:
+                "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+              agentId: "research-agent-7",
+              blockHeight: 920001,
+              blockHash: "ab".repeat(32),
+              merkleRoot: "cd".repeat(32),
+              timestamp: 1789776000000,
+              schema: "bitcoin-stratigraphy/cryptographic-attestation/v1",
+              payload: { contextHash: "4f".repeat(32) },
+              proof: { algorithm: "sha256", merkleRoot: "cd".repeat(32) },
+              signature: { protocol: "nostr", nip: 78 },
+              nostrSignature: { protocol: "nostr", nip: 78 },
+            },
+          ],
           {
             additionalProperties: true,
             properties: {
-              receiptSchema: field("string", "Epistemic anchor receipt schema.", ["bitcoin-stratigraphy/epistemic-anchor/v1"]),
-              contextHash: field("string", "Lowercase SHA-256 context digest.", ["4f".repeat(32)]),
-              agentId: field("string", "Trimmed caller identifier.", ["research-agent-7"]),
-              blockHeight: field("integer", "Grounding Bitcoin block height.", [920001]),
-              blockHash: field("string", "Grounding Bitcoin block hash.", ["ab".repeat(32)]),
-              merkleRoot: field("string", "Signed payload Merkle root.", ["cd".repeat(32)]),
-              timestamp: field("integer", "Grounding time in Unix milliseconds.", [1789776000000]),
-              schema: field("string", "Cryptographic attestation schema.", ["bitcoin-stratigraphy/cryptographic-attestation/v1"]),
-              payload: field("object", "Context and Bitcoin state committed by the signature.", [{ contextHash: "4f".repeat(32) }], { additionalProperties: true }),
-              proof: field("object", "SHA-256 payload and Merkle commitment.", [{ algorithm: "sha256", merkleRoot: "cd".repeat(32) }], { additionalProperties: true }),
-              signature: field("object", "Nostr NIP-78 event signing the commitment.", [{ protocol: "nostr", nip: 78 }], { additionalProperties: true }),
-              nostrSignature: field("object", "Alias for the signed NIP-78 event.", [{ protocol: "nostr", nip: 78 }], { additionalProperties: true }),
+              receiptSchema: field(
+                "string",
+                "Epistemic anchor receipt schema.",
+                ["bitcoin-stratigraphy/epistemic-anchor/v1"],
+              ),
+              contextHash: field(
+                "string",
+                "Lowercase SHA-256 context digest.",
+                ["4f".repeat(32)],
+              ),
+              agentId: field("string", "Trimmed caller identifier.", [
+                "research-agent-7",
+              ]),
+              blockHeight: field(
+                "integer",
+                "Grounding Bitcoin block height.",
+                [920001],
+              ),
+              blockHash: field("string", "Grounding Bitcoin block hash.", [
+                "ab".repeat(32),
+              ]),
+              merkleRoot: field("string", "Signed payload Merkle root.", [
+                "cd".repeat(32),
+              ]),
+              timestamp: field(
+                "integer",
+                "Grounding time in Unix milliseconds.",
+                [1789776000000],
+              ),
+              schema: field("string", "Cryptographic attestation schema.", [
+                "bitcoin-stratigraphy/cryptographic-attestation/v1",
+              ]),
+              payload: field(
+                "object",
+                "Context and Bitcoin state committed by the signature.",
+                [{ contextHash: "4f".repeat(32) }],
+                { additionalProperties: true },
+              ),
+              proof: field(
+                "object",
+                "SHA-256 payload and Merkle commitment.",
+                [{ algorithm: "sha256", merkleRoot: "cd".repeat(32) }],
+                { additionalProperties: true },
+              ),
+              signature: field(
+                "object",
+                "Nostr NIP-78 event signing the commitment.",
+                [{ protocol: "nostr", nip: 78 }],
+                { additionalProperties: true },
+              ),
+              nostrSignature: field(
+                "object",
+                "Alias for the signed NIP-78 event.",
+                [{ protocol: "nostr", nip: 78 }],
+                { additionalProperties: true },
+              ),
             },
-            required: ["receiptSchema", "contextHash", "agentId", "blockHeight", "blockHash", "merkleRoot", "timestamp", "schema", "payload", "proof", "signature", "nostrSignature"],
+            required: [
+              "receiptSchema",
+              "contextHash",
+              "agentId",
+              "blockHeight",
+              "blockHash",
+              "merkleRoot",
+              "timestamp",
+              "schema",
+              "payload",
+              "proof",
+              "signature",
+              "nostrSignature",
+            ],
           },
         ),
       },
@@ -2370,32 +3205,39 @@ const baseMcpToolDefinitions = [
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Dataset identifier and optional Nostr provenance to bind to a signed Bitcoin-tip anchor.",
-      examples: [{
-        cid: "bafybeigdyrzt5sfp7udm7hu76uhka4lyer5y2wjy7zt6fw7v6r2w4x3ydq",
-        nostrEventId: "ab".repeat(32),
-        context: { source: "dataset" },
-      }],
+      description:
+        "Dataset identifier and optional Nostr provenance to bind to a signed Bitcoin-tip anchor.",
+      examples: [
+        {
+          cid: "bafybeigdyrzt5sfp7udm7hu76uhka4lyer5y2wjy7zt6fw7v6r2w4x3ydq",
+          nostrEventId: "ab".repeat(32),
+          context: { source: "dataset" },
+        },
+      ],
       additionalProperties: false,
       properties: {
         cid: {
           type: "string",
-          description: "Target IPFS CID or 32-byte hex dataset hash anchored directly to the live Bitcoin block height. Example: a 64-character lowercase hex digest.",
+          description:
+            "Target IPFS CID or 32-byte hex dataset hash anchored directly to the live Bitcoin block height. Example: a 64-character lowercase hex digest.",
           example: "ab".repeat(32),
           examples: ["ab".repeat(32)],
-          pattern: "^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$",
+          pattern:
+            "^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$",
           maxLength: 256,
         },
         nostrEventId: {
           type: "string",
-          description: "Optional Nostr event ID linked into the signed receipt payload to bind off-chain publications to the block tip. Example: a 64-character lowercase hex event ID.",
+          description:
+            "Optional Nostr event ID linked into the signed receipt payload to bind off-chain publications to the block tip. Example: a 64-character lowercase hex event ID.",
           example: "ab".repeat(32),
           examples: ["ab".repeat(32)],
           pattern: "^[0-9a-fA-F]{64}$",
         },
         context: {
           type: "object",
-          description: "Optional JSON metadata object bound into the signed receipt tuple for additional execution context. Example: {\"source\":\"dataset\"}.",
+          description:
+            'Optional JSON metadata object bound into the signed receipt tuple for additional execution context. Example: {"source":"dataset"}.',
           example: { source: "dataset" },
           examples: [{ source: "dataset" }],
           additionalProperties: true,
@@ -2405,53 +3247,117 @@ const baseMcpToolDefinitions = [
     },
     outputSchema: {
       type: "object",
-      description: "Signed dataset anchor; receiptHash is a tuple digest and proofPayload is a full verifiable signed receipt, not a ZK proof.",
-      examples: [{
-        receiptHash: "cd".repeat(32),
-        blockTip: 920001,
-        blockHash: "ab".repeat(32),
-        ipfsCid: "ef".repeat(32),
-        nostrEventId: "ab".repeat(32),
-        attestation: {
-          type: "Signed-Bitcoin-Tip-Anchor",
-          proofPayload: JSON.stringify({ receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1", contextHash: "cd".repeat(32) }),
-          verified: true,
+      description:
+        "Signed dataset anchor; receiptHash is a tuple digest and proofPayload is a full verifiable signed receipt, not a ZK proof.",
+      examples: [
+        {
+          receiptHash: "cd".repeat(32),
+          blockTip: 920001,
+          blockHash: "ab".repeat(32),
+          ipfsCid: "ef".repeat(32),
+          nostrEventId: "ab".repeat(32),
+          attestation: {
+            type: "Signed-Bitcoin-Tip-Anchor",
+            proofPayload: JSON.stringify({
+              receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+              contextHash: "cd".repeat(32),
+            }),
+            verified: true,
+          },
+          timestamp: "2026-09-19T01:41:36.458Z",
         },
-        timestamp: "2026-09-19T01:41:36.458Z",
-      }],
+      ],
       additionalProperties: false,
       properties: {
-        receiptHash: field("string", "SHA-256 hex digest of the JSON tuple [cid, blockHash, blockTip, nostrEventId or empty string, ISO timestamp], signed as the receipt contextHash.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-        blockTip: field("integer", "Current Bitcoin block height verified at receipt issuance.", [920001], { minimum: 1 }),
-        blockHash: field("string", "Current Bitcoin block hash included in the signed payload.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-        ipfsCid: field("string", "Original dataset CID or hex hash included in the signed payload.", ["ef".repeat(32)]),
-        nostrEventId: field("string", "Optional caller-supplied Nostr event ID included in the signed payload; not a publication result.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
+        receiptHash: field(
+          "string",
+          "SHA-256 hex digest of the JSON tuple [cid, blockHash, blockTip, nostrEventId or empty string, ISO timestamp], signed as the receipt contextHash.",
+          ["cd".repeat(32)],
+          { pattern: "^[0-9a-f]{64}$" },
+        ),
+        blockTip: field(
+          "integer",
+          "Current Bitcoin block height verified at receipt issuance.",
+          [920001],
+          { minimum: 1 },
+        ),
+        blockHash: field(
+          "string",
+          "Current Bitcoin block hash included in the signed payload.",
+          ["ab".repeat(32)],
+          { pattern: "^[0-9a-f]{64}$" },
+        ),
+        ipfsCid: field(
+          "string",
+          "Original dataset CID or hex hash included in the signed payload.",
+          ["ef".repeat(32)],
+        ),
+        nostrEventId: field(
+          "string",
+          "Optional caller-supplied Nostr event ID included in the signed payload; not a publication result.",
+          ["ab".repeat(32)],
+          { pattern: "^[0-9a-fA-F]{64}$" },
+        ),
         attestation: {
           type: "object",
-          description: "Self-verified signed Bitcoin-tip attestation; not a Groth16 proof or a PoW validity proof.",
-          examples: [{
-            type: "Signed-Bitcoin-Tip-Anchor",
-            proofPayload: JSON.stringify({ receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1", contextHash: "cd".repeat(32) }),
-            verified: true,
-          }],
+          description:
+            "Self-verified signed Bitcoin-tip attestation; not a Groth16 proof or a PoW validity proof.",
+          examples: [
+            {
+              type: "Signed-Bitcoin-Tip-Anchor",
+              proofPayload: JSON.stringify({
+                receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+                contextHash: "cd".repeat(32),
+              }),
+              verified: true,
+            },
+          ],
           additionalProperties: false,
           properties: {
-            type: field("string", "Signed Bitcoin-tip anchor type, not a ZK scheme.", ["Signed-Bitcoin-Tip-Anchor"], { const: "Signed-Bitcoin-Tip-Anchor" }),
-            proofPayload: field("string", "JSON-serialized complete signed receipt; parse and send as attestation to POST /api/v1/zk/verify.", [JSON.stringify({ receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1" })]),
-            verified: field("boolean", "Whether the signed receipt passed self-verification before return; not a Bitcoin PoW or ZK proof verification.", [true]),
+            type: field(
+              "string",
+              "Signed Bitcoin-tip anchor type, not a ZK scheme.",
+              ["Signed-Bitcoin-Tip-Anchor"],
+              { const: "Signed-Bitcoin-Tip-Anchor" },
+            ),
+            proofPayload: field(
+              "string",
+              "JSON-serialized complete signed receipt; parse and send as attestation to POST /api/v1/zk/verify.",
+              [
+                JSON.stringify({
+                  receiptSchema: "bitcoin-stratigraphy/epistemic-anchor/v1",
+                }),
+              ],
+            ),
+            verified: field(
+              "boolean",
+              "Whether the signed receipt passed self-verification before return; not a Bitcoin PoW or ZK proof verification.",
+              [true],
+            ),
           },
           required: ["type", "proofPayload", "verified"],
         },
-        timestamp: field("string", "ISO 8601 UTC receipt issuance time included in the signed tuple.", ["2026-09-19T01:41:36.458Z"], { format: "date-time" }),
+        timestamp: field(
+          "string",
+          "ISO 8601 UTC receipt issuance time included in the signed tuple.",
+          ["2026-09-19T01:41:36.458Z"],
+          { format: "date-time" },
+        ),
       },
-      required: ["receiptHash", "blockTip", "blockHash", "ipfsCid", "attestation", "timestamp"],
+      required: [
+        "receiptHash",
+        "blockTip",
+        "blockHash",
+        "ipfsCid",
+        "attestation",
+        "timestamp",
+      ],
     },
   },
   {
     name: "payment.get_info",
     title: "Get MCP Payment Information",
-    description:
-      `Retrieve configured MCP pricing, Lightning invoice rules, and optional Base USDC x402 terms.
+    description: `Retrieve configured MCP pricing, Lightning invoice rules, and optional Base USDC x402 terms.
 
 - PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.get_info\` instead of calling paid tools blindly when checking pricing upfront.
 - USAGE GUIDELINES: Use \`payment.get_info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.get_info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
@@ -2464,78 +3370,186 @@ const baseMcpToolDefinitions = [
     },
     inputSchema: {
       type: "object",
-      description: "Pass an optional canonical toolName to narrow the returned price map; omit it for all advertised prices. This tool requires L402; public HTTP cost quotes remain free.",
+      description:
+        "Pass an optional canonical toolName to narrow the returned price map; omit it for all advertised prices. This tool requires L402; public HTTP cost quotes remain free.",
       examples: [{}, { toolName: "stratigraphy.get_digest" }],
       additionalProperties: false,
       properties: {
-        toolName: field("string", "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.get_digest' or 'proof.verify'); supported legacy aliases are also accepted and resolve to canonical names. When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name or supported legacy alias.", ["stratigraphy.get_digest"], { minLength: 1 }),
+        toolName: field(
+          "string",
+          "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.get_digest' or 'proof.verify'); supported legacy aliases are also accepted and resolve to canonical names. When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name or supported legacy alias.",
+          ["stratigraphy.get_digest"],
+          { minLength: 1 },
+        ),
       },
       required: [],
     },
     outputSchema: {
       type: "object",
-      description: "Configured MCP prices in sats (zero denotes a free tool), Lightning L402 rules, and optional Base USDC x402 terms. No live invoice is created by this tool.",
-      examples: [{
-        standardInvoiceSats: 250, perToolSats: { "stratigraphy.get_digest": 250 },
-        acceptedPaymentMethods: ["Lightning L402"], invoiceExpirySeconds: 3600,
-        challenge: { httpStatus: 402, header: "WWW-Authenticate", fields: ["macaroon", "invoice", "payment_hash", "amount_sats"] },
-        activeAuthSchemes: ["L402"],
-        macaroonRequirements: { authorizationHeader: "L402 <macaroon>:<preimage>", scope: "exact MCP tool path", maxRequests: 1 },
-      }],
+      description:
+        "Configured MCP prices in sats (zero denotes a free tool), Lightning L402 rules, and optional Base USDC x402 terms. No live invoice is created by this tool.",
+      examples: [
+        {
+          standardInvoiceSats: 250,
+          perToolSats: { "stratigraphy.get_digest": 250 },
+          acceptedPaymentMethods: ["Lightning L402"],
+          invoiceExpirySeconds: 3600,
+          challenge: {
+            httpStatus: 402,
+            header: "WWW-Authenticate",
+            fields: ["macaroon", "invoice", "payment_hash", "amount_sats"],
+          },
+          activeAuthSchemes: ["L402"],
+          macaroonRequirements: {
+            authorizationHeader: "L402 <macaroon>:<preimage>",
+            scope: "exact MCP tool path",
+            maxRequests: 1,
+          },
+        },
+      ],
       additionalProperties: false,
       properties: {
-        standardInvoiceSats: field("integer", "Standard paid MCP execution price. Catalog and status lookups may cost less; free tools cost zero.", [250], { const: 250 }),
+        standardInvoiceSats: field(
+          "integer",
+          "Standard paid MCP execution price. Catalog and status lookups may cost less; free tools cost zero.",
+          [250],
+          { const: 250 },
+        ),
         perToolSats: {
-          type: "object", description: "Current advertised canonical tool prices in sats; optional toolName narrows this map.",
+          type: "object",
+          description:
+            "Current advertised canonical tool prices in sats; optional toolName narrows this map.",
           examples: [{ "stratigraphy.get_digest": 250 }],
           additionalProperties: { type: "integer", minimum: 0 },
           properties: {},
         },
-        acceptedPaymentMethods: field("array", "Supported MCP payment method.", [["Lightning L402"]], { items: field("string", "Lightning invoice with L402 payment proof.", ["Lightning L402"]) }),
-        invoiceExpirySeconds: field("integer", "Default expiry for both the issued Lightning invoice and its path-bound macaroon.", [3600], { minimum: 1 }),
+        acceptedPaymentMethods: field(
+          "array",
+          "Supported MCP payment method.",
+          [["Lightning L402"]],
+          {
+            items: field(
+              "string",
+              "Lightning invoice with L402 payment proof.",
+              ["Lightning L402"],
+            ),
+          },
+        ),
+        invoiceExpirySeconds: field(
+          "integer",
+          "Default expiry for both the issued Lightning invoice and its path-bound macaroon.",
+          [3600],
+          { minimum: 1 },
+        ),
         challenge: {
-          type: "object", description: "HTTP payment challenge and response fields.",
-          examples: [{ httpStatus: 402, header: "WWW-Authenticate", fields: ["macaroon", "invoice", "payment_hash", "amount_sats"] }],
+          type: "object",
+          description: "HTTP payment challenge and response fields.",
+          examples: [
+            {
+              httpStatus: 402,
+              header: "WWW-Authenticate",
+              fields: ["macaroon", "invoice", "payment_hash", "amount_sats"],
+            },
+          ],
           additionalProperties: false,
           properties: {
-            httpStatus: field("integer", "HTTP status for a payment challenge.", [402], { const: 402 }),
-            header: field("string", "Header carrying the L402 macaroon and invoice.", ["WWW-Authenticate"]),
-            fields: field("array", "JSON challenge body fields.", [["macaroon", "invoice", "payment_hash", "amount_sats"]], { items: field("string", "Challenge field name.", ["invoice"]) }),
+            httpStatus: field(
+              "integer",
+              "HTTP status for a payment challenge.",
+              [402],
+              { const: 402 },
+            ),
+            header: field(
+              "string",
+              "Header carrying the L402 macaroon and invoice.",
+              ["WWW-Authenticate"],
+            ),
+            fields: field(
+              "array",
+              "JSON challenge body fields.",
+              [["macaroon", "invoice", "payment_hash", "amount_sats"]],
+              { items: field("string", "Challenge field name.", ["invoice"]) },
+            ),
           },
           required: ["httpStatus", "header", "fields"],
         },
-        activeAuthSchemes: field("array", "Authentication schemes for paid MCP calls. Only stratigraphy.list and proof.list execute free.", [["L402"]], { items: field("string", "MCP paid-call scheme.", ["L402"]) }),
+        activeAuthSchemes: field(
+          "array",
+          "Authentication schemes for paid MCP calls. Only stratigraphy.list and proof.list execute free.",
+          [["L402"]],
+          { items: field("string", "MCP paid-call scheme.", ["L402"]) },
+        ),
         x402: {
           type: "object",
-          description: "Base mainnet USDC x402 exact terms; present only when authenticated CDP settlement is configured.",
-          examples: [{
-            network: "eip155:8453", scheme: "exact",
-            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            amount: "1000", payTo: "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775",
-          }],
+          description:
+            "Base mainnet USDC x402 exact terms; present only when authenticated CDP settlement is configured.",
+          examples: [
+            {
+              network: "eip155:8453",
+              scheme: "exact",
+              asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              amount: "1000",
+              payTo: "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775",
+            },
+          ],
           additionalProperties: false,
           properties: {
             network: field("string", "x402 CAIP-2 network.", ["eip155:8453"]),
             scheme: field("string", "x402 scheme.", ["exact"]),
-            asset: field("string", "USDC token contract.", ["0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"]),
-            amount: field("string", "Atomic USDC units per paid call.", ["1000"]),
-            payTo: field("string", "Payment recipient.", ["0x7a4183ce5b9989833bb33133dcbb8efd6a84e775"]),
+            asset: field("string", "USDC token contract.", [
+              "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            ]),
+            amount: field("string", "Atomic USDC units per paid call.", [
+              "1000",
+            ]),
+            payTo: field("string", "Payment recipient.", [
+              "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775",
+            ]),
           },
           required: ["network", "scheme", "asset", "amount", "payTo"],
         },
         macaroonRequirements: {
-          type: "object", description: "A valid payment proof must match the bound invoice, provider, amount, path, expiry and request quota. proof.attenuate requires payment and a valid parent token.",
-          examples: [{ authorizationHeader: "L402 <macaroon>:<preimage>", scope: "exact MCP tool path", maxRequests: 1 }],
+          type: "object",
+          description:
+            "A valid payment proof must match the bound invoice, provider, amount, path, expiry and request quota. proof.attenuate requires payment and a valid parent token.",
+          examples: [
+            {
+              authorizationHeader: "L402 <macaroon>:<preimage>",
+              scope: "exact MCP tool path",
+              maxRequests: 1,
+            },
+          ],
           additionalProperties: false,
           properties: {
-            authorizationHeader: field("string", "Authorization header form for redeeming a settled challenge.", ["L402 <macaroon>:<preimage>"]),
-            scope: field("string", "Issued macaroons are bound to the challenged MCP tool path.", ["exact MCP tool path"]),
-            maxRequests: field("integer", "Default credentials allow one call; X-L402-Batch-Size: 100 buys a tool-scoped 100-call credential.", [1, 100], { enum: [1, 100] }),
+            authorizationHeader: field(
+              "string",
+              "Authorization header form for redeeming a settled challenge.",
+              ["L402 <macaroon>:<preimage>"],
+            ),
+            scope: field(
+              "string",
+              "Issued macaroons are bound to the challenged MCP tool path.",
+              ["exact MCP tool path"],
+            ),
+            maxRequests: field(
+              "integer",
+              "Default credentials allow one call; X-L402-Batch-Size: 100 buys a tool-scoped 100-call credential.",
+              [1, 100],
+              { enum: [1, 100] },
+            ),
           },
           required: ["authorizationHeader", "scope", "maxRequests"],
         },
       },
-      required: ["standardInvoiceSats", "perToolSats", "acceptedPaymentMethods", "invoiceExpirySeconds", "challenge", "activeAuthSchemes", "macaroonRequirements"],
+      required: [
+        "standardInvoiceSats",
+        "perToolSats",
+        "acceptedPaymentMethods",
+        "invoiceExpirySeconds",
+        "challenge",
+        "activeAuthSchemes",
+        "macaroonRequirements",
+      ],
     },
   },
   {
@@ -2546,7 +3560,8 @@ const baseMcpToolDefinitions = [
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Pass {} for current peer health and quorum; extra arguments are rejected and inbound subscription state is not tracked.",
+      description:
+        "Pass {} for current peer health and quorum; extra arguments are rejected and inbound subscription state is not tracked.",
       examples: [{}],
       additionalProperties: false,
       properties: {},
@@ -2555,15 +3570,17 @@ const baseMcpToolDefinitions = [
     outputSchema: {
       type: "object",
       description: "Current peer mesh topology and validation health.",
-      examples: [{
-        nodePubkey: meshStatusJsonProperties.nodePubkey.examples[0],
-        activePeerCount: 3,
-        configuredPeerCount: 2,
-        topologyHealth: "healthy",
-        crossValidationSuccessRate: 0.98,
-        averagePropagationLatencyMs: 42.7,
-        quorumThreshold: 2,
-      }],
+      examples: [
+        {
+          nodePubkey: meshStatusJsonProperties.nodePubkey.examples[0],
+          activePeerCount: 3,
+          configuredPeerCount: 2,
+          topologyHealth: "healthy",
+          crossValidationSuccessRate: 0.98,
+          averagePropagationLatencyMs: 42.7,
+          quorumThreshold: 2,
+        },
+      ],
       additionalProperties: false,
       properties: meshStatusJsonProperties,
       required: Object.keys(meshStatusJsonProperties),
@@ -2577,8 +3594,11 @@ const baseMcpToolDefinitions = [
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
-      description: "Select a stored telemetry record for fresh signing and active mesh distribution.",
-      examples: [{ signalType: "telemetry_snapshot", payload: { date: "2026-09-09" } }],
+      description:
+        "Select a stored telemetry record for fresh signing and active mesh distribution.",
+      examples: [
+        { signalType: "telemetry_snapshot", payload: { date: "2026-09-09" } },
+      ],
       additionalProperties: false,
       properties: {
         signalType: field(
@@ -2589,7 +3609,8 @@ const baseMcpToolDefinitions = [
         ),
         payload: {
           type: "object",
-          description: "UTC date selector for an existing telemetry record submitted for peer attestation, not a caller-supplied record object; for example, {\"date\":\"2026-09-09\"}.",
+          description:
+            'UTC date selector for an existing telemetry record submitted for peer attestation, not a caller-supplied record object; for example, {"date":"2026-09-09"}.',
           examples: [{ date: "2026-09-09" }],
           additionalProperties: false,
           properties: {
@@ -2604,53 +3625,151 @@ const baseMcpToolDefinitions = [
         },
         agentEvent: {
           type: "object",
-          description: "Optional NIP-01 kind 20079 signature over JSON.stringify({networkId,date}) for this exact date selector. The signer must have a trusted mesh attestation. Example: a complete signed event with a matching date.",
-          examples: [{ id: "ab".repeat(32), pubkey: "cd".repeat(32), sig: "ef".repeat(64), kind: 20079, created_at: 1790000000, tags: [], content: '{"networkId":"bitcoin-stratigraphy-mainnet-v1","date":"2026-09-09"}' }],
+          description:
+            "Optional NIP-01 kind 20079 signature over JSON.stringify({networkId,date}) for this exact date selector. The signer must have a trusted mesh attestation. Example: a complete signed event with a matching date.",
+          examples: [
+            {
+              id: "ab".repeat(32),
+              pubkey: "cd".repeat(32),
+              sig: "ef".repeat(64),
+              kind: 20079,
+              created_at: 1790000000,
+              tags: [],
+              content:
+                '{"networkId":"bitcoin-stratigraphy-mainnet-v1","date":"2026-09-09"}',
+            },
+          ],
           additionalProperties: false,
           properties: {
-            id: field("string", "NIP-01 event hash.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-            pubkey: field("string", "Signing agent Nostr pubkey.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-            sig: field("string", "Schnorr signature over the NIP-01 event.", ["ef".repeat(64)], { pattern: "^[0-9a-f]{128}$" }),
-            kind: field("integer", "Agent session event kind.", [20079], { const: 20079 }),
-            created_at: field("integer", "Unix event timestamp in seconds.", [1790000000]),
+            id: field("string", "NIP-01 event hash.", ["ab".repeat(32)], {
+              pattern: "^[0-9a-f]{64}$",
+            }),
+            pubkey: field(
+              "string",
+              "Signing agent Nostr pubkey.",
+              ["cd".repeat(32)],
+              { pattern: "^[0-9a-f]{64}$" },
+            ),
+            sig: field(
+              "string",
+              "Schnorr signature over the NIP-01 event.",
+              ["ef".repeat(64)],
+              { pattern: "^[0-9a-f]{128}$" },
+            ),
+            kind: field("integer", "Agent session event kind.", [20079], {
+              const: 20079,
+            }),
+            created_at: field(
+              "integer",
+              "Unix event timestamp in seconds.",
+              [1790000000],
+            ),
             tags: {
-              type: "array", description: "NIP-01 string tag arrays. Example: [].", examples: [[]],
+              type: "array",
+              description: "NIP-01 string tag arrays. Example: [].",
+              examples: [[]],
               items: {
-                type: "array", description: "One NIP-01 tag. Example: [\"t\",\"session\"].", examples: [["t", "session"]],
+                type: "array",
+                description: 'One NIP-01 tag. Example: ["t","session"].',
+                examples: [["t", "session"]],
                 items: field("string", "One string tag element.", ["session"]),
               },
             },
-            content: field("string", "Exact JSON.stringify({networkId,date}) session binding.", ['{"networkId":"bitcoin-stratigraphy-mainnet-v1","date":"2026-09-09"}']),
+            content: field(
+              "string",
+              "Exact JSON.stringify({networkId,date}) session binding.",
+              [
+                '{"networkId":"bitcoin-stratigraphy-mainnet-v1","date":"2026-09-09"}',
+              ],
+            ),
           },
-          required: ["id", "pubkey", "sig", "kind", "created_at", "tags", "content"],
+          required: [
+            "id",
+            "pubkey",
+            "sig",
+            "kind",
+            "created_at",
+            "tags",
+            "content",
+          ],
         },
       },
       required: ["signalType", "payload"],
     },
     outputSchema: {
       type: "object",
-      description: "Successful peer cross-validation receipt for the selected signed snapshot.",
-      examples: [{
-        signalType: "telemetry_snapshot",
-        date: "2026-09-09",
-        snapshotDigest: "ab".repeat(32),
-        peerAttestations: 1,
-        quorumThreshold: 2,
-        merkleRoot: "cd".repeat(32),
-        networkId: "bitcoin-stratigraphy-mainnet-v1",
-      }],
+      description:
+        "Successful peer cross-validation receipt for the selected signed snapshot.",
+      examples: [
+        {
+          signalType: "telemetry_snapshot",
+          date: "2026-09-09",
+          snapshotDigest: "ab".repeat(32),
+          peerAttestations: 1,
+          quorumThreshold: 2,
+          merkleRoot: "cd".repeat(32),
+          networkId: "bitcoin-stratigraphy-mainnet-v1",
+        },
+      ],
       additionalProperties: false,
       properties: {
-        signalType: field("string", "Signal distributed to configured peers.", ["telemetry_snapshot"], { enum: ["telemetry_snapshot"] }),
-        date: field("string", "UTC date of the distributed telemetry record.", ["2026-09-09"], { format: "date" }),
-        snapshotDigest: field("string", "SHA-256 digest of the canonical mesh-encoded signed snapshot.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-        peerAttestations: field("integer", "Number of remote pinned peers whose signatures were verified; excludes this node.", [1], { minimum: 1 }),
-        quorumThreshold: field("integer", "Required total attestation count, including this node.", [2], { minimum: 1 }),
-        merkleRoot: field("string", "Merkle root of local and peer attestation event identifiers.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-        networkId: field("string", "Mesh network identifier committed in peer attestations.", ["bitcoin-stratigraphy-mainnet-v1"]),
-        agentPubkey: field("string", "Present only when an agent-signed session was verified and accepted by the peer mesh.", ["cd".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
+        signalType: field(
+          "string",
+          "Signal distributed to configured peers.",
+          ["telemetry_snapshot"],
+          { enum: ["telemetry_snapshot"] },
+        ),
+        date: field(
+          "string",
+          "UTC date of the distributed telemetry record.",
+          ["2026-09-09"],
+          { format: "date" },
+        ),
+        snapshotDigest: field(
+          "string",
+          "SHA-256 digest of the canonical mesh-encoded signed snapshot.",
+          ["ab".repeat(32)],
+          { pattern: "^[0-9a-f]{64}$" },
+        ),
+        peerAttestations: field(
+          "integer",
+          "Number of remote pinned peers whose signatures were verified; excludes this node.",
+          [1],
+          { minimum: 1 },
+        ),
+        quorumThreshold: field(
+          "integer",
+          "Required total attestation count, including this node.",
+          [2],
+          { minimum: 1 },
+        ),
+        merkleRoot: field(
+          "string",
+          "Merkle root of local and peer attestation event identifiers.",
+          ["cd".repeat(32)],
+          { pattern: "^[0-9a-f]{64}$" },
+        ),
+        networkId: field(
+          "string",
+          "Mesh network identifier committed in peer attestations.",
+          ["bitcoin-stratigraphy-mainnet-v1"],
+        ),
+        agentPubkey: field(
+          "string",
+          "Present only when an agent-signed session was verified and accepted by the peer mesh.",
+          ["cd".repeat(32)],
+          { pattern: "^[0-9a-f]{64}$" },
+        ),
       },
-      required: ["signalType", "date", "snapshotDigest", "peerAttestations", "quorumThreshold", "merkleRoot", "networkId"],
+      required: [
+        "signalType",
+        "date",
+        "snapshotDigest",
+        "peerAttestations",
+        "quorumThreshold",
+        "merkleRoot",
+        "networkId",
+      ],
     },
   },
 ];
@@ -2658,68 +3777,161 @@ const baseMcpToolDefinitions = [
 const immutabilityNote =
   "Note: Stratigraphy records and zk-SNARK proofs are append-only and immutable by design; update and delete operations are intentionally non-existent.";
 const otsVerificationMetadata = {
-    inputSchema: {
-      type: "object",
-      description: "Serialized OTS receipt and the exact 32-byte SHA-256 digest it stamps.",
-      examples: [{ otsProof: "AQID", targetHash: "ab".repeat(32) }],
-      additionalProperties: false,
-      properties: {
-        otsProof: field("string", "Canonical base64 or even-length hex serialized .ots receipt (maximum 512 KiB decoded).", ["AQID"], { minLength: 1, maxLength: 1_048_576 }),
-        targetHash: field("string", "64-character SHA-256 digest recorded by the receipt; not a Bitcoin header hash.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
-      },
-      required: ["otsProof", "targetHash"],
+  inputSchema: {
+    type: "object",
+    description:
+      "Serialized OTS receipt and the exact 32-byte SHA-256 digest it stamps.",
+    examples: [{ otsProof: "AQID", targetHash: "ab".repeat(32) }],
+    additionalProperties: false,
+    properties: {
+      otsProof: field(
+        "string",
+        "Canonical base64 or even-length hex serialized .ots receipt (maximum 512 KiB decoded).",
+        ["AQID"],
+        { minLength: 1, maxLength: 1_048_576 },
+      ),
+      targetHash: field(
+        "string",
+        "64-character SHA-256 digest recorded by the receipt; not a Bitcoin header hash.",
+        ["ab".repeat(32)],
+        { pattern: "^[0-9a-fA-F]{64}$" },
+      ),
     },
-    outputSchema: {
-      type: "object",
-      description: "OTS verification outcome. Bitcoin height and header hash are null unless a matching Bitcoin block attestation was verified.",
-      examples: [{ valid: true, status: "bitcoin_block_attested", blockHeight: 920000, bitcoinHeaderHash: "ab".repeat(32) }],
-      additionalProperties: false,
-      properties: {
-        valid: field("boolean", "True only for a digest-matching, Bitcoin-attested OTS record with a valid chain-header lookup.", [true]),
-        status: field("string", "Whether the OTS record is Bitcoin-attested; calendar-only receipts are unverified.", ["bitcoin_block_attested"], { enum: ["bitcoin_block_attested", "unverified"] }),
-        blockHeight: field(["integer", "null"], "Bitcoin attestation height, or null if not verified.", [920000]),
-        bitcoinHeaderHash: field(["string", "null"], "Canonical Bitcoin block header hash at the attested height, or null if not verified.", ["ab".repeat(32)]),
+    required: ["otsProof", "targetHash"],
+  },
+  outputSchema: {
+    type: "object",
+    description:
+      "OTS verification outcome. Bitcoin height and header hash are null unless a matching Bitcoin block attestation was verified.",
+    examples: [
+      {
+        valid: true,
+        status: "bitcoin_block_attested",
+        blockHeight: 920000,
+        bitcoinHeaderHash: "ab".repeat(32),
       },
-      required: ["valid", "status", "blockHeight", "bitcoinHeaderHash"],
+    ],
+    additionalProperties: false,
+    properties: {
+      valid: field(
+        "boolean",
+        "True only for a digest-matching, Bitcoin-attested OTS record with a valid chain-header lookup.",
+        [true],
+      ),
+      status: field(
+        "string",
+        "Whether the OTS record is Bitcoin-attested; calendar-only receipts are unverified.",
+        ["bitcoin_block_attested"],
+        { enum: ["bitcoin_block_attested", "unverified"] },
+      ),
+      blockHeight: field(
+        ["integer", "null"],
+        "Bitcoin attestation height, or null if not verified.",
+        [920000],
+      ),
+      bitcoinHeaderHash: field(
+        ["string", "null"],
+        "Canonical Bitcoin block header hash at the attested height, or null if not verified.",
+        ["ab".repeat(32)],
+      ),
     },
+    required: ["valid", "status", "blockHeight", "bitcoinHeaderHash"],
+  },
 };
 const paymentSettlementMetadata = {
-    inputSchema: {
-      type: "object",
-      description: "Payment identifier and one payment proof; the matching signed L402 or x402 credential must be supplied in HTTP headers.",
-      examples: [{ paymentHash: "ab".repeat(32), preimage: "cd".repeat(32) }, { paymentHash: "0x" + "ab".repeat(32), txHash: "0x" + "ab".repeat(32) }],
-      additionalProperties: false,
-      properties: {
-        paymentHash: field("string", "L402 SHA-256 invoice hash, or Base tx hash when using x402.", ["ab".repeat(32)], { pattern: "^(0x)?[0-9a-fA-F]{64}$" }),
-        preimage: field("string", "L402 32-byte hex preimage; also send Authorization: L402 <server-issued macaroon>:<preimage>.", ["cd".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$" }),
-        txHash: field("string", "Base mainnet transaction hash, accepted only after facilitator settlement of PAYMENT-SIGNATURE.", ["0x" + "ab".repeat(32)], { pattern: "^0x[0-9a-fA-F]{64}$" }),
-      },
-      required: ["paymentHash"],
-      oneOf: [{ required: ["preimage"] }, { required: ["txHash"] }],
+  inputSchema: {
+    type: "object",
+    description:
+      "Payment identifier and one payment proof; the matching signed L402 or x402 credential must be supplied in HTTP headers.",
+    examples: [
+      { paymentHash: "ab".repeat(32), preimage: "cd".repeat(32) },
+      { paymentHash: "0x" + "ab".repeat(32), txHash: "0x" + "ab".repeat(32) },
+    ],
+    additionalProperties: false,
+    properties: {
+      paymentHash: field(
+        "string",
+        "L402 SHA-256 invoice hash, or Base tx hash when using x402.",
+        ["ab".repeat(32)],
+        { pattern: "^(0x)?[0-9a-fA-F]{64}$" },
+      ),
+      preimage: field(
+        "string",
+        "L402 32-byte hex preimage; also send Authorization: L402 <server-issued macaroon>:<preimage>.",
+        ["cd".repeat(32)],
+        { pattern: "^[0-9a-fA-F]{64}$" },
+      ),
+      txHash: field(
+        "string",
+        "Base mainnet transaction hash, accepted only after facilitator settlement of PAYMENT-SIGNATURE.",
+        ["0x" + "ab".repeat(32)],
+        { pattern: "^0x[0-9a-fA-F]{64}$" },
+      ),
     },
-    outputSchema: {
-      type: "object",
-      description: "Non-transferable verification claims; never a newly issued payment capability.",
-      examples: [{ verified: true, settlementToken: { scheme: "L402", paymentHash: "ab".repeat(32), scope: "/mcp/tools/stratigraphy.get", settledAt: "2026-09-28T12:00:00.000Z" } }],
-      additionalProperties: false,
-      properties: {
-        verified: field("boolean", "Whether the signed, server-bound payment was verified or settled.", [true]),
+    required: ["paymentHash"],
+    oneOf: [{ required: ["preimage"] }, { required: ["txHash"] }],
+  },
+  outputSchema: {
+    type: "object",
+    description:
+      "Non-transferable verification claims; never a newly issued payment capability.",
+    examples: [
+      {
+        verified: true,
         settlementToken: {
-          type: ["object", "null"],
-          description: "Verified payment claims, not a bearer token or a grant of tool access.",
-          examples: [{ scheme: "L402", paymentHash: "ab".repeat(32), scope: "/mcp/tools/stratigraphy.get", settledAt: "2026-09-28T12:00:00.000Z" }],
-          additionalProperties: false,
-          properties: {
-            scheme: field("string", "Settlement rail.", ["L402"], { enum: ["L402", "x402"] }),
-            paymentHash: field("string", "Verified Lightning invoice hash or Base transaction hash.", ["ab".repeat(32)]),
-            scope: field("string", "Original L402 tool path or x402 MCP resource path; this receipt cannot expand access.", ["/mcp/tools/stratigraphy.get"]),
-            settledAt: field("string", "Settlement verification time as ISO 8601 UTC.", ["2026-09-28T12:00:00.000Z"], { format: "date-time" }),
-          },
-          required: ["scheme", "paymentHash", "scope", "settledAt"],
+          scheme: "L402",
+          paymentHash: "ab".repeat(32),
+          scope: "/mcp/tools/stratigraphy.get",
+          settledAt: "2026-09-28T12:00:00.000Z",
         },
       },
-      required: ["verified", "settlementToken"],
+    ],
+    additionalProperties: false,
+    properties: {
+      verified: field(
+        "boolean",
+        "Whether the signed, server-bound payment was verified or settled.",
+        [true],
+      ),
+      settlementToken: {
+        type: ["object", "null"],
+        description:
+          "Verified payment claims, not a bearer token or a grant of tool access.",
+        examples: [
+          {
+            scheme: "L402",
+            paymentHash: "ab".repeat(32),
+            scope: "/mcp/tools/stratigraphy.get",
+            settledAt: "2026-09-28T12:00:00.000Z",
+          },
+        ],
+        additionalProperties: false,
+        properties: {
+          scheme: field("string", "Settlement rail.", ["L402"], {
+            enum: ["L402", "x402"],
+          }),
+          paymentHash: field(
+            "string",
+            "Verified Lightning invoice hash or Base transaction hash.",
+            ["ab".repeat(32)],
+          ),
+          scope: field(
+            "string",
+            "Original L402 tool path or x402 MCP resource path; this receipt cannot expand access.",
+            ["/mcp/tools/stratigraphy.get"],
+          ),
+          settledAt: field(
+            "string",
+            "Settlement verification time as ISO 8601 UTC.",
+            ["2026-09-28T12:00:00.000Z"],
+            { format: "date-time" },
+          ),
+        },
+        required: ["scheme", "paymentHash", "scope", "settledAt"],
+      },
     },
+    required: ["verified", "settlementToken"],
+  },
 };
 const exactDescriptionToolNames = new Set([
   "proof.notarize",
@@ -2737,200 +3949,437 @@ const exactDescriptionToolNames = new Set([
   "mesh.get_status",
   "mesh.broadcast",
 ]);
-const datasetReceiptDefinition = baseMcpToolDefinitions.find((tool) => tool.name === "proof.issue_receipt")!;
+const datasetReceiptDefinition = baseMcpToolDefinitions.find(
+  (tool) => tool.name === "proof.issue_receipt",
+)!;
 const notarizeToolDefinition = {
   name: "proof.notarize",
   title: "Notarize a SHA256 Digest with OpenTimestamps",
-  description: "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats.",
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  description:
+    "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats.",
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
   inputSchema: {
-    type: "object", description: "A SHA256 digest to timestamp directly, without hashing its bytes again.",
-    examples: [{ hash: "ab".repeat(32) }], additionalProperties: false,
+    type: "object",
+    description:
+      "A SHA256 digest to timestamp directly, without hashing its bytes again.",
+    examples: [{ hash: "ab".repeat(32) }],
+    additionalProperties: false,
     properties: {
-      hash: field("string", "Exactly 64 hexadecimal characters representing the agent state or data SHA256 digest; no 0x prefix.", ["ab".repeat(32)], { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 }),
+      hash: field(
+        "string",
+        "Exactly 64 hexadecimal characters representing the agent state or data SHA256 digest; no 0x prefix.",
+        ["ab".repeat(32)],
+        { pattern: "^[0-9a-fA-F]{64}$", minLength: 64, maxLength: 64 },
+      ),
     },
     required: ["hash"],
   },
   outputSchema: {
-    type: "object", description: "Portable detached .ots binary encoded as lowercase hexadecimal; calendar acceptance is not Bitcoin confirmation.",
-    examples: [{ hash: "ab".repeat(32), otsProofHex: "004f70656e54696d657374616d70730000", otsStatus: "pending_calendar" }],
+    type: "object",
+    description:
+      "Portable detached .ots binary encoded as lowercase hexadecimal; calendar acceptance is not Bitcoin confirmation.",
+    examples: [
+      {
+        hash: "ab".repeat(32),
+        otsProofHex: "004f70656e54696d657374616d70730000",
+        otsStatus: "pending_calendar",
+      },
+    ],
     additionalProperties: false,
     properties: {
-      hash: field("string", "The original SHA256 digest, normalized to lowercase.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-      otsProofHex: field("string", "Hex-encoded detached .ots file. Decode as binary and upgrade or verify later with official OpenTimestamps tools.", ["004f70656e54696d657374616d70730000"], { pattern: "^(?:[0-9a-f]{2})+$", minLength: 2, maxLength: 1048576 }),
-      otsStatus: field("string", "Calendar receipt only; Bitcoin inclusion must be independently upgraded and verified later.", ["pending_calendar"], { const: "pending_calendar" }),
+      hash: field(
+        "string",
+        "The original SHA256 digest, normalized to lowercase.",
+        ["ab".repeat(32)],
+        { pattern: "^[0-9a-f]{64}$" },
+      ),
+      otsProofHex: field(
+        "string",
+        "Hex-encoded detached .ots file. Decode as binary and upgrade or verify later with official OpenTimestamps tools.",
+        ["004f70656e54696d657374616d70730000"],
+        { pattern: "^(?:[0-9a-f]{2})+$", minLength: 2, maxLength: 1048576 },
+      ),
+      otsStatus: field(
+        "string",
+        "Calendar receipt only; Bitcoin inclusion must be independently upgraded and verified later.",
+        ["pending_calendar"],
+        { const: "pending_calendar" },
+      ),
     },
     required: ["hash", "otsProofHex", "otsStatus"],
   },
 };
-const mcpToolDefinitions = [...[...baseMcpToolDefinitions, notarizeToolDefinition]
-  .filter((tool) => tool.name !== "proof.get_status" && tool.name !== "proof.issue_receipt")
-  .map((tool) => {
-    const merged = tool.name === "proof.verify"
-      ? {
-          ...tool,
-          title: "Verify Groth16 or OpenTimestamps Proof",
-          description: "Execute cryptographic verification for supplied Groth16 telemetry or drift zk-SNARK proofs, or OpenTimestamps receipts. Returns proof validity; verification can update a bounded in-memory lifecycle index, and drift checks require a Bitcoin block provider. Use this tool to verify supplied proofs; use `proof.submit` to register new Groth16 proofs and `proof.get_by_hash` to retrieve retained proofs or signed receipts by a known identifier.",
-          annotations: { ...tool.annotations, openWorldHint: true },
-          inputSchema: {
-            type: "object", description: "Select groth16 (default) or ots, supplying only fields for the selected verification path.",
-            examples: [...tool.inputSchema.examples, { proofType: "ots", otsProof: "AQID", targetHash: "ab".repeat(32) }],
-            oneOf: [
-              ...(tool.inputSchema as { oneOf: Array<{ properties: Record<string, unknown> }> }).oneOf.map((branch) => ({
-                ...branch,
-                properties: {
-                  ...branch.properties,
-                  proofType: field("string", "Groth16 verification (default).", ["groth16"], { const: "groth16", default: "groth16" }),
-                },
-              })),
-              {
-                ...otsVerificationMetadata.inputSchema,
-                description: "OTS mode requires proofType ots, a complete receipt, and its SHA-256 file digest.",
-                properties: {
-                  proofType: field("string", "OpenTimestamps Bitcoin verification.", ["ots"], { const: "ots" }),
-                  ...otsVerificationMetadata.inputSchema.properties,
-                },
-                required: ["proofType", "otsProof", "targetHash"],
-              },
-            ],
-          },
-          outputSchema: {
-            ...tool.outputSchema,
-            description: "Groth16 verification timing or OTS Bitcoin attestation result, depending on proofType.",
-            examples: [...tool.outputSchema.examples, ...otsVerificationMetadata.outputSchema.examples],
-            properties: { ...tool.outputSchema.properties, ...otsVerificationMetadata.outputSchema.properties },
-            required: ["valid"],
-            oneOf: [
-              { required: ["verifiedAt", "computationTimeMs"] },
-              { required: ["status", "blockHeight", "bitcoinHeaderHash"] },
-            ],
-          },
-        }
-      : tool.name === "payment.get_info"
-      ? {
-          ...tool,
-          title: "Query MCP Prices or Verify Payment Settlement",
-          description: "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted.",
-          annotations: { ...tool.annotations, readOnlyHint: false, idempotentHint: false, openWorldHint: true },
-          inputSchema: {
-            type: "object",
-            description: "Query pricing (default) or settle a matching authenticated Lightning or Base payment.",
-            examples: [{}, { action: "settle", paymentHash: "ab".repeat(32), preimage: "cd".repeat(32) }],
-            additionalProperties: false,
-            properties: {
-              ...tool.inputSchema.properties,
-              action: field("string", "query (default) discovers prices; settle verifies authenticated payment.", ["query"], { enum: ["query", "settle"], default: "query" }),
-              ...paymentSettlementMetadata.inputSchema.properties,
-              paymentMacaroon: field("string", "Original invoice macaroon, separate from this tool's paid access credential.", ["eyJtYWNhcm9vbiI6ImV4YW1wbGUifQ"], { minLength: 1, maxLength: 8192 }),
-            },
-            required: [],
-            oneOf: [
-              {
-                type: "object", additionalProperties: false,
-                properties: {
-                  ...tool.inputSchema.properties,
-                  action: field("string", "Pricing query (default).", ["query"], { const: "query", default: "query" }),
-                },
-              },
-              {
-                ...paymentSettlementMetadata.inputSchema,
-                properties: {
-                  action: field("string", "Verify or execute payment settlement.", ["settle"], { const: "settle" }),
-                  ...paymentSettlementMetadata.inputSchema.properties,
-                  paymentMacaroon: field("string", "Original invoice macaroon, separate from this tool's paid access credential.", ["eyJtYWNhcm9vbiI6ImV4YW1wbGUifQ"], { minLength: 1, maxLength: 8192 }),
-                },
-                required: ["action", "paymentHash"],
-              },
-            ],
-          },
-          outputSchema: {
-            ...tool.outputSchema,
-            description: "Pricing details for query, or non-transferable payment verification claims for settle.",
-            examples: [...tool.outputSchema.examples, ...paymentSettlementMetadata.outputSchema.examples],
-            properties: { ...tool.outputSchema.properties, ...paymentSettlementMetadata.outputSchema.properties },
-            required: [],
-            oneOf: [
-              { required: tool.outputSchema.required },
-              { required: ["verified", "settlementToken"] },
-            ],
-          },
-        }
-      : tool.name === "proof.ground"
-      ? {
-          ...tool,
-          inputSchema: {
-            type: "object",
-            description: "Provide contextHash and agentId together for live agent context, or cid for a dataset anchor; these two modes are exclusive. Optional metadata applies to context mode; optional nostrEventId and context apply to dataset mode.",
-            examples: [...tool.inputSchema.examples, ...datasetReceiptDefinition.inputSchema.examples],
-            additionalProperties: false,
-            properties: { ...tool.inputSchema.properties, ...datasetReceiptDefinition.inputSchema.properties },
-            oneOf: [{ required: ["contextHash", "agentId"] }, { required: ["cid"] }],
-          },
-          outputSchema: {
-            type: "object",
-            description: "Signed context or dataset receipt anchored to the current Bitcoin tip.",
-            examples: [
-              { receipt: (tool.outputSchema.examples[0] as { receipt: unknown }).receipt, provenanceVerified: true },
-              { receipt: datasetReceiptDefinition.outputSchema.examples[0], provenanceVerified: true },
-            ],
-            additionalProperties: false,
-            properties: {
-              receipt: {
+const mcpToolDefinitions = [
+  ...[...baseMcpToolDefinitions, notarizeToolDefinition]
+    .filter(
+      (tool) =>
+        tool.name !== "proof.get_status" && tool.name !== "proof.issue_receipt",
+    )
+    .map((tool) => {
+      const merged =
+        tool.name === "proof.verify"
+          ? {
+              ...tool,
+              title: "Verify Groth16 or OpenTimestamps Proof",
+              description:
+                "Execute cryptographic verification for supplied Groth16 telemetry or drift zk-SNARK proofs, or OpenTimestamps receipts. Returns proof validity; verification can update a bounded in-memory lifecycle index, and drift checks require a Bitcoin block provider. Use this tool to verify supplied proofs; use `proof.submit` to register new Groth16 proofs and `proof.get_by_hash` to retrieve retained proofs or signed receipts by a known identifier.",
+              annotations: { ...tool.annotations, openWorldHint: true },
+              inputSchema: {
                 type: "object",
-                description: "Full signed context receipt or signed dataset receipt wrapper. Example: a signed Bitcoin-tip anchor.",
-                examples: [(tool.outputSchema.examples[0] as { receipt: unknown }).receipt],
-                oneOf: [(tool.outputSchema.properties as Record<string, unknown>).receipt, datasetReceiptDefinition.outputSchema],
+                description:
+                  "Select groth16 (default) or ots, supplying only fields for the selected verification path.",
+                examples: [
+                  ...tool.inputSchema.examples,
+                  {
+                    proofType: "ots",
+                    otsProof: "AQID",
+                    targetHash: "ab".repeat(32),
+                  },
+                ],
+                oneOf: [
+                  ...(
+                    tool.inputSchema as {
+                      oneOf: Array<{ properties: Record<string, unknown> }>;
+                    }
+                  ).oneOf.map((branch) => ({
+                    ...branch,
+                    properties: {
+                      ...branch.properties,
+                      proofType: field(
+                        "string",
+                        "Groth16 verification (default).",
+                        ["groth16"],
+                        { const: "groth16", default: "groth16" },
+                      ),
+                    },
+                  })),
+                  {
+                    ...otsVerificationMetadata.inputSchema,
+                    description:
+                      "OTS mode requires proofType ots, a complete receipt, and its SHA-256 file digest.",
+                    properties: {
+                      proofType: field(
+                        "string",
+                        "OpenTimestamps Bitcoin verification.",
+                        ["ots"],
+                        { const: "ots" },
+                      ),
+                      ...otsVerificationMetadata.inputSchema.properties,
+                    },
+                    required: ["proofType", "otsProof", "targetHash"],
+                  },
+                ],
               },
-              provenanceVerified: field("boolean", "Whether this signed receipt binds the current verified dataset chain, not whether Bitcoin has attested its OTS proof.", [true]),
-              provenanceMerkleRoot: field("string", "Dataset chain root signed in the receipt, when the referenced dataset still matches.", ["ab".repeat(32)], { pattern: "^[0-9a-f]{64}$" }),
-              otsProof: field("string", "Base64 serialized .ots proof of the dataset root bytes, when a calendar receipt is available.", ["AQID"], { format: "byte" }),
-              otsStatus: field("string", "Calendar-only or independently Bitcoin-verified status of the OTS receipt.", ["pending_calendar"], { enum: ["pending_calendar", "bitcoin_block_attested"] }),
-            },
-            required: ["receipt", "provenanceVerified"],
-          },
-        }
-      : tool;
-    return tool.name.startsWith("stratigraphy.") || tool.name.startsWith("proof.") ||
-      tool.name === "mesh.broadcast"
-      ? {
-          ...merged,
-          description: exactDescriptionToolNames.has(tool.name)
-             ? merged.description
-             : `${merged.description} ${immutabilityNote}`,
-        }
-      : merged;
-  }).map((tool) => ({
-    ...tool,
-    annotations: {
-      ...tool.annotations,
-      l402: {
-        amountSats: mcpToolPrices[tool.name as keyof typeof mcpToolPrices],
-        ...(mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0
-          ? { batchSize: 100, batchHeader: "X-L402-Batch-Size" } : {}),
+              outputSchema: {
+                ...tool.outputSchema,
+                description:
+                  "Groth16 verification timing or OTS Bitcoin attestation result, depending on proofType.",
+                examples: [
+                  ...tool.outputSchema.examples,
+                  ...otsVerificationMetadata.outputSchema.examples,
+                ],
+                properties: {
+                  ...tool.outputSchema.properties,
+                  ...otsVerificationMetadata.outputSchema.properties,
+                },
+                required: ["valid"],
+                oneOf: [
+                  { required: ["verifiedAt", "computationTimeMs"] },
+                  { required: ["status", "blockHeight", "bitcoinHeaderHash"] },
+                ],
+              },
+            }
+          : tool.name === "payment.get_info"
+            ? {
+                ...tool,
+                title: "Query MCP Prices or Verify Payment Settlement",
+                description:
+                  "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted.",
+                annotations: {
+                  ...tool.annotations,
+                  readOnlyHint: false,
+                  idempotentHint: false,
+                  openWorldHint: true,
+                },
+                inputSchema: {
+                  type: "object",
+                  description:
+                    "Query pricing (default) or settle a matching authenticated Lightning or Base payment.",
+                  examples: [
+                    {},
+                    {
+                      action: "settle",
+                      paymentHash: "ab".repeat(32),
+                      preimage: "cd".repeat(32),
+                    },
+                  ],
+                  additionalProperties: false,
+                  properties: {
+                    ...tool.inputSchema.properties,
+                    action: field(
+                      "string",
+                      "query (default) discovers prices; settle verifies authenticated payment.",
+                      ["query"],
+                      { enum: ["query", "settle"], default: "query" },
+                    ),
+                    ...paymentSettlementMetadata.inputSchema.properties,
+                    paymentMacaroon: field(
+                      "string",
+                      "Original invoice macaroon, separate from this tool's paid access credential.",
+                      ["eyJtYWNhcm9vbiI6ImV4YW1wbGUifQ"],
+                      { minLength: 1, maxLength: 8192 },
+                    ),
+                  },
+                  required: [],
+                  oneOf: [
+                    {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        ...tool.inputSchema.properties,
+                        action: field(
+                          "string",
+                          "Pricing query (default).",
+                          ["query"],
+                          { const: "query", default: "query" },
+                        ),
+                      },
+                    },
+                    {
+                      ...paymentSettlementMetadata.inputSchema,
+                      properties: {
+                        action: field(
+                          "string",
+                          "Verify or execute payment settlement.",
+                          ["settle"],
+                          { const: "settle" },
+                        ),
+                        ...paymentSettlementMetadata.inputSchema.properties,
+                        paymentMacaroon: field(
+                          "string",
+                          "Original invoice macaroon, separate from this tool's paid access credential.",
+                          ["eyJtYWNhcm9vbiI6ImV4YW1wbGUifQ"],
+                          { minLength: 1, maxLength: 8192 },
+                        ),
+                      },
+                      required: ["action", "paymentHash"],
+                    },
+                  ],
+                },
+                outputSchema: {
+                  ...tool.outputSchema,
+                  description:
+                    "Pricing details for query, or non-transferable payment verification claims for settle.",
+                  examples: [
+                    ...tool.outputSchema.examples,
+                    ...paymentSettlementMetadata.outputSchema.examples,
+                  ],
+                  properties: {
+                    ...tool.outputSchema.properties,
+                    ...paymentSettlementMetadata.outputSchema.properties,
+                  },
+                  required: [],
+                  oneOf: [
+                    { required: tool.outputSchema.required },
+                    { required: ["verified", "settlementToken"] },
+                  ],
+                },
+              }
+            : tool.name === "proof.ground"
+              ? {
+                  ...tool,
+                  inputSchema: {
+                    type: "object",
+                    description:
+                      "Provide contextHash and agentId together for live agent context, or cid for a dataset anchor; these two modes are exclusive. Optional metadata applies to context mode; optional nostrEventId and context apply to dataset mode.",
+                    examples: [
+                      ...tool.inputSchema.examples,
+                      ...datasetReceiptDefinition.inputSchema.examples,
+                    ],
+                    additionalProperties: false,
+                    properties: {
+                      ...tool.inputSchema.properties,
+                      ...datasetReceiptDefinition.inputSchema.properties,
+                    },
+                    oneOf: [
+                      { required: ["contextHash", "agentId"] },
+                      { required: ["cid"] },
+                    ],
+                  },
+                  outputSchema: {
+                    type: "object",
+                    description:
+                      "Signed context or dataset receipt anchored to the current Bitcoin tip.",
+                    examples: [
+                      {
+                        receipt: (
+                          tool.outputSchema.examples[0] as { receipt: unknown }
+                        ).receipt,
+                        provenanceVerified: true,
+                      },
+                      {
+                        receipt:
+                          datasetReceiptDefinition.outputSchema.examples[0],
+                        provenanceVerified: true,
+                      },
+                    ],
+                    additionalProperties: false,
+                    properties: {
+                      receipt: {
+                        type: "object",
+                        description:
+                          "Full signed context receipt or signed dataset receipt wrapper. Example: a signed Bitcoin-tip anchor.",
+                        examples: [
+                          (
+                            tool.outputSchema.examples[0] as {
+                              receipt: unknown;
+                            }
+                          ).receipt,
+                        ],
+                        oneOf: [
+                          (
+                            tool.outputSchema.properties as Record<
+                              string,
+                              unknown
+                            >
+                          ).receipt,
+                          datasetReceiptDefinition.outputSchema,
+                        ],
+                      },
+                      provenanceVerified: field(
+                        "boolean",
+                        "Whether this signed receipt binds the current verified dataset chain, not whether Bitcoin has attested its OTS proof.",
+                        [true],
+                      ),
+                      provenanceMerkleRoot: field(
+                        "string",
+                        "Dataset chain root signed in the receipt, when the referenced dataset still matches.",
+                        ["ab".repeat(32)],
+                        { pattern: "^[0-9a-f]{64}$" },
+                      ),
+                      otsProof: field(
+                        "string",
+                        "Base64 serialized .ots proof of the dataset root bytes, when a calendar receipt is available.",
+                        ["AQID"],
+                        { format: "byte" },
+                      ),
+                      otsStatus: field(
+                        "string",
+                        "Calendar-only or independently Bitcoin-verified status of the OTS receipt.",
+                        ["pending_calendar"],
+                        {
+                          enum: ["pending_calendar", "bitcoin_block_attested"],
+                        },
+                      ),
+                    },
+                    required: ["receipt", "provenanceVerified"],
+                  },
+                }
+              : tool;
+      return tool.name.startsWith("stratigraphy.") ||
+        tool.name.startsWith("proof.") ||
+        tool.name === "mesh.broadcast"
+        ? {
+            ...merged,
+            description: exactDescriptionToolNames.has(tool.name)
+              ? merged.description
+              : `${merged.description} ${immutabilityNote}`,
+          }
+        : merged;
+    })
+    .map((tool) => ({
+      ...tool,
+      annotations: {
+        ...tool.annotations,
+        l402: {
+          amountSats: mcpToolPrices[tool.name as keyof typeof mcpToolPrices],
+          ...(mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0
+            ? { batchSize: 100, batchHeader: "X-L402-Batch-Size" }
+            : {}),
+        },
       },
-    },
-  }))];
+    })),
+];
 
 const paidTools = {
-  "proof.notarize": { amountSats: mcpToolPrices["proof.notarize"], schema: notarizeInputSchema },
-  "proof.attenuate": { amountSats: mcpToolPrices["proof.attenuate"], schema: attenuateInputSchema },
-  "mesh.get_status": { amountSats: mcpToolPrices["mesh.get_status"], schema: meshStatusInputSchema },
-  "mesh.status": { amountSats: mcpToolPrices["mesh.get_status"], schema: meshStatusInputSchema },
-  "payment.get_info": { amountSats: mcpToolPrices["payment.get_info"], schema: paymentInfoInputSchema },
-  "payment.info": { amountSats: mcpToolPrices["payment.get_info"], schema: paymentInfoInputSchema },
-  "stratigraphy.get": { amountSats: mcpToolPrices["stratigraphy.get"], schema: stratigraphyInputSchema },
-  "stratigraphy.get_digest": { amountSats: mcpToolPrices["stratigraphy.get_digest"], schema: stratigraphyDigestInputSchema },
-  "stratigraphy.get_diff": { amountSats: mcpToolPrices["stratigraphy.get_diff"], schema: stratigraphyDiffInputSchema },
-  "stratigraphy.get_range": { amountSats: mcpToolPrices["stratigraphy.get_range"], schema: stratigraphyRangeInputSchema },
+  "proof.notarize": {
+    amountSats: mcpToolPrices["proof.notarize"],
+    schema: notarizeInputSchema,
+  },
+  "proof.attenuate": {
+    amountSats: mcpToolPrices["proof.attenuate"],
+    schema: attenuateInputSchema,
+  },
+  "mesh.get_status": {
+    amountSats: mcpToolPrices["mesh.get_status"],
+    schema: meshStatusInputSchema,
+  },
+  "mesh.status": {
+    amountSats: mcpToolPrices["mesh.get_status"],
+    schema: meshStatusInputSchema,
+  },
+  "payment.get_info": {
+    amountSats: mcpToolPrices["payment.get_info"],
+    schema: paymentInfoInputSchema,
+  },
+  "payment.info": {
+    amountSats: mcpToolPrices["payment.get_info"],
+    schema: paymentInfoInputSchema,
+  },
+  "stratigraphy.get": {
+    amountSats: mcpToolPrices["stratigraphy.get"],
+    schema: stratigraphyInputSchema,
+  },
+  "stratigraphy.get_digest": {
+    amountSats: mcpToolPrices["stratigraphy.get_digest"],
+    schema: stratigraphyDigestInputSchema,
+  },
+  "stratigraphy.get_diff": {
+    amountSats: mcpToolPrices["stratigraphy.get_diff"],
+    schema: stratigraphyDiffInputSchema,
+  },
+  "stratigraphy.get_range": {
+    amountSats: mcpToolPrices["stratigraphy.get_range"],
+    schema: stratigraphyRangeInputSchema,
+  },
   // Keep the original scope and invoice description for already-issued L402 credentials.
-  "stratigraphy.digest": { amountSats: mcpToolPrices["stratigraphy.get_digest"], schema: stratigraphyDigestInputSchema },
-  "stratigraphy.diff": { amountSats: mcpToolPrices["stratigraphy.get_diff"], schema: stratigraphyDiffInputSchema },
-  "stratigraphy.range": { amountSats: mcpToolPrices["stratigraphy.get_range"], schema: stratigraphyRangeInputSchema },
-  "proof.get_by_hash": { amountSats: mcpToolPrices["proof.get_by_hash"], schema: proofByHashInputSchema },
-  "proof.verify": { amountSats: mcpToolPrices["proof.verify"], schema: verifyProofInputSchema },
-  "proof.ground": { amountSats: mcpToolPrices["proof.ground"], schema: proofGroundInputSchema },
-  "proof.submit": { amountSats: mcpToolPrices["proof.submit"], schema: submitProofInputSchema },
-  "mesh.broadcast": { amountSats: mcpToolPrices["mesh.broadcast"], schema: meshBroadcastInputSchema },
+  "stratigraphy.digest": {
+    amountSats: mcpToolPrices["stratigraphy.get_digest"],
+    schema: stratigraphyDigestInputSchema,
+  },
+  "stratigraphy.diff": {
+    amountSats: mcpToolPrices["stratigraphy.get_diff"],
+    schema: stratigraphyDiffInputSchema,
+  },
+  "stratigraphy.range": {
+    amountSats: mcpToolPrices["stratigraphy.get_range"],
+    schema: stratigraphyRangeInputSchema,
+  },
+  "proof.get_by_hash": {
+    amountSats: mcpToolPrices["proof.get_by_hash"],
+    schema: proofByHashInputSchema,
+  },
+  "proof.verify": {
+    amountSats: mcpToolPrices["proof.verify"],
+    schema: verifyProofInputSchema,
+  },
+  "proof.ground": {
+    amountSats: mcpToolPrices["proof.ground"],
+    schema: proofGroundInputSchema,
+  },
+  "proof.submit": {
+    amountSats: mcpToolPrices["proof.submit"],
+    schema: submitProofInputSchema,
+  },
+  "mesh.broadcast": {
+    amountSats: mcpToolPrices["mesh.broadcast"],
+    schema: meshBroadcastInputSchema,
+  },
 } as const;
 
 function toolNamesForAuthorization(name: string): string[] {
@@ -2946,7 +4395,10 @@ function toolNamesForAuthorization(name: string): string[] {
 
 function createBitcoinStratigraphyMcpServer(
   groundReceipt?: Awaited<ReturnType<typeof groundEpistemicContext>>,
-  mesh: Pick<MeshGossipService, "status" | "createConsensus"> = createMeshGossipService(),
+  mesh: Pick<
+    MeshGossipService,
+    "status" | "createConsensus"
+  > = createMeshGossipService(),
   datasetReceipt?: Awaited<ReturnType<typeof createEpistemicDatasetReceipt>>,
   attenuation?: {
     status: "attenuated";
@@ -2994,18 +4446,31 @@ function createBitcoinStratigraphyMcpServer(
     }
     if (name === "proof.notarize") {
       const parsed = notarizeInputSchema.safeParse(args);
-      if (!parsed.success) throw new McpError(ErrorCode.InvalidParams, "hash must be exactly 64 hexadecimal characters");
+      if (!parsed.success)
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "hash must be exactly 64 hexadecimal characters",
+        );
       try {
         const receipt = await notary(parsed.data.hash);
-        return { content: [{ type: "text" as const, text: JSON.stringify(receipt) }], structuredContent: receipt };
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(receipt) }],
+          structuredContent: receipt,
+        };
       } catch {
-        throw new McpError(ErrorCode.InternalError, "OpenTimestamps notarization unavailable; retry later");
+        throw new McpError(
+          ErrorCode.InternalError,
+          "OpenTimestamps notarization unavailable; retry later",
+        );
       }
     }
     if (name === "stratigraphy.get") {
       const parsed = stratigraphyInputSchema.safeParse(args);
       if (!parsed.success) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid stratigraphy query");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid stratigraphy query",
+        );
       }
       try {
         const records = await queryStratigraphy(parsed.data);
@@ -3040,7 +4505,10 @@ function createBitcoinStratigraphyMcpServer(
     if (name === "stratigraphy.get_digest") {
       const parsed = stratigraphyDigestInputSchema.safeParse(args);
       if (!parsed.success) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid digest target or format");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid digest target or format",
+        );
       }
       try {
         const result = await queryStratigraphyDigest(parsed.data);
@@ -3049,7 +4517,8 @@ function createBitcoinStratigraphyMcpServer(
           structuredContent: { result, proofAvailable: false },
         };
       } catch (error) {
-        if (error instanceof RangeError) throw new McpError(ErrorCode.InvalidParams, error.message);
+        if (error instanceof RangeError)
+          throw new McpError(ErrorCode.InvalidParams, error.message);
         throw error;
       }
     }
@@ -3065,14 +4534,18 @@ function createBitcoinStratigraphyMcpServer(
           structuredContent: result,
         };
       } catch (error) {
-        if (error instanceof RangeError) throw new McpError(ErrorCode.InvalidParams, error.message);
+        if (error instanceof RangeError)
+          throw new McpError(ErrorCode.InvalidParams, error.message);
         throw error;
       }
     }
     if (name === "stratigraphy.get_range") {
       const parsed = stratigraphyRangeInputSchema.safeParse(args);
       if (!parsed.success) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid range bounds, limit or format");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid range bounds, limit or format",
+        );
       }
       try {
         const structuredContent = await queryStratigraphyRange(parsed.data);
@@ -3081,13 +4554,17 @@ function createBitcoinStratigraphyMcpServer(
           structuredContent,
         };
       } catch (error) {
-        if (error instanceof RangeError) throw new McpError(ErrorCode.InvalidParams, error.message);
+        if (error instanceof RangeError)
+          throw new McpError(ErrorCode.InvalidParams, error.message);
         throw error;
       }
     }
     if (name === "stratigraphy.list") {
       if (!stratigraphyCatalogInputSchema.safeParse(args).success) {
-        throw new McpError(ErrorCode.InvalidParams, "Catalog takes no arguments");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Catalog takes no arguments",
+        );
       }
       const structuredContent = await stratigraphyCatalog();
       return {
@@ -3097,7 +4574,10 @@ function createBitcoinStratigraphyMcpServer(
     }
     if (request.params.name === "proof.attenuate") {
       if (!attenuation) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid or unauthorized parent macaroon");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid or unauthorized parent macaroon",
+        );
       }
       return {
         content: [{ type: "text", text: JSON.stringify(attenuation) }],
@@ -3120,7 +4600,10 @@ function createBitcoinStratigraphyMcpServer(
       const startedAt = performance.now();
       if ("circuit" in parsed.data) {
         if (!driftVerification) {
-          throw new McpError(ErrorCode.InternalError, "Drift proof verification provider unavailable");
+          throw new McpError(
+            ErrorCode.InternalError,
+            "Drift proof verification provider unavailable",
+          );
         }
         valid = driftVerification.valid;
       } else {
@@ -3133,11 +4616,12 @@ function createBitcoinStratigraphyMcpServer(
       const structuredContent = {
         valid,
         verifiedAt: new Date().toISOString(),
-        computationTimeMs: Number((
-          "circuit" in parsed.data && driftVerification
+        computationTimeMs: Number(
+          ("circuit" in parsed.data && driftVerification
             ? performance.now() - driftVerification.startedAt
             : performance.now() - startedAt
-        ).toFixed(3)),
+          ).toFixed(3),
+        ),
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
@@ -3146,14 +4630,20 @@ function createBitcoinStratigraphyMcpServer(
     }
     if (name === "proof.get_by_hash") {
       if (!proofByHashInputSchema.safeParse(args).success) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid proof or receipt hash");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid proof or receipt hash",
+        );
       }
       if (!archivedProof) {
-        throw new McpError(ErrorCode.InvalidParams, "Proof or receipt not found");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Proof or receipt not found",
+        );
       }
       const structuredContent = {
         ...archivedProof,
-        ...await provenanceForReceipt(archivedProof.proofPayload),
+        ...(await provenanceForReceipt(archivedProof.proofPayload)),
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
@@ -3162,9 +4652,16 @@ function createBitcoinStratigraphyMcpServer(
     }
     if (name === "payment.get_info") {
       const parsed = paymentInfoInputSchema.safeParse(args);
-      if (!parsed.success) throw new McpError(ErrorCode.InvalidParams, "Invalid payment info request");
+      if (!parsed.success)
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid payment info request",
+        );
       if (parsed.data.action === "settle") {
-        const structuredContent = paymentSettlement ?? { verified: false, settlementToken: null };
+        const structuredContent = paymentSettlement ?? {
+          verified: false,
+          settlementToken: null,
+        };
         return {
           content: [{ type: "text", text: JSON.stringify(structuredContent) }],
           structuredContent,
@@ -3178,7 +4675,11 @@ function createBitcoinStratigraphyMcpServer(
       }
       const structuredContent = {
         standardInvoiceSats: 250,
-        perToolSats: toolName ? { [toolName]: mcpToolPrices[toolName as keyof typeof mcpToolPrices] } : mcpToolPrices,
+        perToolSats: toolName
+          ? {
+              [toolName]: mcpToolPrices[toolName as keyof typeof mcpToolPrices],
+            }
+          : mcpToolPrices,
         acceptedPaymentMethods: x402Configured
           ? ["Lightning L402", "x402 Exact (Base USDC)"]
           : ["Lightning L402"],
@@ -3189,15 +4690,17 @@ function createBitcoinStratigraphyMcpServer(
           fields: ["macaroon", "invoice", "payment_hash", "amount_sats"],
         },
         activeAuthSchemes: x402Configured ? ["L402", "x402"] : ["L402"],
-        ...(x402Configured ? {
-          x402: {
-            network: "eip155:8453",
-            scheme: "exact",
-            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            amount: "1000",
-            payTo: "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775",
-          },
-        } : {}),
+        ...(x402Configured
+          ? {
+              x402: {
+                network: "eip155:8453",
+                scheme: "exact",
+                asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                amount: "1000",
+                payTo: "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775",
+              },
+            }
+          : {}),
         macaroonRequirements: {
           authorizationHeader: "L402 <macaroon>:<preimage>",
           scope: "exact MCP tool path",
@@ -3234,13 +4737,20 @@ function createBitcoinStratigraphyMcpServer(
     if (request.params.name === "proof.submit") {
       const parsed = submitProofInputSchema.safeParse(args);
       if (!parsed.success) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid zk proof submission");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid zk proof submission",
+        );
       }
       const { proof, ...rest } = parsed.data;
-      const canonicalProof = "piA" in proof
-        ? { pi_a: proof.piA, pi_b: proof.piB, pi_c: proof.piC }
-        : proof;
-      const structuredContent = await submitZkProof({ ...rest, proof: canonicalProof });
+      const canonicalProof =
+        "piA" in proof
+          ? { pi_a: proof.piA, pi_b: proof.piB, pi_c: proof.piC }
+          : proof;
+      const structuredContent = await submitZkProof({
+        ...rest,
+        proof: canonicalProof,
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
@@ -3256,17 +4766,26 @@ function createBitcoinStratigraphyMcpServer(
       }
       if ("cid" in parsed.data) {
         if (!datasetReceipt) {
-          throw new McpError(ErrorCode.InternalError, "Signed dataset receipt is unavailable");
+          throw new McpError(
+            ErrorCode.InternalError,
+            "Signed dataset receipt is unavailable",
+          );
         }
         indexEpistemicDatasetReceipt(datasetReceipt);
       } else {
         if (!groundReceipt) {
-          throw new McpError(ErrorCode.InternalError, "Grounding receipt is unavailable");
+          throw new McpError(
+            ErrorCode.InternalError,
+            "Grounding receipt is unavailable",
+          );
         }
         indexGroundedContextReceipt(groundReceipt);
       }
       const receipt = "cid" in parsed.data ? datasetReceipt! : groundReceipt!;
-      const structuredContent = { receipt, ...await provenanceForReceipt(receipt) };
+      const structuredContent = {
+        receipt,
+        ...(await provenanceForReceipt(receipt)),
+      };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
         structuredContent,
@@ -3274,7 +4793,10 @@ function createBitcoinStratigraphyMcpServer(
     }
     if (name === "mesh.get_status") {
       if (!meshStatusInputSchema.safeParse(args).success) {
-        throw new McpError(ErrorCode.InvalidParams, "Mesh status takes no arguments");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Mesh status takes no arguments",
+        );
       }
       const structuredContent = mesh.status();
       return {
@@ -3285,7 +4807,10 @@ function createBitcoinStratigraphyMcpServer(
     if (request.params.name === "mesh.broadcast") {
       const parsed = meshBroadcastInputSchema.safeParse(args);
       if (!parsed.success) {
-        throw new McpError(ErrorCode.InvalidParams, "Invalid mesh broadcast request");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "Invalid mesh broadcast request",
+        );
       }
       if (mesh.status().configuredPeerCount === 0) {
         throw new McpError(ErrorCode.InternalError, "No mesh peers configured");
@@ -3300,14 +4825,23 @@ function createBitcoinStratigraphyMcpServer(
         throw error;
       }
       if (records.length !== 1) {
-        throw new McpError(ErrorCode.InvalidParams, "No telemetry record exists for that date");
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          "No telemetry record exists for that date",
+        );
       }
-      const signedRecord = createNostrAttestor()(records[0]!, Math.floor(Date.now() / 1_000));
+      const signedRecord = createNostrAttestor()(
+        records[0]!,
+        Math.floor(Date.now() / 1_000),
+      );
       let consensus;
       try {
-        consensus = await mesh.createConsensus(signedRecord, parsed.data.agentEvent
-          ? { event: parsed.data.agentEvent, date: parsed.data.payload.date }
-          : undefined);
+        consensus = await mesh.createConsensus(
+          signedRecord,
+          parsed.data.agentEvent
+            ? { event: parsed.data.agentEvent, date: parsed.data.payload.date }
+            : undefined,
+        );
       } catch (error) {
         if (error instanceof MeshQuorumError) {
           throw new McpError(ErrorCode.InternalError, error.message);
@@ -3315,7 +4849,10 @@ function createBitcoinStratigraphyMcpServer(
         throw error;
       }
       if (consensus.peerAttestations.length < 2) {
-        throw new McpError(ErrorCode.InternalError, "No mesh peer acknowledged the snapshot");
+        throw new McpError(
+          ErrorCode.InternalError,
+          "No mesh peer acknowledged the snapshot",
+        );
       }
       const structuredContent = {
         signalType: parsed.data.signalType,
@@ -3325,7 +4862,9 @@ function createBitcoinStratigraphyMcpServer(
         quorumThreshold: consensus.threshold,
         merkleRoot: consensus.merkleRoot,
         networkId: consensus.networkId,
-        ...(parsed.data.agentEvent ? { agentPubkey: parsed.data.agentEvent.pubkey } : {}),
+        ...(parsed.data.agentEvent
+          ? { agentPubkey: parsed.data.agentEvent.pubkey }
+          : {}),
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
@@ -3347,12 +4886,17 @@ async function handleMcpRequest(
   mesh: Pick<MeshGossipService, "status" | "createConsensus">,
 ): Promise<void> {
   const server = createBitcoinStratigraphyMcpServer(
-    res.locals.epistemicAnchorReceipt as Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
+    res.locals.epistemicAnchorReceipt as
+      Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
     mesh,
-    res.locals.epistemicDatasetReceipt as Awaited<ReturnType<typeof createEpistemicDatasetReceipt>> | undefined,
-    res.locals.attenuation as Parameters<typeof createBitcoinStratigraphyMcpServer>[3],
+    res.locals.epistemicDatasetReceipt as
+      Awaited<ReturnType<typeof createEpistemicDatasetReceipt>> | undefined,
+    res.locals.attenuation as Parameters<
+      typeof createBitcoinStratigraphyMcpServer
+    >[3],
     res.locals.archivedProof as ArchivedProofLookup | undefined,
-    res.locals.driftVerification as { valid: boolean; startedAt: number } | undefined,
+    res.locals.driftVerification as
+      { valid: boolean; startedAt: number } | undefined,
     Boolean(res.locals.x402Configured),
     res.locals.paymentSettlement as SettlementCheck | undefined,
     res.locals.notarizeHash as typeof notarizeHash | undefined,
@@ -3368,9 +4912,11 @@ async function handleMcpRequest(
     // requires clients to advertise SSE. Allow JSON-only clients without
     // changing the JSON response format. GET/HEAD probes are handled separately.
     const accept = req.headers.accept;
-    if (req.method === "POST" &&
-        accept?.toLowerCase().includes("application/json") &&
-        !accept.toLowerCase().includes("text/event-stream")) {
+    if (
+      req.method === "POST" &&
+      accept?.toLowerCase().includes("application/json") &&
+      !accept.toLowerCase().includes("text/event-stream")
+    ) {
       req.headers.accept = `${accept}, text/event-stream`;
     }
     await transport.handleRequest(req, res, req.body);
@@ -3404,13 +4950,9 @@ async function handleMcpRequest(
 }
 
 export function registerMcpRequestGuard(app: Express): void {
-  app.use("/mcp", (req, res, next) => {
+  app.use("/mcp", (req, _res, next) => {
     // Never log Authorization, cookies, session identifiers, or query strings.
-    console.log("[MCP Request]", req.method, {
-      accept: req.headers.accept,
-      "content-type": req.headers["content-type"],
-      origin: req.headers.origin,
-    }, req.path);
+    req.log?.debug({ method: req.method, path: req.path }, "MCP request");
     next();
   });
 }
@@ -3427,6 +4969,7 @@ export function registerMcpRoute(
     meshService?: Pick<MeshGossipService, "status" | "createConsensus">;
     revocationStore?: MacaroonRevocationStore;
     notarizeHash?: typeof notarizeHash;
+    publicRateLimiter?: SlidingWindowRateLimiter;
   } = {},
 ): void {
   app.use("/mcp", frameMcpErrors);
@@ -3434,47 +4977,69 @@ export function registerMcpRoute(
     res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;
     next();
   });
-  const rateLimit = createHttpRateLimitMiddleware(
-    createSlidingWindowRateLimiter({ limit: 60, windowMs: 60_000 }),
+  const limitPublic = createPublicRateLimitMiddleware(
+    options.publicRateLimiter,
   );
-  const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
+  const rateLimit: RequestHandler = (req, res, next) => {
+    const name =
+      req.body?.method === "tools/call" ? req.body.params?.name : undefined;
+    // Credential headers alone never exempt free calls. Paid aliases remain gated
+    // by their existing L402/x402 middleware, without imposing an IP batch ceiling.
+    if (
+      req.method === "POST" &&
+      typeof name === "string" &&
+      Object.hasOwn(paidTools, name)
+    ) {
+      next();
+      return;
+    }
+    limitPublic(req, res, next);
+  };
+  const settlementRouter =
+    options.settlementRouter ?? createDefaultMultiSettlementRouter();
   let x402SetupError: unknown;
   let x402Ready = Boolean(options.x402ResourceServer);
   const x402ResourceServer = Promise.resolve(
     options.x402ResourceServer === null
       ? undefined
-      : options.x402ResourceServer ?? createCdpX402ResourceServer(),
-  ).then((server) => {
-    x402Ready = Boolean(server);
-    return server;
-  }).catch((error: unknown) => {
-    x402SetupError = error;
-    x402Ready = false;
-    return undefined;
-  });
+      : (options.x402ResourceServer ?? createCdpX402ResourceServer()),
+  )
+    .then((server) => {
+      x402Ready = Boolean(server);
+      return server;
+    })
+    .catch((error: unknown) => {
+      x402SetupError = error;
+      x402Ready = false;
+      return undefined;
+    });
   const mesh = options.meshService ?? createMeshGossipService();
-  const revocationStore = options.revocationStore ?? createPostgresMacaroonRevocationStore();
+  const revocationStore =
+    options.revocationStore ?? createPostgresMacaroonRevocationStore();
   const gates = Object.fromEntries(
     Object.entries(paidTools).map(([name, { amountSats }]) => [
       name,
       (() => {
         const l402 = createL402Middleware({
-        amountSats,
-        allowBatch: true,
-        invoiceExpirySeconds: MCP_INVOICE_EXPIRY_SECONDS,
-        description: `Bitcoin Stratigraphy MCP ${name} execution`,
-        settlementRouter,
-        sessionSecret: options.sessionSecret,
-        usageStore: options.usageStore,
-        revocationStore,
-        ledger: options.ledger,
-        scopePath: `/mcp/tools/${name}`,
-        requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
+          amountSats,
+          allowBatch: true,
+          invoiceExpirySeconds: MCP_INVOICE_EXPIRY_SECONDS,
+          description: `Bitcoin Stratigraphy MCP ${name} execution`,
+          settlementRouter,
+          sessionSecret: options.sessionSecret,
+          usageStore: options.usageStore,
+          revocationStore,
+          ledger: options.ledger,
+          scopePath: `/mcp/tools/${name}`,
+          requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
         });
         return async (req: Request, res: Response, next: NextFunction) => {
           if (name === "proof.notarize") {
             if (req.header("PAYMENT-SIGNATURE")) {
-              res.status(400).json({ error: "proof.notarize requires Lightning L402; x402 is not accepted" });
+              res.status(400).json({
+                error:
+                  "proof.notarize requires Lightning L402; x402 is not accepted",
+              });
               return;
             }
             await l402(req, res, next);
@@ -3482,7 +5047,9 @@ export function registerMcpRoute(
           }
           if (req.header("X-L402-Batch-Size")) {
             if (req.header("PAYMENT-SIGNATURE")) {
-              res.status(400).json({ error: "Macro-Macaroons support Lightning L402 only" });
+              res
+                .status(400)
+                .json({ error: "Macro-Macaroons support Lightning L402 only" });
               return;
             }
             await l402(req, res, next);
@@ -3492,435 +5059,745 @@ export function registerMcpRoute(
             const server = await x402ResourceServer;
             if (!server) {
               if (x402SetupError) {
-                req.log?.error({ err: x402SetupError }, "CDP x402 setup failed");
+                req.log?.error(
+                  { err: x402SetupError },
+                  "CDP x402 setup failed",
+                );
               }
-              res.status(503).json({ error: "x402 settlement is not configured" });
+              res
+                .status(503)
+                .json({ error: "x402 settlement is not configured" });
               return;
             }
             await createX402PaymentMiddleware({ resourceServer: server })(
-              req, res, next,
+              req,
+              res,
+              next,
             );
             return;
           }
-           // An unauthenticated challenge is only a quote. It does not grant
-           // tool access; a signed x402 request still requires live settlement.
-           const server = x402Ready ? await x402ResourceServer : undefined;
+          // An unauthenticated challenge is only a quote. It does not grant
+          // tool access; a signed x402 request still requires live settlement.
+          const server = x402Ready ? await x402ResourceServer : undefined;
           await createX402PaymentMiddleware({ resourceServer: server })(
-            req, res, (error?: unknown) => {
+            req,
+            res,
+            (error?: unknown) => {
               if (error) return next(error);
               // Express cannot observe a promise returned by a nested next callback.
-              void Promise.resolve().then(() => l402(req, res, next)).catch(next);
+              void Promise.resolve()
+                .then(() => l402(req, res, next))
+                .catch(next);
             },
           );
         };
       })(),
     ]),
-  ) as Record<string, (req: Request, res: Response, next: NextFunction) => void | Promise<void>>;
-  app.all("/mcp", rateLimit, (req, res, next) => {
-    res.locals.x402Configured = x402Ready;
-    // This stateless endpoint returns JSON for POSTs. Discovery scanners can
-    // advertise SSE too, so never open an idle event stream for a GET or HEAD.
-    if (req.method === "GET" || req.method === "HEAD") {
-      res.status(200).json({ status: "ok", service: "MCP Server" });
-      return;
-    }
-    next();
-  }, validateMcpEnvelope, async (req, res, next) => {
-    // Previously-free operations must authorize before settlement/delegation
-    // side effects. Invalid schemas still go to normal JSON-RPC validation.
-    const name = req.body?.method === "tools/call" ? req.body.params?.name : undefined;
-    let semanticInputValid = true;
-    if (name === "proof.attenuate") {
-      const parsed = attenuateInputSchema.safeParse(req.body.params.arguments ?? {});
-      if (parsed.success) {
+  ) as Record<
+    string,
+    (req: Request, res: Response, next: NextFunction) => void | Promise<void>
+  >;
+  app.all(
+    "/mcp",
+    rateLimit,
+    (req, res, next) => {
+      res.locals.x402Configured = x402Ready;
+      // This stateless endpoint returns JSON for POSTs. Discovery scanners can
+      // advertise SSE too, so never open an idle event stream for a GET or HEAD.
+      if (req.method === "GET" || req.method === "HEAD") {
+        res.status(200).json({ status: "ok", service: "MCP Server" });
+        return;
+      }
+      next();
+    },
+    validateMcpEnvelope,
+    async (req, res, next) => {
+      // Previously-free operations must authorize before settlement/delegation
+      // side effects. Invalid schemas still go to normal JSON-RPC validation.
+      const name =
+        req.body?.method === "tools/call" ? req.body.params?.name : undefined;
+      let semanticInputValid = true;
+      if (name === "proof.attenuate") {
+        const parsed = attenuateInputSchema.safeParse(
+          req.body.params.arguments ?? {},
+        );
+        if (parsed.success) {
+          const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+          semanticInputValid = Boolean(
+            secret &&
+            verifySubscriptionMacaroon(
+              parsed.data.macaroon,
+              secret,
+              Math.floor(Date.now() / 1_000),
+            ),
+          );
+          try {
+            normalizedAttenuationCaveats(parsed.data, Date.now());
+          } catch {
+            semanticInputValid = false;
+          }
+        }
+      }
+      if (name === "payment.get_info" || name === "payment.info") {
+        const args = req.body.params.arguments;
+        if (
+          args?.action === "settle" &&
+          typeof args.txHash === "string" &&
+          typeof args.paymentHash === "string" &&
+          args.txHash.replace(/^0x/i, "").toLowerCase() !==
+            args.paymentHash.replace(/^0x/i, "").toLowerCase()
+        ) {
+          res.status(400).json({
+            jsonrpc: "2.0",
+            id: req.body.id ?? null,
+            error: {
+              code: -32602,
+              message: "Payment hash must match the settlement transaction",
+            },
+          });
+          return;
+        }
+        const requestedTool = req.body.params.arguments?.toolName;
+        if (
+          typeof requestedTool === "string" &&
+          !Object.hasOwn(mcpToolPrices, canonicalToolName(requestedTool))
+        ) {
+          res.status(200).json({
+            jsonrpc: "2.0",
+            id: req.body.id ?? null,
+            error: { code: -32602, message: "Unknown MCP tool" },
+          });
+          return;
+        }
+      }
+      if (
+        semanticInputValid &&
+        typeof name === "string" &&
+        [
+          "proof.attenuate",
+          "mesh.get_status",
+          "mesh.status",
+          "payment.get_info",
+          "payment.info",
+        ].includes(name) &&
+        paidTools[name as keyof typeof paidTools].schema.safeParse(
+          req.body.params.arguments ?? {},
+        ).success
+      ) {
+        const authorization = parseL402Header(req.header("Authorization"));
         const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-        semanticInputValid = Boolean(secret && verifySubscriptionMacaroon(parsed.data.macaroon, secret, Math.floor(Date.now() / 1_000)));
-        try { normalizedAttenuationCaveats(parsed.data, Date.now()); }
-        catch { semanticInputValid = false; }
-      }
-    }
-    if (name === "payment.get_info" || name === "payment.info") {
-      const args = req.body.params.arguments;
-      if (args?.action === "settle" && typeof args.txHash === "string" && typeof args.paymentHash === "string" &&
-        args.txHash.replace(/^0x/i, "").toLowerCase() !== args.paymentHash.replace(/^0x/i, "").toLowerCase()) {
-        res.status(400).json({ jsonrpc: "2.0", id: req.body.id ?? null,
-          error: { code: -32602, message: "Payment hash must match the settlement transaction" } });
+        const pass =
+          authorization && secret
+            ? verifySubscriptionMacaroon(
+                authorization.macaroon,
+                secret,
+                Math.floor(Date.now() / 1_000),
+              )
+            : null;
+        if (
+          pass &&
+          (pass.allowedToolSets.some(
+            (set) =>
+              !toolNamesForAuthorization(name).some((allowedName) =>
+                set.includes(allowedName),
+              ),
+          ) ||
+            (pass.maxTarget !== undefined &&
+              !(await withinMcpTargetBound(
+                canonicalToolName(name),
+                req.body.params.arguments ?? {},
+                pass.maxTarget,
+              ))))
+        ) {
+          res.status(403).json({
+            jsonrpc: "2.0",
+            id: req.body.id ?? null,
+            error: {
+              code: -32602,
+              message: "Macaroon tool or target caveat forbids this request",
+            },
+          });
+          return;
+        }
+        await gates[name](req, res, (error?: unknown) => {
+          if (!error) res.locals.earlyL402Authorized = true;
+          next(error);
+        });
         return;
       }
-      const requestedTool = req.body.params.arguments?.toolName;
-      if (typeof requestedTool === "string" && !Object.hasOwn(mcpToolPrices, canonicalToolName(requestedTool))) {
-        res.status(200).json({ jsonrpc: "2.0", id: req.body.id ?? null, error: { code: -32602, message: "Unknown MCP tool" } });
-        return;
-      }
-    }
-    if (semanticInputValid && typeof name === "string" &&
-      ["proof.attenuate", "mesh.get_status", "mesh.status", "payment.get_info", "payment.info"].includes(name) &&
-      paidTools[name as keyof typeof paidTools].schema.safeParse(req.body.params.arguments ?? {}).success) {
-      const authorization = parseL402Header(req.header("Authorization"));
-      const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-      const pass = authorization && secret
-        ? verifySubscriptionMacaroon(authorization.macaroon, secret, Math.floor(Date.now() / 1_000)) : null;
-      if (pass && (pass.allowedToolSets.some((set) =>
-        !toolNamesForAuthorization(name).some((allowedName) => set.includes(allowedName))) ||
-        (pass.maxTarget !== undefined && !(await withinMcpTargetBound(canonicalToolName(name), req.body.params.arguments ?? {}, pass.maxTarget))))) {
-        res.status(403).json({ jsonrpc: "2.0", id: req.body.id ?? null,
-          error: { code: -32602, message: "Macaroon tool or target caveat forbids this request" } });
-        return;
-      }
-      await gates[name](req, res, (error?: unknown) => {
-        if (!error) res.locals.earlyL402Authorized = true;
-        next(error);
-      });
-      return;
-    }
-    next();
-  }, async (req, res, next) => {
-    const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
-    if (body?.method !== "tools/call" ||
-      (body.params?.name !== "payment.get_info" && body.params?.name !== "payment.info")) {
       next();
-      return;
-    }
-    const parsed = paymentInfoInputSchema.safeParse(body.params.arguments ?? {});
-    if (!parsed.success || parsed.data.action !== "settle") {
-      next();
-      return;
-    }
-    const input = parsed.data;
-    const invalid: SettlementCheck = { verified: false, settlementToken: null };
-    res.locals.paymentSettlement = invalid;
-    const paymentHash = input.paymentHash.replace(/^0x/i, "").toLowerCase();
-    if (input.preimage !== undefined) {
-      const authorization = input.paymentMacaroon
-        ? { macaroon: input.paymentMacaroon, preimage: input.preimage.toLowerCase() }
-        : parseL402Header(req.header("Authorization"));
-      const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-      const pass = authorization && secret
-        ? verifySubscriptionMacaroon(authorization.macaroon, secret, Math.floor(Date.now() / 1_000))
-        : null;
-      const originalPath = pass?.allowedPaths[0];
-      const originalTool = originalPath?.startsWith("/mcp/tools/")
-        ? originalPath.slice("/mcp/tools/".length)
-        : "";
-      if (!authorization || !pass || authorization.preimage !== input.preimage.toLowerCase() ||
-        pass.paymentHash !== paymentHash ||
-        createHash("sha256").update(Buffer.from(input.preimage, "hex")).digest("hex") !== paymentHash ||
-        pass.paymentAsset !== "btc-lightning" || !pass.paymentProvider ||
-        pass.allowedPaths.length !== 1 || !Object.hasOwn(paidTools, originalTool) ||
-        pass.amountMsats !== paidTools[originalTool as keyof typeof paidTools].amountSats * 1_000 *
-          (pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1)) {
+    },
+    async (req, res, next) => {
+      const body = req.body as {
+        method?: unknown;
+        params?: { name?: unknown; arguments?: unknown };
+      } | null;
+      if (
+        body?.method !== "tools/call" ||
+        (body.params?.name !== "payment.get_info" &&
+          body.params?.name !== "payment.info")
+      ) {
         next();
         return;
       }
-      try {
-        if (await revocationStore.isRevoked(pass.tokenId)) {
+      const parsed = paymentInfoInputSchema.safeParse(
+        body.params.arguments ?? {},
+      );
+      if (!parsed.success || parsed.data.action !== "settle") {
+        next();
+        return;
+      }
+      const input = parsed.data;
+      const invalid: SettlementCheck = {
+        verified: false,
+        settlementToken: null,
+      };
+      res.locals.paymentSettlement = invalid;
+      const paymentHash = input.paymentHash.replace(/^0x/i, "").toLowerCase();
+      if (input.preimage !== undefined) {
+        const authorization = input.paymentMacaroon
+          ? {
+              macaroon: input.paymentMacaroon,
+              preimage: input.preimage.toLowerCase(),
+            }
+          : parseL402Header(req.header("Authorization"));
+        const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+        const pass =
+          authorization && secret
+            ? verifySubscriptionMacaroon(
+                authorization.macaroon,
+                secret,
+                Math.floor(Date.now() / 1_000),
+              )
+            : null;
+        const originalPath = pass?.allowedPaths[0];
+        const originalTool = originalPath?.startsWith("/mcp/tools/")
+          ? originalPath.slice("/mcp/tools/".length)
+          : "";
+        if (
+          !authorization ||
+          !pass ||
+          authorization.preimage !== input.preimage.toLowerCase() ||
+          pass.paymentHash !== paymentHash ||
+          createHash("sha256")
+            .update(Buffer.from(input.preimage, "hex"))
+            .digest("hex") !== paymentHash ||
+          pass.paymentAsset !== "btc-lightning" ||
+          !pass.paymentProvider ||
+          pass.allowedPaths.length !== 1 ||
+          !Object.hasOwn(paidTools, originalTool) ||
+          pass.amountMsats !==
+            paidTools[originalTool as keyof typeof paidTools].amountSats *
+              1_000 *
+              (pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1)
+        ) {
           next();
           return;
         }
-        const verified = await settlementRouter.verifyPayment({
-          paymentHash,
-          preimage: input.preimage.toLowerCase(),
-          expectedAmountMsats: pass.amountMsats,
-          expectedDescription: `Bitcoin Stratigraphy MCP ${originalTool} execution${pass.requestLimits[0]?.maxRequests === 100 ? " (100-call batch)" : ""}`,
-          expectedProvider: pass.paymentProvider,
-          asset: "btc-lightning",
-        });
-        if (verified === "unavailable") {
+        try {
+          if (await revocationStore.isRevoked(pass.tokenId)) {
+            next();
+            return;
+          }
+          const verified = await settlementRouter.verifyPayment({
+            paymentHash,
+            preimage: input.preimage.toLowerCase(),
+            expectedAmountMsats: pass.amountMsats,
+            expectedDescription: `Bitcoin Stratigraphy MCP ${originalTool} execution${pass.requestLimits[0]?.maxRequests === 100 ? " (100-call batch)" : ""}`,
+            expectedProvider: pass.paymentProvider,
+            asset: "btc-lightning",
+          });
+          if (verified === "unavailable") {
+            res.status(503).json({ error: "Payment verifier unavailable" });
+            return;
+          }
+          if (
+            verified !== "invalid" &&
+            verified.provider === pass.paymentProvider &&
+            (verified.asset === undefined || verified.asset === "btc-lightning")
+          ) {
+            res.locals.paymentSettlement = {
+              verified: true,
+              settlementToken: {
+                scheme: "L402",
+                paymentHash,
+                scope: originalPath!,
+                settledAt: new Date(
+                  verified.settledAt < 10_000_000_000
+                    ? verified.settledAt * 1_000
+                    : verified.settledAt,
+                ).toISOString(),
+              },
+            } satisfies SettlementCheck;
+          }
+        } catch (error) {
+          req.log?.warn(
+            { err: error },
+            "MCP settlement verification unavailable",
+          );
           res.status(503).json({ error: "Payment verifier unavailable" });
           return;
         }
-        if (verified !== "invalid" && verified.provider === pass.paymentProvider &&
-          (verified.asset === undefined || verified.asset === "btc-lightning")) {
+        next();
+        return;
+      }
+      if (
+        !req.header("PAYMENT-SIGNATURE") ||
+        input.txHash!.slice(2).toLowerCase() !== paymentHash
+      ) {
+        next();
+        return;
+      }
+      const server = await x402ResourceServer;
+      if (!server) {
+        res.status(503).json({ error: "x402 settlement is not configured" });
+        return;
+      }
+      const finishSettlement = () => {
+        const settled = res.locals.x402 as
+          | {
+              transaction?: string;
+              network?: string;
+            }
+          | undefined;
+        if (
+          settled?.network === "eip155:8453" &&
+          settled.transaction?.toLowerCase() === input.txHash!.toLowerCase()
+        ) {
           res.locals.paymentSettlement = {
             verified: true,
             settlementToken: {
-              scheme: "L402",
-              paymentHash,
-              scope: originalPath!,
-              settledAt: new Date(verified.settledAt < 10_000_000_000
-                ? verified.settledAt * 1_000 : verified.settledAt).toISOString(),
+              scheme: "x402",
+              paymentHash: input.txHash!.toLowerCase(),
+              scope: "/mcp",
+              settledAt: new Date().toISOString(),
             },
           } satisfies SettlementCheck;
         }
-      } catch (error) {
-        req.log?.warn({ err: error }, "MCP settlement verification unavailable");
-        res.status(503).json({ error: "Payment verifier unavailable" });
-        return;
-      }
-      next();
-      return;
-    }
-    if (!req.header("PAYMENT-SIGNATURE") ||
-      input.txHash!.slice(2).toLowerCase() !== paymentHash) {
-      next();
-      return;
-    }
-    const server = await x402ResourceServer;
-    if (!server) {
-      res.status(503).json({ error: "x402 settlement is not configured" });
-      return;
-    }
-    const finishSettlement = () => {
-      const settled = res.locals.x402 as {
-        transaction?: string; network?: string;
-      } | undefined;
-      if (settled?.network === "eip155:8453" &&
-        settled.transaction?.toLowerCase() === input.txHash!.toLowerCase()) {
-        res.locals.paymentSettlement = {
-          verified: true,
-          settlementToken: {
-            scheme: "x402",
-            paymentHash: input.txHash!.toLowerCase(),
-            scope: "/mcp",
-            settledAt: new Date().toISOString(),
-          },
-        } satisfies SettlementCheck;
-      }
-      next();
-    };
-    if (res.locals.x402) finishSettlement();
-    else await createX402PaymentMiddleware({ resourceServer: server })(req, res, finishSettlement);
-  }, async (req, res, next) => {
-    if (Array.isArray(req.body)) {
-      if (req.body.some((item: unknown) =>
-        item !== null && typeof item === "object" &&
-        (item as { method?: unknown }).method === "tools/call" &&
-        (Object.hasOwn(paidTools, String((item as { params?: { name?: unknown } }).params?.name ?? "")) ||
-          (item as { params?: { name?: unknown } }).params?.name === "proof.attenuate")
-      )) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: { code: -32600, message: "Batch paid tool calls are not supported" },
-          id: null,
-        });
-        return;
-      }
-      next();
-      return;
-    }
-    const body = req.body as { id?: unknown; method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
-    const name = body?.method === "tools/call" ? body.params?.name : undefined;
-    if (name === "proof.attenuate") {
-      const parsed = attenuateInputSchema.safeParse(body?.params?.arguments ?? {});
-      if (!parsed.success) {
-        res.status(400).json({
-          jsonrpc: "2.0", id: body?.id ?? null,
-          error: { code: -32602, message: "Invalid attenuation input" },
-        });
-        return;
-      }
-      const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-      if (!secret) {
-        res.status(503).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32603, message: "Macaroon verification unavailable" } });
-        return;
-      }
-      const now = Date.now();
-      const parent = verifySubscriptionMacaroon(parsed.data.macaroon, secret, Math.floor(now / 1_000));
-      if (!parent || !getMacaroonSignatureId(parsed.data.macaroon)) {
-        res.status(401).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32602, message: "Invalid or expired parent macaroon" } });
-        return;
-      }
-      try {
-        if (await revocationStore.isRevoked(parent.tokenId)) {
-          res.status(401).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32602, message: "Parent macaroon is revoked" } });
+        next();
+      };
+      if (res.locals.x402) finishSettlement();
+      else
+        await createX402PaymentMiddleware({ resourceServer: server })(
+          req,
+          res,
+          finishSettlement,
+        );
+    },
+    async (req, res, next) => {
+      if (Array.isArray(req.body)) {
+        if (
+          req.body.some(
+            (item: unknown) =>
+              item !== null &&
+              typeof item === "object" &&
+              (item as { method?: unknown }).method === "tools/call" &&
+              (Object.hasOwn(
+                paidTools,
+                String(
+                  (item as { params?: { name?: unknown } }).params?.name ?? "",
+                ),
+              ) ||
+                (item as { params?: { name?: unknown } }).params?.name ===
+                  "proof.attenuate"),
+          )
+        ) {
+          res.status(400).json({
+            jsonrpc: "2.0",
+            error: {
+              code: -32600,
+              message: "Batch paid tool calls are not supported",
+            },
+            id: null,
+          });
           return;
         }
-      } catch (error) {
-        req.log?.error({ err: error }, "MCP macaroon revocation lookup failed");
-        res.status(503).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32603, message: "Revocation lookup unavailable" } });
+        next();
         return;
       }
-      let caveats: string[];
-      try {
-        caveats = normalizedAttenuationCaveats(parsed.data, now);
-      } catch (error) {
-        res.status(400).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32602, message: error instanceof Error ? error.message : "Invalid attenuation caveats" } });
-        return;
-      }
-      const child = attenuateSubscriptionMacaroon(parsed.data.macaroon, caveats);
-      if (!child || !verifySubscriptionMacaroon(child, secret, Math.floor(now / 1_000))) {
-        res.status(400).json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32602, message: "Invalid attenuation caveats or expired child" } });
-        return;
-      }
-      res.setHeader("Cache-Control", "no-store");
-      res.locals.attenuation = {
-        status: "attenuated",
-        attenuatedMacaroon: child,
-        appliedCaveats: caveats,
-        issuedAt: new Date(now).toISOString(),
-      };
-      next();
-      return;
-    }
-    if (typeof name !== "string" || !Object.hasOwn(paidTools, name)) {
-      next();
-      return;
-    }
-    const canonicalName = canonicalToolName(name);
-    const tool = paidTools[name as keyof typeof paidTools];
-    if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
-      next();
-      return;
-    }
-    if (name === "proof.get_by_hash") {
-      const lookup = proofByHashInputSchema.parse(body?.params?.arguments ?? {});
-      const found = findArchivedProof(lookup.hash ?? lookup.jobId!, mesh.status().quorumThreshold);
-      if (!found) {
-        res.status(404).json({
-          jsonrpc: "2.0",
-          id: typeof body?.id === "string" || typeof body?.id === "number" ? body.id : null,
-          error: { code: -32004, message: "Proof or receipt not found" },
-        });
-        return;
-      }
-      res.locals.archivedProof = found;
-    }
-    const authorization = parseL402Header(req.header("Authorization"));
-    const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-    const pass = authorization && secret
-      ? verifySubscriptionMacaroon(authorization.macaroon, secret, Math.floor(Date.now() / 1_000))
-      : null;
-    if (pass && (
-      pass.allowedToolSets.some((set) =>
-        !toolNamesForAuthorization(name).some((allowedName) => set.includes(allowedName))
-      ) ||
-      (pass.maxTarget !== undefined &&
-        !(await withinMcpTargetBound(canonicalName, body?.params?.arguments ?? {}, pass.maxTarget)))
-    )) {
-      res.status(403).json({
-        jsonrpc: "2.0", id: body?.id ?? null,
-        error: { code: -32602, message: "Macaroon tool or target caveat forbids this request" },
-      });
-      return;
-    }
-    if (canonicalName === "stratigraphy.get_digest" ||
-      canonicalName === "stratigraphy.get_diff" ||
-      canonicalName === "stratigraphy.get_range") {
-      try {
-        if (canonicalName === "stratigraphy.get_digest") {
-          await queryStratigraphyDigest(stratigraphyDigestInputSchema.parse(body?.params?.arguments ?? {}));
-        } else if (canonicalName === "stratigraphy.get_range") {
-          await queryStratigraphyRange(stratigraphyRangeInputSchema.parse(body?.params?.arguments ?? {}));
-        } else {
-          await queryStratigraphyDiff(stratigraphyDiffInputSchema.parse(body?.params?.arguments ?? {}));
+      const body = req.body as {
+        id?: unknown;
+        method?: unknown;
+        params?: { name?: unknown; arguments?: unknown };
+      } | null;
+      const name =
+        body?.method === "tools/call" ? body.params?.name : undefined;
+      if (name === "proof.attenuate") {
+        const parsed = attenuateInputSchema.safeParse(
+          body?.params?.arguments ?? {},
+        );
+        if (!parsed.success) {
+          res.status(400).json({
+            jsonrpc: "2.0",
+            id: body?.id ?? null,
+            error: { code: -32602, message: "Invalid attenuation input" },
+          });
+          return;
         }
-      } catch (error) {
-        if (!(error instanceof RangeError)) return next(error);
-        res.status(400).json({
+        const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+        if (!secret) {
+          res.status(503).json({
+            jsonrpc: "2.0",
+            id: body?.id ?? null,
+            error: {
+              code: -32603,
+              message: "Macaroon verification unavailable",
+            },
+          });
+          return;
+        }
+        const now = Date.now();
+        const parent = verifySubscriptionMacaroon(
+          parsed.data.macaroon,
+          secret,
+          Math.floor(now / 1_000),
+        );
+        if (!parent || !getMacaroonSignatureId(parsed.data.macaroon)) {
+          res.status(401).json({
+            jsonrpc: "2.0",
+            id: body?.id ?? null,
+            error: {
+              code: -32602,
+              message: "Invalid or expired parent macaroon",
+            },
+          });
+          return;
+        }
+        try {
+          if (await revocationStore.isRevoked(parent.tokenId)) {
+            res.status(401).json({
+              jsonrpc: "2.0",
+              id: body?.id ?? null,
+              error: { code: -32602, message: "Parent macaroon is revoked" },
+            });
+            return;
+          }
+        } catch (error) {
+          req.log?.error(
+            { err: error },
+            "MCP macaroon revocation lookup failed",
+          );
+          res.status(503).json({
+            jsonrpc: "2.0",
+            id: body?.id ?? null,
+            error: { code: -32603, message: "Revocation lookup unavailable" },
+          });
+          return;
+        }
+        let caveats: string[];
+        try {
+          caveats = normalizedAttenuationCaveats(parsed.data, now);
+        } catch (error) {
+          res.status(400).json({
+            jsonrpc: "2.0",
+            id: body?.id ?? null,
+            error: {
+              code: -32602,
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Invalid attenuation caveats",
+            },
+          });
+          return;
+        }
+        const child = attenuateSubscriptionMacaroon(
+          parsed.data.macaroon,
+          caveats,
+        );
+        if (
+          !child ||
+          !verifySubscriptionMacaroon(child, secret, Math.floor(now / 1_000))
+        ) {
+          res.status(400).json({
+            jsonrpc: "2.0",
+            id: body?.id ?? null,
+            error: {
+              code: -32602,
+              message: "Invalid attenuation caveats or expired child",
+            },
+          });
+          return;
+        }
+        res.setHeader("Cache-Control", "no-store");
+        res.locals.attenuation = {
+          status: "attenuated",
+          attenuatedMacaroon: child,
+          appliedCaveats: caveats,
+          issuedAt: new Date(now).toISOString(),
+        };
+        next();
+        return;
+      }
+      if (typeof name !== "string" || !Object.hasOwn(paidTools, name)) {
+        next();
+        return;
+      }
+      const canonicalName = canonicalToolName(name);
+      const tool = paidTools[name as keyof typeof paidTools];
+      if (!tool.schema.safeParse(body?.params?.arguments ?? {}).success) {
+        next();
+        return;
+      }
+      if (name === "proof.get_by_hash") {
+        const lookup = proofByHashInputSchema.parse(
+          body?.params?.arguments ?? {},
+        );
+        const found = findArchivedProof(
+          lookup.hash ?? lookup.jobId!,
+          mesh.status().quorumThreshold,
+        );
+        if (!found) {
+          res.status(404).json({
+            jsonrpc: "2.0",
+            id:
+              typeof body?.id === "string" || typeof body?.id === "number"
+                ? body.id
+                : null,
+            error: { code: -32004, message: "Proof or receipt not found" },
+          });
+          return;
+        }
+        res.locals.archivedProof = found;
+      }
+      const authorization = parseL402Header(req.header("Authorization"));
+      const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+      const pass =
+        authorization && secret
+          ? verifySubscriptionMacaroon(
+              authorization.macaroon,
+              secret,
+              Math.floor(Date.now() / 1_000),
+            )
+          : null;
+      if (
+        pass &&
+        (pass.allowedToolSets.some(
+          (set) =>
+            !toolNamesForAuthorization(name).some((allowedName) =>
+              set.includes(allowedName),
+            ),
+        ) ||
+          (pass.maxTarget !== undefined &&
+            !(await withinMcpTargetBound(
+              canonicalName,
+              body?.params?.arguments ?? {},
+              pass.maxTarget,
+            ))))
+      ) {
+        res.status(403).json({
           jsonrpc: "2.0",
-          id: typeof body?.id === "string" || typeof body?.id === "number" ? body.id : null,
-          error: { code: -32602, message: error.message },
+          id: body?.id ?? null,
+          error: {
+            code: -32602,
+            message: "Macaroon tool or target caveat forbids this request",
+          },
         });
         return;
       }
-    }
-    if (name === "mesh.broadcast" && mesh.status().configuredPeerCount === 0) {
-      res.status(503).json({
-        jsonrpc: "2.0",
-        id: typeof body?.id === "string" || typeof body?.id === "number" ? body.id : null,
-        error: { code: -32603, message: "No mesh peers configured" },
-      });
-      return;
-    }
-    if (name === "proof.ground") {
-      const parsed = proofGroundInputSchema.safeParse(body!.params?.arguments ?? {});
+      if (
+        canonicalName === "stratigraphy.get_digest" ||
+        canonicalName === "stratigraphy.get_diff" ||
+        canonicalName === "stratigraphy.get_range"
+      ) {
+        try {
+          if (canonicalName === "stratigraphy.get_digest") {
+            await queryStratigraphyDigest(
+              stratigraphyDigestInputSchema.parse(
+                body?.params?.arguments ?? {},
+              ),
+            );
+          } else if (canonicalName === "stratigraphy.get_range") {
+            await queryStratigraphyRange(
+              stratigraphyRangeInputSchema.parse(body?.params?.arguments ?? {}),
+            );
+          } else {
+            await queryStratigraphyDiff(
+              stratigraphyDiffInputSchema.parse(body?.params?.arguments ?? {}),
+            );
+          }
+        } catch (error) {
+          if (!(error instanceof RangeError)) return next(error);
+          res.status(400).json({
+            jsonrpc: "2.0",
+            id:
+              typeof body?.id === "string" || typeof body?.id === "number"
+                ? body.id
+                : null,
+            error: { code: -32602, message: error.message },
+          });
+          return;
+        }
+      }
+      if (
+        name === "mesh.broadcast" &&
+        mesh.status().configuredPeerCount === 0
+      ) {
+        res.status(503).json({
+          jsonrpc: "2.0",
+          id:
+            typeof body?.id === "string" || typeof body?.id === "number"
+              ? body.id
+              : null,
+          error: { code: -32603, message: "No mesh peers configured" },
+        });
+        return;
+      }
+      if (name === "proof.ground") {
+        const parsed = proofGroundInputSchema.safeParse(
+          body!.params?.arguments ?? {},
+        );
+        if (!parsed.success) {
+          next();
+          return;
+        }
+        const input = parsed.data;
+        if ("cid" in input) {
+          if (Buffer.byteLength(JSON.stringify(input)) > 16_384) {
+            res.status(400).json({
+              jsonrpc: "2.0",
+              id: body?.id ?? null,
+              error: {
+                code: -32602,
+                message: "Dataset receipt metadata exceeds 16 KiB",
+              },
+            });
+            return;
+          }
+        } else {
+          if (
+            input.metadata &&
+            Buffer.byteLength(JSON.stringify(input.metadata)) > 16_384
+          ) {
+            res.status(400).json({
+              jsonrpc: "2.0",
+              id: body?.id ?? null,
+              error: {
+                code: -32602,
+                message: "Grounding metadata exceeds 16 KiB",
+              },
+            });
+            return;
+          }
+        }
+      }
+      if (res.locals.earlyL402Authorized) return next();
+      await gates[name](req, res, next);
+    },
+    async (req, res, next) => {
+      const body = req.body as {
+        id?: unknown;
+        method?: unknown;
+        params?: { name?: unknown; arguments?: unknown };
+      } | null;
+      if (
+        body?.method !== "tools/call" ||
+        body.params?.name !== "proof.verify"
+      ) {
+        next();
+        return;
+      }
+      const parsed = driftProofInputSchema.safeParse(
+        body.params?.arguments ?? {},
+      );
+      if (!parsed.success) {
+        next();
+        return;
+      }
+      const { circuit: _circuit, ...verifyInput } = parsed.data;
+      const startedAt = performance.now();
+      try {
+        const valid = await verifyDriftProof(verifyInput);
+        res.locals.driftVerification = { valid, startedAt };
+      } catch (error) {
+        req.log?.warn({ err: error }, "MCP drift proof verifier unavailable");
+        res.status(503).json({
+          jsonrpc: "2.0",
+          id:
+            typeof body.id === "string" || typeof body.id === "number"
+              ? body.id
+              : null,
+          error: {
+            code: -32603,
+            message: "Drift proof verification provider unavailable",
+          },
+        });
+        return;
+      }
+      next();
+    },
+    async (req, res, next) => {
+      const body = req.body as {
+        method?: unknown;
+        params?: { name?: unknown; arguments?: unknown };
+      } | null;
+      if (
+        body?.method !== "tools/call" ||
+        body.params?.name !== "proof.ground"
+      ) {
+        next();
+        return;
+      }
+      const parsed = proofGroundInputSchema.safeParse(
+        body.params?.arguments ?? {},
+      );
       if (!parsed.success) {
         next();
         return;
       }
       const input = parsed.data;
-      if ("cid" in input) {
-        if (Buffer.byteLength(JSON.stringify(input)) > 16_384) {
-          res.status(400).json({
-            jsonrpc: "2.0", id: body?.id ?? null,
-            error: { code: -32602, message: "Dataset receipt metadata exceeds 16 KiB" },
-          });
-          return;
+      try {
+        const current = buildProvenanceChain(await readDataset());
+        const datasetProvenance: BoundProvenance = {
+          headHash: current.headHash,
+          merkleRoot: current.merkleRoot,
+          totalDepth: current.totalDepth,
+        };
+        if ("cid" in input) {
+          res.locals.epistemicDatasetReceipt =
+            await createEpistemicDatasetReceipt(
+              {
+                ...input,
+                context: { ...input.context, datasetProvenance },
+              },
+              {
+                readBitcoinTip: options.readBitcoinTip,
+              },
+            );
+        } else {
+          res.locals.epistemicAnchorReceipt = await groundEpistemicContext(
+            {
+              ...input,
+              metadata: { ...input.metadata, datasetProvenance },
+            },
+            {
+              readBitcoinTip: options.readBitcoinTip,
+            },
+          );
         }
-      } else {
-        if (input.metadata && Buffer.byteLength(JSON.stringify(input.metadata)) > 16_384) {
-          res.status(400).json({
-            jsonrpc: "2.0", id: body?.id ?? null,
-            error: { code: -32602, message: "Grounding metadata exceeds 16 KiB" },
-          });
-          return;
-        }
-      }
-    }
-    if (res.locals.earlyL402Authorized) return next();
-    await gates[name](req, res, next);
-  }, async (req, res, next) => {
-    const body = req.body as { id?: unknown; method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
-    if (body?.method !== "tools/call" || body.params?.name !== "proof.verify") {
-      next();
-      return;
-    }
-    const parsed = driftProofInputSchema.safeParse(body.params?.arguments ?? {});
-    if (!parsed.success) {
-      next();
-      return;
-    }
-    const { circuit: _circuit, ...verifyInput } = parsed.data;
-    const startedAt = performance.now();
-    try {
-      const valid = await verifyDriftProof(verifyInput);
-      res.locals.driftVerification = { valid, startedAt };
-    } catch (error) {
-      req.log?.warn({ err: error }, "MCP drift proof verifier unavailable");
-      res.status(503).json({
-        jsonrpc: "2.0",
-        id: typeof body.id === "string" || typeof body.id === "number" ? body.id : null,
-        error: { code: -32603, message: "Drift proof verification provider unavailable" },
-      });
-      return;
-    }
-    next();
-  }, async (req, res, next) => {
-    const body = req.body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | null;
-    if (body?.method !== "tools/call" || body.params?.name !== "proof.ground") {
-      next();
-      return;
-    }
-    const parsed = proofGroundInputSchema.safeParse(body.params?.arguments ?? {});
-    if (!parsed.success) {
-      next();
-      return;
-    }
-    const input = parsed.data;
-    try {
-      const current = buildProvenanceChain(await readDataset());
-      const datasetProvenance: BoundProvenance = {
-        headHash: current.headHash, merkleRoot: current.merkleRoot,
-        totalDepth: current.totalDepth,
-      };
-      if ("cid" in input) {
-        res.locals.epistemicDatasetReceipt = await createEpistemicDatasetReceipt({
-          ...input, context: { ...input.context, datasetProvenance },
-        }, {
-          readBitcoinTip: options.readBitcoinTip,
+      } catch (error) {
+        req.log?.warn(
+          { err: error },
+          "MCP epistemic grounding post-payment failed",
+        );
+        res.status(503).json({
+          error: "Bitcoin chain state or receipt signing is unavailable",
         });
-      } else {
-        res.locals.epistemicAnchorReceipt = await groundEpistemicContext({
-          ...input, metadata: { ...input.metadata, datasetProvenance },
-        }, {
-          readBitcoinTip: options.readBitcoinTip,
+        return;
+      }
+      next();
+    },
+    (req, res) => handleMcpRequest(req, res, mesh),
+    (_req, res) => {
+      if (!res.headersSent) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: { code: -32600, message: "Invalid Request" },
+          id: null,
         });
       }
-    } catch (error) {
-      req.log?.warn({ err: error }, "MCP epistemic grounding post-payment failed");
-      res.status(503).json({ error: "Bitcoin chain state or receipt signing is unavailable" });
-      return;
-    }
-    next();
-  }, (req, res) => handleMcpRequest(req, res, mesh), (_req, res) => {
-    if (!res.headersSent) {
-      res.status(400).json({
-        jsonrpc: "2.0",
-        error: { code: -32600, message: "Invalid Request" },
-        id: null,
-      });
-    }
-  });
+    },
+  );
   app.all(/^\/mcp\/.+/, (_req, res) => {
     res.status(400).json({
       jsonrpc: "2.0",
@@ -3929,21 +5806,27 @@ export function registerMcpRoute(
     });
   });
   // JSON body-parser errors happen before the transport; do not send Express's HTML error page.
-  app.use("/mcp", (error: unknown, req: Request, res: Response, next: NextFunction) => {
-    if (res.headersSent) return next(error);
-    const incomingStatus = (error as { status?: unknown }).status;
-    const status = typeof incomingStatus === "number" &&
-        incomingStatus >= 400 && incomingStatus < 500
-      ? incomingStatus
-      : 500;
-    req.log?.warn({ status }, "MCP request rejected");
-    res.status(status).json({
-      jsonrpc: "2.0",
-      error: {
-        code: status === 400 ? -32700 : -32603,
-        message: status === 400 ? "Invalid JSON request" : "Internal server error",
-      },
-      id: null,
-    });
-  });
+  app.use(
+    "/mcp",
+    (error: unknown, req: Request, res: Response, next: NextFunction) => {
+      if (res.headersSent) return next(error);
+      const incomingStatus = (error as { status?: unknown }).status;
+      const status =
+        typeof incomingStatus === "number" &&
+        incomingStatus >= 400 &&
+        incomingStatus < 500
+          ? incomingStatus
+          : 500;
+      req.log?.warn({ status }, "MCP request rejected");
+      res.status(status).json({
+        jsonrpc: "2.0",
+        error: {
+          code: status === 400 ? -32700 : -32603,
+          message:
+            status === 400 ? "Invalid JSON request" : "Internal server error",
+        },
+        id: null,
+      });
+    },
+  );
 }

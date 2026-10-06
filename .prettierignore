@@ -1,0 +1,19 @@
+# Canonical legal documents, data, generated code, historical release assets.
+LICENSE*
+SECURITY.md
+**/LICENSE*
+**/SECURITY.md
+**/generated/**
+**/.generated/**
+**/dist/**
+**/build/**
+**/node_modules/**
+**/.cache/**
+**/.local/**
+**/.pythonlibs/**
+**/data/**
+**/services/zk/artifacts/**
+attached_assets/**
+distribution/**
+pnpm-lock.yaml
+uv.lock

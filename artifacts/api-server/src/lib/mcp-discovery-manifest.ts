@@ -14,7 +14,8 @@ export const mcpDiscoveryManifest = {
   links: {
     documentation: "https://bitcoin-stratigraphy-dashboard.replit.app/docs",
     cookbooks: "https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks",
-    python_sdk: "https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks/l402_client.py",
+    python_sdk:
+      "https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks/l402_client.py",
     pricing: "https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost",
   },
   mcp: {

@@ -6,6 +6,7 @@ JSON uses the project's sorted-key, compact UTF-8 encoding, not a claim of
 RFC 8785 compatibility. Integer monetary/SLA fields avoid float ambiguity.
 Keys prove possession, not corporate identity, authority, or enforceability.
 """
+
 from __future__ import annotations
 
 import re
@@ -14,7 +15,10 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 
 from .article_12_journal import canonical_json, sha256
 from .audit_verifier import strict_json
@@ -35,7 +39,11 @@ def exact_fields(value, fields):
 
 
 def text(value, limit=4096):
-    if type(value) is not str or not value.strip() or len(value.encode("utf-8")) > limit:
+    if (
+        type(value) is not str
+        or not value.strip()
+        or len(value.encode("utf-8")) > limit
+    ):
         raise ContractVerificationError("Expected bounded nonempty UTF-8 text")
 
 
@@ -50,10 +58,14 @@ def hex_value(value, length):
 
 
 def utc(value):
-    if type(value) is not str or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value):
+    if type(value) is not str or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value
+    ):
         raise ContractVerificationError("Use canonical UTC YYYY-MM-DDTHH:MM:SSZ")
     try:
-        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
     except ValueError as error:
         raise ContractVerificationError("Invalid UTC date") from error
 
@@ -64,10 +76,21 @@ def snapshot(value):
 
 
 def validate_contract(payload):
-    exact_fields(payload, {
-        "schema_version", "contract_id", "parties", "scope", "sla", "pricing",
-        "terms", "issued_utc", "expiration_utc", "nonce",
-    })
+    exact_fields(
+        payload,
+        {
+            "schema_version",
+            "contract_id",
+            "parties",
+            "scope",
+            "sla",
+            "pricing",
+            "terms",
+            "issued_utc",
+            "expiration_utc",
+            "nonce",
+        },
+    )
     if payload["schema_version"] != CONTRACT_SCHEMA:
         raise ContractVerificationError("Unsupported contract schema")
     text(payload["contract_id"], 128)
@@ -80,8 +103,13 @@ def validate_contract(payload):
         text(party["agent_id"], 128)
         hex_value(party["public_key"], 64)
     client, vendor = (payload["parties"][role] for role in ROLES)
-    if client["public_key"] == vendor["public_key"] or client["agent_id"] == vendor["agent_id"]:
-        raise ContractVerificationError("Bilateral parties must have distinct keys and agent IDs")
+    if (
+        client["public_key"] == vendor["public_key"]
+        or client["agent_id"] == vendor["agent_id"]
+    ):
+        raise ContractVerificationError(
+            "Bilateral parties must have distinct keys and agent IDs"
+        )
     exact_fields(payload["scope"], {"description", "deliverables"})
     text(payload["scope"]["description"])
     deliverables = payload["scope"]["deliverables"]
@@ -94,7 +122,9 @@ def validate_contract(payload):
     integer(payload["sla"]["availability_basis_points"], 0, 10_000)
     exact_fields(payload["pricing"], {"currency", "amount_minor", "payment_due_days"})
     if payload["pricing"]["currency"] not in ("USD", "EUR", "GBP"):
-        raise ContractVerificationError("This schema supports USD/EUR/GBP integer cents/pence")
+        raise ContractVerificationError(
+            "This schema supports USD/EUR/GBP integer cents/pence"
+        )
     integer(payload["pricing"]["amount_minor"], 1, 10**15)
     integer(payload["pricing"]["payment_due_days"], 0, 3650)
     if type(payload["terms"]) is not list or not 1 <= len(payload["terms"]) <= 32:
@@ -117,15 +147,24 @@ def verify_role_signatures(body, signatures, parties):
     for role in ROLES:
         hex_value(signatures[role], 128)
         try:
-            Ed25519PublicKey.from_public_bytes(bytes.fromhex(parties[role]["public_key"])).verify(
-                bytes.fromhex(signatures[role]), canonical_json(body))
+            Ed25519PublicKey.from_public_bytes(
+                bytes.fromhex(parties[role]["public_key"])
+            ).verify(bytes.fromhex(signatures[role]), canonical_json(body))
         except (InvalidSignature, ValueError) as error:
-            raise ContractVerificationError(f"Invalid {role} Ed25519 signature") from error
+            raise ContractVerificationError(
+                f"Invalid {role} Ed25519 signature"
+            ) from error
 
 
 def signed_package(payload, signatures):
     verify_signatures(payload, signatures)
-    return snapshot({"schema_version": PACKAGE_SCHEMA, "contract": payload, "signatures": signatures})
+    return snapshot(
+        {
+            "schema_version": PACKAGE_SCHEMA,
+            "contract": payload,
+            "signatures": signatures,
+        }
+    )
 
 
 @dataclass(frozen=True)
@@ -137,8 +176,12 @@ class SigningAgent:
 
     def __post_init__(self):
         text(self.agent_id, 128)
-        if self.role not in ROLES or not isinstance(self.private_key, Ed25519PrivateKey):
-            raise ContractVerificationError("Expected a client/vendor Ed25519 signing agent")
+        if self.role not in ROLES or not isinstance(
+            self.private_key, Ed25519PrivateKey
+        ):
+            raise ContractVerificationError(
+                "Expected a client/vendor Ed25519 signing agent"
+            )
 
     @classmethod
     def generate(cls, agent_id, role, approve=lambda _: True):
@@ -150,8 +193,13 @@ class SigningAgent:
 
     def _check_identity(self, contract):
         validate_contract(contract)
-        if contract["parties"][self.role] != {"agent_id": self.agent_id, "public_key": self.public_key}:
-            raise ContractVerificationError("Signer does not match the designated contract party")
+        if contract["parties"][self.role] != {
+            "agent_id": self.agent_id,
+            "public_key": self.public_key,
+        }:
+            raise ContractVerificationError(
+                "Signer does not match the designated contract party"
+            )
 
     def sign_contract(self, contract):
         self._check_identity(contract)
@@ -162,17 +210,36 @@ class SigningAgent:
     def sign_receipt(self, body, package):
         self._check_identity(package["contract"])
         verify_signatures(package["contract"], package["signatures"])
-        exact_fields(body, {"schema_version", "contract_id", "nonce", "parties",
-                            "contract_hash", "contract_signatures", "expiration_utc",
-                            "generated_utc", "anchoring"})
+        exact_fields(
+            body,
+            {
+                "schema_version",
+                "contract_id",
+                "nonce",
+                "parties",
+                "contract_hash",
+                "contract_signatures",
+                "expiration_utc",
+                "generated_utc",
+                "anchoring",
+            },
+        )
         if body["schema_version"] != RECEIPT_SCHEMA:
-            raise ContractVerificationError("Agent refused an unsupported receipt schema")
+            raise ContractVerificationError(
+                "Agent refused an unsupported receipt schema"
+            )
         for name in ("contract_id", "nonce", "expiration_utc"):
             if body[name] != package["contract"][name]:
-                raise ContractVerificationError("Agent refused conflicting receipt terms")
-        if (body["contract_hash"] != sha256(package)
-                or body["parties"] != package["contract"]["parties"]
-                or body["contract_signatures"] != package["signatures"]
-                or body["anchoring"]["hash"] != sha256(package)):
-            raise ContractVerificationError("Agent refused a receipt for a different agreement")
+                raise ContractVerificationError(
+                    "Agent refused conflicting receipt terms"
+                )
+        if (
+            body["contract_hash"] != sha256(package)
+            or body["parties"] != package["contract"]["parties"]
+            or body["contract_signatures"] != package["signatures"]
+            or body["anchoring"]["hash"] != sha256(package)
+        ):
+            raise ContractVerificationError(
+                "Agent refused a receipt for a different agreement"
+            )
         return self.private_key.sign(canonical_json(body)).hex()

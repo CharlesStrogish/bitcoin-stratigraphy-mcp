@@ -3,7 +3,11 @@
 import express, { type Express } from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { cookbookController, docsController, frameworkCookbookFiles } from "../controllers/docs";
+import {
+  cookbookController,
+  docsController,
+  frameworkCookbookFiles,
+} from "../controllers/docs";
 
 // The server build copies both folders alongside the bundled entry point.
 export function registerDocsRoutes(
@@ -13,22 +17,39 @@ export function registerDocsRoutes(
   const docsRoot = path.join(publicRoot, "docs");
   app.get("/.well-known/llms.txt", (_req, res, next) => {
     res.type("text/plain").set("Cache-Control", "public, max-age=300");
-    res.sendFile(path.join(publicRoot, ".well-known", "llms.txt"), { dotfiles: "allow" }, (error) => {
-      if (error) next(error);
-    });
+    res.sendFile(
+      path.join(publicRoot, ".well-known", "llms.txt"),
+      { dotfiles: "allow" },
+      (error) => {
+        if (error) next(error);
+      },
+    );
   });
   app.get(/^\/docs\/?$/, docsController(docsRoot));
-  app.get(/^\/cookbooks\/?$/, docsController(path.join(publicRoot, "cookbooks")));
-  app.use("/docs/assets", express.static(docsRoot, {
-    index: false,
-    dotfiles: "deny",
-    setHeaders(res) {
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Cache-Control", "no-cache");
-    },
-  }));
-  app.get("/cookbooks/:filename", cookbookController(path.join(publicRoot, "cookbooks")));
-  app.get("/cookbooks/frameworks/:filename", cookbookController(
-    path.join(publicRoot, "cookbooks", "frameworks"), frameworkCookbookFiles,
-  ));
+  app.get(
+    /^\/cookbooks\/?$/,
+    docsController(path.join(publicRoot, "cookbooks")),
+  );
+  app.use(
+    "/docs/assets",
+    express.static(docsRoot, {
+      index: false,
+      dotfiles: "deny",
+      setHeaders(res) {
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("Cache-Control", "no-cache");
+      },
+    }),
+  );
+  app.get(
+    "/cookbooks/:filename",
+    cookbookController(path.join(publicRoot, "cookbooks")),
+  );
+  app.get(
+    "/cookbooks/frameworks/:filename",
+    cookbookController(
+      path.join(publicRoot, "cookbooks", "frameworks"),
+      frameworkCookbookFiles,
+    ),
+  );
 }

@@ -67,9 +67,8 @@ export function calculateJobPrice(
   );
   const pressure = Math.max(queueSaturation, cpuUtilization);
   const ceiling = Math.max(1, maxLoadMultiplier);
-  const multiplier = pressure <= 0.7
-    ? 1
-    : 1 + ((pressure - 0.7) / 0.3) * (ceiling - 1);
+  const multiplier =
+    pressure <= 0.7 ? 1 : 1 + ((pressure - 0.7) / 0.3) * (ceiling - 1);
   const roundedMultiplier = Number(clamp(multiplier, 1, ceiling).toFixed(4));
   return {
     jobKind,
@@ -165,16 +164,15 @@ export function createPricingEngine(input?: {
         requestVelocity(atMs),
       );
     },
-    jobQuote(jobKind, load = input?.loadProvider?.() ?? {
-      queueLength: 0,
-      queueCapacity: 1,
-      cpuUtilization: 0,
-    }) {
-      return calculateJobPrice(
-        jobKind,
-        load,
-        input?.maxLoadMultiplier,
-      );
+    jobQuote(
+      jobKind,
+      load = input?.loadProvider?.() ?? {
+        queueLength: 0,
+        queueCapacity: 1,
+        cpuUtilization: 0,
+      },
+    ) {
+      return calculateJobPrice(jobKind, load, input?.maxLoadMultiplier);
     },
   };
 }

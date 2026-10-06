@@ -26,13 +26,13 @@ export function createPostgresMacaroonRevocationStore(
            SELECT 1 FROM revoked_macaroons WHERE signature_id = $1
          ) AS revoked`;
       const result = signal
-        ? await (databasePool.query as unknown as <Row>(
-            config: {
+        ? await (
+            databasePool.query as unknown as <Row>(config: {
               text: string;
               values: unknown[];
               signal: AbortSignal;
-            },
-          ) => Promise<{ rows: Row[] }>)<{ revoked: boolean }>({
+            }) => Promise<{ rows: Row[] }>
+          )<{ revoked: boolean }>({
             text,
             values: [signatureId],
             signal,

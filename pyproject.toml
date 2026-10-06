@@ -15,6 +15,7 @@ dependencies = [
     "openai>=2.45,<3",
     "opentimestamps-client>=0.7.2",
     "pydantic>=2.11,<3",
+    "ruff>=0.16.10",
 ]
 
 [tool.uv.workspace]

@@ -43,16 +43,27 @@ async function createLocalStateStore(file: string): Promise<StateStore> {
   return store;
 }
 
-export async function createStateStore(options: StoreOptions = {}): Promise<StateStore> {
-  const url = options.url === undefined
-    ? process.env.DATABASE_URL?.trim() || process.env.REPLIT_DB?.trim()
-    : options.url?.trim();
-  const production = options.production ?? process.env.NODE_ENV === "production";
+export async function createStateStore(
+  options: StoreOptions = {},
+): Promise<StateStore> {
+  const url =
+    options.url === undefined
+      ? process.env.DATABASE_URL?.trim() || process.env.REPLIT_DB?.trim()
+      : options.url?.trim();
+  const production =
+    options.production ?? process.env.NODE_ENV === "production";
   if (url) {
     if (!/^postgres(?:ql)?:\/\//.test(url)) {
-      if (production) throw new Error("DATABASE_URL or REPLIT_DB must be a PostgreSQL connection URL");
-      console.warn("PostgreSQL URL is not configured; using local development checkpoint file");
-      return createLocalStateStore(resolve(options.localFile ?? ".autonomous-agent-state.json"));
+      if (production)
+        throw new Error(
+          "DATABASE_URL or REPLIT_DB must be a PostgreSQL connection URL",
+        );
+      console.warn(
+        "PostgreSQL URL is not configured; using local development checkpoint file",
+      );
+      return createLocalStateStore(
+        resolve(options.localFile ?? ".autonomous-agent-state.json"),
+      );
     }
     const pool = new Pool({ connectionString: url, max: 1 });
     try {
@@ -65,8 +76,12 @@ export async function createStateStore(options: StoreOptions = {}): Promise<Stat
     } catch (error) {
       await pool.end();
       if (production) throw error;
-      console.warn("PostgreSQL is not initialized; using local development checkpoint file");
-      return createLocalStateStore(resolve(options.localFile ?? ".autonomous-agent-state.json"));
+      console.warn(
+        "PostgreSQL is not initialized; using local development checkpoint file",
+      );
+      return createLocalStateStore(
+        resolve(options.localFile ?? ".autonomous-agent-state.json"),
+      );
     }
     return {
       async load() {
@@ -90,7 +105,11 @@ export async function createStateStore(options: StoreOptions = {}): Promise<Stat
 
   // Avoid double payment after a Reserved VM restart: production needs durable DB.
   if (production) {
-    throw new Error("Production requires a Replit PostgreSQL DATABASE_URL before auto-pay");
+    throw new Error(
+      "Production requires a Replit PostgreSQL DATABASE_URL before auto-pay",
+    );
   }
-  return createLocalStateStore(resolve(options.localFile ?? ".autonomous-agent-state.json"));
+  return createLocalStateStore(
+    resolve(options.localFile ?? ".autonomous-agent-state.json"),
+  );
 }

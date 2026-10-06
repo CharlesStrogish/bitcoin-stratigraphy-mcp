@@ -4,6 +4,7 @@
 
 No wallet use or remote network calls. OTS test fixtures are explicitly synthetic.
 """
+
 import hashlib
 import io
 import json
@@ -22,10 +23,18 @@ from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
 from cookbooks.article_12_journal import canonical_json
 from cookbooks.audit_verifier_ots import serialize
 from cookbooks.swarm_merkle import (
-    MerkleAccumulator, MerkleProofError, leaf_hash, node_hash, split_size, verify_merkle_inclusion,
+    MerkleAccumulator,
+    MerkleProofError,
+    leaf_hash,
+    node_hash,
+    split_size,
+    verify_merkle_inclusion,
 )
 from cookbooks.swarm_flight_evidence import (
-    DisclosureError, LEAF_SCHEMA, leaf_preimage, verify_inclusion_proof,
+    DisclosureError,
+    LEAF_SCHEMA,
+    leaf_preimage,
+    verify_inclusion_proof,
 )
 from cookbooks.swarm_flight_recorder import SwarmFlightRecorder, main
 
@@ -39,7 +48,9 @@ def reference_root(leaves):
     split = 1
     while split * 2 < len(leaves):
         split *= 2
-    return hashlib.sha256(b"\x01" + reference_root(leaves[:split]) + reference_root(leaves[split:])).digest()
+    return hashlib.sha256(
+        b"\x01" + reference_root(leaves[:split]) + reference_root(leaves[split:])
+    ).digest()
 
 
 class SyntheticNotary:
@@ -50,40 +61,60 @@ class SyntheticNotary:
     def notarize(self, root):
         self.calls.append(root)
         if self.fail:
-            raise RuntimeError("Simulated uncertain request; secret provider diagnostic")
+            raise RuntimeError(
+                "Simulated uncertain request; secret provider diagnostic"
+            )
         stamp = Timestamp(bytes.fromhex(root))
         if not self.empty:
-            stamp.attestations.add(BitcoinBlockHeaderAttestation(999) if self.bitcoin
-                                   else PendingAttestation("https://alice.btc.calendar.opentimestamps.org"))
-        return {"hash": "00" * 32 if self.wrong else root,
-                "otsProofHex": serialize(DetachedTimestampFile(OpSHA256(), stamp)).hex(),
-                "otsStatus": "pending_calendar"}
+            stamp.attestations.add(
+                BitcoinBlockHeaderAttestation(999)
+                if self.bitcoin
+                else PendingAttestation("https://alice.btc.calendar.opentimestamps.org")
+            )
+        return {
+            "hash": "00" * 32 if self.wrong else root,
+            "otsProofHex": serialize(DetachedTimestampFile(OpSHA256(), stamp)).hex(),
+            "otsStatus": "pending_calendar",
+        }
 
 
 class MerkleLogicTests(unittest.TestCase):
     def test_empty_singleton_and_domain_separation(self):
         tree = MerkleAccumulator()
-        self.assertEqual(bytes.fromhex("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
-                         tree.root)
+        self.assertEqual(
+            bytes.fromhex(
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            ),
+            tree.root,
+        )
         self.assertEqual(0, tree.append(b""))
         self.assertEqual(reference_root([b""]), tree.root)
         self.assertEqual([], tree.inclusion_path(0))
         self.assertTrue(verify_merkle_inclusion(b"", 0, 1, [], tree.root))
-        self.assertNotEqual(leaf_hash(b"\x00" * 64), node_hash(b"\x00" * 32, b"\x00" * 32))
+        self.assertNotEqual(
+            leaf_hash(b"\x00" * 64), node_hash(b"\x00" * 32, b"\x00" * 32)
+        )
 
     def test_every_prefix_and_every_leaf_against_independent_rfc_reference(self):
         tree, leaves = MerkleAccumulator(), []
         # Includes odd/non-power-of-two trees and all boundaries through 128.
         for count in range(1, 129):
-            payload = canonical_json({"step": count, "unicode": "企業 Δ", "context": {"x": count}})
+            payload = canonical_json(
+                {"step": count, "unicode": "企業 Δ", "context": {"x": count}}
+            )
             self.assertEqual(count - 1, tree.append(payload))
             leaves.append(payload)
             root = reference_root(leaves)
             self.assertEqual(root, tree.root, count)
             for index, value in enumerate(leaves):
                 path = tree.inclusion_path(index)
-                self.assertTrue(verify_merkle_inclusion(value, index, count, path, root), (count, index))
-                self.assertFalse(verify_merkle_inclusion(value + b" ", index, count, path, root))
+                self.assertTrue(
+                    verify_merkle_inclusion(value, index, count, path, root),
+                    (count, index),
+                )
+                self.assertFalse(
+                    verify_merkle_inclusion(value + b" ", index, count, path, root)
+                )
 
     def test_duplicate_leaves_remain_ordered_without_last_leaf_padding(self):
         tree = MerkleAccumulator()
@@ -93,7 +124,11 @@ class MerkleLogicTests(unittest.TestCase):
         self.assertNotEqual(reference_root([b"a", b"b", b"b", b"b"]), tree.root)
         for index in range(3):
             data = b"a" if index == 0 else b"b"
-            self.assertTrue(verify_merkle_inclusion(data, index, 3, tree.inclusion_path(index), tree.root))
+            self.assertTrue(
+                verify_merkle_inclusion(
+                    data, index, 3, tree.inclusion_path(index), tree.root
+                )
+            )
 
     def test_all_tree_input_guards_and_capacity_atomicity(self):
         for value in (0, -1, True, 1.5, 1_000_001):
@@ -116,8 +151,12 @@ class MerkleLogicTests(unittest.TestCase):
         for index in (-1, 1, True, "0"):
             with self.assertRaises(MerkleProofError):
                 tree.inclusion_path(index)
-        for left, right in [(b"short", b"x" * 32), (b"x" * 32, b"short"),
-                            ("x" * 32, b"x" * 32), (b"x" * 32, "x" * 32)]:
+        for left, right in [
+            (b"short", b"x" * 32),
+            (b"x" * 32, b"short"),
+            ("x" * 32, b"x" * 32),
+            (b"x" * 32, "x" * 32),
+        ]:
             with self.assertRaises(MerkleProofError):
                 node_hash(left, right)
 
@@ -127,18 +166,27 @@ class MerkleLogicTests(unittest.TestCase):
             tree.append(value)
         path, root = tree.inclusion_path(0), tree.root
         invalid = [
-            (b"a", True, 3, path, root), (b"a", 3, 3, path, root),
-            (b"a", 0, 0, path, root), (b"a", 0, True, path, root),
-            (b"a", 0, 1_000_001, path, root), (b"a", 0, 3, path, b"short"),
-            (b"a", 0, 3, path, "x" * 32), (b"a", 0, 3, tuple(path), root),
-            (b"a", 0, 3, [b"x" * 32] * 21, root), (b"a", 0, 3, [b"short"], root),
-            (b"a", 0, 3, ["x" * 32], root), (b"a", 0, 3, path[:-1], root),
-            (b"a", 0, 3, path + [b"x" * 32], root), ("a", 0, 3, path, root),
+            (b"a", True, 3, path, root),
+            (b"a", 3, 3, path, root),
+            (b"a", 0, 0, path, root),
+            (b"a", 0, True, path, root),
+            (b"a", 0, 1_000_001, path, root),
+            (b"a", 0, 3, path, b"short"),
+            (b"a", 0, 3, path, "x" * 32),
+            (b"a", 0, 3, tuple(path), root),
+            (b"a", 0, 3, [b"x" * 32] * 21, root),
+            (b"a", 0, 3, [b"short"], root),
+            (b"a", 0, 3, ["x" * 32], root),
+            (b"a", 0, 3, path[:-1], root),
+            (b"a", 0, 3, path + [b"x" * 32], root),
+            ("a", 0, 3, path, root),
         ]
         for args in invalid:
             with self.subTest(args=args[1:3]), self.assertRaises(MerkleProofError):
                 verify_merkle_inclusion(*args)
-        self.assertFalse(verify_merkle_inclusion(b"a", 0, 3, list(reversed(path)), root))
+        self.assertFalse(
+            verify_merkle_inclusion(b"a", 0, 3, list(reversed(path)), root)
+        )
         self.assertFalse(verify_merkle_inclusion(b"a", 1, 3, path, root))
         self.assertFalse(verify_merkle_inclusion(b"a", 0, 3, path, b"\x00" * 32))
 
@@ -146,14 +194,20 @@ class MerkleLogicTests(unittest.TestCase):
 class FlightRecorderTests(unittest.TestCase):
     def make_disclosure(self, notary=None):
         recorder = SwarmFlightRecorder(notary)
-        recorder.record_trace({"agent": "one", "thought": "Private corporate context", "tool": "validate"})
+        recorder.record_trace(
+            {"agent": "one", "thought": "Private corporate context", "tool": "validate"}
+        )
         recorder.record_trace({"agent": "two", "decision": "Deny PII export"})
-        recorder.record_trace({"agent": "three", "context": "SECRET-NON-DISCLOSED-SWARM-IP"})
+        recorder.record_trace(
+            {"agent": "three", "context": "SECRET-NON-DISCLOSED-SWARM-IP"}
+        )
         receipt = recorder.flush_root()
         return recorder, receipt, recorder.export_disclosure(1)
 
     def verify(self, bundle, **kwargs):
-        return verify_inclusion_proof(bundle["trace"], bundle["merkle_proof"], bundle["root_receipt"], **kwargs)
+        return verify_inclusion_proof(
+            bundle["trace"], bundle["merkle_proof"], bundle["root_receipt"], **kwargs
+        )
 
     def clone(self, value):
         return json.loads(canonical_json(value))
@@ -166,7 +220,9 @@ class FlightRecorderTests(unittest.TestCase):
         self.assertFalse(report["bitcoin_inclusion_verified"])
         self.assertEqual("Deferred/Pending Credential", report["detail"])
         self.assertIsNone(receipt["body"]["anchoring"]["otsProofHex"])
-        self.assertEqual({"agent": "two", "decision": "Deny PII export"}, bundle["trace"])
+        self.assertEqual(
+            {"agent": "two", "decision": "Deny PII export"}, bundle["trace"]
+        )
         self.assertNotIn("SECRET-NON-DISCLOSED-SWARM-IP", json.dumps(bundle))
         self.assertNotIn("Private corporate context", json.dumps(bundle))
         self.assertIn("not a zero-knowledge proof", report["limitations"])
@@ -184,11 +240,20 @@ class FlightRecorderTests(unittest.TestCase):
         self.assertEqual(notary.calls[0], recorder.flush_root()["body"]["root_hash"])
         recorder.add_trace({"event": "second batch"})
         second = recorder.flush_root()
-        self.assertNotEqual(bundle["root_receipt"]["body"]["batch_id"], second["body"]["batch_id"])
+        self.assertNotEqual(
+            bundle["root_receipt"]["body"]["batch_id"], second["body"]["batch_id"]
+        )
         self.assertEqual(2, len(notary.calls))
-        self.assertTrue(self.verify(recorder.export_disclosure(0))["merkle_inclusion_verified"])
-        self.assertTrue(self.verify(recorder.export_disclosure(1, batch_id=bundle["merkle_proof"]["batch_id"]))[
-            "merkle_inclusion_verified"])
+        self.assertTrue(
+            self.verify(recorder.export_disclosure(0))["merkle_inclusion_verified"]
+        )
+        self.assertTrue(
+            self.verify(
+                recorder.export_disclosure(
+                    1, batch_id=bundle["merkle_proof"]["batch_id"]
+                )
+            )["merkle_inclusion_verified"]
+        )
 
     def test_random_leaf_salts_prevent_identical_trace_fingerprints(self):
         recorder = SwarmFlightRecorder()
@@ -196,7 +261,9 @@ class FlightRecorderTests(unittest.TestCase):
         recorder.append_trace({"same": "low entropy"})
         recorder.flush_root()
         a, b = recorder.export_disclosure(0), recorder.export_disclosure(1)
-        self.assertNotEqual(a["merkle_proof"]["leaf_salt"], b["merkle_proof"]["leaf_salt"])
+        self.assertNotEqual(
+            a["merkle_proof"]["leaf_salt"], b["merkle_proof"]["leaf_salt"]
+        )
         self.assertTrue(self.verify(a)["merkle_inclusion_verified"])
         self.assertTrue(self.verify(b)["merkle_inclusion_verified"])
 
@@ -209,16 +276,27 @@ class FlightRecorderTests(unittest.TestCase):
         bundle = recorder.export_disclosure(0)
         self.assertEqual("original", bundle["trace"]["context"]["policy"][0])
         bundle["trace"]["context"]["policy"][0] = "also changed"
-        self.assertEqual("original", recorder.export_disclosure(0)["trace"]["context"]["policy"][0])
+        self.assertEqual(
+            "original", recorder.export_disclosure(0)["trace"]["context"]["policy"][0]
+        )
 
     def test_fifty_concurrent_agents_are_recorded_once(self):
         recorder = SwarmFlightRecorder()
         with ThreadPoolExecutor(max_workers=50) as pool:
-            indices = list(pool.map(lambda i: recorder.record_trace({"agent": i, "event": "execute"}), range(1000)))
+            indices = list(
+                pool.map(
+                    lambda i: recorder.record_trace({"agent": i, "event": "execute"}),
+                    range(1000),
+                )
+            )
         self.assertEqual(set(range(1000)), set(indices))
         recorder.flush_root()
         for index in (0, 13, 499, 999):
-            self.assertTrue(self.verify(recorder.export_disclosure(index))["merkle_inclusion_verified"])
+            self.assertTrue(
+                self.verify(recorder.export_disclosure(index))[
+                    "merkle_inclusion_verified"
+                ]
+            )
 
     def test_appends_continue_during_notary_io_and_roots_are_frozen(self):
         entered, release = threading.Event(), threading.Event()
@@ -241,7 +319,9 @@ class FlightRecorderTests(unittest.TestCase):
             release.set()
             first = future.result(timeout=3)
         self.assertEqual(1, first["body"]["tree_size"])
-        self.assertTrue(self.verify(recorder.export_disclosure(0))["merkle_inclusion_verified"])
+        self.assertTrue(
+            self.verify(recorder.export_disclosure(0))["merkle_inclusion_verified"]
+        )
         second = recorder.flush_root()
         self.assertNotEqual(first["body"]["root_hash"], second["body"]["root_hash"])
 
@@ -264,7 +344,9 @@ class FlightRecorderTests(unittest.TestCase):
             lambda b: b["merkle_proof"].update(path=["00" * 32] * 2),
             lambda b: b["root_receipt"]["body"].update(root_hash="00" * 32),
             lambda b: b["root_receipt"].update(signature="00" * 64),
-            lambda b: b["root_receipt"]["body"]["anchoring"].update(status="unavailable"),
+            lambda b: b["root_receipt"]["body"]["anchoring"].update(
+                status="unavailable"
+            ),
             lambda b: b["merkle_proof"].update(extra="not ignored"),
         ]
         for mutation in mutations:
@@ -289,7 +371,9 @@ class FlightRecorderTests(unittest.TestCase):
                 self.verify(changed)
 
     def test_limits_are_explicit_and_release_restores_capacity(self):
-        recorder = SwarmFlightRecorder(max_leaves=1, max_retained_batches=1, max_buffer_bytes=1024)
+        recorder = SwarmFlightRecorder(
+            max_leaves=1, max_retained_batches=1, max_buffer_bytes=1024
+        )
         with self.assertRaises(MerkleProofError):
             recorder.flush_root()
         with self.assertRaises(ValueError):
@@ -320,23 +404,39 @@ class FlightRecorderTests(unittest.TestCase):
         self.assertEqual(0, tight.pending_count)
 
     def test_invalid_capacity_keys_and_trace_inputs(self):
-        for kwargs in ({"max_leaves": True}, {"max_retained_batches": 0},
-                       {"max_retained_batches": True}, {"max_buffer_bytes": 1},
-                       {"signing_key": "not a key"}):
+        for kwargs in (
+            {"max_leaves": True},
+            {"max_retained_batches": 0},
+            {"max_retained_batches": True},
+            {"max_buffer_bytes": 1},
+            {"signing_key": "not a key"},
+        ):
             with self.assertRaises(ValueError):
                 SwarmFlightRecorder(**kwargs)
         recorder = SwarmFlightRecorder()
-        for payload in ([], {"huge": "x" * 65536}, {"bad": float("nan")},
-                        {"bad": float("inf")}, {1: "numeric", "1": "collision"},
-                        {1: "numeric key"}, {"tuple": (1, 2)}):
+        for payload in (
+            [],
+            {"huge": "x" * 65536},
+            {"bad": float("nan")},
+            {"bad": float("inf")},
+            {1: "numeric", "1": "collision"},
+            {1: "numeric key"},
+            {"tuple": (1, 2)},
+        ):
             with self.assertRaises((ValueError, TypeError)):
                 recorder.record_trace(payload)
         self.assertEqual(0, recorder.pending_count)
-        expected = canonical_json({"schema_version": LEAF_SCHEMA, "salt": "ab" * 32, "trace": {"x": "企業"}})
+        expected = canonical_json(
+            {"schema_version": LEAF_SCHEMA, "salt": "ab" * 32, "trace": {"x": "企業"}}
+        )
         self.assertEqual(expected, leaf_preimage({"x": "企業"}, "ab" * 32))
 
     def test_unknown_or_invalid_notary_outcome_is_sealed_and_not_retried(self):
-        for notary in (SyntheticNotary(fail=True), SyntheticNotary(wrong=True), SyntheticNotary(empty=True)):
+        for notary in (
+            SyntheticNotary(fail=True),
+            SyntheticNotary(wrong=True),
+            SyntheticNotary(empty=True),
+        ):
             recorder, receipt, bundle = self.make_disclosure(notary)
             self.assertEqual("unavailable", self.verify(bundle)["status"])
             self.assertTrue(receipt["body"]["anchoring"]["settlement_unknown"])
@@ -348,8 +448,10 @@ class FlightRecorderTests(unittest.TestCase):
     def test_failed_seal_reserves_batch_without_repaying(self):
         recorder = SwarmFlightRecorder(SyntheticNotary())
         key = recorder._key
-        recorder._key = SimpleNamespace(public_key=key.public_key,
-                                        sign=lambda _: (_ for _ in ()).throw(RuntimeError("Key outage")))
+        recorder._key = SimpleNamespace(
+            public_key=key.public_key,
+            sign=lambda _: (_ for _ in ()).throw(RuntimeError("Key outage")),
+        )
         recorder.record_trace({"event": "one"})
         with self.assertRaises(RuntimeError):
             recorder.flush_root()
@@ -364,12 +466,18 @@ class FlightRecorderTests(unittest.TestCase):
             changed = self.clone(bundle)
             changed["root_receipt"]["body"]["anchoring"]["otsProofHex"] = proof
             changed["root_receipt"]["signature"] = recorder._key.sign(
-                canonical_json(changed["root_receipt"]["body"])).hex()
+                canonical_json(changed["root_receipt"]["body"])
+            ).hex()
             with self.assertRaises(DisclosureError):
                 self.verify(changed)
         _, _, other = self.make_disclosure(SyntheticNotary())
         with self.assertRaises(DisclosureError):
-            self.verify(bundle, upgraded_ots_proof_hex=other["root_receipt"]["body"]["anchoring"]["otsProofHex"])
+            self.verify(
+                bundle,
+                upgraded_ots_proof_hex=other["root_receipt"]["body"]["anchoring"][
+                    "otsProofHex"
+                ],
+            )
 
     def test_pending_original_can_be_upgraded_without_rewriting_receipt(self):
         _, _, bundle = self.make_disclosure(SyntheticNotary())
@@ -383,19 +491,25 @@ class FlightRecorderTests(unittest.TestCase):
     def test_bitcoin_confirmation_requires_independent_headers_and_commitment(self):
         _, receipt, bundle = self.make_disclosure(SyntheticNotary(bitcoin=True))
         self.assertFalse(self.verify(bundle)["bitcoin_inclusion_verified"])
-        self.assertEqual("unavailable", self.verify(bundle, trusted_headers={1: {}})["status"])
+        self.assertEqual(
+            "unavailable", self.verify(bundle, trusted_headers={1: {}})["status"]
+        )
         headers = {"999": {"block_hash": "00" * 32, "header_hex": "00" * 80}}
         with self.assertRaises(DisclosureError):
             self.verify(bundle, trusted_headers=headers)
         root = bytes.fromhex(receipt["body"]["root_hash"])
         # Synthetic trusted-header fixture only, not a claim of actual Bitcoin anchoring.
-        with patch("cookbooks.swarm_flight_evidence.checked_header",
-                   return_value=SimpleNamespace(hashMerkleRoot=root, nTime=1791288000)):
+        with patch(
+            "cookbooks.swarm_flight_evidence.checked_header",
+            return_value=SimpleNamespace(hashMerkleRoot=root, nTime=1791288000),
+        ):
             report = self.verify(bundle, trusted_headers=headers)
         self.assertTrue(report["bitcoin_inclusion_verified"])
         self.assertEqual("verified_bitcoin", report["status"])
-        with patch("cookbooks.swarm_flight_evidence.checked_header",
-                   return_value=SimpleNamespace(hashMerkleRoot=b"\x00" * 32, nTime=1791288000)):
+        with patch(
+            "cookbooks.swarm_flight_evidence.checked_header",
+            return_value=SimpleNamespace(hashMerkleRoot=b"\x00" * 32, nTime=1791288000),
+        ):
             with self.assertRaises(DisclosureError):
                 self.verify(bundle, trusted_headers=headers)
 
@@ -404,9 +518,18 @@ class FlightRecorderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "disclosure.json"
             path.write_bytes(canonical_json(bundle))
-            with patch("sys.stdout", new_callable=io.StringIO) as output, patch(
-                    "cookbooks.swarm_flight_recorder.PrepaidMacroNotarizer") as notary:
-                self.assertEqual(2, main(["--verify", str(path), "--recorder-key", recorder.public_key]))
+            with (
+                patch("sys.stdout", new_callable=io.StringIO) as output,
+                patch(
+                    "cookbooks.swarm_flight_recorder.PrepaidMacroNotarizer"
+                ) as notary,
+            ):
+                self.assertEqual(
+                    2,
+                    main(
+                        ["--verify", str(path), "--recorder-key", recorder.public_key]
+                    ),
+                )
             notary.assert_not_called()
             self.assertTrue(json.loads(output.getvalue())["merkle_inclusion_verified"])
             bundle["trace"]["decision"] += "!"
@@ -416,25 +539,36 @@ class FlightRecorderTests(unittest.TestCase):
             self.assertNotIn("Deny PII", output.getvalue())
 
     def test_demo_simulates_50_agents_without_using_available_credentials(self):
-        with patch.dict("os.environ", {"L402_AUTHORIZATION": "fake-sensitive-token"}), patch(
-                "sys.stdout", new_callable=io.StringIO) as output, patch(
-                "cookbooks.swarm_flight_recorder.PrepaidMacroNotarizer") as notary:
+        with (
+            patch.dict("os.environ", {"L402_AUTHORIZATION": "fake-sensitive-token"}),
+            patch("sys.stdout", new_callable=io.StringIO) as output,
+            patch("cookbooks.swarm_flight_recorder.PrepaidMacroNotarizer") as notary,
+        ):
             self.assertEqual(0, main([]))
         notary.assert_not_called()
         self.assertIn("50 synthetic agents; 1000 traces", output.getvalue())
         self.assertIn("Deferred/Pending Credential", output.getvalue())
         self.assertNotIn("fake-sensitive-token", output.getvalue())
-        with patch.dict("os.environ", {}, clear=True), patch(
-                "sys.stdout", new_callable=io.StringIO):
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch("sys.stdout", new_callable=io.StringIO),
+        ):
             self.assertEqual(0, main(["--production"]))
 
     def test_production_uses_existing_macro_adapter_for_one_root(self):
         token = "L402 synthetic-macaroon:" + "01" * 32
         notary = SyntheticNotary()
-        with patch.dict("os.environ", {"L402_AUTHORIZATION": token}), patch(
-                "cookbooks.swarm_flight_recorder.PrepaidMacroNotarizer", return_value=notary) as adapter, patch(
-                "sys.stdout", new_callable=io.StringIO) as output:
-            self.assertEqual(0, main(["--production", "--url", "https://example.test/mcp"]))
+        with (
+            patch.dict("os.environ", {"L402_AUTHORIZATION": token}),
+            patch(
+                "cookbooks.swarm_flight_recorder.PrepaidMacroNotarizer",
+                return_value=notary,
+            ) as adapter,
+            patch("sys.stdout", new_callable=io.StringIO) as output,
+        ):
+            self.assertEqual(
+                0, main(["--production", "--url", "https://example.test/mcp"])
+            )
         adapter.assert_called_once_with(token, "https://example.test/mcp")
         self.assertEqual(1, len(notary.calls))
         self.assertNotIn(token, output.getvalue())

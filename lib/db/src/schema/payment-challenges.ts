@@ -27,9 +27,7 @@ export const paymentChallengesTable = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [
-    index("payment_challenges_expires_at_idx").on(table.expiresAt),
-  ],
+  (table) => [index("payment_challenges_expires_at_idx").on(table.expiresAt)],
 );
 
 export const paymentRangeChallengesTable = pgTable(

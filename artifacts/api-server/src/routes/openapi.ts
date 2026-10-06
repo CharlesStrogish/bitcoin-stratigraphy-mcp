@@ -7,9 +7,6 @@ const serializedOpenApiDocument = JSON.stringify(openApiDocument);
 
 export function registerOpenApiRoute(app: Express): void {
   app.get("/openapi.json", (_req, res): void => {
-    res
-      .status(200)
-      .type("application/json")
-      .send(serializedOpenApiDocument);
+    res.status(200).type("application/json").send(serializedOpenApiDocument);
   });
 }

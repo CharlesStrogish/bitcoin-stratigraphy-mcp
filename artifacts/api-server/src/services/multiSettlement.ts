@@ -40,9 +40,9 @@ function abortableDelay(delayMs: number, signal?: AbortSignal): Promise<void> {
       return;
     }
     const aborted = () => {
-        clearTimeout(timer);
-        signal?.removeEventListener("abort", aborted);
-        reject(signal?.reason);
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", aborted);
+      reject(signal?.reason);
     };
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", aborted);

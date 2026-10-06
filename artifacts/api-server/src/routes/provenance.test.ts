@@ -108,7 +108,7 @@ test("operator anchor endpoint fails closed and requires the Bearer secret", asy
 
   const publicAnchor = await fetch(`${baseUrl}/api/provenance/anchor`);
   assert.equal(publicAnchor.status, 200);
-  const publicAnchorBody = await publicAnchor.json() as ProvenanceAnchor;
+  const publicAnchorBody = (await publicAnchor.json()) as ProvenanceAnchor;
   assert.equal(publicAnchorBody.headHash, state.headHash);
   assert.equal(publicAnchorBody.merkleRoot, state.merkleRoot);
   assert.equal(publicAnchorBody.totalDepth, state.totalDepth);

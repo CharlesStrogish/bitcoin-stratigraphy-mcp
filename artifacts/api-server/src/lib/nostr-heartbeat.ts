@@ -11,14 +11,14 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { readDataset, refreshDataset } from "../routes/stratigraphy";
+import { logger } from "./logger";
 
 const RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",
   "wss://relay.nostr.band",
 ] as const;
-const DEFAULT_BASE_URL =
-  "https://bitcoin-stratigraphy-dashboard.replit.app";
+const DEFAULT_BASE_URL = "https://bitcoin-stratigraphy-dashboard.replit.app";
 const KEY_PATH = resolve(
   process.env.NOSTR_EPHEMERAL_KEY_PATH ?? ".data/nostr-heartbeat-private-key",
 );
@@ -77,11 +77,7 @@ async function secretKey(): Promise<Uint8Array> {
     mode: 0o600,
     flag: "wx",
   }).catch(async (error) => {
-    if (
-      error instanceof Error &&
-      "code" in error &&
-      error.code === "EEXIST"
-    ) {
+    if (error instanceof Error && "code" in error && error.code === "EEXIST") {
       return;
     }
     throw error;
@@ -148,9 +144,7 @@ async function publishHeartbeat(key: Uint8Array): Promise<string> {
   } finally {
     pool.destroy();
   }
-  return createHash("sha256")
-    .update(JSON.stringify(dataset))
-    .digest("hex");
+  return createHash("sha256").update(JSON.stringify(dataset)).digest("hex");
 }
 
 export async function startNostrHeartbeat(): Promise<() => Promise<void>> {
@@ -170,7 +164,7 @@ export async function startNostrHeartbeat(): Promise<() => Promise<void>> {
     activeUpdate = update;
     void update
       .catch((error) => {
-        console.warn("Nostr heartbeat update failed", error);
+        logger.warn({ err: error }, "Nostr heartbeat update failed");
       })
       .finally(() => {
         if (activeUpdate === update) activeUpdate = undefined;

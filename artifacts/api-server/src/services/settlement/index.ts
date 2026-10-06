@@ -157,11 +157,7 @@ export function createSettlementRouter(input: {
       probeInProgress = true;
     }
     try {
-      const result = await withTimeout(
-        input.primary,
-        operation,
-        requestSignal,
-      );
+      const result = await withTimeout(input.primary, operation, requestSignal);
       primarySucceeded();
       return { value: result, provider: input.primary };
     } catch (error) {
@@ -188,8 +184,7 @@ export function createSettlementRouter(input: {
     async createInvoice(request) {
       return (
         await route(
-          (provider, signal) =>
-            provider.createInvoice({ ...request, signal }),
+          (provider, signal) => provider.createInvoice({ ...request, signal }),
           request.signal,
         )
       ).value;
@@ -200,7 +195,9 @@ export function createSettlementRouter(input: {
           ? [input.primary, input.fallback]
           : [input.fallback, input.primary];
       const eligibleProviders = request.expectedProvider
-        ? providers.filter((provider) => provider.name === request.expectedProvider)
+        ? providers.filter(
+            (provider) => provider.name === request.expectedProvider,
+          )
         : providers;
       let unavailable = false;
       for (const provider of eligibleProviders) {
@@ -214,9 +211,7 @@ export function createSettlementRouter(input: {
           continue;
         }
         const ownsProbe =
-          provider === input.primary &&
-          state !== "closed" &&
-          !probeInProgress;
+          provider === input.primary && state !== "closed" && !probeInProgress;
         if (ownsProbe) {
           state = "half-open";
           probeInProgress = true;
@@ -249,8 +244,7 @@ export function createSettlementRouter(input: {
   };
 
   function activeProviderName() {
-    return (state === "closed" || shouldProbe()) &&
-      input.primary.isConfigured()
+    return (state === "closed" || shouldProbe()) && input.primary.isConfigured()
       ? input.primary.name
       : input.fallback.name;
   }
@@ -265,10 +259,7 @@ export function createDefaultSettlementRouter(
   });
 }
 
-export type {
-  NwcClient,
-  NwcClientFactory,
-} from "./nwc-provider";
+export type { NwcClient, NwcClientFactory } from "./nwc-provider";
 export { createNwcClient } from "./nwc-provider";
 export type {
   SettlementInvoice,

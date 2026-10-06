@@ -1,8 +1,5 @@
 import type { AgentIdentity, AgentTier } from "./agentReputation";
-import {
-  SETTLEMENT_ASSETS,
-  type SettlementAsset,
-} from "./settlement/types";
+import { SETTLEMENT_ASSETS, type SettlementAsset } from "./settlement/types";
 
 const PUBKEY_PATTERN = /^[0-9a-f]{64}$/;
 const AGENT_TIERS = new Set<AgentTier>(["STANDARD", "VIP", "SWARM"]);
@@ -23,10 +20,7 @@ export function constructAgentIdentityCaveats(
   ) {
     throw new Error("Cannot bind an invalid agent identity");
   }
-  return [
-    `agent_pubkey=${identity.pubkey}`,
-    `agent_tier=${identity.tier}`,
-  ];
+  return [`agent_pubkey=${identity.pubkey}`, `agent_tier=${identity.tier}`];
 }
 
 export function parseAgentIdentityCaveats(
@@ -57,9 +51,7 @@ export function presentingAgentMatchesCaveats(
   );
 }
 
-export function constructPaymentAssetCaveat(
-  asset?: SettlementAsset,
-): string[] {
+export function constructPaymentAssetCaveat(asset?: SettlementAsset): string[] {
   if (!asset) return [];
   if (!PAYMENT_ASSETS.has(asset)) {
     throw new Error("Cannot bind an invalid settlement asset");

@@ -56,7 +56,9 @@ let queuedProofs = 0;
 
 function strictContextHalves(hash: string): { high: bigint; low: bigint } {
   if (!/^[0-9a-fA-F]{64}$/.test(hash)) {
-    throw new Error("sessionContextHash must be exactly 64 hexadecimal characters");
+    throw new Error(
+      "sessionContextHash must be exactly 64 hexadecimal characters",
+    );
   }
   return {
     high: BigInt(`0x${hash.slice(0, 32)}`),
@@ -95,9 +97,10 @@ function decodeCompactTarget(bits: number): bigint {
   if (negative || mantissa === 0) {
     throw new Error("Block compact target must encode a positive target");
   }
-  const target = exponent <= 3
-    ? BigInt(mantissa) >> BigInt(8 * (3 - exponent))
-    : BigInt(mantissa) << BigInt(8 * (exponent - 3));
+  const target =
+    exponent <= 3
+      ? BigInt(mantissa) >> BigInt(8 * (3 - exponent))
+      : BigInt(mantissa) << BigInt(8 * (exponent - 3));
   if (target <= 0n || target >= HASH_256_LIMIT) {
     throw new Error("Block compact target is outside the 256-bit range");
   }
@@ -125,7 +128,11 @@ function checkedBlock(value: Block, expectedHeight?: number): Block {
   if (BigInt(`0x${value.hash}`) > target) {
     throw new Error("Block hash does not meet its decoded compact target");
   }
-  return { height: value.height, hash: value.hash.toLowerCase(), bits: value.bits };
+  return {
+    height: value.height,
+    hash: value.hash.toLowerCase(),
+    bits: value.bits,
+  };
 }
 
 async function boundedFetch(url: string): Promise<string> {
@@ -133,7 +140,8 @@ async function boundedFetch(url: string): Promise<string> {
     signal: AbortSignal.timeout(BLOCK_REQUEST_TIMEOUT_MS),
     headers: { accept: "application/json, text/plain" },
   });
-  if (!response.ok) throw new Error(`Bitcoin block API returned HTTP ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Bitcoin block API returned HTTP ${response.status}`);
   const declaredLength = Number(response.headers.get("content-length") ?? 0);
   if (declaredLength > MAX_BLOCK_RESPONSE_BYTES) {
     throw new Error("Bitcoin block API response exceeds size limit");
@@ -162,15 +170,21 @@ async function boundedFetch(url: string): Promise<string> {
 }
 
 async function readMempoolBlock(height?: number): Promise<Block> {
-  const selectedHeight = height ?? Number(
-    (await boundedFetch("https://mempool.space/api/blocks/tip/height")).trim(),
-  );
+  const selectedHeight =
+    height ??
+    Number(
+      (
+        await boundedFetch("https://mempool.space/api/blocks/tip/height")
+      ).trim(),
+    );
   if (!Number.isSafeInteger(selectedHeight) || selectedHeight < 0) {
     throw new Error("Bitcoin block API returned an invalid height");
   }
-  const blockHash = (await boundedFetch(
-    `https://mempool.space/api/block-height/${selectedHeight}`,
-  )).trim();
+  const blockHash = (
+    await boundedFetch(
+      `https://mempool.space/api/block-height/${selectedHeight}`,
+    )
+  ).trim();
   if (!/^[0-9a-fA-F]{64}$/.test(blockHash)) {
     throw new Error("Bitcoin block API returned an invalid block hash");
   }
@@ -188,13 +202,18 @@ async function readMempoolBlock(height?: number): Promise<Block> {
   }
   const details = block as Record<string, unknown>;
   if (details.id !== blockHash) {
-    throw new Error("Bitcoin block API hash does not match its details response");
+    throw new Error(
+      "Bitcoin block API hash does not match its details response",
+    );
   }
-  return checkedBlock({
-    height: Number(details.height),
-    hash: blockHash,
-    bits: Number(details.bits),
-  }, selectedHeight);
+  return checkedBlock(
+    {
+      height: Number(details.height),
+      hash: blockHash,
+      bits: Number(details.bits),
+    },
+    selectedHeight,
+  );
 }
 
 async function fetchBlock(
@@ -292,10 +311,9 @@ async function verificationKey(): Promise<unknown> {
 }
 
 async function verificationKeyId(): Promise<string> {
-  verificationKeyIdPromise ??= readFile(verificationKeyPath)
-    .then((raw) =>
-      `zk-drift-v1-${createHash("sha256").update(raw).digest("hex")}`,
-    );
+  verificationKeyIdPromise ??= readFile(verificationKeyPath).then(
+    (raw) => `zk-drift-v1-${createHash("sha256").update(raw).digest("hex")}`,
+  );
   return verificationKeyIdPromise;
 }
 
@@ -304,11 +322,7 @@ async function verifyCryptographically(
   proof: Groth16Proof,
 ): Promise<boolean> {
   try {
-    return await groth16.verify(
-      await verificationKey(),
-      publicSignals,
-      proof,
-    );
+    return await groth16.verify(await verificationKey(), publicSignals, proof);
   } finally {
     if (process.env.NODE_ENV === "test") {
       const globals = globalThis as typeof globalThis & {
@@ -330,18 +344,16 @@ async function runProof(witness: Record<string, string>): Promise<{
   }
   queuedProofs += 1;
   const run = proofQueueTail.then(() =>
-    groth16.fullProve(
-      witness,
-      wasmPath,
-      zkeyPath,
-      undefined,
-      undefined,
-      { singleThread: true },
-    )
+    groth16.fullProve(witness, wasmPath, zkeyPath, undefined, undefined, {
+      singleThread: true,
+    }),
   );
-  proofQueueTail = run.then(() => undefined, () => undefined);
+  proofQueueTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
   try {
-    return await run as { proof: Groth16Proof; publicSignals: string[] };
+    return (await run) as { proof: Groth16Proof; publicSignals: string[] };
   } finally {
     queuedProofs -= 1;
   }
@@ -354,15 +366,22 @@ function validGroth16Proof(value: unknown): value is Groth16Proof {
     typeof coordinate === "string" &&
     /^(0|[1-9][0-9]{0,76})$/.test(coordinate) &&
     BigInt(coordinate) < BASE_FIELD_MODULUS;
-  return Array.isArray(proof.pi_a) && proof.pi_a.length === 3 &&
+  return (
+    Array.isArray(proof.pi_a) &&
+    proof.pi_a.length === 3 &&
     proof.pi_a.every(validCoordinate) &&
-    Array.isArray(proof.pi_b) && proof.pi_b.length === 3 &&
-    proof.pi_b.every((pair) =>
-      Array.isArray(pair) && pair.length === 2 && pair.every(validCoordinate)
+    Array.isArray(proof.pi_b) &&
+    proof.pi_b.length === 3 &&
+    proof.pi_b.every(
+      (pair) =>
+        Array.isArray(pair) && pair.length === 2 && pair.every(validCoordinate),
     ) &&
-    Array.isArray(proof.pi_c) && proof.pi_c.length === 3 &&
+    Array.isArray(proof.pi_c) &&
+    proof.pi_c.length === 3 &&
     proof.pi_c.every(validCoordinate) &&
-    proof.protocol === "groth16" && proof.curve === "bn128";
+    proof.protocol === "groth16" &&
+    proof.curve === "bn128"
+  );
 }
 
 export async function generateDriftProof(
@@ -403,8 +422,8 @@ export async function generateDriftProof(
   if (
     !selfVerified ||
     generated.publicSignals.length !== metrics.publicSignals.length ||
-    generated.publicSignals.some((signal, index) =>
-      signal !== metrics.publicSignals[index]
+    generated.publicSignals.some(
+      (signal, index) => signal !== metrics.publicSignals[index],
     )
   ) {
     throw new Error("generated zk drift proof failed self-verification");
@@ -442,13 +461,15 @@ export async function verifyDriftProof(
       typeof input.sessionContextHash !== "string" ||
       typeof input.targetBlockHeight !== "number" ||
       typeof input.entropyThreshold !== "number"
-    ) return false;
+    )
+      return false;
     strictContextHalves(input.sessionContextHash);
     if (
       !Number.isSafeInteger(input.targetBlockHeight) ||
       input.targetBlockHeight < 0 ||
       input.targetBlockHeight > 0xffff_ffff
-    ) return false;
+    )
+      return false;
     threshold = parseThreshold(input.entropyThreshold);
   } catch {
     return false;
@@ -472,7 +493,8 @@ export async function verifyDriftProof(
     }) ||
     (input.driftScore !== undefined &&
       (!Number.isFinite(input.driftScore) ||
-        input.driftScore < 0 || input.driftScore > 1)) ||
+        input.driftScore < 0 ||
+        input.driftScore > 1)) ||
     (input.isAligned !== undefined && typeof input.isAligned !== "boolean") ||
     (input.thermodynamicEntropyBits !== undefined &&
       (!Number.isSafeInteger(input.thermodynamicEntropyBits) ||
@@ -483,8 +505,10 @@ export async function verifyDriftProof(
         !/^[0-9a-fA-F]{64}$/.test(input.blockHash))) ||
     (input.compactTarget !== undefined &&
       (!Number.isSafeInteger(input.compactTarget) ||
-        input.compactTarget < 0 || input.compactTarget > 0xffff_ffff))
-  ) return false;
+        input.compactTarget < 0 ||
+        input.compactTarget > 0xffff_ffff))
+  )
+    return false;
 
   // Key-file, provider, and cryptographic errors are operational failures rather
   // than invalid proofs. Let callers surface them as service-unavailable errors.
@@ -493,21 +517,23 @@ export async function verifyDriftProof(
 
   const block = await fetchBlock(input.targetBlockHeight, deps);
   if (
-    (input.blockHash !== undefined && input.blockHash.toLowerCase() !== block.hash) ||
+    (input.blockHash !== undefined &&
+      input.blockHash.toLowerCase() !== block.hash) ||
     (input.compactTarget !== undefined && input.compactTarget !== block.bits)
-  ) return false;
+  )
+    return false;
   const metrics = computeMetrics(input.sessionContextHash, block, threshold);
   if (
     (input.driftScore !== undefined &&
       input.driftScore !== metrics.driftUnits / 512) ||
-    (input.isAligned !== undefined &&
-      input.isAligned !== metrics.isAligned) ||
+    (input.isAligned !== undefined && input.isAligned !== metrics.isAligned) ||
     (input.thermodynamicEntropyBits !== undefined &&
       input.thermodynamicEntropyBits !== metrics.thermodynamicEntropyBits) ||
-    proof.publicSignals.some((signal, index) =>
-      signal !== metrics.publicSignals[index]
+    proof.publicSignals.some(
+      (signal, index) => signal !== metrics.publicSignals[index],
     )
-  ) return false;
+  )
+    return false;
   const groth16Proof: Groth16Proof = {
     pi_a: proof.pi_a!,
     pi_b: proof.pi_b!,
@@ -515,8 +541,5 @@ export async function verifyDriftProof(
     protocol: "groth16",
     curve: "bn128",
   };
-  return await verifyCryptographically(
-    metrics.publicSignals,
-    groth16Proof,
-  );
+  return await verifyCryptographically(metrics.publicSignals, groth16Proof);
 }

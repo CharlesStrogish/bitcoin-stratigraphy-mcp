@@ -18,9 +18,7 @@ import {
 } from "../artifacts/api-server/src/lib/subscription-pass";
 import type { SettlementRouter } from "../artifacts/api-server/src/services/settlement";
 import { createMemoryRevenueLedger } from "../artifacts/api-server/src/services/ledger";
-import {
-  createNwcSettlementProvider,
-} from "../artifacts/api-server/src/services/settlement/nwc-provider";
+import { createNwcSettlementProvider } from "../artifacts/api-server/src/services/settlement/nwc-provider";
 
 const PREIMAGE = "01".repeat(32);
 const TEST_NOSTR_PRIVATE_KEY = "01".padStart(64, "0");
@@ -47,10 +45,10 @@ function fakeSettlementRouter(): SettlementRouter {
     },
     async verifyPayment(input) {
       return input.paymentHash === PAYMENT_HASH &&
-          input.preimage === PREIMAGE &&
-          input.expectedAmountMsats === 5_000 &&
-          input.expectedDescription === "test paid route" &&
-          input.expectedProvider === "test-wallet"
+        input.preimage === PREIMAGE &&
+        input.expectedAmountMsats === 5_000 &&
+        input.expectedDescription === "test paid route" &&
+        input.expectedProvider === "test-wallet"
         ? { settledAt: 1_789_963_200, provider: "test-wallet" }
         : "invalid";
     },
@@ -89,7 +87,10 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     );
     assert.ok(match);
     assert.match(match[2]!, /^lnbc/);
-    assert.equal((await challenge.json() as { amount_sats: number }).amount_sats, 5);
+    assert.equal(
+      ((await challenge.json()) as { amount_sats: number }).amount_sats,
+      5,
+    );
 
     dynamicAmountSats = 9;
     const paid = await fetch(`${baseUrl}/paid`, {
@@ -127,40 +128,72 @@ test("a paid 100-call macro uses one invoice and one single-flight wallet verifi
       invoiceCount++;
       assert.equal(input.amountMsats, 500_000);
       assert.equal(input.description, "test paid route (100-call batch)");
-      return { invoice: "lnbc5n1batch", paymentHash: PAYMENT_HASH, provider: "test-wallet" };
+      return {
+        invoice: "lnbc5n1batch",
+        paymentHash: PAYMENT_HASH,
+        provider: "test-wallet",
+      };
     },
     async verifyPayment(input) {
       verificationCount++;
       await new Promise((resolve) => setTimeout(resolve, 10));
       assert.equal(input.expectedAmountMsats, 500_000);
-      assert.equal(input.expectedDescription, "test paid route (100-call batch)");
-      return input.preimage === PREIMAGE ? { settledAt: clock, provider: "test-wallet" } : "invalid";
+      assert.equal(
+        input.expectedDescription,
+        "test paid route (100-call batch)",
+      );
+      return input.preimage === PREIMAGE
+        ? { settledAt: clock, provider: "test-wallet" }
+        : "invalid";
     },
   };
-  app.get("/batch", createL402Middleware({
-    amountSats: 5, description: "test paid route", settlementRouter: provider,
-    sessionSecret: "test-macro-secret", allowBatch: true, now: () => clock, revocationStore,
-  }), (_req, res) => res.json({ paid: true }));
+  app.get(
+    "/batch",
+    createL402Middleware({
+      amountSats: 5,
+      description: "test paid route",
+      settlementRouter: provider,
+      sessionSecret: "test-macro-secret",
+      allowBatch: true,
+      now: () => clock,
+      revocationStore,
+    }),
+    (_req, res) => res.json({ paid: true }),
+  );
   const server = app.listen(0);
   await once(server, "listening");
   const address = server.address();
   assert.ok(address && typeof address === "object");
   const url = `http://127.0.0.1:${address.port}/batch`;
   try {
-    const invalid = await fetch(url, { headers: { "X-L402-Batch-Size": "101" } });
+    const invalid = await fetch(url, {
+      headers: { "X-L402-Batch-Size": "101" },
+    });
     assert.equal(invalid.status, 400);
     assert.equal(invoiceCount, 0);
-    const challenge = await fetch(url, { headers: { "X-L402-Batch-Size": "100" } });
+    const challenge = await fetch(url, {
+      headers: { "X-L402-Batch-Size": "100" },
+    });
     assert.equal(challenge.status, 402);
-    const offer = await challenge.json() as { macaroon: string; max_requests: number; amount_sats: number };
+    const offer = (await challenge.json()) as {
+      macaroon: string;
+      max_requests: number;
+      amount_sats: number;
+    };
     assert.equal(offer.max_requests, 100);
     assert.equal(offer.amount_sats, 500);
-    const pass = verifySubscriptionMacaroon(offer.macaroon, "test-macro-secret", Math.floor(clock / 1_000));
+    const pass = verifySubscriptionMacaroon(
+      offer.macaroon,
+      "test-macro-secret",
+      Math.floor(clock / 1_000),
+    );
     assert.equal(pass?.maxRequests, 100);
     assert.ok(pass);
     assert.deepEqual(pass?.allowedPaths, ["/batch"]);
     const headers = { Authorization: `L402 ${offer.macaroon}:${PREIMAGE}` };
-    const responses = await Promise.all(Array.from({ length: 100 }, () => fetch(url, { headers })));
+    const responses = await Promise.all(
+      Array.from({ length: 100 }, () => fetch(url, { headers })),
+    );
     for (const response of responses) {
       assert.equal(response.status, 200);
       await response.arrayBuffer();
@@ -171,15 +204,26 @@ test("a paid 100-call macro uses one invoice and one single-flight wallet verifi
     assert.equal(invoiceCount, 1);
     assert.equal(verificationCount, 1);
     const child = attenuateSubscriptionMacaroon(offer.macaroon, [
-      `time_before=${new Date(clock + 20).toISOString()}`, "max_requests=1",
+      `time_before=${new Date(clock + 20).toISOString()}`,
+      "max_requests=1",
     ]);
     assert.ok(child);
-    const childHeaders = { Authorization: `L402 ${child}:${PREIMAGE}`, "X-L402-Batch-Size": "100" };
+    const childHeaders = {
+      Authorization: `L402 ${child}:${PREIMAGE}`,
+      "X-L402-Batch-Size": "100",
+    };
     assert.equal((await fetch(url, { headers: childHeaders })).status, 429);
     clock += 21;
-    assert.equal((await fetch(url, { headers: childHeaders })).status, 401,
-      "cached descendant deadlines cannot outlive time_before");
-    assert.equal(verificationCount, 1, "descendants reuse the exact invoice proof without resetting its quota");
+    assert.equal(
+      (await fetch(url, { headers: childHeaders })).status,
+      401,
+      "cached descendant deadlines cannot outlive time_before",
+    );
+    assert.equal(
+      verificationCount,
+      1,
+      "descendants reuse the exact invoice proof without resetting its quota",
+    );
     assert.equal(invoiceCount, 1);
     await revocationStore.revoke(pass.tokenId);
     const revoked = await fetch(url, { headers });
@@ -187,12 +231,16 @@ test("a paid 100-call macro uses one invoice and one single-flight wallet verifi
     assert.equal(invoiceCount, 1);
     assert.equal(verificationCount, 1);
     clock += 3_600_000;
-    const expired = await fetch(url, { headers: { ...headers, "X-L402-Batch-Size": "100" } });
+    const expired = await fetch(url, {
+      headers: { ...headers, "X-L402-Batch-Size": "100" },
+    });
     assert.equal(expired.status, 402);
     assert.equal(invoiceCount, 2);
   } finally {
     server.closeAllConnections();
-    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
   }
 });
 
@@ -200,9 +248,16 @@ test("edge cache is bounded, expires entries, coalesces lookups, and never cache
   let clock = 0;
   const cache = new L402EdgeCache<string>(() => clock, 2);
   let lookups = 0;
-  const load = async () => { lookups++; await Promise.resolve(); return "settled"; };
-  const values = await Promise.all(Array.from({ length: 10 },
-    () => cache.resolve("credential", 100, load, (value) => value === "settled")));
+  const load = async () => {
+    lookups++;
+    await Promise.resolve();
+    return "settled";
+  };
+  const values = await Promise.all(
+    Array.from({ length: 10 }, () =>
+      cache.resolve("credential", 100, load, (value) => value === "settled"),
+    ),
+  );
   assert.deepEqual(values, Array(10).fill("settled"));
   assert.equal(lookups, 1);
   cache.set("other", "settled", 100);
@@ -211,7 +266,15 @@ test("edge cache is bounded, expires entries, coalesces lookups, and never cache
   clock = 100;
   assert.equal(cache.get("third"), undefined);
   for (let attempt = 0; attempt < 2; attempt++) {
-    await cache.resolve("pending", 200, async () => { lookups++; return "invalid"; }, (value) => value === "settled");
+    await cache.resolve(
+      "pending",
+      200,
+      async () => {
+        lookups++;
+        return "invalid";
+      },
+      (value) => value === "settled",
+    );
   }
   assert.equal(lookups, 3);
   assert.equal(cache.get("pending"), undefined);

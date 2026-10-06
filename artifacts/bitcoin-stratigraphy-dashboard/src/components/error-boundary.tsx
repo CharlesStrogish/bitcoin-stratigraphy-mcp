@@ -3,7 +3,7 @@ import {
   type ComponentType,
   type ErrorInfo,
   type ReactNode,
-} from 'react';
+} from "react";
 
 export interface ErrorFallbackProps {
   error: Error;
@@ -25,7 +25,7 @@ function toError(value: unknown): Error {
   if (value instanceof Error) {
     return value;
   }
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return new Error(value);
   }
   try {
@@ -76,7 +76,7 @@ export class ErrorBoundary extends Component<
 
   componentDidCatch(error: unknown, info: ErrorInfo): void {
     console.error(
-      'ErrorBoundary caught an error:',
+      "ErrorBoundary caught an error:",
       toError(error),
       info.componentStack,
     );

@@ -17,6 +17,7 @@ from typing import Any, Callable, Literal, Mapping, Protocol, TypedDict
 
 SettlementAsset = Literal["btc-lightning", "l-btc", "taproot-assets"]
 
+
 class ZkPublicInputs(TypedDict):
     blockHeight: int
     snapshotDigest: str
@@ -153,9 +154,7 @@ class BitcoinStratigraphyClient:
             delay = 1.0
             while not stop.is_set():
                 try:
-                    response = self._open_authorized(
-                        "/api/v1/stratigraphy/stream"
-                    )
+                    response = self._open_authorized("/api/v1/stratigraphy/stream")
                     with response_lock:
                         subscription._response = response
                     with response:
@@ -201,9 +200,7 @@ class BitcoinStratigraphyClient:
             return json.load(response)
 
     def _open_authorized(self, path: str):
-        headers: dict[str, str] = {
-            "X-Settlement-Asset": self.settlement_asset
-        }
+        headers: dict[str, str] = {"X-Settlement-Asset": self.settlement_asset}
         credential = self._current_credential()
         sent_authorization: str | None = None
         if credential:
@@ -222,9 +219,7 @@ class BitcoinStratigraphyClient:
             if error.code != 402:
                 raise
             challenge = json.loads(error.read().decode("utf-8"))
-            credential = self._pay_challenge(
-                challenge, sent_authorization
-            )
+            credential = self._pay_challenge(challenge, sent_authorization)
             return self._open(
                 path,
                 {
@@ -240,10 +235,7 @@ class BitcoinStratigraphyClient:
     ) -> dict[str, Any]:
         with self._credential_lock:
             cached = self._current_credential()
-            if (
-                cached
-                and self._authorization(cached) != rejected_authorization
-            ):
+            if cached and self._authorization(cached) != rejected_authorization:
                 return cached
             selected = next(
                 (
@@ -254,9 +246,7 @@ class BitcoinStratigraphyClient:
                 None,
             )
             if not selected:
-                raise ValueError(
-                    f"L402 challenge did not include tier {self.tier}"
-                )
+                raise ValueError(f"L402 challenge did not include tier {self.tier}")
             if selected.get("payment_asset") != self.settlement_asset:
                 raise ValueError(
                     "L402 challenge did not match the requested settlement asset"
@@ -265,13 +255,9 @@ class BitcoinStratigraphyClient:
             if isinstance(result, str):
                 preimage = result
             else:
-                preimage = result.get("preimage") or result.get(
-                    "payment_preimage"
-                )
+                preimage = result.get("preimage") or result.get("payment_preimage")
             if not isinstance(preimage, str) or len(preimage) != 64:
-                raise ValueError(
-                    "Wallet did not return a 32-byte payment preimage"
-                )
+                raise ValueError("Wallet did not return a 32-byte payment preimage")
             int(preimage, 16)
             payment_hash = selected.get("payment_hash")
             computed_hash = hashlib.sha256(bytes.fromhex(preimage)).hexdigest()
@@ -279,9 +265,7 @@ class BitcoinStratigraphyClient:
                 not isinstance(payment_hash, str)
                 or computed_hash != payment_hash.lower()
             ):
-                raise ValueError(
-                    "Wallet preimage does not match the L402 payment hash"
-                )
+                raise ValueError("Wallet preimage does not match the L402 payment hash")
             self._credential = {
                 "macaroon": selected["macaroon"],
                 "preimage": preimage.lower(),
@@ -291,19 +275,14 @@ class BitcoinStratigraphyClient:
             return self._credential
 
     def _current_credential(self) -> dict[str, Any] | None:
-        if (
-            self._credential
-            and self._credential["valid_until"] > int(time.time())
-        ):
+        if self._credential and self._credential["valid_until"] > int(time.time()):
             return self._credential
         self._credential = None
         return None
 
     @staticmethod
     def _authorization(credential: Mapping[str, Any]) -> str:
-        return (
-            f"L402 {credential['macaroon']}:{credential['preimage']}"
-        )
+        return f"L402 {credential['macaroon']}:{credential['preimage']}"
 
     def _json_request(self, path: str) -> dict[str, Any]:
         with self._open(
@@ -351,10 +330,7 @@ def _canonical_mesh_value(value: Any) -> Any:
     if isinstance(value, dict):
         return [
             "object",
-            [
-                [key, _canonical_mesh_value(value[key])]
-                for key in sorted(value)
-            ],
+            [[key, _canonical_mesh_value(value[key])] for key in sorted(value)],
         ]
     raise TypeError("Mesh snapshot must be JSON serializable")
 
@@ -386,7 +362,10 @@ def validate_mesh_consensus(
         pubkey = attestation["pubkey"]
         if pubkey in unique_pubkeys or pubkey not in trusted_pubkeys:
             continue
-        if abs((now_seconds or int(time.time())) - attestation["createdAt"]) > max_age_seconds:
+        if (
+            abs((now_seconds or int(time.time())) - attestation["createdAt"])
+            > max_age_seconds
+        ):
             continue
         unique_pubkeys.add(pubkey)
         event = {
@@ -423,7 +402,8 @@ def validate_mesh_consensus(
         and snapshot_digest == consensus["snapshotDigest"]
         and _mesh_merkle_root(
             [item["eventId"] for item in consensus["peerAttestations"]]
-        ) == consensus["merkleRoot"]
+        )
+        == consensus["merkleRoot"]
         and abs(expected_score - consensus["quorumScore"]) < 1e-12
     )
 

@@ -42,24 +42,27 @@ function sha256(value: string): string {
  * this excludes synthetic date and height values, which depend on dataset length.
  */
 function sourceFingerprint(record: ProvenanceSourceRecord): string {
-  return sha256(JSON.stringify([
-    record.day,
-    record.title,
-    record.video_id,
-    record.transcript_summary,
-    record.quantitative_alpha.target_multiplier,
-    record.quantitative_alpha.difficulty_epoch_progress,
-    record.quantitative_alpha.thermodynamic_signal,
-  ]));
+  return sha256(
+    JSON.stringify([
+      record.day,
+      record.title,
+      record.video_id,
+      record.transcript_summary,
+      record.quantitative_alpha.target_multiplier,
+      record.quantitative_alpha.difficulty_epoch_progress,
+      record.quantitative_alpha.thermodynamic_signal,
+    ]),
+  );
 }
 
-function stratumDigest(index: number, fingerprint: string, prevHash: string): string {
-  return sha256(JSON.stringify([
-    "stratigraphy-stratum-v1",
-    index,
-    fingerprint,
-    prevHash,
-  ]));
+function stratumDigest(
+  index: number,
+  fingerprint: string,
+  prevHash: string,
+): string {
+  return sha256(
+    JSON.stringify(["stratigraphy-stratum-v1", index, fingerprint, prevHash]),
+  );
 }
 
 /**
@@ -75,11 +78,9 @@ function merkleRoot(stratumHashes: readonly string[]): string {
     for (let index = 0; index < level.length; index += 2) {
       const left = level[index];
       const right = level[index + 1] ?? left;
-      nextLevel.push(sha256(JSON.stringify([
-        "stratigraphy-merkle-node-v1",
-        left,
-        right,
-      ])));
+      nextLevel.push(
+        sha256(JSON.stringify(["stratigraphy-merkle-node-v1", left, right])),
+      );
     }
     level = nextLevel;
   }
@@ -111,12 +112,17 @@ export function buildProvenanceChain<T extends ProvenanceSourceRecord>(
       typeof record.quantitative_alpha.difficulty_epoch_progress !== "string" ||
       typeof record.quantitative_alpha.thermodynamic_signal !== "string"
     ) {
-      throw new Error(`Invalid or non-sequential provenance source record at index ${index}`);
+      throw new Error(
+        `Invalid or non-sequential provenance source record at index ${index}`,
+      );
     }
 
     const fingerprint = sourceFingerprint(record);
     const stratumHash = stratumDigest(index, fingerprint, prevHash);
-    const supplied = record as T & { prevHash?: unknown; stratumHash?: unknown };
+    const supplied = record as T & {
+      prevHash?: unknown;
+      stratumHash?: unknown;
+    };
     if (
       (Object.prototype.hasOwnProperty.call(record, "prevHash") &&
         supplied.prevHash !== prevHash) ||
@@ -127,7 +133,9 @@ export function buildProvenanceChain<T extends ProvenanceSourceRecord>(
     }
 
     if (index === 0 && stratumHash !== IMMUTABLE_GENESIS_HASH) {
-      throw new Error("Canonical provenance genesis record does not match the pinned genesis hash");
+      throw new Error(
+        "Canonical provenance genesis record does not match the pinned genesis hash",
+      );
     }
 
     chainedRecords.push({ ...record, prevHash, stratumHash });

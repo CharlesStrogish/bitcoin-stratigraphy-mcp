@@ -38,10 +38,7 @@ export interface PaymentChallengeStore {
 }
 
 type StoredState = {
-  challenges: Map<
-    string,
-    { challenge: PaymentChallenge; expiresAt: number }
-  >;
+  challenges: Map<string, { challenge: PaymentChallenge; expiresAt: number }>;
   invoiceAttemptedAt: number[];
 };
 
@@ -103,9 +100,7 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
         if (existing && existing.expiresAt > now) {
           return { kind: "challenge", challenge: existing.challenge } as const;
         }
-        if (
-          state.invoiceAttemptedAt.length >= policy.maxInvoicesPerWindow
-        ) {
+        if (state.invoiceAttemptedAt.length >= policy.maxInvoicesPerWindow) {
           return {
             kind: "limited",
             retryAfter: retryAfter(
@@ -152,10 +147,7 @@ export function createMemoryPaymentChallengeStore(): PaymentChallengeStore {
     async findByPaymentHash(caller, paymentHash) {
       const key = `${caller}|${paymentHash}`;
       const binding = bindings.get(key);
-      if (
-        binding &&
-        (binding.challenge.redeemUntil ?? 0) <= binding.now()
-      ) {
+      if (binding && (binding.challenge.redeemUntil ?? 0) <= binding.now()) {
         bindings.delete(key);
         return null;
       }

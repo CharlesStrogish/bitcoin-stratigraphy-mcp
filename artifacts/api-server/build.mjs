@@ -29,21 +29,42 @@ async function buildAll() {
     { recursive: true },
   );
   // Only publish the public integration examples, never the workspace itself.
-  await mkdir(path.resolve(distDir, "audit-worker/cookbooks"), { recursive: true });
+  await mkdir(path.resolve(distDir, "audit-worker/cookbooks"), {
+    recursive: true,
+  });
   for (const filename of [
-    "audit_web_worker.py", "audit_verifier.py", "audit_verifier_ots.py", "article_12_journal.py",
+    "audit_web_worker.py",
+    "audit_verifier.py",
+    "audit_verifier_ots.py",
+    "article_12_journal.py",
     "_enterprise_compat.py",
   ]) {
-    await cp(path.resolve(artifactDir, "../../cookbooks", filename),
-      path.resolve(distDir, "audit-worker/cookbooks", filename));
+    await cp(
+      path.resolve(artifactDir, "../../cookbooks", filename),
+      path.resolve(distDir, "audit-worker/cookbooks", filename),
+    );
   }
   // Keep the isolated audit worker deployable after the enterprise migration.
   // Copy its minimal SDK dependency closure, not journals or the workspace.
-  const workerSdkDir = path.resolve(distDir, "audit-worker/sdk/python/bitcoin_stratigraphy_enterprise");
+  const workerSdkDir = path.resolve(
+    distDir,
+    "audit-worker/sdk/python/bitcoin_stratigraphy_enterprise",
+  );
   await mkdir(workerSdkDir, { recursive: true });
-  for (const filename of ["__init__.py", "audit_verifier.py", "audit_verifier_ots.py", "article_12_journal.py"]) {
-    await cp(path.resolve(artifactDir, "../../sdk/python/bitcoin_stratigraphy_enterprise", filename),
-      path.resolve(workerSdkDir, filename));
+  for (const filename of [
+    "__init__.py",
+    "audit_verifier.py",
+    "audit_verifier_ots.py",
+    "article_12_journal.py",
+  ]) {
+    await cp(
+      path.resolve(
+        artifactDir,
+        "../../sdk/python/bitcoin_stratigraphy_enterprise",
+        filename,
+      ),
+      path.resolve(workerSdkDir, filename),
+    );
   }
 
   await mkdir(path.resolve(distDir, "public/cookbooks"), { recursive: true });
@@ -52,8 +73,12 @@ async function buildAll() {
     path.resolve(distDir, "public/cookbooks/index.html"),
   );
   for (const filename of [
-    "README.md", "requirements.txt", "l402_client.py",
-    "langchain_example.py", "autogen_example.py", "crewai_example.py",
+    "README.md",
+    "requirements.txt",
+    "l402_client.py",
+    "langchain_example.py",
+    "autogen_example.py",
+    "crewai_example.py",
   ]) {
     await cp(
       path.resolve(artifactDir, "../../cookbooks", filename),
@@ -62,10 +87,15 @@ async function buildAll() {
   }
 
   // Publish only the standalone, explicitly public framework quickstarts.
-  await mkdir(path.resolve(distDir, "public/cookbooks/frameworks"), { recursive: true });
+  await mkdir(path.resolve(distDir, "public/cookbooks/frameworks"), {
+    recursive: true,
+  });
   for (const filename of [
-    "langchain_agent.py", "llamaindex_agent.py", "README.md",
-    "requirements-langchain.txt", "requirements-llamaindex.txt",
+    "langchain_agent.py",
+    "llamaindex_agent.py",
+    "README.md",
+    "requirements-langchain.txt",
+    "requirements-llamaindex.txt",
   ]) {
     await cp(
       path.resolve(artifactDir, "../../cookbooks/frameworks", filename),
@@ -166,7 +196,7 @@ async function buildAll() {
     sourcemap: "linked",
     plugins: [
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
-      esbuildPluginPino({ transports: ["pino-pretty"] })
+      esbuildPluginPino({ transports: ["pino-pretty"] }),
     ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {

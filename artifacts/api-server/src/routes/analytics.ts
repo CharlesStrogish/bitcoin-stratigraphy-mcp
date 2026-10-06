@@ -36,11 +36,15 @@ export function registerRevenueAnalyticsRoutes(
       const rawLimit =
         typeof req.query.limit === "string" ? Number(req.query.limit) : 100;
       if (!Number.isSafeInteger(rawLimit) || rawLimit < 1 || rawLimit > 500) {
-        res.status(400).json({ error: "limit must be an integer from 1 to 500" });
+        res
+          .status(400)
+          .json({ error: "limit must be an integer from 1 to 500" });
         return;
       }
       try {
-        res.status(200).json({ transactions: await ledger.getRecent(rawLimit) });
+        res
+          .status(200)
+          .json({ transactions: await ledger.getRecent(rawLimit) });
       } catch {
         res.status(503).json({ error: "Revenue audit unavailable" });
       }

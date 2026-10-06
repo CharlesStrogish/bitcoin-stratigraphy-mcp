@@ -96,9 +96,13 @@ export function attenuateSubscriptionMacaroon(
     if (
       !/^allowed_path=\/[^\s]*$/.test(caveat) &&
       !/^max_requests=[1-9]\d*$/.test(caveat) &&
-      !/^time_before=(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/.test(caveat) &&
+      !/^time_before=(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/.test(
+        caveat,
+      ) &&
       !/^max_target=(?:0|[1-9]\d*)$/.test(caveat) &&
-      !/^allowed_tools=[a-z][a-z0-9]*\.[a-z][a-z0-9_]*(?:,[a-z][a-z0-9]*\.[a-z][a-z0-9_]*)*$/.test(caveat)
+      !/^allowed_tools=[a-z][a-z0-9]*\.[a-z][a-z0-9_]*(?:,[a-z][a-z0-9]*\.[a-z][a-z0-9_]*)*$/.test(
+        caveat,
+      )
     ) {
       return null;
     }
@@ -151,9 +155,7 @@ export function verifySubscriptionMacaroon(
   secret: string,
   nowSeconds: number,
   presentingAgent?: Pick<AgentIdentity, "pubkey" | "tier"> | null,
-):
-  | VerifiedSubscriptionMacaroon
-  | null {
+): VerifiedSubscriptionMacaroon | null {
   try {
     const token = decodeMacaroon(encoded);
     if (!token) return null;
@@ -180,26 +182,44 @@ export function verifySubscriptionMacaroon(
         allowedPaths.push(value);
       } else if (key === "max_requests") {
         const limit = Number(value);
-        if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(limit)) return null;
+        if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(limit))
+          return null;
         requestLimits.push(limit);
         meteredScopes.push({
           tokenId: runningSignature.toString("hex"),
           maxRequests: limit,
         });
       } else if (key === "time_before") {
-        if (!/^(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/.test(value)) return null;
-        const parsed = Date.parse(value.length === 10 ? `${value}T00:00:00.000Z` : value);
-        if (!Number.isFinite(parsed) ||
-          new Date(parsed).toISOString() !== (value.length === 10 ? `${value}T00:00:00.000Z` : value)) return null;
+        if (
+          !/^(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/.test(
+            value,
+          )
+        )
+          return null;
+        const parsed = Date.parse(
+          value.length === 10 ? `${value}T00:00:00.000Z` : value,
+        );
+        if (
+          !Number.isFinite(parsed) ||
+          new Date(parsed).toISOString() !==
+            (value.length === 10 ? `${value}T00:00:00.000Z` : value)
+        )
+          return null;
         // A date-only caveat includes that calendar date; timestamps use exclusive bounds.
         const expiry = parsed + (value.length === 10 ? 86_400_000 : 0);
         timeBefore = Math.min(timeBefore ?? expiry, expiry);
       } else if (key === "max_target") {
         const bound = Number(value);
-        if (!/^(?:0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(bound)) return null;
+        if (!/^(?:0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(bound))
+          return null;
         maxTarget = Math.min(maxTarget ?? bound, bound);
       } else if (key === "allowed_tools") {
-        if (!/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*(?:,[a-z][a-z0-9]*\.[a-z][a-z0-9_]*)*$/.test(value)) return null;
+        if (
+          !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*(?:,[a-z][a-z0-9]*\.[a-z][a-z0-9_]*)*$/.test(
+            value,
+          )
+        )
+          return null;
         allowedToolSets.push(value.split(","));
       } else {
         if (
@@ -241,9 +261,9 @@ export function verifySubscriptionMacaroon(
       !/^[0-9a-f]{64}$/.test(paymentHash) ||
       !(tier in SUBSCRIPTION_TIERS) ||
       !Number.isSafeInteger(validUntil) ||
-      validUntil <= nowSeconds
-      || (timeBefore !== undefined && nowSeconds * 1_000 >= timeBefore)
-      || (amountMsatsValue !== undefined &&
+      validUntil <= nowSeconds ||
+      (timeBefore !== undefined && nowSeconds * 1_000 >= timeBefore) ||
+      (amountMsatsValue !== undefined &&
         (!/^[1-9]\d*$/.test(amountMsatsValue) ||
           !Number.isSafeInteger(amountMsats))) ||
       agentCaveats === null ||
@@ -255,7 +275,8 @@ export function verifySubscriptionMacaroon(
           presentingAgent ?? undefined,
         )) ||
       rootValues.size !==
-        3 + (amountMsatsValue === undefined ? 0 : 1) +
+        3 +
+          (amountMsatsValue === undefined ? 0 : 1) +
           (paymentAssetCaveat === undefined ? 0 : 1) +
           (paymentProviderCaveat === undefined ? 0 : 1) +
           (agentCaveats === undefined ? 0 : 2)

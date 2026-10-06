@@ -82,6 +82,7 @@ Query telemetry:
 
 ```py
 from sdk.python.client import BitcoinStratigraphyClient
+
 client = BitcoinStratigraphyClient(wallet=lambda invoice: wallet.pay_invoice(invoice))
 records = client.get_telemetry(date="2026-09-09")["records"]
 print(records[0]["quantitative_alpha"] if records else None)
@@ -91,9 +92,14 @@ Verify a zk-SNARK proof (`proof_payload` and `snapshot` come from your agent):
 
 ```py
 from sdk.python.client import BitcoinStratigraphyClient
+
 client = BitcoinStratigraphyClient(wallet=pay_invoice)
-verified = client.verify_proof(proof_payload["proof"],
-    proof_payload["publicInputs"], proof_payload["verificationKeyId"], snapshot)
+verified = client.verify_proof(
+    proof_payload["proof"],
+    proof_payload["publicInputs"],
+    proof_payload["verificationKeyId"],
+    snapshot,
+)
 print(verified["valid"])
 ```
 
@@ -101,6 +107,7 @@ Broadcast a telemetry snapshot:
 
 ```py
 from sdk.python.client import BitcoinStratigraphyClient
+
 client = BitcoinStratigraphyClient(wallet=pay_invoice)
 receipt = client.broadcast_mesh_signal("2026-09-09")
 print(receipt["peerAttestations"], receipt["snapshotDigest"])

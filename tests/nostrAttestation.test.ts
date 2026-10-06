@@ -52,7 +52,10 @@ test("accepts an nsec secret and signs only the unsigned payload", () => {
   });
 
   assert.deepEqual(JSON.parse(attached.attestation.event.content), payload);
-  assert.equal("attestation" in JSON.parse(attached.attestation.event.content), false);
+  assert.equal(
+    "attestation" in JSON.parse(attached.attestation.event.content),
+    false,
+  );
   assert.equal(verifyEvent(attached.attestation.event), true);
 });
 
@@ -88,17 +91,16 @@ test("content cache re-signs mutations without changing prior payloads", () => {
 
   assert.notEqual(first.attestation.event.id, second.attestation.event.id);
   assert.equal(
-    (JSON.parse(first.attestation.event.content) as typeof mutable).block.height,
+    (JSON.parse(first.attestation.event.content) as typeof mutable).block
+      .height,
     920_000,
   );
   assert.equal(
-    (JSON.parse(second.attestation.event.content) as typeof mutable).block.height,
+    (JSON.parse(second.attestation.event.content) as typeof mutable).block
+      .height,
     920_001,
   );
-  assert.equal(
-    (first as typeof mutable).block.height,
-    920_000,
-  );
+  assert.equal((first as typeof mutable).block.height, 920_000);
   assert.equal(verifyEvent(second.attestation.event), true);
 });
 

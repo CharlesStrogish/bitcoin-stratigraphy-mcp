@@ -49,11 +49,7 @@ export function signTelemetryPayload(
   if (!privateKey) {
     throw new Error("NOSTR_PRIVATE_KEY is not configured");
   }
-  return signWithKey(
-    payload,
-    parsePrivateKey(privateKey),
-    options.createdAt,
-  );
+  return signWithKey(payload, parsePrivateKey(privateKey), options.createdAt);
 }
 
 export async function publishNip78Attestation(
@@ -118,7 +114,9 @@ export function createNostrAttestor(
     };
     const serialized = JSON.stringify(unsigned);
     if (serialized === undefined) {
-      throw new TypeError("Nostr attestation payload must be JSON serializable");
+      throw new TypeError(
+        "Nostr attestation payload must be JSON serializable",
+      );
     }
     const detached = JSON.parse(serialized) as T;
     return {
@@ -142,7 +140,9 @@ export function createCachedNostrAttestor(
     };
     const serialized = JSON.stringify(unsigned);
     if (serialized === undefined) {
-      throw new TypeError("Nostr attestation payload must be JSON serializable");
+      throw new TypeError(
+        "Nostr attestation payload must be JSON serializable",
+      );
     }
     const cached = cache.get(serialized);
     if (cached && cached.createdAt === createdAt) {

@@ -1,9 +1,9 @@
 # Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 # Dual-licensed under AGPLv3 and Commercial terms.
 """Offline compliance-cookbook tests; real OTS serialization, no payments/models."""
+
 import hashlib
 import json
-import os
 import tempfile
 import threading
 import unittest
@@ -14,8 +14,12 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from cookbooks.article_12_compliance import (
-    Article12NotaryCallback, MacroNotarizer, MissingBatchCredential,
-    canonical_json, sha256, validated_receipt,
+    Article12NotaryCallback,
+    MacroNotarizer,
+    MissingBatchCredential,
+    canonical_json,
+    sha256,
+    validated_receipt,
 )
 from cookbooks.article_12_journal import AuditJournal
 from opentimestamps.core.notary import PendingAttestation
@@ -28,10 +32,16 @@ from sdk.python.client import BitcoinStratigraphyClient
 def pending_receipt(digest):
     # Genuine OTS format; SYNTHETIC pending attestation, not a real calendar proof.
     receipt = DetachedTimestampFile(OpSHA256(), Timestamp(bytes.fromhex(digest)))
-    receipt.timestamp.attestations.add(PendingAttestation("https://calendar.example.com"))
+    receipt.timestamp.attestations.add(
+        PendingAttestation("https://calendar.example.com")
+    )
     context = BytesSerializationContext()
     receipt.serialize(context)
-    return {"hash": digest, "otsProofHex": context.getbytes().hex(), "otsStatus": "pending_calendar"}
+    return {
+        "hash": digest,
+        "otsProofHex": context.getbytes().hex(),
+        "otsStatus": "pending_calendar",
+    }
 
 
 class FakeNotarizer:
@@ -56,17 +66,33 @@ class Article12Tests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
 
     def callback(self, notarizer=None, **kwargs):
-        return Article12NotaryCallback(journal_path=self.path,
-                                      notarizer=notarizer or FakeNotarizer(), **kwargs)
+        return Article12NotaryCallback(
+            journal_path=self.path, notarizer=notarizer or FakeNotarizer(), **kwargs
+        )
 
     def test_complete_footprint_canonical_hash_receipt_and_duplicate_finish(self):
         notary = FakeNotarizer()
         with self.callback(notary, session_id="session-1", agent_id="assessor") as cb:
             run_id, tool_id = uuid4(), uuid4()
-            cb.on_chain_start({}, {"query": "Assess synthetic borrower", "region": "EU"}, run_id=run_id)
-            cb.on_agent_action(SimpleNamespace(tool="ratio", tool_input={"income": 100},
-                                               log="Exposed scratchpad explanation"), run_id=run_id)
-            cb.on_tool_start({"name": "ratio"}, '{"income":100}', run_id=tool_id, parent_run_id=run_id)
+            cb.on_chain_start(
+                {},
+                {"query": "Assess synthetic borrower", "region": "EU"},
+                run_id=run_id,
+            )
+            cb.on_agent_action(
+                SimpleNamespace(
+                    tool="ratio",
+                    tool_input={"income": 100},
+                    log="Exposed scratchpad explanation",
+                ),
+                run_id=run_id,
+            )
+            cb.on_tool_start(
+                {"name": "ratio"},
+                '{"income":100}',
+                run_id=tool_id,
+                parent_run_id=run_id,
+            )
             cb.on_tool_end({"ratio": 0.1}, run_id=tool_id, parent_run_id=run_id)
             response = {"output": "Refer to a human", "metadata": {"provider": "mock"}}
             cb.on_agent_finish(SimpleNamespace(return_values=response), run_id=run_id)
@@ -77,14 +103,22 @@ class Article12Tests(unittest.TestCase):
         traces = [r for r in records if r["kind"] == "trace"]
         self.assertEqual(len(traces), 1)
         trace = traces[0]["trace"]
-        self.assertEqual(metadata["hash"], hashlib.sha256(canonical_json(trace)).hexdigest())
+        self.assertEqual(
+            metadata["hash"], hashlib.sha256(canonical_json(trace)).hexdigest()
+        )
         self.assertEqual(trace["input_query"], "Assess synthetic borrower")
         self.assertEqual(trace["inputs"]["region"], "EU")
         self.assertEqual(trace["session_id"], "session-1")
         self.assertEqual(trace["agent_id"], "assessor")
         self.assertTrue(trace["timestamp_utc"].endswith("Z"))
-        self.assertEqual([e["event"] for e in trace["events"]], ["agent_action", "tool_start", "tool_end"])
-        self.assertEqual(trace["events"][0]["data"]["scratchpad_log"], "Exposed scratchpad explanation")
+        self.assertEqual(
+            [e["event"] for e in trace["events"]],
+            ["agent_action", "tool_start", "tool_end"],
+        )
+        self.assertEqual(
+            trace["events"][0]["data"]["scratchpad_log"],
+            "Exposed scratchpad explanation",
+        )
         self.assertEqual(trace["final_response"]["output"], "Refer to a human")
         self.assertNotIn("article_12_notarization", trace["final_response"]["metadata"])
         self.assertEqual(notary.calls, [metadata["hash"]])
@@ -93,8 +127,12 @@ class Article12Tests(unittest.TestCase):
         self.assertTrue(metadata["otsProofHex"])
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
 
-    def test_network_failure_persists_and_explicit_uncertain_replay_preserves_hash(self):
-        with self.callback(FakeNotarizer(error=TimeoutError("DO NOT LOG THIS SECRET"))) as cb:
+    def test_network_failure_persists_and_explicit_uncertain_replay_preserves_hash(
+        self,
+    ):
+        with self.callback(
+            FakeNotarizer(error=TimeoutError("DO NOT LOG THIS SECRET"))
+        ) as cb:
             run = cb.start_run("query")
             metadata = cb.finish_run(run, {"output": "done"})
             cb.flush()
@@ -162,12 +200,15 @@ class Article12Tests(unittest.TestCase):
     def test_real_langchain_runnable_attaches_response_metadata(self):
         from langchain_core.callbacks import BaseCallbackHandler
         from langchain_core.runnables import RunnableLambda
+
         with self.callback() as cb:
             self.assertIsInstance(cb, BaseCallbackHandler)
             agent = RunnableLambda(lambda value: {"output": value["input"].upper()})
             result = agent.invoke({"input": "demo"}, config={"callbacks": [cb]})
             cb.flush()
-            self.assertEqual(result["metadata"]["article_12_notarization"]["status"], "notarized")
+            self.assertEqual(
+                result["metadata"]["article_12_notarization"]["status"], "notarized"
+            )
 
     def test_chain_errors_are_audited_without_exception_text(self):
         with self.callback() as cb:
@@ -175,7 +216,9 @@ class Article12Tests(unittest.TestCase):
             cb.on_chain_start({}, {"input": "failure"}, run_id=run)
             cb.on_chain_error(RuntimeError("sensitive diagnostic"), run_id=run)
             cb.flush()
-            trace = next(r["trace"] for r in cb.journal.records() if r["kind"] == "trace")
+            trace = next(
+                r["trace"] for r in cb.journal.records() if r["kind"] == "trace"
+            )
             self.assertEqual(trace["final_response"]["error_type"], "RuntimeError")
         self.assertNotIn("sensitive diagnostic", self.path.read_text())
 
@@ -246,7 +289,14 @@ class Article12Tests(unittest.TestCase):
     def test_atomic_claim_does_not_duplicate_active_attempt(self):
         journal = AuditJournal(self.path)
         trace = {"input": "query"}
-        journal.append({"kind": "trace", "trace_id": "trace", "trace_hash": sha256(trace), "trace": trace})
+        journal.append(
+            {
+                "kind": "trace",
+                "trace_id": "trace",
+                "trace_hash": sha256(trace),
+                "trace": trace,
+            }
+        )
         self.assertTrue(journal.claim("trace", sha256(trace)))
         self.assertFalse(journal.claim("trace", sha256(trace)))
         self.assertFalse(journal.claim("trace", sha256(trace), retry_uncertain=True))
@@ -257,11 +307,27 @@ class Article12Tests(unittest.TestCase):
 
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self):
-                request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                seen.append((self.headers.get("X-L402-Batch-Size"),
-                             self.headers.get("Authorization"), request["params"]))
-                data = json.dumps({"jsonrpc": "2.0", "id": request["id"],
-                                   "result": {"structuredContent": pending_receipt(request["params"]["arguments"]["hash"])}}).encode()
+                request = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"]))
+                )
+                seen.append(
+                    (
+                        self.headers.get("X-L402-Batch-Size"),
+                        self.headers.get("Authorization"),
+                        request["params"],
+                    )
+                )
+                data = json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request["id"],
+                        "result": {
+                            "structuredContent": pending_receipt(
+                                request["params"]["arguments"]["hash"]
+                            )
+                        },
+                    }
+                ).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
@@ -275,11 +341,21 @@ class Article12Tests(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            notary = MacroNotarizer(f"http://127.0.0.1:{server.server_port}/mcp", authorization)
+            notary = MacroNotarizer(
+                f"http://127.0.0.1:{server.server_port}/mcp", authorization
+            )
             result = notary.notarize("ab" * 32)
             self.assertEqual(result["hash"], "ab" * 32)
-            self.assertEqual(seen, [("100", authorization,
-                                    {"name": "proof.notarize", "arguments": {"hash": "ab" * 32}})])
+            self.assertEqual(
+                seen,
+                [
+                    (
+                        "100",
+                        authorization,
+                        {"name": "proof.notarize", "arguments": {"hash": "ab" * 32}},
+                    )
+                ],
+            )
         finally:
             server.shutdown()
             server.server_close()
@@ -287,7 +363,9 @@ class Article12Tests(unittest.TestCase):
 
     def test_transport_rejects_header_injection_and_credentials_in_urls(self):
         with self.assertRaises(ValueError):
-            BitcoinStratigraphyClient(headers={"Authorization": "bad\r\nX-Test: injected"})
+            BitcoinStratigraphyClient(
+                headers={"Authorization": "bad\r\nX-Test: injected"}
+            )
         with self.assertRaises(ValueError):
             BitcoinStratigraphyClient(headers={"Host": "attacker.example"})
         with self.assertRaises(ValueError):

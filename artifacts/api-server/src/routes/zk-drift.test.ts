@@ -16,7 +16,11 @@ const proofResult = {
   proof: {
     circuit: "zk.drift.v1" as const,
     pi_a: ["1", "2", "1"],
-    pi_b: [["1", "2"], ["3", "4"], ["1", "0"]],
+    pi_b: [
+      ["1", "2"],
+      ["3", "4"],
+      ["1", "0"],
+    ],
     pi_c: ["5", "6", "1"],
     publicSignals: ["1", "2"],
     verificationKeyId: "zk-drift-test",
@@ -47,8 +51,9 @@ async function serve(app: ReturnType<typeof express>): Promise<string> {
 
 function makeApp(
   generateDriftProof: Parameters<typeof registerZkDriftRoute>[1] extends
-    | { generateDriftProof?: infer T }
-    | undefined ? NonNullable<T> : never,
+    { generateDriftProof?: infer T } | undefined
+    ? NonNullable<T>
+    : never,
 ) {
   const app = express();
   app.use(express.json({ limit: "8kb" }));
@@ -58,10 +63,12 @@ function makeApp(
 
 test("POST /api/zk/drift validates input and returns the proof result", async () => {
   const calls: unknown[] = [];
-  const baseUrl = await serve(makeApp(async (input, options) => {
-    calls.push({ input, options });
-    return proofResult;
-  }));
+  const baseUrl = await serve(
+    makeApp(async (input, options) => {
+      calls.push({ input, options });
+      return proofResult;
+    }),
+  );
 
   const response = await fetch(`${baseUrl}/api/zk/drift`, {
     method: "POST",
@@ -73,14 +80,16 @@ test("POST /api/zk/drift validates input and returns the proof result", async ()
     }),
   });
   assert.equal(response.status, 200);
-  assert.deepEqual(calls, [{
-    input: {
-      sessionContextHash: hash,
-      blockHeight: "840000",
-      entropyThreshold: 0.9,
+  assert.deepEqual(calls, [
+    {
+      input: {
+        sessionContextHash: hash,
+        blockHeight: "840000",
+        entropyThreshold: 0.9,
+      },
+      options: {},
     },
-    options: {},
-  }]);
+  ]);
   assert.deepEqual(await response.json(), {
     ...proofResult,
     entropyInterpretation:
@@ -92,17 +101,22 @@ test("POST /api/zk/drift validates input and returns the proof result", async ()
 
 test("POST /api/zk/drift rejects malformed and unknown input without invoking proof generation", async () => {
   let calls = 0;
-  const baseUrl = await serve(makeApp(async () => {
-    calls += 1;
-    return proofResult;
-  }));
+  const baseUrl = await serve(
+    makeApp(async () => {
+      calls += 1;
+      return proofResult;
+    }),
+  );
   const invalidBodies = [
     { sessionContextHash: "0x" + hash },
     { sessionContextHash: hash, blockHeight: "01" },
     { sessionContextHash: hash, blockHeight: -1 },
     { sessionContextHash: hash, blockHeight: 4_294_967_296 },
     { sessionContextHash: hash, blockHeight: "4294967296" },
-    { sessionContextHash: hash, blockHeight: "999999999999999999999999999999999999999" },
+    {
+      sessionContextHash: hash,
+      blockHeight: "999999999999999999999999999999999999999",
+    },
     { sessionContextHash: hash, entropyThreshold: 1.1 },
     { sessionContextHash: hash, entropyThreshold: "0.85" },
     { sessionContextHash: hash, anotherField: true },
@@ -123,10 +137,12 @@ test("POST /api/zk/drift rejects malformed and unknown input without invoking pr
 
 test("latest-block requests default correctly and uint32 maximum is accepted", async () => {
   const inputs: unknown[] = [];
-  const baseUrl = await serve(makeApp(async (input) => {
-    inputs.push(input);
-    return proofResult;
-  }));
+  const baseUrl = await serve(
+    makeApp(async (input) => {
+      inputs.push(input);
+      return proofResult;
+    }),
+  );
 
   const latest = await fetch(`${baseUrl}/api/zk/drift`, {
     method: "POST",
@@ -138,19 +154,28 @@ test("latest-block requests default correctly and uint32 maximum is accepted", a
   const maximumHeight = await fetch(`${baseUrl}/api/zk/drift`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ sessionContextHash: hash, blockHeight: "4294967295" }),
+    body: JSON.stringify({
+      sessionContextHash: hash,
+      blockHeight: "4294967295",
+    }),
   });
   assert.equal(maximumHeight.status, 200);
   assert.deepEqual(inputs, [
     { sessionContextHash: hash, entropyThreshold: 0.85 },
-    { sessionContextHash: hash, blockHeight: "4294967295", entropyThreshold: 0.85 },
+    {
+      sessionContextHash: hash,
+      blockHeight: "4294967295",
+      entropyThreshold: 0.85,
+    },
   ]);
 });
 
 test("provider failures return 503 and a full proof queue returns 429", async () => {
-  const unavailableUrl = await serve(makeApp(async () => {
-    throw new Error("provider offline");
-  }));
+  const unavailableUrl = await serve(
+    makeApp(async () => {
+      throw new Error("provider offline");
+    }),
+  );
   const unavailable = await fetch(`${unavailableUrl}/api/zk/drift`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -163,17 +188,21 @@ test("provider failures return 503 and a full proof queue returns 429", async ()
   const bothProofsStarted = new Promise<void>((resolve) => {
     resolveBothStarted = resolve;
   });
-  const queuedUrl = await serve(makeApp(() =>
-    new Promise<typeof proofResult>((resolve) => {
-      releaseProofs.push(resolve);
-      if (releaseProofs.length === 2) resolveBothStarted();
-    }),
-  ));
-  const request = () => fetch(`${queuedUrl}/api/zk/drift`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ sessionContextHash: hash }),
-  });
+  const queuedUrl = await serve(
+    makeApp(
+      () =>
+        new Promise<typeof proofResult>((resolve) => {
+          releaseProofs.push(resolve);
+          if (releaseProofs.length === 2) resolveBothStarted();
+        }),
+    ),
+  );
+  const request = () =>
+    fetch(`${queuedUrl}/api/zk/drift`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionContextHash: hash }),
+    });
   const first = request();
   const second = request();
   await bothProofsStarted;
@@ -188,11 +217,12 @@ test("provider failures return 503 and a full proof queue returns 429", async ()
 
 test("repeated proof requests are rate limited", async () => {
   const baseUrl = await serve(makeApp(async () => proofResult));
-  const request = () => fetch(`${baseUrl}/api/zk/drift`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ sessionContextHash: hash }),
-  });
+  const request = () =>
+    fetch(`${baseUrl}/api/zk/drift`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionContextHash: hash }),
+    });
 
   for (let attempt = 0; attempt < 10; attempt += 1) {
     assert.equal((await request()).status, 200);

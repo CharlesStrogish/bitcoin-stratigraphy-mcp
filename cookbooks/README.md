@@ -339,7 +339,9 @@ or dependency installation is added by this cookbook:
 ```python
 run_id = audit.start_run(query, agent_id="crew-financial-assessment")
 # Within the crew's step/tool callback:
-audit.record_event(run_id, "crew_step", {"tool": tool_name, "input": tool_input, "output": tool_output})
+audit.record_event(
+    run_id, "crew_step", {"tool": tool_name, "input": tool_input, "output": tool_output}
+)
 result = crew.kickoff(inputs={"query": query})
 response = {"output": result.raw}
 audit.finish_run(run_id, response)
@@ -617,18 +619,22 @@ import json
 from cookbooks.swarm_flight_recorder import SwarmFlightRecorder, verify_inclusion_proof
 
 recorder = SwarmFlightRecorder()  # Pass a prepaid notarizer explicitly for production.
-index = recorder.record_trace({
-    "agent_id": "procurement-agent",
-    "decision_summary": "Vendor approval blocked pending privacy review",
-    "tool_call": {"name": "check_vendor_policy", "outcome": "blocked"},
-    "context": {"policy_version": "corporate-approved-version"},
-})
+index = recorder.record_trace(
+    {
+        "agent_id": "procurement-agent",
+        "decision_summary": "Vendor approval blocked pending privacy review",
+        "tool_call": {"name": "check_vendor_policy", "outcome": "blocked"},
+        "context": {"policy_version": "corporate-approved-version"},
+    }
+)
 receipt = recorder.flush_root()
 proof = recorder.generate_inclusion_proof(index)
 bundle = recorder.export_disclosure(index)
 # Use your approved private evidence store, not a public logs bucket.
 report = verify_inclusion_proof(
-    bundle["trace"], proof, receipt,
+    bundle["trace"],
+    proof,
+    receipt,
     expected_recorder_key=recorder.public_key,  # Auditor must independently enroll it.
 )
 ```

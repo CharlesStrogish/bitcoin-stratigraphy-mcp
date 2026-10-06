@@ -1,8 +1,4 @@
-import {
-  SimplePool,
-  type Event,
-  type Filter,
-} from "nostr-tools";
+import { SimplePool, type Event, type Filter } from "nostr-tools";
 import type { RelayConnectionStatus } from "./announcer";
 
 export type RelayCircuitState = "CLOSED" | "OPEN" | "HALF-OPEN";
@@ -286,7 +282,9 @@ export function createAutoHealingRelayPool(options: {
     },
     async publish(event) {
       if (closed) throw new Error("Relay pool is closed");
-      const outcomes = await Promise.all(relays.map((relay) => attempt(relay, event)));
+      const outcomes = await Promise.all(
+        relays.map((relay) => attempt(relay, event)),
+      );
       if (!outcomes.some(Boolean)) {
         throw new Error("No configured Nostr relay accepted the event");
       }

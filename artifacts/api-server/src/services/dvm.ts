@@ -4,14 +4,10 @@ import {
   getPublicKey,
   verifyEvent,
   type Event,
-  type EventTemplate,
   type Filter,
 } from "nostr-tools";
 import { logger } from "../lib/logger";
-import {
-  DEFAULT_NOSTR_RELAYS,
-  parsePrivateKey,
-} from "./nostrAttestation";
+import { DEFAULT_NOSTR_RELAYS, parsePrivateKey } from "./nostrAttestation";
 import {
   createDefaultSettlementRouter,
   createNwcClient,
@@ -29,21 +25,18 @@ import {
   recordRevenueWithRetry,
   type RevenueLedger,
 } from "./ledger";
-import {
-  createPricingEngine,
-  type PricingEngine,
-} from "./pricing";
+import { createPricingEngine, type PricingEngine } from "./pricing";
 import {
   createSlidingWindowRateLimiter,
   type SlidingWindowRateLimiter,
 } from "../middleware/rateLimiter";
-import {
-  runtimePricingLoad,
-  updateDvmRuntime,
-} from "./orchestrator";
+import { runtimePricingLoad, updateDvmRuntime } from "./orchestrator";
 import { createNostrRelayPool } from "./relayPool";
 
-const JOB_REQUEST_KINDS = Array.from({ length: 991 }, (_, index) => 5_000 + index);
+const JOB_REQUEST_KINDS = Array.from(
+  { length: 991 },
+  (_, index) => 5_000 + index,
+);
 const DEFAULT_INVOICE_EXPIRY_SECONDS = 3_600;
 const DEFAULT_SETTLEMENT_POLL_MS = 1_000;
 const DEFAULT_MAX_CONCURRENT_JOBS = 4;
@@ -52,10 +45,7 @@ const MAX_SEEN_REQUESTS = 10_000;
 
 type DvmCapability = "stratigraphy" | "zk-proof";
 type DvmFeedbackStatus =
-  | "payment-required"
-  | "processing"
-  | "success"
-  | "error";
+  "payment-required" | "processing" | "success" | "error";
 
 export type DvmConfig = {
   privateKey: Uint8Array;
@@ -141,20 +131,20 @@ function relayList(raw: string | undefined): string[] {
   return [...new Set(relays)];
 }
 
-export function loadDvmConfig(
-  env: NodeJS.ProcessEnv = process.env,
-): DvmConfig {
+export function loadDvmConfig(env: NodeJS.ProcessEnv = process.env): DvmConfig {
   const configuredKey = env.NOSTR_PRIVATE_KEY?.trim();
   const fallbackSecret = env.SESSION_SECRET?.trim();
   if (!configuredKey && !fallbackSecret) {
-    throw new Error("NOSTR_PRIVATE_KEY or SESSION_SECRET is required for the NIP-90 DVM");
+    throw new Error(
+      "NOSTR_PRIVATE_KEY or SESSION_SECRET is required for the NIP-90 DVM",
+    );
   }
   // A public, hard-coded seed would let anyone impersonate the DVM.
   const privateKey = configuredKey
     ? parsePrivateKey(configuredKey)
     : createHmac("sha256", fallbackSecret!)
-      .update("bitcoin-stratigraphy/nostr-dvm-key/v1")
-      .digest();
+        .update("bitcoin-stratigraphy/nostr-dvm-key/v1")
+        .digest();
   return {
     privateKey,
     publicKey: getPublicKey(privateKey),
@@ -192,9 +182,7 @@ export function loadDvmConfig(
   };
 }
 
-export function createNostrDvmTransport(
-  relays: string[],
-): DvmTransport {
+export function createNostrDvmTransport(relays: string[]): DvmTransport {
   return createNostrRelayPool(relays);
 }
 
@@ -371,13 +359,13 @@ async function defaultStratigraphyQuery(input: Record<string, unknown>) {
 }
 
 async function defaultProofVerification(input: Record<string, unknown>) {
-  const { verifyZkProof, verifyZkProofForSnapshot } = await import(
-    "./zkProofService"
-  );
+  const { verifyZkProof, verifyZkProofForSnapshot } =
+    await import("./zkProofService");
   const startedAt = performance.now();
-  const valid = input.data === undefined
-    ? await verifyZkProof(input)
-    : await verifyZkProofForSnapshot(input, input.data);
+  const valid =
+    input.data === undefined
+      ? await verifyZkProof(input)
+      : await verifyZkProofForSnapshot(input, input.data);
   return {
     valid,
     verifiedAt: new Date().toISOString(),
@@ -410,10 +398,12 @@ export function createNip90Dvm(
   const verifyProof = dependencies.verifyProof ?? defaultProofVerification;
   const now = dependencies.now ?? Date.now;
   const ledger = dependencies.ledger;
-  const pricingEngine = dependencies.pricingEngine ?? createPricingEngine({
-    loadProvider: runtimePricingLoad,
-    maxLoadMultiplier: Number(process.env.DYNAMIC_FEE_MAX_MULTIPLIER) || 3,
-  });
+  const pricingEngine =
+    dependencies.pricingEngine ??
+    createPricingEngine({
+      loadProvider: runtimePricingLoad,
+      maxLoadMultiplier: Number(process.env.DYNAMIC_FEE_MAX_MULTIPLIER) || 3,
+    });
   const rateLimiter =
     dependencies.rateLimiter ??
     createSlidingWindowRateLimiter({
@@ -491,18 +481,18 @@ export function createNip90Dvm(
     );
   };
 
-  const processRequest = async (
-    request: Event,
-    capability: DvmCapability,
-  ) => {
-    const baseFeeSats = request.kind === 5_050
-      ? NIP90_5050_FEE_SATS
-      : capability === "stratigraphy"
-        ? config.stratigraphyFeeSats
-        : config.proofFeeSats;
-    const loadMultiplier = request.kind === 5_050
-      ? 1
-      : pricingEngine.jobQuote?.(capability, runtimePricingLoad()).multiplier ?? 1;
+  const processRequest = async (request: Event, capability: DvmCapability) => {
+    const baseFeeSats =
+      request.kind === 5_050
+        ? NIP90_5050_FEE_SATS
+        : capability === "stratigraphy"
+          ? config.stratigraphyFeeSats
+          : config.proofFeeSats;
+    const loadMultiplier =
+      request.kind === 5_050
+        ? 1
+        : (pricingEngine.jobQuote?.(capability, runtimePricingLoad())
+            .multiplier ?? 1);
     const feeSats = Math.ceil(baseFeeSats * loadMultiplier);
     const amountMsats = feeSats * 1_000;
     const bid = requestedBid(request);
@@ -592,9 +582,10 @@ export function createNip90Dvm(
     await publishFeedback(request, "processing");
     try {
       const input = parseDvmRequest(request);
-      const result = capability === "stratigraphy"
-        ? await queryStratigraphy(input)
-        : await verifyProof(input);
+      const result =
+        capability === "stratigraphy"
+          ? await queryStratigraphy(input)
+          : await verifyProof(input);
       await publishResult(request, result, invoice);
       await publishFeedback(request, "success");
     } finally {
@@ -644,9 +635,7 @@ export function createNip90Dvm(
       return;
     }
     rememberRequest(event.id);
-    if (
-      admittedJobs >= config.maxPendingPayments + config.maxConcurrentJobs
-    ) {
+    if (admittedJobs >= config.maxPendingPayments + config.maxConcurrentJobs) {
       await publishFeedback(
         event,
         "error",
@@ -660,9 +649,8 @@ export function createNip90Dvm(
       await processRequest(event, capability);
     } catch (error) {
       if (!abortController.signal.aborted) {
-        const message = error instanceof Error
-          ? error.message
-          : "Unable to execute DVM job";
+        const message =
+          error instanceof Error ? error.message : "Unable to execute DVM job";
         logger.warn({ err: error, eventId: event.id }, "NIP-90 job failed");
         try {
           await publishFeedback(event, "error", message);
@@ -681,10 +669,7 @@ export function createNip90Dvm(
 
   function rememberRequest(eventId: string) {
     seen.delete(eventId);
-    seen.set(
-      eventId,
-      now() + config.invoiceExpirySeconds * 1_000 + 5 * 60_000,
-    );
+    seen.set(eventId, now() + config.invoiceExpirySeconds * 1_000 + 5 * 60_000);
     while (seen.size > MAX_SEEN_REQUESTS) {
       const oldest = seen.keys().next();
       if (oldest.done) break;

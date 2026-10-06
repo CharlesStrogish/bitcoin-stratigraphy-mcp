@@ -7,11 +7,7 @@ import {
   VerifyZkProofBody,
   VerifyZkProofResponse,
 } from "@workspace/api-zod";
-import {
-  type Express,
-  type Request,
-  type Response,
-} from "express";
+import { type Express, type Request, type Response } from "express";
 import { createL402Middleware } from "../middleware/l402";
 import { quoteMcpTools } from "../lib/mcp-pricing";
 import {
@@ -21,7 +17,10 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { buildProvenanceChain, type ProvenanceSourceRecord } from "../services/provenanceChain";
+import {
+  buildProvenanceChain,
+  type ProvenanceSourceRecord,
+} from "../services/provenanceChain";
 import { persistProvenancePrefix } from "../services/provenancePersistence";
 import { fileURLToPath } from "node:url";
 import {
@@ -44,15 +43,11 @@ import {
   createMemoryMacaroonRevocationStore,
   type MacaroonRevocationStore,
 } from "../lib/macaroon-revocation-store";
-import {
-  createPricingEngine,
-  type PricingEngine,
-} from "../services/pricing";
+import { createPricingEngine, type PricingEngine } from "../services/pricing";
 import {
   createNwcClient,
   type NwcClientFactory,
   type SettlementRouter,
-  SETTLEMENT_ASSETS,
   type SettlementAsset,
 } from "../services/settlement";
 import {
@@ -79,7 +74,6 @@ import {
 } from "../services/agentReputation";
 import {
   generateZkProof,
-  verifyZkProof,
   verifyZkProofForSnapshot,
   ZkVerifierOverloadedError,
 } from "../services/zkProofService";
@@ -174,7 +168,7 @@ function difficultyEpochProgress(day: unknown) {
   if (typeof day !== "number" || !Number.isInteger(day) || day < 1) {
     return "0.00%";
   }
-  return `${((((day - 1) % 14) + 1) / 14 * 100).toFixed(2)}%`;
+  return `${(((((day - 1) % 14) + 1) / 14) * 100).toFixed(2)}%`;
 }
 
 function thermodynamicSignal(multiplier: number) {
@@ -240,7 +234,9 @@ async function readValidatedDataset() {
       chain.records[421].stratumHash !==
         "771b391c5621ab422c60e94cf07edcf7b98e06ddf8eddaa807ded2e5c2141246")
   ) {
-    throw new Error("Canonical provenance baseline has been rewritten or truncated");
+    throw new Error(
+      "Canonical provenance baseline has been rewritten or truncated",
+    );
   }
   const validated = GetPaidStratigraphyResponse.shape.data.parse(
     chain?.records ?? supplied,
@@ -418,9 +414,10 @@ function selectRange(req: Request, dataset: Dataset): SelectedRange | string {
 function parseL402Authorization(value: string | undefined) {
   if (!value) return null;
 
-  const match = /^L402\s+([^:\s]+):([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$/.exec(
-    value.trim(),
-  );
+  const match =
+    /^L402\s+([^:\s]+):([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$/.exec(
+      value.trim(),
+    );
   if (!match) return null;
 
   return /^[0-9a-fA-F]{64}$/.test(match[1])
@@ -543,9 +540,7 @@ async function sendPaidDataset(
   const attestedRecords = records.map((record) => attest(record, createdAt));
   const proofTimestamp =
     Math.max(
-      ...attestedRecords.map(
-        (record) => record.attestation.event.created_at,
-      ),
+      ...attestedRecords.map((record) => record.attestation.event.created_at),
     ) * 1_000;
   let zkProof;
   try {
@@ -570,7 +565,11 @@ async function sendPaidDataset(
     }
     throw error;
   }
-  const body = JSON.stringify({ data: attestedRecords, zkProof, meshConsensus });
+  const body = JSON.stringify({
+    data: attestedRecords,
+    zkProof,
+    meshConsensus,
+  });
   const payloadSha256 = createHash("sha256").update(body).digest("hex");
   const timestamp = new Date(timestampMs).toISOString();
   const signature = createHmac("sha256", secret)
@@ -611,9 +610,7 @@ async function sendPaymentChallenge(
           ...policy,
           maxInvoicesPerWindow: Math.max(
             1,
-            Math.floor(
-              policy.maxInvoicesPerWindow * agent.rateLimitMultiplier,
-            ),
+            Math.floor(policy.maxInvoicesPerWindow * agent.rateLimitMultiplier),
           ),
         }
       : policy;
@@ -622,8 +619,7 @@ async function sendPaymentChallenge(
       challengeAmountMsats: number,
       challengeDescription: string,
     ) => {
-      const providerScope =
-        `${scope}${agentScope}:asset:${paymentAsset}:settlement:${settlementRouter.activeProvider(paymentAsset)}`;
+      const providerScope = `${scope}${agentScope}:asset:${paymentAsset}:settlement:${settlementRouter.activeProvider(paymentAsset)}`;
       return challengeStore.getOrCreate(
         caller,
         providerScope,
@@ -709,46 +705,43 @@ async function sendPaymentChallenge(
     }
     const passes = passResults.map(
       ({ tier, definition, pricing, adjustedPricing, amountMsats, result }) => {
-      if (result.kind !== "challenge") throw new Error("unreachable");
-      const validUntil =
-        Math.floor(result.challenge.issuedAt / 1000) +
-        60 * 60 +
-        definition.durationSeconds;
-      return {
-        tier,
-        invoice: result.challenge.invoice,
-        payment_hash: result.challenge.paymentHash,
-        macaroon: createSubscriptionMacaroon({
-          secret,
-          paymentHash: result.challenge.paymentHash,
+        if (result.kind !== "challenge") throw new Error("unreachable");
+        const validUntil =
+          Math.floor(result.challenge.issuedAt / 1000) +
+          60 * 60 +
+          definition.durationSeconds;
+        return {
           tier,
-          validUntil,
-          amountMsats,
-           paymentAsset,
-           paymentProvider: result.challenge.provider,
-          agentIdentity: agent,
-        }),
-        valid_until: validUntil,
-        price_sats: adjustedPricing.priceSats,
-        original_price_sats: pricing.priceSats,
-        discount_sats: adjustedPricing.discountSats,
-        discount_percent: adjustedPricing.discountPercent,
-        agent_tier: adjustedPricing.tier,
-        payment_asset: paymentAsset,
-      };
+          invoice: result.challenge.invoice,
+          payment_hash: result.challenge.paymentHash,
+          macaroon: createSubscriptionMacaroon({
+            secret,
+            paymentHash: result.challenge.paymentHash,
+            tier,
+            validUntil,
+            amountMsats,
+            paymentAsset,
+            paymentProvider: result.challenge.provider,
+            agentIdentity: agent,
+          }),
+          valid_until: validUntil,
+          price_sats: adjustedPricing.priceSats,
+          original_price_sats: pricing.priceSats,
+          discount_sats: adjustedPricing.discountSats,
+          discount_percent: adjustedPricing.discountPercent,
+          agent_tier: adjustedPricing.tier,
+          payment_asset: paymentAsset,
+        };
       },
     );
 
-    res.setHeader(
-      "WWW-Authenticate",
-      [
-        `L402 macaroon="${legacyResult.challenge.paymentHash}", invoice="${legacyResult.challenge.invoice}"`,
-        ...passes.map(
-          (pass) =>
-            `L402 macaroon="${pass.macaroon}", invoice="${pass.invoice}", tier="${pass.tier}", price_sats="${pass.price_sats}", agent_tier="${pass.agent_tier}"`,
-        ),
-      ],
-    );
+    res.setHeader("WWW-Authenticate", [
+      `L402 macaroon="${legacyResult.challenge.paymentHash}", invoice="${legacyResult.challenge.invoice}"`,
+      ...passes.map(
+        (pass) =>
+          `L402 macaroon="${pass.macaroon}", invoice="${pass.invoice}", tier="${pass.tier}", price_sats="${pass.price_sats}", agent_tier="${pass.agent_tier}"`,
+      ),
+    ]);
     res.setHeader("Cache-Control", "no-store");
     res.status(402).json({
       invoice: legacyResult.challenge.invoice,
@@ -782,11 +775,11 @@ export function registerStratigraphyRoutes(
   policy: ChallengePolicy = defaultChallengePolicy,
   challengeStore: PaymentChallengeStore = createMemoryPaymentChallengeStore(),
   macaroonUsageStore: MacaroonUsageStore = createMemoryMacaroonUsageStore(),
-  revocationStore: MacaroonRevocationStore =
-    createMemoryMacaroonRevocationStore(),
+  revocationStore: MacaroonRevocationStore = createMemoryMacaroonRevocationStore(),
   pricingEngine: PricingEngine = createPricingEngine(),
-  settlementRouter: SettlementRouter =
-    createDefaultMultiSettlementRouter(clientFactory),
+  settlementRouter: SettlementRouter = createDefaultMultiSettlementRouter(
+    clientFactory,
+  ),
   streamOptions: {
     telemetryHub?: StratigraphyTelemetryHub;
     heartbeatScheduler?: IntervalScheduler;
@@ -811,8 +804,7 @@ export function registerStratigraphyRoutes(
           thermodynamicSignal:
             latest?.quantitative_alpha.thermodynamic_signal ??
             "signal-unavailable",
-          targetMultiplier:
-            latest?.quantitative_alpha.target_multiplier ?? 0,
+          targetMultiplier: latest?.quantitative_alpha.target_multiplier ?? 0,
           now: policy.now,
         });
       },
@@ -882,8 +874,8 @@ export function registerStratigraphyRoutes(
   app.post(
     "/api/v1/zk/verify",
     async (req: Request, res: Response): Promise<void> => {
-      const attestation = (req.body as { attestation?: unknown } | null)
-        ?.attestation ?? req.body;
+      const attestation =
+        (req.body as { attestation?: unknown } | null)?.attestation ?? req.body;
       if (
         req.body &&
         typeof req.body === "object" &&
@@ -913,10 +905,7 @@ export function registerStratigraphyRoutes(
       const startedAt = performance.now();
       let valid: boolean;
       try {
-        valid = await verifyZkProofForSnapshot(
-          parsed.data,
-          parsed.data.data,
-        );
+        valid = await verifyZkProofForSnapshot(parsed.data, parsed.data.data);
       } catch (error) {
         if (error instanceof ZkVerifierOverloadedError) {
           res.status(503).json({ error: "zk verifier is busy" });
@@ -924,11 +913,13 @@ export function registerStratigraphyRoutes(
         }
         throw error;
       }
-      res.status(200).json(VerifyZkProofResponse.parse({
-        valid,
-        verifiedAt: new Date().toISOString(),
-        computationTimeMs: Number((performance.now() - startedAt).toFixed(3)),
-      }));
+      res.status(200).json(
+        VerifyZkProofResponse.parse({
+          valid,
+          verifiedAt: new Date().toISOString(),
+          computationTimeMs: Number((performance.now() - startedAt).toFixed(3)),
+        }),
+      );
     },
   );
 
@@ -1034,10 +1025,10 @@ export function registerStratigraphyRoutes(
     "/api/v1/zk/attest",
     (req: Request, res: Response, next): void => {
       const body = req.body as { payload?: unknown } | null;
-      const payload = body &&
-          Object.prototype.hasOwnProperty.call(body, "payload")
-        ? body.payload
-        : req.body;
+      const payload =
+        body && Object.prototype.hasOwnProperty.call(body, "payload")
+          ? body.payload
+          : req.body;
       if (payload === undefined) {
         res.status(400).json({ error: "Attestation payload is required" });
         return;
@@ -1049,16 +1040,17 @@ export function registerStratigraphyRoutes(
           "bitcoin-stratigraphy/epistemic-anchor/v1"
       ) {
         res.status(400).json({
-          error:
-            "Epistemic anchor payloads must use POST /api/v1/zk/ground",
+          error: "Epistemic anchor payloads must use POST /api/v1/zk/ground",
         });
         return;
       }
       try {
-        res.locals.cryptographicAttestation =
-          generateCryptographicAttestation(payload, {
+        res.locals.cryptographicAttestation = generateCryptographicAttestation(
+          payload,
+          {
             timestamp: policy.now(),
-          });
+          },
+        );
         next();
       } catch {
         res.status(400).json({ error: "Payload is not JSON serializable" });
@@ -1087,55 +1079,97 @@ export function registerStratigraphyRoutes(
     res.status(200).json(mesh.status());
   });
 
-  app.post("/api/nostr/verify-identity",
-    createHttpRateLimitMiddleware(createSlidingWindowRateLimiter({
-      limit: 20, windowMs: 60_000, maxKeys: 10_000,
-    })),
+  app.post(
+    "/api/nostr/verify-identity",
+    createHttpRateLimitMiddleware(
+      createSlidingWindowRateLimiter({
+        limit: 20,
+        windowMs: 60_000,
+        maxKeys: 10_000,
+      }),
+    ),
     async (req, res): Promise<void> => {
-    const body = req.body as Record<string, unknown> | null;
-    if (!body || typeof body !== "object" || Array.isArray(body) ||
-        Object.keys(body).some((key) => !["pubkey", "event", "signature"].includes(key)) ||
+      const body = req.body as Record<string, unknown> | null;
+      if (
+        !body ||
+        typeof body !== "object" ||
+        Array.isArray(body) ||
+        Object.keys(body).some(
+          (key) => !["pubkey", "event", "signature"].includes(key),
+        ) ||
         (body.pubkey !== undefined && typeof body.pubkey !== "string") ||
-        (body.signature !== undefined && typeof body.signature !== "string")) {
-      res.status(400).json({ error: "Expected pubkey/npub or a NIP-01 event with an optional matching signature" });
-      return;
-    }
-    try {
-      res.json(await mesh.verifyIdentity(body));
-    } catch (error) {
-      if (error instanceof Error && /pubkey|signature|event|required/.test(error.message)) {
-        res.status(400).json({ error: error.message });
-      } else {
-        req.log?.warn({ err: error }, "Nostr relay identity lookup failed");
-        res.status(503).json({ error: "Nostr relay identity lookup unavailable" });
+        (body.signature !== undefined && typeof body.signature !== "string")
+      ) {
+        res.status(400).json({
+          error:
+            "Expected pubkey/npub or a NIP-01 event with an optional matching signature",
+        });
+        return;
       }
-    }
-    });
+      try {
+        res.json(await mesh.verifyIdentity(body));
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          /pubkey|signature|event|required/.test(error.message)
+        ) {
+          res.status(400).json({ error: error.message });
+        } else {
+          req.log?.warn({ err: error }, "Nostr relay identity lookup failed");
+          res
+            .status(503)
+            .json({ error: "Nostr relay identity lookup unavailable" });
+        }
+      }
+    },
+  );
 
   app.post("/api/v1/mesh/attest", async (req, res): Promise<void> => {
     const body = req.body as Record<string, unknown> | null;
-    const session = body?.agentSession as { event?: unknown; date?: unknown } | undefined;
+    const session = body?.agentSession as
+      { event?: unknown; date?: unknown } | undefined;
     if (
       !body ||
-      Object.keys(body).some((key) => !["snapshot", "snapshotDigest", "networkId", "originPubkey", "agentSession"].includes(key)) ||
+      Object.keys(body).some(
+        (key) =>
+          ![
+            "snapshot",
+            "snapshotDigest",
+            "networkId",
+            "originPubkey",
+            "agentSession",
+          ].includes(key),
+      ) ||
       typeof body.snapshotDigest !== "string" ||
       !/^[0-9a-f]{64}$/.test(body.snapshotDigest) ||
       typeof body.networkId !== "string" ||
       typeof body.originPubkey !== "string" ||
       !/^[0-9a-f]{64}$/.test(body.originPubkey) ||
       !("snapshot" in body) ||
-      (session !== undefined && (!session || typeof session !== "object" || Array.isArray(session) ||
-        !session.event || (session.date !== undefined && (typeof session.date !== "string" ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(session.date)))))
+      (session !== undefined &&
+        (!session ||
+          typeof session !== "object" ||
+          Array.isArray(session) ||
+          !session.event ||
+          (session.date !== undefined &&
+            (typeof session.date !== "string" ||
+              !/^\d{4}-\d{2}-\d{2}$/.test(session.date)))))
     ) {
       res.status(400).json({ error: "Invalid mesh attestation request" });
       return;
     }
     try {
       if (session?.date) {
-        const [record] = await getStratigraphyData({ date: session.date as string });
+        const [record] = await getStratigraphyData({
+          date: session.date as string,
+        });
         const snapshot = body.snapshot as Record<string, unknown> | null;
-        if (!record || !snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+        if (
+          !record ||
+          !snapshot ||
+          typeof snapshot !== "object" ||
+          Array.isArray(snapshot)
+        ) {
           throw new Error("Session date is not the selected source record");
         }
         const { attestation: _attestation, ...unsigned } = snapshot;
@@ -1144,15 +1178,27 @@ export function registerStratigraphyRoutes(
         }
       }
       const event = await mesh.attestSnapshot({
-          snapshot: body.snapshot,
-          snapshotDigest: body.snapshotDigest,
-          networkId: body.networkId,
-          originPubkey: body.originPubkey,
-          ...(session ? { agentSession: session as { event: import("nostr-tools").Event; date?: string } } : {}),
-        });
+        snapshot: body.snapshot,
+        snapshotDigest: body.snapshotDigest,
+        networkId: body.networkId,
+        originPubkey: body.originPubkey,
+        ...(session
+          ? {
+              agentSession: session as {
+                event: import("nostr-tools").Event;
+                date?: string;
+              },
+            }
+          : {}),
+      });
       res.status(200).json({
         event,
-        ...(session ? { agentIdentity: mesh.getSessionState(body.snapshotDigest)?.identity } : {}),
+        ...(session
+          ? {
+              agentIdentity: mesh.getSessionState(body.snapshotDigest)
+                ?.identity,
+            }
+          : {}),
       });
     } catch {
       res.status(422).json({ error: "Mesh snapshot validation failed" });
@@ -1175,10 +1221,7 @@ export function registerStratigraphyRoutes(
       await challengeStore.checkHealth();
     } catch (error) {
       challengeCoordination = "unavailable";
-      req.log.error(
-        { err: error },
-        "Payment challenge readiness check failed",
-      );
+      req.log.error({ err: error }, "Payment challenge readiness check failed");
     }
     const ready =
       walletConfiguration === "available" &&
@@ -1207,8 +1250,14 @@ export function registerStratigraphyRoutes(
 
   app.post("/api/v1/cost", (req, res): void => {
     const parsed = QuoteMcpToolCostsBody.strict().safeParse(req.body);
-    if (!parsed.success || new Set(parsed.data.tools).size !== parsed.data.tools.length) {
-      res.status(400).json({ error: "tools must contain 1–32 distinct nonempty tool names; no other body fields are accepted" });
+    if (
+      !parsed.success ||
+      new Set(parsed.data.tools).size !== parsed.data.tools.length
+    ) {
+      res.status(400).json({
+        error:
+          "tools must contain 1–32 distinct nonempty tool names; no other body fields are accepted",
+      });
       return;
     }
     try {
@@ -1222,7 +1271,11 @@ export function registerStratigraphyRoutes(
   app.get("/api/v1/cost", async (req, res): Promise<void> => {
     let selectedToolQuote: ReturnType<typeof quoteMcpTools> | undefined;
     if (req.query.tool !== undefined) {
-      if (typeof req.query.tool !== "string" || !req.query.tool || req.query.tool.length > 128) {
+      if (
+        typeof req.query.tool !== "string" ||
+        !req.query.tool ||
+        req.query.tool.length > 128
+      ) {
         res.status(400).json({ error: "tool must be one nonempty tool name" });
         return;
       }
@@ -1411,7 +1464,9 @@ export function registerStratigraphyRoutes(
           dateBounds: {
             startDate: new Date(
               LATEST_DATASET_DATE_MS - (dataset.length - 1) * DAY_MS,
-            ).toISOString().slice(0, 10),
+            )
+              .toISOString()
+              .slice(0, 10),
             endDate: "2026-09-09",
           },
         },
@@ -1423,8 +1478,7 @@ export function registerStratigraphyRoutes(
         identifiers: ["hash", "jobId"],
         exampleResult: {
           kind: "zk-proof",
-          hash:
-            "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+          hash: "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
           status: "pending",
           timestamp: new Date(calculatedAt).toISOString(),
           attestationCount: 0,
@@ -1446,23 +1500,24 @@ export function registerStratigraphyRoutes(
           },
           status: {
             type: "string",
-            description:
-              "Filter attestations by lifecycle verification state.",
+            description: "Filter attestations by lifecycle verification state.",
             example: "verified",
             allowedValues: ["verified", "cached", "pending", "invalid"],
             required: false,
           },
         },
         exampleResult: {
-          attestations: [{
-            proofHash:
-              "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
-            snapshotDigest: "1534979302823651498736582947365829473658294",
-            status: "verified",
-            submittedAt: new Date(calculatedAt).toISOString(),
-            attestationCount: 1,
-            meshQuorum: true,
-          }],
+          attestations: [
+            {
+              proofHash:
+                "0x1a2b3c4d5e6f789001234567890abcdef1234567890abcdef1234567890abcd",
+              snapshotDigest: "1534979302823651498736582947365829473658294",
+              status: "verified",
+              submittedAt: new Date(calculatedAt).toISOString(),
+              attestationCount: 1,
+              meshQuorum: true,
+            },
+          ],
           total: 1,
         },
       },
@@ -1490,7 +1545,9 @@ export function registerStratigraphyRoutes(
     async (req: Request, res: Response): Promise<void> => {
       const operatorSecret = process.env.MACAROON_OPERATOR_SECRET;
       if (!operatorSecret) {
-        res.status(503).json({ error: "Macaroon revocation is not configured" });
+        res
+          .status(503)
+          .json({ error: "Macaroon revocation is not configured" });
         return;
       }
       if (!operatorAuthorized(req.header("Authorization"), operatorSecret)) {
@@ -1505,8 +1562,7 @@ export function registerStratigraphyRoutes(
           : undefined;
       if (
         (macaroon ? 1 : 0) + (suppliedSignatureId ? 1 : 0) !== 1 ||
-        (suppliedSignatureId &&
-          !/^[0-9a-f]{64}$/.test(suppliedSignatureId))
+        (suppliedSignatureId && !/^[0-9a-f]{64}$/.test(suppliedSignatureId))
       ) {
         res.status(400).json({
           error: "Provide exactly one valid macaroon or signature_id",
@@ -1557,15 +1613,15 @@ export function registerStratigraphyRoutes(
         res.status(401).json({ error: "Invalid NIP-98 authorization" });
         return;
       }
-      const authorization = parseL402Authorization(
-        req.header("Authorization"),
-      );
+      const authorization = parseL402Authorization(req.header("Authorization"));
       const parentMacaroon =
         typeof req.body?.macaroon === "string" ? req.body.macaroon : undefined;
       const rawCaveats: unknown = req.body?.caveats;
       const caveats =
         Array.isArray(rawCaveats) &&
-        rawCaveats.every((caveat): caveat is string => typeof caveat === "string")
+        rawCaveats.every(
+          (caveat): caveat is string => typeof caveat === "string",
+        )
           ? rawCaveats
           : undefined;
       const secret = process.env.SESSION_SECRET;
@@ -1581,12 +1637,7 @@ export function registerStratigraphyRoutes(
         return;
       }
       if (
-        await rejectRevokedMacaroon(
-          req,
-          res,
-          parentMacaroon,
-          revocationStore,
-        )
+        await rejectRevokedMacaroon(req, res, parentMacaroon, revocationStore)
       ) {
         return;
       }
@@ -1658,7 +1709,10 @@ export function registerStratigraphyRoutes(
         res.status(400).end();
         return;
       }
-      res.setHeader("X-Stratigraphy-Records", String(selectedRange.records.length));
+      res.setHeader(
+        "X-Stratigraphy-Records",
+        String(selectedRange.records.length),
+      );
       res.setHeader(
         "X-Stratigraphy-First-Day",
         String(selectedRange.records[0].day),
@@ -1744,14 +1798,8 @@ export function registerStratigraphyRoutes(
         return;
       }
 
-      const authorization = parseL402Authorization(
-        req.header("Authorization"),
-      );
-      const agentAuth = verifyRequestAgent(
-        req,
-        agentReputation,
-        policy.now(),
-      );
+      const authorization = parseL402Authorization(req.header("Authorization"));
+      const agentAuth = verifyRequestAgent(req, agentReputation, policy.now());
       if (agentAuth.provided && !agentAuth.identity) {
         res.status(401).json({ error: "Invalid NIP-98 authorization" });
         return;
@@ -1783,10 +1831,10 @@ export function registerStratigraphyRoutes(
           );
         const structurallyValidPass = secret
           ? verifySubscriptionMacaroon(
-            authorization.macaroon,
-            secret,
-            Math.floor(policy.now() / 1000),
-          )
+              authorization.macaroon,
+              secret,
+              Math.floor(policy.now() / 1000),
+            )
           : null;
         if (structurallyValidPass?.agentPubkey && !pass) {
           res.status(401).json({
@@ -1797,7 +1845,8 @@ export function registerStratigraphyRoutes(
         if (pass) {
           if (
             pass.allowedPaths.some((allowedPath) => allowedPath !== req.path) ||
-            pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined
+            pass.allowedToolSets.length > 0 ||
+            pass.maxTarget !== undefined
           ) {
             res.status(403).json({ error: "Macaroon path is not allowed" });
             return;
@@ -1808,8 +1857,7 @@ export function registerStratigraphyRoutes(
             verification = await settlementRouter.verifyPayment({
               paymentHash: pass.paymentHash,
               preimage: authorization.preimage,
-              expectedAmountMsats:
-                pass.amountMsats ?? definition.amountMsats,
+              expectedAmountMsats: pass.amountMsats ?? definition.amountMsats,
               expectedDescription: definition.description,
               asset: pass.paymentAsset,
               expectedProvider: pass.paymentProvider,
@@ -2035,14 +2083,8 @@ export function registerStratigraphyRoutes(
         return;
       }
 
-      const authorization = parseL402Authorization(
-        req.header("Authorization"),
-      );
-      const agentAuth = verifyRequestAgent(
-        req,
-        agentReputation,
-        policy.now(),
-      );
+      const authorization = parseL402Authorization(req.header("Authorization"));
+      const agentAuth = verifyRequestAgent(req, agentReputation, policy.now());
       if (agentAuth.provided && !agentAuth.identity) {
         res.status(401).json({ error: "Invalid NIP-98 authorization" });
         return;
@@ -2073,10 +2115,10 @@ export function registerStratigraphyRoutes(
             );
           const structurallyValidPass = secret
             ? verifySubscriptionMacaroon(
-              authorization.macaroon,
-              secret,
-              Math.floor(policy.now() / 1000),
-            )
+                authorization.macaroon,
+                secret,
+                Math.floor(policy.now() / 1000),
+              )
             : null;
           if (structurallyValidPass?.agentPubkey && !pass) {
             res.status(401).json({
@@ -2086,8 +2128,11 @@ export function registerStratigraphyRoutes(
           }
           if (pass) {
             if (
-              pass.allowedPaths.some((allowedPath) => allowedPath !== req.path) ||
-              pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined
+              pass.allowedPaths.some(
+                (allowedPath) => allowedPath !== req.path,
+              ) ||
+              pass.allowedToolSets.length > 0 ||
+              pass.maxTarget !== undefined
             ) {
               res.status(403).json({ error: "Macaroon path is not allowed" });
               return;
@@ -2096,8 +2141,7 @@ export function registerStratigraphyRoutes(
             const verification = await settlementRouter.verifyPayment({
               paymentHash: pass.paymentHash,
               preimage: authorization.preimage,
-              expectedAmountMsats:
-                pass.amountMsats ?? definition.amountMsats,
+              expectedAmountMsats: pass.amountMsats ?? definition.amountMsats,
               expectedDescription: definition.description,
               asset: pass.paymentAsset,
               expectedProvider: pass.paymentProvider,
@@ -2145,64 +2189,66 @@ export function registerStratigraphyRoutes(
           }
         }
         if (authorization.kind === "legacy") {
-        const issuedChallenge = await challengeStore.findByPaymentHash(
-          challengeCaller,
-          authorization.paymentHash,
-        );
-        if (
-          !issuedChallenge?.provider ||
-          issuedChallenge.provider === "legacy-unbound"
-        ) {
-          res.status(401).json({ error: "Invalid payment challenge" });
-          return;
-        }
-        if (issuedChallenge.asset !== assetSelection.asset) {
-          res.status(401).json({ error: "Settlement asset does not match challenge" });
-          return;
-        }
-        const verification = await settlementRouter.verifyPayment({
-          paymentHash: authorization.paymentHash,
-          preimage: authorization.preimage,
-          expectedAmountMsats: selectedRange.amountMsats,
-          expectedDescription: selectedRange.description,
-          asset: assetSelection.asset,
-          expectedProvider: issuedChallenge.provider,
-        });
-        if (verification === "unavailable") {
-          res.status(502).json({ error: "Unable to verify payment" });
-          return;
-        }
-        if (typeof verification === "object") {
-          await recordL402Revenue({
-            req,
+          const issuedChallenge = await challengeStore.findByPaymentHash(
+            challengeCaller,
+            authorization.paymentHash,
+          );
+          if (
+            !issuedChallenge?.provider ||
+            issuedChallenge.provider === "legacy-unbound"
+          ) {
+            res.status(401).json({ error: "Invalid payment challenge" });
+            return;
+          }
+          if (issuedChallenge.asset !== assetSelection.asset) {
+            res
+              .status(401)
+              .json({ error: "Settlement asset does not match challenge" });
+            return;
+          }
+          const verification = await settlementRouter.verifyPayment({
             paymentHash: authorization.paymentHash,
             preimage: authorization.preimage,
-            amountMsats: selectedRange.amountMsats,
-            settledAt: verification.settledAt,
-            clientIdentifier: challengeCaller,
+            expectedAmountMsats: selectedRange.amountMsats,
+            expectedDescription: selectedRange.description,
+            asset: assetSelection.asset,
+            expectedProvider: issuedChallenge.provider,
           });
-          try {
-            await challengeStore.consume(
-              caller,
-              selectedRange.key,
-              authorization.paymentHash,
-            );
-          } catch (error) {
-            req.log.error(
-              { err: error },
-              "Unable to remove consumed payment challenge",
-            );
+          if (verification === "unavailable") {
+            res.status(502).json({ error: "Unable to verify payment" });
+            return;
           }
-          await sendPaidDataset(
-            res,
-            selectedRange.records,
-            authorization.paymentHash,
-            policy.now(),
-            attestDataset,
-            mesh,
-          );
-          return;
-        }
+          if (typeof verification === "object") {
+            await recordL402Revenue({
+              req,
+              paymentHash: authorization.paymentHash,
+              preimage: authorization.preimage,
+              amountMsats: selectedRange.amountMsats,
+              settledAt: verification.settledAt,
+              clientIdentifier: challengeCaller,
+            });
+            try {
+              await challengeStore.consume(
+                caller,
+                selectedRange.key,
+                authorization.paymentHash,
+              );
+            } catch (error) {
+              req.log.error(
+                { err: error },
+                "Unable to remove consumed payment challenge",
+              );
+            }
+            await sendPaidDataset(
+              res,
+              selectedRange.records,
+              authorization.paymentHash,
+              policy.now(),
+              attestDataset,
+              mesh,
+            );
+            return;
+          }
         }
       }
 
@@ -2218,7 +2264,7 @@ export function registerStratigraphyRoutes(
         settlementRouter,
         challengeStore,
         policy,
-          challengeCaller,
+        challengeCaller,
         selectedRange.key,
         selectedRange.amountMsats,
         selectedRange.description,

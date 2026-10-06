@@ -1,9 +1,9 @@
 # Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 # Dual-licensed under AGPLv3 and Commercial terms.
 """Offline verifier tests: genuine OTS operations, synthetic attestations, no fees."""
+
 import hashlib
 import json
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,16 +15,30 @@ from opentimestamps.core.op import OpAppend, OpSHA256
 from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
 
 from cookbooks.article_12_journal import AuditJournal, canonical_json, sha256
-from cookbooks.audit_verifier import audit_journal, main, read_journal, render_report, write_private
+from cookbooks.audit_verifier import (
+    audit_journal,
+    main,
+    read_journal,
+    render_report,
+    write_private,
+)
 from cookbooks.audit_verifier_ots import (
-    BitcoinCore, EvidenceMismatch, OtsVerifier, PublicBitcoin, PublicNetwork,
-    VerificationUnavailable, checked_header, deserialize, serialize,
+    BitcoinCore,
+    EvidenceMismatch,
+    OtsVerifier,
+    PublicBitcoin,
+    PublicNetwork,
+    VerificationUnavailable,
+    checked_header,
+    deserialize,
+    serialize,
 )
 
 GENESIS_HEADER = (
-    "01000000" + "00" * 32 +
-    "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a" +
-    "29ab5f49ffff001d1dac2b7c"
+    "01000000"
+    + "00" * 32
+    + "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"
+    + "29ab5f49ffff001d1dac2b7c"
 )
 GENESIS_HASH = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
 
@@ -33,8 +47,11 @@ def receipt(digest, confirmed=False):
     detached = DetachedTimestampFile(OpSHA256(), Timestamp(bytes.fromhex(digest)))
     leaf = detached.timestamp.ops.add(OpAppend(b"synthetic calendar nonce"))
     leaf = leaf.ops.add(OpSHA256())
-    leaf.attestations.add(BitcoinBlockHeaderAttestation(812345) if confirmed else
-                          PendingAttestation("https://alice.btc.calendar.opentimestamps.org"))
+    leaf.attestations.add(
+        BitcoinBlockHeaderAttestation(812345)
+        if confirmed
+        else PendingAttestation("https://alice.btc.calendar.opentimestamps.org")
+    )
     return detached, leaf
 
 
@@ -49,8 +66,11 @@ class Calendar:
         if self.error:
             raise self.error
         stamp = Timestamp(commitment)
-        stamp.attestations.add(BitcoinBlockHeaderAttestation(812345) if self.upgrade else
-                               PendingAttestation(root))
+        stamp.attestations.add(
+            BitcoinBlockHeaderAttestation(812345)
+            if self.upgrade
+            else PendingAttestation(root)
+        )
         return stamp
 
 
@@ -62,9 +82,12 @@ class FixtureBitcoin:
         self.calls.append((message, attestation.height))
         try:
             attestation.verify_against_blockheader(
-                message, SimpleNamespace(hashMerkleRoot=self.root, nTime=1234567890))
+                message, SimpleNamespace(hashMerkleRoot=self.root, nTime=1234567890)
+            )
         except Exception as error:
-            raise EvidenceMismatch("Bitcoin Merkle commitment does not match") from error
+            raise EvidenceMismatch(
+                "Bitcoin Merkle commitment does not match"
+            ) from error
         return attestation.height
 
 
@@ -73,21 +96,41 @@ class AuditVerifierTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "audit_trail.jsonl"
-        self.payload = {"timestamp_utc": "2026-10-06T12:00:00Z", "agent_id": "financial-agent",
-                        "session_id": "synthetic-session", "input_query": "synthetic assessment",
-                        "events": [], "final_response": {"output": "Human review"}}
+        self.payload = {
+            "timestamp_utc": "2026-10-06T12:00:00Z",
+            "agent_id": "financial-agent",
+            "session_id": "synthetic-session",
+            "input_query": "synthetic assessment",
+            "events": [],
+            "final_response": {"output": "Human review"},
+        }
         self.digest = sha256(self.payload)
 
     def journal(self, proof=True, confirmed=False, payload=None, identifier="trace-1"):
         payload = payload or self.payload
         digest = sha256(payload)
         journal = AuditJournal(self.path)
-        journal.append({"kind": "trace", "trace_id": identifier, "trace_hash": digest, "trace": payload})
+        journal.append(
+            {
+                "kind": "trace",
+                "trace_id": identifier,
+                "trace_hash": digest,
+                "trace": payload,
+            }
+        )
         detached, leaf = receipt(digest, confirmed)
         if proof:
-            journal.append({"kind": "status", "trace_id": identifier, "trace_hash": digest,
-                            "hash": digest, "status": "notarized", "otsStatus": "pending_calendar",
-                            "otsProofHex": serialize(detached).hex()})
+            journal.append(
+                {
+                    "kind": "status",
+                    "trace_id": identifier,
+                    "trace_hash": digest,
+                    "hash": digest,
+                    "status": "notarized",
+                    "otsStatus": "pending_calendar",
+                    "otsProofHex": serialize(detached).hex(),
+                }
+            )
         return detached, leaf
 
     def engine(self, upgrade=False, offline=False, merkle=None, error=None):
@@ -129,8 +172,14 @@ class AuditVerifierTests(unittest.TestCase):
         self.assertEqual(verdict.height, 812345)
         self.assertTrue(engine.bitcoin.calls)
         self.assertIn("VERIFIED: Bitcoin Block #812345", render_report(result))
-        self.assertTrue(any(isinstance(a, BitcoinBlockHeaderAttestation)
-                            for _, a in deserialize(verdict.proof, self.digest).timestamp.all_attestations()))
+        self.assertTrue(
+            any(
+                isinstance(a, BitcoinBlockHeaderAttestation)
+                for _, a in deserialize(
+                    verdict.proof, self.digest
+                ).timestamp.all_attestations()
+            )
+        )
 
     def test_confirmed_receipt_skips_calendar_but_checks_bitcoin(self):
         self.journal(confirmed=True)
@@ -151,11 +200,16 @@ class AuditVerifierTests(unittest.TestCase):
         self.assertEqual(second.traces[0].verdict.status, "verified")
         self.assertEqual(second.traces[0].verdict.proof, first.traces[0].verdict.proof)
         saved.write_bytes(b"altered")
-        self.assertEqual(audit_journal(self.path, self.engine(), archive).traces[0].verdict.status, "tamper")
+        self.assertEqual(
+            audit_journal(self.path, self.engine(), archive).traces[0].verdict.status,
+            "tamper",
+        )
 
     def test_modified_trace_is_explicit_tamper_and_makes_no_network_calls(self):
         self.journal()
-        self.path.write_bytes(self.path.read_bytes().replace(b"Human review", b"Auto approved"))
+        self.path.write_bytes(
+            self.path.read_bytes().replace(b"Human review", b"Auto approved")
+        )
         engine = self.engine(upgrade=True)
         result = audit_journal(self.path, engine)
         self.assertEqual(result.exit_code, 1)
@@ -258,24 +312,38 @@ class AuditVerifierTests(unittest.TestCase):
 
     def test_network_guard_blocks_mcp_and_untrusted_calendar_urls(self):
         network = PublicNetwork()
-        for url in ("https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
-                    "http://127.0.0.1:5000/mcp", "https://attacker.example/timestamp/11"):
+        for url in (
+            "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+            "http://127.0.0.1:5000/mcp",
+            "https://attacker.example/timestamp/11",
+        ):
             with self.assertRaises(VerificationUnavailable):
                 network.get(url, 100)
-        for uri in ("https://bitcoin-stratigraphy-dashboard.replit.app",
-                    "https://user:password@alice.btc.calendar.opentimestamps.org",
-                    "https://alice.btc.calendar.opentimestamps.org/mcp"):
+        for uri in (
+            "https://bitcoin-stratigraphy-dashboard.replit.app",
+            "https://user:password@alice.btc.calendar.opentimestamps.org",
+            "https://alice.btc.calendar.opentimestamps.org/mcp",
+        ):
             self.assertIsNone(network.calendar_root(uri))
-        self.assertIsNotNone(network.calendar_root("https://alice.btc.calendar.opentimestamps.org"))
+        self.assertIsNotNone(
+            network.calendar_root("https://alice.btc.calendar.opentimestamps.org")
+        )
 
     def test_known_mainnet_genesis_header_pow_hash_and_merkle_root(self):
         header = checked_header(GENESIS_HEADER, GENESIS_HASH)
         attestation = BitcoinBlockHeaderAttestation(0)
-        self.assertEqual(attestation.verify_against_blockheader(header.hashMerkleRoot, header), 1231006505)
+        self.assertEqual(
+            attestation.verify_against_blockheader(header.hashMerkleRoot, header),
+            1231006505,
+        )
         with self.assertRaises(VerificationUnavailable):
             checked_header(GENESIS_HEADER, "00" * 32)
         altered = GENESIS_HEADER[:-8] + "00000000"
-        digest = hashlib.sha256(hashlib.sha256(bytes.fromhex(altered)).digest()).digest()[::-1].hex()
+        digest = (
+            hashlib.sha256(hashlib.sha256(bytes.fromhex(altered)).digest())
+            .digest()[::-1]
+            .hex()
+        )
         with self.assertRaises(VerificationUnavailable):
             checked_header(altered, digest)
 
@@ -283,10 +351,16 @@ class AuditVerifierTests(unittest.TestCase):
         class Headers:
             def __init__(self, disagree=False):
                 self.disagree = disagree
+
             def get(self, url, _limit):
                 if url.endswith("/block-height/0"):
-                    return (("11" * 32 if self.disagree and "mempool.space" in url else GENESIS_HASH)).encode()
+                    return (
+                        "11" * 32
+                        if self.disagree and "mempool.space" in url
+                        else GENESIS_HASH
+                    ).encode()
                 return GENESIS_HEADER.encode()
+
         provider = PublicBitcoin(Headers())
         root = checked_header(GENESIS_HEADER, GENESIS_HASH).hashMerkleRoot
         self.assertEqual(provider.verify(root, BitcoinBlockHeaderAttestation(0)), 0)
@@ -295,21 +369,35 @@ class AuditVerifierTests(unittest.TestCase):
 
     def test_core_cli_requires_successful_exit_and_actual_matching_height(self):
         proof = serialize(receipt(self.digest, True)[0])
+
         def run(arguments, **kwargs):
             self.assertNotIn("PYTHONPATH", kwargs["env"])
             self.assertNotIn("NWC_URI", kwargs["env"])
             self.assertIn("--no-default-whitelist", arguments)
             self.assertIn(self.digest, arguments)
-            kwargs["stdout"].write(b"Success! Bitcoin block 812345 attests existence as of 2026-10-06\n")
+            kwargs["stdout"].write(
+                b"Success! Bitcoin block 812345 attests existence as of 2026-10-06\n"
+            )
             return SimpleNamespace(returncode=0)
-        with patch("shutil.which", return_value="/trusted/ots"), patch("subprocess.run", side_effect=run):
-            self.assertEqual(BitcoinCore().verify_receipt(proof, self.digest, {812345}), 812345)
+
+        with (
+            patch("shutil.which", return_value="/trusted/ots"),
+            patch("subprocess.run", side_effect=run),
+        ):
+            self.assertEqual(
+                BitcoinCore().verify_receipt(proof, self.digest, {812345}), 812345
+            )
             with self.assertRaises(VerificationUnavailable):
                 BitcoinCore().verify_receipt(proof, self.digest, {999})
+
         def failed(arguments, **kwargs):
             run(arguments, **kwargs)
             return SimpleNamespace(returncode=1)
-        with patch("shutil.which", return_value="/trusted/ots"), patch("subprocess.run", side_effect=failed):
+
+        with (
+            patch("shutil.which", return_value="/trusted/ots"),
+            patch("subprocess.run", side_effect=failed),
+        ):
             with self.assertRaises(VerificationUnavailable):
                 BitcoinCore().verify_receipt(proof, self.digest, {812345})
 
@@ -317,12 +405,16 @@ class AuditVerifierTests(unittest.TestCase):
         self.journal()
         target = Path(self.directory.name) / "report.md"
         with patch("builtins.print"):
-            self.assertEqual(main([str(self.path), "--offline", "--markdown", str(target)]), 0)
+            self.assertEqual(
+                main([str(self.path), "--offline", "--markdown", str(target)]), 0
+            )
         self.assertEqual(target.stat().st_mode & 0o777, 0o600)
         self.assertIn(self.digest, target.read_text())
         original = self.path.read_bytes()
         with patch("builtins.print"):
-            self.assertEqual(main([str(self.path), "--offline", "--markdown", str(self.path)]), 2)
+            self.assertEqual(
+                main([str(self.path), "--offline", "--markdown", str(self.path)]), 2
+            )
         with self.assertRaises(ValueError):
             write_private(self.path, b"overwrite", self.path)
         self.assertEqual(self.path.read_bytes(), original)

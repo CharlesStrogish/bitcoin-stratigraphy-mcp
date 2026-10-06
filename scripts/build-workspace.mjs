@@ -43,9 +43,12 @@ export function readArtifactBuildBasePath(packageDirectory) {
     if (error?.code === "ENOENT") {
       return undefined;
     }
-    throw new Error(`Could not read artifact routing from ${artifactConfigPath}`, {
-      cause: error,
-    });
+    throw new Error(
+      `Could not read artifact routing from ${artifactConfigPath}`,
+      {
+        cause: error,
+      },
+    );
   }
 
   const configuredBasePaths = (artifactConfig.services ?? [])
@@ -65,9 +68,7 @@ export function readArtifactBuildBasePath(packageDirectory) {
 
   const [basePath] = uniqueBasePaths;
   if (basePath !== artifactConfig.previewPath) {
-    throw new Error(
-      `${artifactConfigPath} BASE_PATH must match previewPath`,
-    );
+    throw new Error(`${artifactConfigPath} BASE_PATH must match previewPath`);
   }
 
   return basePath;

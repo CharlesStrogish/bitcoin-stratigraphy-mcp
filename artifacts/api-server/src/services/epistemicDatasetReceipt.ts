@@ -18,30 +18,46 @@ const receiptIndex = new Map<string, DatasetReceipt>();
 
 export async function createEpistemicDatasetReceipt(
   input: EpistemicDatasetInput,
-  options: { readBitcoinTip?: () => Promise<BitcoinTip>; now?: () => number } = {},
+  options: {
+    readBitcoinTip?: () => Promise<BitcoinTip>;
+    now?: () => number;
+  } = {},
 ) {
   const timestampMs = (options.now ?? Date.now)();
   if (!Number.isSafeInteger(timestampMs) || timestampMs <= 0) {
-    throw new RangeError("Receipt timestamp must be a positive Unix millisecond value");
+    throw new RangeError(
+      "Receipt timestamp must be a positive Unix millisecond value",
+    );
   }
   const timestamp = new Date(timestampMs).toISOString();
   const tip = await (options.readBitcoinTip ?? fetchCurrentBitcoinTip)();
   // JSON tuple encoding avoids ambiguous concatenations of variable-length fields.
   const receiptHash = createHash("sha256")
-    .update(JSON.stringify([input.cid, tip.hash, tip.height, input.nostrEventId ?? "", timestamp]))
+    .update(
+      JSON.stringify([
+        input.cid,
+        tip.hash,
+        tip.height,
+        input.nostrEventId ?? "",
+        timestamp,
+      ]),
+    )
     .digest("hex");
-  const receipt = await groundEpistemicContext({
-    contextHash: receiptHash,
-    agentId: "mcp:proof.epistemic_receipt",
-    metadata: {
-      cid: input.cid,
-      ...(input.nostrEventId ? { nostrEventId: input.nostrEventId } : {}),
-      ...(input.context ? { context: input.context } : {}),
+  const receipt = await groundEpistemicContext(
+    {
+      contextHash: receiptHash,
+      agentId: "mcp:proof.epistemic_receipt",
+      metadata: {
+        cid: input.cid,
+        ...(input.nostrEventId ? { nostrEventId: input.nostrEventId } : {}),
+        ...(input.context ? { context: input.context } : {}),
+      },
     },
-  }, {
-    now: () => timestampMs,
-    readBitcoinTip: async () => tip,
-  });
+    {
+      now: () => timestampMs,
+      readBitcoinTip: async () => tip,
+    },
+  );
   const result = {
     receiptHash,
     blockTip: receipt.blockHeight,
@@ -77,10 +93,15 @@ export function verifyEpistemicDatasetReceipt(value: unknown): boolean {
     typeof result.blockHash !== "string" ||
     typeof result.timestamp !== "string" ||
     !Number.isSafeInteger(result.blockTip) ||
-    (result.nostrEventId !== undefined && typeof result.nostrEventId !== "string")
-  ) return false;
+    (result.nostrEventId !== undefined &&
+      typeof result.nostrEventId !== "string")
+  )
+    return false;
   try {
-    const signed = JSON.parse(attestation.proofPayload) as Record<string, unknown>;
+    const signed = JSON.parse(attestation.proofPayload) as Record<
+      string,
+      unknown
+    >;
     if (!verifyEpistemicAnchorReceipt(signed)) return false;
     const payload = signed.payload as Record<string, unknown>;
     const metadata = payload.metadata as Record<string, unknown> | undefined;
@@ -91,13 +112,17 @@ export function verifyEpistemicDatasetReceipt(value: unknown): boolean {
       new Date(signed.timestamp as number).toISOString() === result.timestamp &&
       metadata?.cid === result.ipfsCid &&
       metadata?.nostrEventId === result.nostrEventId &&
-      createHash("sha256").update(JSON.stringify([
-        result.ipfsCid,
-        result.blockHash,
-        result.blockTip,
-        result.nostrEventId ?? "",
-        result.timestamp,
-      ])).digest("hex") === result.receiptHash
+      createHash("sha256")
+        .update(
+          JSON.stringify([
+            result.ipfsCid,
+            result.blockHash,
+            result.blockTip,
+            result.nostrEventId ?? "",
+            result.timestamp,
+          ]),
+        )
+        .digest("hex") === result.receiptHash
     );
   } catch {
     return false;
@@ -115,11 +140,15 @@ export function indexEpistemicDatasetReceipt(receipt: DatasetReceipt): void {
   }
 }
 
-export function getEpistemicDatasetReceiptStatus(receiptHash: string): string | undefined {
+export function getEpistemicDatasetReceiptStatus(
+  receiptHash: string,
+): string | undefined {
   return receiptIndex.get(receiptHash)?.timestamp;
 }
 
-export function getEpistemicDatasetReceiptByHash(hashOrCid: string): DatasetReceipt | undefined {
+export function getEpistemicDatasetReceiptByHash(
+  hashOrCid: string,
+): DatasetReceipt | undefined {
   const direct = receiptIndex.get(hashOrCid.toLowerCase());
   if (direct) return structuredClone(direct);
   // Most recent signed anchor wins when a CID has been anchored more than once.

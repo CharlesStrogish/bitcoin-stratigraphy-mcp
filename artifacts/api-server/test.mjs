@@ -27,6 +27,9 @@ const outputs = [
   "./dist/otsProvenance.test.js",
   "./dist/otsNotarization.test.js",
   "./dist/audit.test.js",
+  "./dist/public-rate-limit.test.js",
+  "./dist/provenanceChain.test.js",
+  "./dist/provenanceRoutes.test.js",
 ];
 
 const provenancePersistenceTest = `
@@ -123,8 +126,7 @@ await build({
   entryPoints: {
     "stratigraphy.contract.test": "./src/routes/stratigraphy.contract.test.ts",
     "pricing.test": "./tests/unit/pricing.test.ts",
-    "settlement_redundancy.test":
-      "./tests/unit/settlement_redundancy.test.ts",
+    "settlement_redundancy.test": "./tests/unit/settlement_redundancy.test.ts",
     "coinos-uuid-settlement.test":
       "./tests/unit/coinos-uuid-settlement.test.ts",
     "stream.test": "./tests/unit/stream.test.ts",
@@ -146,6 +148,7 @@ await build({
     "otsProvenance.test": "./tests/unit/otsProvenance.test.ts",
     "otsNotarization.test": "./tests/unit/otsNotarization.test.ts",
     "audit.test": "./src/routes/audit.test.ts",
+    "public-rate-limit.test": "./tests/unit/public-rate-limit.test.ts",
   },
   outdir: "./dist",
   bundle: true,

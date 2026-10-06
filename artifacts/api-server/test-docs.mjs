@@ -11,5 +11,7 @@ await build({
   platform: "node",
   packages: "external",
 });
-const result = spawnSync(process.execPath, ["--test", "dist/docs.test.mjs"], { stdio: "inherit" });
+const result = spawnSync(process.execPath, ["--test", "dist/docs.test.mjs"], {
+  stdio: "inherit",
+});
 process.exit(result.status ?? 1);

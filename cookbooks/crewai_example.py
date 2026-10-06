@@ -72,13 +72,20 @@ def _read_proof_arguments(path: str) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Could not read proof arguments from {path}: {exc}") from exc
     if not isinstance(value, dict):
-        raise ValueError("--proof-file must contain a JSON object of proof.verify arguments")
+        raise ValueError(
+            "--proof-file must contain a JSON object of proof.verify arguments"
+        )
     if value.get("proofType") == "ots":
         valid = all(key in value for key in ("otsProof", "targetHash"))
     elif value.get("circuit") == "zk.drift.v1":
         valid = all(
             key in value
-            for key in ("sessionContextHash", "targetBlockHeight", "entropyThreshold", "proof")
+            for key in (
+                "sessionContextHash",
+                "targetBlockHeight",
+                "entropyThreshold",
+                "proof",
+            )
         )
     else:
         public_inputs = value.get("publicInputs")
@@ -134,7 +141,9 @@ def _build_paid_tools(
 
         def _run(self, days: int = 1) -> str:
             if "stratigraphy.get" in used_tools:
-                raise RuntimeError("This example permits only one stratigraphy.get call.")
+                raise RuntimeError(
+                    "This example permits only one stratigraphy.get call."
+                )
             used_tools.add("stratigraphy.get")
             try:
                 result = client.call_tool("stratigraphy.get", {"days": days})
@@ -176,7 +185,9 @@ def _safe_error_detail(error: Exception) -> str:
         r"\1[REDACTED]",
         detail,
     )
-    detail = re.sub(r"(?i)\b(?:lnbc|lntb|lnbcrt)[0-9a-z]+\b", "[REDACTED_INVOICE]", detail)
+    detail = re.sub(
+        r"(?i)\b(?:lnbc|lntb|lnbcrt)[0-9a-z]+\b", "[REDACTED_INVOICE]", detail
+    )
     detail = re.sub(
         r"(?i)(macaroon\s*[:=]\s*)[^\s,;]+",
         r"\1[REDACTED]",

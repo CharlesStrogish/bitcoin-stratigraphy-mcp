@@ -235,20 +235,14 @@ test("binds and validates the payment_asset macaroon caveat", () => {
     paymentAsset: "taproot-assets",
     paymentProvider: "taproot-assets",
   });
-  const verified = verifySubscriptionMacaroon(
-    macaroon,
-    secret,
-    1_800_000_000,
-  );
+  const verified = verifySubscriptionMacaroon(macaroon, secret, 1_800_000_000);
   assert.equal(verified?.paymentAsset, "taproot-assets");
 
   const decoded = JSON.parse(
     Buffer.from(macaroon, "base64url").toString("utf8"),
   );
   decoded.caveats = decoded.caveats.map((caveat: string) =>
-    caveat === "payment_asset=taproot-assets"
-      ? "payment_asset=l-btc"
-      : caveat,
+    caveat === "payment_asset=taproot-assets" ? "payment_asset=l-btc" : caveat,
   );
   const tampered = Buffer.from(JSON.stringify(decoded)).toString("base64url");
   assert.equal(

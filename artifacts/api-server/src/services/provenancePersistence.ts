@@ -1,4 +1,7 @@
-import type { ProvenanceRecord, ProvenanceSourceRecord } from "./provenanceChain";
+import type {
+  ProvenanceRecord,
+  ProvenanceSourceRecord,
+} from "./provenanceChain";
 
 type PersistedStratum = Pick<
   ProvenanceRecord<ProvenanceSourceRecord>,
@@ -45,7 +48,7 @@ export async function persistProvenancePrefix(
 
   const pool =
     databasePool ??
-    (await import("@workspace/db")).pool as unknown as DatabasePool;
+    ((await import("@workspace/db")).pool as unknown as DatabasePool);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -87,7 +90,9 @@ export async function persistProvenancePrefix(
         !/^[a-f0-9]{64}$/.test(storedStratum.prev_hash) ||
         (previousHash !== undefined && storedStratum.prev_hash !== previousHash)
       ) {
-        invalidHistory(`stored history is corrupt or gapped at day ${index + 1}`);
+        invalidHistory(
+          `stored history is corrupt or gapped at day ${index + 1}`,
+        );
       }
       if (
         storedDay !== candidate.day ||
@@ -104,7 +109,9 @@ export async function persistProvenancePrefix(
       const expectedPreviousHash =
         index === 0 ? "0".repeat(64) : records[index - 1].stratumHash;
       if (record.prevHash !== expectedPreviousHash) {
-        invalidHistory(`candidate chain has a broken link at day ${record.day}`);
+        invalidHistory(
+          `candidate chain has a broken link at day ${record.day}`,
+        );
       }
       await client.query(
         `INSERT INTO stratigraphy_provenance_strata (day, stratum_hash, prev_hash)

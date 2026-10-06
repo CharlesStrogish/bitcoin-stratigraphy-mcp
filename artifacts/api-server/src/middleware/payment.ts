@@ -1,7 +1,5 @@
 import type { RequestHandler, Request } from "express";
-import {
-  x402ResourceServer,
-} from "@x402/core/server";
+import { x402ResourceServer } from "@x402/core/server";
 import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 
@@ -68,21 +66,20 @@ function decodePaymentSignature(header: string): PaymentPayload | null {
       (payload as { x402Version?: unknown }).x402Version !== 2 ||
       !("accepted" in payload) ||
       !("payload" in payload)
-    ) return null;
+    )
+      return null;
     return payload as PaymentPayload;
   } catch {
     return null;
   }
 }
 
-function exactTerms(
-  offered: unknown,
-  expected: PaymentRequirements,
-): boolean {
+function exactTerms(offered: unknown, expected: PaymentRequirements): boolean {
   if (offered === null || typeof offered !== "object") return false;
   const candidate = offered as Partial<PaymentRequirements>;
   const extra = candidate.extra;
-  return candidate.scheme === "exact" &&
+  return (
+    candidate.scheme === "exact" &&
     candidate.network === expected.network &&
     typeof candidate.asset === "string" &&
     candidate.asset.toLowerCase() === expected.asset.toLowerCase() &&
@@ -92,13 +89,15 @@ function exactTerms(
     candidate.maxTimeoutSeconds === expected.maxTimeoutSeconds &&
     extra?.paymentFlow === "upfront" &&
     extra.name === "USD Coin" &&
-    extra.version === "2";
+    extra.version === "2"
+  );
 }
 
 export function createX402PaymentMiddleware(
   options: X402MiddlewareOptions,
 ): RequestHandler {
-  const payTo = options.payTo ?? process.env.X402_RECEIVING_ADDRESS ?? X402_PAY_TO;
+  const payTo =
+    options.payTo ?? process.env.X402_RECEIVING_ADDRESS ?? X402_PAY_TO;
   if (!/^0x[a-fA-F0-9]{40}$/.test(payTo)) {
     throw new Error("X402_RECEIVING_ADDRESS must be a 20-byte EVM address");
   }
@@ -120,18 +119,20 @@ export function createX402PaymentMiddleware(
   const createChallengeHeader = async (req: Request): Promise<string> => {
     const resourceUrl = requestResourceUrl(req);
     const response = options.resourceServer
-      ? await options.resourceServer.createPaymentRequiredResponse(
-        [expected],
-        { url: resourceUrl, description: "MCP tool call payment" },
-      )
+      ? await options.resourceServer.createPaymentRequiredResponse([expected], {
+          url: resourceUrl,
+          description: "MCP tool call payment",
+        })
       : {
-        x402Version: 2,
-        resource: { url: resourceUrl, description: "MCP tool call payment" },
-        accepts: [{
-          ...expected,
-          extra: { ...expected.extra, settlementAvailable: false },
-        }],
-      };
+          x402Version: 2,
+          resource: { url: resourceUrl, description: "MCP tool call payment" },
+          accepts: [
+            {
+              ...expected,
+              extra: { ...expected.extra, settlementAvailable: false },
+            },
+          ],
+        };
     return Buffer.from(JSON.stringify(response)).toString("base64");
   };
 
@@ -149,7 +150,10 @@ export function createX402PaymentMiddleware(
             sendJson(body);
           })
           .catch((error: unknown) => {
-            req.log?.error({ err: error }, "Unable to create x402 payment challenge");
+            req.log?.error(
+              { err: error },
+              "Unable to create x402 payment challenge",
+            );
             sendJson(body);
           });
         return res;
@@ -160,13 +164,20 @@ export function createX402PaymentMiddleware(
 
     const payload = decodePaymentSignature(signature);
     if (!options.resourceServer) {
-      res.status(503).json({ error: "x402 settlement is not configured; use L402" });
+      res
+        .status(503)
+        .json({ error: "x402 settlement is not configured; use L402" });
       return;
     }
     const resourceUrl = requestResourceUrl(req);
-    if (!payload || payload.resource?.url !== resourceUrl ||
-        !exactTerms(payload.accepted, expected)) {
-      res.status(400).json({ error: "Invalid x402 payment signature or payment terms" });
+    if (
+      !payload ||
+      payload.resource?.url !== resourceUrl ||
+      !exactTerms(payload.accepted, expected)
+    ) {
+      res
+        .status(400)
+        .json({ error: "Invalid x402 payment signature or payment terms" });
       return;
     }
 
@@ -186,7 +197,8 @@ export function createX402PaymentMiddleware(
         settlement.success !== true ||
         !settlement.transaction ||
         settlement.network !== expected.network ||
-        (settlement.amount !== undefined && settlement.amount !== expected.amount)
+        (settlement.amount !== undefined &&
+          settlement.amount !== expected.amount)
       ) {
         res.status(502).json({ error: "x402 payment settlement failed" });
         return;
@@ -199,7 +211,9 @@ export function createX402PaymentMiddleware(
       next();
     } catch (error) {
       req.log?.error({ err: error }, "x402 verification or settlement failed");
-      res.status(502).json({ error: "Unable to verify or settle x402 payment" });
+      res
+        .status(502)
+        .json({ error: "Unable to verify or settle x402 payment" });
     }
   };
 }

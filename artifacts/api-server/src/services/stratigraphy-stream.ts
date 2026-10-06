@@ -144,7 +144,10 @@ export async function readLiveBitcoinTelemetry(input: {
   try {
     const [heightResult, difficultyResult, pricesResult] =
       await Promise.allSettled([
-        fetchText("https://mempool.space/api/blocks/tip/height", controller.signal),
+        fetchText(
+          "https://mempool.space/api/blocks/tip/height",
+          controller.signal,
+        ),
         fetchJson(
           "https://mempool.space/api/v1/difficulty-adjustment",
           controller.signal,
@@ -159,13 +162,13 @@ export async function readLiveBitcoinTelemetry(input: {
       difficultyResult.status === "fulfilled" &&
       difficultyResult.value &&
       typeof difficultyResult.value === "object"
-        ? difficultyResult.value as { difficultyChange?: unknown }
+        ? (difficultyResult.value as { difficultyChange?: unknown })
         : undefined;
     const prices =
       pricesResult.status === "fulfilled" &&
       pricesResult.value &&
       typeof pricesResult.value === "object"
-        ? pricesResult.value as { USD?: unknown }
+        ? (pricesResult.value as { USD?: unknown })
         : undefined;
     const usdPerBtc =
       typeof prices?.USD === "number" && Number.isFinite(prices.USD)

@@ -25,8 +25,11 @@ function isQueueFullError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { name?: unknown; message?: unknown };
   const name = typeof candidate.name === "string" ? candidate.name : "";
-  const message = typeof candidate.message === "string" ? candidate.message : "";
-  return /queue|overload/i.test(name) || /queue (?:is )?full|overload/i.test(message);
+  const message =
+    typeof candidate.message === "string" ? candidate.message : "";
+  return (
+    /queue|overload/i.test(name) || /queue (?:is )?full|overload/i.test(message)
+  );
 }
 
 function requestBodyBytes(req: Request): number {
@@ -54,7 +57,11 @@ export function registerZkDriftRoute(
     );
     if (!recentRequests.has(address) && recentRequests.size >= 1_000) {
       for (const [key, timestamps] of recentRequests) {
-        if (timestamps.every((timestamp) => now - timestamp >= RATE_LIMIT_WINDOW_MS)) {
+        if (
+          timestamps.every(
+            (timestamp) => now - timestamp >= RATE_LIMIT_WINDOW_MS,
+          )
+        ) {
           recentRequests.delete(key);
         }
       }
@@ -100,7 +107,8 @@ export function registerZkDriftRoute(
       return;
     }
 
-    const validHeight = blockHeight === undefined ||
+    const validHeight =
+      blockHeight === undefined ||
       (typeof blockHeight === "number" &&
         Number.isSafeInteger(blockHeight) &&
         blockHeight >= 0 &&
@@ -108,30 +116,37 @@ export function registerZkDriftRoute(
       (typeof blockHeight === "string" &&
         /^(0|[1-9][0-9]*)$/.test(blockHeight) &&
         (blockHeight.length < 10 ||
-          (blockHeight.length === 10 && blockHeight <= String(MAX_BLOCK_HEIGHT))));
+          (blockHeight.length === 10 &&
+            blockHeight <= String(MAX_BLOCK_HEIGHT))));
     if (!validHeight) {
       res.status(400).json({
-        error: "blockHeight must be a nonnegative integer or canonical decimal string",
+        error:
+          "blockHeight must be a nonnegative integer or canonical decimal string",
       });
       return;
     }
 
-    const threshold = entropyThreshold === undefined
-      ? DEFAULT_ENTROPY_THRESHOLD
-      : entropyThreshold;
+    const threshold =
+      entropyThreshold === undefined
+        ? DEFAULT_ENTROPY_THRESHOLD
+        : entropyThreshold;
     if (
       typeof threshold !== "number" ||
       !Number.isFinite(threshold) ||
       threshold < 0 ||
       threshold > 1
     ) {
-      res.status(400).json({ error: "entropyThreshold must be a number from 0 to 1" });
+      res
+        .status(400)
+        .json({ error: "entropyThreshold must be a number from 0 to 1" });
       return;
     }
 
     const address = req.ip || req.socket.remoteAddress || "unknown";
     if (rateLimited(address)) {
-      res.status(429).json({ error: "Drift proof request rate limit exceeded" });
+      res
+        .status(429)
+        .json({ error: "Drift proof request rate limit exceeded" });
       return;
     }
     if (activeProofs >= MAX_CONCURRENT_PROOFS) {

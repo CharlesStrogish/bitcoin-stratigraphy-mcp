@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import type { BitcoinStratigraphyClient as RestClient, PaidStratigraphyResponse } from "@bitcoin-stratigraphy/sdk";
+import type {
+  BitcoinStratigraphyClient as RestClient,
+  PaidStratigraphyResponse,
+} from "@bitcoin-stratigraphy/sdk";
 import type { BitcoinStratigraphyClient as McpClient } from "@bitcoin-stratigraphy/sdk/mcp";
 import type { Checkpoint, StateStore } from "./state.js";
 
@@ -12,37 +15,65 @@ export type AgentEvent =
 
 export type AgentDependencies = {
   rest: Pick<RestClient, "getLatest">;
-  mcp: Pick<McpClient, "verifyProof" | "getMeshStatus" | "listStratigraphy" | "broadcastMeshSignal">;
+  mcp: Pick<
+    McpClient,
+    "verifyProof" | "getMeshStatus" | "listStratigraphy" | "broadcastMeshSignal"
+  >;
   store: StateStore;
   emit: (event: AgentEvent) => void;
 };
 
 function fingerprint(response: PaidStratigraphyResponse): string {
   // Ignore freshly signed Nostr attestations: only source record changes are new.
-  const records = response.data.map(({
-    day, title, video_id, transcript_summary, quantitative_alpha,
-  }) => ({ day, title, video_id, transcript_summary, quantitative_alpha }));
+  const records = response.data.map(
+    ({ day, title, video_id, transcript_summary, quantitative_alpha }) => ({
+      day,
+      title,
+      video_id,
+      transcript_summary,
+      quantitative_alpha,
+    }),
+  );
   return createHash("sha256").update(JSON.stringify(records)).digest("hex");
 }
 
 /** One iteration; a checkpoint is written only after each successful paid step. */
-export async function runCycle({ rest, mcp, store, emit }: AgentDependencies): Promise<void> {
+export async function runCycle({
+  rest,
+  mcp,
+  store,
+  emit,
+}: AgentDependencies): Promise<void> {
   const snapshot = await rest.getLatest();
   const latest = snapshot.data.at(-1);
-  if (!latest || !snapshot.zkProof?.proof || !snapshot.zkProof.verificationKeyId) {
-    throw new Error("The paid dataset did not include records and a verifiable proof");
+  if (
+    !latest ||
+    !snapshot.zkProof?.proof ||
+    !snapshot.zkProof.verificationKeyId
+  ) {
+    throw new Error(
+      "The paid dataset did not include records and a verifiable proof",
+    );
   }
   emit({
-    type: "telemetry", day: latest.day,
+    type: "telemetry",
+    day: latest.day,
     signal: latest.quantitative_alpha.thermodynamic_signal,
-    telemetryHash: createHash("sha256").update(JSON.stringify({
-      day: latest.day,
-      quantitative_alpha: latest.quantitative_alpha,
-    })).digest("hex"),
+    telemetryHash: createHash("sha256")
+      .update(
+        JSON.stringify({
+          day: latest.day,
+          quantitative_alpha: latest.quantitative_alpha,
+        }),
+      )
+      .digest("hex"),
   });
 
   const snapshotKey = fingerprint(snapshot);
-  let checkpoint: Checkpoint = await store.load() ?? { snapshotKey, verified: false };
+  let checkpoint: Checkpoint = (await store.load()) ?? {
+    snapshotKey,
+    verified: false,
+  };
   if (checkpoint.snapshotKey !== snapshotKey) {
     checkpoint = { snapshotKey, verified: false };
   }
@@ -56,7 +87,9 @@ export async function runCycle({ rest, mcp, store, emit }: AgentDependencies): P
       data: snapshot.data as unknown as Record<string, unknown>[],
     });
     if (!verified.valid) {
-      throw new Error(`The dataset proof was invalid: ${verified.error ?? "verification failed"}`);
+      throw new Error(
+        `The dataset proof was invalid: ${verified.error ?? "verification failed"}`,
+      );
     }
     checkpoint = { snapshotKey, verified: true };
     await store.save(checkpoint);
@@ -65,13 +98,18 @@ export async function runCycle({ rest, mcp, store, emit }: AgentDependencies): P
 
   const mesh = await mcp.getMeshStatus();
   if (mesh.configuredPeerCount < 1 || mesh.topologyHealth === "isolated") {
-    emit({ type: "isolated", reason: "No trusted mesh peers configured or reachable" });
+    emit({
+      type: "isolated",
+      reason: "No trusted mesh peers configured or reachable",
+    });
     return;
   }
   const catalog = await mcp.listStratigraphy();
   const date = catalog.dateBounds.endDate;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw new Error("The stratigraphy catalog did not include a broadcast date");
+    throw new Error(
+      "The stratigraphy catalog did not include a broadcast date",
+    );
   }
   if (checkpoint.broadcastDate === date) return;
 
@@ -99,7 +137,9 @@ export async function runAgentLoop(
       dependencies.emit({
         type: "error",
         error: error instanceof Error ? error.message : "Unknown worker error",
-        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+        ...(error instanceof Error && error.stack
+          ? { stack: error.stack }
+          : {}),
       });
     }
     if (signal.aborted) break;

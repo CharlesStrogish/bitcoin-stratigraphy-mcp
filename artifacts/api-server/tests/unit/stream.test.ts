@@ -18,9 +18,7 @@ import type {
   StratigraphyTelemetryHub,
 } from "../../src/services/stratigraphy-stream";
 import { readLiveBitcoinTelemetry } from "../../src/services/stratigraphy-stream";
-import type {
-  SettlementRouter,
-} from "../../src/services/settlement";
+import type { SettlementRouter } from "../../src/services/settlement";
 import { createAgentReputationService } from "../../src/services/agentReputation";
 
 const vipAgentKey = generateSecretKey();
@@ -276,9 +274,7 @@ test("opens an authenticated SSE stream and sends telemetry JSON", async () => {
     const reader = response.body!.getReader();
     const content = await readUntil(reader, "\n\n");
     assert.match(content, /event: telemetry/);
-    const payload = JSON.parse(
-      content.split("data: ")[1].split("\n\n")[0],
-    );
+    const payload = JSON.parse(content.split("data: ")[1].split("\n\n")[0]);
     const { attestation, ...unsignedTelemetry } = payload.data;
     assert.deepEqual(unsignedTelemetry, telemetry);
     assert.deepEqual(JSON.parse(attestation.event.content), telemetry);
@@ -375,7 +371,9 @@ test("does not attach stream resources after disconnect during verification", as
     return new Promise((resolve, reject) => {
       const abort = () => {
         verificationAborted = true;
-        reject(input.signal?.reason ?? new DOMException("Aborted", "AbortError"));
+        reject(
+          input.signal?.reason ?? new DOMException("Aborted", "AbortError"),
+        );
       };
       if (input.signal?.aborted) {
         abort();
@@ -385,25 +383,22 @@ test("does not attach stream resources after disconnect during verification", as
       void resolve;
     });
   });
-  await withStreamServer(
-    async ({ url, hubState, schedulerState }) => {
-      const controller = new AbortController();
-      const request = fetch(url, {
-        headers: { Authorization: streamAuthorization() },
-        signal: controller.signal,
-      });
-      await started;
-      controller.abort();
-      await request.catch(() => undefined);
-      await waitFor(() => verificationAborted);
-      assert.equal(hubState.hub.activeSubscribers(), 0);
-      assert.equal(schedulerState.intervals.size, 0);
-      assert.equal(verificationAborted, true);
-      assert.equal(hubState.cleanupCalls(), 0);
-      assert.equal(schedulerState.clearCalls(), 0);
-    },
-    router,
-  );
+  await withStreamServer(async ({ url, hubState, schedulerState }) => {
+    const controller = new AbortController();
+    const request = fetch(url, {
+      headers: { Authorization: streamAuthorization() },
+      signal: controller.signal,
+    });
+    await started;
+    controller.abort();
+    await request.catch(() => undefined);
+    await waitFor(() => verificationAborted);
+    assert.equal(hubState.hub.activeSubscribers(), 0);
+    assert.equal(schedulerState.intervals.size, 0);
+    assert.equal(verificationAborted, true);
+    assert.equal(hubState.cleanupCalls(), 0);
+    assert.equal(schedulerState.clearCalls(), 0);
+  }, router);
 });
 
 test("cancels non-success telemetry response bodies", async () => {

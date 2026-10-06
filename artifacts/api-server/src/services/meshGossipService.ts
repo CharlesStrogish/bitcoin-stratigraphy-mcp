@@ -7,7 +7,12 @@ import {
   type Event,
   type EventTemplate,
 } from "nostr-tools";
-import { NostrWebOfTrust, verifyAgentSessionEvent, type AgentIdentity, type IdentityInput } from "./nostrWebOfTrust";
+import {
+  NostrWebOfTrust,
+  verifyAgentSessionEvent,
+  type AgentIdentity,
+  type IdentityInput,
+} from "./nostrWebOfTrust";
 
 const HEX_32 = /^[0-9a-f]{64}$/;
 const DEFAULT_TIMEOUT_MS = 1_500;
@@ -78,8 +83,10 @@ function normalizePeerUrl(value: string): string {
   const url = new URL(value.trim());
   if (
     url.protocol !== "https:" &&
-    !(url.protocol === "http:" &&
-      (url.hostname === "localhost" || url.hostname === "127.0.0.1"))
+    !(
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+    )
   ) {
     throw new Error("Mesh peer URLs must use HTTPS");
   }
@@ -105,9 +112,9 @@ function canonicalMeshValue(value: unknown): unknown {
     return [
       "object",
       Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([key, item]) => [key, canonicalMeshValue(item)]),
+        .filter(([, item]) => item !== undefined)
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, item]) => [key, canonicalMeshValue(item)]),
     ];
   }
   throw new TypeError("Mesh snapshot must be JSON serializable");
@@ -122,11 +129,14 @@ function digestJson(value: unknown): string {
 }
 
 function hashPair(left: string, right: string): string {
-  return createHash("sha256").update(left + right).digest("hex");
+  return createHash("sha256")
+    .update(left + right)
+    .digest("hex");
 }
 
 export function meshMerkleRoot(eventIds: string[]): string {
-  if (eventIds.length === 0) return createHash("sha256").update("").digest("hex");
+  if (eventIds.length === 0)
+    return createHash("sha256").update("").digest("hex");
   let level = [...eventIds].sort();
   while (level.length > 1) {
     const next: string[] = [];
@@ -196,8 +206,7 @@ function validSourceAttestation(
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
   const attestation = candidate.attestation as
-    | { payload_sha256?: unknown; event?: Event }
-    | undefined;
+    { payload_sha256?: unknown; event?: Event } | undefined;
   if (!attestation?.event || typeof attestation.payload_sha256 !== "string") {
     return false;
   }
@@ -216,8 +225,7 @@ function validSourceAttestation(
       (tag) => tag[0] === "t" && tag[1] === "telemetry",
     ) &&
     attestation.event.tags.some(
-      (tag) =>
-        tag[0] === "x" && tag[1] === attestation.payload_sha256,
+      (tag) => tag[0] === "x" && tag[1] === attestation.payload_sha256,
     ) &&
     createHash("sha256").update(content).digest("hex") ===
       attestation.payload_sha256 &&
@@ -239,7 +247,10 @@ function validGossipedSnapshot(
 }
 
 export class MeshQuorumError extends Error {
-  constructor(readonly received: number, readonly required: number) {
+  constructor(
+    readonly received: number,
+    readonly required: number,
+  ) {
     super(
       `Mesh quorum unavailable: received ${received} of ${required} attestations`,
     );
@@ -257,9 +268,15 @@ export class MeshGossipService {
   private readonly timeoutMs: number;
   private readonly now: () => number;
   private readonly identities: NostrWebOfTrust;
-  private readonly sessionGraph = new Map<string, {
-    pubkey: string; eventId: string; acceptedAt: number; identity: AgentIdentity;
-  }>();
+  private readonly sessionGraph = new Map<
+    string,
+    {
+      pubkey: string;
+      eventId: string;
+      acceptedAt: number;
+      identity: AgentIdentity;
+    }
+  >();
   private readonly sessionUsage = new Map<string, string>();
   private validationAttempts = 0;
   private validationSuccesses = 0;
@@ -297,17 +314,25 @@ export class MeshGossipService {
       }
       return { url: normalizePeerUrl(peer.slice(0, separator)), pubkey };
     });
-    if (new Set(this.peers.map((peer) => peer.pubkey)).size !== this.peers.length) {
+    if (
+      new Set(this.peers.map((peer) => peer.pubkey)).size !== this.peers.length
+    ) {
       throw new Error("Mesh peer pubkeys must be unique");
     }
     this.thresholdOverride = options.threshold;
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.now = options.now ?? Date.now;
-    this.identities = options.identityService ?? new NostrWebOfTrust({
-      trustedPubkeys: [this.nodePubkey, ...this.peers.map((peer) => peer.pubkey)],
-      networkId: this.networkId, now: this.now,
-    });
+    this.identities =
+      options.identityService ??
+      new NostrWebOfTrust({
+        trustedPubkeys: [
+          this.nodePubkey,
+          ...this.peers.map((peer) => peer.pubkey),
+        ],
+        networkId: this.networkId,
+        now: this.now,
+      });
   }
 
   verifyIdentity(input: IdentityInput): Promise<AgentIdentity> {
@@ -318,32 +343,46 @@ export class MeshGossipService {
     return this.sessionGraph.get(snapshotDigest);
   }
 
-  private recordSession(snapshotDigest: string, agentEvent: Event, identity: AgentIdentity): void {
+  private recordSession(
+    snapshotDigest: string,
+    agentEvent: Event,
+    identity: AgentIdentity,
+  ): void {
     const previous = this.sessionUsage.get(agentEvent.id);
     if (previous && previous !== snapshotDigest) {
-      throw new Error("Agent session event was already bound to a different mesh state");
+      throw new Error(
+        "Agent session event was already bound to a different mesh state",
+      );
     }
     this.sessionUsage.set(agentEvent.id, snapshotDigest);
     this.sessionGraph.set(snapshotDigest, {
-      pubkey: identity.pubkey, eventId: agentEvent.id, acceptedAt: this.now(), identity,
+      pubkey: identity.pubkey,
+      eventId: agentEvent.id,
+      acceptedAt: this.now(),
+      identity,
     });
-    if (this.sessionGraph.size > 2_048) this.sessionGraph.delete(this.sessionGraph.keys().next().value!);
-    if (this.sessionUsage.size > 2_048) this.sessionUsage.delete(this.sessionUsage.keys().next().value!);
+    if (this.sessionGraph.size > 2_048)
+      this.sessionGraph.delete(this.sessionGraph.keys().next().value!);
+    if (this.sessionUsage.size > 2_048)
+      this.sessionUsage.delete(this.sessionUsage.keys().next().value!);
   }
 
   private async validateAgentSession(
     agentSession: { event: Event; date?: string },
     snapshotDigest: string,
   ): Promise<AgentIdentity> {
-    const binding = agentSession.date === undefined
-      ? { networkId: this.networkId, snapshotDigest }
-      : { networkId: this.networkId, date: agentSession.date };
+    const binding =
+      agentSession.date === undefined
+        ? { networkId: this.networkId, snapshotDigest }
+        : { networkId: this.networkId, date: agentSession.date };
     if (!verifyAgentSessionEvent(agentSession.event, binding, this.now())) {
       throw new Error("Agent session event does not bind to the mesh state");
     }
     const previous = this.sessionUsage.get(agentSession.event.id);
     if (previous && previous !== snapshotDigest) {
-      throw new Error("Agent session event was already bound to a different mesh state");
+      throw new Error(
+        "Agent session event was already bound to a different mesh state",
+      );
     }
     const identity = await this.verifyIdentity({ event: agentSession.event });
     if (!identity.isValidSignature || identity.trustScore <= 0) {
@@ -393,8 +432,15 @@ export class MeshGossipService {
       throw new Error("Mesh snapshot validation failed");
     }
     if (input.agentSession) {
-      const identity = await this.validateAgentSession(input.agentSession, input.snapshotDigest);
-      this.recordSession(input.snapshotDigest, input.agentSession.event, identity);
+      const identity = await this.validateAgentSession(
+        input.agentSession,
+        input.snapshotDigest,
+      );
+      this.recordSession(
+        input.snapshotDigest,
+        input.agentSession.event,
+        identity,
+      );
     }
     return this.signDigest(input.snapshotDigest);
   }
@@ -409,7 +455,10 @@ export class MeshGossipService {
           );
           if (!response.ok) return undefined;
           const body = (await response.json()) as { nodePubkey?: unknown };
-          if (body.nodePubkey !== peer.pubkey || peer.pubkey === this.nodePubkey) {
+          if (
+            body.nodePubkey !== peer.pubkey ||
+            peer.pubkey === this.nodePubkey
+          ) {
             return undefined;
           }
           return { url: peer.url, pubkey: peer.pubkey };
@@ -476,7 +525,9 @@ export class MeshGossipService {
             return undefined;
           }
           const latency = Math.max(0, this.now() - startedAt);
-          const state = this.peers.find((candidate) => candidate.url === peer.url);
+          const state = this.peers.find(
+            (candidate) => candidate.url === peer.url,
+          );
           if (state) {
             state.lastValidatedAt = this.now();
             state.latencyMs = latency;
@@ -499,7 +550,9 @@ export class MeshGossipService {
     for (const result of peerResults) {
       if (
         result &&
-        !attestations.some((attestation) => attestation.pubkey === result.pubkey)
+        !attestations.some(
+          (attestation) => attestation.pubkey === result.pubkey,
+        )
       ) {
         attestations.push(result);
       }

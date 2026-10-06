@@ -6,7 +6,12 @@ import unittest
 import httpx
 
 from scripts.verify_agent_routes import (
-    BECH32, COST_TOOLS, EXPECTED_TOOLS, PROTOCOL_VERSION, bech32_polymod, run_checks,
+    BECH32,
+    COST_TOOLS,
+    EXPECTED_TOOLS,
+    PROTOCOL_VERSION,
+    bech32_polymod,
+    run_checks,
 )
 
 
@@ -26,22 +31,40 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
 
         def handle(request):
             if request.url.path == "/.well-known/mcp/server-card.json":
-                return httpx.Response(200, headers={"access-control-allow-origin": "*"}, json={
-                    "name": "broken" if fault == "card" else "bitcoin-stratigraphy-mcp",
-                    "displayName": "Bitcoin Stratigraphy Data Engine",
-                    "description": "Provides thermodynamic data, proof verification, and L402 payments.",
-                    "version": "1.0.0",
-                    "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
-                })
+                return httpx.Response(
+                    200,
+                    headers={"access-control-allow-origin": "*"},
+                    json={
+                        "name": "broken"
+                        if fault == "card"
+                        else "bitcoin-stratigraphy-mcp",
+                        "displayName": "Bitcoin Stratigraphy Data Engine",
+                        "description": "Provides thermodynamic data, proof verification, and L402 payments.",
+                        "version": "1.0.0",
+                        "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+                    },
+                )
             seen.append(request)
             self.assertNotIn("authorization", request.headers)
             if request.url.path == "/.well-known/mcp.json":
                 namespaces = ["stratigraphy", "proof", "mesh", "payment"]
                 if fault == "namespace":
                     namespaces[-1] = "unknown"
-                return httpx.Response(200, headers={
-                    "access-control-allow-origin": "https://wrong.invalid" if fault == "cors" else "*",
-                }, json={"mcp": {"capabilities": {"tools": {"count": 14, "namespaces": namespaces}}}})
+                return httpx.Response(
+                    200,
+                    headers={
+                        "access-control-allow-origin": "https://wrong.invalid"
+                        if fault == "cors"
+                        else "*",
+                    },
+                    json={
+                        "mcp": {
+                            "capabilities": {
+                                "tools": {"count": 14, "namespaces": namespaces}
+                            }
+                        }
+                    },
+                )
             if request.url.path == "/api/v1/cost":
                 self.assertEqual(request.method, "POST")
                 self.assertEqual(json.loads(request.content), {"tools": COST_TOOLS})
@@ -58,37 +81,67 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
             body = json.loads(request.content)
             method = body["method"]
             if method == "tools/call":
-                self.assertEqual(body["params"], {"name": "stratigraphy.get", "arguments": {"days": 1}})
+                self.assertEqual(
+                    body["params"],
+                    {"name": "stratigraphy.get", "arguments": {"days": 1}},
+                )
                 if fault == "timeout":
-                    raise httpx.ReadTimeout("PRIVATE request error detail", request=request)
+                    raise httpx.ReadTimeout(
+                        "PRIVATE request error detail", request=request
+                    )
                 invoice = invoice_fixture()
                 if fault == "invoice":
                     invoice = invoice[:-1] + ("q" if invoice[-1] != "q" else "p")
                 challenge = f'L402 macaroon="AQ==", invoice="{invoice}"'
                 if fault == "macaroon":
                     challenge = f'L402 macaroon="!!!", invoice="{invoice}"'
-                return httpx.Response(402, headers={} if fault == "challenge" else {"www-authenticate": challenge})
+                return httpx.Response(
+                    402,
+                    headers={}
+                    if fault == "challenge"
+                    else {"www-authenticate": challenge},
+                )
             if method == "tools/list":
                 names = sorted(EXPECTED_TOOLS)
                 if fault == "catalog":
                     names[-1] = names[0]
-                result = {"tools": [{"name": name, "inputSchema": {"type": "object"}} for name in names]}
+                result = {
+                    "tools": [
+                        {"name": name, "inputSchema": {"type": "object"}}
+                        for name in names
+                    ]
+                }
             elif method == "initialize":
                 self.assertEqual(body["params"]["protocolVersion"], PROTOCOL_VERSION)
-                result = {"protocolVersion": PROTOCOL_VERSION, "capabilities": {"tools": {}}}
+                result = {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "capabilities": {"tools": {}},
+                }
             else:
                 self.assertEqual(method, "ping")
                 result = {}
-            response = {"jsonrpc": "2.0", "id": "wrong" if fault == "rpc_id" else body["id"], "result": result}
+            response = {
+                "jsonrpc": "2.0",
+                "id": "wrong" if fault == "rpc_id" else body["id"],
+                "result": result,
+            }
             if fault == "rpc_error" and method == "ping":
                 response = {"jsonrpc": "2.0", "id": body["id"], "error": {"code": -1}}
             if sse:
-                return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=(
-                    ": keepalive\r\n\r\nevent: message\r\ndata: " + json.dumps(response) + "\r\n\r\n"
-                ))
+                return httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    text=(
+                        ": keepalive\r\n\r\nevent: message\r\ndata: "
+                        + json.dumps(response)
+                        + "\r\n\r\n"
+                    ),
+                )
             return httpx.Response(200, json=response)
 
-        async with httpx.AsyncClient(base_url="https://test.invalid", transport=httpx.MockTransport(handle)) as client:
+        async with httpx.AsyncClient(
+            base_url="https://test.invalid", transport=httpx.MockTransport(handle)
+        ) as client:
             results = await run_checks(client)
         self.assertEqual(len(results), 5)
         return results, seen
@@ -104,14 +157,24 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_checks_do_not_skip_other_probes(self):
         for fault, index in [
-            ("cors", 0), ("namespace", 0), ("catalog", 0),
-            ("cost404", 1), ("price", 1), ("challenge", 2), ("card", 4),
-            ("macaroon", 2), ("invoice", 2), ("timeout", 2), ("rpc_error", 3),
+            ("cors", 0),
+            ("namespace", 0),
+            ("catalog", 0),
+            ("cost404", 1),
+            ("price", 1),
+            ("challenge", 2),
+            ("card", 4),
+            ("macaroon", 2),
+            ("invoice", 2),
+            ("timeout", 2),
+            ("rpc_error", 3),
         ]:
             with self.subTest(fault=fault):
                 results, _ = await self.probe(fault)
                 self.assertFalse(results[index][1], results)
-                self.assertEqual(sum(not passed for _, passed, _ in results), 1, results)
+                self.assertEqual(
+                    sum(not passed for _, passed, _ in results), 1, results
+                )
                 self.assertNotIn("PRIVATE", str(results))
                 self.assertNotIn(invoice_fixture(), str(results))
 

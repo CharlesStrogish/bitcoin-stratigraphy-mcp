@@ -13,7 +13,10 @@ export type ProvenanceAnchor = {
   updatedAt: string;
 };
 
-type AnchorState = Pick<ProvenanceAnchor, "headHash" | "merkleRoot" | "totalDepth">;
+type AnchorState = Pick<
+  ProvenanceAnchor,
+  "headHash" | "merkleRoot" | "totalDepth"
+>;
 type StoredAnchor = Omit<ProvenanceAnchor, "otsProof" | "updatedAt"> & {
   otsProof: Buffer;
   updatedAt: Date;
@@ -54,13 +57,19 @@ const PUBLIC_CALENDAR_SET = new Set<string>([
 
 function validateState(state: AnchorState): void {
   if (!/^[0-9a-f]{64}$/i.test(state.headHash)) {
-    throw new TypeError("Provenance headHash must be a 32-byte hexadecimal hash");
+    throw new TypeError(
+      "Provenance headHash must be a 32-byte hexadecimal hash",
+    );
   }
   if (!/^[0-9a-f]{64}$/i.test(state.merkleRoot)) {
-    throw new TypeError("Provenance merkleRoot must be a 32-byte hexadecimal hash");
+    throw new TypeError(
+      "Provenance merkleRoot must be a 32-byte hexadecimal hash",
+    );
   }
   if (!Number.isSafeInteger(state.totalDepth) || state.totalDepth < 0) {
-    throw new TypeError("Provenance totalDepth must be a non-negative safe integer");
+    throw new TypeError(
+      "Provenance totalDepth must be a non-negative safe integer",
+    );
   }
 }
 
@@ -70,12 +79,16 @@ function digestRootBytes(rootBytes: Buffer): string {
 
 function checkedProof(proof: Buffer): Buffer {
   if (proof.length === 0 || proof.length > MAX_PROOF_BYTES) {
-    throw new Error("OpenTimestamps proof is empty or exceeds the maximum size");
+    throw new Error(
+      "OpenTimestamps proof is empty or exceeds the maximum size",
+    );
   }
   return proof;
 }
 
-export function otsCliEnvironment(inherited: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function otsCliEnvironment(
+  inherited: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
   const env = { ...inherited };
   // The Nix CLI must use its own dependency closure, not workspace Python packages.
   delete env.PYTHONPATH;
@@ -83,7 +96,11 @@ export function otsCliEnvironment(inherited: NodeJS.ProcessEnv = process.env): N
   return env;
 }
 
-function runOts(args: string[], cwd: string, timeoutMs: number): Promise<string> {
+function runOts(
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn("ots", ["--no-cache", ...args], {
       cwd,
@@ -106,7 +123,9 @@ function runOts(args: string[], cwd: string, timeoutMs: number): Promise<string>
       outputBytes += chunk.length;
       if (outputBytes > MAX_CLI_OUTPUT_BYTES) {
         child.kill("SIGKILL");
-        finish(new Error("OpenTimestamps CLI output exceeded the maximum size"));
+        finish(
+          new Error("OpenTimestamps CLI output exceeded the maximum size"),
+        );
         return;
       }
       if (target === "stdout") stdout += chunk.toString("utf8");
@@ -122,12 +141,19 @@ function runOts(args: string[], cwd: string, timeoutMs: number): Promise<string>
     child.once("close", (code) => {
       if (settled) return;
       if (code === 0) finish(undefined, stdout);
-      else finish(new Error(`OpenTimestamps CLI failed (${code}): ${stderr.slice(0, 1_024)}`));
+      else
+        finish(
+          new Error(
+            `OpenTimestamps CLI failed (${code}): ${stderr.slice(0, 1_024)}`,
+          ),
+        );
     });
   });
 }
 
-async function inTempDirectory<T>(operation: (directory: string) => Promise<T>): Promise<T> {
+async function inTempDirectory<T>(
+  operation: (directory: string) => Promise<T>,
+): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), "ots-provenance-"));
   try {
     return await operation(directory);
@@ -175,18 +201,28 @@ const otsCli: OtsCli = {
     return inTempDirectory(async (directory) => {
       const proofPath = join(directory, "anchor.ots");
       await writeFile(proofPath, checkedProof(proof), { flag: "wx" });
-      const info = await runOts(["info", proofPath], directory, VERIFY_TIMEOUT_MS);
-      const digest = /^File sha256 hash: ([0-9a-f]{64})$/mi.exec(info)?.[1];
+      const info = await runOts(
+        ["info", proofPath],
+        directory,
+        VERIFY_TIMEOUT_MS,
+      );
+      const digest = /^File sha256 hash: ([0-9a-f]{64})$/im.exec(info)?.[1];
       if (!digest) {
-        throw new Error("OpenTimestamps receipt does not contain a SHA-256 file digest");
+        throw new Error(
+          "OpenTimestamps receipt does not contain a SHA-256 file digest",
+        );
       }
-      const referencedCalendars: string[] = [...(info.match(/https?:\/\/[^\s]+/g) ?? [])];
+      const referencedCalendars: string[] = [
+        ...(info.match(/https?:\/\/[^\s]+/g) ?? []),
+      ];
       if (
-        referencedCalendars.some((url) =>
-          !PUBLIC_CALENDAR_SET.has(url.replace(/[\])},.;'"]+$/, ""))
+        referencedCalendars.some(
+          (url) => !PUBLIC_CALENDAR_SET.has(url.replace(/[\])},.;'"]+$/, "")),
         )
       ) {
-        throw new Error("OpenTimestamps receipt references a non-approved calendar");
+        throw new Error(
+          "OpenTimestamps receipt references a non-approved calendar",
+        );
       }
       return digest;
     });
@@ -233,7 +269,10 @@ export async function verifyOtsProofRecord(
   }
   const encoded = input.otsProof;
   const hex = /^(?:[0-9a-fA-F]{2})+$/.test(encoded);
-  if (!hex && (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0)) {
+  if (
+    !hex &&
+    (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0)
+  ) {
     throw new TypeError("otsProof must be a base64 or hex-encoded OTS receipt");
   }
   const proof = checkedProof(Buffer.from(encoded, hex ? "hex" : "base64"));
@@ -244,54 +283,83 @@ export async function verifyOtsProofRecord(
   const verifyDigest = dependencies.verifyDigest ?? otsCli.verifyDigest;
   const digest = await inspectDigest(proof);
   const unverified: OtsVerificationResult = {
-    valid: false, status: "unverified", blockHeight: null, bitcoinHeaderHash: null,
+    valid: false,
+    status: "unverified",
+    blockHeight: null,
+    bitcoinHeaderHash: null,
   };
-  if (digest.toLowerCase() !== targetHash || !(await verifyDigest(proof, targetHash))) {
+  if (
+    digest.toLowerCase() !== targetHash ||
+    !(await verifyDigest(proof, targetHash))
+  ) {
     return unverified;
   }
-  const inspectHeights = dependencies.inspectHeights ?? (async (bytes: Buffer) =>
-    inTempDirectory(async (directory) => {
-      const proofPath = join(directory, "anchor.ots");
-      await writeFile(proofPath, bytes, { flag: "wx" });
-      const info = await runOts(["info", proofPath], directory, VERIFY_TIMEOUT_MS);
-      return [...info.matchAll(/BitcoinBlockHeaderAttestation\((\d+)\)/g)]
-        .map((match) => Number(match[1]));
-    }));
+  const inspectHeights =
+    dependencies.inspectHeights ??
+    (async (bytes: Buffer) =>
+      inTempDirectory(async (directory) => {
+        const proofPath = join(directory, "anchor.ots");
+        await writeFile(proofPath, bytes, { flag: "wx" });
+        const info = await runOts(
+          ["info", proofPath],
+          directory,
+          VERIFY_TIMEOUT_MS,
+        );
+        return [
+          ...info.matchAll(/BitcoinBlockHeaderAttestation\((\d+)\)/g),
+        ].map((match) => Number(match[1]));
+      }));
   const heights = [...new Set(await inspectHeights(proof))];
-  if (heights.length !== 1 || !Number.isSafeInteger(heights[0]) || heights[0]! <= 0) {
+  if (
+    heights.length !== 1 ||
+    !Number.isSafeInteger(heights[0]) ||
+    heights[0]! <= 0
+  ) {
     return unverified;
   }
   const height = heights[0]!;
-  const readHeaderHash = dependencies.readHeaderHash ?? (async (blockHeight: number) => {
-    const response = await fetch(`https://mempool.space/api/block-height/${blockHeight}`, {
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!response.ok) throw new Error("Bitcoin header provider is unavailable");
-    if (!response.body) throw new Error("Bitcoin header provider returned no body");
-    const reader = response.body.getReader();
-    const chunks: Buffer[] = [];
-    let bytes = 0;
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytes += value.byteLength;
-        if (bytes > 128) throw new Error("Bitcoin header response exceeds size limit");
-        chunks.push(Buffer.from(value));
+  const readHeaderHash =
+    dependencies.readHeaderHash ??
+    (async (blockHeight: number) => {
+      const response = await fetch(
+        `https://mempool.space/api/block-height/${blockHeight}`,
+        {
+          signal: AbortSignal.timeout(5_000),
+        },
+      );
+      if (!response.ok)
+        throw new Error("Bitcoin header provider is unavailable");
+      if (!response.body)
+        throw new Error("Bitcoin header provider returned no body");
+      const reader = response.body.getReader();
+      const chunks: Buffer[] = [];
+      let bytes = 0;
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytes += value.byteLength;
+          if (bytes > 128)
+            throw new Error("Bitcoin header response exceeds size limit");
+          chunks.push(Buffer.from(value));
+        }
+      } finally {
+        await reader.cancel().catch(() => undefined);
       }
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-    const value = Buffer.concat(chunks).toString("utf8").trim().toLowerCase();
-    if (value.length > 64) throw new Error("Bitcoin header response exceeds size limit");
-    return value;
-  });
+      const value = Buffer.concat(chunks).toString("utf8").trim().toLowerCase();
+      if (value.length > 64)
+        throw new Error("Bitcoin header response exceeds size limit");
+      return value;
+    });
   const bitcoinHeaderHash = (await readHeaderHash(height)).toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(bitcoinHeaderHash)) {
     throw new Error("Bitcoin header provider returned an invalid hash");
   }
   return {
-    valid: true, status: "bitcoin_block_attested", blockHeight: height, bitcoinHeaderHash,
+    valid: true,
+    status: "bitcoin_block_attested",
+    blockHeight: height,
+    bitcoinHeaderHash,
   };
 }
 
@@ -344,10 +412,15 @@ export function createOtsProvenanceService(
     const proof = checkedProof(Buffer.from(row.otsProof));
     const rootBytes = Buffer.from(row.merkleRoot, "hex");
     const expectedDigest = digestRootBytes(rootBytes);
-    if (await dependencies.cli.inspectDigest(proof) !== expectedDigest) {
-      throw new Error("Stored OpenTimestamps receipt is not bound to its Merkle root");
+    if ((await dependencies.cli.inspectDigest(proof)) !== expectedDigest) {
+      throw new Error(
+        "Stored OpenTimestamps receipt is not bound to its Merkle root",
+      );
     }
-    if (row.otsStatus !== "pending_calendar" && row.otsStatus !== "bitcoin_block_attested") {
+    if (
+      row.otsStatus !== "pending_calendar" &&
+      row.otsStatus !== "bitcoin_block_attested"
+    ) {
       throw new Error("Stored OpenTimestamps receipt has an invalid status");
     }
     return {
@@ -361,7 +434,9 @@ export function createOtsProvenanceService(
   }
 
   return {
-    async getProvenanceAnchor(headHash: string): Promise<ProvenanceAnchor | undefined> {
+    async getProvenanceAnchor(
+      headHash: string,
+    ): Promise<ProvenanceAnchor | undefined> {
       const row = await dependencies.store.get(headHash);
       return row ? asPublicAnchor(row) : undefined;
     },
@@ -388,18 +463,25 @@ export function createOtsProvenanceService(
         previous.totalDepth === state.totalDepth
       ) {
         proof = checkedProof(Buffer.from(previous.otsProof));
-        if (await dependencies.cli.inspectDigest(proof) !== expectedDigest) {
-          throw new Error("Stored OpenTimestamps receipt is not bound to its Merkle root");
+        if ((await dependencies.cli.inspectDigest(proof)) !== expectedDigest) {
+          throw new Error(
+            "Stored OpenTimestamps receipt is not bound to its Merkle root",
+          );
         }
         proof = checkedProof(await dependencies.cli.upgrade(proof));
       } else {
         proof = checkedProof(await dependencies.cli.stamp(rootBytes));
       }
 
-      if (await dependencies.cli.inspectDigest(proof) !== expectedDigest) {
-        throw new Error("OpenTimestamps CLI produced a receipt for a different Merkle root");
+      if ((await dependencies.cli.inspectDigest(proof)) !== expectedDigest) {
+        throw new Error(
+          "OpenTimestamps CLI produced a receipt for a different Merkle root",
+        );
       }
-      const otsStatus = await dependencies.cli.verifyDigest(proof, expectedDigest)
+      const otsStatus = (await dependencies.cli.verifyDigest(
+        proof,
+        expectedDigest,
+      ))
         ? "bitcoin_block_attested"
         : "pending_calendar";
       const row: StoredAnchor = {
@@ -423,8 +505,10 @@ export async function getProvenanceAnchor(
   return service.getProvenanceAnchor(headHash);
 }
 
-export async function anchorProvenance(
-  state: { headHash: string; merkleRoot: string; totalDepth: number },
-): Promise<ProvenanceAnchor> {
+export async function anchorProvenance(state: {
+  headHash: string;
+  merkleRoot: string;
+  totalDepth: number;
+}): Promise<ProvenanceAnchor> {
   return service.anchorProvenance(state);
 }

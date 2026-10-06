@@ -17,6 +17,8 @@ import { createPricingEngine } from "./services/pricing";
 import { runtimePricingLoad } from "./services/orchestrator";
 import {
   createSlidingWindowRateLimiter,
+  createPublicRateLimiter,
+  createPublicWebRateLimitMiddleware,
 } from "./middleware/rateLimiter";
 import { registerSystemHealthRoute } from "./routes/system-health";
 import { registerLlmExportRoutes } from "./routes/llm-export";
@@ -40,7 +42,9 @@ const l402RateLimiter = createSlidingWindowRateLimiter({
 
 app.set("trust proxy", 1);
 
-registerPublicCors(app);
+const publicRateLimiter = createPublicRateLimiter();
+app.disable("x-powered-by");
+registerPublicCors(app, createPublicWebRateLimitMiddleware(publicRateLimiter));
 app.use(
   pinoHttp({
     logger,
@@ -77,7 +81,12 @@ const macaroonUsageStore = createPostgresMacaroonUsageStore();
 registerOpenApiRoute(app);
 registerDocsRoutes(app);
 registerMcpServerCardRoute(app);
-registerMcpRoute(app, { usageStore: macaroonUsageStore, ledger: revenueLedger, meshService });
+registerMcpRoute(app, {
+  usageStore: macaroonUsageStore,
+  ledger: revenueLedger,
+  meshService,
+  publicRateLimiter,
+});
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);

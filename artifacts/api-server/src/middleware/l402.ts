@@ -11,15 +11,9 @@ import {
   type MacaroonUsageStore,
 } from "../lib/macaroon-usage-store";
 import type { SettlementRouter } from "../services/settlement";
-import type {
-  RevenueLedger,
-  RevenueRequestKind,
-} from "../services/ledger";
+import type { RevenueLedger, RevenueRequestKind } from "../services/ledger";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
-import {
-  paymentReference,
-  recordRevenueWithRetry,
-} from "../services/ledger";
+import { paymentReference, recordRevenueWithRetry } from "../services/ledger";
 
 export type L402Authorization = {
   macaroon: string;
@@ -45,9 +39,10 @@ export type L402MiddlewareOptions = {
 export function parseL402Header(
   value: string | undefined,
 ): L402Authorization | null {
-  const match = /^L402\s+([^:\s]+):([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$/.exec(
-    value?.trim() ?? "",
-  );
+  const match =
+    /^L402\s+([^:\s]+):([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$/.exec(
+      value?.trim() ?? "",
+    );
   return match
     ? { macaroon: match[1]!, preimage: match[2]!.toLowerCase() }
     : null;
@@ -63,13 +58,17 @@ export function createL402Middleware(
     !Number.isSafeInteger(options.invoiceExpirySeconds ?? 3_600) ||
     (options.invoiceExpirySeconds ?? 3_600) <= 0
   ) {
-    throw new RangeError("L402 invoiceExpirySeconds must be a positive integer");
+    throw new RangeError(
+      "L402 invoiceExpirySeconds must be a positive integer",
+    );
   }
   if (
     !Number.isSafeInteger(options.maxChallengesPerMinute ?? 10) ||
     (options.maxChallengesPerMinute ?? 10) <= 0
   ) {
-    throw new RangeError("L402 maxChallengesPerMinute must be a positive integer");
+    throw new RangeError(
+      "L402 maxChallengesPerMinute must be a positive integer",
+    );
   }
   const resolveAmountSats = () => {
     const amount =
@@ -88,11 +87,18 @@ export function createL402Middleware(
   if (typeof options.amountSats === "number") resolveAmountSats();
   const invoiceExpirySeconds = options.invoiceExpirySeconds ?? 3_600;
   const now = options.now ?? Date.now;
-  const credentialCache = new L402EdgeCache<NonNullable<ReturnType<typeof verifySubscriptionMacaroon>>>(now);
-  const settlementCache = new L402EdgeCache<Awaited<ReturnType<SettlementRouter["verifyPayment"]>>>(now);
+  const credentialCache = new L402EdgeCache<
+    NonNullable<ReturnType<typeof verifySubscriptionMacaroon>>
+  >(now);
+  const settlementCache = new L402EdgeCache<
+    Awaited<ReturnType<SettlementRouter["verifyPayment"]>>
+  >(now);
   const usageStore = options.usageStore ?? createMemoryMacaroonUsageStore(now);
   const maxChallengesPerMinute = options.maxChallengesPerMinute ?? 10;
-  const challengeWindows = new Map<string, { startedAt: number; count: number }>();
+  const challengeWindows = new Map<
+    string,
+    { startedAt: number; count: number }
+  >();
   const maxChallengeCallers = 10_000;
   let challengeWindowsCleanedAt = 0;
 
@@ -119,7 +125,10 @@ export function createL402Middleware(
       }
       challengeWindowsCleanedAt = currentTime;
     }
-    if (!challengeWindows.has(caller) && challengeWindows.size >= maxChallengeCallers) {
+    if (
+      !challengeWindows.has(caller) &&
+      challengeWindows.size >= maxChallengeCallers
+    ) {
       res.setHeader("Retry-After", "60");
       res.status(429).json({ error: "Too many payment challenges requested" });
       return;
@@ -134,7 +143,12 @@ export function createL402Middleware(
     if (window.count > maxChallengesPerMinute) {
       res.setHeader(
         "Retry-After",
-        String(Math.max(1, Math.ceil((60_000 - (currentTime - window.startedAt)) / 1_000))),
+        String(
+          Math.max(
+            1,
+            Math.ceil((60_000 - (currentTime - window.startedAt)) / 1_000),
+          ),
+        ),
       );
       res.status(429).json({ error: "Too many payment challenges requested" });
       return;
@@ -142,16 +156,22 @@ export function createL402Middleware(
     try {
       const requestedBatch = req.get("X-L402-Batch-Size");
       if (requestedBatch && (!options.allowBatch || requestedBatch !== "100")) {
-        res.status(400).json({ error: "X-L402-Batch-Size must be 100 on a batch-capable route" });
+        res.status(400).json({
+          error: "X-L402-Batch-Size must be 100 on a batch-capable route",
+        });
         return;
       }
       const batchSize = requestedBatch ? 100 : 1;
       const amountSats = resolveAmountSats() * batchSize;
-      if (!Number.isSafeInteger(amountSats * 1_000)) throw new RangeError("Batch price exceeds safe range");
+      if (!Number.isSafeInteger(amountSats * 1_000))
+        throw new RangeError("Batch price exceeds safe range");
       const amountMsats = amountSats * 1_000;
       const invoice = await options.settlementRouter.createInvoice({
         amountMsats,
-        description: batchSize === 100 ? `${options.description} (100-call batch)` : options.description,
+        description:
+          batchSize === 100
+            ? `${options.description} (100-call batch)`
+            : options.description,
         expirySeconds: invoiceExpirySeconds,
         asset: "btc-lightning",
       });
@@ -201,16 +221,26 @@ export function createL402Middleware(
     const authorization = parseL402Header(req.header("Authorization"));
     if (secret && authorization) {
       const credentialKey = L402EdgeCache.key(secret, authorization.macaroon);
-      const pass = credentialCache.get(credentialKey) ?? verifySubscriptionMacaroon(
-        authorization.macaroon,
-        secret,
-        Math.floor(now() / 1_000),
-      );
+      const pass =
+        credentialCache.get(credentialKey) ??
+        verifySubscriptionMacaroon(
+          authorization.macaroon,
+          secret,
+          Math.floor(now() / 1_000),
+        );
       if (pass) {
-        credentialCache.set(credentialKey, pass, pass.expiresAt ?? pass.validUntil * 1_000);
-        if (!options.scopePath?.startsWith("/mcp/tools/") &&
-          (pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined)) {
-          res.status(403).json({ error: "Macaroon tool or target caveat forbids this route" });
+        credentialCache.set(
+          credentialKey,
+          pass,
+          pass.expiresAt ?? pass.validUntil * 1_000,
+        );
+        if (
+          !options.scopePath?.startsWith("/mcp/tools/") &&
+          (pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined)
+        ) {
+          res.status(403).json({
+            error: "Macaroon tool or target caveat forbids this route",
+          });
           return;
         }
         if (options.revocationStore) {
@@ -228,8 +258,8 @@ export function createL402Middleware(
       }
       const preimageHash = /^[0-9a-f]{64}$/.test(authorization.preimage)
         ? createHash("sha256")
-          .update(Buffer.from(authorization.preimage, "hex"))
-          .digest("hex")
+            .update(Buffer.from(authorization.preimage, "hex"))
+            .digest("hex")
         : null;
       if (
         pass &&
@@ -238,29 +268,50 @@ export function createL402Middleware(
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
         (typeof options.amountSats !== "number" ||
-          pass.amountMsats === options.amountSats * 1_000 *
-            (options.allowBatch && pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1)) &&
+          pass.amountMsats ===
+            options.amountSats *
+              1_000 *
+              (options.allowBatch && pass.requestLimits[0]?.maxRequests === 100
+                ? 100
+                : 1)) &&
         pass.paymentAsset === "btc-lightning" &&
         pass.paymentProvider &&
         pass.allowedPaths.length > 0 &&
-        pass.allowedPaths.every((path) => path === (options.scopePath ?? req.path))
+        pass.allowedPaths.every(
+          (path) => path === (options.scopePath ?? req.path),
+        )
       ) {
         let verification;
         try {
-          const batch = options.allowBatch && pass.requestLimits[0]?.maxRequests === 100;
-          const description = batch ? `${options.description} (100-call batch)` : options.description;
+          const batch =
+            options.allowBatch && pass.requestLimits[0]?.maxRequests === 100;
+          const description = batch
+            ? `${options.description} (100-call batch)`
+            : options.description;
           const expectedAmountMsats = pass.amountMsats;
-          const settlementKey = L402EdgeCache.key(secret, pass.paymentHash, authorization.preimage,
-            pass.paymentProvider, String(pass.amountMsats), description, options.scopePath ?? req.path);
-          verification = await settlementCache.resolve(settlementKey, pass.validUntil * 1_000, () =>
-            options.settlementRouter.verifyPayment({
-            paymentHash: pass.paymentHash,
-            preimage: authorization.preimage,
-            expectedAmountMsats,
-            expectedDescription: description,
-            expectedProvider: pass.paymentProvider,
-            asset: "btc-lightning",
-          }), (value) => typeof value === "object" && value !== null);
+          const settlementKey = L402EdgeCache.key(
+            secret,
+            pass.paymentHash,
+            authorization.preimage,
+            pass.paymentProvider,
+            String(pass.amountMsats),
+            description,
+            options.scopePath ?? req.path,
+          );
+          verification = await settlementCache.resolve(
+            settlementKey,
+            pass.validUntil * 1_000,
+            () =>
+              options.settlementRouter.verifyPayment({
+                paymentHash: pass.paymentHash,
+                preimage: authorization.preimage,
+                expectedAmountMsats,
+                expectedDescription: description,
+                expectedProvider: pass.paymentProvider,
+                asset: "btc-lightning",
+              }),
+            (value) => typeof value === "object" && value !== null,
+          );
         } catch (error) {
           req.log?.error({ err: error }, "L402 payment verification failed");
           res.status(502).json({ error: "Unable to verify payment" });
@@ -272,14 +323,18 @@ export function createL402Middleware(
         }
         if (typeof verification === "object") {
           if ((pass.expiresAt ?? pass.validUntil * 1_000) <= now()) {
-            res.status(401).json({ error: "L402 macaroon expired during verification" });
+            res
+              .status(401)
+              .json({ error: "L402 macaroon expired during verification" });
             return;
           }
           if (
             pass.maxRequests !== undefined &&
             !(await usageStore.consume(pass.requestLimits, pass.validUntil))
           ) {
-            res.status(429).json({ error: "L402 macaroon has already been used" });
+            res
+              .status(429)
+              .json({ error: "L402 macaroon has already been used" });
             return;
           }
           if (options.ledger) {

@@ -44,9 +44,9 @@ function isMatchingAnchor(
 ): anchor is ProvenanceAnchor {
   return Boolean(
     anchor &&
-      anchor.headHash === state.headHash &&
-      anchor.merkleRoot === state.merkleRoot &&
-      anchor.totalDepth === state.totalDepth,
+    anchor.headHash === state.headHash &&
+    anchor.merkleRoot === state.merkleRoot &&
+    anchor.totalDepth === state.totalDepth,
   );
 }
 
@@ -57,7 +57,8 @@ export function registerProvenanceRoutes(
   const readRecords = options.readRecords ?? readDataset;
   const getAnchor = options.getAnchor ?? getProvenanceAnchor;
   const anchor = options.anchor ?? anchorProvenance;
-  const operatorSecret = options.operatorSecret ?? process.env.MACAROON_OPERATOR_SECRET;
+  const operatorSecret =
+    options.operatorSecret ?? process.env.MACAROON_OPERATOR_SECRET;
   const requestsByAddress = new Map<string, number[]>();
 
   async function readCurrentState(): Promise<ChainState> {
@@ -74,7 +75,9 @@ export function registerProvenanceRoutes(
         totalDepth: state.totalDepth,
       });
       if (!isMatchingAnchor(result, state)) {
-        throw new Error("OpenTimestamps service returned an anchor for stale provenance state");
+        throw new Error(
+          "OpenTimestamps service returned an anchor for stale provenance state",
+        );
       }
       return result;
     })();
@@ -82,7 +85,8 @@ export function registerProvenanceRoutes(
     try {
       return await operation;
     } finally {
-      if (activeAnchorOperation === operation) activeAnchorOperation = undefined;
+      if (activeAnchorOperation === operation)
+        activeAnchorOperation = undefined;
     }
   }
 
@@ -125,7 +129,9 @@ export function registerProvenanceRoutes(
       const state = await readCurrentState();
       const storedAnchor = await getAnchor(state.headHash);
       if (storedAnchor && !isMatchingAnchor(storedAnchor, state)) {
-        res.status(409).json({ error: "Stored provenance anchor does not match the current chain" });
+        res.status(409).json({
+          error: "Stored provenance anchor does not match the current chain",
+        });
         return;
       }
       res.json({
@@ -134,7 +140,10 @@ export function registerProvenanceRoutes(
         totalDepth: state.totalDepth,
         otsStatus: storedAnchor?.otsStatus ?? "not_anchored",
         ...(storedAnchor
-          ? { otsProof: storedAnchor.otsProof, updatedAt: storedAnchor.updatedAt }
+          ? {
+              otsProof: storedAnchor.otsProof,
+              updatedAt: storedAnchor.updatedAt,
+            }
           : {}),
       });
     } catch (error) {
@@ -145,20 +154,26 @@ export function registerProvenanceRoutes(
 
   app.post("/api/provenance/anchor", async (req, res): Promise<void> => {
     if (!operatorSecret) {
-      res.status(503).json({ error: "Operator authentication is not configured" });
+      res
+        .status(503)
+        .json({ error: "Operator authentication is not configured" });
       return;
     }
 
     const authorization = req.get("authorization") ?? "";
     const token = /^Bearer ([^\s]+)$/i.exec(authorization)?.[1];
     if (!token || !matchesSecret(token, operatorSecret)) {
-      res.status(401).json({ error: "A valid operator Bearer token is required" });
+      res
+        .status(401)
+        .json({ error: "A valid operator Bearer token is required" });
       return;
     }
 
     const address = req.ip || req.socket.remoteAddress || "unknown";
     if (isRateLimited(address)) {
-      res.status(429).json({ error: "Provenance anchoring rate limit exceeded" });
+      res
+        .status(429)
+        .json({ error: "Provenance anchoring rate limit exceeded" });
       return;
     }
 
@@ -171,7 +186,9 @@ export function registerProvenanceRoutes(
       } else {
         logger.error({ err: error }, "Provenance anchor operation failed");
       }
-      res.status(503).json({ error: "Unable to anchor current provenance state" });
+      res
+        .status(503)
+        .json({ error: "Unable to anchor current provenance state" });
     }
   });
 
@@ -179,7 +196,10 @@ export function registerProvenanceRoutes(
     backgroundTimersScheduled = true;
     const runScheduledStamp = () => {
       void stampCurrentState().catch((error: unknown) => {
-        logger.error({ err: error }, "Scheduled provenance anchor operation failed");
+        logger.error(
+          { err: error },
+          "Scheduled provenance anchor operation failed",
+        );
       });
     };
     const startupTimer = setTimeout(runScheduledStamp, STARTUP_STAMP_DELAY_MS);

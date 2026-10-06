@@ -7,10 +7,15 @@ const DEFAULT_MEMPOOL_API = "https://mempool.space/api";
 const MAX_RESPONSE_BYTES = 4_096;
 const HEX_32 = /^[0-9a-f]{64}$/;
 const RECEIPT_SCHEMA = "bitcoin-stratigraphy/epistemic-anchor/v1";
-const contextReceiptIndex = new Map<string, Awaited<ReturnType<typeof groundEpistemicContext>>>();
+const contextReceiptIndex = new Map<
+  string,
+  Awaited<ReturnType<typeof groundEpistemicContext>>
+>();
 const MAX_CONTEXT_RECEIPTS = 1_000;
 
-export function indexGroundedContextReceipt(receipt: Awaited<ReturnType<typeof groundEpistemicContext>>): void {
+export function indexGroundedContextReceipt(
+  receipt: Awaited<ReturnType<typeof groundEpistemicContext>>,
+): void {
   if (!verifyEpistemicAnchorReceipt(receipt)) {
     throw new Error("Cannot index an invalid signed context receipt");
   }
@@ -21,8 +26,12 @@ export function indexGroundedContextReceipt(receipt: Awaited<ReturnType<typeof g
   }
 }
 
-export function getGroundedContextReceipt(hash: string): Awaited<ReturnType<typeof groundEpistemicContext>> | undefined {
-  const receipt = contextReceiptIndex.get(hash.replace(/^0x/i, "").toLowerCase());
+export function getGroundedContextReceipt(
+  hash: string,
+): Awaited<ReturnType<typeof groundEpistemicContext>> | undefined {
+  const receipt = contextReceiptIndex.get(
+    hash.replace(/^0x/i, "").toLowerCase(),
+  );
   return receipt ? structuredClone(receipt) : undefined;
 }
 
@@ -53,11 +62,13 @@ export type BitcoinTip = {
   source: string;
 };
 
-export async function fetchCurrentBitcoinTip(options: {
-  fetchImpl?: typeof fetch;
-  baseUrl?: string;
-  timeoutMs?: number;
-} = {}): Promise<BitcoinTip> {
+export async function fetchCurrentBitcoinTip(
+  options: {
+    fetchImpl?: typeof fetch;
+    baseUrl?: string;
+    timeoutMs?: number;
+  } = {},
+): Promise<BitcoinTip> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const baseUrl = (options.baseUrl ?? DEFAULT_MEMPOOL_API).replace(/\/+$/, "");
   const controller = new AbortController();
@@ -125,7 +136,9 @@ export async function groundEpistemicContext(
     throw new TypeError("Grounding contextHash must be 32-byte hexadecimal");
   }
   if (agentId.length === 0 || agentId.length > 256) {
-    throw new TypeError("Grounding agentId must be between 1 and 256 characters");
+    throw new TypeError(
+      "Grounding agentId must be between 1 and 256 characters",
+    );
   }
   const tip = validateBitcoinTip(
     await (options.readBitcoinTip ?? fetchCurrentBitcoinTip)(),

@@ -2,9 +2,14 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { z } from "zod";
 
-export const notarizeInputSchema = z.object({
-  hash: z.string().regex(/^[0-9a-fA-F]{64}$/).transform((hash) => hash.toLowerCase()),
-}).strict();
+export const notarizeInputSchema = z
+  .object({
+    hash: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/)
+      .transform((hash) => hash.toLowerCase()),
+  })
+  .strict();
 
 export type NotarizationReceipt = {
   hash: string;
@@ -66,7 +71,8 @@ print(json.dumps({"hash": digest.hex(), "otsProofHex": proof.hex(), "otsStatus":
 
 export async function notarizeHash(hash: string): Promise<NotarizationReceipt> {
   const input = notarizeInputSchema.parse({ hash });
-  if (activeWorkers >= 16) throw new Error("OpenTimestamps notary is busy; retry later");
+  if (activeWorkers >= 16)
+    throw new Error("OpenTimestamps notary is busy; retry later");
   activeWorkers++;
   try {
     const { stdout } = await run("python3", ["-c", worker, input.hash], {
@@ -76,9 +82,13 @@ export async function notarizeHash(hash: string): Promise<NotarizationReceipt> {
       encoding: "utf8",
     });
     const result = JSON.parse(stdout) as NotarizationReceipt;
-    if (result.hash !== input.hash || result.otsStatus !== "pending_calendar" ||
-      typeof result.otsProofHex !== "string" || !/^(?:[0-9a-f]{2})+$/.test(result.otsProofHex) ||
-      result.otsProofHex.length > MAX_PROOF_BYTES * 2) {
+    if (
+      result.hash !== input.hash ||
+      result.otsStatus !== "pending_calendar" ||
+      typeof result.otsProofHex !== "string" ||
+      !/^(?:[0-9a-f]{2})+$/.test(result.otsProofHex) ||
+      result.otsProofHex.length > MAX_PROOF_BYTES * 2
+    ) {
       throw new Error("Invalid OpenTimestamps worker response");
     }
     return result;

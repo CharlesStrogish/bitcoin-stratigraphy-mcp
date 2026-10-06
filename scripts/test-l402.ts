@@ -11,9 +11,7 @@ type L402Challenge = {
 
 function parseChallenge(header: string): L402Challenge {
   const match =
-    /(?:^|,\s*)L402\s+macaroon="([^"]+)",\s*invoice="([^"]+)"/i.exec(
-      header,
-    );
+    /(?:^|,\s*)L402\s+macaroon="([^"]+)",\s*invoice="([^"]+)"/i.exec(header);
   assert.ok(
     match,
     `WWW-Authenticate did not contain an L402 macaroon/invoice challenge: ${header}`,
@@ -92,7 +90,9 @@ async function main() {
   const challenge = await requestChallenge(url);
 
   if (!preimage) {
-    console.log("\nSettle this raw BOLT11 invoice with a Lightning wallet or NWC:");
+    console.log(
+      "\nSettle this raw BOLT11 invoice with a Lightning wallet or NWC:",
+    );
     console.log(challenge.invoice);
     console.log("\nAfter settlement, verify the payment with:");
     console.log("npm run test:l402 -- <64-character-hex-preimage>");

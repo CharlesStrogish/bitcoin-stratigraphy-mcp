@@ -34,11 +34,7 @@ function config(privateKey = generateSecretKey()): DvmConfig {
   };
 }
 
-function request(
-  kind: number,
-  payload: unknown,
-  tags: string[][] = [],
-): Event {
+function request(kind: number, payload: unknown, tags: string[][] = []): Event {
   return finalizeEvent(
     {
       kind,
@@ -101,14 +97,10 @@ test("loads DVM configuration with validated key and fallback relays", () => {
 });
 
 test("accepts standard NIP-90 text, URL, and parameter inputs", () => {
-  const textAndParams = request(
-    5_000,
-    "Fetch latest stratigraphy telemetry",
-    [
-      ["i", "latest", "text"],
-      ["param", "recentDays", "1"],
-    ],
-  );
+  const textAndParams = request(5_000, "Fetch latest stratigraphy telemetry", [
+    ["i", "latest", "text"],
+    ["param", "recentDays", "1"],
+  ]);
   assert.deepEqual(parseDvmRequest(textAndParams), {
     recentDays: 1,
     input: "latest",
@@ -123,9 +115,7 @@ test("accepts standard NIP-90 text, URL, and parameter inputs", () => {
     url: "https://example.com/proof.json",
   });
 
-  const paramsOnly = request(5_000, "", [
-    ["param", "recentDays", "1"],
-  ]);
+  const paramsOnly = request(5_000, "", [["param", "recentDays", "1"]]);
   assert.deepEqual(parseDvmRequest(paramsOnly), { recentDays: 1 });
 });
 
@@ -161,8 +151,8 @@ test("requires settlement before publishing a signed NIP-90 result", async () =>
   assert.deepEqual(
     published
       .filter((candidate) => candidate.kind === 7_000)
-      .map((candidate) =>
-        candidate.tags.find((tag) => tag[0] === "status")?.[1]
+      .map(
+        (candidate) => candidate.tags.find((tag) => tag[0] === "status")?.[1],
       ),
     ["payment-required", "processing", "success"],
   );
@@ -170,14 +160,8 @@ test("requires settlement before publishing a signed NIP-90 result", async () =>
   assert.deepEqual(payment, ["amount", "5000", "lnbc5n1test"]);
   const result = published[2]!;
   assert.equal(verifyEvent(result), true);
-  assert.equal(
-    result.tags.find((tag) => tag[0] === "e")?.[1],
-    event.id,
-  );
-  assert.equal(
-    result.tags.find((tag) => tag[0] === "p")?.[1],
-    event.pubkey,
-  );
+  assert.equal(result.tags.find((tag) => tag[0] === "e")?.[1], event.id);
+  assert.equal(result.tags.find((tag) => tag[0] === "p")?.[1], event.pubkey);
   assert.deepEqual(JSON.parse(result.content), {
     records: [{ day: 7 }],
   });
@@ -211,25 +195,19 @@ test("does not execute unpaid, unsupported, or differently targeted jobs", async
   await dvm.handleEvent(request(5_002, { proof: "encoded" }));
   assert.equal(executions, 0);
   assert.deepEqual(
-    published.map((candidate) =>
-      candidate.tags.find((tag) => tag[0] === "status")?.[1]
+    published.map(
+      (candidate) => candidate.tags.find((tag) => tag[0] === "status")?.[1],
     ),
     ["payment-required", "error"],
   );
   assert.deepEqual(
     published[1]!.tags.find((tag) => tag[0] === "status"),
-    [
-      "status",
-      "error",
-      "Lightning invoice expired or was not settled",
-    ],
+    ["status", "error", "Lightning invoice expired or was not settled"],
   );
 
   await dvm.handleEvent(request(5_500, {}));
   await dvm.handleEvent(request(5_991, {}, [["t", "stratigraphy"]]));
-  await dvm.handleEvent(
-    request(5_002, {}, [["p", "ff".repeat(32)]]),
-  );
+  await dvm.handleEvent(request(5_002, {}, [["p", "ff".repeat(32)]]));
   assert.equal(published.length, 2);
   await dvm.stop();
 });
@@ -270,21 +248,35 @@ test("kind 5050 serves tagged bitcoin, stratigraphy, and zk jobs after 250-sat s
     const job = request(5_050, { days: 1 }, [["t", topic]]);
     await dvm.handleEvent(job);
     const events = published.splice(0);
-    assert.deepEqual(events.map((event) => event.kind), [7_000, 7_000, 6_050, 7_000]);
+    assert.deepEqual(
+      events.map((event) => event.kind),
+      [7_000, 7_000, 6_050, 7_000],
+    );
     for (const feedback of events.filter((event) => event.kind === 7_000)) {
       assert.equal(verifyEvent(feedback), true);
-      assert.deepEqual(feedback.tags.find((tag) => tag[0] === "e"), ["e", job.id]);
-      assert.deepEqual(feedback.tags.find((tag) => tag[0] === "p"), ["p", job.pubkey]);
+      assert.deepEqual(
+        feedback.tags.find((tag) => tag[0] === "e"),
+        ["e", job.id],
+      );
+      assert.deepEqual(
+        feedback.tags.find((tag) => tag[0] === "p"),
+        ["p", job.pubkey],
+      );
     }
     assert.deepEqual(
-      events.filter((event) => event.kind === 7_000).map((event) =>
-        event.tags.find((tag) => tag[0] === "status")?.[1]),
+      events
+        .filter((event) => event.kind === 7_000)
+        .map((event) => event.tags.find((tag) => tag[0] === "status")?.[1]),
       ["payment-required", "processing", "success"],
     );
-    assert.deepEqual(events[0]!.tags.find((tag) => tag[0] === "amount"), [
-      "amount", "250000", "lnbc2500n1test",
-    ]);
-    assert.match(events[0]!.tags.find((tag) => tag[0] === "status")?.[2] ?? "", /invoice/);
+    assert.deepEqual(
+      events[0]!.tags.find((tag) => tag[0] === "amount"),
+      ["amount", "250000", "lnbc2500n1test"],
+    );
+    assert.match(
+      events[0]!.tags.find((tag) => tag[0] === "status")?.[2] ?? "",
+      /invoice/,
+    );
     assert.equal(operations.at(-1), expected);
   }
   await dvm.handleEvent(request(5_050, {}, [["t", "unrelated"]]));

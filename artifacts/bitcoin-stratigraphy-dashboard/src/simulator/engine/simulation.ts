@@ -9,11 +9,23 @@ export const BATCH_SIZE = 50;
 export const NOTARIZE_BATCH_SIZE = "100";
 
 export type Trace = { [k: string]: Json } & {
-  agent_id: string; trace_id: string; round: number; role: string; tool: string; thought: string; tokens_in: number; tokens_out: number;
+  agent_id: string;
+  trace_id: string;
+  round: number;
+  role: string;
+  tool: string;
+  thought: string;
+  tokens_in: number;
+  tokens_out: number;
 };
 export type LeafRecord = { index: number; trace: Trace; salt: string };
 export type InclusionProof = {
-  schema_version: string; batch_id: string; leaf_index: number; tree_size: number; leaf_salt: string; path: string[];
+  schema_version: string;
+  batch_id: string;
+  leaf_index: number;
+  tree_size: number;
+  leaf_salt: string;
+  path: string[];
 };
 
 function mulberry32(seed: number) {
@@ -27,17 +39,46 @@ function mulberry32(seed: number) {
   };
 }
 const ROLES = ["planner", "retriever", "auditor", "executor", "reviewer"];
-const TOOLS = ["ledger.query", "policy.lookup", "vector.search", "ticket.update", "calc.reconcile", "doc.summarize"];
-const VERBS = ["Reconciled", "Flagged", "Escalated", "Deferred", "Cross-checked", "Summarized", "Rejected", "Approved"];
-const OBJECTS = ["a vendor invoice batch", "a retention policy exception", "a procurement approval chain", "an access review queue",
-  "a quarterly accrual schedule", "a contract renewal clause", "a data-residency attestation", "an incident postmortem draft"];
-const REASONS = ["because the totals diverged by 0.7 percent", "after two sources disagreed on the owner",
-  "since the approval predates the policy change", "pending a second reviewer signature",
-  "because the audit window closes in 3 days", "given a missing change-ticket reference"];
+const TOOLS = [
+  "ledger.query",
+  "policy.lookup",
+  "vector.search",
+  "ticket.update",
+  "calc.reconcile",
+  "doc.summarize",
+];
+const VERBS = [
+  "Reconciled",
+  "Flagged",
+  "Escalated",
+  "Deferred",
+  "Cross-checked",
+  "Summarized",
+  "Rejected",
+  "Approved",
+];
+const OBJECTS = [
+  "a vendor invoice batch",
+  "a retention policy exception",
+  "a procurement approval chain",
+  "an access review queue",
+  "a quarterly accrual schedule",
+  "a contract renewal clause",
+  "a data-residency attestation",
+  "an incident postmortem draft",
+];
+const REASONS = [
+  "because the totals diverged by 0.7 percent",
+  "after two sources disagreed on the owner",
+  "since the approval predates the policy change",
+  "pending a second reviewer signature",
+  "because the audit window closes in 3 days",
+  "given a missing change-ticket reference",
+];
 
 export function makeTrace(i: number): Trace {
   const r = mulberry32(i * 7919 + 13);
-  const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)];
+  const pick = <T>(a: T[]) => a[Math.floor(r() * a.length)];
   const agent = i % AGENT_COUNT;
   return {
     agent_id: `agent-${String(agent).padStart(2, "0")}`,
@@ -57,7 +98,8 @@ export function freshSalt(): string {
   return toHex(b);
 }
 export function leafPreimage(trace: Json, salt: string): Uint8Array {
-  if (!/^[0-9a-f]{64}$/.test(salt)) throw new Error("Salt must be 32 canonical lowercase hex bytes");
+  if (!/^[0-9a-f]{64}$/.test(salt))
+    throw new Error("Salt must be 32 canonical lowercase hex bytes");
   return utf8(canonicalJson({ schema_version: LEAF_SCHEMA, salt, trace }));
 }
 
@@ -65,56 +107,109 @@ export class SwarmSession {
   readonly batchId: string;
   records: LeafRecord[] = [];
   private acc = new MerkleAccumulator();
-  constructor(batchId = `sim-${toHex(globalThis.crypto.getRandomValues(new Uint8Array(6)))}`) { this.batchId = batchId; }
-  get size() { return this.acc.size; }
+  constructor(
+    batchId = `sim-${toHex(globalThis.crypto.getRandomValues(new Uint8Array(6)))}`,
+  ) {
+    this.batchId = batchId;
+  }
+  get size() {
+    return this.acc.size;
+  }
   async append(trace: Trace, salt = freshSalt()): Promise<number> {
     const index = await this.acc.append(leafPreimage(trace, salt));
     this.records.push({ index, trace, salt });
     return index;
   }
-  async rootHex(size: number = this.size) { return toHex(await this.acc.root(size)); }
-  async peaks(size: number = this.size) { return (await this.acc.peaks(size)).map((p) => ({ ...p, hash: toHex(p.hash) })); }
+  async rootHex(size: number = this.size) {
+    return toHex(await this.acc.root(size));
+  }
+  async peaks(size: number = this.size) {
+    return (await this.acc.peaks(size)).map((p) => ({
+      ...p,
+      hash: toHex(p.hash),
+    }));
+  }
   /** Atomic read of one immutable prefix: proof and root share the captured size. */
-  async disclosure(index: number, size: number = this.size): Promise<{ proof: InclusionProof; rootHex: string }> {
+  async disclosure(
+    index: number,
+    size: number = this.size,
+  ): Promise<{ proof: InclusionProof; rootHex: string }> {
     const rec = this.records[index];
     if (!rec || index >= size) throw new Error("No such leaf in this prefix");
-    const [path, root] = await Promise.all([this.acc.inclusionPath(index, size), this.acc.root(size)]);
+    const [path, root] = await Promise.all([
+      this.acc.inclusionPath(index, size),
+      this.acc.root(size),
+    ]);
     return {
-      proof: { schema_version: PROOF_SCHEMA, batch_id: this.batchId, leaf_index: index, tree_size: size, leaf_salt: rec.salt, path: path.map(toHex) },
+      proof: {
+        schema_version: PROOF_SCHEMA,
+        batch_id: this.batchId,
+        leaf_index: index,
+        tree_size: size,
+        leaf_salt: rec.salt,
+        path: path.map(toHex),
+      },
       rootHex: toHex(root),
     };
   }
-  async proof(index: number, size: number = this.size): Promise<InclusionProof> {
+  async proof(
+    index: number,
+    size: number = this.size,
+  ): Promise<InclusionProof> {
     return (await this.disclosure(index, size)).proof;
   }
 }
 
 /** Standalone verification from only the disclosed trace, proof and root. */
-export async function verifyDisclosedProof(trace: Trace, proof: InclusionProof, rootHex: string): Promise<boolean> {
-  if (proof.schema_version !== PROOF_SCHEMA) throw new Error("Unsupported proof schema");
-  return verifyMerkleInclusion(leafPreimage(trace, proof.leaf_salt), proof.leaf_index, proof.tree_size,
-    proof.path.map(fromHex), fromHex(rootHex));
+export async function verifyDisclosedProof(
+  trace: Trace,
+  proof: InclusionProof,
+  rootHex: string,
+): Promise<boolean> {
+  if (proof.schema_version !== PROOF_SCHEMA)
+    throw new Error("Unsupported proof schema");
+  return verifyMerkleInclusion(
+    leafPreimage(trace, proof.leaf_salt),
+    proof.leaf_index,
+    proof.tree_size,
+    proof.path.map(fromHex),
+    fromHex(rootHex),
+  );
 }
 
 export function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal.aborted) return reject(new DOMException("aborted", "AbortError"));
-    const t = setTimeout(() => { signal.removeEventListener("abort", onAbort); resolve(); }, ms);
-    const onAbort = () => { clearTimeout(t); reject(new DOMException("aborted", "AbortError")); };
+    if (signal.aborted)
+      return reject(new DOMException("aborted", "AbortError"));
+    const t = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(new DOMException("aborted", "AbortError"));
+    };
     signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 
 export type BatchEvent = { batch: number; batches: number; size: number };
 export async function runSwarm(opts: {
-  session: SwarmSession; signal: AbortSignal; delayMs?: number; traceCount?: number;
+  session: SwarmSession;
+  signal: AbortSignal;
+  delayMs?: number;
+  traceCount?: number;
   onBatch?: (e: BatchEvent) => void | Promise<void>;
 }): Promise<void> {
   const { session, signal, delayMs = 260, traceCount = TRACE_COUNT } = opts;
   const batches = Math.ceil(traceCount / BATCH_SIZE);
   for (let b = 0; b < batches; b++) {
     await sleep(delayMs, signal);
-    for (let i = b * BATCH_SIZE; i < Math.min(traceCount, (b + 1) * BATCH_SIZE); i++) {
+    for (
+      let i = b * BATCH_SIZE;
+      i < Math.min(traceCount, (b + 1) * BATCH_SIZE);
+      i++
+    ) {
       if (signal.aborted) throw new DOMException("aborted", "AbortError");
       await session.append(makeTrace(i));
     }
@@ -123,8 +218,14 @@ export async function runSwarm(opts: {
   }
 }
 
-export async function simulateNotarize(batchId: string, treeSize: number, rootHex: string) {
-  const digest = toHex(await sha256(utf8(`simulated-ots-illustration:${rootHex}`)));
+export async function simulateNotarize(
+  batchId: string,
+  treeSize: number,
+  rootHex: string,
+) {
+  const digest = toHex(
+    await sha256(utf8(`simulated-ots-illustration:${rootHex}`)),
+  );
   return {
     synthetic: true,
     event: "proof.notarize",
@@ -134,7 +235,11 @@ export async function simulateNotarize(batchId: string, treeSize: number, rootHe
       headers: { "X-L402-Batch-Size": NOTARIZE_BATCH_SIZE },
       body: { batch_id: batchId, tree_size: treeSize, root_hash: rootHex },
     },
-    payment: { simulated: true, invoice_paid: false, note: "No payment was requested or made." },
+    payment: {
+      simulated: true,
+      invoice_paid: false,
+      note: "No payment was requested or made.",
+    },
     receipt: {
       schema_version: "saai-swarm-root/1",
       batch_id: batchId,
@@ -151,16 +256,23 @@ export async function simulateNotarize(batchId: string, treeSize: number, rootHe
           kind: "illustrative-object-not-valid-ots-bytes",
           bound_root: rootHex,
           simulated_binding_digest: digest,
-          attestation: "none; no calendar contacted, no Bitcoin block referenced",
+          attestation:
+            "none; no calendar contacted, no Bitcoin block referenced",
         },
       },
     },
   };
 }
 
-export function buildProofExport(rec: LeafRecord, proof: InclusionProof, rootHex: string, anchor: Awaited<ReturnType<typeof simulateNotarize>> | null) {
+export function buildProofExport(
+  rec: LeafRecord,
+  proof: InclusionProof,
+  rootHex: string,
+  anchor: Awaited<ReturnType<typeof simulateNotarize>> | null,
+) {
   return {
-    title: "Selective Disclosure proof (salted Merkle audit path, not zero-knowledge)",
+    title:
+      "Selective Disclosure proof (salted Merkle audit path, not zero-knowledge)",
     synthetic: true,
     disclosed_trace: rec.trace,
     merkle_proof: proof,

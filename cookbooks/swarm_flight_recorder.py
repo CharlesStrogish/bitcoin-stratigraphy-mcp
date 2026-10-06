@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 # Dual-licensed under AGPLv3 and Commercial terms.
 """Compatibility entry point; implementation lives in the enterprise SDK."""
+
 import sys
 from pathlib import Path
 

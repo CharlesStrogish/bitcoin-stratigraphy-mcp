@@ -44,7 +44,10 @@ function httpsUrl(value: string, name: string): URL {
 
 function relayUrls(value: string | undefined): string[] {
   const candidates = value
-    ? value.split(",").map((relay) => relay.trim()).filter(Boolean)
+    ? value
+        .split(",")
+        .map((relay) => relay.trim())
+        .filter(Boolean)
     : DEFAULT_RELAYS;
   const relays = [...new Set(candidates)];
   if (relays.length === 0) throw new Error("At least one relay is required");
@@ -61,10 +64,7 @@ function apiUrls(apiBaseUrl: string) {
   return {
     base,
     endpoint: new URL("/api/v1/stratigraphy", base).toString(),
-    preflightEndpoint: new URL(
-      "/api/v1/stratigraphy?days=1",
-      base,
-    ).toString(),
+    preflightEndpoint: new URL("/api/v1/stratigraphy?days=1", base).toString(),
     openapi: new URL("/openapi.json", base).toString(),
   };
 }
@@ -84,7 +84,9 @@ async function preflight(endpoint: string, openapi: string) {
   }
   const document = (await openapiResponse.json()) as { openapi?: unknown };
   if (typeof document.openapi !== "string") {
-    throw new Error("OpenAPI preflight failed: response is not an OpenAPI document");
+    throw new Error(
+      "OpenAPI preflight failed: response is not an OpenAPI document",
+    );
   }
 
   const endpointResponse = await fetch(endpoint, {
@@ -132,7 +134,6 @@ export function buildAnnouncementTemplate(
       ["alt", "Bitcoin Stratigraphy L402 HTTP API announcement"],
     ],
   };
-
 }
 
 export function buildAnnouncement(
@@ -140,7 +141,10 @@ export function buildAnnouncement(
   apiBaseUrl = DEFAULT_API_BASE_URL,
   createdAt = Math.floor(Date.now() / 1000),
 ): VerifiedEvent {
-  return finalizeEvent(buildAnnouncementTemplate(apiBaseUrl, createdAt), secretKey);
+  return finalizeEvent(
+    buildAnnouncementTemplate(apiBaseUrl, createdAt),
+    secretKey,
+  );
 }
 
 async function main() {

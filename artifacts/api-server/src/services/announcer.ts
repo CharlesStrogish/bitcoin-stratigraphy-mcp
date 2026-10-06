@@ -69,7 +69,10 @@ const discoveryStatus: NostrDiscoveryStatus = {
   pricing: {
     "5000": { capability: "stratigraphy", amount_msats: 5_000 },
     "5002": { capability: "zk-proof", amount_msats: 21_000 },
-    "5050": { capability: "bitcoin-stratigraphy-or-zk", amount_msats: NIP90_5050_FEE_SATS * 1_000 },
+    "5050": {
+      capability: "bitcoin-stratigraphy-or-zk",
+      amount_msats: NIP90_5050_FEE_SATS * 1_000,
+    },
   },
   last_announced_at: null,
   last_attempted_at: null,
@@ -83,9 +86,7 @@ export function parseNip05Identifier(
   value: string | undefined,
 ): { name: string; domain: string; identifier: string } | null {
   if (!value) return null;
-  const match = /^([a-z0-9._-]+)@([a-z0-9.-]+\.[a-z]{2,})$/i.exec(
-    value.trim(),
-  );
+  const match = /^([a-z0-9._-]+)@([a-z0-9.-]+\.[a-z]{2,})$/i.exec(value.trim());
   if (!match) {
     throw new Error("NIP-05 identifier must use the form name@example.com");
   }
@@ -233,10 +234,7 @@ export function createServiceAnnouncer(
     if (statuses) discoveryStatus.relays = statuses;
   };
   const publishProfile = async () => {
-    const event = buildProfileMetadataEvent(
-      config,
-      Math.floor(now() / 1_000),
-    );
+    const event = buildProfileMetadataEvent(config, Math.floor(now() / 1_000));
     discoveryStatus.last_attempted_at = new Date(
       event.created_at * 1_000,
     ).toISOString();

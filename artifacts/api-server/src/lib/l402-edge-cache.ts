@@ -5,8 +5,12 @@ export class L402EdgeCache<T> {
   private readonly entries = new Map<string, { value: T; expires: number }>();
   private readonly pending = new Map<string, Promise<T>>();
 
-  constructor(private readonly now = Date.now, private readonly capacity = 10_000) {
-    if (!Number.isSafeInteger(capacity) || capacity < 1) throw new RangeError("Cache capacity must be positive");
+  constructor(
+    private readonly now = Date.now,
+    private readonly capacity = 10_000,
+  ) {
+    if (!Number.isSafeInteger(capacity) || capacity < 1)
+      throw new RangeError("Cache capacity must be positive");
   }
 
   static key(...parts: string[]): string {
@@ -34,12 +38,18 @@ export class L402EdgeCache<T> {
     this.entries.set(key, { value, expires });
   }
 
-  async resolve(key: string, expires: number, load: () => Promise<T>, cacheable: (value: T) => boolean): Promise<T> {
+  async resolve(
+    key: string,
+    expires: number,
+    load: () => Promise<T>,
+    cacheable: (value: T) => boolean,
+  ): Promise<T> {
     const cached = this.get(key);
     if (cached !== undefined) return cached;
     const running = this.pending.get(key);
     if (running) return running;
-    if (this.pending.size >= this.capacity) throw new Error("L402 verification capacity exceeded");
+    if (this.pending.size >= this.capacity)
+      throw new Error("L402 verification capacity exceeded");
     const operation = Promise.resolve().then(load);
     this.pending.set(key, operation);
     try {

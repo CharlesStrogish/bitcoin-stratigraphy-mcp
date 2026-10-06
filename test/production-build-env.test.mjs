@@ -400,18 +400,18 @@ function findEscapingHtmlMediaUrls(html, pageUrl, basePath) {
     ["video", "poster"],
     ["video", "src"],
   ];
-  const singleUrls = mediaAttributes.flatMap(([tag, attribute]) => [
-    ...html.matchAll(
-      new RegExp(
-        `<${tag}\\b[^>]*\\b${attribute}\\s*=\\s*(["'])(.*?)\\1`,
-        "gi",
+  const singleUrls = mediaAttributes
+    .flatMap(([tag, attribute]) => [
+      ...html.matchAll(
+        new RegExp(
+          `<${tag}\\b[^>]*\\b${attribute}\\s*=\\s*(["'])(.*?)\\1`,
+          "gi",
+        ),
       ),
-    ),
-  ]).map((match) => match[2].trim());
+    ])
+    .map((match) => match[2].trim());
   const srcsetUrls = [
-    ...html.matchAll(
-      /<(?:img|source)\b[^>]*\bsrcset\s*=\s*(["'])(.*?)\1/gi,
-    ),
+    ...html.matchAll(/<(?:img|source)\b[^>]*\bsrcset\s*=\s*(["'])(.*?)\1/gi),
   ].flatMap((match) => parseSrcsetUrls(match[2]));
 
   return [...singleUrls, ...srcsetUrls]
@@ -424,13 +424,17 @@ function findEscapingHtmlMediaUrls(html, pageUrl, basePath) {
 }
 
 function findEscapingCssAssetUrls(css, stylesheetUrl, basePath) {
-  return [...css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^'")\s][^)]*))\s*\)/gi)]
+  return [
+    ...css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^'")\s][^)]*))\s*\)/gi),
+  ]
     .map((match) => (match[1] ?? match[2] ?? match[3]).trim())
     .filter((url) => url && !isExcludedCssUrl(url))
     .map((url) => ({
       url,
-      resolvedPath: new URL(url, new URL(stylesheetUrl, "https://artifact.test"))
-        .pathname,
+      resolvedPath: new URL(
+        url,
+        new URL(stylesheetUrl, "https://artifact.test"),
+      ).pathname,
     }))
     .filter(({ resolvedPath }) => !resolvedPath.startsWith(basePath));
 }
@@ -453,10 +457,7 @@ function inspectCssAssetUrls({
   readStylesheet,
   visitedStylesheets = new Set(),
 }) {
-  const resolvedStylesheetUrl = new URL(
-    stylesheetUrl,
-    "https://artifact.test",
-  );
+  const resolvedStylesheetUrl = new URL(stylesheetUrl, "https://artifact.test");
   resolvedStylesheetUrl.hash = "";
 
   if (visitedStylesheets.has(resolvedStylesheetUrl.href)) {
@@ -538,10 +539,10 @@ test("HTML entry point discovery includes nested pages", () => {
       { encoding: "utf8" },
     );
 
-    assert.deepEqual(
-      findHtmlEntryPoints(outputDirectory).sort(),
-      ["guides/setup.html", "index.html"],
-    );
+    assert.deepEqual(findHtmlEntryPoints(outputDirectory).sort(), [
+      "guides/setup.html",
+      "index.html",
+    ]);
   } finally {
     rmSync(outputDirectory, { force: true, recursive: true });
   }
@@ -698,7 +699,10 @@ function validateProductionOutput({
   buildTool,
 }) {
   const htmlEntryPoints = findHtmlEntryPoints(outputDirectory);
-  assert.ok(htmlEntryPoints.length > 0, `${name} must emit an HTML entry point`);
+  assert.ok(
+    htmlEntryPoints.length > 0,
+    `${name} must emit an HTML entry point`,
+  );
   let assetUrlCount = 0;
 
   for (const htmlEntryPoint of htmlEntryPoints) {

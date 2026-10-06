@@ -66,22 +66,32 @@ test("builds signed Kind 31990 metadata with job prices and capabilities", () =>
   assert.equal(event.kind, 31_990);
   assert.equal(event.pubkey, input.publicKey);
   assert.equal(verifyEvent(event), true);
-  assert.ok(event.tags.some((tag) =>
-    tag[0] === "d" && tag[1] === "bitcoin-stratigraphy-mcp"));
+  assert.ok(
+    event.tags.some(
+      (tag) => tag[0] === "d" && tag[1] === "bitcoin-stratigraphy-mcp",
+    ),
+  );
   assert.ok(event.tags.some((tag) => tag[0] === "k" && tag[1] === "5000"));
   assert.ok(event.tags.some((tag) => tag[0] === "k" && tag[1] === "5002"));
   assert.ok(event.tags.some((tag) => tag[0] === "k" && tag[1] === "5050"));
-  assert.ok(event.tags.some((tag) =>
-    tag[0] === "endpoint" &&
-    tag[1] === "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"));
-  assert.ok(event.tags.some((tag) =>
-    tag[0] === "price" && tag[1] === "10 sats (discovery), 250 sats (ZK/Data)"));
+  assert.ok(
+    event.tags.some(
+      (tag) =>
+        tag[0] === "endpoint" &&
+        tag[1] === "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+    ),
+  );
+  assert.ok(
+    event.tags.some(
+      (tag) =>
+        tag[0] === "price" &&
+        tag[1] === "10 sats (discovery), 250 sats (ZK/Data)",
+    ),
+  );
   for (const topic of ["bitcoin", "stratigraphy", "zk"]) {
     assert.ok(event.tags.some((tag) => tag[0] === "t" && tag[1] === topic));
   }
-  assert.ok(
-    event.tags.some((tag) => tag[0] === "amount" && tag[1] === "5000"),
-  );
+  assert.ok(event.tags.some((tag) => tag[0] === "amount" && tag[1] === "5000"));
   assert.ok(
     event.tags.some((tag) => tag[0] === "amount" && tag[1] === "21000"),
   );
@@ -98,15 +108,25 @@ test("builds signed Kind 31990 metadata with job prices and capabilities", () =>
   assert.equal(content.name, "Bitcoin Stratigraphy Data Engine & ZK Oracle");
   assert.equal(content.author, "Charles R. Strogish");
   assert.equal(content.architect, "Charles R. Strogish");
-  assert.equal(content.about, "Quantitative Bitcoin thermodynamic dataset, Groth16 zk-SNARK state verification, and L402 payment oracle.");
-  assert.equal(content.endpoint, "https://bitcoin-stratigraphy-dashboard.replit.app/mcp");
+  assert.equal(
+    content.about,
+    "Quantitative Bitcoin thermodynamic dataset, Groth16 zk-SNARK state verification, and L402 payment oracle.",
+  );
+  assert.equal(
+    content.endpoint,
+    "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+  );
   assert.equal(content.mcp_price, "10 sats (discovery), 250 sats (ZK/Data)");
   assert.ok(content.capabilities.includes("nip-90"));
   assert.ok(content.capabilities.includes("zk-proof"));
   assert.deepEqual(content.jobs, [
     { kind: 5_000, capability: "stratigraphy", amount_msats: 5_000 },
     { kind: 5_002, capability: "zk-proof", amount_msats: 21_000 },
-    { kind: 5_050, capability: "bitcoin-stratigraphy-or-zk", amount_msats: 250_000 },
+    {
+      kind: 5_050,
+      capability: "bitcoin-stratigraphy-or-zk",
+      amount_msats: 250_000,
+    },
   ]);
 });
 
@@ -148,8 +168,9 @@ test("publishes startup announcements and refreshes NIP-89 every six hours", asy
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(published.length, 3);
   assert.equal(published[2]!.kind, 31_990);
-  assert.ok(published[2]!.tags.some((tag) =>
-    tag[0] === "k" && tag[1] === "5050"));
+  assert.ok(
+    published[2]!.tags.some((tag) => tag[0] === "k" && tag[1] === "5050"),
+  );
   const status = getNostrDiscoveryStatus();
   assert.equal(status.public_key.hex, input.publicKey);
   assert.match(status.public_key.npub!, /^npub1/);
@@ -176,7 +197,7 @@ test("does not report a failed heartbeat attempt as an announcement", async () =
       relayStatuses: () =>
         input.relays.map((relay) => ({
           relay,
-          status: publishes > 2 ? "failed" as const : "connected" as const,
+          status: publishes > 2 ? ("failed" as const) : ("connected" as const),
         })),
     },
     {
@@ -218,7 +239,7 @@ test("serves discovery status and binds NIP-05 to its configured domain", async 
   try {
     const info = await fetch(`${baseUrl}/api/v1/nostr/info`);
     assert.equal(info.status, 200);
-    const body = await info.json() as {
+    const body = (await info.json()) as {
       public_key: { hex: string; npub: string };
       announcement_event_ids: { profile: string; nip89: string[] };
       pricing: Record<string, { amount_msats: number }>;
@@ -236,7 +257,7 @@ test("serves discovery status and binds NIP-05 to its configured domain", async 
       { headers: { "X-Forwarded-Host": "example.com" } },
     );
     assert.equal(identity.status, 200);
-    const identityBody = await identity.json() as {
+    const identityBody = (await identity.json()) as {
       names: Record<string, string>;
     };
     assert.equal(identityBody.names.stratigraphy, body.public_key.hex);

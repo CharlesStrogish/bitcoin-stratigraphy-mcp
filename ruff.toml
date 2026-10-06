@@ -1,0 +1,6 @@
+target-version = "py310"
+line-length = 88
+extend-exclude = ["distribution", "attached_assets", ".pythonlibs", ".cache"]
+
+[lint]
+select = ["F401", "F841"]

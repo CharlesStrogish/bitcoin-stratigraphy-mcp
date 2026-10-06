@@ -6,9 +6,7 @@ import {
   groundEpistemicContext,
   verifyEpistemicAnchorReceipt,
 } from "../artifacts/api-server/src/services/epistemicGrounding";
-import {
-  verifyCryptographicAttestation,
-} from "../artifacts/api-server/src/services/attestation";
+import { verifyCryptographicAttestation } from "../artifacts/api-server/src/services/attestation";
 
 const PRIVATE_KEY = "01".padStart(64, "0");
 const BLOCK_HASH = "ab".repeat(32);
@@ -53,7 +51,10 @@ test("grounds context into a publicly verifiable epistemic anchor", async () => 
       }),
     },
   );
-  assert.equal(receipt.receiptSchema, "bitcoin-stratigraphy/epistemic-anchor/v1");
+  assert.equal(
+    receipt.receiptSchema,
+    "bitcoin-stratigraphy/epistemic-anchor/v1",
+  );
   assert.equal(receipt.contextHash, "cd".repeat(32));
   assert.equal(receipt.blockHeight, 920001);
   assert.equal(receipt.blockHash, BLOCK_HASH);
@@ -68,13 +69,16 @@ test("grounds context into a publicly verifiable epistemic anchor", async () => 
     true,
   );
   assert.equal(
-    verifyCryptographicAttestation({
-      ...receipt,
-      payload: {
-        ...(receipt.payload as Record<string, unknown>),
-        contextHash: "ef".repeat(32),
+    verifyCryptographicAttestation(
+      {
+        ...receipt,
+        payload: {
+          ...(receipt.payload as Record<string, unknown>),
+          contextHash: "ef".repeat(32),
+        },
       },
-    }, { issuerPublicKey }),
+      { issuerPublicKey },
+    ),
     false,
   );
   for (const [field, replacement] of [

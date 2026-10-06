@@ -1,5 +1,6 @@
 // Canonical JSON matching Python: json.dumps(sort_keys=True, separators=(",",":"), ensure_ascii=False, allow_nan=False)
-export type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
+export type Json =
+  null | boolean | number | string | Json[] | { [k: string]: Json };
 
 function cmpCodePoints(a: string, b: string): number {
   const x = Array.from(a);
@@ -34,8 +35,10 @@ export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 export function fromHex(hex: string): Uint8Array {
-  if (!/^(?:[0-9a-f]{2})*$/.test(hex)) throw new Error("Hex must be canonical lowercase");
+  if (!/^(?:[0-9a-f]{2})*$/.test(hex))
+    throw new Error("Hex must be canonical lowercase");
   const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  for (let i = 0; i < out.length; i++)
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   return out;
 }

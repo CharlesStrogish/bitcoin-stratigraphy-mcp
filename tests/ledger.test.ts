@@ -64,16 +64,16 @@ test("calculates accurate daily goal progress", async () => {
 test("handles concurrent unique entries and idempotent duplicate settlements", async () => {
   const ledger = createMemoryRevenueLedger({ now: () => NOW });
   const unique = Array.from({ length: 100 }, (_, index) => entry(index + 1));
-  const inserted = await Promise.all(unique.map((candidate) =>
-    ledger.record(candidate)
-  ));
+  const inserted = await Promise.all(
+    unique.map((candidate) => ledger.record(candidate)),
+  );
   assert.equal(inserted.filter(Boolean).length, 100);
   const duplicateResults = await Promise.all(
     Array.from({ length: 20 }, (_, index) =>
       ledger.record({
         ...unique[0]!,
         id: `duplicate-${index}`,
-      })
+      }),
     ),
   );
   assert.ok(duplicateResults.every((result) => result === false));
@@ -109,7 +109,7 @@ test("serves aggregate revenue metrics and a sanitized audit log", async () => {
   try {
     const revenue = await fetch(`${baseUrl}/api/v1/analytics/revenue`);
     assert.equal(revenue.status, 200);
-    const metrics = await revenue.json() as {
+    const metrics = (await revenue.json()) as {
       totalVolumeSats: number;
       volume24hSats: number;
       channelBreakdown: Record<string, number>;

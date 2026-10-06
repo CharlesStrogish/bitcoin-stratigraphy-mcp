@@ -101,14 +101,19 @@ def _validate_catalog(tools: list[Any]) -> dict[str, Any]:
         if isinstance(name, str) and "." in name
     }
     malformed = sorted(
-        str(name)
-        for name in names
-        if not isinstance(name, str) or name.count(".") != 1
+        str(name) for name in names if not isinstance(name, str) or name.count(".") != 1
     )
     unexpected_namespaces = sorted(namespaces - EXPECTED_NAMESPACES)
     missing_namespaces = sorted(EXPECTED_NAMESPACES - namespaces)
 
-    if duplicates or unknown or missing or malformed or unexpected_namespaces or missing_namespaces:
+    if (
+        duplicates
+        or unknown
+        or missing
+        or malformed
+        or unexpected_namespaces
+        or missing_namespaces
+    ):
         details = []
         if duplicates:
             details.append(f"duplicate names: {duplicates}")
@@ -231,6 +236,7 @@ async def _run(args: argparse.Namespace) -> None:
 
     try:
         from langchain_openai import ChatOpenAI
+
         # Deprecated in LangGraph v1; used here because this cookbook explicitly
         # demonstrates the requested create_react_agent API.
         from langgraph.prebuilt import create_react_agent

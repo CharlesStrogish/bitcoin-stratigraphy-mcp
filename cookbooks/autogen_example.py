@@ -20,7 +20,6 @@ from typing import Any
 
 try:
     from .l402_client import (
-        MCP_URL,
         BitcoinStratigraphyClient,
         add_cli_arguments,
         client_from_args,
@@ -28,7 +27,6 @@ try:
     )
 except ImportError:
     from l402_client import (  # type: ignore[no-redef]
-        MCP_URL,
         BitcoinStratigraphyClient,
         add_cli_arguments,
         client_from_args,
@@ -42,13 +40,20 @@ def _read_proof_arguments(path: str) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Could not read proof arguments from {path}: {exc}") from exc
     if not isinstance(value, dict):
-        raise ValueError("--proof-file must contain a JSON object of proof.verify arguments")
+        raise ValueError(
+            "--proof-file must contain a JSON object of proof.verify arguments"
+        )
     if value.get("proofType") == "ots":
         valid = all(key in value for key in ("otsProof", "targetHash"))
     elif value.get("circuit") == "zk.drift.v1":
         valid = all(
             key in value
-            for key in ("sessionContextHash", "targetBlockHeight", "entropyThreshold", "proof")
+            for key in (
+                "sessionContextHash",
+                "targetBlockHeight",
+                "entropyThreshold",
+                "proof",
+            )
         )
     else:
         public_inputs = value.get("publicInputs")
@@ -81,9 +86,7 @@ async def _discover(client: BitcoinStratigraphyClient) -> None:
     validated = validate_catalog(tools)
     print("MCP tool catalog (validated):")
     print(json.dumps([tool.get("name") for tool in validated], indent=2))
-    response = await asyncio.to_thread(
-        client.request, "GET", "/api/v1/cost"
-    )
+    response = await asyncio.to_thread(client.request, "GET", "/api/v1/cost")
     response.raise_for_status()
     print("Free REST cost/schema discovery (GET /api/v1/cost):")
     print(json.dumps(response.json(), indent=2, ensure_ascii=False))
@@ -117,7 +120,9 @@ async def _run_paid_workflow(
         if not 1 <= days <= 422:
             raise ValueError("days must be in the OpenAPI range 1..422")
         if "stratigraphy.get" in used_tools:
-            raise RuntimeError("This example permits only one paid stratigraphy request.")
+            raise RuntimeError(
+                "This example permits only one paid stratigraphy request."
+            )
         used_tools.add("stratigraphy.get")
         try:
             # The server implements days=N as the most recent N indexed records;
@@ -145,6 +150,7 @@ async def _run_paid_workflow(
         ),
     ]
     if proof_arguments is not None:
+
         async def proof_verify(confirm: bool) -> str:
             """Verify caller-provided proof arguments through canonical MCP proof.verify."""
             if confirm is not True:
@@ -175,7 +181,9 @@ async def _run_paid_workflow(
         "Use stratigraphy_get once for the latest indexed day. "
         "Do not make any other tool calls."
     )
-    task = "Use stratigraphy_get with days=1 to retrieve the latest indexed daily record."
+    task = (
+        "Use stratigraphy_get with days=1 to retrieve the latest indexed daily record."
+    )
     if proof_arguments is not None:
         system_message = (
             "Use stratigraphy_get once for the latest indexed day. Then use proof_verify "
@@ -203,7 +211,8 @@ async def _run_paid_workflow(
         if not required_tools.issubset(used_tools):
             missing = sorted(required_tools - used_tools)
             raise RuntimeError(
-                "Agent completed without executing required tool(s): " + ", ".join(missing)
+                "Agent completed without executing required tool(s): "
+                + ", ".join(missing)
             )
     finally:
         await model_client.close()
@@ -217,7 +226,9 @@ def _safe_error_detail(error: Exception) -> str:
         r"\1[REDACTED]",
         detail,
     )
-    detail = re.sub(r"(?i)\b(?:lnbc|lntb|lnbcrt)[0-9a-z]+\b", "[REDACTED_INVOICE]", detail)
+    detail = re.sub(
+        r"(?i)\b(?:lnbc|lntb|lnbcrt)[0-9a-z]+\b", "[REDACTED_INVOICE]", detail
+    )
     detail = re.sub(
         r"(?i)(macaroon\s*[:=]\s*)[^\s,;]+",
         r"\1[REDACTED]",
@@ -239,7 +250,9 @@ async def _async_main(args: argparse.Namespace, parser: argparse.ArgumentParser)
         parser.error("--proof-file is only used with --run")
 
     try:
-        proof_arguments = _read_proof_arguments(args.proof_file) if args.proof_file else None
+        proof_arguments = (
+            _read_proof_arguments(args.proof_file) if args.proof_file else None
+        )
     except ValueError as exc:
         parser.error(str(exc))
 

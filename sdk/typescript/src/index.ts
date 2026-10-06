@@ -3,10 +3,7 @@
 import { Buffer } from "node:buffer";
 export type SubscriptionTier = "1-day" | "30-day";
 export type AgentTier = "STANDARD" | "VIP" | "SWARM";
-export type SettlementAsset =
-  | "btc-lightning"
-  | "l-btc"
-  | "taproot-assets";
+export type SettlementAsset = "btc-lightning" | "l-btc" | "taproot-assets";
 
 export type AgentReputationMetadata = {
   pubkey: string;
@@ -301,7 +298,10 @@ export class BitcoinStratigraphyClient {
   private readonly credentials: CredentialStore;
   private readonly initialReconnectDelayMs: number;
   private readonly maxReconnectDelayMs: number;
-  private readonly sleep: (delayMs: number, signal: AbortSignal) => Promise<void>;
+  private readonly sleep: (
+    delayMs: number,
+    signal: AbortSignal,
+  ) => Promise<void>;
   private readonly now: () => number;
   private readonly nip98?: BitcoinStratigraphyClientOptions["nip98"];
   private paymentInFlight?: Promise<CachedL402Credential>;
@@ -317,11 +317,10 @@ export class BitcoinStratigraphyClient {
     this.maxReconnectDelayMs = options.reconnect?.maxDelayMs ?? 30_000;
     this.sleep = options.sleep ?? abortableSleep;
     this.now = options.now ?? Date.now;
-    if (
-      options.nip98 &&
-      !/^[0-9a-f]{64}$/.test(options.nip98.pubkey)
-    ) {
-      throw new Error("NIP-98 pubkey must be 64 lowercase hexadecimal characters");
+    if (options.nip98 && !/^[0-9a-f]{64}$/.test(options.nip98.pubkey)) {
+      throw new Error(
+        "NIP-98 pubkey must be 64 lowercase hexadecimal characters",
+      );
     }
     this.nip98 = options.nip98;
   }
@@ -332,7 +331,9 @@ export class BitcoinStratigraphyClient {
 
   async getLatest(): Promise<PaidStratigraphyResponse> {
     await this.getCost();
-    return this.authorizedJson<PaidStratigraphyResponse>("/api/v1/stratigraphy");
+    return this.authorizedJson<PaidStratigraphyResponse>(
+      "/api/v1/stratigraphy",
+    );
   }
 
   async getMeshStatus(): Promise<MeshStatus> {
@@ -486,10 +487,7 @@ export class BitcoinStratigraphyClient {
 
     if (response.status === 401 || response.status === 403) {
       const current = this.currentCredential();
-      if (
-        !current ||
-        this.authorization(current) === sentAuthorization
-      ) {
+      if (!current || this.authorization(current) === sentAuthorization) {
         this.credentials.delete(this.credentialKey());
       }
       credential = undefined;
@@ -544,10 +542,14 @@ export class BitcoinStratigraphyClient {
         const isCoinosReference =
           /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(preimage);
         if (isCoinosReference && selected.payment_asset !== "btc-lightning") {
-          throw new Error("CoinOS payment references require Lightning settlement");
+          throw new Error(
+            "CoinOS payment references require Lightning settlement",
+          );
         }
-        if (!isCoinosReference &&
-            await sha256Hex(preimage) !== selected.payment_hash.toLowerCase()) {
+        if (
+          !isCoinosReference &&
+          (await sha256Hex(preimage)) !== selected.payment_hash.toLowerCase()
+        ) {
           throw new Error(
             "Wallet preimage does not match the L402 payment hash",
           );
@@ -578,19 +580,33 @@ export class BitcoinStratigraphyClient {
 }
 
 function paymentPreimage(value: unknown): string {
-  const isBufferJson = (candidate: unknown): candidate is { type: "Buffer"; data: unknown[] } =>
-    candidate !== null && typeof candidate === "object" &&
-    "type" in candidate && candidate.type === "Buffer" &&
-    "data" in candidate && Array.isArray(candidate.data);
+  const isBufferJson = (
+    candidate: unknown,
+  ): candidate is { type: "Buffer"; data: unknown[] } =>
+    candidate !== null &&
+    typeof candidate === "object" &&
+    "type" in candidate &&
+    candidate.type === "Buffer" &&
+    "data" in candidate &&
+    Array.isArray(candidate.data);
   const fields: Array<[string, unknown]> = [];
-  if (typeof value === "string" || value instanceof Uint8Array || isBufferJson(value)) {
+  if (
+    typeof value === "string" ||
+    value instanceof Uint8Array ||
+    isBufferJson(value)
+  ) {
     fields.push(["response", value]);
   }
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     const response = value as Record<string, unknown>;
     const result = response.result;
-    if (result instanceof Uint8Array || isBufferJson(result)) fields.push(["result", result]);
-    if (result !== null && typeof result === "object" && !Array.isArray(result)) {
+    if (result instanceof Uint8Array || isBufferJson(result))
+      fields.push(["result", result]);
+    if (
+      result !== null &&
+      typeof result === "object" &&
+      !Array.isArray(result)
+    ) {
       const nested = result as Record<string, unknown>;
       fields.push(["result.preimage", nested.preimage]);
       fields.push(["result.payment_preimage", nested.payment_preimage]);
@@ -605,20 +621,33 @@ function paymentPreimage(value: unknown): string {
       const encoded = text.replace(/-/g, "+").replace(/_/g, "/");
       // Node's Base64 decoder accepts malformed strings; require a canonical
       // encoding before interpreting any payment proof as bytes.
-      const isBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(encoded) &&
+      const isBase64 =
+        /^[A-Za-z0-9+/]+={0,2}$/.test(encoded) &&
         encoded.length % 4 !== 1 &&
         Buffer.from(encoded, "base64").toString("base64").replace(/=+$/, "") ===
           encoded.replace(/=+$/, "");
       return {
-        metadata: { typeof: "string", length: field.length, isBase64, isHex: /^[0-9a-f]+$/i.test(hex) },
+        metadata: {
+          typeof: "string",
+          length: field.length,
+          isBase64,
+          isHex: /^[0-9a-f]+$/i.test(hex),
+        },
         bytes: /^[0-9a-f]{64}$/i.test(hex)
           ? Buffer.from(hex, "hex")
-          : isBase64 ? Buffer.from(encoded, "base64") : undefined,
+          : isBase64
+            ? Buffer.from(encoded, "base64")
+            : undefined,
       };
     }
     if (field instanceof Uint8Array) {
       return {
-        metadata: { typeof: "object", length: field.byteLength, isBase64: false, isHex: false },
+        metadata: {
+          typeof: "object",
+          length: field.byteLength,
+          isBase64: false,
+          isHex: false,
+        },
         bytes: Buffer.from(field),
       };
     }
@@ -626,28 +655,55 @@ function paymentPreimage(value: unknown): string {
       const json = field as Record<string, unknown>;
       if (isBufferJson(json)) {
         const data = json.data;
-        const valid = data.every((byte: unknown) =>
-          Number.isInteger(byte) && (byte as number) >= 0 && (byte as number) <= 255);
+        const valid = data.every(
+          (byte: unknown) =>
+            Number.isInteger(byte) &&
+            (byte as number) >= 0 &&
+            (byte as number) <= 255,
+        );
         return {
-          metadata: { typeof: "object", length: data.length, isBase64: false, isHex: false },
+          metadata: {
+            typeof: "object",
+            length: data.length,
+            isBase64: false,
+            isHex: false,
+          },
           bytes: valid ? Buffer.from(data as number[]) : undefined,
         };
       }
     }
-    return { metadata: { typeof: field === null ? "null" : typeof field, length: null, isBase64: false, isHex: false }, bytes: undefined };
+    return {
+      metadata: {
+        typeof: field === null ? "null" : typeof field,
+        length: null,
+        isBase64: false,
+        isHex: false,
+      },
+      bytes: undefined,
+    };
   };
-  const descriptions = fields.map(([name, field]) => ({ name, field, ...describe(field) }));
+  const descriptions = fields.map(([name, field]) => ({
+    name,
+    field,
+    ...describe(field),
+  }));
   for (const { field, bytes } of descriptions) {
     if (bytes?.length === 32) return bytes.toString("hex");
-    if (typeof field === "string" &&
-        /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(field.trim())) {
+    if (
+      typeof field === "string" &&
+      /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(field.trim())
+    ) {
       return field.trim().toLowerCase();
     }
   }
   // Only structural metadata; never print the raw response or payment proof.
-  const shape = descriptions.map(({ name, metadata }) =>
-    `${name}:${JSON.stringify(metadata)}`).join(", ") || "no recognizable fields";
-  throw new Error(`Wallet did not return a 32-byte payment preimage or CoinOS payment reference (${shape})`);
+  const shape =
+    descriptions
+      .map(({ name, metadata }) => `${name}:${JSON.stringify(metadata)}`)
+      .join(", ") || "no recognizable fields";
+  throw new Error(
+    `Wallet did not return a 32-byte payment preimage or CoinOS payment reference (${shape})`,
+  );
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -722,10 +778,7 @@ function parseSseFrame(frame: string): { type: string; data: string } {
   return { type, data: data.join("\n") };
 }
 
-function abortableSleep(
-  delayMs: number,
-  signal: AbortSignal,
-): Promise<void> {
+function abortableSleep(delayMs: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       signal.removeEventListener("abort", abort);
@@ -745,9 +798,8 @@ function abortableSleep(
 }
 
 async function sha256Hex(hexValue: string): Promise<string> {
-  const bytes = Uint8Array.from(
-    hexValue.match(/.{2}/g) ?? [],
-    (pair) => Number.parseInt(pair, 16),
+  const bytes = Uint8Array.from(hexValue.match(/.{2}/g) ?? [], (pair) =>
+    Number.parseInt(pair, 16),
   );
   const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) =>
@@ -867,8 +919,9 @@ export async function validateMeshConsensus(
     if (await verifySchnorr(event)) validAttestationCount += 1;
   }
   const quorumReached = validAttestationCount >= effectiveThreshold;
-  const root =
-    await meshMerkleRoot(consensus.peerAttestations.map((item) => item.eventId));
+  const root = await meshMerkleRoot(
+    consensus.peerAttestations.map((item) => item.eventId),
+  );
   const score = Math.min(1, validAttestationCount / effectiveThreshold);
   return {
     valid:

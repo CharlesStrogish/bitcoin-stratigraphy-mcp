@@ -38,9 +38,7 @@ function retryAfter(
 ) {
   return Math.max(
     1,
-    Math.ceil(
-      (policy.limitWindowMs - (now - oldestAttempt)) / 1000,
-    ),
+    Math.ceil((policy.limitWindowMs - (now - oldestAttempt)) / 1000),
   );
 }
 
@@ -103,8 +101,7 @@ export function createPostgresPaymentChallengeStore(
               invoice: existingChallenge.invoice,
               paymentHash: existingChallenge.payment_hash,
               provider: existingChallenge.provider,
-              issuedAt:
-                existingChallenge.expires_at.getTime() - policy.reuseMs,
+              issuedAt: existingChallenge.expires_at.getTime() - policy.reuseMs,
             },
           };
         }

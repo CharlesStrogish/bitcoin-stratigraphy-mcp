@@ -14,7 +14,7 @@ type InvoicePayer = { payInvoice(invoice: string): Promise<WalletPayment> };
 
 export function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : undefined;
 }
 
@@ -24,16 +24,19 @@ export function record(value: unknown): Record<string, unknown> | undefined {
  */
 function walletService(runtime: IAgentRuntime): InvoicePayer | undefined {
   const service = runtime.getService("bitcoin-stratigraphy-wallet");
-  return service && typeof (service as unknown as InvoicePayer).payInvoice === "function"
-    ? service as unknown as InvoicePayer
+  return service &&
+    typeof (service as unknown as InvoicePayer).payInvoice === "function"
+    ? (service as unknown as InvoicePayer)
     : undefined;
 }
 
 export function hasWallet(runtime: IAgentRuntime): boolean {
   const pairing = runtime.getSetting("NWC_PAIRING_SECRET");
-  return walletService(runtime) !== undefined &&
+  return (
+    walletService(runtime) !== undefined &&
     typeof pairing === "string" &&
-    /^nostr\+walletconnect:\/\/\S+$/i.test(pairing);
+    /^nostr\+walletconnect:\/\/\S+$/i.test(pairing)
+  );
 }
 
 function clientFor(runtime: IAgentRuntime): BitcoinStratigraphyClient {
@@ -44,15 +47,16 @@ function clientFor(runtime: IAgentRuntime): BitcoinStratigraphyClient {
     );
   }
   if (!hasWallet(runtime)) {
-    throw new Error("A configured NWC_PAIRING_SECRET is required for paid actions");
+    throw new Error(
+      "A configured NWC_PAIRING_SECRET is required for paid actions",
+    );
   }
   const setting = runtime.getSetting("BITCOIN_STRATIGRAPHY_MCP_URL");
   if (setting != null && typeof setting !== "string") {
     throw new Error("BITCOIN_STRATIGRAPHY_MCP_URL must be a URL string");
   }
-  return new BitcoinStratigraphyClient(
-    setting || undefined,
-    (invoice) => wallet.payInvoice(invoice),
+  return new BitcoinStratigraphyClient(setting || undefined, (invoice) =>
+    wallet.payInvoice(invoice),
   );
 }
 
@@ -85,26 +89,36 @@ export async function executePaidAction(
   runtime: IAgentRuntime,
   message: Memory,
   callback: HandlerCallback | undefined,
-  operation: (client: BitcoinStratigraphyClient) => Promise<Record<string, unknown>>,
+  operation: (
+    client: BitcoinStratigraphyClient,
+  ) => Promise<Record<string, unknown>>,
   successText: (result: Record<string, unknown>) => string,
 ): Promise<ActionResult> {
   let result: Record<string, unknown>;
   try {
     result = await operation(clientFor(runtime));
   } catch (error) {
-    const text = error instanceof Error ? error.message : "Bitcoin Stratigraphy action failed";
+    const text =
+      error instanceof Error
+        ? error.message
+        : "Bitcoin Stratigraphy action failed";
     const failure: ActionResult = { success: false, text, error: text };
     if (callback) await callback({ text });
     return failure;
   }
-  const response: ActionResult = { success: true, text: successText(result), data: result };
+  const response: ActionResult = {
+    success: true,
+    text: successText(result),
+    data: result,
+  };
   if (callback) {
     try {
       await callback({ text: response.text, data: result });
     } catch (error) {
       // The payment and action succeeded. Report callback failure without
       // marking the action as failed (which could trigger a second payment).
-      response.error = error instanceof Error ? error.message : "Action callback failed";
+      response.error =
+        error instanceof Error ? error.message : "Action callback failed";
     }
   }
   return response;

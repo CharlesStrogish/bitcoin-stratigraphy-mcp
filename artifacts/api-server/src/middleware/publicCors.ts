@@ -1,7 +1,10 @@
 import type { Express, RequestHandler } from "express";
 
 /** Public API CORS is token-based, not cross-origin cookie authentication. */
-export function registerPublicCors(app: Express): void {
+export function registerPublicCors(
+  app: Express,
+  publicRateLimit?: RequestHandler,
+): void {
   app.use((_req, res, next) => {
     res.set({
       "Access-Control-Allow-Origin": "*",
@@ -24,10 +27,17 @@ export function registerPublicCors(app: Express): void {
     next();
   });
 
+  // Set CORS on 429s too, and count public preflights before terminating them.
+  if (publicRateLimit) app.use(publicRateLimit);
+
   const preflight: RequestHandler = (req, res) => {
     res.vary("Access-Control-Request-Headers");
     const headers = req.get("Access-Control-Request-Headers") ?? "";
-    if (headers.split(",").some((header) => header.trim().toLowerCase() === "authorization")) {
+    if (
+      headers
+        .split(",")
+        .some((header) => header.trim().toLowerCase() === "authorization")
+    ) {
       // Authorization is a Fetch non-wildcard request-header name, even when
       // credentials are omitted. Other requested headers remain covered by *.
       res.set("Access-Control-Allow-Headers", "*, Authorization");

@@ -46,7 +46,9 @@ export function createPostgresRevenueLedger(
   secret = process.env.SESSION_SECRET,
 ): RevenueLedger {
   if (!secret) {
-    throw new Error("SESSION_SECRET is required to encrypt revenue ledger data");
+    throw new Error(
+      "SESSION_SECRET is required to encrypt revenue ledger data",
+    );
   }
   return {
     async record(entry) {
@@ -65,9 +67,12 @@ export function createPostgresRevenueLedger(
           entry.requestKind,
           entry.satsReceived,
           entry.paymentHash.toLowerCase(),
-           // Legacy encrypted proof column also stores CoinOS payment IDs;
-           // the entry type keeps references distinct from true preimages.
-           encrypt((entry.preimage ?? entry.coinosPaymentId).toLowerCase(), secret),
+          // Legacy encrypted proof column also stores CoinOS payment IDs;
+          // the entry type keeps references distinct from true preimages.
+          encrypt(
+            (entry.preimage ?? entry.coinosPaymentId).toLowerCase(),
+            secret,
+          ),
           encrypt(entry.clientIdentifier, secret),
         ],
       );
@@ -136,7 +141,7 @@ export function createPostgresRevenueLedger(
           paymentHash: row.payment_hash,
           preimage: "00".repeat(32),
           clientIdentifier: "redacted",
-        })
+        }),
       );
     },
   };

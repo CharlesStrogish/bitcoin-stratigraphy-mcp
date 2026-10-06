@@ -5,6 +5,7 @@
 Frameworks are optional. Importing this namespace performs no network or payment
 operations. Evidence is not a legal certification or a zero-knowledge proof.
 """
+
 from importlib import import_module
 
 __version__ = "0.2.0"
@@ -18,7 +19,10 @@ _EXPORTS = {
     "PrepaidMacroNotarizer": ("b2b_settlement", "PrepaidMacroNotarizer"),
     "SigningAgent": ("b2b_contract", "SigningAgent"),
     "verify_inclusion_proof": ("swarm_flight_evidence", "verify_inclusion_proof"),
-    "verify_contract_settlement": ("b2b_settlement_verifier", "verify_contract_settlement"),
+    "verify_contract_settlement": (
+        "b2b_settlement_verifier",
+        "verify_contract_settlement",
+    ),
     "audit_journal": ("audit_verifier", "audit_journal"),
     "OtsVerifier": ("audit_verifier_ots", "OtsVerifier"),
 }

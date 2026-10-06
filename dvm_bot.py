@@ -37,7 +37,9 @@ def main():
         if not isinstance(metrics, dict):
             metrics = {}
     except (URLError, ValueError, OSError):
-        print("Could not reach local server directly. Generating teaser snapshot fallback...\n")
+        print(
+            "Could not reach local server directly. Generating teaser snapshot fallback...\n"
+        )
         metrics = {}
     publish_teaser(metrics)
 

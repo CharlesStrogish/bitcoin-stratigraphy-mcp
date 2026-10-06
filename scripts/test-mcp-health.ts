@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 
-const DEFAULT_BASE_URL =
-  "https://bitcoin-stratigraphy-dashboard.replit.app";
+const DEFAULT_BASE_URL = "https://bitcoin-stratigraphy-dashboard.replit.app";
 const MCP_PROTOCOL_VERSION = "2025-03-26";
 const REQUEST_TIMEOUT_MS = 30_000;
 const EXPECTED_TOOLS = [
@@ -68,7 +67,11 @@ function assertJsonSchema(
   toolName: string,
 ): asserts value is Record<string, unknown> {
   assert.ok(isRecord(value), `${toolName} inputSchema must be an object`);
-  assert.equal(value.type, "object", `${toolName} inputSchema must be an object schema`);
+  assert.equal(
+    value.type,
+    "object",
+    `${toolName} inputSchema must be an object schema`,
+  );
   assert.equal(
     value.additionalProperties,
     false,
@@ -99,7 +102,9 @@ function assertJsonSchema(
       `${toolName} requires an undefined property: ${String(propertyName)}`,
     );
   }
-  for (const [propertyName, propertySchema] of Object.entries(value.properties)) {
+  for (const [propertyName, propertySchema] of Object.entries(
+    value.properties,
+  )) {
     assert.ok(
       isRecord(propertySchema),
       `${toolName}.${propertyName} schema must be an object`,
@@ -180,7 +185,11 @@ async function assertToolList(baseUrl: URL) {
     "tools/list result must contain a tools array",
   );
   const tools = response.result.tools as McpTool[];
-  assert.equal(tools.length, EXPECTED_TOOLS.length, "Unexpected MCP tool count");
+  assert.equal(
+    tools.length,
+    EXPECTED_TOOLS.length,
+    "Unexpected MCP tool count",
+  );
 
   const names = tools.map((tool) => tool.name);
   assert.deepEqual(
@@ -189,7 +198,11 @@ async function assertToolList(baseUrl: URL) {
     "MCP tool names do not match the canonical registry",
   );
   for (const alias of LEGACY_TOOL_ALIASES) {
-    assert.equal(names.includes(alias), false, `${alias} must remain call-only`);
+    assert.equal(
+      names.includes(alias),
+      false,
+      `${alias} must remain call-only`,
+    );
   }
   for (const tool of tools) {
     const toolName = tool.name;
@@ -201,10 +214,10 @@ async function assertToolList(baseUrl: URL) {
     );
     assertJsonSchema(tool.inputSchema, toolName);
   }
-  const toolByName = new Map(
-    tools.map((tool) => [tool.name as string, tool]),
-  );
-  for (const [name, description] of Object.entries(EXPECTED_TOOL_DESCRIPTIONS)) {
+  const toolByName = new Map(tools.map((tool) => [tool.name as string, tool]));
+  for (const [name, description] of Object.entries(
+    EXPECTED_TOOL_DESCRIPTIONS,
+  )) {
     assert.equal(
       toolByName.get(name)?.description,
       description,
@@ -233,13 +246,19 @@ async function assertMeshStatusCall(baseUrl: URL) {
     "mesh.get_status must return structuredContent",
   );
   const output = response.result.structuredContent;
-  assert.equal(typeof output.activePeerCount, "number", "activePeerCount must be a number");
+  assert.equal(
+    typeof output.activePeerCount,
+    "number",
+    "activePeerCount must be a number",
+  );
   assert.equal(
     typeof output.configuredPeerCount,
     "number",
     "configuredPeerCount must be a number",
   );
-  console.log(`Free mesh.get_status call verified: ${String(output.activePeerCount)} active peer(s).`);
+  console.log(
+    `Free mesh.get_status call verified: ${String(output.activePeerCount)} active peer(s).`,
+  );
 }
 
 async function main() {

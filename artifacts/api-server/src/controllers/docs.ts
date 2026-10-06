@@ -34,7 +34,10 @@ export function docsController(directory: string): RequestHandler {
   };
 }
 
-export function cookbookController(directory: string, allowedFiles = cookbookFiles): RequestHandler {
+export function cookbookController(
+  directory: string,
+  allowedFiles = cookbookFiles,
+): RequestHandler {
   return (req, res, next) => {
     const filename = String(req.params.filename);
     if (!allowedFiles.has(filename)) {

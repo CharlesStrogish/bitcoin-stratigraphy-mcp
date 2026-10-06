@@ -42,13 +42,13 @@ export function createPostgresMacaroonUsageStore(
         values?: unknown[],
       ) =>
         signal
-          ? (client.query as unknown as <ResultRow>(
-              config: {
+          ? (
+              client.query as unknown as <ResultRow>(config: {
                 text: string;
                 values?: unknown[];
                 signal: AbortSignal;
-              },
-            ) => Promise<{ rows: ResultRow[] }>)<Row>({
+              }) => Promise<{ rows: ResultRow[] }>
+            )<Row>({
               text,
               values,
               signal,
@@ -63,10 +63,9 @@ export function createPostgresMacaroonUsageStore(
         for (const { tokenId } of [...limits].sort((a, b) =>
           a.tokenId.localeCompare(b.tokenId),
         )) {
-          await query(
-            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-            [tokenId],
-          );
+          await query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+            tokenId,
+          ]);
         }
         for (const { tokenId, maxRequests } of limits) {
           const result = await query<{ token_id: string }>(

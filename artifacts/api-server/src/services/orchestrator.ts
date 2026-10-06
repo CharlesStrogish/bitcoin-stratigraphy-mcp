@@ -25,10 +25,7 @@ function sampleCpu(): number {
     currentCpu.user - previousCpu.user + currentCpu.system - previousCpu.system;
   previousCpu = currentCpu;
   previousSample = currentTime;
-  sampledCpuUtilization = Math.min(
-    1,
-    Math.max(0, usedMicros / elapsedMicros),
-  );
+  sampledCpuUtilization = Math.min(1, Math.max(0, usedMicros / elapsedMicros));
   return sampledCpuUtilization;
 }
 

@@ -94,7 +94,10 @@ function buildTestAttestation(secretKey: Uint8Array) {
     ],
   };
   const event = finalizeEvent(template, secretKey);
-  assert.ok(verifyEvent(event), "Locally signed Nostr event failed verification");
+  assert.ok(
+    verifyEvent(event),
+    "Locally signed Nostr event failed verification",
+  );
   return { event, identifier, metadata, contentHash };
 }
 
@@ -106,7 +109,11 @@ function assertFetchedEvent(
   assert.ok(verifyEvent(fetched), "Fetched event signature is invalid");
   assert.equal(fetched.kind, 30078, "Fetched event kind is not NIP-78");
   assert.equal(fetched.pubkey, expected.event.pubkey, "Fetched pubkey changed");
-  assert.equal(fetched.content, expected.event.content, "Fetched content changed");
+  assert.equal(
+    fetched.content,
+    expected.event.content,
+    "Fetched content changed",
+  );
   assert.deepEqual(
     JSON.parse(fetched.content),
     expected.metadata,

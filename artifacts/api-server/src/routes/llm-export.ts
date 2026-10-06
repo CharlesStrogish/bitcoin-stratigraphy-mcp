@@ -14,14 +14,21 @@ const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 500;
 type ExportFormat = "jsonl" | "json";
 
-function parseExportQuery(req: Request): { limit: number; format: ExportFormat } | string {
-  if (Object.keys(req.query).some((key) => key !== "limit" && key !== "format")) {
+function parseExportQuery(
+  req: Request,
+): { limit: number; format: ExportFormat } | string {
+  if (
+    Object.keys(req.query).some((key) => key !== "limit" && key !== "format")
+  ) {
     return "Only limit and format query parameters are supported";
   }
   const limit = req.query.limit ?? String(DEFAULT_LIMIT);
   const format = req.query.format ?? "jsonl";
-  if (typeof limit !== "string" || !/^[1-9]\d*$/.test(limit) ||
-      Number(limit) > MAX_LIMIT) {
+  if (
+    typeof limit !== "string" ||
+    !/^[1-9]\d*$/.test(limit) ||
+    Number(limit) > MAX_LIMIT
+  ) {
     return `limit must be an integer between 1 and ${MAX_LIMIT}`;
   }
   if (format !== "jsonl" && format !== "json") {
@@ -35,8 +42,13 @@ function exportRow(
   index: number,
   total: number,
 ) {
-  const { height, date, targetMultiplier, recordHash } = digestRecord(record, index, total);
-  const { difficulty_epoch_progress, thermodynamic_signal } = record.quantitative_alpha;
+  const { height, date, targetMultiplier, recordHash } = digestRecord(
+    record,
+    index,
+    total,
+  );
+  const { difficulty_epoch_progress, thermodynamic_signal } =
+    record.quantitative_alpha;
   const instruction = `Define the Bitcoin Stratigraphy terms target_multiplier, difficulty_epoch_progress, and thermodynamic_signal for the indexed record at height ${height}. What thermodynamic truth does this record establish?`;
   return {
     height,
@@ -59,7 +71,10 @@ function exportRow(
 const recordSchema = (
   openApiDocument as { components: { schemas: Record<string, unknown> } }
 ).components.schemas.HuggingFaceExportRecord;
-if (!recordSchema) throw new Error("HuggingFaceExportRecord is missing from the OpenAPI document");
+if (!recordSchema)
+  throw new Error(
+    "HuggingFaceExportRecord is missing from the OpenAPI document",
+  );
 
 const schemaManifest = {
   schema_version: "1.0.0",
@@ -71,26 +86,49 @@ const schemaManifest = {
     verification: "/api/v1/zk/verify",
   },
   parameters: {
-    limit: { in: "query", type: "integer", default: DEFAULT_LIMIT, minimum: 1, maximum: MAX_LIMIT, description: "Most recent N indexed records, returned in ascending order" },
-    format: { in: "query", type: "string", enum: ["jsonl", "json"], default: "jsonl", content_types: { jsonl: "application/x-ndjson", json: "application/json" } },
+    limit: {
+      in: "query",
+      type: "integer",
+      default: DEFAULT_LIMIT,
+      minimum: 1,
+      maximum: MAX_LIMIT,
+      description: "Most recent N indexed records, returned in ascending order",
+    },
+    format: {
+      in: "query",
+      type: "string",
+      enum: ["jsonl", "json"],
+      default: "jsonl",
+      content_types: {
+        jsonl: "application/x-ndjson",
+        json: "application/json",
+      },
+    },
   },
   record_schema: recordSchema,
   domain_constraints: {
     indexed_height: `A deterministic daily index ending at ${LATEST_DATASET_BLOCK} on ${LATEST_DATASET_DATE}; each older record steps back ${BLOCKS_PER_RECORDED_EPOCH} blocks. It is not an observed per-record Bitcoin block height.`,
-    timestamp: "UTC midnight on the historical indexed date, not a measured Bitcoin block timestamp.",
-    target_multiplier: "Source title-derived target-distance proxy; not measured energy or a physical thermodynamic law.",
-    thermodynamic_signal: "Qualitative target-distance band based on the source multiplier.",
-    proof_availability: "The historical source dataset has no per-record ZK proofs. zk_proof_status is unavailable for every export row.",
+    timestamp:
+      "UTC midnight on the historical indexed date, not a measured Bitcoin block timestamp.",
+    target_multiplier:
+      "Source title-derived target-distance proxy; not measured energy or a physical thermodynamic law.",
+    thermodynamic_signal:
+      "Qualitative target-distance band based on the source multiplier.",
+    proof_availability:
+      "The historical source dataset has no per-record ZK proofs. zk_proof_status is unavailable for every export row.",
   },
   verification_protocols: {
     record_hash: {
       algorithm: "SHA-256",
-      canonicalization: "UTF-8 JSON.stringify([day,title,video_id,transcript_summary,target_multiplier,difficulty_epoch_progress,thermodynamic_signal])",
-      meaning: "Source-field fingerprint only; not a Bitcoin block hash or ZK proof.",
+      canonicalization:
+        "UTF-8 JSON.stringify([day,title,video_id,transcript_summary,target_multiplier,difficulty_epoch_progress,thermodynamic_signal])",
+      meaning:
+        "Source-field fingerprint only; not a Bitcoin block hash or ZK proof.",
     },
     zk_proof: {
       status: "unavailable",
-      guidance: "Do not claim these export rows have zk-SNARK verification. Independently supplied Groth16 attestations can be checked using POST /api/v1/zk/verify with their exact bound payload.",
+      guidance:
+        "Do not claim these export rows have zk-SNARK verification. Independently supplied Groth16 attestations can be checked using POST /api/v1/zk/verify with their exact bound payload.",
     },
   },
   access_policy: {
@@ -109,15 +147,20 @@ export function registerLlmExportRoutes(app: Express): void {
     }
     const records = await getStratigraphyData();
     const start = Math.max(0, records.length - query.limit);
-    const rows = records.slice(start).map((record, index) =>
-      exportRow(record, start + index, records.length)
-    );
+    const rows = records
+      .slice(start)
+      .map((record, index) => exportRow(record, start + index, records.length));
     res.setHeader("Cache-Control", "public, max-age=300");
     if (query.format === "json") {
       res.json(rows);
       return;
     }
-    res.type("application/x-ndjson").send(rows.map((row) => JSON.stringify(row)).join("\n") + (rows.length ? "\n" : ""));
+    res
+      .type("application/x-ndjson")
+      .send(
+        rows.map((row) => JSON.stringify(row)).join("\n") +
+          (rows.length ? "\n" : ""),
+      );
   });
 
   app.get("/.well-known/llm-schema.json", (_req, res) => {

@@ -36,15 +36,19 @@ from bitcoin_stratigraphy_enterprise import SwarmFlightRecorder, Article12Notary
 from bitcoin_stratigraphy_enterprise import SwarmFlightRecorder, verify_inclusion_proof
 
 recorder = SwarmFlightRecorder()  # No wallet or network access by default.
-index = recorder.record_trace({
-    "agent_id": "policy-reviewer",
-    "decision_summary": "Denied export pending privacy review",
-    "tool_call": {"name": "export_records", "outcome": "blocked"},
-})
+index = recorder.record_trace(
+    {
+        "agent_id": "policy-reviewer",
+        "decision_summary": "Denied export pending privacy review",
+        "tool_call": {"name": "export_records", "outcome": "blocked"},
+    }
+)
 receipt = recorder.flush_root()  # Deferred locally, not Bitcoin-anchored.
 bundle = recorder.export_disclosure(index)
 report = verify_inclusion_proof(
-    bundle["trace"], bundle["merkle_proof"], bundle["root_receipt"],
+    bundle["trace"],
+    bundle["merkle_proof"],
+    bundle["root_receipt"],
     expected_recorder_key=recorder.public_key,
 )
 assert report["merkle_inclusion_verified"]
@@ -64,7 +68,9 @@ dependency; when available, the Article 12 wrapper subclasses its real
 ```python
 from bitcoin_stratigraphy_enterprise import Article12NotaryCallback
 
-with Article12NotaryCallback(agent_id="risk-review", journal_path="private-audit.jsonl") as callback:
+with Article12NotaryCallback(
+    agent_id="risk-review", journal_path="private-audit.jsonl"
+) as callback:
     # chain.invoke(inputs, config={"callbacks": [callback]})
     run_id = callback.start_run({"request": "synthetic"})
     callback.finish_run(run_id, {"decision": "blocked"})

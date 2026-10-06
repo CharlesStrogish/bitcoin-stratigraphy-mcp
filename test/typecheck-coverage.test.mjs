@@ -5,7 +5,9 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const workspaceRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const workspaceRoot = path.resolve(
+  fileURLToPath(new URL("..", import.meta.url)),
+);
 
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
@@ -30,8 +32,9 @@ function listWorkspacePackages(filters = []) {
 }
 
 function rootTypecheckFilters(typecheckCommand) {
-  return [...typecheckCommand.matchAll(/--filter\s+(?:"([^"]+)"|'([^']+)'|(\S+))/g)]
-    .map((match) => match[1] ?? match[2] ?? match[3]);
+  return [
+    ...typecheckCommand.matchAll(/--filter\s+(?:"([^"]+)"|'([^']+)'|(\S+))/g),
+  ].map((match) => match[1] ?? match[2] ?? match[3]);
 }
 
 function filteredTypecheckPackagePaths(
@@ -83,7 +86,9 @@ test("root typecheck covers every TypeScript workspace package", () => {
   );
 
   const uncoveredPackages = listWorkspacePackages()
-    .filter(({ path: packagePath }) => path.resolve(packagePath) !== workspaceRoot)
+    .filter(
+      ({ path: packagePath }) => path.resolve(packagePath) !== workspaceRoot,
+    )
     .filter(({ path: packagePath }) =>
       existsSync(path.join(packagePath, "tsconfig.json")),
     )
@@ -94,7 +99,10 @@ test("root typecheck covers every TypeScript workspace package", () => {
         !selectedPackagePaths.has(resolvedPath)
       );
     })
-    .map(({ name, path: packagePath }) => name ?? path.relative(workspaceRoot, packagePath))
+    .map(
+      ({ name, path: packagePath }) =>
+        name ?? path.relative(workspaceRoot, packagePath),
+    )
     .sort();
 
   assert.deepEqual(

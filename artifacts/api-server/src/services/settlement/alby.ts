@@ -17,9 +17,7 @@ export function albySettlementMode(): AlbySettlementMode {
   return albySettlementUri() ? "live" : "standby";
 }
 
-export function createAlbySettlementProvider(
-  clientFactory?: NwcClientFactory,
-) {
+export function createAlbySettlementProvider(clientFactory?: NwcClientFactory) {
   return createNwcSettlementProvider({
     name: "alby",
     uri: albySettlementUri,

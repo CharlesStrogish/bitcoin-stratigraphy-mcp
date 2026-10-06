@@ -10,7 +10,8 @@ import {
 export type NwcClient = Pick<
   NWCClient,
   "lookupInvoice" | "makeInvoice" | "close"
-> & Partial<Pick<NWCClient, "listTransactions">>;
+> &
+  Partial<Pick<NWCClient, "listTransactions">>;
 export type NwcClientFactory = (nwcUri: string) => NwcClient;
 
 const silentNwcLogger = {
@@ -71,7 +72,7 @@ export function createNwcSettlementProvider(input: {
     isConfigured: () => configuredUri() !== undefined,
     async createInvoice(request: SettlementInvoiceInput) {
       if (
-        request.asset && request.asset !== "btc-lightning" ||
+        (request.asset && request.asset !== "btc-lightning") ||
         !Number.isSafeInteger(request.amountMsats) ||
         request.amountMsats <= 0 ||
         !Number.isSafeInteger(request.expirySeconds) ||
@@ -147,7 +148,7 @@ export function createNwcSettlementProvider(input: {
       if (
         !/^[0-9a-f]{64}$/.test(request.paymentHash) ||
         (!isHexPreimage && !isCoinosReference) ||
-        request.asset && request.asset !== "btc-lightning" ||
+        (request.asset && request.asset !== "btc-lightning") ||
         !Number.isSafeInteger(request.expectedAmountMsats) ||
         request.expectedAmountMsats <= 0
       ) {
@@ -196,11 +197,13 @@ export function createNwcSettlementProvider(input: {
         const valid =
           transaction.type === "incoming" &&
           transaction.state === "settled" &&
-          (isCoinosReference || transaction.amount === request.expectedAmountMsats) &&
+          (isCoinosReference ||
+            transaction.amount === request.expectedAmountMsats) &&
           transaction.description === request.expectedDescription &&
           transactionPaymentHash === request.paymentHash &&
           (isCoinosReference ||
-            ((!transactionPreimage || transactionPreimage === request.preimage) &&
+            ((!transactionPreimage ||
+              transactionPreimage === request.preimage) &&
               (transactionPreimage === undefined ||
                 /^[0-9a-f]{64}$/.test(transactionPreimage)))) &&
           (transaction.settled_at === undefined ||
@@ -213,8 +216,12 @@ export function createNwcSettlementProvider(input: {
           // for internal transfers. The issuing wallet must see BOTH the paid
           // incoming invoice and that exact outgoing payment in its own account.
           const settledAt = transaction.settled_at;
-          if (!Number.isSafeInteger(settledAt) ||
-              !settledAt || typeof transaction.invoice !== "string") return "invalid";
+          if (
+            !Number.isSafeInteger(settledAt) ||
+            !settledAt ||
+            typeof transaction.invoice !== "string"
+          )
+            return "invalid";
           const from = Math.max(0, settledAt - 3_600);
           const until = settledAt + 3_600;
           const matchesTransaction = async (
@@ -225,26 +232,36 @@ export function createNwcSettlementProvider(input: {
             for (let offset = 0; offset < 500; offset += 100) {
               if (request.signal?.aborted) return false;
               const page = await wallet.listTransactions({
-                type, from, until, limit: 100, offset,
+                type,
+                from,
+                until,
+                limit: 100,
+                offset,
               });
               if (!Array.isArray(page.transactions)) return false;
-              if (page.transactions.some((payment) =>
-                payment.type === type &&
-                payment.state === "settled" &&
-                (type === "incoming" ||
-                  payment.payment_hash?.toLowerCase() === request.preimage.toLowerCase()) &&
-                payment.invoice === transaction.invoice &&
-                payment.amount === request.expectedAmountMsats &&
-                typeof payment.created_at === "number" &&
-                payment.created_at >= from && payment.created_at <= until
-              )) return true;
+              if (
+                page.transactions.some(
+                  (payment) =>
+                    payment.type === type &&
+                    payment.state === "settled" &&
+                    (type === "incoming" ||
+                      payment.payment_hash?.toLowerCase() ===
+                        request.preimage.toLowerCase()) &&
+                    payment.invoice === transaction.invoice &&
+                    payment.amount === request.expectedAmountMsats &&
+                    typeof payment.created_at === "number" &&
+                    payment.created_at >= from &&
+                    payment.created_at <= until,
+                )
+              )
+                return true;
               if (page.transactions.length < 100) break;
             }
             return false;
           };
           // Internal credits may leave CLN's amount_received_msat unset. The
           // issuer's incoming transaction list supplies the actual credited amount.
-          if (!await matchesTransaction(client, "incoming")) return "invalid";
+          if (!(await matchesTransaction(client, "incoming"))) return "invalid";
           if (await matchesTransaction(client, "outgoing")) {
             return { settledAt, provider: input.name, asset: "btc-lightning" };
           }
@@ -252,10 +269,19 @@ export function createNwcSettlementProvider(input: {
           if (payerUri && payerUri !== uri) {
             const payer = clientFactory(payerUri);
             const closePayer = () => payer.close();
-            request.signal?.addEventListener("abort", closePayer, { once: true });
+            request.signal?.addEventListener("abort", closePayer, {
+              once: true,
+            });
             try {
-              if (!request.signal?.aborted && await matchesTransaction(payer, "outgoing")) {
-                return { settledAt, provider: input.name, asset: "btc-lightning" };
+              if (
+                !request.signal?.aborted &&
+                (await matchesTransaction(payer, "outgoing"))
+              ) {
+                return {
+                  settledAt,
+                  provider: input.name,
+                  asset: "btc-lightning",
+                };
               }
             } finally {
               request.signal?.removeEventListener("abort", closePayer);

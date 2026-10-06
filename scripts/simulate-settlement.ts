@@ -78,9 +78,7 @@ function paymentPreimage(value: unknown): string {
 function optionalPaymentPreimage(value: unknown): string | undefined {
   try {
     const valueCandidate = paymentPreimage(value).toLowerCase();
-    return /^[0-9a-f]{64}$/.test(valueCandidate)
-      ? valueCandidate
-      : undefined;
+    return /^[0-9a-f]{64}$/.test(valueCandidate) ? valueCandidate : undefined;
   } catch {
     return undefined;
   }
@@ -133,62 +131,66 @@ function buildAnnouncements(createdAt: number): [Event, Event] {
   assert.ok(rawKey, "NOSTR_PRIVATE_KEY is required for Nostr re-broadcast");
   const privateKey = parsePrivateKey(rawKey);
   const publicKey = getPublicKey(privateKey);
-  const profile = finalizeEvent({
-    kind: 0,
-    created_at: createdAt,
-    tags: [],
-    content: JSON.stringify({
-      name: DVM_NAME,
-      about: DVM_ABOUT,
-      picture: process.env.DVM_PICTURE_URL?.trim() ?? "",
-      banner: process.env.DVM_BANNER_URL?.trim() ?? "",
-      ...(process.env.NIP05_IDENTIFIER?.trim()
-        ? { nip05: process.env.NIP05_IDENTIFIER.trim() }
-        : {}),
-    }),
-  }, privateKey);
-  const stratigraphyAmount = positiveInteger(
-    process.env.DVM_STRATIGRAPHY_FEE_SATS,
-    5,
-  ) * 1_000;
-  const proofAmount = positiveInteger(process.env.DVM_ZK_PROOF_FEE_SATS, 21) *
-    1_000;
-  const handler = finalizeEvent({
-    kind: 31_990,
-    created_at: createdAt,
-    tags: [
-      ["d", "bitcoin-stratigraphy-dvm"],
-      ["k", "5000"],
-      ["k", "5002"],
-      ["amount", String(stratigraphyAmount)],
-      ["amount", String(proofAmount)],
-      ["t", "stratigraphy"],
-      ["t", "zk-proof"],
-      ["capability", "nip-90"],
-      ["capability", "mcp"],
-      ["capability", "l402"],
-    ],
-    content: JSON.stringify({
-      name: DVM_NAME,
-      about: DVM_ABOUT,
-      picture: process.env.DVM_PICTURE_URL?.trim() ?? "",
-      banner: process.env.DVM_BANNER_URL?.trim() ?? "",
-      capabilities: ["nip-90", "stratigraphy", "zk-proof", "mcp", "l402"],
-      jobs: [
-        {
-          kind: 5_000,
-          capability: "stratigraphy",
-          amount_msats: stratigraphyAmount,
-        },
-        {
-          kind: 5_002,
-          capability: "zk-proof",
-          amount_msats: proofAmount,
-        },
+  const profile = finalizeEvent(
+    {
+      kind: 0,
+      created_at: createdAt,
+      tags: [],
+      content: JSON.stringify({
+        name: DVM_NAME,
+        about: DVM_ABOUT,
+        picture: process.env.DVM_PICTURE_URL?.trim() ?? "",
+        banner: process.env.DVM_BANNER_URL?.trim() ?? "",
+        ...(process.env.NIP05_IDENTIFIER?.trim()
+          ? { nip05: process.env.NIP05_IDENTIFIER.trim() }
+          : {}),
+      }),
+    },
+    privateKey,
+  );
+  const stratigraphyAmount =
+    positiveInteger(process.env.DVM_STRATIGRAPHY_FEE_SATS, 5) * 1_000;
+  const proofAmount =
+    positiveInteger(process.env.DVM_ZK_PROOF_FEE_SATS, 21) * 1_000;
+  const handler = finalizeEvent(
+    {
+      kind: 31_990,
+      created_at: createdAt,
+      tags: [
+        ["d", "bitcoin-stratigraphy-dvm"],
+        ["k", "5000"],
+        ["k", "5002"],
+        ["amount", String(stratigraphyAmount)],
+        ["amount", String(proofAmount)],
+        ["t", "stratigraphy"],
+        ["t", "zk-proof"],
+        ["capability", "nip-90"],
+        ["capability", "mcp"],
+        ["capability", "l402"],
       ],
-      pubkey: publicKey,
-    }),
-  }, privateKey);
+      content: JSON.stringify({
+        name: DVM_NAME,
+        about: DVM_ABOUT,
+        picture: process.env.DVM_PICTURE_URL?.trim() ?? "",
+        banner: process.env.DVM_BANNER_URL?.trim() ?? "",
+        capabilities: ["nip-90", "stratigraphy", "zk-proof", "mcp", "l402"],
+        jobs: [
+          {
+            kind: 5_000,
+            capability: "stratigraphy",
+            amount_msats: stratigraphyAmount,
+          },
+          {
+            kind: 5_002,
+            capability: "zk-proof",
+            amount_msats: proofAmount,
+          },
+        ],
+        pubkey: publicKey,
+      }),
+    },
+    privateKey,
+  );
   return [profile, handler];
 }
 
@@ -217,20 +219,23 @@ async function publishEventToRelays(
   return acknowledgements.map((result, index) => ({
     relay: relays[index]!,
     delivered: result.status === "fulfilled",
-    receipt: result.status === "fulfilled"
-      ? result.value
-      : result.reason instanceof Error
-        ? result.reason.message
-        : String(result.reason),
+    receipt:
+      result.status === "fulfilled"
+        ? result.value
+        : result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason),
   }));
 }
 
 async function rebroadcastNostrAnnouncements() {
-  const relays = [...new Set(
-    (process.env.NOSTR_RELAYS?.split(",") ?? [...DEFAULT_NOSTR_RELAYS])
-      .map((relay) => relay.trim())
-      .filter(Boolean),
-  )];
+  const relays = [
+    ...new Set(
+      (process.env.NOSTR_RELAYS?.split(",") ?? [...DEFAULT_NOSTR_RELAYS])
+        .map((relay) => relay.trim())
+        .filter(Boolean),
+    ),
+  ];
   const createdAt = Math.floor(Date.now() / 1_000);
   const [profile, nip89] = buildAnnouncements(createdAt);
   const pool = new SimplePool({ enableReconnect: true });
@@ -261,15 +266,21 @@ async function rebroadcastNostrAnnouncements() {
 
 async function main() {
   if (process.argv.includes("--nostr-only")) {
-    console.log(JSON.stringify({
-      nostrRebroadcast: await rebroadcastNostrAnnouncements(),
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          nostrRebroadcast: await rebroadcastNostrAnnouncements(),
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
   const baseUrl = apiBaseUrl();
   const endpoint = `${baseUrl}/api/v1/zk/ground`;
-  const nwcUri = process.env.L402_PAYER_NWC_URI?.trim() ??
-    process.env.NWC_URI?.trim();
+  const nwcUri =
+    process.env.L402_PAYER_NWC_URI?.trim() ?? process.env.NWC_URI?.trim();
   assert.ok(
     nwcUri,
     "L402_PAYER_NWC_URI or NWC_URI is required to settle the L402 invoice",
@@ -307,8 +318,9 @@ async function main() {
   let preimage: string;
   try {
     const payment = await wallet.payInvoice({ invoice: challenge.invoice });
-    preimage = optionalPaymentPreimage(payment) ??
-      await settledPreimage(wallet, challenge.payment_hash);
+    preimage =
+      optionalPaymentPreimage(payment) ??
+      (await settledPreimage(wallet, challenge.payment_hash));
   } finally {
     wallet.close();
   }
@@ -338,9 +350,7 @@ async function main() {
   assert.equal(paid.receipt.contextHash, CONTEXT.contextHash);
 
   const [afterRevenue, audit, nostr] = await Promise.all([
-    jsonRequest<Record<string, unknown>>(
-      `${baseUrl}/api/v1/analytics/revenue`,
-    ),
+    jsonRequest<Record<string, unknown>>(`${baseUrl}/api/v1/analytics/revenue`),
     jsonRequest<{ transactions: AuditEntry[] }>(
       `${baseUrl}/api/v1/analytics/audit?limit=100`,
     ),
@@ -356,22 +366,28 @@ async function main() {
   );
   assert.ok(ledgerEntry, "The 5-sat zk-proof ledger entry was not found");
 
-  console.log(JSON.stringify({
-    simulation: {
-      endpoint,
-      challengeAmountSats: challenge.amount_sats,
-      paymentHashVerified: true,
-      settlementRecorded: true,
-      paymentReference: reference,
-    },
-    epistemicAnchorReceipt: paid.receipt,
-    revenue: {
-      before: beforeRevenue,
-      after: afterRevenue,
-      matchedLedgerEntry: ledgerEntry,
-    },
-    nostrRebroadcast: nostr,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        simulation: {
+          endpoint,
+          challengeAmountSats: challenge.amount_sats,
+          paymentHashVerified: true,
+          settlementRecorded: true,
+          paymentReference: reference,
+        },
+        epistemicAnchorReceipt: paid.receipt,
+        revenue: {
+          before: beforeRevenue,
+          after: afterRevenue,
+          matchedLedgerEntry: ledgerEntry,
+        },
+        nostrRebroadcast: nostr,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 main().catch((error: unknown) => {

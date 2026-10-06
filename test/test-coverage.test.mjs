@@ -5,7 +5,9 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const workspaceRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const workspaceRoot = path.resolve(
+  fileURLToPath(new URL("..", import.meta.url)),
+);
 const ignoredDirectories = new Set([
   "build",
   "coverage",
@@ -37,7 +39,10 @@ function packageContainsTests(packagePath) {
 
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) {
-        if (!ignoredDirectories.has(entry.name) && !entry.name.startsWith(".")) {
+        if (
+          !ignoredDirectories.has(entry.name) &&
+          !entry.name.startsWith(".")
+        ) {
           pendingDirectories.push(path.join(directory, entry.name));
         }
       } else if (entry.isFile() && testFilePattern.test(entry.name)) {
@@ -54,7 +59,9 @@ function packagesMissingTestScripts(
   containsTests = packageContainsTests,
 ) {
   return packages
-    .filter(({ path: packagePath }) => path.resolve(packagePath) !== workspaceRoot)
+    .filter(
+      ({ path: packagePath }) => path.resolve(packagePath) !== workspaceRoot,
+    )
     .filter(({ path: packagePath }) => containsTests(packagePath))
     .filter(({ path: packagePath }) => {
       const packageJson = readJson(path.join(packagePath, "package.json"));

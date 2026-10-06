@@ -240,17 +240,14 @@ test("intercepts an L402 challenge, pays it, and retries automatically", async (
       });
       if (String(input).endsWith("/cost")) return Response.json(cost);
       if (!authorization) return Response.json(challenge, { status: 402 });
-       return Response.json(paidResponse);
+      return Response.json(paidResponse);
     },
   });
 
   assert.deepEqual(await client.getLatest(), paidResponse);
   assert.equal(paymentCalls, 1);
   assert.equal(requests.length, 3);
-  assert.equal(
-    requests[2].authorization,
-    `L402 cached-macaroon:${preimage}`,
-  );
+  assert.equal(requests[2].authorization, `L402 cached-macaroon:${preimage}`);
 });
 
 test("redeems a CoinOS NIP-47 result.preimage without a second payment", async () => {
@@ -260,7 +257,9 @@ test("redeems a CoinOS NIP-47 result.preimage without a second payment", async (
     async payInvoice({ invoice }) {
       assert.equal(invoice, "lnbc-subscription");
       payments++;
-      return { result: { preimage: Buffer.from(preimage, "hex").toString("base64") } };
+      return {
+        result: { preimage: Buffer.from(preimage, "hex").toString("base64") },
+      };
     },
   });
   const client = new BitcoinStratigraphyClient({
@@ -284,10 +283,14 @@ test("sends an internal CoinOS payment ID once for issuer-side verification", as
   let payments = 0;
   const authorizations: Array<string | null> = [];
   const wallet = new NwcWalletAdapter({
-    payInvoice: async () => { payments++; return { result: { preimage: reference } }; },
+    payInvoice: async () => {
+      payments++;
+      return { result: { preimage: reference } };
+    },
   });
   const client = new BitcoinStratigraphyClient({
-    baseUrl: "https://node.example", wallet,
+    baseUrl: "https://node.example",
+    wallet,
     fetch: async (input, init) => {
       if (String(input).endsWith("/cost")) return Response.json(cost);
       const authorization = new Headers(init?.headers).get("Authorization");
@@ -323,22 +326,42 @@ test("accepts NWC preimages from each wrapped or unwrapped NIP-47 field", async 
     assert.equal(await wallet.payInvoice("lnbc-test"), preimage);
   }
   const internal = new NwcWalletAdapter({
-    payInvoice: async () => ({ result: { preimage: "123E4567-E89B-12D3-A456-426614174000" } }),
+    payInvoice: async () => ({
+      result: { preimage: "123E4567-E89B-12D3-A456-426614174000" },
+    }),
   });
-  assert.equal(await internal.payInvoice("lnbc-test"), "123e4567-e89b-12d3-a456-426614174000");
+  assert.equal(
+    await internal.payInvoice("lnbc-test"),
+    "123e4567-e89b-12d3-a456-426614174000",
+  );
   const invalid = new NwcWalletAdapter({
     payInvoice: async () => ({ result: { preimage: "wallet-local-uuid" } }),
   });
   await assert.rejects(invalid.payInvoice("lnbc-test"), (error: unknown) => {
     assert.ok(error instanceof Error);
-    assert.match(error.message, /Wallet did not return a 32-byte payment preimage/);
-    assert.match(error.message, /result\.preimage:\{"typeof":"string","length":17,"isBase64":false,"isHex":false\}/);
+    assert.match(
+      error.message,
+      /Wallet did not return a 32-byte payment preimage/,
+    );
+    assert.match(
+      error.message,
+      /result\.preimage:\{"typeof":"string","length":17,"isBase64":false,"isHex":false\}/,
+    );
     assert.doesNotMatch(error.message, /wallet-local-uuid/);
     return true;
   });
-  for (const bad of [Buffer.alloc(31), "A".repeat(44), { type: "Buffer", data: [256, ...Array(31).fill(0)] }]) {
-    const wallet = new NwcWalletAdapter({ payInvoice: async () => ({ preimage: bad }) });
-    await assert.rejects(wallet.payInvoice("lnbc-test"), /Wallet did not return a 32-byte payment preimage/);
+  for (const bad of [
+    Buffer.alloc(31),
+    "A".repeat(44),
+    { type: "Buffer", data: [256, ...Array(31).fill(0)] },
+  ]) {
+    const wallet = new NwcWalletAdapter({
+      payInvoice: async () => ({ preimage: bad }),
+    });
+    await assert.rejects(
+      wallet.payInvoice("lnbc-test"),
+      /Wallet did not return a 32-byte payment preimage/,
+    );
   }
 });
 
@@ -362,7 +385,7 @@ test("sends NIP-98 identity while acquiring and redeeming a bound pass", async (
       if (!requestHeaders.has("X-Nostr-Authorization")) {
         return Response.json(challenge, { status: 402 });
       }
-       return Response.json(paidResponse);
+      return Response.json(paidResponse);
     },
   });
 
@@ -527,7 +550,8 @@ test("parses SSE frames when CRLF separators span transport chunks", async () =>
       new Response(
         new ReadableStream({
           start(controller) {
-            for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+            for (const chunk of chunks)
+              controller.enqueue(encoder.encode(chunk));
             controller.close();
           },
         }),
@@ -542,14 +566,19 @@ test("parses SSE frames when CRLF separators span transport chunks", async () =>
   });
 
   let subscription!: ReturnType<typeof client.subscribeStream>;
-  const received = await new Promise<StratigraphyTelemetryEnvelope>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("No telemetry")), 1_000);
-    subscription = client.subscribeStream((value) => {
-      clearTimeout(timeout);
-      subscription.close();
-      resolve(value);
-    }, reject);
-  });
+  const received = await new Promise<StratigraphyTelemetryEnvelope>(
+    (resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("No telemetry")),
+        1_000,
+      );
+      subscription = client.subscribeStream((value) => {
+        clearTimeout(timeout);
+        subscription.close();
+        resolve(value);
+      }, reject);
+    },
+  );
   assert.deepEqual(received, { data: telemetry, zkProof });
 });
 
@@ -627,13 +656,18 @@ test("dispatches a lone-CR-terminated SSE frame at EOF", async () => {
   });
 
   let subscription!: ReturnType<typeof client.subscribeStream>;
-  const received = await new Promise<StratigraphyTelemetryEnvelope>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("No telemetry")), 1_000);
-    subscription = client.subscribeStream((value) => {
-      clearTimeout(timeout);
-      subscription.close();
-      resolve(value);
-    }, reject);
-  });
+  const received = await new Promise<StratigraphyTelemetryEnvelope>(
+    (resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("No telemetry")),
+        1_000,
+      );
+      subscription = client.subscribeStream((value) => {
+        clearTimeout(timeout);
+        subscription.close();
+        resolve(value);
+      }, reject);
+    },
+  );
   assert.deepEqual(received, { data: telemetry, zkProof });
 });

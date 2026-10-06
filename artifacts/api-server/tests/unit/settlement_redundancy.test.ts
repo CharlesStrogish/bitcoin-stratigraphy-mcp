@@ -8,9 +8,7 @@ import { createMemoryPaymentChallengeStore } from "../../src/lib/payment-challen
 import { createPostgresPaymentChallengeStore } from "../../src/lib/postgres-payment-challenge-store";
 import { registerStratigraphyRoutes } from "../../src/routes/stratigraphy";
 import { calculateTierCost } from "../../src/services/pricing";
-import {
-  albySettlementMode,
-} from "../../src/services/settlement/alby";
+import { albySettlementMode } from "../../src/services/settlement/alby";
 import { createCoinosSettlementProvider } from "../../src/services/settlement/coinos";
 import {
   createDefaultSettlementRouter,
@@ -36,27 +34,32 @@ test("keeps Alby optional in standby while Coinos remains operational", async ()
   delete process.env.ALBY_NWC_URI;
   delete process.env.NWC_FALLBACK_URI;
   let closeCalls = 0;
-  const router = createDefaultSettlementRouter(() => ({
-    makeInvoice: async () => ({
-      invoice: "lnbc-coinos-standby",
-      payment_hash: "a".repeat(64),
-    }),
-    lookupInvoice: async () => {
-      throw new Error("unused");
-    },
-    close: () => {
-      closeCalls += 1;
-    },
-  }) as never);
+  const router = createDefaultSettlementRouter(
+    () =>
+      ({
+        makeInvoice: async () => ({
+          invoice: "lnbc-coinos-standby",
+          payment_hash: "a".repeat(64),
+        }),
+        lookupInvoice: async () => {
+          throw new Error("unused");
+        },
+        close: () => {
+          closeCalls += 1;
+        },
+      }) as never,
+  );
   try {
     assert.equal(albySettlementMode(), "standby");
     assert.equal(router.isConfigured(), true);
     assert.equal(
-      (await router.createInvoice({
-        amountMsats: 5_000,
-        description: "test",
-        expirySeconds: 3600,
-      })).provider,
+      (
+        await router.createInvoice({
+          amountMsats: 5_000,
+          description: "test",
+          expirySeconds: 3600,
+        })
+      ).provider,
       "coinos",
     );
     assert.equal(closeCalls, 1);
@@ -79,9 +82,7 @@ function provider(input: {
   return {
     name: input.name,
     isConfigured: () => true,
-    createInvoice:
-      input.createInvoice ??
-      (async () => invoice(input.name)),
+    createInvoice: input.createInvoice ?? (async () => invoice(input.name)),
     verifyPayment:
       input.verifyPayment ??
       (async () => ({
@@ -111,11 +112,16 @@ test("fails over immediately on a Coinos network or 5xx error", async () => {
     }),
   });
 
-  assert.equal((await router.createInvoice({
-    amountMsats: 5_000,
-    description: "test",
-    expirySeconds: 3600,
-  })).provider, "alby");
+  assert.equal(
+    (
+      await router.createInvoice({
+        amountMsats: 5_000,
+        description: "test",
+        expirySeconds: 3600,
+      })
+    ).provider,
+    "alby",
+  );
   assert.equal(router.circuitState(), "open");
   assert.equal(router.activeProvider(), "alby");
 
@@ -150,28 +156,35 @@ test("classifies a raw Coinos HTTP 5xx response and closes its client", async ()
   const configuredNwcUri = process.env.NWC_URI;
   process.env.NWC_URI = "nostr+walletconnect://coinos";
   let closeCalls = 0;
-  const primary = createCoinosSettlementProvider(() => ({
-    makeInvoice: async () => {
-      throw Object.assign(new Error("upstream unavailable"), { status: 503 });
-    },
-    lookupInvoice: async () => {
-      throw new Error("unused");
-    },
-    close: () => {
-      closeCalls += 1;
-    },
-  }) as never);
+  const primary = createCoinosSettlementProvider(
+    () =>
+      ({
+        makeInvoice: async () => {
+          throw Object.assign(new Error("upstream unavailable"), {
+            status: 503,
+          });
+        },
+        lookupInvoice: async () => {
+          throw new Error("unused");
+        },
+        close: () => {
+          closeCalls += 1;
+        },
+      }) as never,
+  );
   const router = createSettlementRouter({
     primary,
     fallback: provider({ name: "alby" }),
   });
   try {
     assert.equal(
-      (await router.createInvoice({
-        amountMsats: 5_000,
-        description: "test",
-        expirySeconds: 3600,
-      })).provider,
+      (
+        await router.createInvoice({
+          amountMsats: 5_000,
+          description: "test",
+          expirySeconds: 3600,
+        })
+      ).provider,
       "alby",
     );
     assert.equal(closeCalls, 1);
@@ -186,15 +199,18 @@ test("closes the Coinos NWC client when the router timeout fires", async () => {
   const configuredNwcUri = process.env.NWC_URI;
   process.env.NWC_URI = "nostr+walletconnect://coinos";
   let closeCalls = 0;
-  const primary = createCoinosSettlementProvider(() => ({
-    makeInvoice: () => new Promise(() => undefined),
-    lookupInvoice: async () => {
-      throw new Error("unused");
-    },
-    close: () => {
-      closeCalls += 1;
-    },
-  }) as never);
+  const primary = createCoinosSettlementProvider(
+    () =>
+      ({
+        makeInvoice: () => new Promise(() => undefined),
+        lookupInvoice: async () => {
+          throw new Error("unused");
+        },
+        close: () => {
+          closeCalls += 1;
+        },
+      }) as never,
+  );
   const router = createSettlementRouter({
     operationTimeoutMs: 5,
     primary,
@@ -202,11 +218,13 @@ test("closes the Coinos NWC client when the router timeout fires", async () => {
   });
   try {
     assert.equal(
-      (await router.createInvoice({
-        amountMsats: 5_000,
-        description: "test",
-        expirySeconds: 3600,
-      })).provider,
+      (
+        await router.createInvoice({
+          amountMsats: 5_000,
+          description: "test",
+          expirySeconds: 3600,
+        })
+      ).provider,
       "alby",
     );
     assert.equal(closeCalls, 1);
@@ -469,7 +487,7 @@ test("builds every L402 challenge with the active fallback provider", async () =
     assert.match(response.headers.get("www-authenticate") ?? "", /lnbc-alby-1/);
     assert.match(response.headers.get("www-authenticate") ?? "", /lnbc-alby-2/);
     assert.match(response.headers.get("www-authenticate") ?? "", /lnbc-alby-3/);
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       invoice: string;
       passes: Array<{ invoice: string }>;
     };
@@ -521,14 +539,13 @@ test("attributes failover challenges to the actual provider cache", async () => 
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
   const address = server.address() as AddressInfo;
-  const url =
-    `http://127.0.0.1:${address.port}/api/v1/stratigraphy?days=1`;
+  const url = `http://127.0.0.1:${address.port}/api/v1/stratigraphy?days=1`;
   try {
     const failedOver = await fetch(url);
     assert.equal(failedOver.status, 402);
     assert.equal(primaryCalls, 1);
     assert.equal(fallbackInvoices, 3);
-    const body = await failedOver.json() as {
+    const body = (await failedOver.json()) as {
       invoice: string;
       passes: Array<{ invoice: string }>;
     };
@@ -589,19 +606,15 @@ test("deduplicates concurrent PostgreSQL failover under stale provider scopes", 
     assert.equal(second.kind, "challenge");
     assert.equal(creations, 1);
     if (first.kind === "challenge" && second.kind === "challenge") {
-      assert.equal(
-        first.challenge.paymentHash,
-        second.challenge.paymentHash,
-      );
+      assert.equal(first.challenge.paymentHash, second.challenge.paymentHash);
     }
   } finally {
     await pool.query(
       "DELETE FROM payment_range_challenges WHERE caller_key = $1",
       [caller],
     );
-    await pool.query(
-      "DELETE FROM payment_challenges WHERE caller_key = $1",
-      [caller],
-    );
+    await pool.query("DELETE FROM payment_challenges WHERE caller_key = $1", [
+      caller,
+    ]);
   }
 });

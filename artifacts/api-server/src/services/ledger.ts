@@ -13,10 +13,11 @@ type RevenueLedgerBase = {
   clientIdentifier: string;
 };
 
-export type RevenueLedgerEntry = RevenueLedgerBase & (
-  | { preimage: string; coinosPaymentId?: never }
-  | { preimage?: never; coinosPaymentId: string }
-);
+export type RevenueLedgerEntry = RevenueLedgerBase &
+  (
+    | { preimage: string; coinosPaymentId?: never }
+    | { preimage?: never; coinosPaymentId: string }
+  );
 
 export type RevenueChannelBreakdown = Record<RevenueChannel, number>;
 
@@ -66,8 +67,12 @@ export function validateLedgerEntry(
     throw new TypeError("paymentHash must be a 32-byte hexadecimal digest");
   }
   if (entry.coinosPaymentId !== undefined) {
-    if (entry.channel !== "L402" ||
-        !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(entry.coinosPaymentId)) {
+    if (
+      entry.channel !== "L402" ||
+      !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(
+        entry.coinosPaymentId,
+      )
+    ) {
       throw new TypeError("Invalid CoinOS settlement reference");
     }
   } else {

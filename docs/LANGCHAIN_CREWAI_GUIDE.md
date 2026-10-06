@@ -159,6 +159,7 @@ def make_args_model(tool: Any) -> type[BaseModel]:
         return values
 
     extra_policy = "forbid" if schema.get("additionalProperties") is False else "allow"
+
     # Preserve the full advertised schema for the LLM, including nested
     # properties, enums, and oneOf branches, rather than exposing Any fields.
     def expose_mcp_schema(generated_schema: dict[str, Any]) -> None:
@@ -227,9 +228,7 @@ def result_text(result: Any) -> str:
         return json.dumps(structured, ensure_ascii=False, default=str)
 
     text_blocks = [
-        block.text
-        for block in (result.content or [])
-        if getattr(block, "text", None)
+        block.text for block in (result.content or []) if getattr(block, "text", None)
     ]
     if text_blocks:
         return "\n".join(text_blocks)

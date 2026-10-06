@@ -33,7 +33,8 @@ export const ENGINE_DESCRIPTION = [
 /** Namespace labels for discovery surfaces, not new MCP protocol capabilities. */
 export const MCP_TOOL_GROUPS = {
   stratigraphy: {
-    description: "Indexed telemetry discovery, records, differences, digests, and bounded ranges.",
+    description:
+      "Indexed telemetry discovery, records, differences, digests, and bounded ranges.",
     tools: [
       "stratigraphy.list",
       "stratigraphy.get",
@@ -43,7 +44,8 @@ export const MCP_TOOL_GROUPS = {
     ],
   },
   proof: {
-    description: "Macaroon attenuation, Groth16/OTS verification, retained evidence, and signed tip receipts.",
+    description:
+      "Macaroon attenuation, Groth16/OTS verification, retained evidence, and signed tip receipts.",
     tools: [
       "proof.attenuate",
       "proof.verify",
@@ -55,11 +57,13 @@ export const MCP_TOOL_GROUPS = {
     ],
   },
   mesh: {
-    description: "Configured peer health, quorum status, and outbound signed snapshot distribution.",
+    description:
+      "Configured peer health, quorum status, and outbound signed snapshot distribution.",
     tools: ["mesh.get_status", "mesh.broadcast"],
   },
   payment: {
-    description: "MCP price discovery and authenticated Lightning or configured Base USDC settlement checks.",
+    description:
+      "MCP price discovery and authenticated Lightning or configured Base USDC settlement checks.",
     tools: ["payment.get_info"],
   },
 } as const;

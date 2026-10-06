@@ -9,10 +9,7 @@ import {
   type EventTemplate,
 } from "nostr-tools";
 
-const DEFAULT_RELAYS = [
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-] as const;
+const DEFAULT_RELAYS = ["wss://relay.damus.io", "wss://nos.lol"] as const;
 const TEST_TIMEOUT_MS = 30_000;
 const PUBLISH_TIMEOUT_MS = 10_000;
 
@@ -47,7 +44,10 @@ function buildRequest(secretKey: Uint8Array): Event {
     content: "Fetch latest stratigraphy telemetry",
   };
   const event = finalizeEvent(template, secretKey);
-  assert.ok(verifyEvent(event), "Generated NIP-90 request signature is invalid");
+  assert.ok(
+    verifyEvent(event),
+    "Generated NIP-90 request signature is invalid",
+  );
   return event;
 }
 
@@ -128,10 +128,7 @@ async function main() {
               if (feedback.invoice) {
                 console.log(`  Lightning invoice: ${feedback.invoice}`);
               }
-              if (
-                feedback.status === "payment-required" &&
-                feedback.invoice
-              ) {
+              if (feedback.status === "payment-required" && feedback.invoice) {
                 selectedProvider = event.pubkey;
                 console.log(`  Selected DVM provider: ${selectedProvider}`);
               }
@@ -163,7 +160,9 @@ async function main() {
               return;
             }
             if (!verifyEvent(event)) {
-              finish(new Error("Received Kind 6000 result has an invalid signature"));
+              finish(
+                new Error("Received Kind 6000 result has an invalid signature"),
+              );
               return;
             }
 

@@ -27,12 +27,24 @@ from urllib.request import parse_http_list
 import httpx
 
 MCP_URL = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
-CANONICAL_TOOLS = frozenset({
-    "stratigraphy.list", "stratigraphy.get", "stratigraphy.get_digest",
-    "stratigraphy.get_diff", "stratigraphy.get_range", "proof.attenuate",
-    "proof.verify", "proof.get_by_hash", "proof.list", "proof.submit",
-    "proof.ground", "mesh.get_status", "mesh.broadcast", "payment.get_info",
-})
+CANONICAL_TOOLS = frozenset(
+    {
+        "stratigraphy.list",
+        "stratigraphy.get",
+        "stratigraphy.get_digest",
+        "stratigraphy.get_diff",
+        "stratigraphy.get_range",
+        "proof.attenuate",
+        "proof.verify",
+        "proof.get_by_hash",
+        "proof.list",
+        "proof.submit",
+        "proof.ground",
+        "mesh.get_status",
+        "mesh.broadcast",
+        "payment.get_info",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -102,7 +114,7 @@ def _invoice_details(invoice: str) -> tuple[str, int]:
         if len(tagged) < 3:
             raise ValueError("Truncated BOLT11 tag")
         tag, size = tagged[0], (tagged[1] << 5) | tagged[2]
-        payload, tagged = tagged[3:3 + size], tagged[3 + size:]
+        payload, tagged = tagged[3 : 3 + size], tagged[3 + size :]
         if len(payload) != size:
             raise ValueError("Truncated BOLT11 tagged payload")
         if alphabet[tag] == "p":
@@ -115,13 +127,19 @@ def _invoice_details(invoice: str) -> tuple[str, int]:
                 raise ValueError("Invalid BOLT11 payment-hash padding")
             hashes.append((number >> 4).to_bytes(32, "big").hex())
     if len(hashes) != 1 or msats <= 0:
-        raise ValueError("Invoice must contain exactly one payment hash and a positive amount")
+        raise ValueError(
+            "Invoice must contain exactly one payment hash and a positive amount"
+        )
     return hashes[0], msats
 
 
 class _Budget:
     def __init__(self, total_sats: int):
-        if isinstance(total_sats, bool) or not isinstance(total_sats, int) or total_sats <= 0:
+        if (
+            isinstance(total_sats, bool)
+            or not isinstance(total_sats, int)
+            or total_sats <= 0
+        ):
             raise ValueError("Payment budget must be a positive integer")
         self.remaining = total_sats
         self.lock = threading.Lock()
@@ -130,9 +148,14 @@ class _Budget:
 class L402Auth(httpx.Auth):
     """Sync/async HTTPX auth; only 402 bodies are buffered, never live SSE."""
 
-    def __init__(self, merchant_url: str, pay_invoice: PaymentHook | None = None,
-                 max_sats: int = 250, budget_sats: int = 1000,
-                 budget: _Budget | None = None):
+    def __init__(
+        self,
+        merchant_url: str,
+        pay_invoice: PaymentHook | None = None,
+        max_sats: int = 250,
+        budget_sats: int = 1000,
+        budget: _Budget | None = None,
+    ):
         url = httpx.URL(merchant_url)
         if url.scheme not in ("http", "https") or not url.host or url.userinfo:
             raise ValueError("Use an HTTP(S) merchant URL without embedded credentials")
@@ -154,7 +177,9 @@ class L402Auth(httpx.Auth):
         if request.url.path == self.mcp_path:
             rpc = json.loads(request.content)
             if rpc.get("method") != "tools/call":
-                raise ValueError("MCP discovery and initialization must not require payment")
+                raise ValueError(
+                    "MCP discovery and initialization must not require payment"
+                )
             tool = rpc.get("params", {}).get("name")
             if tool not in CANONICAL_TOOLS:
                 raise ValueError("Refusing payment for an unrecognized MCP tool")
@@ -171,7 +196,10 @@ class L402Auth(httpx.Auth):
         body = response.json()
         if not isinstance(body, dict):
             raise ValueError("L402 challenge body must be a JSON object")
-        macaroon, invoice = attributes.get("macaroon", ""), attributes.get("invoice", "")
+        macaroon, invoice = (
+            attributes.get("macaroon", ""),
+            attributes.get("invoice", ""),
+        )
         if not re.fullmatch(r"[A-Za-z0-9_+/=-]{1,8192}", macaroon):
             raise ValueError("Invalid L402 macaroon")
         if body.get("macaroon") != macaroon or body.get("invoice") != invoice:
@@ -181,11 +209,19 @@ class L402Auth(httpx.Auth):
         if not isinstance(supplied_hash, str) or supplied_hash.lower() != payment_hash:
             raise ValueError("Invoice and challenge payment hashes differ")
         amount = body.get("amount_sats")
-        if isinstance(amount, bool) or not isinstance(amount, int) or amount * 1000 != msats:
+        if (
+            isinstance(amount, bool)
+            or not isinstance(amount, int)
+            or amount * 1000 != msats
+        ):
             raise ValueError("Invoice and challenge amounts differ")
         if amount > self.max_sats:
-            raise ValueError("Invoice exceeds the configured per-invoice spending limit")
-        return L402Challenge(macaroon, invoice, payment_hash, amount, str(request.url), tool)
+            raise ValueError(
+                "Invoice exceeds the configured per-invoice spending limit"
+            )
+        return L402Challenge(
+            macaroon, invoice, payment_hash, amount, str(request.url), tool
+        )
 
     def _settle(self, challenge: L402Challenge) -> str:
         if self.pay_invoice is None:
@@ -197,9 +233,16 @@ class L402Auth(httpx.Auth):
                 raise ValueError("Run-wide invoice spending budget exhausted")
             self.budget.remaining -= challenge.amount_sats
             preimage = self.pay_invoice(challenge)
-        if not isinstance(preimage, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", preimage):
-            raise ValueError("Wallet callback must return a 32-byte hex preimage, not an invoice ID")
-        if hashlib.sha256(bytes.fromhex(preimage)).hexdigest() != challenge.payment_hash:
+        if not isinstance(preimage, str) or not re.fullmatch(
+            r"[0-9a-fA-F]{64}", preimage
+        ):
+            raise ValueError(
+                "Wallet callback must return a 32-byte hex preimage, not an invoice ID"
+            )
+        if (
+            hashlib.sha256(bytes.fromhex(preimage)).hexdigest()
+            != challenge.payment_hash
+        ):
             raise ValueError("Wallet preimage does not match the selected invoice")
         return f"L402 {challenge.macaroon}:{preimage.lower()}"
 
@@ -216,7 +259,9 @@ class L402Auth(httpx.Auth):
                 response = yield request
                 if response.status_code == 402:
                     response.close()
-                    raise PaymentRejectedError("Paid retry still returned 402; no second invoice payment attempted")
+                    raise PaymentRejectedError(
+                        "Paid retry still returned 402; no second invoice payment attempted"
+                    )
         finally:
             if original is None:
                 request.headers.pop("Authorization", None)
@@ -232,11 +277,15 @@ class L402Auth(httpx.Auth):
                 await response.aread()
                 challenge = self._challenge(response)
                 await response.aclose()
-                request.headers["Authorization"] = await asyncio.to_thread(self._settle, challenge)
+                request.headers["Authorization"] = await asyncio.to_thread(
+                    self._settle, challenge
+                )
                 response = yield request
                 if response.status_code == 402:
                     await response.aclose()
-                    raise PaymentRejectedError("Paid retry still returned 402; no second invoice payment attempted")
+                    raise PaymentRejectedError(
+                        "Paid retry still returned 402; no second invoice payment attempted"
+                    )
         finally:
             if original is None:
                 request.headers.pop("Authorization", None)
@@ -244,19 +293,27 @@ class L402Auth(httpx.Auth):
                 request.headers["Authorization"] = original
 
 
-def async_httpx_factory(mcp_url: str, pay_invoice: PaymentHook | None = None,
-                        max_sats: int = 250, timeout: float = 20.0,
-                        budget_sats: int = 1000):
+def async_httpx_factory(
+    mcp_url: str,
+    pay_invoice: PaymentHook | None = None,
+    max_sats: int = 250,
+    timeout: float = 20.0,
+    budget_sats: int = 1000,
+):
     """Factory accepted by langchain-mcp-adapters; each session owns its client."""
     budget = _Budget(budget_sats)
 
     def factory(headers=None, timeout=None, auth=None):
         if auth is not None:
-            raise ValueError("Do not combine another HTTP auth provider with the L402 factory")
+            raise ValueError(
+                "Do not combine another HTTP auth provider with the L402 factory"
+            )
         return httpx.AsyncClient(
-            headers=headers, timeout=timeout if timeout is not None else default_timeout,
+            headers=headers,
+            timeout=timeout if timeout is not None else default_timeout,
             auth=L402Auth(mcp_url, pay_invoice, max_sats, budget=budget),
-            follow_redirects=False, verify=ssl.create_default_context(),
+            follow_redirects=False,
+            verify=ssl.create_default_context(),
         )
 
     default_timeout = timeout
@@ -266,9 +323,15 @@ def async_httpx_factory(mcp_url: str, pay_invoice: PaymentHook | None = None,
 class BitcoinStratigraphyClient:
     """Remote JSON-RPC and REST. Credentials are request-local and never cached."""
 
-    def __init__(self, mcp_url: str = MCP_URL, pay_invoice: PaymentHook | None = None,
-                 max_sats: int = 250, timeout: float = 20.0, budget_sats: int = 1000,
-                 transport: httpx.BaseTransport | None = None):
+    def __init__(
+        self,
+        mcp_url: str = MCP_URL,
+        pay_invoice: PaymentHook | None = None,
+        max_sats: int = 250,
+        timeout: float = 20.0,
+        budget_sats: int = 1000,
+        transport: httpx.BaseTransport | None = None,
+    ):
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("HTTP timeout must be finite and positive")
         self.mcp_url = str(httpx.URL(mcp_url))
@@ -277,7 +340,9 @@ class BitcoinStratigraphyClient:
         self._initialized = False
         self._initialize_lock = threading.RLock()
         self._http = httpx.Client(
-            transport=transport, timeout=timeout, follow_redirects=False,
+            transport=transport,
+            timeout=timeout,
+            follow_redirects=False,
             auth=L402Auth(mcp_url, pay_invoice, max_sats, budget_sats),
             verify=ssl.create_default_context(),
         )
@@ -306,7 +371,9 @@ class BitcoinStratigraphyClient:
         if params is not None:
             body["params"] = params
         headers = {**self._headers, "MCP-Protocol-Version": self.protocol_version}
-        with self._http.stream("POST", self.mcp_url, json=body, headers=headers) as response:
+        with self._http.stream(
+            "POST", self.mcp_url, json=body, headers=headers
+        ) as response:
             response.raise_for_status()
             if response.headers.get("mcp-session-id"):
                 self._headers["Mcp-Session-Id"] = response.headers["mcp-session-id"]
@@ -326,14 +393,18 @@ class BitcoinStratigraphyClient:
                             message = candidate
                             break
                 if message is None:
-                    raise ValueError("MCP SSE response contained no matching JSON-RPC result")
+                    raise ValueError(
+                        "MCP SSE response contained no matching JSON-RPC result"
+                    )
             else:
                 response.read()
                 message = response.json()
         if message.get("id") != request_id or message.get("jsonrpc") != "2.0":
             raise ValueError("Mismatched MCP JSON-RPC response")
         if "error" in message:
-            raise RuntimeError(f"MCP error: {message['error'].get('message', 'unknown error')}")
+            raise RuntimeError(
+                f"MCP error: {message['error'].get('message', 'unknown error')}"
+            )
         if not isinstance(message.get("result"), dict):
             raise ValueError("MCP response is missing a structured result")
         return message["result"]
@@ -342,17 +413,29 @@ class BitcoinStratigraphyClient:
         with self._initialize_lock:
             if self._initialized:
                 return
-            result = self._rpc("initialize", {
-                "protocolVersion": self.protocol_version, "capabilities": {},
-                "clientInfo": {"name": "bitcoin-stratigraphy-python-cookbooks", "version": "1.0.0"},
-            })
+            result = self._rpc(
+                "initialize",
+                {
+                    "protocolVersion": self.protocol_version,
+                    "capabilities": {},
+                    "clientInfo": {
+                        "name": "bitcoin-stratigraphy-python-cookbooks",
+                        "version": "1.0.0",
+                    },
+                },
+            )
             version = result.get("protocolVersion")
             if version not in {"2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"}:
                 raise ValueError("Unsupported negotiated MCP protocol")
             self.protocol_version = version
-            response = self._http.post(self.mcp_url, headers={
-                **self._headers, "MCP-Protocol-Version": version,
-            }, json={"jsonrpc": "2.0", "method": "notifications/initialized"})
+            response = self._http.post(
+                self.mcp_url,
+                headers={
+                    **self._headers,
+                    "MCP-Protocol-Version": version,
+                },
+                json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+            )
             response.raise_for_status()
             self._initialized = True
 
@@ -382,7 +465,9 @@ class BitcoinStratigraphyClient:
 def validate_catalog(tools: list[dict]) -> list[dict]:
     names = [tool["name"] for tool in tools]
     if len(names) != 14 or len(set(names)) != 14 or set(names) != CANONICAL_TOOLS:
-        raise ValueError("Remote catalog does not match the 14 canonical Stratigraphy tools")
+        raise ValueError(
+            "Remote catalog does not match the 14 canonical Stratigraphy tools"
+        )
     return tools
 
 
@@ -412,9 +497,14 @@ def error_detail(error: BaseException) -> str:
 
 def lnd_pay_invoice(challenge: L402Challenge) -> str:
     """Real LND REST adapter. Wallet keys are read only when explicitly invoked."""
-    url, macaroon = os.environ.get("LND_REST_URL", ""), os.environ.get("LND_MACAROON_HEX", "")
+    url, macaroon = (
+        os.environ.get("LND_REST_URL", ""),
+        os.environ.get("LND_MACAROON_HEX", ""),
+    )
     if not url.startswith("https://") or not re.fullmatch(r"[0-9a-fA-F]+", macaroon):
-        raise ValueError("Configure an HTTPS LND_REST_URL and LND_MACAROON_HEX securely")
+        raise ValueError(
+            "Configure an HTTPS LND_REST_URL and LND_MACAROON_HEX securely"
+        )
     verify = ssl.create_default_context(cafile=os.environ.get("LND_TLS_CERT") or None)
     with httpx.Client(timeout=30, verify=verify, follow_redirects=False) as wallet:
         response = wallet.post(
@@ -430,16 +520,30 @@ def lnd_pay_invoice(challenge: L402Challenge) -> str:
 
 
 def add_cli_arguments(parser: argparse.ArgumentParser):
-    parser.add_argument("--url", default=MCP_URL, help="Remote Streamable HTTP MCP endpoint")
-    parser.add_argument("--timeout", type=float, default=20.0, help="HTTP timeout in seconds")
-    parser.add_argument("--max-sats", type=int, default=250, help="Maximum sats per invoice")
-    parser.add_argument("--budget-sats", type=int, default=1000, help="Maximum invoice sats per run")
-    parser.add_argument("--pay-hook", help="Explicit wallet callback module:function (never enabled by default)")
+    parser.add_argument(
+        "--url", default=MCP_URL, help="Remote Streamable HTTP MCP endpoint"
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=20.0, help="HTTP timeout in seconds"
+    )
+    parser.add_argument(
+        "--max-sats", type=int, default=250, help="Maximum sats per invoice"
+    )
+    parser.add_argument(
+        "--budget-sats", type=int, default=1000, help="Maximum invoice sats per run"
+    )
+    parser.add_argument(
+        "--pay-hook",
+        help="Explicit wallet callback module:function (never enabled by default)",
+    )
 
 
 def client_from_args(args) -> BitcoinStratigraphyClient:
     return BitcoinStratigraphyClient(
-        args.url, load_payment_hook(args.pay_hook), args.max_sats, args.timeout,
+        args.url,
+        load_payment_hook(args.pay_hook),
+        args.max_sats,
+        args.timeout,
         budget_sats=args.budget_sats,
     )
 
@@ -448,7 +552,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     add_cli_arguments(parser)
     parser.add_argument("--tool", default="payment.get_info")
-    parser.add_argument("--arguments", default="{}", help="JSON object of tool arguments")
+    parser.add_argument(
+        "--arguments", default="{}", help="JSON object of tool arguments"
+    )
     args = parser.parse_args()
     arguments = json.loads(args.arguments)
     if not isinstance(arguments, dict):

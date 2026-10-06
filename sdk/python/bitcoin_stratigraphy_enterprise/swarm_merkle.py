@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 # Dual-licensed under AGPLv3 and Commercial terms.
 """RFC 6962-style ordered, unpadded Merkle hashing and audit paths (stdlib only)."""
+
 import hashlib
 import hmac
 
@@ -18,7 +19,12 @@ def leaf_hash(data):
 
 
 def node_hash(left, right):
-    if type(left) is not bytes or type(right) is not bytes or len(left) != 32 or len(right) != 32:
+    if (
+        type(left) is not bytes
+        or type(right) is not bytes
+        or len(left) != 32
+        or len(right) != 32
+    ):
         raise MerkleProofError("Child hashes must be 32 bytes")
     return hashlib.sha256(b"\x01" + left + right).digest()
 
@@ -43,6 +49,7 @@ class MerkleAccumulator:
     No duplicate-last-leaf padding. Root retrieval folds at most O(log n)
     perfect subtrees. Leaves are ordered by acceptance, not claimed wall time.
     """
+
     def __init__(self, max_leaves=10_000):
         if type(max_leaves) is not int or not 1 <= max_leaves <= MAX_LEAVES:
             raise MerkleProofError("Invalid leaf capacity")
@@ -70,11 +77,15 @@ class MerkleAccumulator:
         if cached is not None:
             return cached
         width = split_size(size)
-        return node_hash(self._subtree(start, width), self._subtree(start + width, size - width))
+        return node_hash(
+            self._subtree(start, width), self._subtree(start + width, size - width)
+        )
 
     @property
     def root(self):
-        return self._subtree(0, self.size) if self.size else hashlib.sha256(b"").digest()
+        return (
+            self._subtree(0, self.size) if self.size else hashlib.sha256(b"").digest()
+        )
 
     def inclusion_path(self, index):
         validate_position(index, self.size)
@@ -84,8 +95,12 @@ class MerkleAccumulator:
                 return []
             width = split_size(size)
             if offset < width:
-                return walk(start, width, offset) + [self._subtree(start + width, size - width)]
-            return walk(start + width, size - width, offset - width) + [self._subtree(start, width)]
+                return walk(start, width, offset) + [
+                    self._subtree(start + width, size - width)
+                ]
+            return walk(start + width, size - width, offset - width) + [
+                self._subtree(start, width)
+            ]
 
         return walk(0, self.size, index)
 
@@ -110,7 +125,9 @@ def verify_merkle_inclusion(data, index, size, siblings, root):
             return digest
         split = split_size(width)
         left = offset < split
-        child = rebuild(offset if left else offset - split, split if left else width - split)
+        child = rebuild(
+            offset if left else offset - split, split if left else width - split
+        )
         if used >= len(path):
             raise MerkleProofError("Audit path is too short")
         sibling = path[used]

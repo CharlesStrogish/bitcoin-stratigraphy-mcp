@@ -22,8 +22,7 @@ test("reaches but never exceeds tier ceilings", () => {
     assert.equal(quote.priceSats, STATIC_TIER_PRICING[tier].maxSats);
     assert.equal(
       quote.multiplier,
-      STATIC_TIER_PRICING[tier].maxSats /
-        STATIC_TIER_PRICING[tier].baseSats,
+      STATIC_TIER_PRICING[tier].maxSats / STATIC_TIER_PRICING[tier].baseSats,
     );
   }
 });

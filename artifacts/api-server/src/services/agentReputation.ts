@@ -90,8 +90,7 @@ function decodeNip98Event(value: string): Event | null {
       !Array.isArray(parsed.tags) ||
       !parsed.tags.every(
         (tag) =>
-          Array.isArray(tag) &&
-          tag.every((value) => typeof value === "string"),
+          Array.isArray(tag) && tag.every((value) => typeof value === "string"),
       )
     ) {
       return null;
@@ -132,7 +131,9 @@ export function createAgentReputationService(input?: {
   const identityForPubkey = (rawPubkey: string): AgentIdentity => {
     const pubkey = rawPubkey.toLowerCase();
     if (!PUBKEY_PATTERN.test(pubkey)) {
-      throw new Error("Agent pubkey must be 64 lowercase hexadecimal characters");
+      throw new Error(
+        "Agent pubkey must be 64 lowercase hexadecimal characters",
+      );
     }
     const tier = registry.get(pubkey) ?? "STANDARD";
     return { pubkey, tier, ...AGENT_TIER_POLICIES[tier] };
@@ -170,7 +171,9 @@ export function createAgentReputationService(input?: {
         return null;
       }
       if (payload !== undefined) {
-        const expectedPayload = createHash("sha256").update(payload).digest("hex");
+        const expectedPayload = createHash("sha256")
+          .update(payload)
+          .digest("hex");
         if (
           eventPayload.state !== "valid" ||
           eventPayload.value !== expectedPayload
@@ -200,9 +203,7 @@ export function createAgentReputationService(input?: {
         } satisfies AgentIdentity);
       const priceSats = Math.max(
         1,
-        Math.round(
-          originalPriceSats * (1 - resolved.discountPercent / 100),
-        ),
+        Math.round(originalPriceSats * (1 - resolved.discountPercent / 100)),
       );
       return {
         ...resolved,

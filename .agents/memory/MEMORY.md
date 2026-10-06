@@ -39,6 +39,7 @@
 - [Smithery discovery probes](smithery-discovery-probes.md) — static card, finite GET/HEAD probes, and public wildcard token-based CORS are intentional user requirements.
 - [Public training export policy](public-training-export-policy.md) — crawler dataset exports stay open while interactive MCP queries remain L402-paid; describe index/proof limits plainly.
 - [OTS pool receipt calendars](ots-pool-receipt-calendars.md) — public pools can return underlying calendar URLs; inspect real receipts before tightening the accepted issuer list.
+- [Independent audit evidence](independent-audit-evidence.md) — confirm Bitcoin commitments without paid MCP access; distinguish calendar acceptance, public-header corroboration, and full-node validation.
 - [x402 paid MCP settlement](x402-paid-mcp-settlement.md) — quote both rails without credentials, but mark x402 unavailable and require upfront settlement before tool execution.
 - [Standalone server-source imports](standalone-server-source-imports.md) — bundled API asset URLs and package-local dependencies may not resolve when a root script imports server TypeScript directly.
 - [Registry pricing claims](registry-pricing-claims.md) — requested 10-sat/$0.001 listing tier is illustrative; use live payment.info for actual tool charges.

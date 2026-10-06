@@ -361,6 +361,63 @@ alongside `hash` in response metadata. `pending_calendar` is **not Bitcoin
 confirmation** or a legal compliance finding; upgrade and independently verify
 the receipt later. Client UTC timestamps alone are not trusted time.
 
+### Independent audit verification (no MCP or L402)
+
+Run [`audit_verifier.py`](audit_verifier.py) against the original JSONL journal
+after the callback has flushed. It reads the trace and status records by
+`trace_id`, checks the append-only hash chain and exact canonical SHA-256 trace
+digest, parses real detached OTS receipts, and upgrades pending commitments
+using the official Python OpenTimestamps SDK. It never calls our MCP server or
+pays an invoice. The original journal is read-only.
+
+```sh
+uv run --no-sync python cookbooks/audit_verifier.py audit_trail.jsonl
+uv run --no-sync python cookbooks/audit_verifier.py audit_trail.jsonl \
+  --markdown .data/article12/report.md \
+  --receipt-dir .data/article12/receipts
+uv run --no-sync python -m unittest cookbooks.test_audit_verifier -v
+```
+
+The optional receipt directory stores owner-only upgraded `.ots` files keyed
+by trace digest. Future runs can recheck these saved upgrades even if the
+original calendar is unavailable. Never discard the journal in favor of
+receipts alone: receipt bytes do not contain the execution trace.
+
+The default verification method checks an OTS Merkle path against a
+proof-of-work-valid Bitcoin header and requires **matching block hashes and
+headers from both** Blockstream and mempool.space public mainnet explorers.
+Their agreement is **not** the same as validating the entire chain yourself.
+For regulator-grade independent chain validation, configure a fully validating
+**mainnet Bitcoin Core node** for the official `ots` CLI, then run:
+
+```sh
+uv run --no-sync python cookbooks/audit_verifier.py audit_trail.jsonl \
+  --bitcoin-core --markdown .data/article12/report.md
+```
+
+The verifier tells you which Bitcoin check it used. Untrusted calendar URLs
+and redirects are refused; only official HTTPS OpenTimestamps calendar hosts
+are queried, with per-request deadlines and a bounded number of upgrades.
+Some legitimate older HTTP-only calendar attestations will stay pending under
+that policy. Missing node access, an unavailable explorer, or an already-mined
+block that cannot be checked reports **Verification Unavailable**, not
+`VERIFIED`. A newly stamped receipt with no Bitcoin attestation reports
+**Pending Calendar Confirmation** rather than failure, regardless of age.
+`--offline` performs local checks without network access and never claims
+Bitcoin verification.
+
+Exit codes are **0** for an intact journal with verified and/or pending
+receipts, **1** for tamper evidence or journal corruption, and **2** for
+incomplete/unavailable verification (including absent receipts). The report
+includes UTC trace timestamps, agent IDs, full SHA-256 digests, and clear
+per-trace statuses. Timestamps recorded by the client are not trusted Bitcoin
+time. Even a genuinely verified Bitcoin commitment proves only that the
+committed trace bytes existed by the block's time; it does not establish
+that the producer captured all events, that the agent really did the work,
+that no journal entries were omitted, or that Article 12 legal requirements
+are satisfied. Protect and archive journals separately from reports and keep
+external journal checkpoints to detect truncation or wholesale rewrites.
+
 ## Official framework references
 
 - [CrewAI remote MCP](https://docs.crewai.com/en/mcp/overview).

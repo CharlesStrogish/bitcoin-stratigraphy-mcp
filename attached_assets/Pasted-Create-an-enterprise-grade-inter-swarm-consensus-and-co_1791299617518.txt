@@ -1,0 +1,32 @@
+Create an enterprise-grade inter-swarm consensus and contract settlement cookbook in `cookbooks/b2b_settlement.py` to establish our engine as the neutral settlement layer for cross-enterprise AI agents.
+
+Requirements:
+1. Bilateral Swarm Protocol:
+   - Implement a modular `B2BSettlementProtocol` class that orchestrates agreements between two independent autonomous agents (e.g., `ClientAgent` and `VendorAgent`).
+   - Define a canonical, deterministic contract schema (e.g., Contract ID, Parties, Scope/SLA, Pricing/Terms, Expiration UTC ISO-8601, Nonce).
+
+2. Cryptographic Consensus & Mutual Signing:
+   - Provide lightweight keypair generation and signing (using standard Ed25519 or ECDSA via standard libraries/existing project dependencies).
+   - Both agents sign the canonical, sorted contract JSON payload.
+   - The protocol validates both signatures against their respective public keys before initiating settlement.
+
+3. Anchored State Commitment:
+   - Compute a SHA-256 digest of the mutually signed contract package (payload + signatures).
+   - Interface with the Bitcoin Stratigraphy `proof.notarize` tool using our prepaid L402 Macro-Macaroon batch header (`X-L402-Batch-Size: 100`) to anchor the contract state to Bitcoin.
+   - Generate a tamper-proof settlement receipt binding both agent public keys, the contract hash, and the OpenTimestamps receipt.
+
+4. Verifiable Dispute Resolution:
+   - Include a verification function `verify_contract_settlement(receipt, contract_payload)` that an auditor or court can run offline to confirm:
+     a) Both corporate agent keys signed the exact terms.
+     b) The contract hash was anchored before contract expiration.
+     c) The terms have not been altered by a single character.
+
+5. Sandbox & Production Modes:
+   - Include a runnable `if __name__ == "__main__":` demonstration simulating an enterprise procurement negotiation between two swarms, culminating in a signed, notarized bilateral contract.
+   - Maintain cryptographic honesty: if running without an L402 wallet credential, clearly log the contract signatures and mark the OTS anchoring as "Deferred/Pending Credential" without fabricating receipts.
+
+6. Testing & Guardrails:
+   - Add unit tests in `cookbooks/test_b2b_settlement.py` covering: signature verification, tamper detection if payload is altered, and receipt creation.
+   - All 55 existing tests must continue to pass.
+   - Keep the core 15 MCP tools, schemas, and Express routes untouched.
+   - Zero new package vulnerabilities.

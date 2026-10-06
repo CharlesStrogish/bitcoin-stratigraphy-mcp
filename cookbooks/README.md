@@ -449,6 +449,118 @@ under your organization's governance. Submitting still discloses the supplied
 trace to the server operator: use the local CLI and your own Bitcoin Core
 node instead for confidential or stronger independent audits.
 
+## Bilateral enterprise contract-state settlement (repository cookbook)
+
+`cookbooks/b2b_settlement.py` demonstrates two independent signing agents
+negotiating a procurement contract and using the existing paid `proof.notarize`
+tool as a neutral contract-state anchoring service. It adds no MCP tools or
+Express routes. This is **bilateral agreement**, not Byzantine consensus,
+financial escrow, proof of delivery, or legal certification.
+
+```bash
+# Safe synthetic demo: no network, wallet, invoice, or credential use.
+uv run --no-sync python cookbooks/b2b_settlement.py
+
+# Explicit synthetic demo with a REAL prepaid notary call.
+# First provision a proof.notarize-scoped pass via your approved wallet process
+# and supply L402_AUTHORIZATION through your secret manager (never a CLI argument).
+uv run --no-sync python cookbooks/b2b_settlement.py --production
+
+# Auditor/court verification: local evidence only, no MCP or payments.
+uv run --no-sync python cookbooks/b2b_settlement.py \
+  --verify settlement_receipt.json --contract original_contract.json
+```
+
+The default demonstration ignores any available credentials. If production
+mode lacks a prepaid pass, it still prints genuine contract signatures and a
+mutually sealed receipt, but marks anchoring **Deferred/Pending Credential**
+with no fabricated OTS bytes. A configured adapter sends
+`X-L402-Batch-Size: 100` and its prepaid L402 authorization; it never purchases
+an invoice. The header does not itself create a prepaid pass or grant 100 calls.
+Revocation, expiration, remaining quota and tool scope are enforced by the
+unchanged engine. A failed or ambiguous call is not automatically retried.
+
+### Deterministic contract and receipt binding
+
+The strict `saai-b2b-contract/1` payload has these required fields:
+
+| Field | Contract rule |
+| --- | --- |
+| `contract_id` | Nonempty bounded transaction identifier; production must coordinate it durably |
+| `parties` | Distinct `client`/`vendor`, each with `agent_id` and a 32-byte lowercase hex Ed25519 public key |
+| `scope` | Description and ordered list of deliverables |
+| `sla` | Integer `max_latency_ms` and `availability_basis_points` |
+| `pricing` | `USD`/`EUR` cents or `GBP` pence in integer `amount_minor`, plus integer `payment_due_days` |
+| `terms` | Ordered strings; every character, including whitespace, is signed |
+| `issued_utc`, `expiration_utc` | Canonical `YYYY-MM-DDTHH:MM:SSZ`; expiration follows claimed issuance |
+| `nonce` | Fresh 32-byte cryptographic random value encoded as lowercase hex |
+
+Canonical encoding is the existing project definition: sorted JSON keys,
+compact separators, UTF-8 without ASCII escaping, and no non-finite numbers.
+This schema rejects unknown fields, floats and booleans in integer fields.
+JSON indentation/key order are not contractual terms; string contents are
+not trimmed or Unicode-normalized.
+
+Each agent signs the canonical payload. The engine digest is SHA-256 of
+the complete deterministic **signed package**, including the payload and both
+role-specific signatures. Only that digest—not plaintext terms—is sent to
+the notary. Both agents then sign the receipt body, binding their public
+keys, original signatures, package hash, expiration and exact OTS bytes.
+This produces a **tamper-evident** receipt, not an editable hash-only claim.
+Never rewrite its OTS field during an upgrade; keep upgraded proof evidence
+separately.
+
+For actual corporate integrations, replace ephemeral demo signers with
+independently enrolled enterprise key custodians and authenticated proposal
+transport. Supply an approval policy to each signing agent; both approvals and
+signatures are required before a paid call. Session-local replay guards
+prevent repeated quota redemption in one process, including uncertain
+outcomes. They are not distributed exactly-once coordination: persist
+transaction/nonce reservations and original evidence across restarts.
+Do not use demo keys for real corporate authority.
+
+### Offline dispute-resolution limits
+
+```python
+from cookbooks.b2b_settlement import verify_contract_settlement
+
+report = verify_contract_settlement(
+    original_receipt,
+    original_contract,
+    expected_party_keys={"client": known_client_key, "vendor": known_vendor_key},
+    trusted_headers=auditor_mainnet_headers,
+    upgraded_ots_proof_hex=auditor_upgraded_proof_hex,  # optional
+)
+```
+
+The auditor checks both contract signatures, both receipt seals, and the
+OTS digest/Merkle binding. A pending receipt is **not** evidence of Bitcoin
+inclusion or before-expiration anchoring. An embedded Bitcoin attestation is
+also not enough by itself.
+
+To confirm Bitcoin inclusion offline, independently obtain a header map from
+the auditor's fully validating mainnet node or separately trusted validated
+chain evidence. The format is height to `{"block_hash":"<64 hex>",
+"header_hex":"<160 hex>"}`. Supply it through `trusted_headers` or
+`--trusted-headers auditor_headers.json`; never automatically trust a header
+map bundled by the contracting parties. Obtain upgrades separately with the
+official OTS tools and pass binary evidence using `--upgraded-ots proof.ots`.
+Pin independently enrolled public keys using `--party-keys corporate_keys.json`,
+whose JSON fields are `client` and `vendor` with their lowercase 64-hex keys.
+
+`bitcoin_inclusion_verified` and `header_timestamp_before_expiration` are
+separate findings. `verified_header_time` means a validated commitment's
+block timestamp precedes expiration; `after_expiration` is a late anchor,
+not a signature mismatch. **Bitcoin timestamps are miner-declared and do
+not establish an exact UTC/legal deadline.** An exact legal timing policy
+needs separately agreed trusted time evidence and counsel's interpretation.
+No verifier can infer real corporate signing authority from a bare key.
+
+Standalone prerequisites are listed in `cookbooks/requirements-b2b.txt`
+(Ed25519 via existing `cryptography`, plus the official OTS Python library).
+The repository already has these packages installed; no additional package
+was introduced for the cookbook.
+
 ## Official framework references
 
 - [CrewAI remote MCP](https://docs.crewai.com/en/mcp/overview).

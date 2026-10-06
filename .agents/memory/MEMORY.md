@@ -51,3 +51,5 @@
 - [MCP freemium policy](mcp-freemium-policy.md) — exactly two free sandbox capabilities; all other canonical tools require paid access.
 - [Macro payment caching](macro-payment-caching.md) — share exact invoice proofs across descendants, but never cache away expiry, revocation, or inherited quotas.
 - [OpenTimestamps dependency choice](opentimestamps-dependency-choice.md) — use the official Python library; the latest JavaScript package was blocked by vulnerable legacy dependencies.
+- [Bilateral settlement trust](b2b-settlement-trust.md) — seal receipts separately from contract signatures; independent Bitcoin evidence is not an exact legal clock or payment proof.
+- [Orphaned workflows](orphaned-workflow-processes.md) — failed workflows may leave old servers holding ports; confirm ownership before restarting.

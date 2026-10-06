@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";

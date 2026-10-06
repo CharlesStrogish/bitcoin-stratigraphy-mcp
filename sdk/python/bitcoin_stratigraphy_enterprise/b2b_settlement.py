@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Bilateral enterprise contract-state settlement, not escrow or corporate KYC.
 
 Sandbox: stratigraphy-b2b

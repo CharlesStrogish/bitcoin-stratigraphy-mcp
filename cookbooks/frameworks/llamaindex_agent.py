@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Native LlamaIndex MCP / ReAct quickstart.
 
 Installation is temporarily unavailable: LlamaIndex requires vulnerable NLTK.

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import { createHash } from "node:crypto";
 import { frameMcpErrors, validateMcpEnvelope } from "../middleware/mcpJsonRpc";
 import { canonicalToolName, legacyToolNames, mcpToolPrices, MCP_INVOICE_EXPIRY_SECONDS } from "../lib/mcp-pricing";

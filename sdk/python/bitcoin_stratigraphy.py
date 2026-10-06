@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Dependency-free Bitcoin Stratigraphy L402 client for Python agents."""
 
 from __future__ import annotations

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """CrewAI example for free discovery and explicitly authorized paid MCP calls.
 
 Default mode only discovers MCP tools and reads public cost metadata. It does

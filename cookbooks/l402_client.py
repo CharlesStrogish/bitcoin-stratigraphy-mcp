@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """HTTPX MCP/REST client with explicit, bounded Lightning payment callbacks.
 
 Requires Python 3.11+ and httpx. No credentials are loaded or invoices paid

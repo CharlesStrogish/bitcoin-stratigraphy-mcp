@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Offline verifier tests: genuine OTS operations, synthetic attestations, no fees."""
 import hashlib
 import json

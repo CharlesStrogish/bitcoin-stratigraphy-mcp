@@ -30,6 +30,38 @@ a trusted, budget-controlled wallet proxy; they do not pay automatically.
 
 Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **15 Canonical Tools**.
 
+## Licensing, IP & Enterprise Terms
+
+**Created & Architected by Charles R. Strogish.**
+
+Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+
+Covered first-party software is **dual-licensed: GNU Affero General Public
+License version 3 (AGPLv3) or Enterprise Commercial terms**. The complete AGPLv3
+text and dual-licensing rider are in [LICENSE.md](LICENSE.md).
+
+- **Open-source option:** Use, modification and redistribution are governed by
+  AGPLv3. Commercial activity is permitted when AGPL conditions are met.
+  Preserve required notices, provide corresponding source when required, and
+  comply with section 13's source-offer obligations for modified software that
+  interacts with users over a network.
+- **Enterprise Commercial option:** For proprietary, closed-source enterprise
+  swarm deployments or multi-tenant hosting without the source disclosure
+  required by AGPL, a Commercial License from Charles R. Strogish is required.
+  Deployment scope, rights, fees, support and any SLA require a separate written
+  agreement; this notice is not that agreement. Contact the repository maintainer
+  to arrange commercial terms before such deployment.
+- **IP and scope:** This model applies to rights the licensor owns or is
+  authorized to license. Third-party dependencies, contributions and separately
+  licensed datasets retain their own terms. Previously granted licenses are not
+  revoked. Payment for API access does not grant a commercial software license.
+- **Security:** Follow the coordinated disclosure guidelines in
+  [SECURITY.md](SECURITY.md). Do not publish vulnerabilities or credentials in
+  ordinary public issues.
+
+These notices do not guarantee legal protection or regulatory compliance.
+Obtain qualified legal review of ownership and any enterprise agreement.
+
 ## Enterprise SDK and Swarm Flight Simulator
 
 Install the self-contained enterprise suite from the checkout or a built wheel:

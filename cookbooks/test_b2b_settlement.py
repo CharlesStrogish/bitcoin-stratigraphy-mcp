@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Real Ed25519/OTS serialization; synthetic notaries, no wallets or remote calls."""
 import io
 import json

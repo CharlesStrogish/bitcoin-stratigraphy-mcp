@@ -1,0 +1,29 @@
+Implement comprehensive IP and legal protection across the repository to establish a dual-licensing framework (AGPLv3 + Enterprise Commercial) for Charles R. Strogish.
+
+Requirements:
+1. `LICENSE.md`:
+   - Create a formal `LICENSE.md` containing the complete GNU Affero General Public License v3 (AGPLv3) text.
+   - At the very top, add a clear dual-licensing rider:
+     "Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+      This software is dual-licensed. Open-source usage is governed by the AGPLv3. For proprietary, closed-source enterprise swarm deployments or multi-tenant hosting without source disclosure, a Commercial License from Charles R. Strogish is required."
+
+2. Documentation & Standard Attribution:
+   - In `README.md` and on the `/standard` frontend specification page, add an explicit "Licensing, IP & Enterprise Terms" section outlining the dual AGPLv3/Commercial model.
+   - Explicitly state copyright ownership: "Created & Architected by Charles R. Strogish."
+
+3. Automated Source Code Attribution:
+   - Add the standard copyright header to all active source code files (`.py`, `.ts`, `.js`, `.tsx`, `.jsx` in `sdk/`, `cookbooks/`, and server routes).
+   - Python:
+     `# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.`
+     `# Dual-licensed under AGPLv3 and Commercial terms.`
+   - JS/TS:
+     `// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.`
+     `// Dual-licensed under AGPLv3 and Commercial terms.`
+   - Note: If a file begins with a shebang (`#!/...`) or encoding declaration, place the comment header directly after it so execution is not broken.
+
+4. `SECURITY.md`:
+   - Create a `SECURITY.md` defining a formal Vulnerability Disclosure Policy (VDP) for ethical security researchers, detailing coordinated disclosure guidelines and response expectations.
+
+5. Verification:
+   - Run the full test suite (all existing Python, API, and workspace tests) and the frontend build/typecheck to verify that comment insertions did not break parsing or test execution.
+   - Ensure the dependency audit remains at zero vulnerabilities.

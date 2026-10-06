@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import { Buffer } from "node:buffer";
 export type SubscriptionTier = "1-day" | "30-day";
 export type AgentTier = "STANDARD" | "VIP" | "SWARM";

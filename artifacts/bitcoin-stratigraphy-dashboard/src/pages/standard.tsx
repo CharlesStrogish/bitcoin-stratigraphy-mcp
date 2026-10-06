@@ -191,7 +191,7 @@ export default function StandardPage() {
             <p className="subtitle">Independently checkable log-integrity evidence for procurement teams, in place of unverifiable vendor assurances. SA-AI is a proposed vendor specification. It is not regulator-endorsed, not a certification, not a globally recognized standard, and not a guarantee of EU AI Act Article 12 compliance.</p><TrustBadges /></div>
             <div className="header-actions"><Link href="/" className="control-button" data-testid="link-dashboard">Back to dashboard</Link></div></div>
         </header>
-        <nav className="sa-toc" aria-label="On this page">{[["req", "Requirements"], ["art12", "Article 12"], ["msa", "MSA clause"], ["badge", "Badge"], ["verify", "Verifier"], ["indep", "Independence"]].map(([h, l]) => <a key={h} href={`#${h}`}>{l}</a>)}</nav>
+        <nav className="sa-toc" aria-label="On this page">{[["req", "Requirements"], ["art12", "Article 12"], ["msa", "MSA clause"], ["badge", "Badge"], ["verify", "Verifier"], ["indep", "Independence"], ["licensing", "Licensing & IP"]].map(([h, l]) => <a key={h} href={`#${h}`}>{l}</a>)}</nav>
         <main className="sa-main">
           <section id="req" className="panel sa-sec"><h2>1. Requirements</h2>
             <p className="sa-hint">Key words MUST and SHOULD are used in the sense of RFC 2119.</p>
@@ -211,6 +211,19 @@ export default function StandardPage() {
             <Verifier /></section>
           <section id="indep" className="panel sa-sec"><h2>6. Independence of verification</h2>
             <p>Public-header agreement is not full-node chain validation. For stronger independence, use the offline cookbook and your own mainnet Bitcoin Core node to check proofs against headers you validated yourself.</p></section>
+          <section id="licensing" className="panel sa-sec" data-testid="section-licensing">
+            <h2>7. Licensing, IP &amp; Enterprise Terms</h2>
+            <p><strong>Created &amp; Architected by Charles R. Strogish.</strong></p>
+            <p>Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.</p>
+            <p>Covered first-party software is dual-licensed under GNU Affero General Public License version 3 (AGPLv3) or Enterprise Commercial terms.</p>
+            <dl className="sa-dl">
+              <div><dt>Open-source · AGPLv3</dt><dd>AGPL permits commercial use when its conditions are met. Preserve required notices and satisfy applicable corresponding-source obligations, including section 13 for modified versions that interact with users over a network.</dd></div>
+              <div><dt>Enterprise · Commercial</dt><dd>For proprietary, closed-source enterprise swarm deployments or multi-tenant hosting without the source disclosure required by AGPL, a Commercial License from Charles R. Strogish is required. Deployment rights, pricing, support and any SLA require a separate written agreement with the maintainer.</dd></div>
+            </dl>
+            <p>API payments do not purchase a commercial software license. Third-party code and separately licensed data retain their own terms; previously granted licenses are not revoked. These notices do not establish ownership of third-party contributions or certify regulatory compliance.</p>
+            <p><a href={`${BASE}LICENSE.md`} target="_blank" rel="noopener noreferrer" data-testid="link-license">Read the complete AGPLv3 license and dual-licensing rider</a> · <a href={`${BASE}SECURITY.md`} target="_blank" rel="noopener noreferrer">Vulnerability disclosure policy</a></p>
+            <p className="sa-hint">A commercial grant must be agreed in writing. Qualified legal review of ownership and enterprise terms is recommended.</p>
+          </section>
         </main>
       </div>
     </div>

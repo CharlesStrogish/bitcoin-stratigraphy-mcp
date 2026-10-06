@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """AutoGen HTTP/REST example with explicitly authorized L402 calls.
 
 Default mode performs only free MCP catalog and REST cost discovery. It makes

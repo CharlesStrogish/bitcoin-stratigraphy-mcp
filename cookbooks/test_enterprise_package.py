@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Distribution namespace and identity-preserving legacy routing regressions."""
 import ast
 import importlib

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Discover the Stratigraphy MCP catalog, optionally running a LangGraph agent.
 
 Requires the project-provided ``l402_client.py`` and, for discovery:

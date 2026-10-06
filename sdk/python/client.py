@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Zero-required-dependency MCP client; uses urllib3 when available, otherwise stdlib."""
 
 from __future__ import annotations

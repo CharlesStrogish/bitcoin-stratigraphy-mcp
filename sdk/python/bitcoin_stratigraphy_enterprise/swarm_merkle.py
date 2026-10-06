@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """RFC 6962-style ordered, unpadded Merkle hashing and audit paths (stdlib only)."""
 import hashlib
 import hmac

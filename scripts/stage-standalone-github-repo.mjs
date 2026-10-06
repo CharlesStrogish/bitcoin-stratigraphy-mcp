@@ -34,8 +34,10 @@ const require = createRequire(join(root, "artifacts/api-server/package.json"));
 const { parse } = require("yaml");
 json("openapi.json", parse(readFileSync(join(root, "lib/api-spec/openapi.yaml"), "utf8")));
 copy("sdk/typescript/LICENSE", "LICENSE");
+copy("LICENSE.md");
+copy("SECURITY.md");
 for (const name of [
-  "src", "client.ts", "client.test.ts", "tsconfig.json", "tsconfig.mcp.json", "LICENSE",
+  "src", "client.ts", "client.test.ts", "tsconfig.json", "tsconfig.mcp.json", "LICENSE", "LICENSE.md",
 ]) copy(`sdk/typescript/${name}`);
 for (const name of ["client.py", "bitcoin_stratigraphy.py", "test_client.py"]) {
   copy(`sdk/python/${name}`);

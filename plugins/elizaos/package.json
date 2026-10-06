@@ -2,7 +2,7 @@
   "name": "@bitcoin-stratigraphy/plugin-elizaos",
   "version": "0.1.0",
   "description": "ElizaOS actions for the Bitcoin Stratigraphy L402 MCP tools",
-  "license": "MIT",
+  "license": "(AGPL-3.0-only OR LicenseRef-Commercial)",
   "type": "module",
   "publishConfig": { "access": "public" },
   "engines": { "node": ">=18" },
@@ -15,7 +15,7 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist/index.js", "dist/types/**/*.d.ts", "dist/types/**/*.d.ts.map", "README.md"],
+  "files": ["dist/index.js", "dist/types/**/*.d.ts", "dist/types/**/*.d.ts.map", "README.md", "LICENSE.md"],
   "scripts": {
     "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js",
     "prepack": "pnpm run build",

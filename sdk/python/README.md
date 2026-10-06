@@ -1,5 +1,18 @@
 # Bitcoin Stratigraphy Enterprise SDK
 
+## Licensing, IP & Enterprise Terms
+
+Created & Architected by Charles R. Strogish.
+
+Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+This SDK is dual-licensed under AGPLv3 or a separately executed Enterprise
+Commercial License. See [LICENSE.md](LICENSE.md) for the complete terms.
+AGPL permits commercial use subject to its conditions. Proprietary deployments
+that cannot meet applicable source-disclosure obligations require a Commercial
+License from Charles R. Strogish. API fees do not grant commercial software
+rights. Third-party components and previously granted licenses retain their
+own terms.
+
 Python 3.10+ evidence tooling for LangChain, CrewAI, and framework-independent
 agents. Install a built wheel or the source directory:
 

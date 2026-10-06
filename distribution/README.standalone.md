@@ -268,7 +268,8 @@ smithery.yaml             Canonical remote registration manifest
 mcp.json                  Remote MCP client configuration
 openapi.yaml              Canonical self-contained REST/OpenAPI contract
 openapi.json              JSON rendering of the same canonical contract
-LICENSE                   MIT license
+LICENSE / LICENSE.md      AGPLv3 + Commercial dual-licensing terms
+SECURITY.md               Coordinated vulnerability disclosure policy
 cookbooks/                Native framework sources, requirements, and offline tests
 sdk/typescript/           TypeScript REST/MCP clients and standalone package
 sdk/python/               Python REST/MCP clients and offline tests
@@ -308,5 +309,18 @@ unless you explicitly run a sandbox or agent entrypoint.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Frameworks and optional dependencies retain their own
-licenses and terms.
+## Licensing, IP & Enterprise Terms
+
+Created & Architected by Charles R. Strogish.
+
+Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+Covered first-party software is dual-licensed under GNU AGPLv3 or a separately
+executed Enterprise Commercial License. See [LICENSE.md](LICENSE.md) for the
+complete license and rider. AGPL permits commercial use when its conditions,
+including applicable corresponding-source and network-use obligations, are met.
+Proprietary, closed-source enterprise swarm deployments or multi-tenant hosting
+without the source disclosure required by AGPL need a Commercial License from
+Charles R. Strogish. API fees do not grant commercial software rights.
+Third-party frameworks and dependencies retain their own licenses and terms;
+previously granted licenses are not revoked. See [SECURITY.md](SECURITY.md) for
+coordinated vulnerability reporting.

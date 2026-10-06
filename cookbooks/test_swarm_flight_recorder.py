@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Exhaustive RFC-style tree/paths, privacy, concurrency and offline evidence.
 
 No wallet use or remote network calls. OTS test fixtures are explicitly synthetic.

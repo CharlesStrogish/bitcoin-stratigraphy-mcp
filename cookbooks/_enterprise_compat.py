@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Checkout-only bootstrap for legacy cookbook import and CLI compatibility."""
 from importlib import import_module
 from pathlib import Path

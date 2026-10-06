@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Durable append-only, hash-chained JSONL storage for Article 12 evidence.
 
 POSIX flock coordinates cooperating processes. This is not WORM storage:

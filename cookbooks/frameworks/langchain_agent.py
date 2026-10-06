@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Native LangChain MCP / ReAct quickstart (langchain[mcp]>=1.4).
 
 Install requirements-langchain.txt in a separate consumer Python project.

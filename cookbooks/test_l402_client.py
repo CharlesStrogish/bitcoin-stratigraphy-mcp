@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Offline payment/transport regression tests: no real invoices or wallet calls."""
 
 import asyncio

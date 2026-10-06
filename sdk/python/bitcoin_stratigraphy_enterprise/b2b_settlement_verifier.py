@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Offline contract/receipt verification. No MCP, payments, or network requests."""
 from __future__ import annotations
 

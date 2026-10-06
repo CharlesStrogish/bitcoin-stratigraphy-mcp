@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import express, { type Express } from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

@@ -8,8 +8,8 @@ version = "0.2.0"
 description = "Private agent telemetry, prepaid root notarization, selective disclosure and independent evidence auditing"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "AGPL-3.0-only OR LicenseRef-Commercial"
+license-files = ["LICENSE.md"]
 dependencies = [
   "cryptography>=50.0.2,<51",
   "opentimestamps==0.4.5",

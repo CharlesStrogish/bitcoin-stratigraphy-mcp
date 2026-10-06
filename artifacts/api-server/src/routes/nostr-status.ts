@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import type { Express } from "express";
 import { getNostrHeartbeatStatus } from "../lib/nostr-heartbeat";
 import {

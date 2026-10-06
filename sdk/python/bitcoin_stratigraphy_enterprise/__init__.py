@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Enterprise evidence tooling: local capture, selective disclosure and auditing.
 
 Frameworks are optional. Importing this namespace performs no network or payment

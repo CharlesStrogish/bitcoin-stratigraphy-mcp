@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Payment-path and HTTP transport checks without a live wallet or external server."""
 
 import hashlib

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 /**
  * Dependency-free, one-shot L402 client for the Bitcoin Stratigraphy MCP endpoint.
  * Each paid tool call has its own path-bound, single-use credential; do not cache it.

@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Offline compliance-cookbook tests; real OTS serialization, no payments/models."""
 import hashlib
 import json

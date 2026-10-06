@@ -2,7 +2,7 @@
   "name": "@bitcoin-stratigraphy/sdk",
   "version": "0.1.0",
   "description": "L402 client SDK for the Bitcoin Stratigraphy Node",
-  "license": "MIT",
+  "license": "(AGPL-3.0-only OR LicenseRef-Commercial)",
   "type": "module",
   "publishConfig": {
     "access": "public"
@@ -10,7 +10,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE.md"
   ],
   "exports": {
     ".": {

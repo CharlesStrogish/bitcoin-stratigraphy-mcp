@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Strict deterministic bilateral contract schema and Ed25519 agent signing.
 
 JSON uses the project's sorted-key, compact UTF-8 encoding, not a claim of

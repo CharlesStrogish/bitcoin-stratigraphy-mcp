@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+# Dual-licensed under AGPLv3 and Commercial terms.
 """Independently audit Article 12 JSONL evidence; never contact MCP or pay L402.
 
 Run: stratigraphy-audit audit_trail.jsonl

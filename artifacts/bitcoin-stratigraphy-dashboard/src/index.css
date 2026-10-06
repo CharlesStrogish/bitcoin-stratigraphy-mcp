@@ -578,6 +578,9 @@ html{color-scheme:dark;background:hsl(222 34% 12%)}
 .trust-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
 .trust-row a{display:inline-flex;align-items:center;max-width:100%}
 .trust-row svg,.trust-row img{height:20px;width:auto;max-width:100%;display:block}
+.trust-row .trust-listing-chip{min-height:20px;padding:3px 8px;border:1px solid hsl(var(--border));border-radius:4px;background:hsl(var(--muted)/.5);color:hsl(var(--foreground));font:600 10px/1.4 var(--app-font-mono);text-decoration:none;overflow-wrap:anywhere}
+.trust-row .trust-listing-chip:hover{border-color:hsl(var(--primary));color:hsl(var(--primary))}
+.trust-row a:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:3px}
 .smithery-backlink{display:none}
 html,body{max-width:100%;overflow-x:hidden}
 .app-shell,.shell-inner,.topbar,.header-main>*,.panel,.stat-card,.sim-col,.sim-grid>*,.stats-row>*,.workspace-grid>*,.insights-grid>*{min-width:0}

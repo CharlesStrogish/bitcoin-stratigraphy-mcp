@@ -22,3 +22,11 @@ different claims; an enterprise trust row should not fabricate credentials.
 **How to apply:** Confirm provider badge sources before embedding them. If no
 official image can be confirmed, ask for the asset or label a listing link
 honestly rather than minting a provider's verified badge.
+
+Use a clean UI link/chip labelled “mcpservers.org · Official listing” for this
+directory entry, not a fake SVG embed.
+
+**Why:** The user explicitly selected the official-listing link alternative.
+
+**How to apply:** Preserve the distinction between a linked official directory
+entry and a provider-issued verification badge when updating the trust row.

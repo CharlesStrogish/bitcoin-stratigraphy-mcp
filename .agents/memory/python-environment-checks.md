@@ -18,6 +18,16 @@ then check the actual interpreter version and imports via the uv project runtime
 Do not fix compiled-wheel mismatches by pointing a different Python at another
 version's site-packages directory.
 
+Package discoverability checks such as `find_spec` do not establish import or ABI
+compatibility. Exercise a real import with the managed interpreter.
+
+**Why:** A shell interpreter could find LangChain in the managed site-packages
+directory but could not load its compiled Pydantic dependency for that Python ABI.
+
+**How to apply:** Run framework cookbook tests and demos through `uv run --no-sync`
+when the project environment is already installed, rather than trusting the
+generic shell `python` or a successful module lookup.
+
 Keep workspace Python import paths out of subprocesses that run Nix-managed
 Python CLIs.
 

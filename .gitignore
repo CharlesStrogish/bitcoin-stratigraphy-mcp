@@ -48,3 +48,7 @@ Thumbs.db
 .cache/
 .local/
 .data/
+
+# Private enterprise audit evidence; never commit trace data.
+/audit_trail.jsonl
+/audit_trail.jsonl.*

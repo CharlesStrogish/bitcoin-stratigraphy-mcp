@@ -255,6 +255,112 @@ streaming. No real wallet, payment, or model call is made.
 HTTP clients use the system TLS trust store. If a corporate/development proxy
 uses a private CA, configure the trusted CA rather than disabling verification.
 
+## Article 12 automated audit-evidence cookbook
+
+[`article_12_compliance.py`](article_12_compliance.py) implements
+`Article12NotaryCallback`, a LangChain `BaseCallbackHandler` with public
+`start_run`, `record_event`, and `finish_run` methods for CrewAI-style loops.
+It supports **Article 12 record-keeping evidence**, not a legal-compliance
+certification. Article 12 applies to high-risk AI systems; your organization must
+determine applicability and the required events, oversight, retention, lawful
+processing, and access controls.
+See [Regulation (EU) 2024/1689, Article 12](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng).
+
+The callback records completed and failed root runs: UTC timestamps, session and
+agent IDs, original inputs, observable tool inputs/outputs and exposed scratchpad
+logs, and the final response. It does not obtain hidden model reasoning.
+Credential redaction precedes project-defined canonical sorted UTF-8 JSON
+serialization and SHA-256 hashing. Supply a domain-specific `redactor` for PII.
+Only the digest is submitted to `proof.notarize`; full traces stay local.
+
+Use this workspace's managed Python 3.13 interpreter (the generic shell
+`python` may use a different ABI):
+
+```sh
+uv run --no-sync python cookbooks/article_12_compliance.py \
+  --journal .data/article12/audit_trail.jsonl
+uv run --no-sync python -m unittest cookbooks.test_article_12_compliance -v
+```
+
+The runnable example uses a synthetic financial assessment, not an actual
+financial decision. Without a prepaid pass it deliberately prints the trace
+hash and deferred status, **not a fabricated OTS receipt**. To obtain a real
+receipt, provision `L402_AUTHORIZATION` through your secret manager as
+`L402 <macaroon>:<preimage>` for a prepaid **tool-scoped `proof.notarize`**
+100-call Macro-Macaroon. The SDK sends `X-L402-Batch-Size: 100` on every
+notarization. It does not buy or renew invoices, and the header alone does not
+purchase or authorize 100 calls.
+
+```python
+from cookbooks.article_12_compliance import Article12NotaryCallback, MacroNotarizer
+import os
+
+with Article12NotaryCallback(
+    agent_id="financial-assessment",
+    journal_path=".data/article12/audit_trail.jsonl",
+    notarizer=MacroNotarizer(authorization=os.getenv("L402_AUTHORIZATION")),
+) as audit:
+    response = agent.invoke(
+        {"input": "Assess the supplied synthetic financial profile"},
+        config={"callbacks": [audit], "metadata": {"session_id": "assessment-session"}},
+    )
+    audit.flush()  # At the audit boundary, not inside the ReAct loop.
+    evidence = response["metadata"]["article_12_notarization"]
+```
+
+For CrewAI, use the same public lifecycle API around your existing execution
+loop; configure its tool/task callbacks to call `record_event`. No CrewAI import
+or dependency installation is added by this cookbook:
+
+```python
+run_id = audit.start_run(query, agent_id="crew-financial-assessment")
+# Within the crew's step/tool callback:
+audit.record_event(run_id, "crew_step", {"tool": tool_name, "input": tool_input, "output": tool_output})
+result = crew.kickoff(inputs={"query": query})
+response = {"output": result.raw}
+audit.finish_run(run_id, response)
+audit.flush()
+```
+
+Notarization runs on one bounded background worker, so network I/O does not block
+the ReAct loop. Response metadata starts as `pending` and is updated in place;
+call `flush` or close the context before serializing the final audit receipt.
+Nested chain completions and repeated agent/chain finish notifications do not
+create duplicate notarizations. Root chain errors are also captured.
+
+`audit_trail.jsonl` uses owner-only permissions, POSIX file locking, fsynced
+append-only records, and a checked hash chain. A trace is persisted **before**
+it is queued. Queue saturation and missing credentials remain safely replayable;
+network failures remain in the journal. Local disk failures raise explicitly.
+This is **plaintext local evidence**, not encrypted/WORM storage: use protected
+local disks, restricted directories, governed archival, and retention policies.
+Hash chaining detects alteration relative to the stored chain; it cannot prove
+that a privileged actor has not rewritten or truncated the entire journal.
+Runs that crash before the completion callback need separate durable runtime
+logging. For long-lived deployments, use bounded per-worker/session shards and
+governed archival rather than one ever-growing journal; each append validates
+the existing shard. Do not use filesystems whose POSIX locks are unreliable.
+
+Explicit deferred replay uses the same unchanged digests and prepaid batch pass:
+
+```sh
+uv run --no-sync python cookbooks/article_12_compliance.py --replay \
+  --journal .data/article12/audit_trail.jsonl
+```
+
+Timeouts can be ambiguous: the server may already have consumed a paid call.
+These records are not silently replayed. After reconciliation, deliberately add
+`--retry-uncertain` if another attempt is authorized. Active attempts are protected
+by a cooperative lease; a process crash leaves an uncertain attempt for recovery.
+Successful records are skipped. No exception messages or payment credentials are
+written into fallback status records.
+
+Receipts are structurally parsed with the project's official OpenTimestamps
+library, checked against the exact SHA-256 digest, and attached as `otsProofHex`
+alongside `hash` in response metadata. `pending_calendar` is **not Bitcoin
+confirmation** or a legal compliance finding; upgrade and independently verify
+the receipt later. Client UTC timestamps alone are not trusted time.
+
 ## Official framework references
 
 - [CrewAI remote MCP](https://docs.crewai.com/en/mcp/overview).

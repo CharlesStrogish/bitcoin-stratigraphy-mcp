@@ -37,12 +37,20 @@ class BitcoinStratigraphyClient:
         server_url: str = DEFAULT_MCP_SERVER_URL,
         wallet: WalletHandler | None = None,
         timeout: float = 30.0,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         if urlsplit(server_url).scheme not in ("http", "https"):
             raise ValueError("MCP server URL must use HTTP or HTTPS")
         self.server_url = server_url
         self.wallet = wallet
         self.timeout = timeout
+        self.headers = dict(headers or {})
+        for name, value in self.headers.items():
+            if (not isinstance(name, str) or not isinstance(value, str)
+                    or not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", name)
+                    or name.lower() in {"host", "content-length", "transfer-encoding", "connection"}
+                    or "\r" in value or "\n" in value):
+                raise ValueError("Invalid MCP request header")
         self._next_id = 0
         self._http = urllib3.PoolManager() if urllib3 is not None else None
         self._opener = urllib.request.build_opener(_NoRedirect())
@@ -206,7 +214,15 @@ class BitcoinStratigraphyClient:
             "Accept": "application/json, text/event-stream",
             "MCP-Protocol-Version": "2025-03-26",
         }
+        for name, value in self.headers.items():
+            for existing in list(headers):
+                if existing.lower() == name.lower():
+                    del headers[existing]
+            headers[name] = value
         if authorization:
+            for name in list(headers):
+                if name.lower() == "authorization":
+                    del headers[name]
             headers["Authorization"] = authorization
         if self._http is not None:
             response = self._http.request(

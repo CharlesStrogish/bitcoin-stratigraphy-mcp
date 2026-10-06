@@ -29,6 +29,14 @@ async function buildAll() {
     { recursive: true },
   );
   // Only publish the public integration examples, never the workspace itself.
+  await mkdir(path.resolve(distDir, "audit-worker/cookbooks"), { recursive: true });
+  for (const filename of [
+    "audit_web_worker.py", "audit_verifier.py", "audit_verifier_ots.py", "article_12_journal.py",
+  ]) {
+    await cp(path.resolve(artifactDir, "../../cookbooks", filename),
+      path.resolve(distDir, "audit-worker/cookbooks", filename));
+  }
+
   await mkdir(path.resolve(distDir, "public/cookbooks"), { recursive: true });
   await cp(
     path.resolve(artifactDir, "src/public/cookbooks/index.html"),

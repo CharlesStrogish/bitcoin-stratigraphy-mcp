@@ -418,6 +418,37 @@ that no journal entries were omitted, or that Article 12 legal requirements
 are satisfied. Protect and archive journals separately from reports and keep
 external journal checkpoints to detect truncation or wholesale rewrites.
 
+### Public web verification
+
+The dashboard's `/standard` page publishes the proposed SA-AI specification
+and a free interactive verifier. SA-AI is not an officially recognized
+standard or legal certification. The static badge indicates self-asserted
+adoption only; only a successfully checked receipt gets a Bitcoin-verified result.
+
+`POST /api/audit/verify` accepts `audit_trail.jsonl` bytes with content type
+`application/x-ndjson` or `text/plain`, or an `application/json` envelope:
+
+```json
+{"trace":{"agent_id":"your-agent","timestamp_utc":"2026-10-06T00:00:00Z","events":[]},"receipt":{"hash":"<trace-sha256>","otsProofHex":"<detached-ots-hex>"}}
+```
+
+Use the exact original trace, not the illustrative object above. Receipt
+fields may alternatively be provided directly alongside `trace`, but do not
+mix both envelope forms. Requests need no payment, authorization, or MCP
+access. The endpoint returns per-trace `status`, `label`, full `sha256`, UTC
+timestamp, claimed agent, optional `blockHeight`, journal integrity findings,
+and verification-method limitations. Missing/unavailable evidence is neither
+verified nor assumed tampered. A raw trace cannot establish journal integrity.
+
+The free endpoint limits bodies to 1 MiB, 128 journal records, 32 traces,
+64 receipts, 10 submissions per minute per IP, and two concurrent workers.
+Worker CPU, memory, calendar calls and wall-clock time are bounded. Uploaded
+evidence remains in memory and is never written to a temporary journal, even
+when a request is cancelled. No upload is retained; keep the original evidence
+under your organization's governance. Submitting still discloses the supplied
+trace to the server operator: use the local CLI and your own Bitcoin Core
+node instead for confidential or stronger independent audits.
+
 ## Official framework references
 
 - [CrewAI remote MCP](https://docs.crewai.com/en/mcp/overview).

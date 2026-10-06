@@ -21,6 +21,81 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export type AuditSubmissionTrace = { [key: string]: unknown };
+
+export type AuditSubmissionReceipt = {
+  otsProofHex?: string;
+  hash?: string;
+  otsStatus?: string;
+};
+
+export interface AuditSubmission {
+  trace: AuditSubmissionTrace;
+  otsProofHex?: string;
+  hash?: string;
+  receipt?: AuditSubmissionReceipt;
+}
+
+export type AuditTraceResultStatus = typeof AuditTraceResultStatus[keyof typeof AuditTraceResultStatus];
+
+
+export const AuditTraceResultStatus = {
+  verified: 'verified',
+  pending: 'pending',
+  tamper: 'tamper',
+  missing: 'missing',
+  unavailable: 'unavailable',
+} as const;
+
+export interface AuditTraceResult {
+  traceId: string;
+  timestampUtc: string;
+  agentId: string;
+  sha256: string;
+  status: AuditTraceResultStatus;
+  label: string;
+  detail: string;
+  /** @minimum 0 */
+  blockHeight?: number;
+}
+
+export type AuditReportScope = typeof AuditReportScope[keyof typeof AuditReportScope];
+
+
+export const AuditReportScope = {
+  journal: 'journal',
+  trace: 'trace',
+} as const;
+
+export type AuditReportJournalIntegrity = typeof AuditReportJournalIntegrity[keyof typeof AuditReportJournalIntegrity];
+
+
+export const AuditReportJournalIntegrity = {
+  consistent: 'consistent',
+  tamper: 'tamper',
+  not_applicable: 'not_applicable',
+} as const;
+
+export type AuditReportExitCode = typeof AuditReportExitCode[keyof typeof AuditReportExitCode];
+
+
+export const AuditReportExitCode = {
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
+export interface AuditReport {
+  generatedUtc: string;
+  method: string;
+  scope: AuditReportScope;
+  journalIntegrity: AuditReportJournalIntegrity;
+  exitCode: AuditReportExitCode;
+  issues: string[];
+  traces: AuditTraceResult[];
+  limitations: string;
+}
+
 export interface PublicMetadata { [key: string]: unknown }
 
 export const SmitheryServerCardValue = {

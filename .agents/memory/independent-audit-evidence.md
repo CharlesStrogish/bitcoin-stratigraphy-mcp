@@ -30,3 +30,23 @@ against independently obtained Bitcoin evidence before saying VERIFIED;
 disclose whether the check used corroborated public headers or an auditor's
 own mainnet node. Preserve the original JSONL and encourage externally
 retained journal checkpoints for completeness claims.
+
+Public HTTP audit uploads must remain in memory, including under cancellation
+and hard worker termination.
+
+**Why:** A bounded worker can be killed before Python temporary-directory
+finalizers run, leaving confidential plaintext uploads on disk even when the
+normal success path cleans up.
+
+**How to apply:** Reuse the verifier's in-memory parsing path for web uploads,
+avoid temporary journal files, and bound worker output without retaining payloads.
+
+Browser submission must preserve original bytes and raw JSON text; do not
+parse and stringify submissions before sending them to the strict verifier.
+
+**Why:** JavaScript round-tripping silently removes duplicate keys and changes
+numeric spellings such as 1.0, defeating strict input checks or changing the
+Python-defined canonical trace digest.
+
+**How to apply:** Send file bytes unchanged. Parsing for content-type detection
+must not replace the original body; perform authoritative validation server-side.

@@ -1,0 +1,22 @@
+Create the public-facing "State-Anchored AI" (SA-AI) enterprise specification page and an interactive Web Verifier on our live dashboard to establish our engine as a global compliance standard. 
+
+Requirements:
+1. Backend API (`POST /api/audit/verify`):
+   - Add a new Express route that securely accepts an uploaded `audit_trail.jsonl` file or a raw JSON trace/receipt.
+   - Adapt the core OpenTimestamps verification logic from `cookbooks/audit_verifier.py` to evaluate the receipts on the backend.
+   - Return a structured JSON response detailing each trace's status: "VERIFIED (Block #)", "Pending Calendar", or "TAMPER EVIDENT FAILURE".
+   - Verification must be completely free; do not gate this specific route behind L402.
+
+2. Frontend Specification Page (`/standard` route):
+   - Build a polished, enterprise-grade React page (or equivalent in our frontend stack) that publishes the formal "State-Anchored AI Specification", explicitly mapping our solution to EU AI Act Article 12 log integrity requirements.
+   - Include a "Corporate Procurement" section providing a copy-paste legal clause for Master Services Agreements (e.g., "All autonomous third-party agents deployed in production must utilize State-Anchored AI OpenTimestamps notarization to ensure cryptographic log integrity...").
+   - Create an embeddable markdown trust badge (e.g., an SVG badge reading "State-Anchored AI: Verified") that developers can copy and place on their own GitHub readmes.
+
+3. Interactive Web Verifier UI:
+   - On the new `/standard` page, build a drag-and-drop file uploader and a text-input box designed for compliance officers to test the verification engine live.
+   - When a user submits an `audit_trail.jsonl` file, POST to the new `/api/audit/verify` endpoint and render a clean, color-coded table of the results (Green for Verified/Bitcoin Confirmed, Yellow for Pending Calendar, Red for Tampered).
+
+4. Guardrails:
+   - DO NOT modify or touch the 15 existing canonical MCP tools, their schemas, or the L402 payment middleware.
+   - Ensure all 44 existing verification tests continue to pass. Add basic tests for the new API endpoint.
+   - Do not introduce new packages with known vulnerabilities; keep the dependency tree clean.

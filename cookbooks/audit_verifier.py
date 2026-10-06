@@ -89,6 +89,11 @@ def read_journal(path: Path) -> Audit:
         if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
             raise ValueError("Audit input must be a regular file")
         data = stream.read(MAX_JOURNAL + 1)
+    return read_journal_data(data, str(path))
+
+
+def read_journal_data(data: bytes, source: str = "submitted journal") -> Audit:
+    """Apply identical journal checks to a bounded in-memory HTTP upload."""
     if len(data) > MAX_JOURNAL:
         raise ValueError("Journal exceeds 64 MiB; use the callback's bounded archival shards")
     records, issues, previous = [], [], "0" * 64
@@ -167,7 +172,7 @@ def read_journal(path: Path) -> Audit:
                 trace.receipts.append(proof)
         except ValueError:
             trace.errors.append("invalid OTS receipt encoding or metadata digest")
-    return Audit(list(traces.values()), issues, str(path))
+    return Audit(list(traces.values()), issues, source)
 
 
 def archived_receipt(path: Path, digest: str) -> bytes | None:
@@ -187,7 +192,10 @@ def archived_receipt(path: Path, digest: str) -> bytes | None:
 
 
 def audit_journal(path: Path, verifier: OtsVerifier, receipt_dir: Path | None = None) -> Audit:
-    audit = read_journal(path)
+    return verify_audit(read_journal(path), verifier, receipt_dir)
+
+
+def verify_audit(audit: Audit, verifier: OtsVerifier, receipt_dir: Path | None = None) -> Audit:
     audit.method = ("Offline integrity check; Bitcoin not verified" if verifier.offline else
                     "Auditor's Bitcoin Core via official OTS CLI" if
                     verifier.bitcoin.__class__.__name__ == "BitcoinCore" else

@@ -28,6 +28,18 @@ directory but could not load its compiled Pydantic dependency for that Python AB
 when the project environment is already installed, rather than trusting the
 generic shell `python` or a successful module lookup.
 
+Apply interpreter alignment to Node-spawned Python workers too, and test the
+actual subprocess under its restricted environment rather than only in-process
+Python tests or mocked HTTP handlers.
+
+**Why:** The shell's generic interpreter was older than the managed project
+runtime. Removing Replit's Python import-path settings also hid installed OTS
+dependencies, causing live workers to fail despite passing Python unit tests.
+
+**How to apply:** Select the managed project interpreter for project workers
+and retain only necessary runtime/import/SSL settings. Do not forward application,
+wallet or payment credentials. Check a real worker response after packaging.
+
 Keep workspace Python import paths out of subprocesses that run Nix-managed
 Python CLIs.
 

@@ -25,6 +25,50 @@ import * as zod from 'zod';
 
 
 /**
+ * Accepts a raw JSON trace with an OTS receipt, or a JSONL journal uploaded
+ * as application/x-ndjson or text/plain. Maximum body size is 1 MiB and
+ * maximum journal size is 32 traces / 128 records. No L402 payment or MCP
+ * access is required. Payloads are processed transiently, not retained.
+ * Public-header corroboration is not full-node chain validation or legal certification.
+ * @summary Independently verify Article 12 audit evidence, free of charge
+ */
+export const VerifyAuditBody = zod.object({
+  "trace": zod.record(zod.string(), zod.unknown()),
+  "otsProofHex": zod.string().optional(),
+  "hash": zod.string().optional(),
+  "receipt": zod.object({
+  "otsProofHex": zod.string().optional(),
+  "hash": zod.string().optional(),
+  "otsStatus": zod.string().optional()
+}).optional()
+})
+
+export const verifyAuditResponseTracesItemBlockHeightMin = 0;
+
+
+
+export const VerifyAuditResponse = zod.object({
+  "generatedUtc": zod.string(),
+  "method": zod.string(),
+  "scope": zod.enum(['journal', 'trace']),
+  "journalIntegrity": zod.enum(['consistent', 'tamper', 'not_applicable']),
+  "exitCode": zod.union([zod.literal(0),zod.literal(1),zod.literal(2)]),
+  "issues": zod.array(zod.string()),
+  "traces": zod.array(zod.object({
+  "traceId": zod.string(),
+  "timestampUtc": zod.string(),
+  "agentId": zod.string(),
+  "sha256": zod.string(),
+  "status": zod.enum(['verified', 'pending', 'tamper', 'missing', 'unavailable']),
+  "label": zod.string(),
+  "detail": zod.string(),
+  "blockHeight": zod.number().int().min(verifyAuditResponseTracesItemBlockHeightMin).optional()
+})),
+  "limitations": zod.string()
+})
+
+
+/**
  * @summary API entry point and agent discovery links
  */
 export const GetApiDiscoveryResponse = zod.record(zod.string(), zod.unknown())

@@ -24,6 +24,15 @@
 
 export * from './agentReputationMetadata';
 export * from './agentReputationMetadataTier';
+export * from './auditReport';
+export * from './auditReportExitCode';
+export * from './auditReportJournalIntegrity';
+export * from './auditReportScope';
+export * from './auditSubmission';
+export * from './auditSubmissionReceipt';
+export * from './auditSubmissionTrace';
+export * from './auditTraceResult';
+export * from './auditTraceResultStatus';
 export * from './datasetHealthStatus';
 export * from './epistemicAnchorReceipt';
 export * from './epistemicAnchorReceiptPayload';

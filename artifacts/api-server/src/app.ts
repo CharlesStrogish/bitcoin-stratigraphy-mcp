@@ -24,6 +24,7 @@ import { registerProvenanceRoutes } from "./routes/provenance";
 import { createMeshGossipService } from "./services/meshGossipService";
 import { registerZkDriftRoute } from "./routes/zk-drift";
 import { registerPublicCors } from "./middleware/publicCors";
+import { registerAuditRoutes } from "./routes/audit";
 
 const app: Express = express();
 const meshService = createMeshGossipService();
@@ -60,6 +61,7 @@ app.use(
   }),
 );
 registerMcpRequestGuard(app);
+registerAuditRoutes(app);
 app.use(
   express.json({
     limit: "1mb",

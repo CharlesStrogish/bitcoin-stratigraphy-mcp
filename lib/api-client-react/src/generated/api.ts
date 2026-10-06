@@ -36,6 +36,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AuditReport,
+  AuditSubmission,
   DatasetHealthStatus,
   EpistemicGroundingRequest,
   ExportHuggingFaceDatasetParams,
@@ -116,6 +118,82 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getVerifyAuditUrl = () => {
+
+
+
+
+  return `/api/audit/verify`
+}
+
+/**
+ * Accepts a raw JSON trace with an OTS receipt, or a JSONL journal uploaded
+ * as application/x-ndjson or text/plain. Maximum body size is 1 MiB and
+ * maximum journal size is 32 traces / 128 records. No L402 payment or MCP
+ * access is required. Payloads are processed transiently, not retained.
+ * Public-header corroboration is not full-node chain validation or legal certification.
+ * @summary Independently verify Article 12 audit evidence, free of charge
+ */
+export const verifyAudit = async (verifyAuditBody: AuditSubmission | string, options?: Parameters<typeof customFetch>[1]): Promise<AuditReport> => {
+
+  return customFetch<AuditReport>(getVerifyAuditUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: JSON.stringify(verifyAuditBody)
+  }
+);}
+
+
+
+
+
+export const getVerifyAuditMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAudit>>, TError,{data: BodyType<AuditSubmission | string>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyAudit>>, TError,{data: BodyType<AuditSubmission | string>}, TContext> => {
+
+const mutationKey = ['verifyAudit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyAudit>>, {data: BodyType<AuditSubmission | string>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyAudit(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyAuditMutationResult = NonNullable<Awaited<ReturnType<typeof verifyAudit>>>
+    export type VerifyAuditMutationBody = BodyType<AuditSubmission | string>
+    export type VerifyAuditMutationError = ErrorType<void>
+
+    /**
+ * @summary Independently verify Article 12 audit evidence, free of charge
+ */
+export const useVerifyAudit = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAudit>>, TError,{data: BodyType<AuditSubmission | string>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyAudit>>,
+        TError,
+        {data: BodyType<AuditSubmission | string>},
+        TContext
+      > => {
+      return useMutation(getVerifyAuditMutationOptions(options));
+    }
 
 export const getGetApiDiscoveryUrl = () => {
 

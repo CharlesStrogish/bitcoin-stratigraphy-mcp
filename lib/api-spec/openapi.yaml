@@ -651,6 +651,47 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /audit/verify:
+    post:
+      operationId: verifyAudit
+      tags: [Audit]
+      summary: Independently verify Article 12 audit evidence, free of charge
+      description: |
+        Accepts a raw JSON trace with an OTS receipt, or a JSONL journal uploaded
+        as application/x-ndjson or text/plain. Maximum body size is 1 MiB and
+        maximum journal size is 32 traces / 128 records. No L402 payment or MCP
+        access is required. Payloads are processed transiently, not retained.
+        Public-header corroboration is not full-node chain validation or legal certification.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditSubmission'
+          application/x-ndjson:
+            schema:
+              type: string
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Verification completed, including pending or tampered evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditReport'
+        '400':
+          description: Malformed or unsupported audit submission
+        '413':
+          description: Submission exceeds bounded verification limits
+        '415':
+          description: Unsupported content type
+        '429':
+          description: Free public verification rate limit reached
+        '503':
+          description: Verification capacity or worker unavailable
   /:
     get:
       operationId: getApiDiscovery
@@ -1707,6 +1748,77 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    AuditSubmission:
+      type: object
+      properties:
+        trace:
+          type: object
+          additionalProperties: true
+        otsProofHex:
+          type: string
+        hash:
+          type: string
+        receipt:
+          type: object
+          properties:
+            otsProofHex:
+              type: string
+            hash:
+              type: string
+            otsStatus:
+              type: string
+          additionalProperties: false
+      required: [trace]
+      additionalProperties: false
+    AuditTraceResult:
+      type: object
+      properties:
+        traceId:
+          type: string
+        timestampUtc:
+          type: string
+        agentId:
+          type: string
+        sha256:
+          type: string
+        status:
+          type: string
+          enum: [verified, pending, tamper, missing, unavailable]
+        label:
+          type: string
+        detail:
+          type: string
+        blockHeight:
+          type: integer
+          minimum: 0
+      required: [traceId, timestampUtc, agentId, sha256, status, label, detail]
+    AuditReport:
+      type: object
+      properties:
+        generatedUtc:
+          type: string
+        method:
+          type: string
+        scope:
+          type: string
+          enum: [journal, trace]
+        journalIntegrity:
+          type: string
+          enum: [consistent, tamper, not_applicable]
+        exitCode:
+          type: integer
+          enum: [0, 1, 2]
+        issues:
+          type: array
+          items:
+            type: string
+        traces:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditTraceResult'
+        limitations:
+          type: string
+      required: [generatedUtc, method, scope, journalIntegrity, exitCode, issues, traces, limitations]
     PublicMetadata:
       type: object
       additionalProperties: true

@@ -38,6 +38,8 @@ minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - '@replit/*'
   - stripe-replit-sync
+  # Verified emergency security patch; keep the age guard for other releases.
+  - 'proxy-addr@2.0.8'
 
 onlyBuiltDependencies:
   - '@swc/core'

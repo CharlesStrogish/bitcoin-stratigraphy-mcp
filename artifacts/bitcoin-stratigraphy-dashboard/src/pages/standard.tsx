@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Check, Copy, FileUp, Loader2, ShieldAlert, X } from "lucide-react";
+import { TrustBadges } from "@/components/trust-badges";
 import type { AuditReport } from "@workspace/api-client-react";
 
 const BASE = import.meta.env.BASE_URL;
@@ -187,7 +188,7 @@ export default function StandardPage() {
           <div className="eyebrow"><span className="eyebrow-line" /> SA-AI / PROPOSED SPECIFICATION / DRAFT</div>
           <div className="header-main"><div>
             <h1>State-Anchored <span>AI</span></h1>
-            <p className="subtitle">Independently checkable log-integrity evidence for procurement teams, in place of unverifiable vendor assurances. SA-AI is a proposed vendor specification. It is not regulator-endorsed, not a certification, not a globally recognized standard, and not a guarantee of EU AI Act Article 12 compliance.</p></div>
+            <p className="subtitle">Independently checkable log-integrity evidence for procurement teams, in place of unverifiable vendor assurances. SA-AI is a proposed vendor specification. It is not regulator-endorsed, not a certification, not a globally recognized standard, and not a guarantee of EU AI Act Article 12 compliance.</p><TrustBadges /></div>
             <div className="header-actions"><Link href="/" className="control-button" data-testid="link-dashboard">Back to dashboard</Link></div></div>
         </header>
         <nav className="sa-toc" aria-label="On this page">{[["req", "Requirements"], ["art12", "Article 12"], ["msa", "MSA clause"], ["badge", "Badge"], ["verify", "Verifier"], ["indep", "Independence"]].map(([h, l]) => <a key={h} href={`#${h}`}>{l}</a>)}</nav>

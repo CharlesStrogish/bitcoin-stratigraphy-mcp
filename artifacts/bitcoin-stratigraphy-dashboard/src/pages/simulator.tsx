@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Play, RotateCcw, Square } from "lucide-react";
+import { TrustBadges } from "@/components/trust-badges";
 import { SyntheticBanner } from "@/simulator/components/SyntheticBanner";
 import { AgentGrid } from "@/simulator/components/AgentGrid";
 import { TreeGraph } from "@/simulator/components/TreeGraph";
@@ -134,6 +135,7 @@ export default function SimulatorPage() {
             <div>
               <h1>Enterprise Swarm <span>Control Room</span></h1>
               <p className="subtitle">Fifty synthetic agents emit 1000 traces. Each is salted, hashed and streamed into a rolling RFC 6962 Merkle tree. Pick any thought and verify it against the root.</p>
+              <TrustBadges />
             </div>
             <div className="header-actions">
               <Link href="/" className="control-button" data-testid="link-home"><ArrowLeft size={14} /> Dashboard</Link>

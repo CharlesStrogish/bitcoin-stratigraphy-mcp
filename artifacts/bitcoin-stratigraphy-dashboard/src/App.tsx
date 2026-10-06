@@ -17,11 +17,9 @@ import {
   FileText,
   Filter,
   Layers3,
-  Moon,
   Play,
   RefreshCw,
   Search,
-  Sun,
   X,
 } from "lucide-react";
 import {
@@ -43,6 +41,7 @@ import { Route, Switch, useLocation, Router as WouterRouter } from "wouter";
 import NotFound from "@/pages/not-found";
 import StandardPage from "@/pages/standard";
 import SimulatorPage from "@/pages/simulator";
+import { TrustBadges } from "@/components/trust-badges";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -147,16 +146,12 @@ function getSignals(title: string) {
 }
 
 function Header({
-  isDark,
-  onToggleDark,
   onRefresh,
   onExport,
   refreshing,
   lastRefreshed,
   rowCount,
 }: {
-  isDark: boolean;
-  onToggleDark: () => void;
   onRefresh: () => void;
   onExport: () => void;
   refreshing: boolean;
@@ -175,6 +170,7 @@ function Header({
             <span className="source-caption">{rowCount ? `${rowCount} records in view` : "Awaiting dataset"}</span>
             {lastRefreshed && <span className="source-caption">Updated {lastRefreshed}</span>}
           </div>
+          <TrustBadges />
         </div>
         <div className="header-actions">
           <a className="control-button" href={`${import.meta.env.BASE_URL}docs`}>
@@ -194,9 +190,6 @@ function Header({
           </button>
           <button className="icon-button" onClick={() => window.print()} aria-label="Export as PDF" title="Export as PDF" disabled={!rowCount}>
             <FileText size={15} />
-          </button>
-          <button className="icon-button" onClick={onToggleDark} aria-label="Toggle dark mode" title="Toggle dark mode">
-            {isDark ? <Sun size={15} /> : <Moon size={15} />}
           </button>
         </div>
       </div>
@@ -378,15 +371,14 @@ function Home() {
     queryFn: loadCompleteDataset,
     staleTime: Infinity,
   });
-  const [isDark, setIsDark] = useState(false);
-  const [search, setSearch] = useState("");
+    const [search, setSearch] = useState("");
   const [minDay, setMinDay] = useState("");
   const [maxDay, setMaxDay] = useState("");
   const [sortKey, setSortKey] = useState<keyof StratigraphyEntry>("day");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const allRows = query.data || [];
   const loading = query.isLoading || query.isFetching;
-  useEffect(() => { document.documentElement.classList.toggle("dark", isDark); }, [isDark]);
+  useEffect(() => { document.documentElement.classList.add("dark"); }, []);
   const filteredRows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return allRows.filter((entry) => {
@@ -411,7 +403,7 @@ function Home() {
     <div className="app-shell">
       <div className="grain" />
       <div className="shell-inner">
-        <Header isDark={isDark} onToggleDark={() => setIsDark((value) => !value)} onRefresh={() => query.refetch()} onExport={() => downloadCsv(filteredRows)} refreshing={query.isFetching} lastRefreshed={lastRefreshed} rowCount={filteredRows.length} />
+        <Header onRefresh={() => query.refetch()} onExport={() => downloadCsv(filteredRows)} refreshing={query.isFetching} lastRefreshed={lastRefreshed} rowCount={filteredRows.length} />
         {query.isError ? <div className="error-state panel"><div className="empty-glyph"><RefreshCw size={20} /></div><strong>Dataset connection interrupted</strong><span>We couldn't read the uploaded JSON right now.</span><button className="reset-button" onClick={() => query.refetch()}>Try again</button></div> : (
           <>
             <div className="stats-row">

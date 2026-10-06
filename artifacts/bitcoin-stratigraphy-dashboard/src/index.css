@@ -564,3 +564,56 @@ code { color: hsl(var(--muted-foreground)); font-size: 10px; }
 .sim-leaves{margin-top:12px}.sim-leaves-bar{display:flex;align-items:center;gap:8px}.sim-leaves-range{flex:1;display:grid;gap:2px;font:10px var(--app-font-mono);color:hsl(var(--muted-foreground))}.sim-leaves-range input{width:100%;accent-color:hsl(var(--primary))}
 .sim-leafgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:3px;margin-top:8px}
 .sim-leaf{height:28px;border:1px solid hsl(var(--border));background:hsl(var(--muted)/.6);color:inherit;font:9px var(--app-font-mono);padding:0}.sim-leaf:hover{border-color:hsl(var(--primary))}.sim-leaf-on{background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-color:hsl(var(--primary))}
+
+/* Dark-only enforcement, trust badges, mobile hardening */
+html{color-scheme:dark;background:hsl(222 34% 12%)}
+.dark .stat-rust{--stat-accent:#e88e79}
+.dark .stat-teal{--stat-accent:#76c5b0}
+.dark .stat-slate{--stat-accent:#a6b7d0}
+.dark .signal-gold{color:#f2c362}
+.dark .signal-rust{color:#e88e79}
+.dark .signal-teal,.dark .status-badge,.dark .sim-ok{color:#76c5b0}
+.trust-badges{margin-top:16px;display:grid;gap:6px;min-width:0;max-width:100%}
+.trust-label{font:9px var(--app-font-mono);letter-spacing:.08em;text-transform:uppercase;color:hsl(var(--muted-foreground))}
+.trust-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.trust-row a{display:inline-flex;align-items:center;max-width:100%}
+.trust-row svg,.trust-row img{height:20px;width:auto;max-width:100%;display:block}
+.smithery-backlink{display:none}
+html,body{max-width:100%;overflow-x:hidden}
+.app-shell,.shell-inner,.topbar,.header-main>*,.panel,.stat-card,.sim-col,.sim-grid>*,.stats-row>*,.workspace-grid>*,.insights-grid>*{min-width:0}
+h1,.subtitle,.panel-heading h2,.sim-row-text,.sim-thought,.footer-note span{overflow-wrap:anywhere}
+.header-actions{flex-wrap:wrap}
+.sim-pre,.sim-details pre,.sa-block pre{max-width:100%;overflow:auto}
+.sim-proof,.sim-chain{min-width:0}.sim-chain code,.sim-kv dd,.sim-details code{overflow-wrap:anywhere;word-break:break-all}
+.sim-leaves,.sim-pad,.sim-panel{max-width:100%;overflow-x:auto}
+.chart-wrap,.breakdown-content{min-width:0}
+@media (max-width:640px){
+ .shell-inner{width:calc(100% - 20px)}
+ h1{font-size:clamp(1.9rem,10vw,2.6rem)}
+ .header-actions .control-button{flex:1 1 calc(50% - 7px);min-width:0}
+ .stats-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .stat-value{font-size:19px;overflow-wrap:anywhere}
+ .stat-detail{white-space:normal}
+ .sim-rootval{font-size:15px}
+ .panel-heading{flex-wrap:wrap}
+ .breakdown-content{flex-direction:column;align-items:stretch}
+ .breakdown-content .recharts-responsive-container{width:100%!important}
+ .pagination{flex-wrap:wrap;gap:8px}
+ .sim-kv,.sa-grid2{grid-template-columns:1fr}
+ .sim-controls>*{min-width:0}.sim-progress{flex:1 1 100%}
+ .sa-reqs li{grid-template-columns:1fr;gap:4px}
+ .sim-search{margin-inline:13px}.sim-row{padding-inline:13px}
+}
+@media (max-width:360px){.stats-row{grid-template-columns:minmax(0,1fr)}.header-actions .control-button{flex-basis:100%}}
+
+/* Keep the existing print/PDF export legible while the screen UI stays dark. */
+@media print{
+ html.dark{color-scheme:light;--foreground:222 25% 15%;--muted-foreground:220 12% 36%;--primary:39 85% 32%;--border:220 12% 70%;--card-border:220 12% 70%}
+ .dark .stat-rust,.dark .signal-rust{--stat-accent:#a04735;color:#a04735}
+ .dark .stat-teal{--stat-accent:#32695d}
+ .dark .stat-slate{--stat-accent:#53657d}
+ .dark .signal-gold{color:#a16e07}
+ .dark .signal-teal,.dark .status-badge,.dark .sim-ok{color:#32695d}
+ .recharts-text{fill:#434b57}
+ .trust-badges{display:none}
+}

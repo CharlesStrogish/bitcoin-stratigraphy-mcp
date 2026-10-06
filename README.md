@@ -30,6 +30,31 @@ a trusted, budget-controlled wallet proxy; they do not pay automatically.
 
 Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **15 Canonical Tools**.
 
+## Enterprise SDK and Swarm Flight Simulator
+
+Install the self-contained enterprise suite from the checkout or a built wheel:
+
+```bash
+pip install ./sdk/python
+```
+
+```python
+from bitcoin_stratigraphy_enterprise import SwarmFlightRecorder, Article12NotaryCallback
+```
+
+The package also provides bilateral settlement and independent offline auditing.
+See the [enterprise SDK guide](sdk/python/README.md) for prepaid anchoring,
+LangChain/CrewAI integration, console commands and distribution builds.
+It is not yet published to PyPI. Legacy cookbook imports and CLI paths remain
+compatible.
+
+Open **`/simulator`** on the dashboard for the **Enterprise Swarm Control Room**:
+50 synthetic agents stream 1,000 traces into a real, salted SHA-256 Merkle tree.
+Select any thought to verify and export its inclusion path. The final
+`X-L402-Batch-Size: 100` anchor/OTS receipt is explicitly simulated: **no payment,
+no calendar submission, no Bitcoin confirmation**. Selective disclosure is a
+Merkle audit path, not a zero-knowledge proof.
+
 ## Architecture Overview
 
 ```text

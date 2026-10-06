@@ -2,6 +2,12 @@ version = 1
 revision = 3
 requires-python = "==3.13.*"
 
+[manifest]
+members = [
+    "bitcoin-stratigraphy-enterprise",
+    "repl-nix-workspace",
+]
+
 [[package]]
 name = "aiofiles"
 version = "24.1.0"
@@ -97,6 +103,23 @@ openai = [
     { name = "aiofiles" },
     { name = "openai" },
     { name = "tiktoken" },
+]
+
+[[package]]
+name = "bitcoin-stratigraphy-enterprise"
+version = "0.2.0"
+source = { editable = "sdk/python" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "opentimestamps" },
+    { name = "opentimestamps-client" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", specifier = ">=50.0.2,<51" },
+    { name = "opentimestamps", specifier = "==0.4.5" },
+    { name = "opentimestamps-client", specifier = ">=0.7.2,<0.8" },
 ]
 
 [[package]]
@@ -997,6 +1020,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "autogen-agentchat" },
     { name = "autogen-ext", extra = ["openai"] },
+    { name = "bitcoin-stratigraphy-enterprise" },
     { name = "httpx" },
     { name = "langchain-mcp-adapters" },
     { name = "langchain-openai" },
@@ -1011,6 +1035,7 @@ dependencies = [
 requires-dist = [
     { name = "autogen-agentchat", specifier = "==0.7.5" },
     { name = "autogen-ext", extras = ["openai"], specifier = "==0.7.5" },
+    { name = "bitcoin-stratigraphy-enterprise", editable = "sdk/python" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "langchain-mcp-adapters", specifier = "==0.3.2" },
     { name = "langchain-openai", specifier = ">=1,<2" },

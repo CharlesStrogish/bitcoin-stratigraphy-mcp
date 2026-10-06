@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=80.9"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bitcoin-stratigraphy-enterprise"
+version = "0.2.0"
+description = "Private agent telemetry, prepaid root notarization, selective disclosure and independent evidence auditing"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+  "cryptography>=50.0.2,<51",
+  "opentimestamps==0.4.5",
+  "opentimestamps-client>=0.7.2,<0.8",
+]
+keywords = ["agent", "telemetry", "merkle", "opentimestamps", "langchain", "crewai"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Security :: Cryptography",
+]
+
+[project.scripts]
+stratigraphy-swarm = "bitcoin_stratigraphy_enterprise.swarm_flight_recorder:main"
+stratigraphy-article12 = "bitcoin_stratigraphy_enterprise.article_12_compliance:main"
+stratigraphy-b2b = "bitcoin_stratigraphy_enterprise.b2b_settlement:main"
+stratigraphy-audit = "bitcoin_stratigraphy_enterprise.audit_verifier:main"
+
+[tool.setuptools]
+packages = ["bitcoin_stratigraphy_enterprise"]
+include-package-data = false

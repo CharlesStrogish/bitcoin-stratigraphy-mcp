@@ -55,3 +55,4 @@
 - [Orphaned workflows](orphaned-workflow-processes.md) — failed workflows may leave old servers holding ports; confirm ownership before restarting.
 - [Swarm disclosure trust](swarm-disclosure-trust.md) — blinded Merkle paths are not ZK proofs; local membership, recorder authority and Bitcoin inclusion are separate findings.
 - [Stdlib trace coverage](stdlib-trace-coverage.md) — trace can exit successfully despite wrapped test failures; confirm plain unittest independently.
+- [Enterprise SDK compatibility](enterprise-sdk-compatibility.md) — preserve legacy module identity for patches; verify staged audit workers independently of the checkout.

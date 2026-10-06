@@ -52,3 +52,9 @@ Thumbs.db
 # Private enterprise audit evidence; never commit trace data.
 /audit_trail.jsonl
 /audit_trail.jsonl.*
+
+# Enterprise SDK build output and Python bytecode.
+/sdk/python/build/
+/sdk/python/*.egg-info/
+__pycache__/
+*.pyc

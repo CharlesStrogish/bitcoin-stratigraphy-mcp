@@ -32,9 +32,18 @@ async function buildAll() {
   await mkdir(path.resolve(distDir, "audit-worker/cookbooks"), { recursive: true });
   for (const filename of [
     "audit_web_worker.py", "audit_verifier.py", "audit_verifier_ots.py", "article_12_journal.py",
+    "_enterprise_compat.py",
   ]) {
     await cp(path.resolve(artifactDir, "../../cookbooks", filename),
       path.resolve(distDir, "audit-worker/cookbooks", filename));
+  }
+  // Keep the isolated audit worker deployable after the enterprise migration.
+  // Copy its minimal SDK dependency closure, not journals or the workspace.
+  const workerSdkDir = path.resolve(distDir, "audit-worker/sdk/python/bitcoin_stratigraphy_enterprise");
+  await mkdir(workerSdkDir, { recursive: true });
+  for (const filename of ["__init__.py", "audit_verifier.py", "audit_verifier_ots.py", "article_12_journal.py"]) {
+    await cp(path.resolve(artifactDir, "../../sdk/python/bitcoin_stratigraphy_enterprise", filename),
+      path.resolve(workerSdkDir, filename));
   }
 
   await mkdir(path.resolve(distDir, "public/cookbooks"), { recursive: true });

@@ -1,5 +1,29 @@
 # Python framework cookbooks
 
+## Distributable enterprise suite
+
+The Article 12, B2B settlement, Swarm Flight Recorder and audit-verifier
+implementations now ship as a self-contained Python distribution:
+
+```bash
+pip install ./sdk/python
+```
+
+```python
+from bitcoin_stratigraphy_enterprise import SwarmFlightRecorder, Article12NotaryCallback
+```
+
+Run this install command from a repository checkout. The package has not yet
+been published to PyPI; built wheels can also be installed directly.
+See `sdk/python/README.md` for packaging and framework integration.
+The original cookbook paths are compatible entry points, including their
+mock/patch bindings. No changes are required to older examples.
+
+The dashboard's `/simulator` route demonstrates 50 synthetic agents, real
+salted Merkle hashing and selectable inclusion proofs. Its L402/OTS anchor is
+an illustration, not a payment or Bitcoin confirmation. Merkle selective
+disclosure is not cryptographic zero knowledge.
+
 ## Native framework toolkits (Phase 2)
 
 For the 15-tool server and `proof.notarize`, use the standalone

@@ -42,6 +42,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation, Router as WouterRouter } from "wouter";
 import NotFound from "@/pages/not-found";
 import StandardPage from "@/pages/standard";
+import SimulatorPage from "@/pages/simulator";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -181,6 +182,9 @@ function Header({
           </a>
           <a className="control-button" href={`${import.meta.env.BASE_URL}standard`} data-testid="link-standard">
             <Check size={14} /> SA-AI standard
+          </a>
+          <a className="control-button" href={`${import.meta.env.BASE_URL}simulator`} data-testid="link-simulator">
+            <Play size={14} /> Swarm simulator
           </a>
           <button className="control-button" onClick={onRefresh} disabled={refreshing}>
             <RefreshCw size={14} className={refreshing ? "spin" : ""} /> Refresh
@@ -432,7 +436,7 @@ function Home() {
 }
 
 function Router() {
-  return <ErrorBoundary><Switch><Route path="/" component={Home} /><Route path="/standard" component={StandardPage} /><Route component={NotFound} /></Switch></ErrorBoundary>;
+  return <ErrorBoundary><Switch><Route path="/" component={Home} /><Route path="/standard" component={StandardPage} /><Route path="/simulator" component={SimulatorPage} /><Route component={NotFound} /></Switch></ErrorBoundary>;
 }
 
 function App() {

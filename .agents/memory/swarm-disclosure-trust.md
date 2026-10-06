@@ -26,13 +26,22 @@ authority. A pending calendar is not Bitcoin inclusion.
 validated mainnet evidence for Bitcoin confirmation. Do not turn a successful
 Merkle check into a blanket anchored/enterprise-authorized verdict.
 
-Standalone enterprise cookbook work must preserve existing canonical MCP
-tools, schemas and Express routes. Flight-recorder work also leaves the
-B2B/Article 12 cookbook code intact.
+Enterprise SDK and simulator work must preserve the 15 canonical MCP tools,
+schemas and live API contracts. The user authorized migrating enterprise
+cookbooks into a distributable package while preserving legacy behavior.
 
-**Why:** The user repeated this isolation guardrail in the enterprise cookbook
-briefs.
+**Why:** The user repeated the core-contract guardrail and specifically requested
+SDK packaging without breaking the existing cookbook tests.
 
-**How to apply:** Reuse existing adapters/helpers without rewriting the engine
-or earlier cookbooks. Compatible dependency security updates can maintain
-the zero-vulnerability requirement without modifying endpoint contracts.
+**How to apply:** Keep old imports/CLI paths compatible during packaging changes.
+Do not rewrite engine tool definitions or routes to support the simulator.
+Maintain the zero-vulnerability dependency baseline.
+
+The public Swarm Flight Simulator is a browser-only demonstration for enterprise
+CISOs, with real Merkle hashing but simulated financial/OTS events.
+
+**Why:** The user requested a visual mock of the swarm and batch anchor.
+
+**How to apply:** Do not introduce live payments or calendar submissions without
+explicit authorization. Keep genuine membership, simulated anchoring and Bitcoin
+confirmation distinct.

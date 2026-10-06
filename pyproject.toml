@@ -6,6 +6,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "autogen-agentchat==0.7.5",
     "autogen-ext[openai]==0.7.5",
+    "bitcoin-stratigraphy-enterprise",
     "httpx==0.28.1",
     "langchain-mcp-adapters==0.3.2",
     "langchain-openai>=1,<2",
@@ -15,3 +16,11 @@ dependencies = [
     "opentimestamps-client>=0.7.2",
     "pydantic>=2.11,<3",
 ]
+
+[tool.uv.workspace]
+members = [
+    "sdk/python",
+]
+
+[tool.uv.sources]
+bitcoin-stratigraphy-enterprise = { workspace = true }

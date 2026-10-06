@@ -1,0 +1,26 @@
+Create the ultimate enterprise-grade AI telemetry tracker in `cookbooks/swarm_flight_recorder.py` to handle high-frequency agent swarms while preserving corporate privacy through Selective Disclosure Merkle proofs.
+
+Requirements:
+1. High-Frequency Merkle Accumulator (RFC 6962 style):
+   - Implement a `SwarmFlightRecorder` class designed for high-velocity LangChain/CrewAI swarms. 
+   - Instead of anchoring every single micro-thought individually, it must hash incoming agent execution traces (thoughts, tool calls, context) as leaves in an in-memory rolling Merkle tree.
+
+2. Batch Root Anchoring:
+   - Provide a `flush_root()` method. This finalizes the current Merkle tree, extracts the Merkle Root, and anchors ONLY the root hash to the Bitcoin Stratigraphy `proof.notarize` MCP tool using our `X-L402-Batch-Size: 100` L402 header.
+   - This reduces enterprise costs from paying per-tool-call to paying per-batch-root, enabling massive swarm telemetry seamlessly.
+
+3. Zero-Knowledge Selective Disclosure:
+   - Implement a `generate_inclusion_proof(leaf_index)` method.
+   - If an auditor questions a specific agent decision, the enterprise must be able to export just that single trace and its Merkle inclusion path to the anchored root. This prevents the enterprise from having to expose their entire proprietary swarm memory (IP/PII) to regulators.
+   
+4. Offline Verifier:
+   - Include a `verify_inclusion_proof(trace_payload, merkle_proof, anchored_root_receipt)` function that independently confirms the specific trace hashes up to the Bitcoin-anchored root.
+
+5. Sandbox & Production Demo:
+   - Build a runnable `if __name__ == "__main__":` demo simulating a high-speed 50-agent swarm generating a rapid burst of execution traces.
+   - Compute the Merkle tree, anchor the root (reporting "Deferred/Pending Credential" if no L402 wallet is present), generate a selective disclosure proof for one specific "controversial" decision, and verify it.
+
+6. Guardrails:
+   - Do not modify existing MCP tools, schemas, Express routes, or the B2B/Article 12 cookbooks.
+   - Achieve 100% test coverage for the Merkle tree logic in `cookbooks/test_swarm_flight_recorder.py`.
+   - Maintain zero dependency vulnerabilities. All 84 existing tests must pass.

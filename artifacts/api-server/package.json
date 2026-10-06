@@ -14,7 +14,7 @@
   "dependencies": {
     "@coinbase/cdp-sdk": "^1.57.0",
     "@getalby/sdk": "8.0.3",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "@x402/core": "^2.27.0",

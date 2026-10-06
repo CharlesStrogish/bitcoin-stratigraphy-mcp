@@ -53,3 +53,5 @@
 - [OpenTimestamps dependency choice](opentimestamps-dependency-choice.md) — use the official Python library; the latest JavaScript package was blocked by vulnerable legacy dependencies.
 - [Bilateral settlement trust](b2b-settlement-trust.md) — seal receipts separately from contract signatures; independent Bitcoin evidence is not an exact legal clock or payment proof.
 - [Orphaned workflows](orphaned-workflow-processes.md) — failed workflows may leave old servers holding ports; confirm ownership before restarting.
+- [Swarm disclosure trust](swarm-disclosure-trust.md) — blinded Merkle paths are not ZK proofs; local membership, recorder authority and Bitcoin inclusion are separate findings.
+- [Stdlib trace coverage](stdlib-trace-coverage.md) — trace can exit successfully despite wrapped test failures; confirm plain unittest independently.

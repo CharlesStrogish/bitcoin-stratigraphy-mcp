@@ -561,6 +561,137 @@ Standalone prerequisites are listed in `cookbooks/requirements-b2b.txt`
 The repository already has these packages installed; no additional package
 was introduced for the cookbook.
 
+## Swarm flight recorder: selective trace disclosure
+
+`cookbooks/swarm_flight_recorder.py` captures high-frequency JSON agent traces
+locally, builds an ordered RFC 6962-style Merkle tree, and submits **only one
+root hash per batch** to the existing `proof.notarize` tool. No tools, schemas,
+routes, or B2B/Article 12 cookbook code are changed.
+
+```bash
+# Offline, safe 50-agent / 1000-trace synthetic demonstration.
+uv run --no-sync python cookbooks/swarm_flight_recorder.py
+
+# Explicit synthetic demo consuming ONE REAL prepaid root-notarization call.
+# Supply a proof.notarize-scoped L402_AUTHORIZATION through your secret manager.
+uv run --no-sync python cookbooks/swarm_flight_recorder.py --production
+
+# Local auditor verification of one exported JSON disclosure.
+uv run --no-sync python cookbooks/swarm_flight_recorder.py \
+  --verify selective_disclosure.json --recorder-key <enrolled-public-key>
+```
+
+Without `--production`, available credentials are ignored and no network or
+wallet is used. Missing credentials yield **Deferred/Pending Credential**;
+no OTS evidence is fabricated. The reused prepaid SDK adapter sends
+`X-L402-Batch-Size: 100`, never purchases invoices, and never automatically
+retries uncertain notarizations. The header does not manufacture a paid pass
+or override expiry, scope, revocation, or remaining quota.
+
+```python
+import json
+from cookbooks.swarm_flight_recorder import SwarmFlightRecorder, verify_inclusion_proof
+
+recorder = SwarmFlightRecorder()  # Pass a prepaid notarizer explicitly for production.
+index = recorder.record_trace({
+    "agent_id": "procurement-agent",
+    "decision_summary": "Vendor approval blocked pending privacy review",
+    "tool_call": {"name": "check_vendor_policy", "outcome": "blocked"},
+    "context": {"policy_version": "corporate-approved-version"},
+})
+receipt = recorder.flush_root()
+proof = recorder.generate_inclusion_proof(index)
+bundle = recorder.export_disclosure(index)
+# Use your approved private evidence store, not a public logs bucket.
+report = verify_inclusion_proof(
+    bundle["trace"], proof, receipt,
+    expected_recorder_key=recorder.public_key,  # Auditor must independently enroll it.
+)
+```
+
+### Capture and batch lifecycle
+
+- `record_trace`, `append_trace`, and `add_trace` accept JSON dictionaries.
+  Use these from LangChain callbacks or CrewAI event/tool wrappers after an
+  explicit enterprise allowlist/redaction policy. They are generic capture
+  hooks, not automatic framework callback subclasses; they do not intercept
+  or execute tools. Do not indiscriminately log secrets, full prompts, or PII.
+- Capture order, not agent-claimed timestamps, defines leaf order. Append is
+  thread-safe with worst-case O(log n) hash work. Frozen batch notary I/O does
+  not block new trace capture. Fifty demo workers each emit twenty events.
+- Defaults: 10,000 active leaves, eight retained batches, 64 KiB per trace,
+  and a 16 MiB serialized-leaf byte budget across active/retained batches.
+  Tree/hash/object overhead is additional bounded memory. Limits reject new
+  work explicitly; there is no silent trace eviction or implicit paid flush.
+- `flush_root()` swaps the active tree before network I/O. Empty subsequent
+  flushes return the last receipt without another call. A first empty batch
+  is not submitted. Failed/uncertain results remain sealed as unavailable;
+  an interrupted/failed seal leaves a reserved batch requiring manual
+  resolution, not a second quota redemption.
+- Leaf indices restart at zero per batch. Preserve the receipt's `batch_id`
+  and pass it to proof/export methods when querying older retained batches.
+  `release_batch(batch_id)` explicitly deletes that batch's in-memory
+  evidence and frees its serialized-leaf budget. Export everything needed
+  first: released proofs cannot be regenerated.
+- Memory is not a durable audit store or distributed exactly-once ledger.
+  Production needs authenticated event sources, durable transaction/root
+  reservations, private evidence storage, stable corporate signing-key
+  custody, and retention/deletion policies. A crash can lose unexported
+  traces, salts and proofs.
+
+### Hashing, disclosure and trust
+
+RFC-style leaf hashing is `SHA256(0x00 || canonical_leaf_bytes)`, internal
+nodes are `SHA256(0x01 || left || right)`, and empty-tree hashing is
+`SHA256(b"")`. Irregular trees split at the largest smaller power of two;
+there is **no duplicate-last-leaf padding**.
+
+A leaf preimage is compact sorted-key UTF-8 JSON containing
+`schema_version: saai-swarm-leaf/1`, a fresh private 32-byte random `salt`,
+and the exact trace dictionary. Salts resist guessing low-entropy
+undisclosed traces. The export contains only the chosen trace, its salt,
+index/tree size, sibling hashes, and the root receipt. Other trace
+plaintext/salts remain local. The recorder signs the whole root receipt
+with Ed25519 so OTS bytes and tree metadata are tamper-evident.
+
+**This is selective-disclosure Merkle verification, not a zero-knowledge
+proof.** It reveals the selected trace and structural metadata; it does not
+prove that every execution was captured, that events were truthful, or
+that a bare recorder key represents an authorized corporation.
+
+`merkle_inclusion_verified` and `bitcoin_inclusion_verified` are independent
+findings. A deferred/pending receipt can prove membership in its sealed
+local root but **cannot prove Bitcoin anchoring**. For offline Bitcoin
+confirmation, separately supply `trusted_headers` from the auditor's fully
+validating mainnet node or validated chain evidence. CLI format:
+`--trusted-headers auditor_headers.json`, mapping heights to
+`{"block_hash":"<64 lowercase hex>","header_hex":"<160 lowercase hex>"}`.
+Never automatically trust a map supplied by the recorder.
+
+Keep upgraded OTS bytes separate from the original signed receipt and pass
+`--upgraded-ots upgraded.ots`. Bitcoin timestamps are miner-declared and
+are not exact legal UTC clocks. Offline CLI exits 0 only for independently
+confirmed Bitcoin inclusion, 2 for pending/deferred/unavailable evidence,
+and 1 for malformed/tampered evidence.
+
+### Tests and Merkle coverage
+
+```bash
+uv run --no-sync python -m unittest cookbooks.test_swarm_flight_recorder -q
+# Stdlib coverage, no new test dependency:
+uv run --no-sync python -m trace --count --missing --summary \
+  --coverdir=/tmp/swarm-flight-coverage --module unittest \
+  cookbooks.test_swarm_flight_recorder -q
+```
+
+The tree tests compare every prefix size 1–128 and every leaf position
+against an independent RFC-style recursive reference, test irregular trees,
+domain separation, duplicates, invalid indices/hashes, and short/extra/
+reordered paths. The Merkle implementation has **100% executable-line
+coverage**. Runtime prerequisites are listed separately in
+`cookbooks/requirements-swarm-flight-recorder.txt`; both packages were
+already installed in this workspace.
+
 ## Official framework references
 
 - [CrewAI remote MCP](https://docs.crewai.com/en/mcp/overview).

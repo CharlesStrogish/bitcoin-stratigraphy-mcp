@@ -2,5 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://bitcoin-stratigraphy-dashboard.replit.app/sitemap.xml
 # Agent discovery: https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt
+Sitemap: https://bitcoin-stratigraphy-dashboard.replit.app/sitemap.xml

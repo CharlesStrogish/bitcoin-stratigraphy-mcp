@@ -1,16 +1,6 @@
 User-agent: *
-User-agent: SmitheryBot
-User-agent: GPTBot
-User-agent: OAI-SearchBot
-User-agent: ChatGPT-User
-User-agent: ClaudeBot
-User-agent: Claude-SearchBot
-User-agent: PerplexityBot
-User-agent: FirecrawlBot
 Allow: /
-Allow: /docs
-Allow: /cookbooks
-Allow: /.well-known/mcp.json
+Disallow: /api/
 
 Sitemap: https://bitcoin-stratigraphy-dashboard.replit.app/sitemap.xml
 # Agent discovery: https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt

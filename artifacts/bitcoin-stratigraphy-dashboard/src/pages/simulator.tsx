@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Play, RotateCcw, Square } from "lucide-react";
 import { TrustBadges } from "@/components/trust-badges";
+import EnterpriseLicenseLink from "@/components/enterprise-license-link";
 import { SyntheticBanner } from "@/simulator/components/SyntheticBanner";
 import { AgentGrid } from "@/simulator/components/AgentGrid";
 import { TreeGraph } from "@/simulator/components/TreeGraph";
@@ -227,6 +228,7 @@ export default function SimulatorPage() {
               <TrustBadges />
             </div>
             <div className="header-actions">
+              <EnterpriseLicenseLink />
               <Link href="/" className="control-button" data-testid="link-home">
                 <ArrowLeft size={14} /> Dashboard
               </Link>

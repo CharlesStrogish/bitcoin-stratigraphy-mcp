@@ -1,0 +1,20 @@
+Create a new dedicated page for Enterprise Commercial Licensing (`/enterprise`).
+
+Requirements for the page:
+1. Navigation: Add an "Enterprise License" button to the main header navigation across the app so CISOs can easily find it.
+2. Aesthetic & Layout: 
+   - Ensure the page strictly follows the app's existing dark mode thermodynamic aesthetic (e.g., `#161b26` background, premium UI components).
+   - The layout must be perfectly mobile-responsive, scaling cleanly from smartphones to ultrawide desktop monitors without breaking margins or text wrapping.
+3. SEO Meta Tags:
+   - Title: "Enterprise Licensing | Bitcoin Stratigraphy Data Engine"
+   - Description: "Air-gapped, commercially licensed State-Anchored AI infrastructure. Protect your proprietary AI IP and ensure EU AI Act Article 12 compliance with a dedicated enterprise SLA."
+4. Page Content & Copywriting (Focus on Enterprise Value):
+   - Hero Section: "Enterprise Swarm Infrastructure. Secure, Air-Gapped, and Commercially Licensed."
+   - The AGPLv3 IP Protection: Explain that the public API uses an AGPLv3 license. For enterprises, the Commercial License grants a full exemption, allowing them to run the engine behind their own firewalls without being legally forced to open-source their proprietary AI code or weights.
+   - Regulatory Compliance (EU AI Act): Detail how the engine solves Article 12 by providing an unalterable Merkle chain of custody and cryptographic flight recorder for post-hoc audit reconstruction.
+   - Advanced Use Cases: Briefly highlight Multi-Vendor Arbitration (proving which agent made a mistake) and L402 "Runaway Agent" Circuit Breakers for cyber-liability insurance underwriting.
+   - Settlement Model: Clearly state that enterprise pricing is customized based on swarm size and deployment needs, settled securely via a single Bitcoin transaction paid in full at the time of execution.
+5. Call to Action (CTA): 
+   - A highly visible button stating "Contact Sales for Enterprise Sizing" that links to exactly: `mailto:crstrogish@aol.com`.
+6. SEO/Sitemap: Update the `public/sitemap.xml` to include the new `https://bitcoin-stratigraphy-dashboard.replit.app/enterprise` route with a Priority of 0.9.
+7. Run a frontend build check to verify routing and responsiveness.

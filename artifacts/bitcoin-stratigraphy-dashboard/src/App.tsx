@@ -43,6 +43,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, Router as WouterRouter } from "wouter";
 import NotFound from "@/pages/not-found";
+import EnterprisePage from "@/pages/enterprise";
+import EnterpriseLicenseLink from "@/components/enterprise-license-link";
 import StandardPage from "@/pages/standard";
 import SimulatorPage from "@/pages/simulator";
 import { TrustBadges } from "@/components/trust-badges";
@@ -189,9 +191,9 @@ function Header({
           </h1>
           <p className="subtitle">
             Enterprise-grade L402 data engine and cryptographic notary hub.
-            Providing State-Anchored AI data layers and Swarm Flight Recorders for
-            EU AI Act Article 12 compliance — Created &amp; Architected by Charles
-            R. Strogish.
+            Providing State-Anchored AI data layers and Swarm Flight Recorders
+            for EU AI Act Article 12 compliance — Created &amp; Architected by
+            Charles R. Strogish.
           </p>
           <div className="source-row">
             <span className="source-badge">
@@ -207,6 +209,7 @@ function Header({
           <TrustBadges />
         </div>
         <div className="header-actions">
+          <EnterpriseLicenseLink />
           <a
             className="control-button"
             href={`${import.meta.env.BASE_URL}docs`}
@@ -988,6 +991,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/standard" component={StandardPage} />
+        <Route path="/enterprise" component={EnterprisePage} />
         <Route path="/simulator" component={SimulatorPage} />
         <Route component={NotFound} />
       </Switch>

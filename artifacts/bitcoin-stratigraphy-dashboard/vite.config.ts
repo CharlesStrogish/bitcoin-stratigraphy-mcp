@@ -2,6 +2,7 @@ import path from "path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
+import { enterpriseSeoPlugin } from "./enterprise-seo-plugin";
 
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
@@ -46,7 +47,13 @@ export default defineConfig(({ command }) => {
 
   return {
     base: basePath,
-    plugins: [react(), tailwindcss(), runtimeErrorOverlay(), ...replitPlugins],
+    plugins: [
+      react(),
+      tailwindcss(),
+      runtimeErrorOverlay(),
+      ...replitPlugins,
+      enterpriseSeoPlugin(),
+    ],
     resolve: {
       alias: {
         "@": path.resolve(import.meta.dirname, "src"),

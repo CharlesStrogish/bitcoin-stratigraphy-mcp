@@ -20,6 +20,14 @@ serve = "static"
 publicDir = "artifacts/bitcoin-stratigraphy-dashboard/dist/public"
 
 [[services.production.rewrites]]
+from = "/enterprise"
+to = "/enterprise/index.html"
+
+[[services.production.rewrites]]
+from = "/enterprise/"
+to = "/enterprise/index.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

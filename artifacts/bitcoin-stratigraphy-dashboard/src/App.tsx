@@ -188,9 +188,10 @@ function Header({
             Bitcoin <span>Stratigraphy</span>
           </h1>
           <p className="subtitle">
-            Quantitative Bitcoin thermodynamic dataset, Groth16 ZK-SNARK engine,
-            Nostr P2P mesh consensus, and L402 micropayment oracle powering 15
-            MCP tools — Created &amp; Architected by Charles R. Strogish.
+            Enterprise-grade L402 data engine and cryptographic notary hub.
+            Providing State-Anchored AI data layers and Swarm Flight Recorders for
+            EU AI Act Article 12 compliance — Created &amp; Architected by Charles
+            R. Strogish.
           </p>
           <div className="source-row">
             <span className="source-badge">

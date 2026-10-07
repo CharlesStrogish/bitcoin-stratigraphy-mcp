@@ -28,3 +28,31 @@ mtime_ms = 1790983168909
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/78d348fc-55fa-4bc8-8360-0fbca65916d0/925773fa-7d55-4986-bbe1-1af5afb2e2be"
 storage_version_token = "1790983232796457"
 content_type = "text/html"
+
+[[outputs]]
+id = "heYioMFh_9Squ9rk3Jv94"
+uri = "file://artifacts/bitcoin-stratigraphy-dashboard/public/favicon-192x192.png"
+type = "image"
+title = "MCP favicon — 192 × 192"
+description = "Square PNG favicon generated from your official logo."
+logical_id = "d12647c4-b3c3-4c0b-9e90-b8de109332da"
+content_hash = "sha256:7540d5d944c4d26daca66ff65aeb72b79ef6ccccc0e2c840f0a33ca36b52c6f8"
+size = 23974
+mtime_ms = 1791414821272
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/d12647c4-b3c3-4c0b-9e90-b8de109332da/9e390c9f-ed5a-4f1f-866f-04bf094c1afe"
+storage_version_token = "1791414924597254"
+content_type = "image/png"
+
+[[outputs]]
+id = "RrQRLn3LMmuJWN7LxVNF4"
+uri = "file://artifacts/bitcoin-stratigraphy-dashboard/public/og-image.png"
+type = "image"
+title = "MCP search and social preview — 1200 × 630"
+description = "Official logo centered on the requested #161b26 background."
+logical_id = "31803642-c4d2-4721-9a13-2745f744aefb"
+content_hash = "sha256:6ebe56a1018c1f53d840f4a9867bd762ba5c2fcc171b5bab2fb0aebd6295fa59"
+size = 112715
+mtime_ms = 1791414822541
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/31803642-c4d2-4721-9a13-2745f744aefb/46a5ec6f-1ff9-4854-8463-665e221c9626"
+storage_version_token = "1791414925149077"
+content_type = "image/png"

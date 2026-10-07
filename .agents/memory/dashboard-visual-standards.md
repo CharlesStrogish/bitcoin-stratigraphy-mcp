@@ -30,3 +30,12 @@ directory entry, not a fake SVG embed.
 
 **How to apply:** Preserve the distinction between a linked official directory
 entry and a provider-issued verification badge when updating the trust row.
+
+The user designated the supplied dark rounded tile with a white “M” and amber
+“CP” as this project's official MCP logo.
+
+**Why:** The user supplied it as “our official MCP logo.”
+
+**How to apply:** Use the supplied mark for this project's MCP branding rather
+than inventing a replacement. It is project branding, not a protocol-wide
+certification or a third-party verification seal.

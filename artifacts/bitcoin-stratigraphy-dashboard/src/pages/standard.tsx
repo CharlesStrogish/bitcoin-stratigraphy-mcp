@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Check, Copy, FileUp, Loader2, ShieldAlert, X } from "lucide-react";
 import { TrustBadges } from "@/components/trust-badges";
 import EnterpriseLicenseLink from "@/components/enterprise-license-link";
+import WhitepaperLink from "@/components/whitepaper-link";
 import type { AuditReport } from "@workspace/api-client-react";
 
 const BASE = import.meta.env.BASE_URL;
@@ -522,6 +523,7 @@ export default function StandardPage() {
             </div>
             <div className="header-actions">
               <EnterpriseLicenseLink />
+              <WhitepaperLink />
               <Link
                 href="/"
                 className="control-button"

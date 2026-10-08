@@ -1,0 +1,17 @@
+.site-footer {
+  background: #161b26;
+  color: hsl(var(--foreground));
+}
+.site-footer .shell-inner {
+  padding-top: 0;
+}
+.site-footer .footer-note {
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+.site-footer nav {
+  flex-shrink: 0;
+}
+.site-footer .control-button {
+  text-decoration: none;
+}

@@ -13,6 +13,7 @@ const NAV: [string, string, string][] = [
   ["docs", "Docs", "docs"],
   ["standard", "Standard", "standard"],
   ["simulator", "Simulator", "simulator"],
+  ["whitepaper", "Whitepaper", "whitepaper"],
 ];
 
 const SECTIONS: {

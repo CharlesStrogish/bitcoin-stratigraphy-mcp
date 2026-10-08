@@ -45,6 +45,9 @@ import { Route, Switch, Router as WouterRouter } from "wouter";
 import NotFound from "@/pages/not-found";
 import EnterprisePage from "@/pages/enterprise";
 import EnterpriseLicenseLink from "@/components/enterprise-license-link";
+import WhitepaperPage from "@/pages/whitepaper";
+import WhitepaperLink from "@/components/whitepaper-link";
+import SiteFooter from "@/components/site-footer";
 import StandardPage from "@/pages/standard";
 import SimulatorPage from "@/pages/simulator";
 import { TrustBadges } from "@/components/trust-badges";
@@ -210,6 +213,7 @@ function Header({
         </div>
         <div className="header-actions">
           <EnterpriseLicenseLink />
+          <WhitepaperLink />
           <a
             className="control-button"
             href={`${import.meta.env.BASE_URL}docs`}
@@ -970,16 +974,6 @@ function Home() {
             </div>
           </>
         )}
-        <footer className="footer-note">
-          <span>
-            <Play size={12} fill="currentColor" /> SOURCE LINKS OPEN IN A NEW
-            TAB
-          </span>
-          <span>
-            ARCHITECTED BY CHARLES R. STROGISH | POWERED BY L402 MICROPAYMENTS,
-            GROTH16 ZK-SNARK PROOFS &amp; NOSTR P2P MESH CONSENSUS.
-          </span>
-        </footer>
       </div>
     </div>
   );
@@ -992,9 +986,11 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/standard" component={StandardPage} />
         <Route path="/enterprise" component={EnterprisePage} />
+        <Route path="/whitepaper" component={WhitepaperPage} />
         <Route path="/simulator" component={SimulatorPage} />
         <Route component={NotFound} />
       </Switch>
+      <SiteFooter />
     </ErrorBoundary>
   );
 }

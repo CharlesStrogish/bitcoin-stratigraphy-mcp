@@ -4,21 +4,41 @@ import {
   ENTERPRISE_TITLE,
   ENTERPRISE_URL,
 } from "./src/lib/enterprise-seo";
+import {
+  WHITEPAPER_DESCRIPTION,
+  WHITEPAPER_TITLE,
+  WHITEPAPER_URL,
+} from "./src/lib/whitepaper-seo";
 
-function enterpriseHead(html: string): string {
+const routes = [
+  {
+    path: "enterprise",
+    title: ENTERPRISE_TITLE,
+    description: ENTERPRISE_DESCRIPTION,
+    url: ENTERPRISE_URL,
+  },
+  {
+    path: "whitepaper",
+    title: WHITEPAPER_TITLE,
+    description: WHITEPAPER_DESCRIPTION,
+    url: WHITEPAPER_URL,
+  },
+];
+
+function pageHead(html: string, page: (typeof routes)[number]): string {
   const escape = (value: string) =>
     value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   let result = html.replace(
     /<title>[^<]*<\/title>/,
-    `<title>${escape(ENTERPRISE_TITLE)}</title>`,
+    `<title>${escape(page.title)}</title>`,
   );
   for (const [key, value] of [
-    ["description", ENTERPRISE_DESCRIPTION],
-    ["og:title", ENTERPRISE_TITLE],
-    ["og:description", ENTERPRISE_DESCRIPTION],
-    ["twitter:title", ENTERPRISE_TITLE],
-    ["twitter:description", ENTERPRISE_DESCRIPTION],
-    ["og:url", ENTERPRISE_URL],
+    ["description", page.description],
+    ["og:title", page.title],
+    ["og:description", page.description],
+    ["twitter:title", page.title],
+    ["twitter:description", page.description],
+    ["og:url", page.url],
   ]) {
     const tag = new RegExp(
       `<meta\\b(?=[^>]*\\b(?:name|property)="${key}")[^>]*>`,
@@ -32,7 +52,7 @@ function enterpriseHead(html: string): string {
   }
   return result.replace(
     /<link\b(?=[^>]*\brel="canonical")[^>]*>/,
-    `<link rel="canonical" href="${ENTERPRISE_URL}" />`,
+    `<link rel="canonical" href="${page.url}" />`,
   );
 }
 
@@ -47,7 +67,8 @@ export function enterpriseSeoPlugin(): Plugin {
         const path = (context.originalUrl ?? context.path)
           .split("?")[0]!
           .replace(/\/$/, "");
-        return path.endsWith("/enterprise") ? enterpriseHead(html) : html;
+        const page = routes.find((page) => path.endsWith(`/${page.path}`));
+        return page ? pageHead(html, page) : html;
       },
     },
     generateBundle: {
@@ -55,12 +76,14 @@ export function enterpriseSeoPlugin(): Plugin {
       handler(_options, bundle) {
         const index = bundle["index.html"];
         if (!index || index.type !== "asset")
-          this.error("Missing index.html for enterprise SEO output");
-        this.emitFile({
-          type: "asset",
-          fileName: "enterprise/index.html",
-          source: enterpriseHead(String(index.source)),
-        });
+          this.error("Missing index.html for dedicated-page SEO output");
+        for (const page of routes) {
+          this.emitFile({
+            type: "asset",
+            fileName: `${page.path}/index.html`,
+            source: pageHead(String(index.source), page),
+          });
+        }
       },
     },
   };

@@ -3,6 +3,7 @@ import {
   WHITEPAPER_TITLE as TITLE,
   WHITEPAPER_DESCRIPTION as DESC,
 } from "@/lib/whitepaper-seo";
+import WhitepaperContent, { WHITEPAPER_SECTIONS } from "./whitepaper-content";
 import "./whitepaper.css";
 
 const BASE = import.meta.env.BASE_URL;
@@ -64,30 +65,34 @@ export default function WhitepaperPage() {
         <main className="wp-main">
           <section className="panel wp-hero">
             <div className="eyebrow">
-              <span className="eyebrow-line" /> WHITEPAPER / PLACEHOLDER
+              <span className="eyebrow-line" /> TECHNICAL WHITEPAPER
             </div>
-            <h1>Bitcoin Stratigraphy Whitepaper</h1>
-            <p className="subtitle" data-testid="text-whitepaper-status">
-              Status: coming soon. This page is a placeholder and no document is
-              available yet.
-            </p>
-            <div className="wp-actions">
-              <a
-                href={MAIL}
-                className="wp-cta"
-                data-testid="link-contact-sales"
-              >
-                Contact Sales for Enterprise Sizing
-              </a>
-              <a
-                href={`${BASE}enterprise`}
-                className="wp-cta wp-cta-alt"
-                data-testid="link-enterprise-licensing"
-              >
-                View Enterprise Licensing
-              </a>
-            </div>
+            <h1>{TITLE}</h1>
+            <nav className="wp-toc" aria-label="On this page">
+              {WHITEPAPER_SECTIONS.map((x) => (
+                <a
+                  key={x.id}
+                  href={`#${x.id}`}
+                  data-testid={`link-toc-${x.id}`}
+                >
+                  {x.title}
+                </a>
+              ))}
+            </nav>
           </section>
+          <WhitepaperContent />
+          <div className="wp-actions">
+            <a href={MAIL} className="wp-cta" data-testid="link-contact-sales">
+              Contact Sales for Enterprise Sizing
+            </a>
+            <a
+              href={`${BASE}enterprise`}
+              className="wp-cta wp-cta-alt"
+              data-testid="link-enterprise-licensing"
+            >
+              View Enterprise Licensing
+            </a>
+          </div>
         </main>
       </div>
     </div>

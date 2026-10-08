@@ -76,3 +76,121 @@
     width: 100%;
   }
 }
+.wp-hero h1 {
+  overflow-wrap: break-word;
+  text-wrap: balance;
+  hyphens: auto;
+}
+.wp-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+  max-width: 62rem;
+}
+.wp-toc a {
+  font-family: var(--app-font-mono);
+  font-size: 12px;
+  color: hsl(var(--primary));
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.wp-toc a:hover {
+  border-color: hsl(var(--primary));
+}
+.wp-main {
+  min-width: 0;
+}
+.wp-main > .wp-actions {
+  margin: 32px 0 48px;
+}
+.wp-section {
+  scroll-margin-top: 24px;
+  max-width: 78ch;
+  margin: 40px auto 0;
+  padding: clamp(18px, 4vw, 40px);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: #d7dce8;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.wp-section h2 {
+  font-size: clamp(1.4rem, 3.5vw, 2.1rem);
+  line-height: 1.2;
+  margin: 0 0 20px;
+  color: #f1f3f9;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+.wp-section h3 {
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  line-height: 1.3;
+  margin: 32px 0 12px;
+  color: #f1f3f9;
+  overflow-wrap: break-word;
+}
+.wp-section p {
+  margin: 0 0 16px;
+}
+.wp-section ul,
+.wp-section ol {
+  margin: 0 0 18px;
+  padding-left: 1.4em;
+}
+.wp-section li {
+  margin-bottom: 8px;
+}
+.wp-section a {
+  color: hsl(var(--primary));
+  overflow-wrap: anywhere;
+}
+.wp-note {
+  margin: 24px 0;
+  padding: 16px 18px;
+  border-left: 3px solid hsl(var(--primary));
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0 4px 4px 0;
+}
+.wp-formula,
+.wp-code {
+  margin: 24px 0;
+  max-width: 100%;
+  min-width: 0;
+}
+.wp-formula figcaption,
+.wp-code figcaption {
+  font-family: var(--app-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #aab2c5;
+  margin-bottom: 8px;
+}
+.wp-formula pre,
+.wp-code pre {
+  margin: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  background: #0e121a;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+}
+.wp-formula code,
+.wp-code code {
+  font-family: var(--app-font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  color: #f1f3f9;
+  white-space: pre;
+  display: block;
+  width: max-content;
+  min-width: 100%;
+}

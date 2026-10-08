@@ -5,6 +5,7 @@ import { TrustBadges } from "@/components/trust-badges";
 import EnterpriseLicenseLink from "@/components/enterprise-license-link";
 import WhitepaperLink from "@/components/whitepaper-link";
 import { SyntheticBanner } from "@/simulator/components/SyntheticBanner";
+import { CopyJsonButton } from "@/simulator/components/CopyJsonButton";
 import { AgentGrid } from "@/simulator/components/AgentGrid";
 import { TreeGraph } from "@/simulator/components/TreeGraph";
 import { TraceBrowser } from "@/simulator/components/TraceBrowser";
@@ -66,6 +67,7 @@ export default function SimulatorPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [inspect, setInspect] = useState<InspectState>({ status: "idle" });
   const [anchor, setAnchor] = useState<Notarized | null>(null);
+  const anchorJson = anchor ? JSON.stringify(anchor, null, 2) : null;
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState("");
 
@@ -405,7 +407,10 @@ export default function SimulatorPage() {
               <div className="section-kicker">Final event</div>
               <h2 id="sim-anchor-h">proof.notarize (simulated)</h2>
             </div>
-            <span className="sim-tag">SYNTHETIC</span>
+            <div className="sim-receipt-actions">
+              <span className="sim-tag">SYNTHETIC</span>
+              <CopyJsonButton text={anchorJson} testId="button-copy-receipt-json" />
+            </div>
           </div>
           <div className="sim-verdicts">
             <div className="sim-card sim-card-real">
@@ -431,7 +436,7 @@ export default function SimulatorPage() {
           </div>
           {anchor ? (
             <pre className="sim-pre" tabIndex={0} data-testid="text-receipt">
-              {JSON.stringify(anchor, null, 2)}
+              {anchorJson}
             </pre>
           ) : (
             <div className="sim-empty">

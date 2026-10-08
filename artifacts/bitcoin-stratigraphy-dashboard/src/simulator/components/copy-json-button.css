@@ -1,0 +1,15 @@
+.sim-copy-json {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-transform: none;
+}
+.sim-copy-json[data-copied="true"] {
+  color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+.sim-receipt-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}

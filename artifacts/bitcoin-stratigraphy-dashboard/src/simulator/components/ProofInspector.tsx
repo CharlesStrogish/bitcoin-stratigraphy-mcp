@@ -1,5 +1,6 @@
 import { CheckCircle2, Download, XCircle } from "lucide-react";
 import type { InclusionProof, LeafRecord } from "../engine/simulation.ts";
+import { CopyJsonButton } from "./CopyJsonButton";
 
 export type InspectState = {
   status: "idle" | "working" | "valid" | "invalid" | "error";
@@ -17,6 +18,8 @@ export function ProofInspector({
   state: InspectState;
   onDownload: () => void;
 }) {
+  const proofJson =
+    record && state.proof ? JSON.stringify(state.proof, null, 2) : null;
   return (
     <section
       className="panel sim-panel"
@@ -28,6 +31,7 @@ export function ProofInspector({
           <div className="section-kicker">Selective Disclosure</div>
           <h2 id="sim-inspector-h">Proof inspector</h2>
         </div>
+        <CopyJsonButton text={proofJson} testId="button-copy-proof-json" />
       </div>
       <div className="sim-pad">
         <p className="sim-note">
@@ -98,7 +102,7 @@ export function ProofInspector({
                 <summary>
                   Merkle proof object ({state.proof.path.length} siblings)
                 </summary>
-                <pre tabIndex={0}>{JSON.stringify(state.proof, null, 2)}</pre>
+                <pre tabIndex={0}>{proofJson}</pre>
               </details>
             )}
             <button

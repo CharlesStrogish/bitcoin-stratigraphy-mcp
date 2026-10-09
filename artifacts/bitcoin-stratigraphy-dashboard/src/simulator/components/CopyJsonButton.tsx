@@ -5,9 +5,13 @@ import "./copy-json-button.css";
 export function CopyJsonButton({
   text,
   testId,
+  label = "Copy JSON",
+  copiedLabel = "Copied!",
 }: {
   text: string | null;
   testId: string;
+  label?: string;
+  copiedLabel?: string;
 }) {
   const [status, setStatus] = useState<"idle" | "copying" | "copied" | "error">(
     "idle",
@@ -61,10 +65,10 @@ export function CopyJsonButton({
         <Copy size={14} aria-hidden="true" />
       )}
       {status === "copied"
-        ? "Copied!"
+        ? copiedLabel
         : status === "error"
           ? "Copy failed"
-          : "Copy JSON"}
+          : label}
     </button>
   );
 }

@@ -3,8 +3,8 @@ name: MCP catalog size
 description: Discovery tool-count constraint and how to preserve behavior when consolidating MCP tools.
 ---
 
-Keep the advertised MCP catalog within the user's target 3–15 tool band by grouping related operations under explicit mode selectors, rather than advertising adjacent operations as extra standalone tools.
+Keep the advertised MCP catalog at exactly 15 registered tools. Do not append, rename, wrap, or re-index existing tools during REST or frontend enhancements.
 
-**Why:** The user specifically targets Glama's 3–15 tool-count scoring band. Exceeding it can lower the count score even if individual tools are well documented. A smaller catalog is not worth ambiguous inputs or weakened payment checks.
+**Why:** The user originally targeted Glama's 3–15 tool-count scoring band, then explicitly tightened the requirement to exactly 15 tools across the escrow REST and frontend requests. Those additions must not change the existing manifest.
 
-**How to apply:** When adding related verification or payment behaviors, use exclusive mode-specific schemas, preserve the existing default behavior for callers who omit the selector, and keep HTTP authentication and paid execution gates bound to the selected operation. Update server-card, OpenAPI, SDK, documentation, and discovery tests together. This is a catalog-size target, not proof of an externally measured Glama score.
+**How to apply:** Keep REST-only and browser-only features outside MCP registration and preserve existing schemas and payment gates. Check the actual runtime tools/list count. Changing the catalog requires a new explicit user instruction; exactly 15 is a project constraint, not proof of an externally measured Glama score.

@@ -1,0 +1,27 @@
+SYSTEM INSTRUCTION: FRONTEND UI ENHANCEMENT. STRICTLY MAINTAIN THE OBSIDIAN/COPPER/ORANGE AESTHETIC. DO NOT MODIFY EXISTING MCP SCHEMAS, TOOL DEFINITIONS (STRICTLY KEEP 15 TOOLS), OR EXISTING DASHBOARD SIMULATOR CARDS.
+
+Implement an "Autonomous Agent Escrow Terminal" card directly below the existing Enterprise Swarm Simulator in the frontend:
+
+1. Visual Container & Styling:
+- Render a dedicated card container matching the established obsidian dark-theme container styles (deep dark slate/obsidian background, copper/orange border accent and glow).
+- Header: "Autonomous Proof-of-Execution Escrow Oracle (L402 + RFC 6962)"
+- Subtitle: "Machine-native conditional micro-settlement for autonomous agent-to-agent delegation."
+
+2. Interactive 3-Step Simulation Workflow:
+- Build a responsive 3-step visual sequence:
+  - Step 1 (Bounty Lock): "Agent A Locks 1,000 Sats (Contract: Model Fine-Tuning Verification)" -> Display simulated task hash and contract ID badge.
+  - Step 2 (Work Submission): "Agent B Submits Deterministic Execution Trace + Result Hash" -> Display simulated SHA-256 trace digest.
+  - Step 3 (Settlement & Toll): "Stratigraphy Hub Validates RFC 6962 Leaf -> Releases Payment Preimage -> Collects 21 Sats Toll" -> Display green "SETTLED & NOTARIZED" badge.
+- Action Trigger: "Simulate Agent Settlement" button (styled in copper/orange).
+  - Clicking this triggers a smooth visual transition: animates the Merkle leaf generation, reveals the 64-char hex preimage, and renders an Article 12 compliance receipt preview.
+
+3. Telemetry Counter & Clipboard Utility:
+- Display a dedicated metric badge: "Automated Protocol Tolls Accrued: X sats".
+  - Initialize at current baseline and increment by +21 sats upon each successful client simulation click.
+- Add a "Copy Escrow Proof (JSON)" button:
+  - Wire this to the existing zero-dependency clipboard helper to copy the sample JSON-LD Article 12 proof payload with a brief "Copied to Clipboard!" visual indicator.
+
+4. Non-Regression Safeguards:
+- Do not modify existing dashboard components, CSS classes used by other widgets, or global layout headers.
+- Verify `mcp_server.py` remains untouched at exactly 15 tools.
+- Ensure build/bundle passes without TypeScript or JSX linting errors.

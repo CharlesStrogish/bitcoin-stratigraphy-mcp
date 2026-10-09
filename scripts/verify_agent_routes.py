@@ -7,7 +7,7 @@ The batch-cost probe intentionally POSTs {"tools": [...]} using the requested
 descriptive names. It does NOT silently replace this with the existing GET cost
 route or payment.get_info. A passing batch response must expose perToolSats (or
 costs) keyed by both requested names, with positive integer satoshi prices.
-The other probes use the existing canonical 14-tool catalog.
+The other probes use the existing canonical 15-tool catalog.
 
 A protected call may create an unpaid invoice. No payment is attempted.
 Challenge validation checks syntax/checksum, not cryptographic authenticity.
@@ -42,12 +42,13 @@ EXPECTED_TOOLS = frozenset(
         "proof.list",
         "proof.submit",
         "proof.ground",
+        "proof.notarize",
         "mesh.get_status",
         "mesh.broadcast",
         "payment.get_info",
     }
 )
-NAMESPACES = {"stratigraphy": 5, "proof": 6, "mesh": 2, "payment": 1}
+NAMESPACES = {"stratigraphy": 5, "proof": 7, "mesh": 2, "payment": 1}
 COST_TOOLS = ["stratigraphy.get_latest", "proof.verify_zk_proof"]
 PROTOCOL_VERSION = "2025-03-26"
 MCP_HEADERS = {
@@ -182,8 +183,8 @@ async def check_manifest(client: httpx.AsyncClient) -> str:
         isinstance(capability, dict), "Manifest MCP tool capability must be an object"
     )
     require(
-        type(capability.get("count")) is int and capability["count"] == 14,
-        "Manifest must declare 14 tools",
+        type(capability.get("count")) is int and capability["count"] == 15,
+        "Manifest must declare 15 tools",
     )
     declared = capability.get("namespaces")
     require(
@@ -197,12 +198,12 @@ async def check_manifest(client: httpx.AsyncClient) -> str:
     catalog = await rpc(client, "tools/list", "health-tools", {})
     tools = catalog.get("tools")
     require(
-        isinstance(tools, list) and len(tools) == 14,
-        "Live catalog must contain exactly 14 tools",
+        isinstance(tools, list) and len(tools) == 15,
+        "Live catalog must contain exactly 15 tools",
     )
     require(
         not catalog.get("nextCursor"),
-        "14-tool catalog unexpectedly requires pagination",
+        "15-tool catalog unexpectedly requires pagination",
     )
     require(
         all(isinstance(tool, dict) for tool in tools),
@@ -212,7 +213,7 @@ async def check_manifest(client: httpx.AsyncClient) -> str:
     require(all(isinstance(name, str) for name in names), "Every tool must have a name")
     require(
         set(names) == EXPECTED_TOOLS,
-        "Live catalog does not match the canonical 14 tools",
+        "Live catalog does not match the canonical 15 tools",
     )
     require(
         Counter(name.split(".", 1)[0] for name in names) == NAMESPACES,
@@ -224,7 +225,7 @@ async def check_manifest(client: httpx.AsyncClient) -> str:
             isinstance(schema, dict) and schema.get("type") == "object",
             f"{tool['name']} must expose an object input schema",
         )
-    return "HTTP 200; wildcard CORS; 14 live schemas across four namespaces"
+    return "HTTP 200; wildcard CORS; 15 live schemas across four namespaces"
 
 
 async def check_cost(client: httpx.AsyncClient) -> str:

@@ -60,7 +60,7 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
                     json={
                         "mcp": {
                             "capabilities": {
-                                "tools": {"count": 14, "namespaces": namespaces}
+                                "tools": {"count": 15, "namespaces": namespaces}
                             }
                         }
                     },

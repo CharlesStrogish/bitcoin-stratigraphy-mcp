@@ -1,0 +1,37 @@
+SYSTEM INSTRUCTION: STRICT CODE INTEGRITY & ZERO REGRESSIONS. DO NOT MODIFY, REMOVE, OR ALTER EXISTING MCP TOOLS (TOOLS 1-15), MERKLE ROUTINES, OR GLOBAL REPOSITORIES.
+
+Implement the persistent database layer and cryptographic settlement engine for the "Stratigraphic Proof-of-Execution Escrow Oracle":
+
+1. Concurrency-Safe SQLite Store (`services/escrow_db.py`):
+- Connect using strict write-ahead logging and busy timeouts to prevent concurrent agent locking:
+  `PRAGMA journal_mode=WAL;`
+  `PRAGMA busy_timeout=5000;`
+  `PRAGMA synchronous=NORMAL;`
+- Create table `agent_escrow_contracts`:
+  - `escrow_id` (TEXT PRIMARY KEY, UUIDv4)
+  - `buyer_pubkey` (TEXT NOT NULL)
+  - `worker_pubkey` (TEXT NOT NULL)
+  - `task_hash` (TEXT NOT NULL, 64-char SHA-256 hex)
+  - `amount_sats` (INTEGER NOT NULL)
+  - `toll_fee_sats` (INTEGER NOT NULL DEFAULT 21)
+  - `payment_hash` (TEXT NOT NULL, 64-char SHA-256 hex)
+  - `preimage` (TEXT NOT NULL, 64-char hex, air-gapped/held securely until settled)
+  - `status` (TEXT NOT NULL CHECK(status IN ('PENDING', 'LOCKED', 'SETTLED', 'EXPIRED', 'DISPUTED')))
+  - `execution_leaf_hash` (TEXT, nullable)
+  - `settled_at_strata_block` (INTEGER, nullable)
+  - `created_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+2. Deterministic Cryptographic Settlement Engine (`services/escrow_engine.py`):
+- CRITICAL: Import and utilize our existing Stratigraphy Merkle Tree engine/routines to append the leaf. Do not generate a duplicate or separate Merkle tree file.
+- `create_l402_escrow(buyer_pubkey, worker_pubkey, task_hash, amount_sats)`:
+  - Generates a cryptographically secure 32-byte random preimage: `secrets.token_hex(32)`.
+  - Computes `payment_hash = hashlib.sha256(bytes.fromhex(preimage)).hexdigest()`.
+  - Persists contract state with status 'LOCKED' and reserves a 21-sat protocol toll. Returns `escrow_id` and `payment_hash`.
+- `verify_execution_and_settle(escrow_id, execution_trace, result_payload)`:
+  - Fetches the contract; strictly asserts `status == 'LOCKED'`.
+  - Calculates trace hash: `H_trace = hashlib.sha256(execution_trace.encode('utf-8')).digest()`.
+  - Calculates result hash: `H_res = hashlib.sha256(result_payload.encode('utf-8')).digest()`.
+  - Computes RFC 6962 leaf hash enforcing leaf domain separation: `SHA256(0x00 || bytes.fromhex(task_hash) || H_trace || H_res)`.
+  - Appends leaf into our active Stratigraphy Merkle Tree engine, generating the audit path and new root.
+  - Updates contract status to 'SETTLED', assigns `settled_at_strata_block`, and releases `preimage`.
+  - Generates a standardized EU AI Act Article 12 compliance receipt containing: `escrow_id`, `leaf_index`, `audit_path`, `merkle_root`, and timestamp.

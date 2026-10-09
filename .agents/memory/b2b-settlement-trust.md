@@ -46,3 +46,17 @@ failed to consume a prepaid quota.
 
 **How to apply:** Reserve transaction IDs/nonces before submission, preserve
 uncertain outcomes, and require durable coordination across production restarts.
+
+Execution-escrow commitments must remain distinct from funded Lightning escrow,
+task correctness, Bitcoin anchoring, and legal compliance certification.
+
+**Why:** The requested oracle creates LOCKED contracts from a generated payment
+hash without a funding-verification step. Committing submitted trace/result hashes
+does not independently verify their truth. Article 12 logging requirements do not
+define a universal JSON receipt standard.
+
+**How to apply:** Describe the 21-sat toll as a ledger reservation until collection
+is verified. Require trusted execution acceptance and funding checks before any
+public redemption integration. Never invent a strata height or call a local
+receipt Bitcoin inclusion. Permission-restricted SQLite is not air-gapped or
+encrypted custody.

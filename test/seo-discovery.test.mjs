@@ -14,29 +14,28 @@ function meta(html, key) {
   return matching[0].match(/content="([^"]*)"/)?.[1] ?? "";
 }
 
-test("dashboard metadata describes the live developer and batch-pricing surfaces", async () => {
+test("dashboard metadata preserves enterprise branding, attribution and batch-pricing discovery", async () => {
   const html = await load(
     "artifacts/bitcoin-stratigraphy-dashboard/index.html",
   );
   assert.equal((html.match(/<title>/g) ?? []).length, 1);
   assert.match(
     html,
-    /<title>Bitcoin Stratigraphy .*14 MCP Tools.*Docs.*L402 Pricing<\/title>/,
+    /<title>Bitcoin Stratigraphy Enterprise \| State-Anchored AI<\/title>/,
   );
+  for (const key of ["og:title", "twitter:title"]) {
+    assert.equal(meta(html, key), "Bitcoin Stratigraphy Enterprise | State-Anchored AI");
+  }
+  assert.equal(meta(html, "robots"), "index, follow");
+  assert.ok(meta(html, "google-site-verification").length > 0);
   for (const key of ["description", "og:description", "twitter:description"]) {
     const content = meta(html, key);
     for (const feature of [
-      /14.*MCP tools/i,
-      /4 namespaces/i,
-      /\/docs/,
-      /Live Tool Explorer/,
-      /Python SDK/,
-      /\/cookbooks/,
-      /CrewAI/,
-      /LangChain/,
-      /AutoGen/,
-      /L402 Lightning micropayments/,
-      /batch POST pricing/,
+      /Enterprise-grade L402 data engine/,
+      /cryptographic notary hub/,
+      /State-Anchored AI data layers/,
+      /Swarm Flight Recorders/,
+      /EU AI Act Article 12 compliance/,
     ])
       assert.match(content, feature, key);
   }
@@ -54,14 +53,32 @@ test("dashboard metadata describes the live developer and batch-pricing surfaces
     /<script type="application\/ld\+json">([\s\S]*?)<\/script>/,
   );
   assert.ok(json);
-  const api = JSON.parse(json[1])["@graph"].find(
+  const schema = JSON.parse(json[1]);
+  assert.equal(schema["@context"], "https://schema.org");
+  const graph = schema["@graph"];
+  const person = graph.find((entry) => entry["@type"] === "Person");
+  assert.equal(person["@id"], origin + "/#creator");
+  assert.equal(person.name, "Charles R. Strogish");
+  assert.equal(person.jobTitle, "Founder & Lead Architect");
+  const dataset = graph.find((entry) => entry["@type"] === "Dataset");
+  assert.equal(dataset.url, origin + "/");
+  assert.equal(dataset.author["@id"], person["@id"]);
+  assert.equal(dataset.creator["@type"], "Person");
+  assert.equal(dataset.creator.name, person.name);
+  assert.equal(dataset.license, "https://creativecommons.org/licenses/by/4.0/");
+  assert.match(dataset.conditionsOfAccess, /POST \/api\/v1\/cost/);
+  assert.match(dataset.conditionsOfAccess, /batch totals without generating invoices/);
+  const api = graph.find(
     (entry) => entry["@type"] === "WebAPI",
   );
   assert.equal(api.documentation, origin + "/docs");
+  assert.equal(api.url, origin + "/mcp");
+  assert.match(api.description, /15 canonical MCP tools/);
+  assert.match(api.description, /L402 Lightning micropayment settlement/);
   assert.ok(
     api.potentialAction.some(
       (entry) =>
-        /batch pricing/.test(entry.name) &&
+        /itemized MCP batch pricing.*without generating invoices/.test(entry.name) &&
         entry.target.httpMethod === "POST" &&
         entry.target.urlTemplate === origin + "/api/v1/cost",
     ),
@@ -73,10 +90,14 @@ test("crawler rules and sitemap include developer pages and MCP discovery", asyn
     "artifacts/bitcoin-stratigraphy-dashboard/public/robots.txt",
   );
   assert.match(robots, /^User-agent: \*$/m);
-  for (const path of ["/", "/docs", "/cookbooks", "/.well-known/mcp.json"]) {
-    assert.ok(robots.split("\n").includes(`Allow: ${path}`));
-  }
-  assert.doesNotMatch(robots, /^Disallow:\s*\S/m);
+  // The wildcard root allowance covers every public page and discovery route.
+  // Preserve the existing API-only exclusion; reject any additional restrictions.
+  assert.deepEqual(
+    robots.split("\n").map((line) => line.trim()).filter(
+      (line) => /^(User-agent|Allow|Disallow):/i.test(line),
+    ),
+    ["User-agent: *", "Allow: /", "Disallow: /api/"],
+  );
   assert.ok(robots.includes(`Sitemap: ${origin}/sitemap.xml`));
   const xml = await load(
     "artifacts/bitcoin-stratigraphy-dashboard/public/sitemap.xml",
@@ -88,10 +109,18 @@ test("crawler rules and sitemap include developer pages and MCP discovery", asyn
   assert.equal(urls.length, new Set(urls).size);
   for (const path of [
     "/",
+    "/simulator",
+    "/standard",
+    "/enterprise",
+    "/whitepaper",
     "/docs",
     "/cookbooks",
     "/.well-known/mcp.json",
     "/cookbooks/l402_client.py",
+    "/llms.txt",
+    "/llms-full.txt",
+    "/openapi.json",
+    "/.well-known/mcp/server-card.json",
   ]) {
     assert.ok(urls.includes(origin + path), path);
   }

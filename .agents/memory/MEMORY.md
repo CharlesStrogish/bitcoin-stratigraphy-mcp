@@ -58,3 +58,4 @@
 - [Enterprise SDK compatibility](enterprise-sdk-compatibility.md) — preserve legacy module identity for patches; verify staged audit workers independently of the checkout.
 - [Dashboard visual standards](dashboard-visual-standards.md) — dark default, mobile containment, authentic trust claims and the user-supplied official MCP mark.
 - [Enterprise swarm traffic](enterprise-swarm-traffic.md) — paid MCP and notarization serve legitimate high-frequency swarm batches; avoid blanket IP ceilings.
+- [Production SEO safeguards](production-seo-safeguards.md) — align stale tests to intentional SEO; preserve crawler visibility, canonical metadata and attribution.

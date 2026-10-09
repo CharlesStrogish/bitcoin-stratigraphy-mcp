@@ -27,6 +27,7 @@ import { createMeshGossipService } from "./services/meshGossipService";
 import { registerZkDriftRoute } from "./routes/zk-drift";
 import { registerPublicCors } from "./middleware/publicCors";
 import { registerAuditRoutes } from "./routes/audit";
+import { registerEscrowRoutes } from "./routes/escrow";
 
 const app: Express = express();
 const meshService = createMeshGossipService();
@@ -93,6 +94,10 @@ registerSystemHealthRoute(app, pricingEngine);
 registerLlmExportRoutes(app);
 registerProvenanceRoutes(app, { schedule: true });
 registerZkDriftRoute(app);
+registerEscrowRoutes(app, {
+  usageStore: macaroonUsageStore,
+  revocationStore: createPostgresMacaroonRevocationStore(),
+});
 app.use("/api", router);
 registerStratigraphyRoutes(
   app,

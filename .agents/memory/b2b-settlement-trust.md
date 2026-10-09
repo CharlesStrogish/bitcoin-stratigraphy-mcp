@@ -60,3 +60,13 @@ is verified. Require trusted execution acceptance and funding checks before any
 public redemption integration. Never invent a strata height or call a local
 receipt Bitcoin inclusion. Permission-restricted SQLite is not air-gapped or
 encrypted custody.
+
+L402 access payment must not itself authorize execution-escrow preimage release.
+
+**Why:** Any paying client could otherwise settle or inspect another party's
+contract. Access fees, contract funding, task acceptance, and custody authority
+are separate trust decisions.
+
+**How to apply:** Keep public redemption closed without independently bound
+party identity and acceptance. Operator-only REST access is intentional until
+those checks exist; do not remove it merely to make browser calls easier.

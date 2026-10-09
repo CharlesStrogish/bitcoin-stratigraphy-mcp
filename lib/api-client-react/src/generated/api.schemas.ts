@@ -21,6 +21,119 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export interface EscrowInput {
+  /** @pattern ^[0-9a-fA-F]{64}$ */
+  buyer_pubkey: string;
+  /** @pattern ^[0-9a-fA-F]{64}$ */
+  worker_pubkey: string;
+  /** @pattern ^[0-9a-fA-F]{64}$ */
+  task_hash: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740970
+     */
+  amount_sats: number;
+}
+
+export interface EscrowExecutionInput {
+  escrow_id: string;
+  /** @maxLength 262144 */
+  execution_trace: string;
+  /** @maxLength 262144 */
+  result_payload: string;
+}
+
+export type EscrowContractStatus = typeof EscrowContractStatus[keyof typeof EscrowContractStatus];
+
+
+export const EscrowContractStatus = {
+  LOCKED: 'LOCKED',
+} as const;
+
+export type EscrowContractTollFeeSats = typeof EscrowContractTollFeeSats[keyof typeof EscrowContractTollFeeSats];
+
+
+export const EscrowContractTollFeeSats = {
+  NUMBER_21: 21,
+} as const;
+
+export interface EscrowContract {
+  escrow_id: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  payment_hash: string;
+  status: EscrowContractStatus;
+  amount_sats: number;
+  toll_fee_sats: EscrowContractTollFeeSats;
+}
+
+export type EscrowReceiptReceiptType = typeof EscrowReceiptReceiptType[keyof typeof EscrowReceiptReceiptType];
+
+
+export const EscrowReceiptReceiptType = {
+  article_12_execution_commitment: 'article_12_execution_commitment',
+} as const;
+
+export interface EscrowReceipt {
+  escrow_id: string;
+  /** @minimum 0 */
+  leaf_index: number;
+  /** @items.pattern ^[0-9a-f]{64}$ */
+  audit_path: string[];
+  /** @pattern ^[0-9a-f]{64}$ */
+  merkle_root: string;
+  timestamp: string;
+  /** @minimum 1 */
+  tree_size: number;
+  execution_leaf_hash: string;
+  /** @minimum 0 */
+  settled_at_strata_block: number;
+  receipt_type: EscrowReceiptReceiptType;
+}
+
+export type EscrowSettlementStatus = typeof EscrowSettlementStatus[keyof typeof EscrowSettlementStatus];
+
+
+export const EscrowSettlementStatus = {
+  SETTLED: 'SETTLED',
+} as const;
+
+export interface EscrowSettlement {
+  status: EscrowSettlementStatus;
+  /** @pattern ^[0-9a-f]{64}$ */
+  preimage: string;
+  merkle_root: string;
+  audit_path: string[];
+  article_12_receipt: EscrowReceipt;
+}
+
+export type EscrowReceiptDocumentContext = { [key: string]: unknown };
+
+export type EscrowReceiptDocumentType = typeof EscrowReceiptDocumentType[keyof typeof EscrowReceiptDocumentType];
+
+
+export const EscrowReceiptDocumentType = {
+  DigitalDocument: 'DigitalDocument',
+} as const;
+
+export type EscrowReceiptDocumentVerification = {
+  merkle_inclusion: boolean;
+  bitcoin_anchor_verified: boolean;
+  strata_block_height: number;
+  task_hash: string;
+  trace_hash: string;
+  result_hash: string;
+};
+
+export interface EscrowReceiptDocument {
+  '@context': EscrowReceiptDocumentContext;
+  '@type': EscrowReceiptDocumentType;
+  identifier: string;
+  dateCreated: string;
+  proof: EscrowReceipt;
+  verification: EscrowReceiptDocumentVerification;
+  description: string;
+}
+
 export type AuditSubmissionTrace = { [key: string]: unknown };
 
 export type AuditSubmissionReceipt = {

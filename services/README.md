@@ -70,3 +70,35 @@ The raw leaf is `task_hash_bytes || SHA256(trace_utf8) || SHA256(result_utf8)`.
 The existing accumulator applies RFC 6962's `0x00` leaf prefix exactly once.
 Verify membership using the SDK's existing `verify_merkle_inclusion` with that
 raw data, the receipt's tree size, and its hex-decoded sibling path/root.
+
+## REST mount
+
+The existing Express server mounts `/api/v1/escrow/create`, `/settle`, and
+`/receipt/:escrow_id` through `routers/escrow_api.py` using a bounded, staged
+Python worker. No separate Python web server is started. The worker receives
+no wallet, payment, session, or operator secrets in its environment.
+
+All three resources require an existing L402 access proof **and**
+`X-Escrow-Operator-Token` (the configured operator secret). Each access challenge
+costs 21 sats, separately from the contract's 21-sat toll reservation and task
+consideration. These are operator endpoints: never distribute the operator
+secret to untrusted workers or browser users. Standard token-based CORS applies.
+Invalid request fields return 400 before payment processing. For valid inputs,
+unpaid requests receive 402 with the standard L402 WWW-Authenticate header;
+paid callers lacking operator authorization receive 403.
+
+REST settlement reads the current Bitcoin tip using the existing tip provider
+and records its height; this observation is not consensus validation or anchoring.
+Unknown contracts return 404 before tip lookup. Settled or otherwise non-LOCKED
+contracts return 422. Pending receipt lookups return 404. Provider/custody failures
+return 503 without exposing exception details or secrets.
+
+Receipt retrieval validates the stored inclusion path and returns JSON-LD with
+trace/result hashes for independent membership verification; no preimage is
+included. OpenAPI's `Autonomous Escrow` tag documents these three routes. The
+15-tool MCP catalog and its definitions are untouched.
+
+The SQLite file stays outside `dist/` under the API process's private `.data`
+directory. Durable production custody/backup remains an operator deployment
+responsibility; an ephemeral runtime filesystem is not a persistent custody
+volume. Lost settlement responses must not trigger automatic payment or replay.

@@ -40,6 +40,11 @@ import type {
   AuditSubmission,
   DatasetHealthStatus,
   EpistemicGroundingRequest,
+  EscrowContract,
+  EscrowExecutionInput,
+  EscrowInput,
+  EscrowReceiptDocument,
+  EscrowSettlement,
   ExportHuggingFaceDatasetParams,
   GetNip05IdentityParams,
   GetPaidStratigraphyParams,
@@ -118,6 +123,228 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getCreateEscrowUrl = () => {
+
+
+
+
+  return `/api/v1/escrow/create`
+}
+
+/**
+ * Requires L402 access plus X-Escrow-Operator-Token. The 21-sat access invoice is separate from the contract toll reservation; LOCKED does not establish funding.
+ * @summary Create a local execution escrow commitment
+ */
+export const createEscrow = async (escrowInput: EscrowInput, options?: Parameters<typeof customFetch>[1]): Promise<EscrowContract> => {
+
+  return customFetch<EscrowContract>(getCreateEscrowUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(escrowInput)
+  }
+);}
+
+
+
+
+
+export const getCreateEscrowMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEscrow>>, TError,{data: BodyType<EscrowInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createEscrow>>, TError,{data: BodyType<EscrowInput>}, TContext> => {
+
+const mutationKey = ['createEscrow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEscrow>>, {data: BodyType<EscrowInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createEscrow(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateEscrowMutationResult = NonNullable<Awaited<ReturnType<typeof createEscrow>>>
+    export type CreateEscrowMutationBody = BodyType<EscrowInput>
+    export type CreateEscrowMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a local execution escrow commitment
+ */
+export const useCreateEscrow = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEscrow>>, TError,{data: BodyType<EscrowInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createEscrow>>,
+        TError,
+        {data: BodyType<EscrowInput>},
+        TContext
+      > => {
+      return useMutation(getCreateEscrowMutationOptions(options));
+    }
+
+export const getSettleEscrowUrl = () => {
+
+
+
+
+  return `/api/v1/escrow/settle`
+}
+
+/**
+ * Trusted operators must independently verify funding and task acceptance. Payment alone never authorizes preimage release. The recorded provider height is not a Bitcoin anchor proof.
+ * @summary Commit authorized execution evidence and release the escrow preimage
+ */
+export const settleEscrow = async (escrowExecutionInput: EscrowExecutionInput, options?: Parameters<typeof customFetch>[1]): Promise<EscrowSettlement> => {
+
+  return customFetch<EscrowSettlement>(getSettleEscrowUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(escrowExecutionInput)
+  }
+);}
+
+
+
+
+
+export const getSettleEscrowMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof settleEscrow>>, TError,{data: BodyType<EscrowExecutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof settleEscrow>>, TError,{data: BodyType<EscrowExecutionInput>}, TContext> => {
+
+const mutationKey = ['settleEscrow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof settleEscrow>>, {data: BodyType<EscrowExecutionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  settleEscrow(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SettleEscrowMutationResult = NonNullable<Awaited<ReturnType<typeof settleEscrow>>>
+    export type SettleEscrowMutationBody = BodyType<EscrowExecutionInput>
+    export type SettleEscrowMutationError = ErrorType<void>
+
+    /**
+ * @summary Commit authorized execution evidence and release the escrow preimage
+ */
+export const useSettleEscrow = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof settleEscrow>>, TError,{data: BodyType<EscrowExecutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof settleEscrow>>,
+        TError,
+        {data: BodyType<EscrowExecutionInput>},
+        TContext
+      > => {
+      return useMutation(getSettleEscrowMutationOptions(options));
+    }
+
+export const getGetEscrowReceiptUrl = (escrowId: string,) => {
+
+
+
+
+  return `/api/v1/escrow/receipt/${escrowId}`
+}
+
+/**
+ * Contains verifiable RFC 6962 membership and a recorded block height, not a signed Bitcoin inclusion proof or Article 12 certification. Contains no preimage.
+ * @summary Get a standalone JSON-LD execution commitment receipt
+ */
+export const getEscrowReceipt = async (escrowId: string, options?: Parameters<typeof customFetch>[1]): Promise<EscrowReceiptDocument> => {
+
+  return customFetch<EscrowReceiptDocument>(getGetEscrowReceiptUrl(escrowId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEscrowReceiptQueryKey = (escrowId: string,) => {
+    return [
+    `/api/v1/escrow/receipt/${escrowId}`
+    ] as const;
+    }
+
+
+export const getGetEscrowReceiptQueryOptions = <TData = Awaited<ReturnType<typeof getEscrowReceipt>>, TError = ErrorType<void>>(escrowId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEscrowReceiptQueryKey(escrowId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEscrowReceipt>>> = ({ signal }) => getEscrowReceipt(escrowId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: escrowId !== null && escrowId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEscrowReceipt>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEscrowReceiptQueryResult = NonNullable<Awaited<ReturnType<typeof getEscrowReceipt>>>
+export type GetEscrowReceiptQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a standalone JSON-LD execution commitment receipt
+ */
+
+export function useGetEscrowReceipt<TData = Awaited<ReturnType<typeof getEscrowReceipt>>, TError = ErrorType<void>>(
+ escrowId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEscrowReceiptQueryOptions(escrowId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getVerifyAuditUrl = () => {
 

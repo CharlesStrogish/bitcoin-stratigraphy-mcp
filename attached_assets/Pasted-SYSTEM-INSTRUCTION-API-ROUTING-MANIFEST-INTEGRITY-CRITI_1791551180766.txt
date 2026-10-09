@@ -1,0 +1,34 @@
+SYSTEM INSTRUCTION: API ROUTING & MANIFEST INTEGRITY. 
+CRITICAL RULE: DO NOT ADD NEW TOOLS TO `mcp_server.py`. THE MCP SERVER MANIFEST MUST REMAIN STRICTLY AT EXACTLY 15 REGISTERED TOOLS TO PRESERVE TDQS DIRECTORY SCORING ON GLAMA.
+
+Expose the Escrow Engine via native REST API routes with zero regressions to existing services:
+
+1. REST API Routing (`routers/escrow_api.py`):
+- `POST /api/v1/escrow/create`:
+  - Ingests `{ buyer_pubkey, worker_pubkey, task_hash, amount_sats }`.
+  - Validates all fields are present (return 400 Bad Request on failure).
+  - Calls `escrow_engine.create_l402_escrow(...)`.
+  - Returns HTTP 201 Created with `{ escrow_id, payment_hash, status: "LOCKED", amount_sats, toll_fee_sats: 21 }`.
+- `POST /api/v1/escrow/settle`:
+  - Ingests `{ escrow_id, execution_trace, result_payload }`.
+  - Returns 404 Not Found if `escrow_id` does not exist.
+  - Calls `escrow_engine.verify_execution_and_settle(...)`.
+  - If verification fails (e.g., invalid trace/state), return HTTP 422 Unprocessable Entity with error details.
+  - On cryptographic success, returns HTTP 200 OK with `{ status: "SETTLED", preimage, merkle_root, audit_path, article_12_receipt }`.
+- `GET /api/v1/escrow/receipt/{escrow_id}`:
+  - Returns HTTP 200 with standalone JSON-LD proof verifying audit trail and block height (or 404 if not found).
+- L402 Middleware / Header Formatting:
+  - If unauthorized requests access protected escrow resources, return `HTTP 402 Payment Required` with header:
+    `WWW-Authenticate: L402 token="...", invoice="..."`
+
+2. Application Mounting:
+- Mount `routers/escrow_api.py` into the main server application file (e.g., `main.py` / `app.py`) using prefix `/api/v1/escrow` and tags `["Autonomous Escrow"]`.
+- Ensure standard CORS handling applies so frontend clients can call these endpoints seamlessly.
+
+3. Strict MCP Registry Guard:
+- Inspect `mcp_server.py`.
+- Programmatically assert that exactly 15 tools are exported in the tool list/registry.
+- Do NOT append, rename, wrap, or re-index any MCP tools.
+
+4. OpenAPI Documentation Sync:
+- Sync `openapi.json` to expose these new REST routes under the "Autonomous Escrow" tag while keeping all 15 existing MCP tool schemas intact.

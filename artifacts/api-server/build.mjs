@@ -13,6 +13,19 @@ const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
+  // Publish an isolated stdlib-only escrow worker; never copy custody DB files.
+  for (const [folder, filenames] of [
+    ["routers", ["__init__.py", "escrow_api.py", "escrow_worker.py"]],
+    ["services", ["__init__.py", "escrow_db.py", "escrow_engine.py"]],
+    ["sdk/python/bitcoin_stratigraphy_enterprise", ["__init__.py", "swarm_merkle.py"]],
+  ]) {
+    const destination = path.resolve(distDir, "escrow-worker", folder);
+    await mkdir(destination, { recursive: true });
+    for (const filename of filenames) {
+      await cp(path.resolve(artifactDir, "../..", folder, filename),
+        path.resolve(destination, filename));
+    }
+  }
   await cp(
     path.resolve(artifactDir, "src/services/zk/artifacts"),
     path.resolve(distDir, "zk/artifacts"),

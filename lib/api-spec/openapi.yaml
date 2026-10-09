@@ -25,6 +25,8 @@ servers:
   - url: /api
     description: Base API path
 tags:
+  - name: Autonomous Escrow
+    description: Operator-authorized L402 execution commitments; not funded custody or Bitcoin inclusion.
   - name: health
     description: Health operations
   - name: stratigraphy
@@ -651,6 +653,118 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /v1/escrow/create:
+    post:
+      operationId: createEscrow
+      tags: [Autonomous Escrow]
+      summary: Create a local execution escrow commitment
+      description: Requires L402 access plus X-Escrow-Operator-Token. The 21-sat access invoice is separate from the contract toll reservation; LOCKED does not establish funding.
+      security:
+        - L402: []
+          EscrowOperator: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscrowInput"
+      responses:
+        "201":
+          description: Contract created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscrowContract"
+        "400":
+          description: Missing or invalid fields
+        "402":
+          description: L402 payment required
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+              description: 'L402 token="...", invoice="..."'
+        "403":
+          description: Trusted operator authorization required
+        "503":
+          description: Escrow service unavailable
+  /v1/escrow/settle:
+    post:
+      operationId: settleEscrow
+      tags: [Autonomous Escrow]
+      summary: Commit authorized execution evidence and release the escrow preimage
+      description: Trusted operators must independently verify funding and task acceptance. Payment alone never authorizes preimage release. The recorded provider height is not a Bitcoin anchor proof.
+      security:
+        - L402: []
+          EscrowOperator: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscrowExecutionInput"
+      responses:
+        "200":
+          description: Committed settlement; private preimage released to the operator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscrowSettlement"
+        "400":
+          description: Missing or malformed fields
+        "402":
+          description: L402 payment required
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+        "403":
+          description: Trusted operator authorization required
+        "404":
+          description: Escrow not found
+        "422":
+          description: Invalid execution evidence or contract state
+        "503":
+          description: Settlement provider or escrow service unavailable
+  /v1/escrow/receipt/{escrow_id}:
+    get:
+      operationId: getEscrowReceipt
+      tags: [Autonomous Escrow]
+      summary: Get a standalone JSON-LD execution commitment receipt
+      description: Contains verifiable RFC 6962 membership and a recorded block height, not a signed Bitcoin inclusion proof or Article 12 certification. Contains no preimage.
+      security:
+        - L402: []
+          EscrowOperator: []
+      parameters:
+        - name: escrow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Validated stored execution receipt
+          content:
+            application/ld+json:
+              schema:
+                $ref: "#/components/schemas/EscrowReceiptDocument"
+        "400":
+          description: Invalid escrow identifier
+        "402":
+          description: L402 payment required
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+        "403":
+          description: Trusted operator authorization required
+        "404":
+          description: Escrow or settled receipt not found
+        "422":
+          description: Stored receipt does not verify
+        "503":
+          description: Escrow service unavailable
   /audit/verify:
     post:
       operationId: verifyAudit
@@ -1729,6 +1843,11 @@ components:
             type: string
           description: Wildcard; Authorization is also explicitly listed when requested because Fetch excludes it from the wildcard
   securitySchemes:
+    EscrowOperator:
+      type: apiKey
+      in: header
+      name: X-Escrow-Operator-Token
+      description: Existing MACAROON_OPERATOR_SECRET, required in addition to L402. Never expose it to untrusted browser clients.
     operatorBearer:
       type: http
       scheme: bearer
@@ -1748,6 +1867,138 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    EscrowInput:
+      type: object
+      additionalProperties: false
+      required: [buyer_pubkey, worker_pubkey, task_hash, amount_sats]
+      properties:
+        buyer_pubkey:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+        worker_pubkey:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+        task_hash:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
+        amount_sats:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740970
+    EscrowExecutionInput:
+      type: object
+      additionalProperties: false
+      required: [escrow_id, execution_trace, result_payload]
+      properties:
+        escrow_id:
+          type: string
+          format: uuid
+        execution_trace:
+          type: string
+          maxLength: 262144
+        result_payload:
+          type: string
+          maxLength: 262144
+    EscrowContract:
+      type: object
+      required: [escrow_id, payment_hash, status, amount_sats, toll_fee_sats]
+      properties:
+        escrow_id:
+          type: string
+          format: uuid
+        payment_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        status:
+          type: string
+          enum: [LOCKED]
+        amount_sats:
+          type: integer
+        toll_fee_sats:
+          type: integer
+          enum: [21]
+    EscrowReceipt:
+      type: object
+      required: [escrow_id, leaf_index, audit_path, merkle_root, timestamp, tree_size, execution_leaf_hash, settled_at_strata_block, receipt_type]
+      properties:
+        escrow_id:
+          type: string
+        leaf_index:
+          type: integer
+          minimum: 0
+        audit_path:
+          type: array
+          items:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+        merkle_root:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        timestamp:
+          type: string
+        tree_size:
+          type: integer
+          minimum: 1
+        execution_leaf_hash:
+          type: string
+        settled_at_strata_block:
+          type: integer
+          minimum: 0
+        receipt_type:
+          type: string
+          enum: [article_12_execution_commitment]
+    EscrowSettlement:
+      type: object
+      required: [status, preimage, merkle_root, audit_path, article_12_receipt]
+      properties:
+        status:
+          type: string
+          enum: [SETTLED]
+        preimage:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        merkle_root:
+          type: string
+        audit_path:
+          type: array
+          items:
+            type: string
+        article_12_receipt:
+          $ref: "#/components/schemas/EscrowReceipt"
+    EscrowReceiptDocument:
+      type: object
+      required: ["@context", "@type", identifier, dateCreated, proof, verification, description]
+      properties:
+        "@context":
+          type: object
+          additionalProperties: true
+        "@type":
+          type: string
+          enum: [DigitalDocument]
+        identifier:
+          type: string
+        dateCreated:
+          type: string
+        proof:
+          $ref: "#/components/schemas/EscrowReceipt"
+        verification:
+          type: object
+          required: [merkle_inclusion, bitcoin_anchor_verified, strata_block_height, task_hash, trace_hash, result_hash]
+          properties:
+            merkle_inclusion:
+              type: boolean
+            bitcoin_anchor_verified:
+              type: boolean
+            strata_block_height:
+              type: integer
+            task_hash:
+              type: string
+            trace_hash:
+              type: string
+            result_hash:
+              type: string
+        description:
+          type: string
     AuditSubmission:
       type: object
       properties:

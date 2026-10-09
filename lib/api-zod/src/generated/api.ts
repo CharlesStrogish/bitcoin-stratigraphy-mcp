@@ -25,6 +25,126 @@ import * as zod from 'zod';
 
 
 /**
+ * Requires L402 access plus X-Escrow-Operator-Token. The 21-sat access invoice is separate from the contract toll reservation; LOCKED does not establish funding.
+ * @summary Create a local execution escrow commitment
+ */
+export const createEscrowBodyBuyerPubkeyRegExp = new RegExp('^[0-9a-fA-F]{64}$');
+export const createEscrowBodyWorkerPubkeyRegExp = new RegExp('^[0-9a-fA-F]{64}$');
+export const createEscrowBodyTaskHashRegExp = new RegExp('^[0-9a-fA-F]{64}$');
+export const createEscrowBodyAmountSatsMax = 9007199254740970;
+
+
+
+export const CreateEscrowBody = zod.object({
+  "buyer_pubkey": zod.string().regex(createEscrowBodyBuyerPubkeyRegExp),
+  "worker_pubkey": zod.string().regex(createEscrowBodyWorkerPubkeyRegExp),
+  "task_hash": zod.string().regex(createEscrowBodyTaskHashRegExp),
+  "amount_sats": zod.number().int().min(1).max(createEscrowBodyAmountSatsMax)
+})
+
+export const createEscrowResponsePaymentHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const CreateEscrowResponse = zod.object({
+  "escrow_id": zod.string().uuid(),
+  "payment_hash": zod.string().regex(createEscrowResponsePaymentHashRegExp),
+  "status": zod.enum(['LOCKED']),
+  "amount_sats": zod.number().int(),
+  "toll_fee_sats": zod.literal(21)
+})
+
+
+/**
+ * Trusted operators must independently verify funding and task acceptance. Payment alone never authorizes preimage release. The recorded provider height is not a Bitcoin anchor proof.
+ * @summary Commit authorized execution evidence and release the escrow preimage
+ */
+export const settleEscrowBodyExecutionTraceMax = 262144;
+
+export const settleEscrowBodyResultPayloadMax = 262144;
+
+
+
+export const SettleEscrowBody = zod.object({
+  "escrow_id": zod.string().uuid(),
+  "execution_trace": zod.string().max(settleEscrowBodyExecutionTraceMax),
+  "result_payload": zod.string().max(settleEscrowBodyResultPayloadMax)
+})
+
+export const settleEscrowResponsePreimageRegExp = new RegExp('^[0-9a-f]{64}$');
+export const settleEscrowResponseArticle12ReceiptLeafIndexMin = 0;
+
+export const settleEscrowResponseArticle12ReceiptAuditPathItemRegExp = new RegExp('^[0-9a-f]{64}$');
+export const settleEscrowResponseArticle12ReceiptMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+
+export const settleEscrowResponseArticle12ReceiptSettledAtStrataBlockMin = 0;
+
+
+
+export const SettleEscrowResponse = zod.object({
+  "status": zod.enum(['SETTLED']),
+  "preimage": zod.string().regex(settleEscrowResponsePreimageRegExp),
+  "merkle_root": zod.string(),
+  "audit_path": zod.array(zod.string()),
+  "article_12_receipt": zod.object({
+  "escrow_id": zod.string(),
+  "leaf_index": zod.number().int().min(settleEscrowResponseArticle12ReceiptLeafIndexMin),
+  "audit_path": zod.array(zod.string().regex(settleEscrowResponseArticle12ReceiptAuditPathItemRegExp)),
+  "merkle_root": zod.string().regex(settleEscrowResponseArticle12ReceiptMerkleRootRegExp),
+  "timestamp": zod.string(),
+  "tree_size": zod.number().int().min(1),
+  "execution_leaf_hash": zod.string(),
+  "settled_at_strata_block": zod.number().int().min(settleEscrowResponseArticle12ReceiptSettledAtStrataBlockMin),
+  "receipt_type": zod.enum(['article_12_execution_commitment'])
+})
+})
+
+
+/**
+ * Contains verifiable RFC 6962 membership and a recorded block height, not a signed Bitcoin inclusion proof or Article 12 certification. Contains no preimage.
+ * @summary Get a standalone JSON-LD execution commitment receipt
+ */
+export const GetEscrowReceiptParams = zod.object({
+  "escrow_id": zod.coerce.string().uuid()
+})
+
+export const getEscrowReceiptResponseProofLeafIndexMin = 0;
+
+export const getEscrowReceiptResponseProofAuditPathItemRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getEscrowReceiptResponseProofMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+
+export const getEscrowReceiptResponseProofSettledAtStrataBlockMin = 0;
+
+
+
+export const GetEscrowReceiptResponse = zod.object({
+  "@context": zod.record(zod.string(), zod.unknown()),
+  "@type": zod.enum(['DigitalDocument']),
+  "identifier": zod.string(),
+  "dateCreated": zod.string(),
+  "proof": zod.object({
+  "escrow_id": zod.string(),
+  "leaf_index": zod.number().int().min(getEscrowReceiptResponseProofLeafIndexMin),
+  "audit_path": zod.array(zod.string().regex(getEscrowReceiptResponseProofAuditPathItemRegExp)),
+  "merkle_root": zod.string().regex(getEscrowReceiptResponseProofMerkleRootRegExp),
+  "timestamp": zod.string(),
+  "tree_size": zod.number().int().min(1),
+  "execution_leaf_hash": zod.string(),
+  "settled_at_strata_block": zod.number().int().min(getEscrowReceiptResponseProofSettledAtStrataBlockMin),
+  "receipt_type": zod.enum(['article_12_execution_commitment'])
+}),
+  "verification": zod.object({
+  "merkle_inclusion": zod.boolean(),
+  "bitcoin_anchor_verified": zod.boolean(),
+  "strata_block_height": zod.number().int(),
+  "task_hash": zod.string(),
+  "trace_hash": zod.string(),
+  "result_hash": zod.string()
+}),
+  "description": zod.string()
+})
+
+
+/**
  * Accepts a raw JSON trace with an OTS receipt, or a JSONL journal uploaded
  * as application/x-ndjson or text/plain. Maximum body size is 1 MiB and
  * maximum journal size is 32 traces / 128 records. No L402 payment or MCP

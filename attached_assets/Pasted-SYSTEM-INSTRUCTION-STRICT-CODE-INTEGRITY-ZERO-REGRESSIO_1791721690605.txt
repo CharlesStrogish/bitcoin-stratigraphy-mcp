@@ -1,0 +1,30 @@
+SYSTEM INSTRUCTION: STRICT CODE INTEGRITY & ZERO REGRESSIONS. DO NOT ALTER EXISTING MCP TOOLS (STRICTLY KEEP EXACTLY 15 TOOLS), PRODUCTION SEO DIRECTIVES, OR JSON-LD ATTRIBUTION TO "CHARLES R. STROGISH".
+
+Connect the Escrow Oracle settlement fee to the repository's existing dynamic pricing engine to ensure agents are never priced out during rapid Bitcoin market appreciation:
+
+1. Identify & Integrate Existing Pricing Rails (`services/escrow_engine.py` or equivalent file):
+- Locate the repository's existing Bitcoin price conversion utility / L402 pricing helper used by other paid routes in the engine.
+- Implement `get_dynamic_escrow_toll()`:
+  - Target an autonomous machine micro-toll benchmark (target: ~$0.015 - $0.02 USD equivalent).
+  - Dynamically compute required satoshis: `sats = round((target_usd / btc_usd_price) * 100_000_000)`.
+  - Enforce a strict minimum floor of 1 satoshi (`max(1, sats)`) so settlements never drop to zero.
+  - Fail-safe Fallback: If the price feed or exchange rate oracle is unreachable or errors out, fall back gracefully to the deterministic default: 21 satoshis.
+- Update `create_l402_escrow(...)`:
+  - Replace the hardcoded 21-sat toll with `toll_fee_sats = get_dynamic_escrow_toll()`.
+  - Persist this value into the existing `agent_escrow_contracts` table (schema already supports integer values; no table migrations needed).
+
+2. REST Endpoint & Response Sync (`routers/escrow_api.py` or equivalent file):
+- Ensure `POST /api/v1/escrow/create` returns the dynamically calculated `toll_fee_sats` in the response body alongside `escrow_id` and `payment_hash`.
+
+3. Frontend Terminal Sync (`/simulator` or `public/index.html`):
+- Update the Autonomous Agent Escrow Terminal UI:
+  - Modify the toll counter and step 3 text so that rather than showing a static 21 sats, it dynamically displays the current evaluated toll (e.g., "Collects X Sats Toll (Dynamic ~0.02 USD)").
+  - Increment the session accumulator by the dynamic toll amount upon each simulated settlement click.
+
+4. Test Coverage & MCP Registry Guard:
+- Add comprehensive unit tests in the test suite:
+  - Test dynamic calculation at current Bitcoin prices.
+  - Test hyper-appreciation scenario (simulate BTC at $1,000,000 and assert toll safely hits the 1-sat or 2-sat floor without error).
+  - Test offline/error fallback asserting exactly 21 sats are selected if the feed fails.
+- STRICT ASSERTION: Programmatically assert that `registered_mcp_tools == 15`. Do not add, remove, or modify any tools in the MCP registry.
+- Confirm all existing tests pass with 0 errors.

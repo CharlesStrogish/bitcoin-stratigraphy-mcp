@@ -50,6 +50,9 @@ import WhitepaperLink from "@/components/whitepaper-link";
 import SiteFooter from "@/components/site-footer";
 import StandardPage from "@/pages/standard";
 import SimulatorPage from "@/pages/simulator";
+import CompliancePage from "@/pages/compliance";
+import ComplianceGuideLink from "@/components/compliance-guide-link";
+import { EscrowTerminal } from "@/simulator/components/EscrowTerminal";
 import { TrustBadges } from "@/components/trust-badges";
 
 const queryClient = new QueryClient({
@@ -974,6 +977,10 @@ function Home() {
             </div>
           </>
         )}
+        <section id="escrow-terminal" data-testid="section-escrow-terminal">
+          <ComplianceGuideLink />
+          <EscrowTerminal />
+        </section>
       </div>
     </div>
   );
@@ -988,6 +995,7 @@ function Router() {
         <Route path="/enterprise" component={EnterprisePage} />
         <Route path="/whitepaper" component={WhitepaperPage} />
         <Route path="/simulator" component={SimulatorPage} />
+        <Route path="/compliance" component={CompliancePage} />
         <Route component={NotFound} />
       </Switch>
       <SiteFooter />

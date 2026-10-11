@@ -5,6 +5,7 @@ import { TrustBadges } from "@/components/trust-badges";
 import EnterpriseLicenseLink from "@/components/enterprise-license-link";
 import WhitepaperLink from "@/components/whitepaper-link";
 import { SyntheticBanner } from "@/simulator/components/SyntheticBanner";
+import ComplianceGuideLink from "@/components/compliance-guide-link";
 import { EscrowTerminal } from "@/simulator/components/EscrowTerminal";
 import { CopyJsonButton } from "@/simulator/components/CopyJsonButton";
 import { AgentGrid } from "@/simulator/components/AgentGrid";
@@ -446,6 +447,7 @@ export default function SimulatorPage() {
             </div>
           )}
         </section>
+        <ComplianceGuideLink />
         <EscrowTerminal />
       </div>
     </div>

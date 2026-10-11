@@ -36,6 +36,14 @@ from = "/whitepaper/"
 to = "/whitepaper/index.html"
 
 [[services.production.rewrites]]
+from = "/compliance"
+to = "/compliance/index.html"
+
+[[services.production.rewrites]]
+from = "/compliance/"
+to = "/compliance/index.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

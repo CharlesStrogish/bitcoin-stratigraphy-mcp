@@ -9,6 +9,13 @@ export default function SiteFooter() {
         <div className="footer-note">
           <nav aria-label="Footer navigation">
             <WhitepaperLink />
+            <a
+              className="control-button"
+              href={`${import.meta.env.BASE_URL}compliance`}
+              data-testid="link-footer-compliance"
+            >
+              Enterprise Compliance
+            </a>
           </nav>
           <span>
             <Play size={12} fill="currentColor" aria-hidden="true" /> SOURCE

@@ -9,6 +9,12 @@ import {
   WHITEPAPER_TITLE,
   WHITEPAPER_URL,
 } from "./src/lib/whitepaper-seo";
+import {
+  COMPLIANCE_ARTICLE,
+  COMPLIANCE_DESCRIPTION,
+  COMPLIANCE_TITLE,
+  COMPLIANCE_URL,
+} from "./src/lib/compliance-seo";
 
 const routes = [
   {
@@ -22,6 +28,12 @@ const routes = [
     title: WHITEPAPER_TITLE,
     description: WHITEPAPER_DESCRIPTION,
     url: WHITEPAPER_URL,
+  },
+  {
+    path: "compliance",
+    title: COMPLIANCE_TITLE,
+    description: COMPLIANCE_DESCRIPTION,
+    url: COMPLIANCE_URL,
   },
 ];
 
@@ -50,10 +62,22 @@ function pageHead(html: string, page: (typeof routes)[number]): string {
       `<meta ${attribute}="${key}" content="${escape(value)}" />`,
     );
   }
-  return result.replace(
+  result = result.replace(
     /<link\b(?=[^>]*\brel="canonical")[^>]*>/,
     `<link rel="canonical" href="${page.url}" />`,
   );
+  if (page.path === "compliance") {
+    result = result.replace(
+      /<meta\b(?=[^>]*\bproperty="og:type")[^>]*>/,
+      '<meta property="og:type" content="article" />',
+    );
+    const article = JSON.stringify(COMPLIANCE_ARTICLE).replace(/</g, "\\u003c");
+    result = result.replace(
+      "</head>",
+      `<script id="compliance-article-jsonld" type="application/ld+json">${article}</script>\n  </head>`,
+    );
+  }
+  return result;
 }
 
 /** Social crawlers receive route metadata without having to execute React. */

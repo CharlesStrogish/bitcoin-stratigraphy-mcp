@@ -1,3 +1,4 @@
+/* Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available). */
 .cmp-page { min-height: 100dvh; }
 .cmp-page .cmp-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
 .cmp-page .cmp-nav a { text-decoration: none; }

@@ -1,0 +1,128 @@
+{
+  "audited_at": "2026-10-11T13:18:58.816Z",
+  "copyright_files": [
+    "artifacts/api-server/src/public/docs/index.html",
+    "artifacts/api-server/src/routes/escrow.test.ts",
+    "artifacts/api-server/src/routes/escrow.ts",
+    "artifacts/api-server/src/services/escrowBridge.ts",
+    "artifacts/api-server/src/services/escrowPricing.test.ts",
+    "artifacts/api-server/src/services/escrowPricing.ts",
+    "artifacts/bitcoin-stratigraphy-dashboard/enterprise-seo-plugin.ts",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/components/compliance-guide-link.tsx",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/components/public-route-head.tsx",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/lib/compliance-seo.ts",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/lib/escrow-seo.ts",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/pages/compliance.css",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/pages/compliance.tsx",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/EscrowTerminal.tsx",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/escrow-terminal.css",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/engine/escrowToll.ts",
+    "lib/api-zod/src/generated/types/escrowContract.ts",
+    "lib/api-zod/src/generated/types/escrowContractStatus.ts",
+    "lib/api-zod/src/generated/types/escrowExecutionInput.ts",
+    "lib/api-zod/src/generated/types/escrowInput.ts",
+    "lib/api-zod/src/generated/types/escrowReceipt.ts",
+    "lib/api-zod/src/generated/types/escrowReceiptDocument.ts",
+    "lib/api-zod/src/generated/types/escrowReceiptDocumentContext.ts",
+    "lib/api-zod/src/generated/types/escrowReceiptDocumentType.ts",
+    "lib/api-zod/src/generated/types/escrowReceiptDocumentVerification.ts",
+    "lib/api-zod/src/generated/types/escrowReceiptReceiptType.ts",
+    "lib/api-zod/src/generated/types/escrowSettlement.ts",
+    "lib/api-zod/src/generated/types/escrowSettlementStatus.ts",
+    "lib/api-zod/src/generated/types/escrowTollQuote.ts",
+    "lib/api-zod/src/generated/types/escrowTollQuoteSource.ts",
+    "lib/api-zod/src/generated/types/escrowTollQuoteTargetUsd.ts",
+    "routers/__init__.py",
+    "routers/escrow_api.py",
+    "routers/escrow_worker.py",
+    "routers/test_escrow_api.py",
+    "services/__init__.py",
+    "services/escrow_db.py",
+    "services/escrow_engine.py",
+    "services/escrow_pricing.py",
+    "services/test_escrow.py",
+    "services/test_escrow_pricing.py",
+    "test/compliance-route.test.mjs",
+    "test/escrow-terminal.test.mjs",
+    "test/system-audit-metadata.test.mjs"
+  ],
+  "source_file_count": 323,
+  "sha256_root": "adfeab7e98cd6a35be9d2744bf1cf98da96c44b5fbd40925506a6a2c1f05bba8",
+  "manifest_sha256": "0ca4f63a424842b853bab590734fcfec43e98954f5a020ebb3b428e1d7426209",
+  "ots_sha256": "68119e307730104d21897f457f946c069343b49bb4eca25c796913f1ea8a2d90",
+  "ots_status": "Submitted; pending calendar attestations, not independently confirmed Bitcoin inclusion",
+  "core_logic_models_routes_unchanged": true,
+  "mcp_tools": 15,
+  "mcp_catalog_unchanged": true,
+  "sqlite": {
+    "journal_mode": "wal",
+    "busy_timeout_ms": 5000,
+    "observed_cold_start_contention": true
+  },
+  "tests": {
+    "javascript_typescript": 370,
+    "python": 151,
+    "total": 521,
+    "final_failures": 0,
+    "notes": "Initial legacy license-header assertion aligned with the required added prefix while preserving original copyright checks. Concurrent WAL startup test failed once and passed unchanged on rerun; the other Python suites passed."
+  },
+  "typecheck": "passed",
+  "python_lint": "passed",
+  "production_build": "passed",
+  "browser_e2e": "passed; initial root metadata failure verdict withdrawn after focused verification",
+  "routes": {
+    "/": {
+      "http_status": 200,
+      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/",
+      "structured_data_blocks": 2
+    },
+    "/compliance": {
+      "http_status": 200,
+      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/compliance",
+      "structured_data_blocks": 3
+    },
+    "/simulator": {
+      "http_status": 200,
+      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/simulator",
+      "structured_data_blocks": 2
+    },
+    "/docs": {
+      "http_status": 200,
+      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/docs",
+      "structured_data_blocks": 1
+    },
+    "/api/docs": {
+      "http_status": 404
+    },
+    "/standard": {
+      "http_status": 200,
+      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/standard",
+      "structured_data_blocks": 2
+    },
+    "/enterprise": {
+      "http_status": 200,
+      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/enterprise",
+      "structured_data_blocks": 2
+    },
+    "/whitepaper": {
+      "http_status": 200,
+      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/whitepaper",
+      "structured_data_blocks": 2
+    },
+    "/robots.txt": {
+      "http_status": 200
+    },
+    "/sitemap.xml": {
+      "http_status": 200
+    }
+  },
+  "notes": [
+    "No payments, production records or existing database contents were changed. SQLite checks used temporary stores.",
+    "/api/docs does not exist; preserved 404 behavior and audited the actual /docs route. A nonexistent route is not included in the sitemap.",
+    "Retained existing Glama registry metadata and added publisher/website per the user's compatibility choice.",
+    "Replaced old application host references in mcp.json and the DVM announcement text. Preserved external Glama listing identifiers in README, marketing, architecture and the badge: existing external listing returned200; the guessed domain-based replacement returned404.",
+    "Copyright notices use // for TypeScript/JavaScript, # for Python and valid CSS/HTML comment syntax; JSON configuration remains valid comment-free JSON.",
+    "New copyright prefixes on generated API types may be overwritten by future code generation unless the generation workflow is extended.",
+    "SEO was verified in the running preview and built static output; updated files require publishing to reach production."
+  ]
+}

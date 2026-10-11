@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { calculateEscrowToll, createEscrowPriceReader, escrowTollQuote } from "./escrowPricing";

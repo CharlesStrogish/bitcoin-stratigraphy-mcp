@@ -1,4 +1,6 @@
 {
+  "publisher": "Charles R. Strogish",
+  "website": "https://bitcoin-stratigraphy-dashboard.replit.app/",
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": ["charlesstrogish"],
   "name": "Bitcoin Stratigraphy Notary",

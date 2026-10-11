@@ -1,3 +1,4 @@
+/* Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available). */
 .escrow-term{margin-top:15px;border:1px solid hsl(var(--primary));background:hsl(var(--card));box-shadow:0 0 24px hsl(var(--primary)/.12);padding:18px 17px;min-width:0}
 .escrow-term h2{margin:4px 0 4px;font-size:20px;overflow-wrap:anywhere}
 .escrow-term .et-sub{margin:0 0 12px;font-size:13px;color:hsl(var(--muted-foreground))}

@@ -56,3 +56,17 @@ mtime_ms = 1791414822541
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/31803642-c4d2-4721-9a13-2745f744aefb/46a5ec6f-1ff9-4854-8463-665e221c9626"
 storage_version_token = "1791414925149077"
 content_type = "image/png"
+
+[[outputs]]
+id = "tyeCkAcmxQMSGq6ypKLAa"
+uri = "file://proofs/system-audit-report.html"
+type = "html"
+title = "Bitcoin Stratigraphy System Audit"
+description = "521 passing tests, 323 verified source hashes, 44 copyright headers, SEO checks and downloadable OpenTimestamps evidence, with qualified startup and routing findings."
+logical_id = "a70e7ed7-a382-45f2-b010-a0643dbff69f"
+content_hash = "sha256:8398260544135dc83691bbc83f653b8d052d547042317afd9ed428d53bf98ae7"
+size = 110546
+mtime_ms = 1791724739969
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/a70e7ed7-a382-45f2-b010-a0643dbff69f/c7b5c367-75bb-4860-bb1d-7e9ceb840b6c"
+storage_version_token = "1791724740599888"
+content_type = "text/html"

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { CopyJsonButton } from "./CopyJsonButton";
@@ -86,6 +87,7 @@ export function EscrowTerminal() {
       const json = JSON.stringify({
         "@context": "https://schema.org",
         "@type": "Report",
+        author: { "@type": "Person", name: "Charles R. Strogish" },
         name: "Illustrative Article 12 receipt preview (SAMPLE / CLIENT SIMULATION)",
         disclaimer: "Illustrative only. Not certified as EU AI Act Article 12 compliance. No real payment. No Bitcoin anchor.",
         contractId, taskHash, traceRecord, resultHash, traceSha256: trace,

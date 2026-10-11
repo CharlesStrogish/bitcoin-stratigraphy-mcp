@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 """Native escrow controller; transport/authentication live in the Express mount.
 
 This module does not start another HTTP server or register any MCP tools.

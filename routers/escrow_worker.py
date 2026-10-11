@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 """Bounded, secret-free-env JSON bridge for the existing Express server."""
 
 import json

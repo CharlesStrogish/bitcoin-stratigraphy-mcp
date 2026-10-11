@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 """Stdlib-only regression checks for the isolated escrow service."""
 
 from concurrent.futures import ThreadPoolExecutor

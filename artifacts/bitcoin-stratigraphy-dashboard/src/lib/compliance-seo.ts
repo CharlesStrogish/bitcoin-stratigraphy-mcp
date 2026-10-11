@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
+import { ESCROW_APPLICATION } from "./escrow-seo";
+
 export const COMPLIANCE_TITLE =
   "EU AI Act Article 12 Compliance Sandbox | Bitcoin Stratigraphy";
 export const COMPLIANCE_DESCRIPTION =
@@ -14,6 +17,11 @@ export const COMPLIANCE_ARTICLE = {
   url: COMPLIANCE_URL,
   mainEntityOfPage: COMPLIANCE_URL,
   inLanguage: "en",
+  about: ESCROW_APPLICATION,
+  license: [
+    "https://www.gnu.org/licenses/agpl-3.0.html",
+    "https://bitcoin-stratigraphy-dashboard.replit.app/enterprise",
+  ],
   author: {
     "@type": "Person",
     name: "Charles R. Strogish",

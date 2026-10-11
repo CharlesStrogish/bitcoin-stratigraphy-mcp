@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import { readLiveBitcoinUsdPrice } from "./stratigraphy-stream";
 
 export const ESCROW_TARGET_USD = 0.02;

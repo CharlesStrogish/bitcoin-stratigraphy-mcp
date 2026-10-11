@@ -1,0 +1,1643 @@
+{
+  "version": 1,
+  "created_at": "2026-10-11T13:15:11.680981Z",
+  "author": "Charles R. Strogish",
+  "hash_algorithm": "SHA-256",
+  "file_count": 323,
+  "sha256_root": "adfeab7e98cd6a35be9d2744bf1cf98da96c44b5fbd40925506a6a2c1f05bba8",
+  "root_definition": "SHA-256 of UTF-8 JSON serialization of the files array, sorted by path, with object keys sorted and separators comma/colon without whitespace. This is a source-catalog digest, not a Bitcoin commitment or Merkle inclusion proof.",
+  "scope": [
+    "artifacts/api-server/src",
+    "services",
+    "routers",
+    "sdk/python",
+    "lib/db/src",
+    "lib/api-spec",
+    "lib/api-zod/src",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/simulator",
+    "artifacts/bitcoin-stratigraphy-dashboard/src/lib",
+    "circuits"
+  ],
+  "files": [
+    {
+      "path": "artifacts/api-server/src/app.ts",
+      "sha256": "a8137e9f2a3f9beaed8c4a5524248e3a0e4599bb5e8089cf74de2a060c8aabd5",
+      "bytes": 3878
+    },
+    {
+      "path": "artifacts/api-server/src/controllers/docs.ts",
+      "sha256": "4264b10680201428214b59d0e0aaf82895db2a71175ca9360056c5fb0365e51e",
+      "bytes": 1707
+    },
+    {
+      "path": "artifacts/api-server/src/index.ts",
+      "sha256": "49d34653860f819cd52bef960dd444a6ebaa23e122f3d9abd778b7e2cac0c868",
+      "bytes": 2577
+    },
+    {
+      "path": "artifacts/api-server/src/lib/engine-metadata.ts",
+      "sha256": "857439f686e8804dd9a645e8e17c8c44f3da7a502299347a05e92a24436ec5b1",
+      "bytes": 4583
+    },
+    {
+      "path": "artifacts/api-server/src/lib/l402-edge-cache.ts",
+      "sha256": "a35e1910d78ce2ee05252ca09fb5ba55776180f9ed61a700a1245b193e2be6c6",
+      "bytes": 1919
+    },
+    {
+      "path": "artifacts/api-server/src/lib/logger.ts",
+      "sha256": "f3378d02e804e38692e9d63b99d0d22a07a05f400ac4ceb1c57dd25dbf5232e5",
+      "bytes": 479
+    },
+    {
+      "path": "artifacts/api-server/src/lib/macaroon-revocation-store.ts",
+      "sha256": "0686a805186f8ab514061caf76dc0dc0f53e53d51430ea238691ff5f3a0564cf",
+      "bytes": 904
+    },
+    {
+      "path": "artifacts/api-server/src/lib/macaroon-usage-store.ts",
+      "sha256": "c95e2039687504bdef9316381901f855cf4abc190b377a4937479f803fe3bc5f",
+      "bytes": 1391
+    },
+    {
+      "path": "artifacts/api-server/src/lib/mcp-discovery-manifest.ts",
+      "sha256": "778f80e292f3f84da9d2a1ef42362e87e92dfa18ccb66695e5ec3a3c4a0cec6f",
+      "bytes": 1903
+    },
+    {
+      "path": "artifacts/api-server/src/lib/mcp-pricing.ts",
+      "sha256": "fa4f2e8adf9e8910612ab2559b0979a78e3cbc090ca0249c4ad1cbfbe49575de",
+      "bytes": 3796
+    },
+    {
+      "path": "artifacts/api-server/src/lib/nostr-heartbeat.ts",
+      "sha256": "d63cc021cfd491b4314a4489120160cd4091fcb86870461080945df3e564ad03",
+      "bytes": 5355
+    },
+    {
+      "path": "artifacts/api-server/src/lib/payment-challenge-store.ts",
+      "sha256": "f269dac6c69d0f8d4796c1d6744c065ca81c6a57ab39d35ce58e3c089a9e2144",
+      "bytes": 5054
+    },
+    {
+      "path": "artifacts/api-server/src/lib/postgres-macaroon-revocation-store.ts",
+      "sha256": "f7431e7da225f8cf9b35acb2613c559f5005a8730a95ef1b432b8a1be118f326",
+      "bytes": 1820
+    },
+    {
+      "path": "artifacts/api-server/src/lib/postgres-macaroon-usage-store.ts",
+      "sha256": "8b1960d947639ebe6dd45a340e28f8440eb994b312ad663360192d7ae3a92cfe",
+      "bytes": 3093
+    },
+    {
+      "path": "artifacts/api-server/src/lib/postgres-payment-challenge-store.ts",
+      "sha256": "126b1c88c429bc75fdc9b007104b36b5a2a153a2756d211b843529d8e527928f",
+      "bytes": 9227
+    },
+    {
+      "path": "artifacts/api-server/src/lib/subscription-pass.ts",
+      "sha256": "242521b80818a73cf02448e6e137ce6d728f774d07a5ebe798e92dc2841a1073",
+      "bytes": 10214
+    },
+    {
+      "path": "artifacts/api-server/src/middleware/l402.ts",
+      "sha256": "1078ba8b8e2fdbf90977a00cc2b0ad92486e016a6a9df1b2fb09673f582de22b",
+      "bytes": 13428
+    },
+    {
+      "path": "artifacts/api-server/src/middleware/mcpJsonRpc.ts",
+      "sha256": "4a1e9aeb3f1c536f22d3ecabd7013c041a4889ab0f3a55d8659e761d3727787a",
+      "bytes": 2898
+    },
+    {
+      "path": "artifacts/api-server/src/middleware/payment.ts",
+      "sha256": "c2f414a2732c4fb537ef283b5a64302e62f835e012ca480e14b745a677d58050",
+      "bytes": 7455
+    },
+    {
+      "path": "artifacts/api-server/src/middleware/publicCors.ts",
+      "sha256": "7ff5d682b3ce2c9e965a5cff2f97b0058e494aed37a60d968a99fa244343bf2a",
+      "bytes": 1864
+    },
+    {
+      "path": "artifacts/api-server/src/middleware/rateLimiter.ts",
+      "sha256": "b3ed0bea21efd882d7c64a347a12c75bc259723b9dd18374ead3e3fd63cc3238",
+      "bytes": 6613
+    },
+    {
+      "path": "artifacts/api-server/src/openapi.ts",
+      "sha256": "999256027429eb4338be0e3f80c35c7cfe63656036d11bb84c4fa8ac951940d1",
+      "bytes": 614
+    },
+    {
+      "path": "artifacts/api-server/src/public/cookbooks/index.html",
+      "sha256": "1126f36d26e7b6f46d45f9f2ea2c6d4a7a98e0a93ab515b42986d4ee466e0143",
+      "bytes": 6559
+    },
+    {
+      "path": "artifacts/api-server/src/public/docs/index.html",
+      "sha256": "d3440a750ddb8b3fda2fac839cd4ceaf293d1e9496bf7b64220b8df5209d1183",
+      "bytes": 9948
+    },
+    {
+      "path": "artifacts/api-server/src/public/docs/portal.css",
+      "sha256": "b295670b776b9f1973f6a5179080034f9236757783ecfae83ea53218e5feb948",
+      "bytes": 14233
+    },
+    {
+      "path": "artifacts/api-server/src/public/docs/portal.js",
+      "sha256": "627cb4c4580063b91fd9c2bbb1d48af594d6a48418f0b3cb41009c42fac57bb0",
+      "bytes": 34347
+    },
+    {
+      "path": "artifacts/api-server/src/routes/analytics.ts",
+      "sha256": "8326769139af5350829c8190a0c7380eae7de2a934d8ec0e19ff740949700358",
+      "bytes": 1622
+    },
+    {
+      "path": "artifacts/api-server/src/routes/audit.test.ts",
+      "sha256": "98d9974a5fd39b922ff8817e85328250b8628c6bdf4528d9974256a4362150dd",
+      "bytes": 4791
+    },
+    {
+      "path": "artifacts/api-server/src/routes/audit.ts",
+      "sha256": "6e05609547f20ac76c5f1cf0eabcf1cad8fc663f5bf890dfb12d887318475e39",
+      "bytes": 3855
+    },
+    {
+      "path": "artifacts/api-server/src/routes/docs.test.ts",
+      "sha256": "d434eafa2d69960514de60e00c25a08f8df3c4d5bc6414ef4c0ec84baf0c955c",
+      "bytes": 4823
+    },
+    {
+      "path": "artifacts/api-server/src/routes/docs.ts",
+      "sha256": "fd40f9ff817d3ab85b8046ae6b555f8e31df8bcd138b79b44b466aae03a979f6",
+      "bytes": 1595
+    },
+    {
+      "path": "artifacts/api-server/src/routes/escrow.test.ts",
+      "sha256": "16cc63e3c1c8916a365a1fa245b4396cb19ac2bba557aa793a68340e3aabb263",
+      "bytes": 9541
+    },
+    {
+      "path": "artifacts/api-server/src/routes/escrow.ts",
+      "sha256": "2f0d6f3bb7092cfe24476c9a717c8a96630ff76900a515b4738853febb953915",
+      "bytes": 7300
+    },
+    {
+      "path": "artifacts/api-server/src/routes/health.ts",
+      "sha256": "cf345aa31fb3dcb5ab2f6fe510d7811568efcd746b7710ee9f87623b72e47e89",
+      "bytes": 823
+    },
+    {
+      "path": "artifacts/api-server/src/routes/index.ts",
+      "sha256": "e9c5992cb8d0a1c0b6f93588897b1b2d9b09c35cd20de9b1f71b0496a771669e",
+      "bytes": 287
+    },
+    {
+      "path": "artifacts/api-server/src/routes/llm-export.ts",
+      "sha256": "795c3f97f74c26f7cff6398514a6d915abf88794f9a9baff7b2e98d5f32eeed4",
+      "bytes": 6378
+    },
+    {
+      "path": "artifacts/api-server/src/routes/mcp-server-card.ts",
+      "sha256": "31556783f3048e4f5249499e914ab318f9d4c0307301b6a5362292c30d0e3526",
+      "bytes": 7813
+    },
+    {
+      "path": "artifacts/api-server/src/routes/mcp.ts",
+      "sha256": "85ee57d0ec496572d1554b78556c4cee25c6fa61e2592cf36211b3631c6559b8",
+      "bytes": 202061
+    },
+    {
+      "path": "artifacts/api-server/src/routes/nostr-status.ts",
+      "sha256": "8f2fa6b28cc6e9e21db686b3972f6f4cb3acd2da4a0f56d6f77cedddac203a2e",
+      "bytes": 1344
+    },
+    {
+      "path": "artifacts/api-server/src/routes/openapi.ts",
+      "sha256": "d33b620abb85423943a0d54f5e430a3bd5eb5ea2da9e3e666136a01bf0e5fce9",
+      "bytes": 466
+    },
+    {
+      "path": "artifacts/api-server/src/routes/provenance.test.ts",
+      "sha256": "191d76319d67ee227ae821b3248aea62a70d189b281e86aa989bf8235182c6b5",
+      "bytes": 4623
+    },
+    {
+      "path": "artifacts/api-server/src/routes/provenance.ts",
+      "sha256": "b98a088bfc63a3b5e0f69567a22e62767f7489ce5649950ca2c5c88b2190f954",
+      "bytes": 6762
+    },
+    {
+      "path": "artifacts/api-server/src/routes/stratigraphy-index.ts",
+      "sha256": "a5c3f0ecd0b02ad297db1c2094dc1a98c1ebc58c66951dcf38356f411c1f6b30",
+      "bytes": 1706
+    },
+    {
+      "path": "artifacts/api-server/src/routes/stratigraphy.contract.test.ts",
+      "sha256": "bd496c3ed7e5e63fa7f9a449b110fc895ee89c0e6af6a4852b6903b7dad755c0",
+      "bytes": 239050
+    },
+    {
+      "path": "artifacts/api-server/src/routes/stratigraphy.ts",
+      "sha256": "63de78d3e1388bdb1eb0d7595c0e4b699dae9bc82de6449f397770c91acfce25",
+      "bytes": 74704
+    },
+    {
+      "path": "artifacts/api-server/src/routes/system-health.ts",
+      "sha256": "35e11409644870f71ffe74492dad786f48f5ee1622adb3b7165b74d5322b6d63",
+      "bytes": 1634
+    },
+    {
+      "path": "artifacts/api-server/src/routes/zk-drift.test.ts",
+      "sha256": "0c9eeaf7b08c7a2589328e3779bab100457b94c3ad144db14ce27aef1b96fbfa",
+      "bytes": 7035
+    },
+    {
+      "path": "artifacts/api-server/src/routes/zk-drift.ts",
+      "sha256": "ff27fcbba3f301500a4ecc46460633b56fddf3ce14758b504a42ba14a40a1a85",
+      "bytes": 5925
+    },
+    {
+      "path": "artifacts/api-server/src/services/agentReputation.ts",
+      "sha256": "36ee3b26783d3113aec81f4aa51af3c888e1785e63a55dc02015d989936849cd",
+      "bytes": 6254
+    },
+    {
+      "path": "artifacts/api-server/src/services/announcer.ts",
+      "sha256": "09398d54bd244e616bb02db0ce1ce65b64c4ce48ea5c849efd2a92d1df3f7cba",
+      "bytes": 8266
+    },
+    {
+      "path": "artifacts/api-server/src/services/attestation.ts",
+      "sha256": "e9180733b89a9e01d6c1b81a04046c66085d7278f4746ece8f57218585b8fbcf",
+      "bytes": 4969
+    },
+    {
+      "path": "artifacts/api-server/src/services/auditVerification.ts",
+      "sha256": "482c852fdd271172a43d61113a34219deb3af1eb54b517fa145b0d07e5b07c4d",
+      "bytes": 3914
+    },
+    {
+      "path": "artifacts/api-server/src/services/dvm.ts",
+      "sha256": "68798c1459d1746b161dab5d3e2c033ee67cfe7c794fbaa3976e02a9ee2ddcba",
+      "bytes": 22636
+    },
+    {
+      "path": "artifacts/api-server/src/services/epistemicDatasetReceipt.ts",
+      "sha256": "44f4b7196105aa6367ff8a861c1a45fd3967a520cde1c0d4c1705f4e80fdd6c1",
+      "bytes": 5182
+    },
+    {
+      "path": "artifacts/api-server/src/services/epistemicGrounding.ts",
+      "sha256": "5a72d4b2c249586b4ec9b106e69fdeeb29cc832532c8f2ab407a5ca72d6a15f7",
+      "bytes": 7162
+    },
+    {
+      "path": "artifacts/api-server/src/services/escrowBridge.ts",
+      "sha256": "27b5b837c0d37643d2fddf930b9d64e5acf23d97140b7e6b99b835766cb1ed26",
+      "bytes": 3479
+    },
+    {
+      "path": "artifacts/api-server/src/services/escrowPricing.test.ts",
+      "sha256": "dd751421bcc30865a6271d0977ca2a5e70252de59696e6886f5be518a5c2e1b0",
+      "bytes": 2788
+    },
+    {
+      "path": "artifacts/api-server/src/services/escrowPricing.ts",
+      "sha256": "f7180de8875855c9fbba9e3fc5bf9750adb427743931695bcfd4d51c5cccc9f8",
+      "bytes": 2111
+    },
+    {
+      "path": "artifacts/api-server/src/services/l402Caveats.ts",
+      "sha256": "9ee160f2313cd98ad8634a85c7e7504f003b55db197a1f302107091692cfe8fc",
+      "bytes": 2719
+    },
+    {
+      "path": "artifacts/api-server/src/services/ledger.ts",
+      "sha256": "6cbe8428255315a6464ab798968d7a5566bd3297c182b6549272f15eda942867",
+      "bytes": 6155
+    },
+    {
+      "path": "artifacts/api-server/src/services/meshGossipService.ts",
+      "sha256": "3c510d74aa8484bf1bfb6e3401fef81a2e50cdc1fde817bac5224e4f6a6be52d",
+      "bytes": 19283
+    },
+    {
+      "path": "artifacts/api-server/src/services/multiSettlement.ts",
+      "sha256": "05bce132a9c01f6ed5fde3861b758d4958322fe87f0f0ffe735530e1cb8d9cd7",
+      "bytes": 10538
+    },
+    {
+      "path": "artifacts/api-server/src/services/nostrAttestation.ts",
+      "sha256": "606111ceb5785c3d0caa24cb353ab4963b8b10632d7b20ea101bb2571c6c2073",
+      "bytes": 5001
+    },
+    {
+      "path": "artifacts/api-server/src/services/nostrWebOfTrust.ts",
+      "sha256": "acc6633b713a9c93905ff79415b8f60d2d32ec1e978397430300fbffe1c2d5d2",
+      "bytes": 8828
+    },
+    {
+      "path": "artifacts/api-server/src/services/orchestrator.ts",
+      "sha256": "141448c6270797bd406f00288f0c4932d10771114d50d8257d5f42d579da9ce5",
+      "bytes": 1792
+    },
+    {
+      "path": "artifacts/api-server/src/services/otsNotarization.ts",
+      "sha256": "8cc5b03c5aa9eb009e8e5a64b4de10a83b506fe88a48dac8e818956f1cee9228",
+      "bytes": 3419
+    },
+    {
+      "path": "artifacts/api-server/src/services/otsProvenance.ts",
+      "sha256": "016017363899959dabf2007b2c0ac4f8f6e2bdf07cc56ead45e908cca716299e",
+      "bytes": 16209
+    },
+    {
+      "path": "artifacts/api-server/src/services/postgres-ledger.ts",
+      "sha256": "169ff0706457aef9b5254114990e12440f004fa0268df9f4cdf5b003110aee67",
+      "bytes": 4730
+    },
+    {
+      "path": "artifacts/api-server/src/services/pricing.ts",
+      "sha256": "52890ccac0563c7455c9983d60b6ed5abd0ca75be59bcb3ab660acb930296e83",
+      "bytes": 4810
+    },
+    {
+      "path": "artifacts/api-server/src/services/provenanceChain.ts",
+      "sha256": "cc754ad998785c81f09c66f6be86dfa479d1237606b31fb944fcd9679f17825c",
+      "bytes": 4824
+    },
+    {
+      "path": "artifacts/api-server/src/services/provenancePersistence.ts",
+      "sha256": "8990fa7c70ba494a7931d0519ff0ef6b08adc4b497a9a5716d8120186764c461",
+      "bytes": 4003
+    },
+    {
+      "path": "artifacts/api-server/src/services/relayPool.ts",
+      "sha256": "62ca4c039ae3cc67e7895eb5fa897b5b49b28b47e85bb32d61088cd794ab8c1b",
+      "bytes": 9842
+    },
+    {
+      "path": "artifacts/api-server/src/services/settlement/alby.ts",
+      "sha256": "5b8fef6b06ec00ffc884f177f3acfd1ce3e7af3c5805e6e7e58af6a19e574f4f",
+      "bytes": 606
+    },
+    {
+      "path": "artifacts/api-server/src/services/settlement/coinos.ts",
+      "sha256": "34fb56f76bb0c6df3c2364968722a9d3486b1af5ca909fadf5a6ac6263fd2f5f",
+      "bytes": 353
+    },
+    {
+      "path": "artifacts/api-server/src/services/settlement/index.ts",
+      "sha256": "f11f7d9117ae3dd9693ed2ddccd8c8fc1369518f8c0dc5f439eb3cb912a7b912",
+      "bytes": 8413
+    },
+    {
+      "path": "artifacts/api-server/src/services/settlement/nwc-provider.ts",
+      "sha256": "9c5c9dea2c1f6f8ff72ae5e1d7641f20337691f6c18691da009fe8180430d4d6",
+      "bytes": 10907
+    },
+    {
+      "path": "artifacts/api-server/src/services/settlement/types.ts",
+      "sha256": "c15a9347842895ef39162d206138f0965cb4ee2bd84950c38218b937a479c3df",
+      "bytes": 1315
+    },
+    {
+      "path": "artifacts/api-server/src/services/stratigraphy-stream.ts",
+      "sha256": "867b68298cff588ac945ac9faca9d0a7360d6e36888ae16627d6d1f413151d55",
+      "bytes": 6649
+    },
+    {
+      "path": "artifacts/api-server/src/services/zk/artifacts/drift_js/generate_witness.js",
+      "sha256": "4995a2e6b01432f76182abec6a831fdaf7f840384035072002ccaa43101b14d4",
+      "bytes": 697
+    },
+    {
+      "path": "artifacts/api-server/src/services/zk/artifacts/drift_js/witness_calculator.js",
+      "sha256": "3bfca49ee5489996a827a1e5a0c8a1f558dbd99e657c7591f5b32e0d33189ce4",
+      "bytes": 10441
+    },
+    {
+      "path": "artifacts/api-server/src/services/zk/drift.circom",
+      "sha256": "3347c5bf8b7db6d2091bb87ce028d8d0132fb860a5a5519c4555add22027b6fb",
+      "bytes": 4627
+    },
+    {
+      "path": "artifacts/api-server/src/services/zk/telemetry.circom",
+      "sha256": "ea62146906e5b6a3b18216f103f6b1dc36e59089377523f577cf404865999277",
+      "bytes": 1233
+    },
+    {
+      "path": "artifacts/api-server/src/services/zkDriftService.ts",
+      "sha256": "b78d0fd9deda8d6f7ee2e7afdd03aa79471e898d5c6008d6e1bd812716c48cd9",
+      "bytes": 17518
+    },
+    {
+      "path": "artifacts/api-server/src/services/zkProofService.ts",
+      "sha256": "3fa1bdc64a7c422bc446a4803023d162b9cbed65504dcfd84b8476ae4e0b48e1",
+      "bytes": 26242
+    },
+    {
+      "path": "artifacts/api-server/src/types/snarkjs.d.ts",
+      "sha256": "c49001241c55efd69de03650de48c263b1ab4b0b44564c66fea2e35b371da287",
+      "bytes": 441
+    },
+    {
+      "path": "artifacts/api-server/src/yaml.d.ts",
+      "sha256": "87c4b7cf580aa6ca8da46c16d6e57d96013cd104c16bc7613d0d59c90c47a0c0",
+      "bytes": 77
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/enterprise-seo-plugin.ts",
+      "sha256": "0677b8979864180a158e8c9f037329395914de99dbb20d3171e5cbd0737d519e",
+      "bytes": 4243
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/index.html",
+      "sha256": "10f52a1d956746a09f77498b294e44c915f34aa3c73750f0d5cad89adfc9ae6c",
+      "bytes": 6088
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/App.tsx",
+      "sha256": "94e8b40647c605a9c698cb648b26cb8eaaea08ce15440c23bcc1591157800d3c",
+      "bytes": 31379
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/components/public-route-head.tsx",
+      "sha256": "66dc8e519b16b40e69d1c615139d6451b352fa8d7994599bebf5910c0dea8d0c",
+      "bytes": 1306
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/lib/compliance-seo.ts",
+      "sha256": "01fa17b2043c4edebc12c8dbd258d0c8fe891ccba28880a215ea89277443a0a3",
+      "bytes": 1092
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/lib/enterprise-seo.ts",
+      "sha256": "c2b9f4d614b8f43a834ef12ee8ae06d487f9ba6af620a0b8ce8dd5972d12ce0f",
+      "bytes": 407
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/lib/escrow-seo.ts",
+      "sha256": "7237bfd55c09b67da745b24d960c80fb0549eef5d3fe2b3aff8d0cee4df53253",
+      "bytes": 1257
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/lib/utils.ts",
+      "sha256": "44f68ca49d982e69f5563a6366d5b032e3aca059af53aba7e1a451e69a19c4ae",
+      "bytes": 170
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/lib/whitepaper-seo.ts",
+      "sha256": "8d5f4727e502404b527ff4048665a015672230758591c823e04079e221acbfcd",
+      "bytes": 445
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/AgentGrid.tsx",
+      "sha256": "161ab7fa322dbd29e487eadb940189c6b64d28b27f6355927d4069f9d3651dc6",
+      "bytes": 843
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/CopyJsonButton.tsx",
+      "sha256": "6fdc524b67ce4dcdc29d3013e3c392db488eac673a56902ecf983ccc30f7d789",
+      "bytes": 1926
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/EscrowTerminal.tsx",
+      "sha256": "a84edea869062924983c5145de24276b95c9d3c5cfd3239b87d1338d833b7607",
+      "bytes": 8672
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/ProofInspector.tsx",
+      "sha256": "025c3d713f771848b4704c8ce0ff4c978a9b9212466606d779f85232d7b4681b",
+      "bytes": 4061
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/SyntheticBanner.tsx",
+      "sha256": "dfdaf4a96879e3e8e77c9fc021f5152d94375d9d05dd08e3569232bb36f0bd41",
+      "bytes": 620
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/TraceBrowser.tsx",
+      "sha256": "9f946152fd9db07d9db214dc1e79df63679cd9834acbc8d4a75701b2929b4b2d",
+      "bytes": 3480
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/TreeGraph.tsx",
+      "sha256": "9e4165d196391befbfc5cb8c189c2b6c1ff7deb759497c6298dca78009448567",
+      "bytes": 6128
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/copy-json-button.css",
+      "sha256": "6a448e85145eecd8ad7cc0595dcd1b15c0836996f3fdb52c46455671e784ef04",
+      "bytes": 286
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/components/escrow-terminal.css",
+      "sha256": "e13abb101f26c64c23de984b9d4f85f373dc6f6a68b538036f8827305fb5937e",
+      "bytes": 3006
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/engine/canonical.ts",
+      "sha256": "7a498d3ad4ca19681ae7ccc05bc7418ee42de646c98c256b515494c1193c6244",
+      "bytes": 1709
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/engine/escrowToll.ts",
+      "sha256": "fce96aa7e41cb3b9ac0e8bf0d5fe2a6373cd43af1d083cce2cfa0a3dbd41f9db",
+      "bytes": 1498
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/engine/merkle.ts",
+      "sha256": "1b552288a1e09051e71e3c6fe81901a6aa81b94a9f44b79ce99fc628c2654176",
+      "bytes": 5211
+    },
+    {
+      "path": "artifacts/bitcoin-stratigraphy-dashboard/src/simulator/engine/simulation.ts",
+      "sha256": "3dc706e14a2912d24dbb5a66bea7d2d508ef8cca50cd95d778cc636922e04fba",
+      "bytes": 8431
+    },
+    {
+      "path": "dvm_bot.py",
+      "sha256": "f6b978389e05df647baa5263746195fc4e0a9fc101237eabb9a16430b84ac013",
+      "bytes": 1541
+    },
+    {
+      "path": "glama.json",
+      "sha256": "0fae1b09e9e04cbc10c54ee3fc5a3190bc630ef1f12b846166e49f01d5f0bbab",
+      "bytes": 4396
+    },
+    {
+      "path": "lib/api-spec/openapi.yaml",
+      "sha256": "5eab4a8e0b426d1053d76ede854a32340c6de297acb9d4bc3974be2421e57cc4",
+      "bytes": 149069
+    },
+    {
+      "path": "lib/api-spec/orval.config.ts",
+      "sha256": "fbf0c972023e849d073581bac10685363522612d7a7458c50eda83e7e171f867",
+      "bytes": 2051
+    },
+    {
+      "path": "lib/api-spec/test/fixtures/invalid-unresolved-reference.openapi.yaml",
+      "sha256": "7b10d29730fec9cda30df9b19c433bf10aa1ee5f6801242e6afd88921c4979d0",
+      "bytes": 454
+    },
+    {
+      "path": "lib/api-spec/test/unresolved-reference.test.mjs",
+      "sha256": "0ac218ed7ecaccdf423066108c5662417e0fd0e40bed90f89acd97c152fb4875",
+      "bytes": 637
+    },
+    {
+      "path": "lib/api-zod/src/generated/api.ts",
+      "sha256": "9621c03729da66c84903afcccacfc54e9a9d1b8f3740a06059c57836f1d0f8c1",
+      "bytes": 88307
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/agentReputationMetadata.ts",
+      "sha256": "d90a11bc023c438e87ba9f3c89be2bad339082f2934a40ae3b89a4811d71ce13",
+      "bytes": 3457
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/agentReputationMetadataTier.ts",
+      "sha256": "f99003af6962f57e0c5491dd0cd278e7ea146e519c28676a0e2cfd864978a063",
+      "bytes": 3416
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditReport.ts",
+      "sha256": "1079016b67b0d473ca312c8d48fea8f43e3528a809e10745665b50f99c60207b",
+      "bytes": 3706
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditReportExitCode.ts",
+      "sha256": "4cce5dc6705240403524363d27a3fcbf77c661b69bae20f7844ab8a372cb23fe",
+      "bytes": 3373
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditReportJournalIntegrity.ts",
+      "sha256": "55d0b46f3727d54a458ac4508af9d4629963f9dfc66ed6876d0d91db10209d7b",
+      "bytes": 3444
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditReportScope.ts",
+      "sha256": "d986719ce280c78883401ee3b0837b397592eed4dc5fd783406bcc0a9eb65233",
+      "bytes": 3356
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditSubmission.ts",
+      "sha256": "fd65179c700228d940630ec88425f75cc5cce0f8a67d33b616b5ea1382e86547",
+      "bytes": 3466
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditSubmissionReceipt.ts",
+      "sha256": "fb51c51c9ef4c7745390bf10ab8bfc755295ac3fb62bc279aca88ccd50139e47",
+      "bytes": 3286
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditSubmissionTrace.ts",
+      "sha256": "b2e18ce8ae5dab4050645a31506d28ca6a2fcf7444cc3dfc0814d644d1c10992",
+      "bytes": 3244
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditTraceResult.ts",
+      "sha256": "1de931e2e34bf581aae86850b1ea4d1121f2d3e3b555f6614aef5dc689ff4314",
+      "bytes": 3484
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/auditTraceResultStatus.ts",
+      "sha256": "dc370fb93f229af8ad3ccbfdeaced5e121314ea8895b7057fcbe88d9ab3503ad",
+      "bytes": 3458
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/datasetHealthStatus.ts",
+      "sha256": "fb28bf1919c7beb6b0411d108bed551c32751691386967e84316b0d9c2ca2f78",
+      "bytes": 3360
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/epistemicAnchorReceipt.ts",
+      "sha256": "87d9f257324ad61f32b68d29da8ae589e31860257e9e93632f3684e5653e0aac",
+      "bytes": 4180
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/epistemicAnchorReceiptPayload.ts",
+      "sha256": "2ada0c80cfe538b7440cd67dd73242dab36ee163a48d2001a19d58b6e8fac146",
+      "bytes": 3253
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/epistemicAnchorReceiptProof.ts",
+      "sha256": "cc11840c24e4d905cb91ae8d963099087b0bb05dfd9f7cd75fc87993024ba21b",
+      "bytes": 3251
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/epistemicGroundingRequest.ts",
+      "sha256": "d3cd06fd64854c5db653ef038c48f0defe480d18dd0f7fc16a93765e1d351fd8",
+      "bytes": 3681
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/epistemicGroundingRequestMetadata.ts",
+      "sha256": "74dae755edeac417c2394bbe85486ed80a537da6b0ee98372e83815606041f4e",
+      "bytes": 3332
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowContract.ts",
+      "sha256": "c2f9df3acfea6680630020c4da3f06c648b35c9d98038227689f1b5c57cbc7f2",
+      "bytes": 3606
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowContractStatus.ts",
+      "sha256": "d803c41507b4a6c07b1950d601dceef74c3f6bd3969950db8a906d1b87b92aab",
+      "bytes": 3450
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowExecutionInput.ts",
+      "sha256": "40c01f98beff3f1a63d36c3334d635692fedfdd5d786bb98a09b9e6718d4a8a0",
+      "bytes": 3449
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowInput.ts",
+      "sha256": "1fbb101b76d7c957ab4065b9305b24eef323239dcf75a3037e73b3fbc43ffdac",
+      "bytes": 3578
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowReceipt.ts",
+      "sha256": "09ba3905ed3c68e59555b59a77da73c6c6b0049bef7e35229546f1b65268aaa3",
+      "bytes": 3762
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowReceiptDocument.ts",
+      "sha256": "eb53a80ce584ad28a500e77f04d3ac292e10f52c2e221017eb4546638d914089",
+      "bytes": 3857
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowReceiptDocumentContext.ts",
+      "sha256": "520a530a81047927f023eb64b5af3edfce447a7a1f43f12534f41211141e1d7f",
+      "bytes": 3350
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowReceiptDocumentType.ts",
+      "sha256": "77cecc088f240f709cf64ed6c567f785dd9657dda339a51f346bbce1f88145da",
+      "bytes": 3488
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowReceiptDocumentVerification.ts",
+      "sha256": "341ffbcbfbd1541943f5e04ea5d767777d318a59aeb7085be481bab6059b8c5a",
+      "bytes": 3494
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowReceiptReceiptType.ts",
+      "sha256": "7ee9fca58d1f157731594fc02d69c72737dce2a1a3f818286ce7baa84153d408",
+      "bytes": 3516
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowSettlement.ts",
+      "sha256": "a59f188ce75e4688156a03d971b26a165600b7d8d6d0c97230da3c4f01d157ae",
+      "bytes": 3614
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowSettlementStatus.ts",
+      "sha256": "9cf768c76a0851720d35827f202941ee539641143ce7a459de2f2059b4c262a7",
+      "bytes": 3460
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowTollQuote.ts",
+      "sha256": "72ed9868fedbcb436c48bdea8f2dc56ad8769c31177f1568e96d0d7eb37d539b",
+      "bytes": 3734
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowTollQuoteSource.ts",
+      "sha256": "f18610b884d27512de7f7e73f729ec46b94e9baf70dcd68142b9f05be0f7a762",
+      "bytes": 3478
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/escrowTollQuoteTargetUsd.ts",
+      "sha256": "f441d34de48f7768b44853bbe5ec4845e59b9a880ad56c69c1a80094550dbbea",
+      "bytes": 3461
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/exportHuggingFaceDatasetFormat.ts",
+      "sha256": "219afca50651a65fd9cb6dcfbc04c1e3f4a38b99705eec779755ea8c76903f2e",
+      "bytes": 3406
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/exportHuggingFaceDatasetParams.ts",
+      "sha256": "537a82ccbb4b9328a3200e0bafa7595a28ff5c630c06dc63eabd7d035a25070d",
+      "bytes": 3554
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getNip05IdentityParams.ts",
+      "sha256": "f7b4be41870310448df1efbcd476801296cdc8491a2a79ff3f172ab2edb4deb0",
+      "bytes": 3238
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getPaidStratigraphyParams.ts",
+      "sha256": "4e6b1c658c0a7127ff6635912febdadb9a00ca90d26c48e541f33a4c690884aa",
+      "bytes": 3485
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getRevenueAuditParams.ts",
+      "sha256": "8af2ca54d6ce55fd99a55176108bc27085ee84d35464508d29efa7e0095233f6",
+      "bytes": 3276
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/getStratigraphyCostParams.ts",
+      "sha256": "eff3f36e48f948e0b5c0a81fa4f5df9065259291c88cdc0f8c4c580e13e59eca",
+      "bytes": 3366
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/groundEpistemicContext200.ts",
+      "sha256": "188efec9b717121d6f78e2646bae78e226f88a9e2494198e20f15903c09cfa5a",
+      "bytes": 3333
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/headPaidStratigraphyParams.ts",
+      "sha256": "10e4c4b68246ac66bcfe79564cb8c2558dfd51c4ba9190d02fb73925609d1446",
+      "bytes": 3293
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/healthStatus.ts",
+      "sha256": "89af4ac5488d842db5f1a89f142c4681f69374c3d23d415cdd9c0f6e6317218e",
+      "bytes": 3233
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/huggingFaceExportRecord.ts",
+      "sha256": "5b5bfda80499d8b083f201689957a35486750c7334c72c8b25186112a979749d",
+      "bytes": 4570
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/huggingFaceExportRecordZkProofStatus.ts",
+      "sha256": "78cfdf95a9e8df1905a26821bdd5af4c04a01186cceea4ac7b097d48173315bd",
+      "bytes": 3493
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/index.ts",
+      "sha256": "599101be618df925c613a455b8e0268fd2c1f6d0088d04207fe339532aa4f04a",
+      "bytes": 10720
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/invalidRangeError.ts",
+      "sha256": "525c78c067d9f40705d02f15e6411f6fe58ec0c26f20775a2c6ce5185907d372",
+      "bytes": 3277
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/jsonSchema.ts",
+      "sha256": "748b5f3bf05dbc0c481521c942a46b37f57ee8137d2b5140aca7f4c88ea2628b",
+      "bytes": 3442
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/jsonSchemaItems.ts",
+      "sha256": "eaef7a92f73628f8b7ccd5b7864d700b49667b7d5bbbf114c2a2f7990f5e3089",
+      "bytes": 3239
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/jsonSchemaProperties.ts",
+      "sha256": "1b3a9b06511c4235d095fe5fd1581e19079fdfe48034e9e3967f23fbd1320cce",
+      "bytes": 3244
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/l402Challenge.ts",
+      "sha256": "80fc57659575d4bd0de44732d7ef43418412d52e981d3f943234cceae3800c15",
+      "bytes": 3819
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/l402SubscriptionPass.ts",
+      "sha256": "56c858bd89b93c85fdd4233d6b2c097e99271f693d11110e84081b4d09eb2d64",
+      "bytes": 4191
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/l402SubscriptionPassAgentTier.ts",
+      "sha256": "ec1666b6500d749886d944bc4b94d5afc7b3d24295c86efde065af1c9e0850de",
+      "bytes": 3424
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/l402SubscriptionPassTier.ts",
+      "sha256": "db416d60ca29353ef59c1a6c614b47569bd7399678482777fe9e79fcea92e9f8",
+      "bytes": 3390
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listProofAttestationsMcpTool.ts",
+      "sha256": "a067bc4fc99efd0085b83fe35265e7774816c8fb23e86bd3f967e19f62293086",
+      "bytes": 3821
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listProofAttestationsMcpToolParameters.ts",
+      "sha256": "1d6303a6a441ad3988ac7506f4bfba0dc39f38cdb58bff827084bad5377f68cc",
+      "bytes": 3424
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/listProofAttestationsResult.ts",
+      "sha256": "6e671bb5ef3efa1efec779d5fdf6585fe3f6d31e90c42728b04a5db9e4a59966",
+      "bytes": 3601
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/llmSchemaManifest.ts",
+      "sha256": "ae8587586def7e5d50d4a26c4d7a9bfd052e253287a135cf11343b1f5bec1465",
+      "bytes": 4213
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/llmSchemaManifestAccessPolicy.ts",
+      "sha256": "d12af1dd60a8ebecf95fe3c0cb31759a9ddcfe58ced11e8a746299f5ba9f55e4",
+      "bytes": 3253
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/llmSchemaManifestDomainConstraints.ts",
+      "sha256": "fe73fda7a54833d664b085f6b199c5a0d3687a9a18eae91654247fb8c66f0e93",
+      "bytes": 3258
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/llmSchemaManifestEndpoints.ts",
+      "sha256": "09ba8e99df31b2858a875c5c3aa7a7a989a74cc6f35b3896ee75c46e66764cae",
+      "bytes": 3250
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/llmSchemaManifestParameters.ts",
+      "sha256": "555e416999807c29917dd739b054a4ab26a108886adcd94a6602ce0f49164f49",
+      "bytes": 3251
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/llmSchemaManifestRecordSchema.ts",
+      "sha256": "e88f89d6fc9a18cb8316983f5617b9bdad0a0df741b1158db00e07d6dbaa17e2",
+      "bytes": 3253
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/llmSchemaManifestVerificationProtocols.ts",
+      "sha256": "8c656291cafc35b4baf0f93b8926ce78b5d09e76511498a3991822d6a3edebac",
+      "bytes": 3262
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/macaroonAttenuationRequest.ts",
+      "sha256": "4c8feef756d1ff7f5ecb02534fd7ebae7ad20a42b5b2ed986688960954e5cec9",
+      "bytes": 3372
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/macaroonAttenuationResponse.ts",
+      "sha256": "1698cf1e319a755325c7e6543da249b59edb0eb0e60036ef9e1f5e21817cb1af",
+      "bytes": 3393
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/macaroonAttenuationResponseCaveats.ts",
+      "sha256": "7d8e054811555e6c1fc8d4d022aaf2769b5612f57f92612a12c88193a76ba514",
+      "bytes": 3306
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/macaroonRevocationRequest.ts",
+      "sha256": "df47340ddf884f2cdcf20e83c25bf5d51251be815f77c471c70044ae98ee048d",
+      "bytes": 3363
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/macaroonRevocationResponse.ts",
+      "sha256": "085fddb7b4e5ecce22b8b75f5cd42e8c66ea7f3661cb1f9f5c54d2ffa632a929",
+      "bytes": 3325
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpBatchCostQuote.ts",
+      "sha256": "9c86fe4b1d25152b93333ef5dfa6777f2edb8d69f21c05550066266b3af00faf",
+      "bytes": 3671
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpBatchCostQuoteL402.ts",
+      "sha256": "8bad6378c7622a654771c96917259f39332b881d924660d7587aef7816acd2d0",
+      "bytes": 3734
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpBatchCostQuoteL402Batch.ts",
+      "sha256": "d906327b536620429e6758b43d4321ec03bb163df1ab542f97bdd01d0bbab689",
+      "bytes": 3378
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpBatchCostQuotePerToolSats.ts",
+      "sha256": "9d475c7bc10062e260379aa9c40e5dbe534a336608f6a96ecc5be4849797e233",
+      "bytes": 3249
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifest.ts",
+      "sha256": "0f23cffdbb3df8c9a30130ddc575875c947eaf976bed1e5bae0049d4ad62cbbe",
+      "bytes": 4029
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestAuthor.ts",
+      "sha256": "baef26070775076f6a9adfa85fe79a5021ad27e09d462796aa1d87aee1eae3df",
+      "bytes": 3258
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestLinks.ts",
+      "sha256": "bd24ae9da96eb4980abd153bba9105eb5f7b78272b88f519a56333b14dfac55a",
+      "bytes": 3313
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestMcp.ts",
+      "sha256": "f50dbe286df7ea11defcb511e50715812ec5d17bd542ea432e6070302a96e2d8",
+      "bytes": 3551
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestMcpCapabilities.ts",
+      "sha256": "a08f9eeec91cb2e852513bf8c5b0f66f828c05133dbb10120cd3b1d0c70c15fc",
+      "bytes": 3437
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestMcpCapabilitiesTools.ts",
+      "sha256": "bd6d8aae64680d88756a2a4339bcf15a1d997e46a8b53712e628d787e27a0b35",
+      "bytes": 3282
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestMcpTransportsItem.ts",
+      "sha256": "0b0b360758245a988196214e48f3c31b356b3e06544863995618e387fa33c0ab",
+      "bytes": 3419
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestMcpTransportsItemType.ts",
+      "sha256": "4e1630827530a04078727fef647c9378de771fa1f6ef2a75c3730f0f54aa66de",
+      "bytes": 3456
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestPricing.ts",
+      "sha256": "3e81feea4922c399070a6f1bb498194d222e22f39922e9c9faa2a036452f5694",
+      "bytes": 3532
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestPricingCostDiscoveryMethodsItem.ts",
+      "sha256": "b69efd9ace8c0f9efac950b6fde217c7b63a3be7333687766730cc2abf12cce8",
+      "bytes": 3486
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpDiscoveryManifestVerification.ts",
+      "sha256": "ddc4059e83ce2b1a5c2a5c96ac4ef5ec02dc0241c151a33ec6eb4fb095fed6b9",
+      "bytes": 3328
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpInvoiceGeneration.ts",
+      "sha256": "73cbdb46422fada7d8db0a61b85013378a8e2e8a7db8b9a562962f75e616dbec",
+      "bytes": 3443
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpJsonRpcError.ts",
+      "sha256": "e7baa2ee1ce07f5dd29c4e0096f59d2d4e582d2702e07685adcc5fc5323915e3",
+      "bytes": 3271
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpJsonRpcRequest.ts",
+      "sha256": "8f9facbe904e60c343f415c2e9e7a7b1b9e969b666889e9f5583f223d3bd54dc",
+      "bytes": 3416
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpJsonRpcRequestParams.ts",
+      "sha256": "40a416ec7394e243caf1b9e89105461f508eec0a241660bdfdc9fb36eec2d7cd",
+      "bytes": 3259
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpJsonRpcResponse.ts",
+      "sha256": "7c8892c3b7664a1514a20d3a7920bd4a00fa03bc4ad2bdb1b9e5442cb018fbac",
+      "bytes": 3432
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpProbe.ts",
+      "sha256": "b6d9895d593fc1a1c13878aba78039f527ae1dbda0ec81d9ecf282f376294e4b",
+      "bytes": 3310
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpToolCostItem.ts",
+      "sha256": "8f8a82a3d1ef392737b958ea0bc5246a516e21fcd21f9638be4442a9d9f996af",
+      "bytes": 3503
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpToolCostSelection.ts",
+      "sha256": "469626388b83c098b18a4986d19dbfb0ec7726d428ec406327d5fb623eeb6557",
+      "bytes": 3349
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/mcpToolParameter.ts",
+      "sha256": "0304d8c4eaf4975ee1c6d919b83f029a39993c1c3e16922c63a6cfcc2128ab26",
+      "bytes": 3855
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshAttestRequest.ts",
+      "sha256": "8a863bc9429dc64c9436b40f74472e045b6689cdaed0159fefa9d89c7951f984",
+      "bytes": 4119
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshAttestRequestAgentSession.ts",
+      "sha256": "7f9d299009ce6cebf8fafe1ca00582b9e6a1e064b1d3ecd4899e25367da836f6",
+      "bytes": 3696
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshAttestRequestSnapshot.ts",
+      "sha256": "25c0972fbbf78232a908fc1b273c77ebd362551029953de19c1a70ebbbece925",
+      "bytes": 3415
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshAttestResponse.ts",
+      "sha256": "564fb7e7a373362e2cf9a4b9c8fc4014f2fac415e7e906c7112948376e504f41",
+      "bytes": 3407
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshConsensus.ts",
+      "sha256": "c48c526a5fb53c28a86f2dd232c25b9aaa60aaa4f4e094987dc8b2c939f7e277",
+      "bytes": 3791
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshPeerAttestation.ts",
+      "sha256": "db383f5d89520cf54361912314b25d16a11332333415c542cd50277baabac462",
+      "bytes": 3471
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshSignedEvent.ts",
+      "sha256": "f751804bab9d4d078b2eb8850a15b829bdb703b2e94174a692a6526bb0183a46",
+      "bytes": 3441
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshStatus.ts",
+      "sha256": "cae6f8979a0c22c01b7a5184204d82584fbbecaaabff65ff04ea4d3614624fc4",
+      "bytes": 3762
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/meshStatusTopologyHealth.ts",
+      "sha256": "f190ddf6d3f64e0c4134fbdd807145a163a56effa6ddda638d42c8684c073bf2",
+      "bytes": 3418
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrAgentIdentity.ts",
+      "sha256": "272c6c0a0fec59166159ed8ef9e5f34c2590931f77f94453e819da99dbfbc66b",
+      "bytes": 4042
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrAgentIdentityMetadata.ts",
+      "sha256": "90f092d139c9ad66242f7af22e9222dd2a147ed0bb5595ef064be315cd09483a",
+      "bytes": 3262
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrAttestation.ts",
+      "sha256": "59f5bd3b843835fd73440c377cdb6d2cfcd283bdb9b99e2d35ad69308d705e76",
+      "bytes": 3489
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrHeartbeatStatus.ts",
+      "sha256": "dee3bfa4ae6390e266c607d8f98cfe6bbaf2a09414979709b03c3b431659e9e4",
+      "bytes": 3493
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrHeartbeatStatusRelaysItem.ts",
+      "sha256": "c79aac538d8720dad94191f29daebaad1bf851f6b7b3cd39560c7e8b340db77a",
+      "bytes": 3416
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrHeartbeatStatusRelaysItemStatus.ts",
+      "sha256": "df87ea2dd5b982a844b27724792141dc0a1f4cf443bb223cccd2684d09d45876",
+      "bytes": 3460
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrIdentityEvent.ts",
+      "sha256": "6ae087da147b54f76dabcfa0f9714ad128761264ca69950bbb56fe86e558f791",
+      "bytes": 3445
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrIdentityInput.ts",
+      "sha256": "4d70da87e3780bcbc095d0df4ef7175d217ab1e7e5ad6d0d5c1a3db11cb96924",
+      "bytes": 3506
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/nostrSignedEvent.ts",
+      "sha256": "1272c75d1ef03a9101204209e70ad10efe24b6722673d715c68fd15324b02180",
+      "bytes": 3442
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/paidStratigraphyResponse.ts",
+      "sha256": "030948134cadd616fe3cb20236b1d0a9e8e8a3344e1545d70645185c41e3561f",
+      "bytes": 3466
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/paymentChallengeRateLimitError.ts",
+      "sha256": "57169cd7b8025f90cf16fbc740083a068055b68d7af4ac19b23d84add24047f5",
+      "bytes": 3446
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/paymentChallengeServiceUnavailableError.ts",
+      "sha256": "a74a0a442b0005fa86bd564e15db4208e5698370f3dc020c50d44d2e7d3a5027",
+      "bytes": 3412
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/paymentConfigurationError.ts",
+      "sha256": "d6eaaf8adce0ae143bfe3ed673d1e5f6c18771a2823cfc13e71599a3b5254aff",
+      "bytes": 3357
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/paymentConfigurationErrorError.ts",
+      "sha256": "47f636157b9732c0b2678e7c83fb69701c8386f25b0c41262a4dc9bfdbbfd593",
+      "bytes": 3526
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/proofAttestationRecord.ts",
+      "sha256": "78ce0256561c1b0226cbf36a93425463a0faec5c8e0b22ecab2aacf268c4a701",
+      "bytes": 3944
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/proofAttestationRecordStatus.ts",
+      "sha256": "b9617e2f570b4fa5af886777371d711bb62b96dc905be155de20918038cbdd30",
+      "bytes": 3501
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/proofByHashMcpTool.ts",
+      "sha256": "f37b3d18af1db82735b5398d5bc36a3e143f89cc6e858870f5f7dbb3c9f23878",
+      "bytes": 3912
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/proofByHashMcpToolExampleResult.ts",
+      "sha256": "e1986c054dc9000a6a9f7467dbb28fd8eec64206bf1c5b5ea928fdc76c1a3b1c",
+      "bytes": 4074
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/proofByHashMcpToolExampleResultKind.ts",
+      "sha256": "670b77f6e253614a3090147572dffb614a49698ca1bff335c5ebff54781030e8",
+      "bytes": 3538
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/proofByHashMcpToolExampleResultProofPayload.ts",
+      "sha256": "1338c68b30a4ffd2fda785b4f855b59995ebc1d28bfa36468c08e712a7b007fe",
+      "bytes": 3362
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/proofByHashMcpToolExampleResultStatus.ts",
+      "sha256": "ecfe8ba0a23935f46bfe090f6c47ea2d6633d94c12d5795689911c3086860671",
+      "bytes": 3488
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/proofByHashMcpToolIdentifiersItem.ts",
+      "sha256": "c54d9e13a9be718ab5d14e8779be3c99aa8bfbc43a17252f4d6ad2d7f017267e",
+      "bytes": 3418
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/provenanceAnchorStatus.ts",
+      "sha256": "f5aaa66d20fe713bccf45fbf82626883295a3456f98b5421a596d6cb0f1d7afc",
+      "bytes": 3644
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/provenanceAnchorStatusOtsStatus.ts",
+      "sha256": "cb84d46897c19c4567374414d82b1556e3e4aead933e4316a597d8753520fdf9",
+      "bytes": 3500
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/provenanceChainStatus.ts",
+      "sha256": "9578b73d2b1576f9e40985d9ed235323c027b78dd1d4bd0def28dd5af131a030",
+      "bytes": 3587
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/provenanceChainStatusLatestOtsStatus.ts",
+      "sha256": "45302ec4460455b5b1a66ba249d7c5e86c14e97d2215f3ec81e89d5977cbcbf5",
+      "bytes": 3520
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/publicMetadata.ts",
+      "sha256": "a6831c207961d29db38cceace67f50dd1883134b70a477cc01886428fc7ac76d",
+      "bytes": 3240
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/publicMetadataResponse.ts",
+      "sha256": "1c83c2e51cfd4e30fb4816cfa39b46715fac08d0d0b1ee951013672ec1a96769",
+      "bytes": 3378
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/publicPreflightResponse.ts",
+      "sha256": "23a9b73f960c7ca06e1237019593d8b068ca0e0a06ffc57a4c546350dc3dd45a",
+      "bytes": 3271
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/quantitativeAlpha.ts",
+      "sha256": "3fd63af0b838b561b5d5adb9aa790d4be04a8ec251d1e2e4523a17501abf4168",
+      "bytes": 3597
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/quoteMcpToolCosts400.ts",
+      "sha256": "f2888fa7b0e432057e6e0d999b6796cea8808558d6e513e6413fda4caeb54298",
+      "bytes": 3238
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/readinessStatus.ts",
+      "sha256": "c4b6d126f0b0e4a48f86cdcc702c741b776aac98d5c5122c0c969655d7c3786e",
+      "bytes": 3448
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/readinessStatusDependencies.ts",
+      "sha256": "d57726eb27868562e794d7255e072fc776723fade72f813b948ede122df41d8d",
+      "bytes": 3717
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/readinessStatusDependenciesChallengeCoordination.ts",
+      "sha256": "42d15cde4bef212efe63aa2dea0b3f2512a92f77290f74d5d8c5ea7f1909bb3f",
+      "bytes": 3500
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/readinessStatusDependenciesWalletConfiguration.ts",
+      "sha256": "1e8342563ac65fcc5967b897f562592f50532e4c8f6eb12c27c2a694bfa434c2",
+      "bytes": 3591
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/readinessStatusStatus.ts",
+      "sha256": "d2fd736506b8b445cb80888ea11ccc38b6ead1825b031e1def567257a7b987b8",
+      "bytes": 3380
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/settlementAsset.ts",
+      "sha256": "7bc2485bb1f9fb3b0dfbc2766ef9e75db81b67d14ab1de4fd69b8084269b64c7",
+      "bytes": 3406
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/settlementAssetSelectionError.ts",
+      "sha256": "d18b0c3b559c1cff14174ca814979f2d1aa41289a268a4b9a77e88e06c5e2cd0",
+      "bytes": 3373
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/settlementAssetSelectionErrorError.ts",
+      "sha256": "cd1659212da96b32983a1ffac018e09e817861032749698c03954a852597dda9",
+      "bytes": 3532
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/smitheryServerCard.ts",
+      "sha256": "49520fd5e08ac979412dd76abe9ab4dab6d6e832531f68ebaa7b11744f25fe03",
+      "bytes": 3556
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCatalog.ts",
+      "sha256": "6892b4813a5e8e0e7c2890d07f1edaf2a640cd7cee2871a77bbe3f48c23fb397",
+      "bytes": 3984
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCatalogDateBounds.ts",
+      "sha256": "7030e6deb70c5e9262e082f6121685edf4f14a2aae49b40581278f9482dc6103",
+      "bytes": 3445
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCatalogMcpTool.ts",
+      "sha256": "1ccac444f61143024ba0f50eaff5301eaa23ac1b69ff54733f4977a9248f0606",
+      "bytes": 3565
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCost.ts",
+      "sha256": "445e03d041d22a837de6d85c3f187fee0cc3740786a4c29b384da95f2a730fb4",
+      "bytes": 4812
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCostAccessTiersItem.ts",
+      "sha256": "f5449f7a75a50825e96ab9c3c58dadbaf10b7dfed856116650e2118461db7a03",
+      "bytes": 3573
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCostAccessTiersItemId.ts",
+      "sha256": "b1717f2619e115a5a44828babc81db5168d6bf34fecebc9f47d79c1f60131746",
+      "bytes": 3426
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCostDataset.ts",
+      "sha256": "2189a4cee4e22e4f525ab73b737bfa1947f3bce968aa34f17de82fff8601b44c",
+      "bytes": 3345
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCostDynamicPricing.ts",
+      "sha256": "7d836d8b9be15d8a278b283032fe758ee8d5813ed9521a7f1fe7ce70aa62e59f",
+      "bytes": 3395
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCostLegacyQueryPricing.ts",
+      "sha256": "218c4154f9b8bb03565e5531dc5e7d9eca82c68758aeb11de4db15da4a193c80",
+      "bytes": 3273
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCostMcpTool.ts",
+      "sha256": "3c09608b50f926235a21fbd5d0fc2da57a976f2b5bab1282512c7e9e46462224",
+      "bytes": 3395
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyCostMcpToolParameters.ts",
+      "sha256": "1458f4d86cb5b98c39ea93c8156f572f012f8bbac74085a47ba04f780dd90169",
+      "bytes": 3557
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/stratigraphyEntry.ts",
+      "sha256": "368714a27621ed0f079e4ea91413df49485805ab5289721708bcb9ea4a231e8f",
+      "bytes": 3827
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/submitZkProofMcpTool.ts",
+      "sha256": "d129885a21ad9cad43c9d803dfaa7ef76987cd3149de77c5297fc804ead30fe5",
+      "bytes": 4007
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/submitZkProofMcpToolOptionalInputsItem.ts",
+      "sha256": "051fde39f797d164b99def8d51b24d667ff2ab1ffa2e170af10490d901d610f7",
+      "bytes": 3440
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/submitZkProofMcpToolRequiredInputsItem.ts",
+      "sha256": "ad300582221de6f8b8428de0875caf024f0068507aa059cb892e61b8fa54643f",
+      "bytes": 3456
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/submitZkProofResult.ts",
+      "sha256": "0caefe876f36dd6085ecf466b947c93871b1a06862b351947b40d5ead5810b7b",
+      "bytes": 3788
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/submitZkProofResultStatus.ts",
+      "sha256": "37096e62b3e0bb52141ddb3352ca763bcc25f0a7ab2ae6edd3e10e55caa58a6a",
+      "bytes": 3448
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/tokenRevocationServiceUnavailableError.ts",
+      "sha256": "aa0d9f6fee50615eb8228cf2db717f0b758e76dd228939554541db134beed6af",
+      "bytes": 3408
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/verifyZkProof400.ts",
+      "sha256": "8abc703c095f9a231af6c3c7d2c9914e4424a63bfb79e8f46606bfe1668d7ddd",
+      "bytes": 3234
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/verifyZkProof503.ts",
+      "sha256": "d19739c2decaa81f6ceef5c2fde03147aaaa5d0a023242122586708648879715",
+      "bytes": 3264
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/walletGatewayError.ts",
+      "sha256": "fa754ea19001a1a14c9506687fb35ec0d9003563c8c7f3c4058aa0ccea2a9d14",
+      "bytes": 3329
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/walletGatewayErrorError.ts",
+      "sha256": "12f254d45a711f19d58963c72aa0a328a5d0bf272318dd3facf9bb98db59bb83",
+      "bytes": 3472
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkDriftProof.ts",
+      "sha256": "34281b35cefe12fc07a6d187c4d5fa8c441ac4d5332273ab95823dbc0be84b38",
+      "bytes": 3766
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkDriftRequest.ts",
+      "sha256": "8849905a215e96c5e0f1e9af191fd4a5c010bf69b78666cb6d9ba8fb3e1629a7",
+      "bytes": 3632
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkDriftResponse.ts",
+      "sha256": "4eaef78826462e43fba6d31d2a5c78aeccb4881e2b769cef8120fdb845de0110",
+      "bytes": 4417
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkProof.ts",
+      "sha256": "9d9b893f96533793a2521b0ab4b440a7d6cd3b212f31c371f9370f083980ad7b",
+      "bytes": 3385
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkPublicInputs.ts",
+      "sha256": "f0648215d69ffb3e83289801c6b272c4dc2a716e46bc4f7ab1872bbf8c6afbaf",
+      "bytes": 3758
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkTelemetryEventEnvelope.ts",
+      "sha256": "b8a62a89e4d5a3528924b26fd9201795dd7e7170555660f9e0634fa4e72e0f29",
+      "bytes": 3524
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkTelemetryEventEnvelopeData.ts",
+      "sha256": "4e7bdc03514a904ea7d12cf13937e453dc216bebf11f3a9d4a13852a2780049b",
+      "bytes": 3281
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkVerifyInput.ts",
+      "sha256": "8bb7bf73f0ccfa4b5ee7e3057df74234acd361bf615264bf2ca438642b3c09da",
+      "bytes": 3559
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkVerifyRequest.ts",
+      "sha256": "1db36e911c381eb999d5e901cb536044970aed284683721be1fe956255d6d798",
+      "bytes": 3683
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkVerifyRequestData.ts",
+      "sha256": "ce4001f02d80cad7dac171d8212ead5a729e9a3b3e5fd31c5b65e18d3313aeeb",
+      "bytes": 3435
+    },
+    {
+      "path": "lib/api-zod/src/generated/types/zkVerifyResponse.ts",
+      "sha256": "eb9573999097e8863a7a04f2218b60648723dd808cf4ec4818b6569edbeb6ce5",
+      "bytes": 3306
+    },
+    {
+      "path": "lib/api-zod/src/index.ts",
+      "sha256": "effb7d33b5df99004c9b1a840944516ca3ad65cbcd3ae2fcc717c505814ce039",
+      "bytes": 68
+    },
+    {
+      "path": "lib/db/src/index.ts",
+      "sha256": "fc285bc83108137ba57c4c2774a35053e3c25fda1292c3d7a16a57d43dd9679c",
+      "bytes": 416
+    },
+    {
+      "path": "lib/db/src/schema/index.ts",
+      "sha256": "5c241fe71bb331fa0d35283446793973d786d7675e0fe31a9bf6e46d421f4568",
+      "bytes": 935
+    },
+    {
+      "path": "lib/db/src/schema/ots-provenance-anchors.ts",
+      "sha256": "8d43f4751da9c0d3397730bdb702ad4588e5ca7b335327d1804289ae1a18435a",
+      "bytes": 657
+    },
+    {
+      "path": "lib/db/src/schema/payment-challenges.ts",
+      "sha256": "35c930fce3c899f98f5be89ef675f5453a6c65d89eb57204e5e69029ee35efc4",
+      "bytes": 1996
+    },
+    {
+      "path": "lib/db/src/schema/revenue-ledger.ts",
+      "sha256": "d6548e5afafaec75871be033cfdb007fc5dddb5f8ef3a40982cc1943d9e9cfdf",
+      "bytes": 962
+    },
+    {
+      "path": "lib/db/src/schema/revoked-macaroons.ts",
+      "sha256": "02507b2aa1750aae98b3aa1b2d22e6080bf5339057e9733895f3390af7d5238e",
+      "bytes": 308
+    },
+    {
+      "path": "lib/db/src/schema/stratigraphy-provenance-strata.ts",
+      "sha256": "c9e8656ffe4853023e7b36c58eb2f6aed719f435f0bd2a694fda9a1efaa3d913",
+      "bytes": 420
+    },
+    {
+      "path": "mcp.json",
+      "sha256": "ce0441f6ce2d4af98385fa902e4d8158a2dec1c12dcd123c75bee2ad9d9beab8",
+      "bytes": 130
+    },
+    {
+      "path": "routers/__init__.py",
+      "sha256": "cd335c19b1ee6112f81570245f6072e2576e380a0f43d0e297b59a20728b574d",
+      "bytes": 172
+    },
+    {
+      "path": "routers/escrow_api.py",
+      "sha256": "5979039ee5d56e117937faad7d56290f325a930566042b36e7aa1c91af06dd29",
+      "bytes": 6328
+    },
+    {
+      "path": "routers/escrow_worker.py",
+      "sha256": "47e8713c72c67ac2cb1dbac2419881535e4532fe6f26fe997e1acdac95f875c9",
+      "bytes": 1560
+    },
+    {
+      "path": "routers/test_escrow_api.py",
+      "sha256": "958cb9654d622c1e6d7292eb481cbf2450169630414907b50ca5fded5d7180c8",
+      "bytes": 3846
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy.py",
+      "sha256": "3f1f43e98d43934255a90a6951bafbfbd93a8f6a2deb060dd360caf9c52ae12d",
+      "bytes": 14385
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/__init__.py",
+      "sha256": "7393bbfe414b406af55d798e0d61fdc49ca34d15709805503c2a25650b801dd2",
+      "bytes": 1548
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/article_12_compliance.py",
+      "sha256": "12a67c1b79e463baa5617bdf36204220356feefc247bc3b2b263a0e17b3fcec5",
+      "bytes": 23911
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/article_12_journal.py",
+      "sha256": "a61a0cff5a6ce6b7bbf4c3a83a89420441b0a420ec2b85be4935935eeb37bfce",
+      "bytes": 6773
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/audit_verifier.py",
+      "sha256": "aebbdad8ac46d66aa005b5390fb25255efc3f6acd60c76ce316f947ce6266ce3",
+      "bytes": 15863
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/audit_verifier_ots.py",
+      "sha256": "f19f47413b8c79af647ddbc53bf3bd7f1581eade18ad46e9a6898507ad3ab3d4",
+      "bytes": 15410
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/b2b_contract.py",
+      "sha256": "cf6a53e6a3dfe2a1c552d4936f2a524901d43a7423f4eed77270a84429de6b79",
+      "bytes": 8827
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/b2b_settlement.py",
+      "sha256": "ea985a02ab97b9040daaf4026e0a96160744e888b30511662fdbdedc0ee3e647",
+      "bytes": 15187
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/b2b_settlement_verifier.py",
+      "sha256": "78cc92d099a2f31200f1d0ee7275b07b858737e32c1a21ce71fdacac24fc9378",
+      "bytes": 9461
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/client.py",
+      "sha256": "925ada4c9fbac45ae3c4565f79436f8af7b951b48a5f44b7a52a18fb385859b8",
+      "bytes": 12014
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/swarm_flight_evidence.py",
+      "sha256": "cd2aed1d13c4306003ed5fe616f675bfd7ee662b03e295c72acc736d8b44b71a",
+      "bytes": 10518
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/swarm_flight_recorder.py",
+      "sha256": "ec79288a544aa14cb3e1ca5bfe70a206f64482f97406b70c21a94e7989fc86aa",
+      "bytes": 14056
+    },
+    {
+      "path": "sdk/python/bitcoin_stratigraphy_enterprise/swarm_merkle.py",
+      "sha256": "541d17942ecb3ea09542f557ad8e719c91509b7116e58e675a7c0ec327a20bfe",
+      "bytes": 4721
+    },
+    {
+      "path": "sdk/python/client.py",
+      "sha256": "925ada4c9fbac45ae3c4565f79436f8af7b951b48a5f44b7a52a18fb385859b8",
+      "bytes": 12014
+    },
+    {
+      "path": "sdk/python/test_client.py",
+      "sha256": "c2f5d25df33d9f687ecc5563a5b4619906e939a829417612d92da41660e40a49",
+      "bytes": 6616
+    },
+    {
+      "path": "services/__init__.py",
+      "sha256": "4c83efc42794fdf88bab7f1d7d02c3a3b59cfa8d0ef3a761f79ed25dabb5d6bd",
+      "bytes": 173
+    },
+    {
+      "path": "services/escrow_db.py",
+      "sha256": "dca8f6089ab3fee0b4ecb79f0e5de6be96ec2fdcec17101e44c431b3c2b8cf74",
+      "bytes": 6522
+    },
+    {
+      "path": "services/escrow_engine.py",
+      "sha256": "cc7971bd7bbe1f49c26d17cf288996a046519115d2d72f2aca80caaaca3683cd",
+      "bytes": 7676
+    },
+    {
+      "path": "services/escrow_pricing.py",
+      "sha256": "d4c03b5fb0bd2a4d71bcea4f9e4d56f9b0f941786a2f9df392a7aba7d2a49f56",
+      "bytes": 1388
+    },
+    {
+      "path": "services/test_escrow.py",
+      "sha256": "5fc4ad29bfc8ec5219ec507c1780ddf27eed98f405fa515a01fdee11ed55609b",
+      "bytes": 9347
+    },
+    {
+      "path": "services/test_escrow_pricing.py",
+      "sha256": "17aa4b451f7d1d32381677aa2b66bcd4d19f1fb14d1e0df6733bc795a1b0863a",
+      "bytes": 9202
+    },
+    {
+      "path": "smithery.yaml",
+      "sha256": "810538df4d5ece46ef3616fa7f150ac52dafad84066fa40f51b4f19bac16c46d",
+      "bytes": 5229
+    }
+  ],
+  "anchoring": {
+    "method": "OpenTimestamps",
+    "requested_proof_file": "source-integrity-manifest.json.ots",
+    "status_note": "See system-audit-report for submission status. A submitted calendar receipt is not a confirmed Bitcoin anchor."
+  }
+}

@@ -1,6 +1,12 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Allow: /api/docs
+Disallow: /tmp/
+Disallow: /generated-artifacts/
+Disallow: /.data/
+Disallow: /.local/
+Disallow: /attached_assets/
 
 # Agent discovery: https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt
 Sitemap: https://bitcoin-stratigraphy-dashboard.replit.app/sitemap.xml

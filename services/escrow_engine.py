@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 """Execution commitments using the existing SDK's unchanged RFC 6962 engine."""
 
 from datetime import datetime, timezone

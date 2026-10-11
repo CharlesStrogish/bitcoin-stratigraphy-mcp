@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -119,7 +120,11 @@ test("direct compliance HTML includes exact crawler metadata and author JSON-LD"
 test("homepage metadata stays unchanged and dedicated static pages remain emitted", () => {
   const plugin = enterpriseSeoPlugin();
   const input = read("index.html");
-  assert.equal(plugin.transformIndexHtml.handler(input, { path: "/" }), input);
+  const home = plugin.transformIndexHtml.handler(input, { path: "/" });
+  assert.equal(home.replace(
+    /<script id="escrow-application-jsonld" type="application\/ld\+json">[^<]+<\/script>\n/,
+    "",
+  ), input);
   const emitted = [];
   plugin.generateBundle.handler.call(
     {
@@ -135,9 +140,11 @@ test("homepage metadata stays unchanged and dedicated static pages remain emitte
   );
   assert.deepEqual(
     emitted.map((asset) => asset.fileName),
-    ["enterprise/index.html", "whitepaper/index.html", "compliance/index.html"],
+    ["simulator/index.html", "standard/index.html", "enterprise/index.html",
+      "whitepaper/index.html", "compliance/index.html"],
   );
-  for (const existing of emitted.slice(0, 2)) {
+  for (const existing of emitted.filter((asset) =>
+    ["enterprise/index.html", "whitepaper/index.html"].includes(asset.fileName))) {
     assert.ok(!existing.source.includes('id="compliance-article-jsonld"'));
   }
 });

@@ -90,13 +90,14 @@ test("crawler rules and sitemap include developer pages and MCP discovery", asyn
     "artifacts/bitcoin-stratigraphy-dashboard/public/robots.txt",
   );
   assert.match(robots, /^User-agent: \*$/m);
-  // The wildcard root allowance covers every public page and discovery route.
-  // Preserve the existing API-only exclusion; reject any additional restrictions.
+  // Public pages remain crawlable; only API data and internal files are excluded.
   assert.deepEqual(
     robots.split("\n").map((line) => line.trim()).filter(
       (line) => /^(User-agent|Allow|Disallow):/i.test(line),
     ),
-    ["User-agent: *", "Allow: /", "Disallow: /api/"],
+    ["User-agent: *", "Allow: /", "Disallow: /api/", "Allow: /api/docs",
+      "Disallow: /tmp/", "Disallow: /generated-artifacts/", "Disallow: /.data/",
+      "Disallow: /.local/", "Disallow: /attached_assets/"],
   );
   assert.ok(robots.includes(`Sitemap: ${origin}/sitemap.xml`));
   const xml = await load(
@@ -110,6 +111,7 @@ test("crawler rules and sitemap include developer pages and MCP discovery", asyn
   for (const path of [
     "/",
     "/simulator",
+    "/compliance",
     "/standard",
     "/enterprise",
     "/whitepaper",

@@ -65,6 +65,10 @@ test("all active SDK, cookbook and server route sources have correctly positione
       }
     }
     const prefix = path.endsWith(".py") ? "#" : "//";
+    // The audit-required first-line notice supplements, not replaces, the
+    // original two-line license declaration checked below.
+    if (lines[position] === `${prefix} Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).`)
+      position++;
     assert.equal(lines[position], `${prefix} ${copyright}`, path);
     assert.equal(lines[position + 1], `${prefix} ${terms}`, path);
     assert.equal(

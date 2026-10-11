@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import type { Plugin } from "vite";
 import {
   ENTERPRISE_DESCRIPTION,
@@ -15,8 +16,23 @@ import {
   COMPLIANCE_TITLE,
   COMPLIANCE_URL,
 } from "./src/lib/compliance-seo";
+import {
+  ESCROW_APPLICATION, SIMULATOR_DESCRIPTION, SIMULATOR_TITLE, SIMULATOR_URL,
+} from "./src/lib/escrow-seo";
 
 const routes = [
+  {
+    path: "simulator",
+    title: SIMULATOR_TITLE,
+    description: SIMULATOR_DESCRIPTION,
+    url: SIMULATOR_URL,
+  },
+  {
+    path: "standard",
+    title: "API Access & Pricing | Bitcoin Stratigraphy",
+    description: "Discover Bitcoin Stratigraphy API access, live L402 micropayment pricing, and commercial licensing for autonomous agents.",
+    url: "https://bitcoin-stratigraphy-dashboard.replit.app/standard",
+  },
   {
     path: "enterprise",
     title: ENTERPRISE_TITLE,
@@ -80,6 +96,14 @@ function pageHead(html: string, page: (typeof routes)[number]): string {
   return result;
 }
 
+function escrowHead(html: string): string {
+  const schema = JSON.stringify({
+    "@context": "https://schema.org", ...ESCROW_APPLICATION,
+  }).replace(/</g, "\\u003c");
+  return html.replace("</head>",
+    `<script id="escrow-application-jsonld" type="application/ld+json">${schema}</script>\n</head>`);
+}
+
 /** Social crawlers receive route metadata without having to execute React. */
 export function enterpriseSeoPlugin(): Plugin {
   return {
@@ -92,7 +116,7 @@ export function enterpriseSeoPlugin(): Plugin {
           .split("?")[0]!
           .replace(/\/$/, "");
         const page = routes.find((page) => path.endsWith(`/${page.path}`));
-        return page ? pageHead(html, page) : html;
+        return escrowHead(page ? pageHead(html, page) : html);
       },
     },
     generateBundle: {

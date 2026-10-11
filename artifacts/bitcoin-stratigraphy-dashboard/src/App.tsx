@@ -54,6 +54,7 @@ import CompliancePage from "@/pages/compliance";
 import ComplianceGuideLink from "@/components/compliance-guide-link";
 import { EscrowTerminal } from "@/simulator/components/EscrowTerminal";
 import { TrustBadges } from "@/components/trust-badges";
+import { PublicRouteHead } from "@/components/public-route-head";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -998,6 +999,7 @@ function Router() {
         <Route path="/compliance" component={CompliancePage} />
         <Route component={NotFound} />
       </Switch>
+      <PublicRouteHead />
       <SiteFooter />
     </ErrorBoundary>
   );

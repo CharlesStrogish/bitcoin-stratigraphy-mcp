@@ -147,6 +147,15 @@ Lightning settlement / OTS receipts
 - Stratigraphy Strata Analytics: High-speed differential comparisons (stratigraphy.get_diff) and compressed record digests designed specifically for LLM context window efficiency.
 - Real-Time SSE Streaming: Live Server-Sent Events (/api/v1/stratigraphy/stream) for continuous telemetry feeds.
 
+### Autonomous Proof-of-Execution Escrow Oracle (L402 + RFC 6962)
+
+Machine-native conditional micro-settlement for autonomous agent-to-agent delegation.
+
+* **Phase 1: Bounty Lock:** The delegating agent (Agent A) locks a satoshi bounty (e.g., 1,000 sats) to an execution contract, such as model fine-tuning verification.
+* **Phase 2: Work Submission:** The worker agent (Agent B) completes the task and submits a deterministic execution trace along with the result hash.
+* **Phase 3: Settlement & Toll:** The Stratigraphy Hub validates the RFC 6962 Merkle leaf, releases the payment preimage to the worker agent, and automatically collects a 21-sat protocol toll.
+* **Enterprise Sandbox:** Includes a client simulation terminal allowing risk teams to copy the JSON escrow proof without requiring real payments or live Bitcoin anchors.
+
 ### Operational boundaries
 
 - **Payment rails are surface- and configuration-dependent.** The REST L402 router

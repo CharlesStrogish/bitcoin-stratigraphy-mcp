@@ -24,6 +24,9 @@ def settle_in_process(path, escrow_id):
 
 class EscrowTests(unittest.TestCase):
     def setUp(self):
+        price = patch("services.escrow_pricing.read_bitcoin_usd_price", return_value=None)
+        price.start()
+        self.addCleanup(price.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "private" / "escrow.sqlite3"
@@ -55,7 +58,7 @@ class EscrowTests(unittest.TestCase):
     def test_create_pragmas_and_private_storage(self):
         created = self.create()
         self.assertEqual(uuid.UUID(created["escrow_id"]).version, 4)
-        self.assertEqual(set(created), {"escrow_id", "payment_hash"})
+        self.assertEqual(set(created), {"escrow_id", "payment_hash", "toll_fee_sats"})
         metadata = self.store.get_contract(created["escrow_id"])
         self.assertNotIn("preimage", metadata)
         self.assertEqual(metadata["status"], "LOCKED")

@@ -16,7 +16,7 @@ async function buildAll() {
   // Publish an isolated stdlib-only escrow worker; never copy custody DB files.
   for (const [folder, filenames] of [
     ["routers", ["__init__.py", "escrow_api.py", "escrow_worker.py"]],
-    ["services", ["__init__.py", "escrow_db.py", "escrow_engine.py"]],
+    ["services", ["__init__.py", "escrow_db.py", "escrow_engine.py", "escrow_pricing.py"]],
     ["sdk/python/bitcoin_stratigraphy_enterprise", ["__init__.py", "swarm_merkle.py"]],
   ]) {
     const destination = path.resolve(distDir, "escrow-worker", folder);

@@ -45,6 +45,7 @@ import type {
   EscrowInput,
   EscrowReceiptDocument,
   EscrowSettlement,
+  EscrowTollQuote,
   ExportHuggingFaceDatasetParams,
   GetNip05IdentityParams,
   GetPaidStratigraphyParams,
@@ -123,6 +124,84 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetEscrowTollUrl = () => {
+
+
+
+
+  return `/api/v1/escrow/toll`
+}
+
+/**
+ * Public read-only price preview. Uses the existing Bitcoin/USD market rail, a $0.02 target and a 1-satoshi minimum; unavailable or invalid rates select exactly 21 sats. No escrow creation, payment or MCP tool execution.
+ * @summary Preview the current USD-normalized escrow settlement toll
+ */
+export const getEscrowToll = async ( options?: Parameters<typeof customFetch>[1]): Promise<EscrowTollQuote> => {
+
+  return customFetch<EscrowTollQuote>(getGetEscrowTollUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEscrowTollQueryKey = () => {
+    return [
+    `/api/v1/escrow/toll`
+    ] as const;
+    }
+
+
+export const getGetEscrowTollQueryOptions = <TData = Awaited<ReturnType<typeof getEscrowToll>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowToll>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEscrowTollQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEscrowToll>>> = ({ signal }) => getEscrowToll({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEscrowToll>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEscrowTollQueryResult = NonNullable<Awaited<ReturnType<typeof getEscrowToll>>>
+export type GetEscrowTollQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Preview the current USD-normalized escrow settlement toll
+ */
+
+export function useGetEscrowToll<TData = Awaited<ReturnType<typeof getEscrowToll>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowToll>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEscrowTollQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getCreateEscrowUrl = () => {
 

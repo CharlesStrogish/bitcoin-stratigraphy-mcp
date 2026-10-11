@@ -653,6 +653,20 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /v1/escrow/toll:
+    get:
+      operationId: getEscrowToll
+      tags: [Autonomous Escrow]
+      summary: Preview the current USD-normalized escrow settlement toll
+      description: Public read-only price preview. Uses the existing Bitcoin/USD market rail, a $0.02 target and a 1-satoshi minimum; unavailable or invalid rates select exactly 21 sats. No escrow creation, payment or MCP tool execution.
+      security: []
+      responses:
+        "200":
+          description: Current toll quote or deterministic offline fallback
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscrowTollQuote"
   /v1/escrow/create:
     post:
       operationId: createEscrow
@@ -1916,7 +1930,28 @@ components:
           type: integer
         toll_fee_sats:
           type: integer
-          enum: [21]
+          minimum: 1
+          maximum: 9007199254740991
+    EscrowTollQuote:
+      type: object
+      required: [toll_fee_sats, target_usd, btc_usd_price, source, quoted_at]
+      properties:
+        toll_fee_sats:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        target_usd:
+          type: number
+          enum: [0.02]
+        btc_usd_price:
+          type: [number, "null"]
+          exclusiveMinimum: 0
+        source:
+          type: string
+          enum: [market, fallback]
+        quoted_at:
+          type: string
+          format: date-time
     EscrowReceipt:
       type: object
       required: [escrow_id, leaf_index, audit_path, merkle_root, timestamp, tree_size, execution_leaf_hash, settled_at_strata_block, receipt_type]

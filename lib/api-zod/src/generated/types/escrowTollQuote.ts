@@ -21,10 +21,21 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+import type { EscrowTollQuoteSource } from './escrowTollQuoteSource';
+import type { EscrowTollQuoteTargetUsd } from './escrowTollQuoteTargetUsd';
 
-export type EscrowContractTollFeeSats = typeof EscrowContractTollFeeSats[keyof typeof EscrowContractTollFeeSats];
-
-
-export const EscrowContractTollFeeSats = {
-  NUMBER_21: 21,
-} as const;
+export interface EscrowTollQuote {
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  toll_fee_sats: number;
+  target_usd: EscrowTollQuoteTargetUsd;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  btc_usd_price: number | null;
+  source: EscrowTollQuoteSource;
+  quoted_at: Date;
+}

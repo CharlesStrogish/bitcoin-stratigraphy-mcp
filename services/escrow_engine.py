@@ -9,6 +9,7 @@ import uuid
 
 from bitcoin_stratigraphy_enterprise.swarm_merkle import MerkleAccumulator, leaf_hash
 from services.escrow_db import EscrowStore
+from services.escrow_pricing import get_dynamic_escrow_toll
 
 
 def _hex32(value, name):
@@ -30,9 +31,13 @@ class EscrowEngine:
     The strata height provider must supply an independently sourced current height.
     """
 
-    def __init__(self, store=None, *, strata_block_provider=None, max_leaves=10_000):
+    def __init__(
+        self, store=None, *, strata_block_provider=None, max_leaves=10_000,
+        bitcoin_price_provider=None,
+    ):
         self.store = store if store is not None else EscrowStore()
         self.strata_block_provider = strata_block_provider
+        self.bitcoin_price_provider = bitcoin_price_provider
         # Delegate capacity validation to the existing engine.
         MerkleAccumulator(max_leaves)
         self.max_leaves = max_leaves
@@ -41,7 +46,10 @@ class EscrowEngine:
         buyer_pubkey = _hex32(buyer_pubkey, "buyer_pubkey")
         worker_pubkey = _hex32(worker_pubkey, "worker_pubkey")
         task_hash = _hex32(task_hash, "task_hash")
-        if type(amount_sats) is not int or not 0 < amount_sats <= 2**63 - 1 - 21:
+        if type(amount_sats) is not int or not 0 < amount_sats <= 2**63 - 1:
+            raise ValueError("amount_sats must be a positive SQLite-safe integer")
+        toll_fee_sats = get_dynamic_escrow_toll(self.bitcoin_price_provider)
+        if amount_sats > 2**63 - 1 - toll_fee_sats:
             raise ValueError("amount_sats must be a positive SQLite-safe integer")
         preimage = secrets.token_hex(32)
         payment_hash = hashlib.sha256(bytes.fromhex(preimage)).hexdigest()
@@ -51,11 +59,14 @@ class EscrowEngine:
                 """INSERT INTO agent_escrow_contracts
                 (escrow_id, buyer_pubkey, worker_pubkey, task_hash, amount_sats,
                  toll_fee_sats, payment_hash, preimage, status)
-                VALUES (?, ?, ?, ?, ?, 21, ?, ?, 'LOCKED')""",
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'LOCKED')""",
                 (escrow_id, buyer_pubkey, worker_pubkey, task_hash,
-                 amount_sats, payment_hash, preimage),
+                 amount_sats, toll_fee_sats, payment_hash, preimage),
             )
-        return {"escrow_id": escrow_id, "payment_hash": payment_hash}
+        return {
+            "escrow_id": escrow_id, "payment_hash": payment_hash,
+            "toll_fee_sats": toll_fee_sats,
+        }
 
     def verify_execution_and_settle(self, escrow_id, execution_trace, result_payload):
         """Commit caller-authorized execution evidence; release only after commit.

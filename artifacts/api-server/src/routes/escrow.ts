@@ -5,6 +5,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import {
   CreateEscrowBody, CreateEscrowResponse, SettleEscrowBody, SettleEscrowResponse,
   GetEscrowReceiptParams, GetEscrowReceiptResponse,
+  GetEscrowTollResponse,
 } from "@workspace/api-zod";
 import { createL402Middleware } from "../middleware/l402";
 import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
@@ -16,10 +17,12 @@ import { openApiDocument } from "../openapi";
 import type { MacaroonUsageStore } from "../lib/macaroon-usage-store";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import type { SettlementRouter } from "../services/settlement";
+import { escrowTollQuote, readEscrowBitcoinPrice } from "../services/escrowPricing";
 
 type EscrowOptions = {
   execute?: EscrowExecutor;
   readHeight?: () => Promise<number>;
+  readPrice?: () => Promise<number | null>;
   paymentGate?: RequestHandler;
   operatorSecret?: string;
   usageStore?: MacaroonUsageStore;
@@ -43,6 +46,7 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
   const router = express.Router();
   const execute = options.execute ?? executeEscrow;
   const readHeight = options.readHeight ?? (async () => (await fetchCurrentBitcoinTip()).height);
+  const readPrice = options.readPrice ?? readEscrowBitcoinPrice;
   const operatorSecret = options.operatorSecret ?? process.env.MACAROON_OPERATOR_SECRET;
   const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
   const gate = (suffix: string) => options.paymentGate ?? createL402Middleware({
@@ -138,6 +142,11 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
       res.removeListener("close", abort);
     }
   };
+  // Public, read-only price preview. Never creates an escrow or collects a fee.
+  router.get("/toll", async (_req, res) => {
+    const price = await readPrice().catch(() => null);
+    if (!res.destroyed) res.json(GetEscrowTollResponse.parse(escrowTollQuote(price)));
+  });
   router.post("/create", validate("create"), gate("create"), operatorGate, run("create"));
   router.post("/settle", validate("settle"), gate("settle"), operatorGate, run("settle"));
   router.get("/receipt/:escrow_id", validate("receipt"), gate("receipt"), operatorGate, run("receipt"));

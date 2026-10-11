@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 import os
 from pathlib import Path
+import re
 import sqlite3
 import stat
 
@@ -14,7 +15,8 @@ CREATE TABLE IF NOT EXISTS agent_escrow_contracts (
     worker_pubkey TEXT NOT NULL,
     task_hash TEXT NOT NULL CHECK(length(task_hash) = 64),
     amount_sats INTEGER NOT NULL CHECK(amount_sats > 0),
-    toll_fee_sats INTEGER NOT NULL DEFAULT 21 CHECK(toll_fee_sats = 21),
+    toll_fee_sats INTEGER NOT NULL DEFAULT 21
+        CHECK(typeof(toll_fee_sats) = 'integer' AND toll_fee_sats >= 1),
     payment_hash TEXT NOT NULL CHECK(length(payment_hash) = 64),
     preimage TEXT NOT NULL CHECK(length(preimage) = 64),
     status TEXT NOT NULL CHECK(status IN
@@ -60,6 +62,58 @@ class EscrowStore:
             os.close(descriptor)
         with self.connection() as connection:
             connection.executescript(SCHEMA)
+            self._upgrade_fixed_toll_constraint(connection)
+
+    @staticmethod
+    def _upgrade_fixed_toll_constraint(connection):
+        """Atomically relax only the legacy toll check; preserve rows and FKs.
+
+        SQLite cannot ALTER a CHECK constraint. Rebuild the same table using its
+        original schema, retaining all columns, indexes, triggers and custody data.
+        BEGIN IMMEDIATE serializes concurrent worker startups.
+        """
+        fixed = re.compile(r"CHECK\s*\(\s*toll_fee_sats\s*=\s*21\s*\)", re.I)
+
+        def table_sql():
+            return connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' "
+                "AND name='agent_escrow_contracts'"
+            ).fetchone()[0]
+
+        if not fixed.search(table_sql()):
+            return
+        connection.execute("PRAGMA foreign_keys=OFF")
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            original = table_sql()
+            if fixed.search(original):
+                objects = connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE tbl_name='agent_escrow_contracts' "
+                    "AND type IN ('index', 'trigger') AND sql IS NOT NULL"
+                ).fetchall()
+                revised = fixed.sub(
+                    "CHECK(typeof(toll_fee_sats) = 'integer' AND toll_fee_sats >= 1)",
+                    original,
+                ).replace("agent_escrow_contracts", "agent_escrow_contracts_dynamic", 1)
+                connection.execute(revised)
+                connection.execute(
+                    "INSERT INTO agent_escrow_contracts_dynamic "
+                    "SELECT * FROM agent_escrow_contracts"
+                )
+                connection.execute("DROP TABLE agent_escrow_contracts")
+                connection.execute(
+                    "ALTER TABLE agent_escrow_contracts_dynamic RENAME TO agent_escrow_contracts"
+                )
+                for row in objects:
+                    connection.execute(row[0])
+                if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                    raise RuntimeError("Escrow constraint migration failed integrity check")
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
+        finally:
+            connection.execute("PRAGMA foreign_keys=ON")
 
     @contextmanager
     def connection(self):

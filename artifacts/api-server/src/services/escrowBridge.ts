@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { z } from "zod";
+import { readEscrowBitcoinPrice } from "./escrowPricing";
 
 export type EscrowOperation = "create" | "settle" | "lookup" | "receipt";
 const workerResult = z.object({
@@ -19,7 +20,9 @@ export type EscrowExecutor = (
 ) => Promise<EscrowWorkerResult>;
 
 /** Only staged source code is bundled. The custody DB never enters dist/. */
-export const executeEscrow: EscrowExecutor = (operation, body, height, signal) => {
+export const executeEscrow: EscrowExecutor = async (operation, body, height, signal) => {
+  if (signal?.aborted) throw new Error("Escrow request cancelled");
+  const price = operation === "create" ? await readEscrowBitcoinPrice() : undefined;
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error("Escrow request cancelled"));
     const managedPython = fileURLToPath(
@@ -69,7 +72,7 @@ export const executeEscrow: EscrowExecutor = (operation, body, height, signal) =
       }
     });
     child.stdin.end(JSON.stringify({
-      operation, body, strata_height: height,
+      operation, body, strata_height: height, btc_usd_price: price,
       database_path: path.resolve(process.cwd(), ".data/escrow/escrow.sqlite3"),
     }));
   });

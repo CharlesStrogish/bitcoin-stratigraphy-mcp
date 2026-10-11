@@ -50,20 +50,48 @@ export const EscrowContractStatus = {
   LOCKED: 'LOCKED',
 } as const;
 
-export type EscrowContractTollFeeSats = typeof EscrowContractTollFeeSats[keyof typeof EscrowContractTollFeeSats];
-
-
-export const EscrowContractTollFeeSats = {
-  NUMBER_21: 21,
-} as const;
-
 export interface EscrowContract {
   escrow_id: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
   status: EscrowContractStatus;
   amount_sats: number;
-  toll_fee_sats: EscrowContractTollFeeSats;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  toll_fee_sats: number;
+}
+
+export type EscrowTollQuoteTargetUsd = typeof EscrowTollQuoteTargetUsd[keyof typeof EscrowTollQuoteTargetUsd];
+
+
+export const EscrowTollQuoteTargetUsd = {
+  '002': 0.02,
+} as const;
+
+export type EscrowTollQuoteSource = typeof EscrowTollQuoteSource[keyof typeof EscrowTollQuoteSource];
+
+
+export const EscrowTollQuoteSource = {
+  market: 'market',
+  fallback: 'fallback',
+} as const;
+
+export interface EscrowTollQuote {
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  toll_fee_sats: number;
+  target_usd: EscrowTollQuoteTargetUsd;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  btc_usd_price: number | null;
+  source: EscrowTollQuoteSource;
+  quoted_at: string;
 }
 
 export type EscrowReceiptReceiptType = typeof EscrowReceiptReceiptType[keyof typeof EscrowReceiptReceiptType];

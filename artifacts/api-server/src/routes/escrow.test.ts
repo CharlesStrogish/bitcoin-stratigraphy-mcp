@@ -59,6 +59,40 @@ test("preserves exactly 15 MCP tool schemas and documents all three REST routes"
   ]) assert.deepEqual(paths[path!]![method!]!.tags, ["Autonomous Escrow"]);
 });
 
+test("public toll preview needs no payment or operator token and exposes no escrow secrets", async () => {
+  for (const [price, expected] of [[100_000, 20], [1_000_000, 2], [2_000_000, 1]] as const) {
+    const base = await serve({ readPrice: async () => price,
+      execute: async () => { throw new Error("Quotes must not create contracts"); } });
+    const response = await fetch(`${base}/toll`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const quote = await response.json() as Record<string, unknown>;
+    assert.equal(quote.toll_fee_sats, expected);
+    assert.equal(quote.target_usd, 0.02);
+    assert.equal(quote.source, "market");
+    assert.equal(Object.hasOwn(quote, "preimage"), false);
+  }
+});
+
+test("public toll quote falls back to exactly 21 when market provider fails", async () => {
+  const base = await serve({ readPrice: async () => { throw new Error("offline"); } });
+  const response = await fetch(`${base}/toll`);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json() as Record<string, unknown>).toll_fee_sats, 21);
+});
+
+test("create envelope accepts dynamically evaluated tolls and rejects zero", async () => {
+  for (const fee of [1, 2, 13, 40, 0]) {
+    const base = await serve({ execute: async () => ({ status: 201, body: {
+      escrow_id: id, payment_hash: "f".repeat(64), status: "LOCKED",
+      amount_sats: input.amount_sats, toll_fee_sats: fee,
+    } }) });
+    const response = await fetch(`${base}/create`, post(input));
+    assert.equal(response.status, fee === 0 ? 503 : 201);
+    if (fee > 0) assert.equal((await response.json() as Record<string, unknown>).toll_fee_sats, fee);
+  }
+});
+
 test("returns 400 for missing/unknown fields without reaching payment or Python", async () => {
   const base = await serve({ execute: async () => { throw new Error("Must not execute"); } });
   for (const body of [{}, { ...input, extra: true }, { ...input, amount_sats: 0 },

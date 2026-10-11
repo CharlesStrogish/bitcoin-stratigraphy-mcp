@@ -33,7 +33,7 @@ class EscrowApi:
                 contract = self.engine.create_l402_escrow(**body)
                 return 201, {
                     **contract, "status": "LOCKED",
-                    "amount_sats": body["amount_sats"], "toll_fee_sats": 21,
+                    "amount_sats": body["amount_sats"],
                 }
             fields = (
                 {"escrow_id", "execution_trace", "result_payload"}

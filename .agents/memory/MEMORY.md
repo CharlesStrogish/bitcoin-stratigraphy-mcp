@@ -8,6 +8,7 @@
 - [Macaroon delegation caveats](macaroon-delegation-caveats.md) — enforce tool and target restrictions at redemption, and deny routes that cannot honor them.
 - [Macaroon revocation scope](macaroon-revocation-scope.md) — revoke exact final signatures, keep relatives valid, and fail closed when the shared index is unavailable.
 - [Dynamic pass price binding](dynamic-pass-price-binding.md) — bind each issued scarcity price into the macaroon and cache scope; verify against issuance, not the latest quote.
+- [Escrow affordability](escrow-affordability.md) — USD-normalized settlement tolls protect autonomous agents during Bitcoin appreciation; keep REST access fees separate.
 - [Settlement failover invariants](settlement-failover-invariants.md) — abort timed-out clients, single-probe recovery, and cache fallback invoices under predicted and actual providers.
 - [Paid SSE lifecycle](paid-sse-lifecycle.md) — authenticate before headers, propagate disconnect aborts through paid checks, bound upstream reads, and stop shared timers at zero listeners.
 - [L402 SDK payment coordination](l402-sdk-payment-coordination.md) — bind preimages to challenge hashes and never let delayed 402 responses replace or repay newer credentials.

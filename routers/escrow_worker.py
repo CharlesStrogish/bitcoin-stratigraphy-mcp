@@ -24,6 +24,9 @@ def main():
         engine = EscrowEngine(
             EscrowStore(request["database_path"]),
             strata_block_provider=(lambda: height) if height is not None else None,
+            bitcoin_price_provider=(
+                (lambda: request["btc_usd_price"]) if "btc_usd_price" in request else None
+            ),
         )
         status, body = EscrowApi(engine).dispatch(request["operation"], request["body"])
         print(json.dumps({"status": status, "body": body}))

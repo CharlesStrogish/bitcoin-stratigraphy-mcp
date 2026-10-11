@@ -132,6 +132,20 @@ async function fetchText(url: string, signal: AbortSignal) {
   return readBoundedBody(response);
 }
 
+/** The same bounded market rail used by paid stratigraphy telemetry. */
+export async function readLiveBitcoinUsdPrice(): Promise<number | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  timeout.unref();
+  try {
+    const value = await fetchJson("https://mempool.space/api/v1/prices", controller.signal);
+    const price = (value as { USD?: unknown } | null)?.USD;
+    return typeof price === "number" && Number.isFinite(price) && price > 0 ? price : null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function readLiveBitcoinTelemetry(input: {
   epochProgressPercent: number;
   thermodynamicSignal: string;

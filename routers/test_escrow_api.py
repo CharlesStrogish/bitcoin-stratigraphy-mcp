@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from routers.escrow_api import EscrowApi
 from services.escrow_db import EscrowStore
@@ -11,6 +12,9 @@ from services.escrow_engine import EscrowEngine
 
 class EscrowApiTests(unittest.TestCase):
     def setUp(self):
+        price = patch("services.escrow_pricing.read_bitcoin_usd_price", return_value=None)
+        price.start()
+        self.addCleanup(price.stop)
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.store = EscrowStore(Path(directory.name) / "private" / "escrow.sqlite3")

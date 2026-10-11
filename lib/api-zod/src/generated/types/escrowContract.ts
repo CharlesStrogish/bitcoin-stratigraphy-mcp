@@ -22,7 +22,6 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { EscrowContractStatus } from './escrowContractStatus';
-import type { EscrowContractTollFeeSats } from './escrowContractTollFeeSats';
 
 export interface EscrowContract {
   escrow_id: string;
@@ -30,5 +29,9 @@ export interface EscrowContract {
   payment_hash: string;
   status: EscrowContractStatus;
   amount_sats: number;
-  toll_fee_sats: EscrowContractTollFeeSats;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  toll_fee_sats: number;
 }

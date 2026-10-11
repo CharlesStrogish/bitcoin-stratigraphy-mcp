@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { CopyJsonButton } from "./CopyJsonButton";
+import type { EscrowTollQuote } from "@workspace/api-client-react";
+import { evaluateEscrowToll } from "../engine/escrowToll";
 import "./escrow-terminal.css";
 
 const enc = new TextEncoder();
@@ -35,19 +37,33 @@ type Run = {
 export function EscrowTerminal() {
   const [stage, setStage] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [toll, setToll] = useState(0);
+  const [toll, setToll] = useState(0n);
+  const [quote, setQuote] = useState<EscrowTollQuote | null>(null);
   const [run, setRun] = useState<Partial<Run>>({});
   const [done, setDone] = useState<Run | null>(null);
   const [error, setError] = useState("");
   const ctl = useRef<AbortController | null>(null);
-  useEffect(() => () => ctl.current?.abort(), []);
+  const quoteCtl = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const c = new AbortController();
+    quoteCtl.current = c;
+    void evaluateEscrowToll(c.signal).then((value) => {
+      if (!c.signal.aborted) setQuote(value);
+    }).catch(() => undefined);
+    return () => { c.abort(); ctl.current?.abort(); };
+  }, []);
 
   const start = async () => {
     if (ctl.current) return;
     const c = new AbortController();
     ctl.current = c;
-    setBusy(true); setError(""); setDone(null); setRun({}); setStage(0);
+    quoteCtl.current?.abort();
+    setBusy(true); setError(""); setDone(null); setRun({}); setStage(0); setQuote(null);
     try {
+      const evaluatedQuote = await evaluateEscrowToll(c.signal);
+      if (c.signal.aborted) return;
+      setQuote(evaluatedQuote);
+      const tollSats = evaluatedQuote.toll_fee_sats;
       const contractId = "SAMPLE-" + rand(4).toUpperCase();
       const taskHash = await sha(enc.encode("task:model-fine-tuning-verification:" + contractId));
       if (c.signal.aborted) return;
@@ -75,11 +91,12 @@ export function EscrowTerminal() {
         contractId, taskHash, traceRecord, resultHash, traceSha256: trace,
         rfc6962: { leafHash: leaf, singleLeafRoot: leaf, leafPrefix: "0x00", treeSize: 1, leafIndex: 0, inclusionPath: [] },
         illustrativePreimage: preimage,
-        tollSats: 21, bountySats: 1000, anchor: null, simulated: true,
+        tollSats, pricing: evaluatedQuote,
+        bountySats: 1000, anchor: null, simulated: true,
       }, null, 2);
       if (c.signal.aborted) return;
       const full = { contractId, taskHash, trace, resultHash, leaf, preimage, json };
-      setRun(full); setDone(full); setStage(3); setToll((t) => t + 21);
+      setRun(full); setDone(full); setStage(3); setToll((t) => t + BigInt(tollSats));
     } catch (e) {
       if (c.signal.aborted) return;
       setError((e as Error).message || "Simulation failed"); setStage(0);
@@ -117,7 +134,10 @@ export function EscrowTerminal() {
         </div>
         <div className="et-step" data-state={st(2)} data-testid="stage-3">
           <div className="section-kicker">3 Settlement &amp; Toll</div>
-          <p>Stratigraphy Hub Validates RFC 6962 Leaf → Releases Payment Preimage → Collects 21 Sats Toll</p>
+          <p>Stratigraphy Hub Validates RFC 6962 Leaf → Releases Payment Preimage →{" "}
+            {quote
+              ? `Collects ${quote.toll_fee_sats} Sats Toll (${quote.source === "market" ? "Dynamic ~$0.02 USD" : "Fallback"})`
+              : "Evaluating Dynamic Toll…"}</p>
           {stage === 2 && <div className="et-leaf-generation" role="status">
             <span aria-hidden="true" /> Generating RFC 6962 leaf…
           </div>}
@@ -135,7 +155,10 @@ export function EscrowTerminal() {
           <Play size={15} aria-hidden="true" /> Simulate Agent Settlement
         </button>
         <span className="et-metric" data-testid="metric-tolls" role="status">
-          Automated Protocol Tolls Accrued: {toll} sats
+          Automated Protocol Tolls Accrued: {toll.toString()} sats
+        </span>
+        <span className="et-baseline" data-testid="metric-current-toll" role="status">
+          {quote ? `Current evaluated toll: ${quote.toll_fee_sats} sats` : "Evaluating current toll…"}
         </span>
         <span className="et-baseline">Simulated only · session baseline: 0 sats</span>
         <CopyJsonButton text={done ? done.json : null} testId="button-copy-escrow-proof"

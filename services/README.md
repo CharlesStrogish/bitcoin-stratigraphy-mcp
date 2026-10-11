@@ -44,8 +44,12 @@ properly backed-up custody volume and understand that durability tradeoff.
   **plaintext secrets**. Permissions are not encryption or an air gap. Deploy on
   an isolated encrypted custody volume; do not expose these modules to untrusted
   workers or add the database to source control.
-- Creation reserves a fixed 21-sat toll in the contract ledger. `amount_sats` is
-  worker consideration; total accounting reservation is `amount_sats + 21`.
+- Creation reserves a USD-normalized toll in the contract ledger, targeting
+  $0.02 using the existing mempool.space Bitcoin/USD price rail. The toll is
+  rounded to an integer with a 1-satoshi floor; failed or invalid rates select
+  exactly 21 sats. `amount_sats` is worker consideration; total accounting
+  reservation is `amount_sats + toll_fee_sats`. The issued toll is persisted
+  once and never repriced at settlement.
   No invoice issuance, funding verification, funds transfer, or toll collection
   occurs. LOCKED is local contract state, **not evidence of a funded escrow**.
 - An authorized operator must independently authenticate the worker, verify
@@ -80,7 +84,7 @@ no wallet, payment, session, or operator secrets in its environment.
 
 All three resources require an existing L402 access proof **and**
 `X-Escrow-Operator-Token` (the configured operator secret). Each access challenge
-costs 21 sats, separately from the contract's 21-sat toll reservation and task
+costs 21 sats, separately from the contract's dynamic toll reservation and task
 consideration. These are operator endpoints: never distribute the operator
 secret to untrusted workers or browser users. Standard token-based CORS applies.
 Invalid request fields return 400 before payment processing. For valid inputs,
@@ -89,6 +93,19 @@ paid callers lacking operator authorization receive 403.
 
 REST settlement reads the current Bitcoin tip using the existing tip provider
 and records its height; this observation is not consensus validation or anchoring.
+
+`GET /api/v1/escrow/toll` is a public, read-only preview for the browser simulator.
+It shares the existing market rail with escrow creation, refreshes successful
+rates after at most 15 seconds, and briefly caches failures for 2 seconds. A
+simulation captures one evaluated toll for its step text, JSON and session
+counter; it never calls the operator creation or settlement routes.
+
+Existing databases with `CHECK(toll_fee_sats = 21)` receive an atomic,
+constraint-only compatibility migration at store initialization. All existing
+columns, custody records, execution leaves, indexes and triggers are retained.
+WAL and foreign-key enforcement remain enabled; failed integrity checks roll
+back the migration. No migration is needed for databases already using the
+positive-integer toll constraint.
 Unknown contracts return 404 before tip lookup. Settled or otherwise non-LOCKED
 contracts return 422. Pending receipt lookups return 404. Provider/custody failures
 return 503 without exposing exception details or secrets.

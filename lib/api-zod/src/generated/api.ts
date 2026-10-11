@@ -25,6 +25,25 @@ import * as zod from 'zod';
 
 
 /**
+ * Public read-only price preview. Uses the existing Bitcoin/USD market rail, a $0.02 target and a 1-satoshi minimum; unavailable or invalid rates select exactly 21 sats. No escrow creation, payment or MCP tool execution.
+ * @summary Preview the current USD-normalized escrow settlement toll
+ */
+export const getEscrowTollResponseTollFeeSatsMax = 9007199254740991;
+
+export const getEscrowTollResponseBtcUsdPriceExclusiveMin = 0;
+
+
+
+export const GetEscrowTollResponse = zod.object({
+  "toll_fee_sats": zod.number().int().min(1).max(getEscrowTollResponseTollFeeSatsMax),
+  "target_usd": zod.literal(0.02),
+  "btc_usd_price": zod.number().gt(getEscrowTollResponseBtcUsdPriceExclusiveMin).nullable(),
+  "source": zod.enum(['market', 'fallback']),
+  "quoted_at": zod.coerce.date()
+})
+
+
+/**
  * Requires L402 access plus X-Escrow-Operator-Token. The 21-sat access invoice is separate from the contract toll reservation; LOCKED does not establish funding.
  * @summary Create a local execution escrow commitment
  */
@@ -43,6 +62,8 @@ export const CreateEscrowBody = zod.object({
 })
 
 export const createEscrowResponsePaymentHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const createEscrowResponseTollFeeSatsMax = 9007199254740991;
+
 
 
 export const CreateEscrowResponse = zod.object({
@@ -50,7 +71,7 @@ export const CreateEscrowResponse = zod.object({
   "payment_hash": zod.string().regex(createEscrowResponsePaymentHashRegExp),
   "status": zod.enum(['LOCKED']),
   "amount_sats": zod.number().int(),
-  "toll_fee_sats": zod.literal(21)
+  "toll_fee_sats": zod.number().int().min(1).max(createEscrowResponseTollFeeSatsMax)
 })
 
 

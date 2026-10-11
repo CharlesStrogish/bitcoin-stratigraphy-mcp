@@ -1,0 +1,40 @@
+Run a non-destructive End-to-End (E2E) System Audit, apply IP license protections, and optimize global SEO metadata across the Bitcoin Stratigraphy Data Engine.
+
+### 1. STRICT CONSTRAINTS & CODE INTEGRITY
+- ZERO REGRESSION POLICY: Do not modify, rename, or delete existing core logic, database models, or API routing behaviors.
+- MCP MANIFEST PRESERVATION: The MCP catalog must strictly retain exactly 15 canonical tools (across stratigraphy, proof, payment, and mesh). Do not alter tool names, parameters, or schemas.
+- TEST SUITE INTEGRITY: Ensure all existing test suites pass cleanly without breaking any assertions.
+- DATABASE CONCURRENCY: Verify SQLite runs in WAL mode with a busy timeout of 5000ms (`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;`).
+
+### 2. COPYRIGHT & INTELLECTUAL PROPERTY ENFORCEMENT
+- Scan all newly added files from the Phase 1–4 Escrow Oracle upgrades, the `/compliance` route, and dynamic pricing rails.
+- Ensure every newly created source file has the following dual-license header prepended at line 1:
+  // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
+- Generate a cryptographic audit record:
+  - Compute SHA-256 hashes of all core engine and escrow source files.
+  - Save this hash manifest into `proofs/source-integrity-manifest.json` with an ISO-8601 timestamp.
+  - If `opentimestamps-client` is installed or accessible in the shell environment, attempt to create `.ots` files for the manifest; if not, log the calculated SHA-256 root into the manifest for external anchoring.
+
+### 3. COMPREHENSIVE SEO & CANONICAL AUDIT
+- CANONICAL ANCHORING: Audit every public route (`/`, `/compliance`, `/simulator`, `/api/docs`), HTML template, and JSON-LD script. Ensure all canonical links, Open Graph tags, and structured data point exclusively to:
+  https://bitcoin-stratigraphy-dashboard.replit.app/
+- PURGE DEFUNCT REFERENCES: Perform a codebase search for any hardcoded occurrences of the legacy vanity slug (`dashboard--charlesstrogish`). If found in internal links, schemas, or docs, replace them with the production domain (`bitcoin-stratigraphy-dashboard.replit.app`).
+- STRUCTURED DATA VALIDATION: Verify that every page exports valid Schema.org JSON-LD:
+  - Homepage / Dashboard: `@type: "Dataset"` with `"name": "Bitcoin Stratigraphy Dataset"`, valid `"creator"` containing `@type: "Person"` with `"name": "Charles R. Strogish"`, and appropriate license URLs.
+  - Escrow Terminal & Compliance Route: Ensure structured markup accurately reflects the Autonomous Proof-of-Execution Escrow Oracle (L402 + RFC 6962) authored by Charles R. Strogish.
+- Create a `glama.json` file in the root directory setting the publisher/author name explicitly to "Charles R. Strogish" to override the default namespace with this exact content:
+  {
+    "publisher": "Charles R. Strogish",
+    "website": "https://bitcoin-stratigraphy-dashboard.replit.app/"
+  }
+- CRAWLER DIRECTIVES:
+  - Check `robots.txt` to confirm all public routes are open for crawling, while internal temp files remain disallowed.
+  - Verify that `sitemap.xml` lists all public endpoints (including `/compliance`), includes updated `<lastmod>` tags, and uses clean production URLs.
+
+### 4. TEST RUN & VERIFICATION REPORT
+- Run the full test suite (`npm test` or your designated test runner). Confirm that 100% of tests pass with 0 failures.
+- Output a clear summary report detailing:
+  1. Files updated with copyright headers.
+  2. SHA-256 hash manifest verification results.
+  3. Total test pass count and health status.
+  4. Structured data / SEO validation status across all endpoints.

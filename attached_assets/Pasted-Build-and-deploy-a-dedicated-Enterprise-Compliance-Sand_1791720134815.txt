@@ -1,0 +1,51 @@
+Build and deploy a dedicated "Enterprise Compliance Sandbox" page for the Bitcoin Stratigraphy Data Engine to target corporate risk officers and EU AI Act Article 12 auditors.
+
+### 1. STRICT CONSTRAINTS & ZERO REGRESSION
+- Do not modify, break, or alter any of the 15 existing MCP tools, the SQLite WAL database, or the live L402 routing logic.
+- Ensure the existing "Simulate Agent Settlement" button and Escrow Terminal on the homepage continue to function exactly as they do now.
+
+### 2. CREATE THE COMPLIANCE ROUTE
+- Create a new public route: `/compliance` (or `/enterprise-compliance`).
+- Build a clean, highly professional, dark-mode-optimized webpage/template for this route that matches the existing UI aesthetics (e.g., gold/yellow accents, terminal-style typography).
+
+### 3. INJECT THE COPY
+Populate the new page with the following exact text, properly formatted with standard web typography (H1, H2, bullet points, and bold text):
+
+# EU AI Act Article 12 Compliance Sandbox: Autonomous Proof-of-Execution
+
+## 1. The Enterprise Compliance Problem
+Under Article 12 of the EU AI Act, organizations deploying high-risk autonomous AI systems must ensure the automatic, tamper-proof recording of events throughout the system's lifetime. When a regulatory auditor investigates an AI agent's decision six months after execution, standard IT logs are legally insufficient. A traditional log file can be quietly edited, overwritten, or deleted by a system administrator without leaving a trace, entirely breaking the chain of custody. If an enterprise cannot cryptographically prove that an agent's execution trace was complete, unaltered, and properly governed, they face severe regulatory penalties.
+
+## 2. The L402 + RFC 6962 Solution
+The Bitcoin Stratigraphy Data Engine solves the Article 12 mandate natively by replacing mutable databases with mathematically non-repudiable state-anchoring. We combine two protocols to create an enterprise-grade "Flight Recorder" for multi-agent swarms:
+- **L402 Micro-Settlements:** Autonomous agents do not wait for human procurement. They programmatically fund their own execution traces using 21-satoshi Lightning Network micro-settlements, bypassing API key bottlenecks and credit card walls.
+- **RFC 6962 Merkle Evidence:** Every agent thought, context window, and tool execution is hashed into an append-only Merkle tree. If a single comma in a historical agent log is altered, the cryptographic root hash fractures, immediately alerting auditors to tampering.
+
+## 3. Sandbox Walkthrough: Simulating Agent Settlement
+To demonstrate this cryptographic custody chain without requiring an active Lightning Network wallet, use our Autonomous Escrow Simulator on the main dashboard. Follow these exact steps to view the compliance evidence your engineering team will receive in production:
+1. **Navigate to the Escrow Terminal:** Return to the main dashboard.
+2. **Execute the Simulation:** Click the yellow "Simulate Agent Settlement" button.
+3. **Analyze the Flow:** The UI visually guides you through the machine settlement: Agent A locks the bounty, Agent B submits the execution trace, and the Stratigraphy Hub validates the RFC 6962 Merkle leaf while collecting the 21-sat toll.
+4. **Export the Evidence:** Click the "Copy Escrow Proof (JSON)" button. This JSON-LD payload is the exact, audit-ready structured data your risk team will hand to EU regulators.
+
+## 4. Enterprise Air-Gapped Licensing
+The public Bitcoin Stratigraphy network operates under the AGPLv3 Open-Source License. If you connect your proprietary internal AI swarms to the public network, the AGPLv3 legally mandates that you open-source your entire proprietary AI codebase and model weights to the public. For massive technology corporations that cannot expose proprietary agent logic, we provide a **Commercial Enterprise License ($250k/Annual)**. 
+
+The Enterprise Exemption grants:
+- Complete IP Protection: A full exemption from all AGPLv3 open-source requirements.
+- Air-Gapped Deployment: The legal right to deploy the Notary Hub and Escrow Oracle entirely on-premises or within isolated internal networks.
+- Zero-Telemetry Sovereign Guarantee: 100% offline, self-contained execution with zero vendor backdoors, network phone-home pings, or third-party dependencies.
+
+[Contact crstrogish@aol.com for Enterprise Licensing]
+
+### 4. UI INTEGRATION & NAVIGATION
+- On the main homepage/dashboard, add a highly visible link or badge near the Escrow Terminal that says: "EU AI Act Article 12 Compliance Guide" and links to `/compliance`.
+- Add "Enterprise Compliance" to the main site navigation or footer.
+- At the bottom of the new `/compliance` page, add a primary CTA button that links back to the homepage `/` with the text: "Access the Escrow Simulator".
+
+### 5. SEO & CANONICAL METADATA
+- Ensure the new page has the following meta tags:
+  - `<title>`: EU AI Act Article 12 Compliance Sandbox | Bitcoin Stratigraphy
+  - `<meta name="description" content="Simulate autonomous L402 proof-of-execution and ensure your multi-agent swarms meet EU AI Act Article 12 compliance with RFC 6962 Merkle flight recorders.">`
+  - `<link rel="canonical" href="https://bitcoin-stratigraphy-dashboard.replit.app/compliance" />`
+- Add `@type: "TechArticle"` or `@type: "WebPage"` structured data (JSON-LD) to this route, clearly noting the author as Charles R. Strogish.

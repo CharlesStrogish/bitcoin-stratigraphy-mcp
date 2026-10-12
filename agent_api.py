@@ -56,6 +56,7 @@ def create_app(*, proof_directory=ARCHIVE_DIRECTORY, proof_storage=None) -> Fast
                 timeout=8,
                 verify=ssl.create_default_context(),
                 follow_redirects=False,
+                trust_env=False,
             ) as bitcoin_client:
                 pipeline = StratigraphyPipeline(bitcoin_client)
                 application.state.stratigraphy_pipeline = pipeline

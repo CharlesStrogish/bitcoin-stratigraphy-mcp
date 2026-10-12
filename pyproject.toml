@@ -7,6 +7,7 @@ dependencies = [
     "autogen-agentchat==0.7.5",
     "autogen-ext[openai]==0.7.5",
     "bitcoin-stratigraphy-enterprise",
+    "coverage>=7.16.2",
     "cryptography>=50.0.2",
     "fastapi>=0.143.0",
     "fastapi-mcp>=0.4.0",

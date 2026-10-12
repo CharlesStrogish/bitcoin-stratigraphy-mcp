@@ -5,10 +5,13 @@ import asyncio
 import json
 import logging
 import math
+import os
 import re
 import time
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -33,6 +36,99 @@ logger = logging.getLogger(__name__)
 
 class PipelineUnavailable(Exception):
     """A complete, fresh snapshot cannot currently be supplied."""
+
+
+@dataclass(frozen=True)
+class BitcoinCoreConfig:
+    url: str = field(repr=False)
+    user: str = field(repr=False)
+    password: str = field(repr=False)
+
+    @classmethod
+    def from_environment(cls):
+        names = ("BITCOIN_CORE_RPC_URL", "RPC_USER", "RPC_PASSWORD")
+        if not any(name in os.environ for name in names):
+            return None
+        values = [os.environ.get(name, "") for name in names]
+        if not all(value.strip() for value in values):
+            raise PipelineUnavailable("All three Bitcoin Core RPC settings are required")
+        try:
+            parsed = urlsplit(values[0])
+            valid = (
+                parsed.scheme in ("http", "https") and parsed.hostname
+                and parsed.port != 0 and not parsed.username and not parsed.password
+                and not parsed.query and not parsed.fragment
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise PipelineUnavailable("Invalid Bitcoin Core RPC URL")
+        return cls(*values)
+
+
+async def _read_rpc(client: httpx.AsyncClient, config: BitcoinCoreConfig, method: str, params: list):
+    """Bound authenticated RPC responses; never redirect or try public providers."""
+    try:
+        async with asyncio.timeout(8):
+            async with client.stream(
+                "POST", config.url, auth=httpx.BasicAuth(config.user, config.password),
+                json={"jsonrpc": "1.0", "id": method, "method": method, "params": params},
+                follow_redirects=False,
+            ) as response:
+                response.raise_for_status()
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    if len(body) + len(chunk) > 256 * 1024:
+                        raise ValueError("RPC response exceeds size limit")
+                    body.extend(chunk)
+        data = json.loads(body)
+        if (
+            not isinstance(data, dict) or data.get("id") != method
+            or data.get("error") is not None or "result" not in data
+        ):
+            raise ValueError("Invalid RPC response")
+        return data["result"]
+    except (httpx.HTTPError, TimeoutError, ValueError, UnicodeError):
+        # Do not expose URLs, node errors, or Basic Auth credentials.
+        raise PipelineUnavailable("Bitcoin Core RPC input unavailable") from None
+
+
+async def _read_chain_info(client: httpx.AsyncClient, config: BitcoinCoreConfig) -> dict:
+    info = await _read_rpc(client, config, "getblockchaininfo", [])
+    if (
+        not isinstance(info, dict) or info.get("chain") != "main"
+        or type(info.get("blocks")) is not int
+        or not 0 <= info["blocks"] <= MAX_BLOCK_HEIGHT
+        or not isinstance(info.get("bestblockhash"), str)
+        or not re.fullmatch(r"[0-9a-f]{64}", info["bestblockhash"])
+        or info.get("initialblockdownload") is not False
+    ):
+        raise PipelineUnavailable("Bitcoin Core mainnet tip unavailable or still syncing")
+    return info
+
+
+async def _read_core_snapshot(client: httpx.AsyncClient, config: BitcoinCoreConfig):
+    info = await _read_chain_info(client, config)
+    height, block_hash = info["blocks"], info["bestblockhash"]
+    header = await _read_rpc(client, config, "getblockheader", [block_hash, True])
+    if (
+        not isinstance(header, dict) or header.get("hash") != block_hash
+        or type(header.get("height")) is not int or header["height"] != height
+        or type(header.get("time")) is not int or header["time"] < 0
+    ):
+        raise PipelineUnavailable("Bitcoin Core header does not match its reported tip")
+    hashrate = _positive_number(await _read_rpc(client, config, "getnetworkhashps", [120, height]))
+    # Bitcoin Core has no fiat-price oracle. Publish chain telemetry without
+    # inventing a price or reaching out of the air-gapped deployment.
+    snapshot = calculate_stratigraphy_metrics(
+        height, None, hashrate, "unavailable:bitcoin-core-has-no-fiat-price",
+    )
+    return snapshot.model_copy(update={
+        "source": "bitcoin-core-rpc:getblockchaininfo",
+        "hashrate_source": "bitcoin-core-rpc:getnetworkhashps",
+        "best_block_hash": block_hash,
+        "block_header": header,
+    })
 
 
 class SupplyMetrics(BaseModel):
@@ -60,9 +156,9 @@ class SupplyMetrics(BaseModel):
 
 
 class StratigraphyMetrics(SupplyMetrics):
-    btc_price_usd: float = Field(gt=0, description="Observed Bitcoin spot price in USD.")
+    btc_price_usd: float | None = Field(gt=0, description="Observed Bitcoin spot price in USD; null in local-node mode.")
     hal_finney_horizon_target_usd: Literal[10_000_000.0] = HORIZON_PRICE_USD
-    hal_finney_horizon_multiple: float = Field(
+    hal_finney_horizon_multiple: float | None = Field(
         gt=0, description="10000000.0 / btc_price_usd; not a time-to-target forecast."
     )
     # Declaration order preserves adjacency in both REST and MCP JSON.
@@ -86,6 +182,8 @@ class StratigraphyMetrics(SupplyMetrics):
         "excludes cooling and other auxiliary loads."
     )
     snapshot_age_seconds: float = Field(ge=0, default=0)
+    best_block_hash: str | None = None
+    block_header: dict | None = None
 
 
 def calculate_supply_metrics(height: int) -> SupplyMetrics:
@@ -139,6 +237,9 @@ async def _read_body(client: httpx.AsyncClient, url: str, limit: int) -> bytes:
 
 
 async def read_live_height(client: httpx.AsyncClient) -> int:
+    config = BitcoinCoreConfig.from_environment()
+    if config is not None:
+        return (await _read_chain_info(client, config))["blocks"]
     try:
         body = await _read_body(client, TIP_URL, 32)
         text = body.decode("ascii").strip()
@@ -175,12 +276,17 @@ def _positive_number(value, *, allow_string=False) -> float:
 
 
 async def read_live_hashrate(client: httpx.AsyncClient) -> float:
+    config = BitcoinCoreConfig.from_environment()
+    if config is not None:
+        return _positive_number(await _read_rpc(client, config, "getnetworkhashps", [120]))
     data = await _read_json(client, HASHRATE_URL)
     return _positive_number(data.get("currentHashrate"))
 
 
-async def read_live_price(client: httpx.AsyncClient) -> tuple[float, str]:
+async def read_live_price(client: httpx.AsyncClient) -> tuple[float | None, str]:
     """Try an independent spot-price provider, then a timestamped public quote."""
+    if BitcoinCoreConfig.from_environment() is not None:
+        return None, "unavailable:bitcoin-core-has-no-fiat-price"
     try:
         data = (await _read_json(client, PRICE_URL)).get("data")
         if not isinstance(data, dict) or data.get("base") != "BTC" or data.get("currency") != "USD":
@@ -197,15 +303,16 @@ async def read_live_price(client: httpx.AsyncClient) -> tuple[float, str]:
 
 
 def calculate_stratigraphy_metrics(
-    height: int, price_usd: float, hashrate_h_s: float, price_source: str
+    height: int, price_usd: float | None, hashrate_h_s: float, price_source: str
 ) -> StratigraphyMetrics:
-    price_usd = _positive_number(price_usd)
+    if price_usd is not None:
+        price_usd = _positive_number(price_usd)
     hashrate_h_s = _positive_number(hashrate_h_s)
     hashrate_th_s = hashrate_h_s / 1e12
     return StratigraphyMetrics(
         **calculate_supply_metrics(height).model_dump(),
         btc_price_usd=price_usd,
-        hal_finney_horizon_multiple=HORIZON_PRICE_USD / price_usd,
+        hal_finney_horizon_multiple=HORIZON_PRICE_USD / price_usd if price_usd is not None else None,
         network_hashrate_h_s=hashrate_h_s,
         network_hashrate_th_s=hashrate_th_s,
         network_energy_watts=hashrate_th_s * EFFICIENCY_BASELINE_J_TH,
@@ -261,6 +368,12 @@ class StratigraphyPipeline:
             return False
 
     async def _refresh(self):
+        config = BitcoinCoreConfig.from_environment()
+        if config is not None:
+            async with asyncio.timeout(20):
+                snapshot = await _read_core_snapshot(self.client, config)
+            self._published = (snapshot, time.monotonic())
+            return
         tasks = [
             asyncio.create_task(read_live_height(self.client)),
             asyncio.create_task(read_live_price(self.client)),

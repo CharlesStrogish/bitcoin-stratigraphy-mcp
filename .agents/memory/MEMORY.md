@@ -65,3 +65,4 @@
 - [Production SEO safeguards](production-seo-safeguards.md) — align stale tests to intentional SEO; preserve crawler visibility, canonical metadata and attribution.
 - [SQLite WAL startup](sqlite-wal-startup.md) — a busy timeout does not guarantee concurrent cold journal-mode transitions; audit startup separately from steady-state writes.
 - [Read-only Git audits](read-only-git-audits.md) — compare committed blobs without index refreshes; do not elevate Git permissions for an integrity check.
+- [Enterprise air-gap scope](enterprise-air-gap.md) — commercial deployments need local telemetry; distinguish pipeline isolation from other services' network requirements.

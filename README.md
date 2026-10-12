@@ -32,6 +32,34 @@ Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin tele
 
 ## Licensing, IP & Enterprise Terms
 
+### Local Bitcoin Core telemetry (enterprise pipeline)
+
+Set all three environment variables on the deployment:
+`BITCOIN_CORE_RPC_URL` (for example, `http://127.0.0.1:8332`), `RPC_USER`,
+and `RPC_PASSWORD`. Keep credentials in your deployment's secret configuration,
+not in source control or the RPC URL. Enable authenticated Bitcoin Core RPC and
+restrict its listener/firewall to the engine's trusted network.
+
+`stratigraphy_pipeline.py` then uses only the configured RPC endpoint:
+`getblockchaininfo`, `getblockheader`, and `getnetworkhashps`. Headers and hashrate
+are bound to the same observed mainnet tip. A node still in initial block download,
+invalid/partial configuration, or RPC failure makes telemetry unavailable; it
+never triggers a public-API fallback. RPC redirects are refused, and the enterprise
+telemetry HTTP client ignores ambient HTTP proxy settings.
+
+Bitcoin Core does not provide BTC/USD prices. Local-mode snapshots report
+`btc_price_usd` and `hal_finney_horizon_multiple` as `null`, with an explicit
+unavailable price source; supply, header, hashrate, and power metrics remain usable.
+When **all three variables are absent**, the existing mempool.space/Coinbase
+route (including the public price fallback) remains unchanged.
+This mode isolates the telemetry pipeline; other services, including cloud
+archives, OpenTimestamps calendars, relays, and Lightning wallets, have their
+own connectivity requirements.
+
+Run `bash scripts/test-stratigraphy-coverage.sh` to exercise both RPC and public
+routes with offline HTTP fixtures. The command enforces **100% statement and
+branch coverage** for `stratigraphy_pipeline.py`, including failure paths.
+
 **Created & Architected by Charles R. Strogish.**
 
 Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.

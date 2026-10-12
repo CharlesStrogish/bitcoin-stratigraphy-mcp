@@ -2,6 +2,7 @@
 """Live-provider parsing, exact requested models and continuous worker lifecycle."""
 
 import asyncio
+import os
 import time
 import unittest
 from unittest.mock import patch
@@ -26,6 +27,16 @@ def live_response(request):
 
 
 class MetricModelTests(unittest.TestCase):
+    def test_invalid_heights_and_numeric_conversion_failures(self):
+        for height in (-1, True, "1", pipeline.MAX_BLOCK_HEIGHT + 1):
+            with self.assertRaises(ValueError):
+                pipeline.calculate_supply_metrics(height)
+        self.assertEqual(pipeline.calculate_supply_metrics(0).scheduled_issued_supply_sats, 50 * 10**8)
+        self.assertEqual(pipeline.calculate_supply_metrics(pipeline.MAX_BLOCK_HEIGHT).current_block_subsidy_btc, 0)
+        for value in ("bad", 10**1000):
+            with self.assertRaises(pipeline.PipelineUnavailable):
+                pipeline._positive_number(value, allow_string=True)
+
     def test_requested_formulas_and_exact_metadata(self):
         result = pipeline.calculate_stratigraphy_metrics(971032, 83530.875, 1e21, pipeline.PRICE_URL)
         self.assertEqual(result.hal_finney_horizon_multiple, 10000000.0 / 83530.875)
@@ -59,6 +70,47 @@ class MetricModelTests(unittest.TestCase):
 
 
 class PipelineTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        env = patch.dict(os.environ, {}, clear=True)
+        env.start()
+        self.addCleanup(env.stop)
+
+    async def test_height_parser_rejects_invalid_public_responses(self):
+        for body in (b"invalid", b"\xff", b"2147483648", b"x" * 33):
+            async with httpx.AsyncClient(transport=httpx.MockTransport(
+                lambda _: httpx.Response(200, content=body),
+            )) as client:
+                with self.assertRaises(pipeline.PipelineUnavailable):
+                    await pipeline.read_live_height(client)
+
+    async def test_invalid_worker_intervals(self):
+        async with httpx.AsyncClient() as client:
+            for value in (0, -1, float("nan"), float("inf")):
+                for key in ("refresh_interval", "max_age"):
+                    with self.assertRaises(ValueError):
+                        pipeline.StratigraphyPipeline(client, **{key: value})
+
+    async def test_failed_public_input_cancels_remaining_tasks(self):
+        cancelled = []
+        async def failed(_client):
+            await asyncio.sleep(0)
+            raise pipeline.PipelineUnavailable("fixture failure")
+        async def pending(_client):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.append(True)
+        async with httpx.AsyncClient() as client:
+            worker = pipeline.StratigraphyPipeline(client)
+            with (
+                patch.object(pipeline, "read_live_height", failed),
+                patch.object(pipeline, "read_live_price", pending),
+                patch.object(pipeline, "read_live_hashrate", pending),
+                self.assertRaises(pipeline.PipelineUnavailable),
+            ):
+                await worker._refresh()
+            self.assertEqual(len(cancelled), 2)
+
     async def test_primary_price_and_hashrate_units(self):
         async with httpx.AsyncClient(transport=httpx.MockTransport(live_response)) as client:
             price, source = await pipeline.read_live_price(client)

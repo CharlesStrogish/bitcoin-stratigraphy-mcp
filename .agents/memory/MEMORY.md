@@ -53,6 +53,7 @@
 - [MCP freemium policy](mcp-freemium-policy.md) — exactly two free sandbox capabilities; all other canonical tools require paid access.
 - [Macro payment caching](macro-payment-caching.md) — share exact invoice proofs across descendants, but never cache away expiry, revocation, or inherited quotas.
 - [OpenTimestamps dependency choice](opentimestamps-dependency-choice.md) — use the official Python library; the latest JavaScript package was blocked by vulnerable legacy dependencies.
+- [Daily provenance policy](daily-provenance-policy.md) — UTC archive dates must be real captures; retries preserve exact bytes, and calendar receipts are not Bitcoin verification.
 - [Bilateral settlement trust](b2b-settlement-trust.md) — seal receipts separately from contract signatures; independent Bitcoin evidence is not an exact legal clock or payment proof.
 - [Orphaned workflows](orphaned-workflow-processes.md) — failed workflows may leave old servers holding ports; confirm ownership before restarting.
 - [Swarm disclosure trust](swarm-disclosure-trust.md) — blinded Merkle paths are not ZK proofs; local membership, recorder authority and Bitcoin inclusion are separate findings.

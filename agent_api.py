@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
-"""License-gated Bitcoin supply API and its separate, single-tool MCP server."""
+"""License-gated live Bitcoin metrics and historical provenance MCP server."""
 
 import os
 import ssl
@@ -11,6 +11,8 @@ from fastapi.responses import RedirectResponse
 from fastapi_mcp import FastApiMCP
 
 from main import require_enterprise_license
+from provenance_anchor import ARCHIVE_DIRECTORY, ProvenanceAnchor
+from provenance_routes import register_provenance_routes
 from stratigraphy_pipeline import (
     MAX_BLOCK_HEIGHT as MAX_BLOCK_HEIGHT,
     TIP_URL as TIP_URL,
@@ -37,7 +39,7 @@ async def read_live_height(client: httpx.AsyncClient) -> int:
         ) from exc
 
 
-def create_app() -> FastAPI:
+def create_app(*, proof_directory=ARCHIVE_DIRECTORY) -> FastAPI:
     # Runs during `uvicorn agent_api:app` import, before an API can be constructed.
     require_enterprise_license()
 
@@ -53,10 +55,14 @@ def create_app() -> FastAPI:
             ) as bitcoin_client:
                 pipeline = StratigraphyPipeline(bitcoin_client)
                 application.state.stratigraphy_pipeline = pipeline
+                anchor = ProvenanceAnchor(pipeline, bitcoin_client, directory=proof_directory)
+                application.state.provenance_anchor = anchor
                 try:
                     await pipeline.start()
+                    await anchor.start()
                     yield
                 finally:
+                    await anchor.stop()
                     await pipeline.stop()
         finally:
             await tool_client.aclose()
@@ -109,10 +115,12 @@ def create_app() -> FastAPI:
                 detail="Live stratigraphy pipeline unavailable. No placeholder or stale data returned.",
             ) from exc
 
+    register_provenance_routes(application, proof_directory, API_PREFIX)
+
     mcp = FastApiMCP(
         application,
         name="Bitcoin Stratigraphy Enterprise Supply",
-        include_operations=["get_supply_metrics"],
+        include_operations=["get_supply_metrics", "get_historical_proof"],
         describe_full_response_schema=True,
         http_client=tool_client,
     )

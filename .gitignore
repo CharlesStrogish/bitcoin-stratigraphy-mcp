@@ -58,3 +58,6 @@ Thumbs.db
 /sdk/python/*.egg-info/
 __pycache__/
 *.pyc
+
+# Runtime provenance archives and generated verification artifacts.
+/generated-artifacts/

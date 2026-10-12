@@ -130,7 +130,7 @@ class AgentApiTests(unittest.TestCase):
                     for operation in path.values()
                     if isinstance(operation, dict) and "operationId" in operation
                 ]
-                self.assertEqual(operations, ["get_supply_metrics"])
+                self.assertEqual(operations, ["get_supply_metrics", "get_historical_proof"])
                 response = client.get("/agent-api/supply-metrics")
                 self.assertEqual(response.status_code, 200)
                 result = response.json()

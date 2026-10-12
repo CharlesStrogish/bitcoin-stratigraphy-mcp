@@ -25,7 +25,10 @@ It is registered as a second service of the existing API artifact.
 
 - `/agent-api/docs`: OpenAPI documentation.
 - `/agent-api/supply-metrics`: REST JSON for `get_supply_metrics`.
-- `/agent-api/mcp`: MCP Streamable HTTP; exactly one tool, `get_supply_metrics`.
+- `/agent-api/mcp`: MCP Streamable HTTP; two tools, `get_supply_metrics` and
+  `get_historical_proof`.
+- `/agent-api/historical-proof?date=YYYY-MM-DD`: archived JSON and OpenTimestamps
+  proof, including exact contents and download URLs.
 - `/agent-api/health`: process health; not an MCP tool.
 
 The existing `/mcp` server and its 15 canonical tools are unchanged.
@@ -89,3 +92,100 @@ prediction of when that valuation will occur**.
 
 The license gate authorizes this deployment to start; it is not per-agent request
 authentication. No existing L402 gates or public API access rules were changed.
+
+## Phase 3: cryptographic provenance
+
+`provenance_anchor.py` schedules a background job at **midnight UTC**, once per UTC
+day, after licensed ASGI startup. It captures the live pipeline's complete,
+non-expired snapshot and saves these local files:
+
+```text
+generated-artifacts/provenance/snapshot_YYYY-MM-DD.json
+generated-artifacts/provenance/snapshot_YYYY-MM-DD.json.ots
+```
+
+The date identifies the archive's UTC capture day; the JSON's `observed_at_utc`
+retains the source-collection time. The job does not manufacture past dates or
+capture an additional snapshot merely because the process restarts. The first
+new snapshot is created at the next midnight UTC. If collection/stamping fails,
+the job retries every five minutes. Once JSON is saved, retries stamp those
+**same bytes**, never recapture different data under that date.
+
+The installed `opentimestamps-client` supplies the official core library.
+Stamping uses SHA-256 detached-file proofs, standard random-nonce blinding,
+and the library's default public calendar pools. The asyncio transport has
+deadlines, bounded responses and disabled redirects; it requires two accepted
+calendar responses, matching the CLI default quorum. Files are atomically
+published without overwriting existing archives; per-date filesystem locks
+coordinate workers sharing the same local disk. Shutdown cancels and awaits
+outstanding calendar submissions. Incomplete saved snapshots resume after restart.
+
+Archives are excluded from Git and deployment build images. **This is local
+storage as requested, not a durable replicated archive.** Republish, container
+replacement, or separate deployment instances may lose or not share these files.
+Retain externally downloaded copies or add persistent storage for durable
+production history. A missed date remains unavailable rather than being backfilled
+with today's data.
+
+### Agent retrieval
+
+MCP:
+
+```json
+{"name":"get_historical_proof","arguments":{"date":"2026-10-12"}}
+```
+
+REST:
+
+```text
+GET /agent-api/historical-proof?date=2026-10-12
+```
+
+The response contains:
+- `snapshot_json`: the **exact saved UTF-8 text**, including its final newline.
+- `ots_proof_base64`: the **exact detached .ots bytes**, base64-encoded.
+- `snapshot_sha256`, `ots_sha256`, filenames and `proof_status`.
+- `snapshot_download_url`, `ots_download_url` and `bundle_download_url`.
+
+Those URLs serve byte-exact attachments:
+
+```text
+GET /agent-api/historical-proof/2026-10-12/snapshot
+GET /agent-api/historical-proof/2026-10-12/ots
+GET /agent-api/historical-proof/2026-10-12/download
+```
+
+The last URL downloads a ZIP containing both files. Download helpers are REST
+only; they do not add further MCP tools. Retrieval is read-only and first checks
+that the .ots SHA-256 commitment matches the original JSON bytes.
+
+Invalid dates return **422**; missing archives return **404**. A saved snapshot
+without its proof, corrupt files or a commitment mismatch return **409**.
+
+### Independent Bitcoin verification
+
+New OpenTimestamps receipts generally contain **pending calendar attestations**,
+not completed Bitcoin proofs. `proof_status` is either:
+
+- `pending_bitcoin_confirmation`: public-calendar receipt, not yet Bitcoin-confirmed.
+- `bitcoin_attestation_present_unverified`: Bitcoin attestation exists in the
+  receipt, but this server has **not independently verified its chain inclusion**.
+
+After the public calendars anchor the commitment, use an independent, working
+OpenTimestamps CLI with the downloaded files and your own fully validating
+Bitcoin mainnet node:
+
+```sh
+ots upgrade snapshot_2026-10-12.json.ots
+ots verify snapshot_2026-10-12.json.ots
+```
+
+Keep the matching `.json` in the same directory. Do **not** parse and reserialize
+the JSON before verification. Upgrade changes your local proof, not the snapshot.
+The service does not automatically upgrade historical receipts; the client
+obtains confirmation evidence independently from the public calendars.
+
+Calendar acceptance or matching SHA-256 alone is not Bitcoin verification.
+Successful Bitcoin verification establishes that the exact bytes existed by
+the anchoring block, not that every price/hashrate observation is accurate,
+that no days were omitted, or that a block timestamp proves an exact midnight.

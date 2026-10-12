@@ -16,8 +16,10 @@ dependencies = [
     "langgraph==1.2.12",
     "mcp>=1.28.1,<1.29",
     "openai>=2.45,<3",
+    "opentimestamps>=0.4.5",
     "opentimestamps-client>=0.7.2",
     "pydantic>=2.11,<3",
+    "replit-object-storage>=1.0.2",
     "ruff>=0.16.10",
     "uvicorn>=0.54.0",
 ]

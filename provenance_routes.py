@@ -6,14 +6,14 @@ import base64
 import hashlib
 import io
 import zipfile
-from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from provenance_anchor import ProofNotFound, ProofUnavailable, load_historical_proof
+from provenance_anchor import ProofNotFound, ProofUnavailable
+from provenance_storage import StorageUnavailable
 
 
 class HistoricalProof(BaseModel):
@@ -31,18 +31,18 @@ class HistoricalProof(BaseModel):
     verification_instructions: str
 
 
-def register_provenance_routes(app: FastAPI, directory: Path, prefix: str):
-    directory = Path(directory)
-
+def register_provenance_routes(app: FastAPI, storage, prefix: str):
     async def load(day):
         try:
-            return await asyncio.to_thread(load_historical_proof, directory, day)
+            return await asyncio.to_thread(storage.load, day)
         except ValueError as exc:
             raise HTTPException(422, "date must be a real UTC calendar date in YYYY-MM-DD format") from exc
         except ProofNotFound as exc:
             raise HTTPException(404, "No archived snapshot for this UTC date") from exc
         except ProofUnavailable as exc:
             raise HTTPException(409, str(exc)) from exc
+        except StorageUnavailable as exc:
+            raise HTTPException(503, "Historical archive storage is temporarily unavailable") from exc
 
     @app.get(
         f"{prefix}/historical-proof",

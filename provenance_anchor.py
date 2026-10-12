@@ -36,6 +36,10 @@ class ProofUnavailable(Exception):
     pass
 
 
+class MissingHistoricalCapture(ProofUnavailable):
+    pass
+
+
 def validate_date(value: str) -> str:
     if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
         raise ValueError("Use a date in YYYY-MM-DD format")
@@ -186,10 +190,13 @@ def save_once(path: Path, body: bytes):
 class ProvenanceAnchor:
     """Midnight scheduler; retries preserve saved bytes rather than recapturing."""
 
-    def __init__(self, pipeline, client: httpx.AsyncClient, *, directory=ARCHIVE_DIRECTORY):
+    def __init__(self, pipeline, client: httpx.AsyncClient, *, directory=ARCHIVE_DIRECTORY, storage=None):
+        from provenance_storage import ObjectArchive
+
         self.pipeline = pipeline
         self.client = client
         self.directory = Path(directory)
+        self.storage = storage if storage is not None else ObjectArchive()
         self._task: asyncio.Task | None = None
 
     async def start(self):
@@ -209,43 +216,76 @@ class ProvenanceAnchor:
                 raise ProofUnavailable("Another worker is anchoring this date")
             snapshot_path = self.directory / f"snapshot_{day}.json"
             proof_path = snapshot_path.with_suffix(".json.ots")
-            if proof_path.exists():
-                load_historical_proof(self.directory, day)
+            snapshot = await asyncio.to_thread(self.storage.get, day)
+            if snapshot is None:
+                if snapshot_path.exists():
+                    snapshot = read_archive_file(snapshot_path)
+                    StratigraphyMetrics.model_validate_json(snapshot)
+                else:
+                    # Never fabricate a snapshot for a day the process missed.
+                    if day != datetime.now(timezone.utc).date().isoformat():
+                        raise MissingHistoricalCapture("Cannot backfill a missing historical snapshot")
+                    metrics = self.pipeline.get_snapshot()
+                    snapshot = (json.dumps(
+                        metrics.model_dump(), ensure_ascii=False, allow_nan=False, indent=2
+                    ) + "\n").encode("utf-8")
+                    if len(snapshot) > MAX_FILE_SIZE:
+                        raise ProofUnavailable("Snapshot exceeds size limit")
+                    save_once(snapshot_path, snapshot)
+                # Upload before contacting calendars. Adopt an existing winner
+                # atomically, rather than replacing another instance's snapshot.
+                snapshot = await asyncio.to_thread(self.storage.put, day, snapshot)
+            StratigraphyMetrics.model_validate_json(snapshot)
+            proof = await asyncio.to_thread(self.storage.get, day, proof=True)
+            if proof is not None:
+                proof_status(snapshot, proof)
                 return
-            if snapshot_path.exists():
-                snapshot = read_archive_file(snapshot_path)
-                StratigraphyMetrics.model_validate_json(snapshot)
+            if proof_path.exists():
+                proof = read_archive_file(proof_path)
+                try:
+                    proof_status(snapshot, proof)
+                except ProofUnavailable:
+                    # This instance's local capture may have lost the cloud race.
+                    proof = await stamp_snapshot(snapshot, self.client)
             else:
-                # Never fabricate a midnight snapshot for a day the process missed.
-                if day != datetime.now(timezone.utc).date().isoformat():
-                    raise ProofUnavailable("Cannot backfill a missing historical snapshot")
-                metrics = self.pipeline.get_snapshot()
-                snapshot = (json.dumps(
-                    metrics.model_dump(), ensure_ascii=False, allow_nan=False, indent=2
-                ) + "\n").encode("utf-8")
-                if len(snapshot) > MAX_FILE_SIZE:
-                    raise ProofUnavailable("Snapshot exceeds size limit")
-                save_once(snapshot_path, snapshot)
-            proof = await stamp_snapshot(snapshot, self.client)
-            save_once(proof_path, proof)
+                proof = await stamp_snapshot(snapshot, self.client)
+            proof_status(snapshot, proof)
+            if (
+                not proof_path.exists() and snapshot_path.exists()
+                and read_archive_file(snapshot_path) == snapshot
+            ):
+                save_once(proof_path, proof)
+            # Upload as soon as generated; local files are only a retry cache.
+            proof = await asyncio.to_thread(self.storage.put, day, proof, proof=True)
+            proof_status(snapshot, proof)
             logger.info("Archived OpenTimestamps snapshot for UTC date %s", day)
 
     async def _run(self):
         # Resume already-captured, unstamped snapshots after a restart. Never
         # manufacture a missing historical day or stamp a new day at startup.
         pending = set()
+        local_days = set()
         if self.directory.exists():
             for path in self.directory.glob("snapshot_????-??-??.json"):
                 try:
                     day = validate_date(path.name[9:-5])
-                    if not path.with_suffix(".json.ots").exists():
-                        pending.add(day)
+                    local_days.add(day)
                 except ValueError:
                     continue
         due = next_midnight_utc(datetime.now(timezone.utc))
         retry_at = datetime.now(timezone.utc)
+        survey_at = retry_at
         while True:
             now = datetime.now(timezone.utc)
+            if now >= survey_at:
+                try:
+                    snapshots, proofs = await asyncio.to_thread(self.storage.days)
+                    pending.update((snapshots | local_days) - (snapshots & proofs))
+                    local_days.clear()
+                except Exception as exc:
+                    logger.warning("Provenance archive discovery unavailable (%s)", type(exc).__name__)
+                survey_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+                now = datetime.now(timezone.utc)
             if now >= due:
                 pending.add(due.date().isoformat())
                 due = next_midnight_utc(now)
@@ -255,13 +295,11 @@ class ProvenanceAnchor:
                     try:
                         await self.anchor_date(day)
                         pending.remove(day)
+                    except MissingHistoricalCapture:
+                        pending.remove(day)
+                        logger.warning("No captured provenance snapshot for missed UTC date %s", day)
                     except Exception as exc:
                         logger.warning("Provenance anchor unavailable for %s (%s)", day, type(exc).__name__)
-                        if (
-                            day < datetime.now(timezone.utc).date().isoformat()
-                            and not (self.directory / f"snapshot_{day}.json").exists()
-                        ):
-                            pending.remove(day)
                 retry_at = datetime.now(timezone.utc) + timedelta(minutes=5)
             wake = min(due, retry_at) if pending else due
             delay = (wake - datetime.now(timezone.utc)).total_seconds()

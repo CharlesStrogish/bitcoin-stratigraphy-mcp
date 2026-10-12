@@ -97,11 +97,11 @@ authentication. No existing L402 gates or public API access rules were changed.
 
 `provenance_anchor.py` schedules a background job at **midnight UTC**, once per UTC
 day, after licensed ASGI startup. It captures the live pipeline's complete,
-non-expired snapshot and saves these local files:
+non-expired snapshot and uploads these objects to **Replit App Storage**:
 
 ```text
-generated-artifacts/provenance/snapshot_YYYY-MM-DD.json
-generated-artifacts/provenance/snapshot_YYYY-MM-DD.json.ots
+provenance/daily/snapshot_YYYY-MM-DD.json
+provenance/daily/snapshot_YYYY-MM-DD.json.ots
 ```
 
 The date identifies the archive's UTC capture day; the JSON's `observed_at_utc`
@@ -109,23 +109,41 @@ retains the source-collection time. The job does not manufacture past dates or
 capture an additional snapshot merely because the process restarts. The first
 new snapshot is created at the next midnight UTC. If collection/stamping fails,
 the job retries every five minutes. Once JSON is saved, retries stamp those
-**same bytes**, never recapture different data under that date.
+**same bytes**, never recapture different data under that date. The JSON is
+uploaded **before** public-calendar submission, and the proof is uploaded as soon
+as it is generated. An interrupted proof operation can therefore resume from
+the bucket's original JSON even after the entire local filesystem is replaced.
 
 The installed `opentimestamps-client` supplies the official core library.
 Stamping uses SHA-256 detached-file proofs, standard random-nonce blinding,
 and the library's default public calendar pools. The asyncio transport has
 deadlines, bounded responses and disabled redirects; it requires two accepted
 calendar responses, matching the CLI default quorum. Files are atomically
-published without overwriting existing archives; per-date filesystem locks
-coordinate workers sharing the same local disk. Shutdown cancels and awaits
-outstanding calendar submissions. Incomplete saved snapshots resume after restart.
+published without overwriting existing archives. Cloud uploads use atomic
+generation-zero preconditions, so competing instances cannot replace a date's
+snapshot or proof; all adopt the existing cloud snapshot before stamping.
+Per-date filesystem locks additionally coordinate workers sharing local disk.
+Shutdown cancels and awaits outstanding calendar submissions.
 
-Archives are excluded from Git and deployment build images. **This is local
-storage as requested, not a durable replicated archive.** Republish, container
-replacement, or separate deployment instances may lose or not share these files.
-Retain externally downloaded copies or add persistent storage for durable
-production history. A missed date remains unavailable rather than being backfilled
-with today's data.
+`replit-object-storage` provides managed Replit credentials. The provisioned
+bucket is selected by `DEFAULT_OBJECT_STORAGE_BUCKET_ID`; no separate Google
+service-account key is needed. The SDK's authenticated GCS handle supplies
+create-only uploads, bounded range downloads and transport timeouts.
+
+**Object Storage is the source of truth** for all historical REST and MCP
+responses, including JSON, proof and ZIP downloads. Local files under
+`generated-artifacts/provenance/` are only staging/retry caches and remain
+excluded from Git and deployment images. Existing local archives are uploaded
+on startup; completed receipts are preserved without restamping. Startup and
+five-minute recovery scans discover cloud snapshots missing proofs, including
+ones created by a previous deployment with no surviving local cache.
+
+Successfully uploaded archives survive replacement of the application filesystem.
+Storage outages are reported explicitly; there is no silent local-file fallback.
+If a server is lost before its initial JSON upload succeeds, that unuploaded
+capture cannot be recovered from Object Storage. A missed date remains unavailable
+rather than being backfilled with today's data. The midnight producer still
+requires a running licensed API process.
 
 ### Agent retrieval
 
@@ -161,6 +179,8 @@ that the .ots SHA-256 commitment matches the original JSON bytes.
 
 Invalid dates return **422**; missing archives return **404**. A saved snapshot
 without its proof, corrupt files or a commitment mismatch return **409**.
+Storage connectivity, authorization or upload-service failures return **503**,
+not a misleading "missing date" response.
 
 ### Independent Bitcoin verification
 

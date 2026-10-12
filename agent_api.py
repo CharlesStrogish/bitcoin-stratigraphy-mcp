@@ -13,6 +13,7 @@ from fastapi_mcp import FastApiMCP
 from main import require_enterprise_license
 from provenance_anchor import ARCHIVE_DIRECTORY, ProvenanceAnchor
 from provenance_routes import register_provenance_routes
+from provenance_storage import ObjectArchive
 from stratigraphy_pipeline import (
     MAX_BLOCK_HEIGHT as MAX_BLOCK_HEIGHT,
     TIP_URL as TIP_URL,
@@ -39,9 +40,10 @@ async def read_live_height(client: httpx.AsyncClient) -> int:
         ) from exc
 
 
-def create_app(*, proof_directory=ARCHIVE_DIRECTORY) -> FastAPI:
+def create_app(*, proof_directory=ARCHIVE_DIRECTORY, proof_storage=None) -> FastAPI:
     # Runs during `uvicorn agent_api:app` import, before an API can be constructed.
     require_enterprise_license()
+    storage = proof_storage if proof_storage is not None else ObjectArchive()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -55,7 +57,7 @@ def create_app(*, proof_directory=ARCHIVE_DIRECTORY) -> FastAPI:
             ) as bitcoin_client:
                 pipeline = StratigraphyPipeline(bitcoin_client)
                 application.state.stratigraphy_pipeline = pipeline
-                anchor = ProvenanceAnchor(pipeline, bitcoin_client, directory=proof_directory)
+                anchor = ProvenanceAnchor(pipeline, bitcoin_client, directory=proof_directory, storage=storage)
                 application.state.provenance_anchor = anchor
                 try:
                     await pipeline.start()
@@ -115,7 +117,7 @@ def create_app(*, proof_directory=ARCHIVE_DIRECTORY) -> FastAPI:
                 detail="Live stratigraphy pipeline unavailable. No placeholder or stale data returned.",
             ) from exc
 
-    register_provenance_routes(application, proof_directory, API_PREFIX)
+    register_provenance_routes(application, storage, API_PREFIX)
 
     mcp = FastApiMCP(
         application,

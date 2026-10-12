@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 import agent_api
 import main
 import stratigraphy_pipeline as pipeline
+from provenance_fixtures import MemoryArchive
 
 
 class SupplyCalculationTests(unittest.TestCase):
@@ -54,7 +55,7 @@ class SupplyCalculationTests(unittest.TestCase):
 class LiveHeightTests(unittest.IsolatedAsyncioTestCase):
     async def test_license_rechecked_before_asgi_startup(self):
         with patch.object(main, "verify_license", return_value=True):
-            app = agent_api.create_app()
+            app = agent_api.create_app(proof_storage=MemoryArchive())
         with (
             patch.object(main, "verify_license", return_value=False),
             contextlib.redirect_stderr(io.StringIO()),
@@ -121,7 +122,7 @@ class AgentApiTests(unittest.TestCase):
             patch.object(pipeline, "read_live_price", AsyncMock(return_value=(100_000, pipeline.PRICE_URL))) as price_reader,
             patch.object(pipeline, "read_live_hashrate", AsyncMock(return_value=1e21)) as hashrate_reader,
         ):
-            app = agent_api.create_app()
+            app = agent_api.create_app(proof_storage=MemoryArchive())
             with TestClient(app) as client:
                 schema = client.get("/agent-api/openapi.json").json()
                 operations = [
@@ -158,7 +159,7 @@ class AgentApiTests(unittest.TestCase):
             patch.object(pipeline, "read_live_price", AsyncMock(return_value=(100_000, pipeline.PRICE_URL))),
             patch.object(pipeline, "read_live_hashrate", AsyncMock(return_value=1e21)),
         ):
-            app = agent_api.create_app()
+            app = agent_api.create_app(proof_storage=MemoryArchive())
             with TestClient(app) as client:
                 response = client.get("/agent-api/supply-metrics")
                 self.assertEqual(response.status_code, 503)

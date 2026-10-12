@@ -16,3 +16,15 @@ Invented backfills would give agents misleading history despite a valid receipt.
 states explicitly, and preserve original UTF-8 bytes through downloads and
 verification. Distinguish pending calendar acceptance from independently
 verified Bitcoin inclusion.
+
+Historical archives must survive server restarts and redeployments. Object
+Storage is authoritative; local files are only staging/retry caches, never a
+fallback for historical downloads.
+
+**Why:** The user explicitly required removing ephemeral-storage risk. A local
+copy cannot establish that an archive remains retrievable after filesystem
+replacement, and a silent fallback can hide an unsuccessful cloud upload.
+
+**How to apply:** Persist the JSON before stamping, resume incomplete captures
+from their cloud bytes, and distinguish storage outages from missing dates.
+Preserve create-only cloud writes across concurrent instances.

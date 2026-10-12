@@ -26,6 +26,8 @@ from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
 import provenance_anchor as anchor
 from provenance_routes import register_provenance_routes
 from stratigraphy_pipeline import PipelineUnavailable, calculate_stratigraphy_metrics
+from provenance_fixtures import MemoryArchive
+from provenance_storage import StorageUnavailable
 
 
 def serialize(value):
@@ -92,6 +94,85 @@ class ProofTests(unittest.TestCase):
 
 
 class AnchorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cloud_only_incomplete_snapshot_resumes_after_redeployment(self):
+        day = datetime.now(timezone.utc).date().isoformat()
+        storage = MemoryArchive()
+        original = snapshot().model_dump_json().encode()
+        storage.put(day, original)
+        def unavailable_pipeline():
+            raise AssertionError("Historical cloud capture must not be recreated")
+        with tempfile.TemporaryDirectory() as empty_directory:
+            async with httpx.AsyncClient(transport=httpx.MockTransport(calendar)) as client:
+                service = anchor.ProvenanceAnchor(
+                    SimpleNamespace(get_snapshot=unavailable_pipeline), client,
+                    directory=empty_directory, storage=storage,
+                )
+                await service.start()
+                try:
+                    async with asyncio.timeout(2):
+                        while storage.key(day, proof=True) not in storage.objects:
+                            await asyncio.sleep(0.01)
+                finally:
+                    await service.stop()
+                self.assertEqual(storage.load(day)[0], original)
+                self.assertFalse(list(Path(empty_directory).glob("snapshot*")))
+
+    async def test_existing_local_completed_archives_migrate_without_restamping(self):
+        day = "2009-01-03"
+        body = snapshot().model_dump_json().encode()
+        proof = receipt(body)
+        storage = MemoryArchive()
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / f"snapshot_{day}.json"
+            path.write_bytes(body)
+            path.with_suffix(".json.ots").write_bytes(proof)
+            async with httpx.AsyncClient() as client:
+                service = anchor.ProvenanceAnchor(None, client, directory=folder, storage=storage)
+                with patch.object(anchor, "stamp_snapshot", AsyncMock()) as stamp:
+                    await service.anchor_date(day)
+                    stamp.assert_not_awaited()
+                self.assertEqual(storage.load(day)[:2], (body, proof))
+
+    async def test_failed_proof_upload_keeps_exact_receipt_for_retry(self):
+        day = datetime.now(timezone.utc).date().isoformat()
+        storage = MemoryArchive()
+        real_put = storage.put
+        def put(day, body, *, proof=False):
+            if proof:
+                raise StorageUnavailable("test interrupted proof upload")
+            return real_put(day, body)
+        with tempfile.TemporaryDirectory() as folder:
+            async with httpx.AsyncClient(transport=httpx.MockTransport(calendar)) as client:
+                service = anchor.ProvenanceAnchor(
+                    SimpleNamespace(get_snapshot=snapshot), client, directory=folder, storage=storage,
+                )
+                with patch.object(storage, "put", put):
+                    with self.assertRaises(StorageUnavailable):
+                        await service.anchor_date(day)
+                path = Path(folder) / f"snapshot_{day}.json.ots"
+                original_proof = path.read_bytes()
+                with patch.object(anchor, "stamp_snapshot", AsyncMock()) as stamp:
+                    await service.anchor_date(day)
+                    stamp.assert_not_awaited()
+                self.assertEqual(storage.get(day, proof=True), original_proof)
+
+    async def test_cloud_snapshot_wins_over_conflicting_local_capture(self):
+        day = datetime.now(timezone.utc).date().isoformat()
+        cloud = snapshot().model_dump_json().encode()
+        storage = MemoryArchive()
+        storage.put(day, cloud)
+        with tempfile.TemporaryDirectory() as folder:
+            # Another instance had a different JSON serialization and receipt.
+            local = cloud + b"\n"
+            path = Path(folder) / f"snapshot_{day}.json"
+            path.write_bytes(local)
+            path.with_suffix(".json.ots").write_bytes(receipt(local))
+            async with httpx.AsyncClient(transport=httpx.MockTransport(calendar)) as client:
+                service = anchor.ProvenanceAnchor(None, client, directory=folder, storage=storage)
+                await service.anchor_date(day)
+                self.assertEqual(storage.load(day)[0], cloud)
+                self.assertEqual(anchor.proof_status(cloud, storage.get(day, proof=True)), "pending_bitcoin_confirmation")
+
     async def test_scheduler_captures_once_per_midnight_not_at_startup(self):
         class Clock(datetime):
             current = datetime(2026, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
@@ -101,7 +182,7 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
                 return cls.current
 
         with tempfile.TemporaryDirectory() as folder:
-            service = anchor.ProvenanceAnchor(None, None, directory=folder)
+            service = anchor.ProvenanceAnchor(None, None, directory=folder, storage=MemoryArchive())
             captured = []
 
             async def capture(day):
@@ -133,7 +214,7 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
             path.write_bytes(body)
             path.with_suffix(".json.ots").write_bytes(proof)
             app = FastAPI()
-            register_provenance_routes(app, Path(folder), "/agent-api")
+            register_provenance_routes(app, MemoryArchive.from_directory(Path(folder)), "/agent-api")
             async with httpx.AsyncClient(
                 base_url="http://test", transport=httpx.ASGITransport(app=app)
             ) as client:
@@ -185,7 +266,7 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
         pipe = SimpleNamespace(get_snapshot=lambda: metrics)
         with tempfile.TemporaryDirectory() as folder:
             async with httpx.AsyncClient(transport=httpx.MockTransport(calendar)) as client:
-                service = anchor.ProvenanceAnchor(pipe, client, directory=folder)
+                service = anchor.ProvenanceAnchor(pipe, client, directory=folder, storage=MemoryArchive())
                 with patch.object(anchor, "stamp_snapshot", AsyncMock(side_effect=anchor.ProofUnavailable())):
                     with self.assertRaises(anchor.ProofUnavailable):
                         await service.anchor_date(day)
@@ -205,7 +286,7 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
             raise PipelineUnavailable()
         with tempfile.TemporaryDirectory() as folder:
             async with httpx.AsyncClient(transport=httpx.MockTransport(calendar)) as client:
-                service = anchor.ProvenanceAnchor(SimpleNamespace(get_snapshot=no_snapshot), client, directory=folder)
+                service = anchor.ProvenanceAnchor(SimpleNamespace(get_snapshot=no_snapshot), client, directory=folder, storage=MemoryArchive())
                 with self.assertRaises(PipelineUnavailable):
                     await service.anchor_date(datetime.now(timezone.utc).date().isoformat())
                 self.assertFalse(list(Path(folder).glob("snapshot*")))
@@ -216,7 +297,7 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as folder:
             day = datetime.now(timezone.utc).date().isoformat()
             async with httpx.AsyncClient(transport=httpx.MockTransport(calendar)) as client:
-                service = anchor.ProvenanceAnchor(SimpleNamespace(get_snapshot=snapshot), client, directory=folder)
+                service = anchor.ProvenanceAnchor(SimpleNamespace(get_snapshot=snapshot), client, directory=folder, storage=MemoryArchive())
                 with anchor.day_lock(Path(folder), day):
                     with self.assertRaises(anchor.ProofUnavailable):
                         await service.anchor_date(day)
@@ -235,7 +316,7 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
                 active -= 1
         with tempfile.TemporaryDirectory() as folder:
             async with httpx.AsyncClient(transport=httpx.MockTransport(hanging)) as client:
-                service = anchor.ProvenanceAnchor(SimpleNamespace(get_snapshot=snapshot), client, directory=folder)
+                service = anchor.ProvenanceAnchor(SimpleNamespace(get_snapshot=snapshot), client, directory=folder, storage=MemoryArchive())
                 await service.start()
                 original_task = service._task
                 await service.start()
@@ -256,6 +337,33 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DownloadTests(unittest.TestCase):
+    def test_cloud_downloads_survive_loss_of_entire_local_archive(self):
+        day = "2026-10-12"
+        body = snapshot().model_dump_json().encode()
+        proof = receipt(body)
+        storage = MemoryArchive()
+        storage.put(day, body)
+        storage.put(day, proof, proof=True)
+        # The read path has no local directory parameter or filesystem fallback.
+        app = FastAPI()
+        register_provenance_routes(app, storage, "/agent-api")
+        with TestClient(app) as client:
+            manifest = client.get("/agent-api/historical-proof", params={"date": day}).json()
+            self.assertEqual(client.get(manifest["snapshot_download_url"]).content, body)
+            self.assertEqual(client.get(manifest["ots_download_url"]).content, proof)
+
+    def test_storage_create_only_and_bounded_reads(self):
+        storage = MemoryArchive()
+        day = "2026-10-12"
+        self.assertEqual(storage.put(day, b"original"), b"original")
+        self.assertEqual(storage.put(day, b"replacement"), b"original")
+        storage.objects[storage.key(day)] = b"x" * (anchor.MAX_FILE_SIZE + 1)
+        with self.assertRaises(anchor.ProofUnavailable):
+            storage.get(day)
+        storage.fail_download = True
+        with self.assertRaises(StorageUnavailable):
+            storage.get(day)
+
     def test_json_mcp_manifest_and_exact_downloads_and_zip(self):
         with tempfile.TemporaryDirectory() as folder:
             day = "2026-10-12"
@@ -265,7 +373,8 @@ class DownloadTests(unittest.TestCase):
             path.write_bytes(body)
             path.with_suffix(".json.ots").write_bytes(proof)
             app = FastAPI()
-            register_provenance_routes(app, Path(folder), "/agent-api")
+            storage = MemoryArchive.from_directory(Path(folder))
+            register_provenance_routes(app, storage, "/agent-api")
             with TestClient(app) as client:
                 response = client.get("/agent-api/historical-proof", params={"date": day})
                 self.assertEqual(response.status_code, 200)
@@ -286,11 +395,13 @@ class DownloadTests(unittest.TestCase):
                 for invalid in ("../../acme_corp.lic", "2026-02-30"):
                     self.assertEqual(client.get("/agent-api/historical-proof", params={"date": invalid}).status_code, 422)
                 self.assertEqual(client.get("/agent-api/historical-proof", params={"date": "2026-10-13"}).status_code, 404)
-                path.with_suffix(".json.ots").unlink()
+                del storage.objects[storage.key(day, proof=True)]
                 self.assertEqual(client.get("/agent-api/historical-proof", params={"date": day}).status_code, 409)
-                path.with_suffix(".json.ots").write_bytes(proof)
-                path.write_bytes(body + b"\n")
+                storage.objects[storage.key(day, proof=True)] = proof
+                storage.objects[storage.key(day)] = body + b"\n"
                 self.assertEqual(client.get("/agent-api/historical-proof", params={"date": day}).status_code, 409)
+                storage.fail_download = True
+                self.assertEqual(client.get("/agent-api/historical-proof", params={"date": day}).status_code, 503)
 
 
 if __name__ == "__main__":

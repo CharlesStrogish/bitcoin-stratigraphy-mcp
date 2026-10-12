@@ -34,7 +34,7 @@ test("registry publisher attribution preserves existing release and 15-tool meta
   assert.equal(registry.publisher, "Charles R. Strogish");
   assert.equal(registry.website, origin + "/");
   assert.equal(registry.toolCount, 15);
-  assert.equal(registry.version, "1.1.0");
+  assert.equal(registry.version, JSON.parse(load("package.json")).version);
   assert.equal(JSON.parse(load("mcp.json")).mcpServers["bitcoin-stratigraphy"].url, origin + "/mcp");
 });
 

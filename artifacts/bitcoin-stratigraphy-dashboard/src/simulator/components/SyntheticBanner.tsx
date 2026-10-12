@@ -6,12 +6,13 @@ export function SyntheticBanner() {
       <ShieldAlert size={18} aria-hidden="true" />
       <div>
         <strong>
-          SYNTHETIC SIMULATION. Runs entirely in this browser tab.
+          Live REST Escrow · real Lightning Network micropayments
         </strong>
         <p>
-          No payment is made. No calendar submission happens. No Bitcoin
-          confirmation exists. Hashing and Merkle membership are real SHA-256;
-          the notarization step and its receipt are illustrative objects only.
+          The escrow terminal below executes real payments via L402 and Nostr
+          Wallet Connect (NWC). Enterprise Interactive Preview is a client-only
+          visualizer: its example traces and illustrative receipts do not initiate
+          payments or submit Bitcoin timestamp commitments.
         </p>
       </div>
     </div>

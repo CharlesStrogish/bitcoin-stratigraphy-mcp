@@ -59,7 +59,7 @@ function text(node) {
   return text(node.props?.children);
 }
 
-test("compliance marketing copy renders verbatim, including the contact brackets", () => {
+test("compliance marketing copy preserves approved text with live escrow pricing and naming updates", () => {
   const blocks = [];
   walk(renderPage(), (node) => {
     if (["h1", "h2", "p", "li"].includes(node.type)) {
@@ -69,7 +69,7 @@ test("compliance marketing copy renders verbatim, including the contact brackets
   assert.equal(blocks.length, 20);
   assert.equal(
     createHash("sha256").update(blocks.join("\n")).digest("hex"),
-    "e72dacb6fe39563287a339fd515c2eb19061743bbad1af4ce633b7bf3c41de3a",
+    "dd803ad1e7b3b3b7522e4606c9ff30b5c1606752d18d90c7a2f131ac3961e054",
   );
 });
 
@@ -79,7 +79,7 @@ test("compliance CTA returns to homepage and licensing contact uses mailto", () 
     if (node.type === "a") links.push(node);
   });
   assert.equal(
-    links.find((node) => text(node).trim() === "Access the Escrow Simulator")
+    links.find((node) => text(node).trim() === "Access Live REST Escrow")
       ?.props.href,
     "/",
   );

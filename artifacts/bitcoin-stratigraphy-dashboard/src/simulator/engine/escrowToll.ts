@@ -3,12 +3,12 @@ import { getEscrowToll, type EscrowTollQuote } from "@workspace/api-client-react
 
 export function fallbackEscrowToll(): EscrowTollQuote {
   return {
-    toll_fee_sats: 21, target_usd: 0.02, btc_usd_price: null,
+    toll_fee_sats: 24, target_usd: 0.02, btc_usd_price: null,
     source: "fallback", quoted_at: new Date().toISOString(),
   };
 }
 
-/** A failed quote must not prevent a browser-only simulation or reuse a stale fee. */
+/** Failed quotes use an indicative preview; real charges remain server-authoritative. */
 export async function evaluateEscrowToll(
   signal: AbortSignal,
   readQuote: typeof getEscrowToll = getEscrowToll,
@@ -23,8 +23,7 @@ export async function evaluateEscrowToll(
     if (signal.aborted) throw new DOMException("aborted", "AbortError");
     const fee = quote?.toll_fee_sats;
     if (!Number.isSafeInteger(fee) || fee < 1 || quote.target_usd !== 0.02
-        || !["market", "fallback"].includes(quote.source)
-        || (quote.source === "fallback" && fee !== 21)) return fallbackEscrowToll();
+        || !["market", "fallback"].includes(quote.source)) return fallbackEscrowToll();
     return quote;
   } catch (error) {
     if (signal.aborted) throw error;

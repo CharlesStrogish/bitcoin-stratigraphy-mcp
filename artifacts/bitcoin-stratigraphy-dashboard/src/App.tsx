@@ -236,7 +236,7 @@ function Header({
             href={`${import.meta.env.BASE_URL}simulator`}
             data-testid="link-simulator"
           >
-            <Play size={14} /> Swarm simulator
+            <Play size={14} /> Enterprise preview
           </a>
           <button
             className="control-button"

@@ -33,19 +33,31 @@ const helper = compile(read("engine/escrowToll.ts"), (path) => {
   return { getEscrowToll: async () => quote() };
 });
 
-test("browser evaluates quoted fee and fails safely to 21 on offline or invalid responses", async () => {
+test("browser preserves dynamic server fees and uses a 24-sat preview when quotes are unavailable", async () => {
   const signal = new AbortController().signal;
   assert.equal((await helper.evaluateEscrowToll(signal)).toll_fee_sats, 2);
   assert.equal((await helper.evaluateEscrowToll(signal, async () => {
     throw new Error("offline");
-  })).toll_fee_sats, 21);
+  })).toll_fee_sats, 24);
   for (const fee of [0, -1, NaN, 1.5, "2", Number.MAX_SAFE_INTEGER + 1]) {
-    assert.equal((await helper.evaluateEscrowToll(signal, async () => quote(fee))).toll_fee_sats, 21);
+    assert.equal((await helper.evaluateEscrowToll(signal, async () => quote(fee))).toll_fee_sats, 24);
   }
   assert.equal(
-    (await helper.evaluateEscrowToll(signal, async () => quote(2, "fallback"))).toll_fee_sats, 21,
+    (await helper.evaluateEscrowToll(signal, async () => quote(2, "fallback"))).toll_fee_sats, 2,
   );
   assert.equal((await helper.evaluateEscrowToll(signal, async () => quote(1))).toll_fee_sats, 1);
+});
+
+test("escrow UI distinguishes live micropayments from the client preview and includes fiat pricing", () => {
+  const terminal = read("components/EscrowTerminal.tsx");
+  const banner = read("components/SyntheticBanner.tsx");
+  assert.match(terminal, /Live REST Escrow Terminal/);
+  assert.match(terminal, /Nostr Wallet Connect \(NWC\)/);
+  assert.match(terminal, /24 sats \(~\$0\.02\) fallback estimate/);
+  assert.match(terminal, /Server-issued invoice and contract prices are authoritative/);
+  assert.match(banner, /Enterprise Interactive Preview is a client-only/);
+  assert.match(banner, /real payments via L402/);
+  assert.doesNotMatch(terminal + banner, /21 sats|server price wins|SYNTHETIC SIMULATION|Runs entirely in this browser tab|Sample \/ Client Simulation/);
 });
 
 test("cancelled browser quote does not silently continue a settlement", async () => {

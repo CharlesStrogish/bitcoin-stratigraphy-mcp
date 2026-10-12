@@ -41,7 +41,7 @@ export function TreeGraph({
       </figcaption>
       {size === 0 ? (
         <div className="sim-empty">
-          The tree is empty. Run the simulation to stream leaves into it.
+          The tree is empty. Run the preview to stream leaves into it.
         </div>
       ) : (
         <svg

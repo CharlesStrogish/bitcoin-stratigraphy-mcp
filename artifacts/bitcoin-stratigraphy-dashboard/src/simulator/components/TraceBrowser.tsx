@@ -58,7 +58,7 @@ export function TraceBrowser({
         <div className="sim-empty">
           {records.length
             ? "No thoughts match this search."
-            : "No traces captured yet. Run the simulation."}
+            : "No traces captured yet. Run the preview."}
         </div>
       ) : (
         <ul className="sim-list">

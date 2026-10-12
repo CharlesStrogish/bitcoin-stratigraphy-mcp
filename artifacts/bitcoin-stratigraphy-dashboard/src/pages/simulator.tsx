@@ -5,6 +5,7 @@ import { TrustBadges } from "@/components/trust-badges";
 import EnterpriseLicenseLink from "@/components/enterprise-license-link";
 import WhitepaperLink from "@/components/whitepaper-link";
 import { SyntheticBanner } from "@/simulator/components/SyntheticBanner";
+import { SIMULATOR_TITLE, SIMULATOR_DESCRIPTION } from "@/lib/escrow-seo";
 import ComplianceGuideLink from "@/components/compliance-guide-link";
 import { EscrowTerminal } from "@/simulator/components/EscrowTerminal";
 import { CopyJsonButton } from "@/simulator/components/CopyJsonButton";
@@ -43,10 +44,8 @@ function useMeta() {
       document.head.appendChild(tag);
     }
     const prevDesc = tag.content;
-    document.title =
-      "Enterprise Swarm Control Room | Bitcoin Stratigraphy Simulator";
-    tag.content =
-      "Browser-only synthetic simulation: 50 agents, 1000 traces, a rolling RFC 6962 Merkle tree with real SHA-256, selective-disclosure inclusion proofs, and a simulated proof.notarize anchor. No payment, no Bitcoin.";
+    document.title = SIMULATOR_TITLE;
+    tag.content = SIMULATOR_DESCRIPTION;
     return () => {
       document.title = prevTitle;
       if (created) tag!.remove();
@@ -218,15 +217,15 @@ export default function SimulatorPage() {
       <div className="shell-inner">
         <header className="topbar">
           <div className="eyebrow">
-            <span className="eyebrow-line" /> SIMULATOR / SA-AI SWARM EVIDENCE
+            <span className="eyebrow-line" /> CLIENT VISUALIZER / SA-AI SWARM EVIDENCE
           </div>
           <div className="header-main">
             <div>
               <h1>
-                Enterprise Swarm <span>Control Room</span>
+                Enterprise Interactive <span>Preview</span>
               </h1>
               <p className="subtitle">
-                Fifty synthetic agents emit 1000 traces. Each is salted, hashed
+                Fifty example agents emit 1000 traces. Each is salted, hashed
                 and streamed into a rolling RFC 6962 Merkle tree. Pick any
                 thought and verify it against the root.
               </p>
@@ -254,7 +253,7 @@ export default function SimulatorPage() {
             <Play size={15} aria-hidden="true" />{" "}
             {phase === "done" || phase === "cancelled"
               ? "Run again"
-              : "Run Simulation"}
+              : "Run Preview"}
           </button>
           <button
             type="button"
@@ -304,7 +303,7 @@ export default function SimulatorPage() {
         </div>
         {phase === "error" && (
           <div className="sim-bad panel sim-pad" role="alert">
-            Simulation failed: {error}{" "}
+            Preview failed: {error}{" "}
             <button type="button" className="control-button" onClick={run}>
               Retry
             </button>

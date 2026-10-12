@@ -12,7 +12,7 @@ const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],
   ["docs", "Docs", "docs"],
   ["standard", "Standard", "standard"],
-  ["simulator", "Simulator", "simulator"],
+  ["simulator", "Enterprise Preview", "simulator"],
   ["whitepaper", "Whitepaper", "whitepaper"],
 ];
 

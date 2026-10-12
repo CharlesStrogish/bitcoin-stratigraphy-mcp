@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 export const SIMULATOR_TITLE =
-  "Enterprise Swarm Control Room | Bitcoin Stratigraphy Simulator";
+  "Enterprise Interactive Preview & Live REST Escrow | Bitcoin Stratigraphy";
 export const SIMULATOR_DESCRIPTION =
-  "Browser-only synthetic simulation: 50 agents, 1000 traces, a rolling RFC 6962 Merkle tree with real SHA-256, selective-disclosure inclusion proofs, and a simulated proof.notarize anchor. No payment, no Bitcoin.";
+  "Enterprise Interactive Preview visualizes client-side swarm evidence with SHA-256 and RFC 6962 Merkle proofs. The separate Live REST Escrow terminal executes real Lightning Network micropayments via L402 and Nostr Wallet Connect, with dynamic market toll pricing targeting ~$0.02.";
 export const SIMULATOR_URL =
   "https://bitcoin-stratigraphy-dashboard.replit.app/simulator";
 

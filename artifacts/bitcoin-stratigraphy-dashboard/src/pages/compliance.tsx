@@ -14,7 +14,7 @@ const MAIL = "mailto:crstrogish@aol.com";
 const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],
   ["standard", "Standard", "standard"],
-  ["simulator", "Simulator", "simulator"],
+  ["simulator", "Enterprise Preview", "simulator"],
   ["whitepaper", "Whitepaper", "whitepaper"],
   ["enterprise", "Enterprise License", "enterprise"],
 ];
@@ -126,7 +126,7 @@ export default function CompliancePage() {
             </p>
             <ul>
               <li>
-                <strong>L402 Micro-Settlements:</strong> Autonomous agents do not wait for human procurement. They programmatically fund their own execution traces using 21-satoshi Lightning Network micro-settlements, bypassing API key bottlenecks and credit card walls.
+                <strong>L402 Micro-Settlements:</strong> Autonomous agents do not wait for human procurement. They programmatically fund their own execution traces using Lightning Network micro-settlements with a current 24-sat (~$0.02) toll preview and dynamic server pricing, bypassing API key bottlenecks and credit card walls.
               </li>
               <li>
                 <strong>RFC 6962 Merkle Evidence:</strong> Every agent thought, context window, and tool execution is hashed into an append-only Merkle tree. If a single comma in a historical agent log is altered, the cryptographic root hash fractures, immediately alerting auditors to tampering.
@@ -135,9 +135,9 @@ export default function CompliancePage() {
           </section>
 
           <section id="walkthrough" className="panel cmp-sec">
-            <h2>3. Sandbox Walkthrough: Simulating Agent Settlement</h2>
+            <h2>3. Enterprise Interactive Preview: Agent Settlement Walkthrough</h2>
             <p>
-              To demonstrate this cryptographic custody chain without requiring an active Lightning Network wallet, use our Autonomous Escrow Simulator on the main dashboard. Follow these exact steps to view the compliance evidence your engineering team will receive in production:
+              To demonstrate this cryptographic custody chain without requiring an active Lightning Network wallet, use our Enterprise Interactive Preview. The separate Live REST Escrow terminal on the main dashboard executes real Lightning Network micropayments via L402 and Nostr Wallet Connect. Follow these exact steps to view the compliance evidence your engineering team will receive in production:
             </p>
             <ol>
               <li>
@@ -147,7 +147,7 @@ export default function CompliancePage() {
                 <strong>Execute the Simulation:</strong> Click the yellow "Simulate Agent Settlement" button.
               </li>
               <li>
-                <strong>Analyze the Flow:</strong> The UI visually guides you through the machine settlement: Agent A locks the bounty, Agent B submits the execution trace, and the Stratigraphy Hub validates the RFC 6962 Merkle leaf while collecting the 21-sat toll.
+                <strong>Analyze the Flow:</strong> The UI visually guides you through the machine settlement: Agent A locks the bounty, Agent B submits the execution trace, and the Stratigraphy Hub validates the RFC 6962 Merkle leaf. The live terminal shows a current 24-sat (~$0.02) toll preview; settlement uses the contract's dynamic server price.
               </li>
               <li>
                 <strong>Export the Evidence:</strong> Click the "Copy Escrow Proof (JSON)" button. This JSON-LD payload is the exact, audit-ready structured data your risk team will hand to EU regulators.
@@ -173,7 +173,7 @@ export default function CompliancePage() {
             </p>
             <div className="cmp-actions">
               <a href={BASE} className="cmp-cta" data-testid="link-access-simulator">
-                Access the Escrow Simulator
+                Access Live REST Escrow
               </a>
             </div>
           </section>

@@ -16,6 +16,9 @@ type Pending =
 
 export function EscrowTerminal() {
   const [quote, setQuote] = useState<EscrowTollQuote | null>(null);
+  const quoteSummary = quote
+    ? `${quote.toll_fee_sats} sats (~$${quote.target_usd.toFixed(2)}; ${quote.source === "market" ? "dynamic market quote" : "fallback estimate"})`
+    : "24 sats (~$0.02) fallback estimate · fetching live market quote…";
   const [token, setToken] = useState("");
   const [buyer, setBuyer] = useState("");
   const [worker, setWorker] = useState("");
@@ -138,9 +141,9 @@ export function EscrowTerminal() {
 
   return (
     <section className="escrow-term" aria-labelledby="escrow-h" data-testid="panel-escrow">
-      <div className="section-kicker">Autonomous Agent Escrow Terminal</div>
-      <h2 id="escrow-h">Autonomous Proof-of-Execution Escrow Oracle (L402 + RFC 6962)</h2>
-      <p className="et-sub">Live REST escrow: create, pay L402 challenges from your own wallet, settle against the server.</p>
+      <div className="section-kicker">Live REST Escrow Terminal</div>
+      <h2 id="escrow-h">Live REST Escrow · Proof-of-Execution Oracle (L402 + RFC 6962)</h2>
+      <p className="et-sub">Real Lightning Network micropayments via L402 and Nostr Wallet Connect (NWC). Create an escrow, pay the server-issued L402 invoice with your own wallet, and settle against the live server.</p>
       <div className="et-tags" aria-live="polite">
         {settled
           ? <span className="et-tag et-ok" data-testid="badge-settled">SERVER CONFIRMED: {settled.status}</span>
@@ -156,7 +159,7 @@ export function EscrowTerminal() {
         <div className="et-step" data-state={st(0)} data-testid="stage-1">
           <div className="section-kicker">1 Create escrow</div>
           <p>Creation requires an L402 access fee; the server-quoted invoice amount is authoritative.
-            {quote ? ` Public toll preview: ${quote.toll_fee_sats} sats (${quote.source}).` : " Fetching toll preview…"}</p>
+            {` Settlement toll preview: ${quoteSummary}.`}</p>
           {inp("buyer-pubkey", "Buyer pubkey (64 hex)", buyer, (s) => setBuyer(s.trim().toLowerCase()))}
           {inp("worker-pubkey", "Worker pubkey (64 hex)", worker, (s) => setWorker(s.trim().toLowerCase()))}
           {inp("task-hash", "Task hash (64 hex)", taskHash, (s) => setTaskHash(s.trim().toLowerCase()))}
@@ -219,7 +222,7 @@ export function EscrowTerminal() {
           Verified settle toll accrued: {verifiedToll} sats
         </span>
         <span className="et-baseline" data-testid="metric-current-toll" role="status">
-          {quote ? `Public toll preview: ${quote.toll_fee_sats} sats (server price wins)` : "Fetching toll preview…"}
+          Settlement toll preview: {quoteSummary}. Server-issued invoice and contract prices are authoritative.
         </span>
         {busy && <span className="et-baseline" role="status" data-testid="status-busy">Contacting server…</span>}
         <CopyJsonButton text={exportJson} testId="button-copy-escrow-proof"

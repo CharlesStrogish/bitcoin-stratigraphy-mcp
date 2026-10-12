@@ -14,6 +14,7 @@ from main import require_enterprise_license
 from provenance_anchor import ARCHIVE_DIRECTORY, ProvenanceAnchor
 from provenance_routes import register_provenance_routes
 from provenance_storage import ObjectArchive
+from provenance_upgrade import ProvenanceUpgrader
 from stratigraphy_pipeline import (
     MAX_BLOCK_HEIGHT as MAX_BLOCK_HEIGHT,
     TIP_URL as TIP_URL,
@@ -59,11 +60,15 @@ def create_app(*, proof_directory=ARCHIVE_DIRECTORY, proof_storage=None) -> Fast
                 application.state.stratigraphy_pipeline = pipeline
                 anchor = ProvenanceAnchor(pipeline, bitcoin_client, directory=proof_directory, storage=storage)
                 application.state.provenance_anchor = anchor
+                upgrader = ProvenanceUpgrader(storage)
+                application.state.provenance_upgrader = upgrader
                 try:
                     await pipeline.start()
                     await anchor.start()
+                    await upgrader.start()
                     yield
                 finally:
+                    await upgrader.stop()
                     await anchor.stop()
                     await pipeline.stop()
         finally:

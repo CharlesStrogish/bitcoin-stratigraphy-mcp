@@ -121,7 +121,7 @@ deadlines, bounded responses and disabled redirects; it requires two accepted
 calendar responses, matching the CLI default quorum. Files are atomically
 published without overwriting existing archives. Cloud uploads use atomic
 generation-zero preconditions, so competing instances cannot replace a date's
-snapshot or proof; all adopt the existing cloud snapshot before stamping.
+snapshot or initial proof; all adopt the existing cloud snapshot before stamping.
 Per-date filesystem locks additionally coordinate workers sharing local disk.
 Shutdown cancels and awaits outstanding calendar submissions.
 
@@ -144,6 +144,28 @@ If a server is lost before its initial JSON upload succeeds, that unuploaded
 capture cannot be recovered from Object Storage. A missed date remains unavailable
 rather than being backfilled with today's data. The midnight producer still
 requires a running licensed API process.
+
+### Automatic Bitcoin finalization
+
+`provenance_upgrade.py` scans every `.ots` object in the configured bucket on
+startup and **every six hours** while the licensed API runs. A dedicated,
+single-thread background worker keeps calendar, Bitcoin and storage I/O off the
+ASGI event loop and off the data pipeline's shared thread pool.
+
+The official OpenTimestamps core library upgrades pending attestations. Before
+replacement, the worker checks the Merkle commitment against matching block
+headers from Blockstream and mempool.space, including header hash and proof of
+work. It removes calendar-only branches and atomically **overwrites the same
+`.ots` object**, conditional on its original cloud generation. Concurrent
+changes, pending commitments, unavailable sources and invalid receipts retain
+the existing object for a future scan. Snapshot JSON is never modified.
+
+Finalized receipts can be verified without contacting calendar servers; agents
+can download the latest receipt through the existing historical-proof endpoints.
+Their proof hash may change after finalization. Public-header corroboration is
+not full-node chain validation: the API conservatively retains the
+`bitcoin_attestation_present_unverified` status and auditors should independently
+verify with their own Bitcoin mainnet node. Routine retries are debug-only logs.
 
 ### Agent retrieval
 

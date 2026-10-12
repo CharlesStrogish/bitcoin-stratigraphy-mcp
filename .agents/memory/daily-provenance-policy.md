@@ -27,4 +27,19 @@ replacement, and a silent fallback can hide an unsuccessful cloud upload.
 
 **How to apply:** Persist the JSON before stamping, resume incomplete captures
 from their cloud bytes, and distinguish storage outages from missing dates.
-Preserve create-only cloud writes across concurrent instances.
+Preserve create-only snapshot and initial-proof uploads across concurrent instances.
+
+Pending proofs are replaced in-place after Bitcoin finalization, every six hours
+while the API runs. Snapshot JSON remains immutable. Final receipts must retain
+verified Bitcoin paths and remove pending calendar-only branches.
+
+**Why:** The user explicitly requested six-hour background upgrades and overwriting
+the pending bucket object so downloaded proofs become independent of calendars.
+An upgrade alone does not verify Bitcoin inclusion; corroborated public headers
+are still weaker than an auditor's fully validating node.
+
+**How to apply:** Condition replacement on the exact object generation read,
+validate the daily JSON/proof binding, and leave originals untouched on failure.
+Keep the worker's blocking I/O separate from the API event loop and data feed.
+Preserve the distinction between a portable finalized receipt and full-node
+verification in API status claims.

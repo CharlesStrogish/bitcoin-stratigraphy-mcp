@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
-"""Immutable daily archives in Replit App Storage, using managed SDK credentials."""
+"""Daily archives in App Storage; snapshots immutable, proofs safely upgradeable."""
 
 import os
 import re
@@ -98,6 +98,52 @@ class ObjectArchive:
         except Exception as exc:
             raise StorageUnavailable("App Storage archive listing unavailable") from exc
         return snapshots, proofs
+
+    def proof_keys(self):
+        """Stream every .ots object in the configured bucket, not only daily files."""
+        try:
+            for item in self._bucket().list_blobs(timeout=10, retry=RETRY):
+                if item.name.endswith(".ots"):
+                    yield item.name
+        except Exception as exc:
+            raise StorageUnavailable("App Storage proof listing unavailable") from exc
+
+    def read_proof_version(self, key: str) -> tuple[bytes, int] | None:
+        """Read exact bytes at one generation for a later compare-and-swap."""
+        if not key.endswith(".ots"):
+            raise ValueError("Expected an OTS object")
+        try:
+            blob = self._bucket().blob(key)
+            blob.reload(timeout=10, retry=RETRY)
+            generation = int(blob.generation)
+            body = blob.download_as_bytes(
+                start=0, end=MAX_FILE_SIZE, if_generation_match=generation,
+                timeout=10, retry=RETRY,
+            )
+        except (NotFound, PreconditionFailed):
+            return None  # Deleted/changed during discovery; retry next pass.
+        except Exception as exc:
+            raise StorageUnavailable("App Storage versioned proof read unavailable") from exc
+        if not body or len(body) > MAX_FILE_SIZE:
+            raise ProofUnavailable("Invalid archived proof size")
+        return body, generation
+
+    def replace_proof(self, key: str, body: bytes, generation: int) -> bool:
+        """Atomically replace only the proof generation we actually verified."""
+        if not key.endswith(".ots") or generation <= 0:
+            raise ValueError("Expected an existing OTS object generation")
+        if not body or len(body) > MAX_FILE_SIZE:
+            raise ProofUnavailable("Invalid upgraded proof size")
+        try:
+            self._bucket().blob(key).upload_from_string(
+                body, content_type="application/octet-stream",
+                if_generation_match=generation, timeout=10, retry=RETRY,
+            )
+            return True
+        except (NotFound, PreconditionFailed):
+            return False  # Another process won; never overwrite its newer proof.
+        except Exception as exc:
+            raise StorageUnavailable("App Storage proof replacement unavailable") from exc
 
     def load(self, day: str) -> tuple[bytes, bytes, str]:
         snapshot = self.get(day)

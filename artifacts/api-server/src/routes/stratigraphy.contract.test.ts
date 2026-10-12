@@ -1711,14 +1711,13 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
     "Shared OpenAPI document must define x-mcp-tools",
   );
   assert.equal(sharedDocument.info?.description, ENGINE_DESCRIPTION);
-  assert.equal(
-    smitheryMetadata.description,
-    `${smitheryServerCard.description}\n\n${ENGINE_DESCRIPTION}`,
-  );
-  assert.equal(
-    glamaMetadata.description,
-    `${smitheryServerCard.description}\n\n${ENGINE_DESCRIPTION}`,
-  );
+  assert.equal(smitheryMetadata.description, glamaMetadata.description);
+  const registryDescription = String(smitheryMetadata.description);
+  assert.ok(registryDescription.startsWith(`${smitheryServerCard.description}\n\n`));
+  assert.ok(registryDescription.endsWith(ENGINE_DESCRIPTION));
+  for (const phrase of ["Hal Finney Horizon tracker", "15 J/TH thermodynamic energy calculation", "Live L402 Satoshi settlement"]) {
+    assert.ok(registryDescription.includes(phrase), phrase);
+  }
   assert.equal(mcpServerCard.description, ENGINE_DESCRIPTION);
 
   const listed = await mcpRequest("tools/list");
@@ -1767,18 +1766,15 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
         }
       | undefined;
     assert.ok(openApiTool, `OpenAPI x-mcp-tools must define ${name}`);
-    assert.equal(
-      openApiTool.description,
-      expectedDescription,
-      `${name} OpenAPI description must match the exact public description`,
-    );
     const listedTool = listedTools.find((candidate) => candidate.name === name);
     assert.ok(listedTool, `tools/list must define ${name}`);
     assert.equal(
+      openApiTool.description,
       listedTool.description,
-      expectedDescription,
-      `${name} tools/list description must match the exact public description`,
+      `${name} OpenAPI and tools/list descriptions must match exactly`,
     );
+    assert.ok(listedTool.description.startsWith(expectedDescription), `${name} must preserve its contract guidance`);
+    assert.ok(listedTool.description.includes("Live L402 Satoshi settlement"), name);
   }
 
   const requiredSchemaTools = [
@@ -2196,10 +2192,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         "mesh.get_status",
       ].includes(candidate.name)
     ) {
-      assert.equal(
-        candidate.description,
-        expectedMcpToolDescriptions[candidate.name],
-      );
+      assert.ok(candidate.description.startsWith(expectedMcpToolDescriptions[candidate.name]));
     } else {
       assert.match(
         candidate.description,

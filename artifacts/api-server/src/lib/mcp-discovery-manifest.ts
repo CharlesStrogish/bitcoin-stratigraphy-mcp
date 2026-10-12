@@ -2,9 +2,9 @@
 export const mcpDiscoveryManifest = {
   $schema: "https://modelcontextprotocol.io/schemas/discovery/v1.json",
   name: "bitcoin-stratigraphy-mcp",
-  version: "2.0.0",
+  version: "2.1.0",
   description:
-    "Bitcoin Stratigraphy: 15 live MCP tools across 4 namespaces, including OpenTimestamps notarization, an interactive Developer Portal and Live Tool Explorer, Python SDK/client and CrewAI, LangChain and AutoGen cookbooks, and L402 Lightning micropayments with free batch POST pricing.",
+    "Bitcoin Stratigraphy: 15 canonical MCP tools for the Hal Finney Horizon tracker ($10M / BTC USD price), 15 J/TH thermodynamic energy calculation (hashrate H/s / 1e12 * 15 watts), Sovereign Node Bitcoin Core RPC telemetry, Live L402 Satoshi settlement through configured NWC, and OpenTimestamps provenance. Two sandbox discovery tools are free; paid execution requires verified settlement.",
   author: {
     name: "Charles R. Strogish",
     url: "https://bitcoin-stratigraphy-dashboard.replit.app",

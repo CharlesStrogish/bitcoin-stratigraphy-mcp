@@ -1,11 +1,13 @@
 {
   "name": "workspace",
   "mcpName": "crstrogish/bitcoin-stratigraphy",
-  "version": "0.0.0",
+  "version": "2.1.0",
   "license": "(AGPL-3.0-only OR LicenseRef-Commercial)",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && node scripts/build-workspace.mjs",
+    "build:npm": "node scripts/build-npm-release.mjs",
+    "release:npm:check": "node scripts/check-npm-release.mjs",
     "release:check": "node scripts/check-published-assets.mjs",
     "format:check": "node scripts/check-format.mjs",
     "lint:python": "uv run --no-sync ruff check",

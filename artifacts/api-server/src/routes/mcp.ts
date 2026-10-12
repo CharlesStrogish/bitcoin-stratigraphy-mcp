@@ -4341,6 +4341,11 @@ export const mcpToolDefinitions = [
     .map((tool) => ({
       ...tool,
       ...(primaryStratigraphyContracts[tool.name] ?? {}),
+      description: `${primaryStratigraphyContracts[tool.name]?.description ?? tool.description} ${
+        mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0
+          ? "Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution."
+          : "Free metadata discovery: no Live L402 Satoshi settlement is required for this sandbox tool; no paid payload is released."
+      }`,
       annotations: {
         ...tool.annotations,
         ...(tool.name === "stratigraphy.get" ? { zkProof: undefined } : {}),
@@ -4465,7 +4470,7 @@ function createBitcoinStratigraphyMcpServer(
   const server = new McpServer(
     {
       name: "bitcoin-stratigraphy",
-      version: "1.0.0",
+      version: "2.1.0",
       description: ENGINE_DESCRIPTION,
     },
     {

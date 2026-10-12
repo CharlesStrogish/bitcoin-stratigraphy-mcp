@@ -1,0 +1,24 @@
+{
+  "name": "@bitcoin-stratigraphy/mcp-server",
+  "version": "2.1.0",
+  "description": "Bitcoin MCP server: Hal Finney Horizon tracker, 15 J/TH thermodynamic energy calculation, Sovereign Node RPC telemetry, and Live L402 Satoshi settlement through NWC.",
+  "mcpName": "crstrogish/bitcoin-stratigraphy",
+  "license": "(AGPL-3.0-only OR LicenseRef-Commercial)",
+  "type": "module",
+  "main": "dist/index.mjs",
+  "bin": {
+    "bitcoin-stratigraphy-mcp-server": "dist/cli.mjs"
+  },
+  "files": ["dist/", "README.md", "LICENSE"],
+  "engines": { "node": ">=22" },
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
+  "scripts": { "start": "node dist/cli.mjs" },
+  "keywords": [
+    "mcp", "bitcoin", "hal-finney-horizon", "thermodynamic-energy",
+    "15-j-th", "l402", "satoshi", "lightning", "nwc", "bitcoin-core-rpc"
+  ],
+  "dependencies": {
+    "poseidon-lite": "0.3.0",
+    "snarkjs": "0.7.6"
+  }
+}

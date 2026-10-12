@@ -2,7 +2,7 @@
 
 **[Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks)**
 
-## v1.1.0 — 15 Canonical Tools
+## v2.1.0 — 15 Canonical Tools
 
 **OpenTimestamps AI Notary Hub · LangChain/LlamaIndex Native · 100-call Macro-Macaroons · Free Sandbox available**
 
@@ -31,6 +31,29 @@ a trusted, budget-controlled wallet proxy; they do not pay automatically.
 Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **15 Canonical Tools**.
 
 ## Licensing, IP & Enterprise Terms
+
+### Npm server release
+
+`@bitcoin-stratigraphy/mcp-server@2.1.0` is staged separately from this private
+workspace. It packages the HTTP MCP runtime, required proof assets, isolated
+workers, and the license-gated Python companion inside `dist/`, with README.md,
+LICENSE, and npm's mandatory package.json. No wallet secrets, customer license,
+custody database, source maps, development workspace, or node_modules are shipped.
+
+From the workspace root:
+
+```sh
+pnpm run build:npm && pnpm run release:npm:check
+(cd generated-artifacts/npm/mcp-server && npm publish --access public --tag latest)
+```
+
+The publish command requires an npm account authorized for the
+`@bitcoin-stratigraphy` scope. See [runtime setup](npm/mcp-server/README.md) before
+installing: the executable uses Streamable HTTP, not stdio, and the licensed
+Python companion runs separately on loopback port 8000.
+Npm publication does not update the hosted HTTP server or automatically refresh
+Smithery/official MCP Registry entries; publish the endpoint changes and refresh
+those listings through their respective workflows.
 
 ### Local Bitcoin Core telemetry (enterprise pipeline)
 

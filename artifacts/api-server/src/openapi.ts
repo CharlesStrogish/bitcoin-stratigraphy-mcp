@@ -5,6 +5,7 @@ import { primaryStratigraphyContracts } from "./services/primaryStratigraphySche
 import { mcpToolDefinitions } from "./routes/mcp";
 
 export const openApiDocument = parse(openApiSource) as Record<string, unknown>;
+(openApiDocument.info as Record<string, unknown>).version = "2.1.0";
 const tools = openApiDocument["x-mcp-tools"] as Record<
   string,
   { annotations?: Record<string, unknown> }
@@ -28,4 +29,7 @@ for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
     inputSchema: mcpToolDefinitions.find((tool) => tool.name === name)?.inputSchema,
   });
   if (name === "stratigraphy.get") delete tools[name].annotations?.zkProof;
+}
+for (const tool of mcpToolDefinitions) {
+  Object.assign(tools[tool.name], { description: tool.description });
 }

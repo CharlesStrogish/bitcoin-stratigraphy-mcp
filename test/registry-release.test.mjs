@@ -15,9 +15,10 @@ const [smithery, glama, pkg, readme] = await Promise.all([
   readFile(new URL("README.md", root), "utf8"),
 ]);
 
-test("v1.1.0 registry manifests agree on the live remote MCP endpoint and release", () => {
+test("registry manifests agree on the live remote MCP endpoint and release", () => {
   assert.equal(pkg.mcpName, "crstrogish/bitcoin-stratigraphy");
-  assert.equal(smithery.version, "1.1.0");
+  assert.equal(smithery.version, pkg.version);
+  assert.equal(pkg.version, "2.1.0");
   assert.equal(glama.version, smithery.version);
   assert.equal(glama.toolCount, 15);
   assert.equal(smithery.transport.type, "streamable-http");
@@ -34,6 +35,9 @@ test("v1.1.0 registry manifests agree on the live remote MCP endpoint and releas
     "LangChain/LlamaIndex Native",
     "100-call Macro-Macaroons",
     "Free Sandbox available",
+    "Hal Finney Horizon tracker",
+    "15 J/TH thermodynamic energy calculation",
+    "Live L402 Satoshi settlement",
   ]) {
     assert.ok(smithery.description.includes(phrase), phrase);
   }
@@ -58,7 +62,7 @@ test("registry sandbox and notarization pricing claims match the release", () =>
 });
 
 test("README prominently links native frameworks and all three readiness badges", () => {
-  assert.match(readme.slice(0, 2200), /v1\.1\.0 — 15 Canonical Tools/);
+  assert.match(readme.slice(0, 2200), /v2\.1\.0 — 15 Canonical Tools/);
   assert.match(readme, /\]\(cookbooks\/frameworks\/\)/);
   for (const badge of [
     "LangChain Ready",

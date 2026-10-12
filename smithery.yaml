@@ -4,10 +4,12 @@
 # https://smithery.ai/docs/build/publish
 # smithery mcp publish "https://bitcoin-stratigraphy-dashboard.replit.app/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
 name: bitcoin-stratigraphy
-version: "1.1.0"
+version: "2.1.0"
 displayName: Bitcoin Stratigraphy Notary
 description: |-
   OpenTimestamps AI Notary Hub: 15 L402-gated tools (13 paid, 2 free sandbox tools), LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and Free Sandbox available through stratigraphy.list and proof.list.
+
+  Hal Finney Horizon tracker = $10,000,000 / BTC USD price (a price multiple, not a forecast). The 15 J/TH thermodynamic energy calculation estimates watts as (hashrate H/s / 1e12) * 15, not measured electricity. Sovereign Node RPC telemetry uses local Bitcoin Core without public fallback; fiat price and horizon are null in that mode. Live L402 Satoshi settlement uses configured NWC invoices and confirmed incoming payments, not simulated receipts.
 
   Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.
 

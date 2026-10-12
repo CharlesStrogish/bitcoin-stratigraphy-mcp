@@ -5,7 +5,7 @@ import { mcpToolPrices } from "../lib/mcp-pricing";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 
-export const MCP_RELEASE_VERSION = "1.1.0";
+export const MCP_RELEASE_VERSION = "2.1.0";
 export const MCP_RELEASE_DESCRIPTION =
   "OpenTimestamps AI Notary Hub: 15 L402-gated tools (13 paid, 2 free sandbox tools), " +
   "LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and " +

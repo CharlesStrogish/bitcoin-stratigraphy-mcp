@@ -32,9 +32,9 @@ const liveExample = {
 };
 const liveSchema = {
   type: "object", additionalProperties: true,
-  description: "Fresh, complete pipeline snapshot. Energy is estimated from hashrate / 1e12 * assumed 15 J/TH; the $10M divided by USD price multiple is not a time forecast.",
+  description: "Hal Finney Horizon tracker and 15 J/TH thermodynamic energy calculation. Horizon = $10,000,000 / btc_price_usd (a price multiple, not a forecast). Estimated network power in watts = (network_hashrate_h_s / 1e12) * 15. Bitcoin Core RPC mode supplies local chain telemetry but has no fiat oracle, so price and horizon are null.",
   properties: Object.fromEntries(Object.entries(liveExample).map(([key, value]) =>
-    [key, attribute(typeof value === "number" ? "number" : "string",
+    [key, attribute(["btc_price_usd", "hal_finney_horizon_multiple"].includes(key) ? ["number", "null"] : typeof value === "number" ? "number" : "string",
       `Current pipeline ${key}; not a value reconstructed from the historical video index.`, value)])),
   required: Object.keys(liveExample),
   examples: [liveExample],
@@ -65,6 +65,7 @@ const sharedExample = {
 };
 
 function contract(description: string, example: Record<string, unknown>, properties: Record<string, unknown>) {
+  description += " Semantic discovery: Hal Finney Horizon tracker = $10,000,000 / BTC USD price; this is a valuation multiple, not a time-to-price forecast. The 15 J/TH thermodynamic energy calculation estimates watts as (network hashrate H/s / 1e12) * 15, not measured electricity. Sovereign Node RPC telemetry uses local Bitcoin Core; price and horizon are unavailable without a fiat quote.";
   return {
     description,
     outputSchema: {

@@ -30,3 +30,24 @@ NODE_ENV = "production"
 
 [services.production.health.startup]
 path = "/api/healthz"
+[[services]]
+localPort = 8000
+name = "Enterprise Agent API"
+paths = ["/agent-api"]
+
+[services.development]
+run = "cd ../.. && PORT=8000 uv run --no-sync python main.py"
+
+[services.production]
+
+[services.production.build]
+args = ["uv", "sync", "--frozen"]
+
+[services.production.run]
+args = ["uv", "run", "--no-sync", "python", "main.py"]
+
+[services.production.run.env]
+PORT = "8000"
+
+[services.production.health.startup]
+path = "/agent-api/health"

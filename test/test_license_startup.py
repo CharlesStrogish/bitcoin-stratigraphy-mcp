@@ -18,6 +18,7 @@ class LicenseStartupTests(unittest.TestCase):
         stderr = io.StringIO()
         with (
             patch.object(entrypoint, "verify_license", **verifier_options) as check,
+            patch.object(entrypoint, "start_engine") as start_engine,
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
@@ -26,6 +27,7 @@ class LicenseStartupTests(unittest.TestCase):
                 code = 0
             except SystemExit as exc:
                 code = exc.code
+            self.assertEqual(start_engine.call_count, 1 if code == 0 else 0)
         return code, stdout.getvalue(), stderr.getvalue(), check
 
     def assert_denied(self, **verifier_options):
@@ -40,8 +42,7 @@ class LicenseStartupTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(stderr, "")
         self.assertIn("Welcome to Bitcoin Stratigraphy Enterprise", stdout)
-        self.assertIn("Hello from repl-nix-workspace!", stdout)
-        self.assertLess(stdout.index("Welcome"), stdout.index("Hello"))
+        self.assertNotIn("Hello from repl-nix-workspace!", stdout)
         check.assert_called_once_with(
             Path(entrypoint.__file__).resolve().with_name("acme_corp.lic")
         )

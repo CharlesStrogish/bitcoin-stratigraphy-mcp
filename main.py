@@ -5,7 +5,8 @@ from pathlib import Path
 from license_verifier import verify_license
 
 
-def main():
+def require_enterprise_license():
+    """Deny startup unless the project-root license verifies explicitly True."""
     try:
         license_path = Path(__file__).resolve().with_name("acme_corp.lic")
         authorized = verify_license(license_path)
@@ -25,11 +26,21 @@ def main():
         )
         raise SystemExit(1)
 
+
+def start_engine():
+    # Import only after authorization; direct ASGI imports are gated separately.
+    from agent_api import run_server
+
+    run_server()
+
+
+def main():
+    require_enterprise_license()
     print(
         "Welcome to Bitcoin Stratigraphy Enterprise. "
         "Your license has been verified; starting the engine."
     )
-    print("Hello from repl-nix-workspace!")
+    start_engine()
 
 
 if __name__ == "__main__":

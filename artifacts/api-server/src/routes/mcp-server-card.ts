@@ -41,11 +41,6 @@ const baseServerCard = {
           readOnly: true,
           audience: ["assistant"],
           priority: 1,
-          zkProof: {
-            included: true,
-            scheme: "Groth16/Poseidon BN254",
-            verificationEndpoint: "POST /api/v1/zk/verify",
-          },
         },
       },
       {

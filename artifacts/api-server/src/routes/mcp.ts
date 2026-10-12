@@ -77,6 +77,13 @@ import {
 import { verifyDriftProof } from "../services/zkDriftService";
 import { notarizeHash, notarizeInputSchema } from "../services/otsNotarization";
 import { getStratigraphyData, readDataset } from "./stratigraphy";
+import {
+  createPrimaryStratigraphyBackend,
+  PrimaryStratigraphyUnavailable,
+  type PrimaryStratigraphyBackend,
+  type PrimaryStratigraphyResult,
+} from "../services/primaryStratigraphy";
+import { primaryStratigraphyContracts } from "../services/primaryStratigraphySchemas";
 import { buildProvenanceChain } from "../services/provenanceChain";
 import {
   getProvenanceAnchor,
@@ -210,7 +217,7 @@ const stratigraphyInputSchema = z
       .int()
       .min(0)
       .optional()
-      .describe("Indexed Bitcoin block height selecting one telemetry record."),
+      .describe("Actual captured Bitcoin height selecting one pipeline snapshot."),
     metrics: z
       .array(
         z
@@ -225,7 +232,7 @@ const stratigraphyInputSchema = z
         "metrics must contain unique values",
       )
       .optional()
-      .describe("Telemetry metrics projected into each returned record."),
+      .describe("Deprecated legacy projection hint; live pipeline snapshots are returned intact."),
     startDate: z
       .string()
       .min(1)
@@ -1163,6 +1170,40 @@ async function stratigraphyCatalog() {
   };
 }
 
+/** @internal Legacy indexed fixture for pre-unification payment regression tests only.
+ * The production request path never selects this backend. */
+export const indexedContractTestFixture: PrimaryStratigraphyBackend = async (name, args) => {
+  const records = await getStratigraphyData();
+  const height = (target: string) => snapshotBlock(indexedStratumIndex(target, records), records.length);
+  let result: Record<string, unknown>;
+  let targetHeights: number[] = [];
+  if (name === "stratigraphy.list") result = await stratigraphyCatalog();
+  else if (name === "stratigraphy.get") {
+    const selected = await queryStratigraphy(stratigraphyInputSchema.parse(args));
+    result = { records: selected };
+    targetHeights = selected.map((record) => snapshotBlock(record.day - 1, records.length));
+  } else if (name === "stratigraphy.get_digest") {
+    const input = stratigraphyDigestInputSchema.parse(args);
+    result = { result: await queryStratigraphyDigest(input), proofAvailable: false };
+    const targets = input.target.includes("..")
+      ? records.flatMap((_record, i) => {
+        const day = snapshotDate(i, records.length);
+        const [first, last] = input.target.split("..");
+        return day >= first && day <= last ? [snapshotBlock(i, records.length)] : [];
+      }) : [height(input.target)];
+    targetHeights = targets;
+  } else if (name === "stratigraphy.get_diff") {
+    const input = stratigraphyDiffInputSchema.parse(args);
+    result = await queryStratigraphyDiff(input);
+    targetHeights = [height(input.fromTarget), height(input.toTarget)];
+  } else if (name === "stratigraphy.get_range") {
+    const input = stratigraphyRangeInputSchema.parse(args);
+    result = await queryStratigraphyRange(input);
+    targetHeights = [height(input.startTarget), height(input.endTarget)];
+  } else throw new RangeError("Unknown fixture tool");
+  return { result, targetHeights };
+};
+
 async function queryStratigraphy(
   input: z.infer<typeof stratigraphyInputSchema>,
 ) {
@@ -1435,8 +1476,13 @@ async function withinMcpTargetBound(
   name: string,
   args: unknown,
   maxTarget: number,
+  actualHeights?: number[],
 ): Promise<boolean> {
   name = canonicalToolName(name);
+  if (name.startsWith("stratigraphy.")) {
+    return Boolean(actualHeights?.length) &&
+      actualHeights!.every((height) => height <= maxTarget);
+  }
   const records = await getStratigraphyData();
   const heightAt = (index: number) => snapshotBlock(index, records.length);
   if (name === "stratigraphy.get") {
@@ -1555,20 +1601,20 @@ const baseMcpToolDefinitions = [
         ),
         blockHeight: field(
           "integer",
-          "Select one indexed non-negative dataset height (e.g. 850000), not an arbitrary live chain lookup; cannot combine with days, date, or range bounds.",
+          "Select one actual captured non-negative Bitcoin height or the current live height; never a synthetic date-to-height index. Cannot combine with days, date, or range bounds.",
           [850000],
           { minimum: 0 },
         ),
         metrics: field(
           "array",
-          "Unique telemetry metric keys to project into each selected record's quantitative_alpha; omit for all metrics, or choose one or more allowed names.",
+          "Deprecated legacy projection hint retained for compatibility; the live source returns complete pipeline records regardless of this hint. Inspect live_metrics for the real pipeline field names.",
           [["target_multiplier"]],
           {
             minItems: 1,
             uniqueItems: true,
             items: field(
               "string",
-              "Allowed thermodynamic metric name to include in each returned quantitative_alpha object.",
+              "Deprecated hint such as target_multiplier; does not project the current pipeline snapshot.",
               ["target_multiplier"],
               { enum: [...thermodynamicMetricNames] },
             ),
@@ -4014,7 +4060,7 @@ const notarizeToolDefinition = {
     required: ["hash", "otsProofHex", "otsStatus"],
   },
 };
-const mcpToolDefinitions = [
+export const mcpToolDefinitions = [
   ...[...baseMcpToolDefinitions, notarizeToolDefinition]
     .filter(
       (tool) =>
@@ -4294,8 +4340,10 @@ const mcpToolDefinitions = [
     })
     .map((tool) => ({
       ...tool,
+      ...(primaryStratigraphyContracts[tool.name] ?? {}),
       annotations: {
         ...tool.annotations,
+        ...(tool.name === "stratigraphy.get" ? { zkProof: undefined } : {}),
         l402: {
           amountSats: mcpToolPrices[tool.name as keyof typeof mcpToolPrices],
           ...(mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0
@@ -4411,6 +4459,8 @@ function createBitcoinStratigraphyMcpServer(
   x402Configured = false,
   paymentSettlement?: SettlementCheck,
   notary: typeof notarizeHash = notarizeHash,
+  primaryBackend: PrimaryStratigraphyBackend = createPrimaryStratigraphyBackend(),
+  primaryResult?: PrimaryStratigraphyResult,
 ) {
   const server = new McpServer(
     {
@@ -4443,6 +4493,24 @@ function createBitcoinStratigraphyMcpServer(
     const name = canonicalToolName(request.params.name);
     if (!mcpToolDefinitions.some((tool) => tool.name === name)) {
       throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
+    }
+    if (name.startsWith("stratigraphy.")) {
+      const schema = name === "stratigraphy.list" ? stratigraphyCatalogInputSchema
+        : paidTools[name as keyof typeof paidTools]?.schema;
+      const parsed = schema?.safeParse(args);
+      if (!parsed?.success) throw new McpError(ErrorCode.InvalidParams, "Invalid stratigraphy query");
+      try {
+        const data = primaryResult ?? await primaryBackend(name, parsed.data);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(data.result) }],
+          structuredContent: data.result,
+        };
+      } catch (error) {
+        throw new McpError(
+          error instanceof RangeError ? ErrorCode.InvalidParams : ErrorCode.InternalError,
+          error instanceof Error ? error.message : "Live stratigraphy source unavailable",
+        );
+      }
     }
     if (name === "proof.notarize") {
       const parsed = notarizeInputSchema.safeParse(args);
@@ -4884,6 +4952,7 @@ async function handleMcpRequest(
   req: Request,
   res: Response,
   mesh: Pick<MeshGossipService, "status" | "createConsensus">,
+  primaryBackend: PrimaryStratigraphyBackend,
 ): Promise<void> {
   const server = createBitcoinStratigraphyMcpServer(
     res.locals.epistemicAnchorReceipt as
@@ -4900,6 +4969,8 @@ async function handleMcpRequest(
     Boolean(res.locals.x402Configured),
     res.locals.paymentSettlement as SettlementCheck | undefined,
     res.locals.notarizeHash as typeof notarizeHash | undefined,
+    primaryBackend,
+    res.locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined,
   );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -4969,9 +5040,12 @@ export function registerMcpRoute(
     meshService?: Pick<MeshGossipService, "status" | "createConsensus">;
     revocationStore?: MacaroonRevocationStore;
     notarizeHash?: typeof notarizeHash;
+    stratigraphyBackend?: PrimaryStratigraphyBackend;
     publicRateLimiter?: SlidingWindowRateLimiter;
   } = {},
 ): void {
+  const primaryBackend = options.stratigraphyBackend ??
+    createPrimaryStratigraphyBackend({ secret: options.sessionSecret });
   app.use("/mcp", frameMcpErrors);
   app.use("/mcp", (_req, res, next) => {
     res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;
@@ -5570,6 +5644,56 @@ export function registerMcpRoute(
               Math.floor(Date.now() / 1_000),
             )
           : null;
+      // Anonymous calls get the existing 402 without invoking the cloud-backed
+      // source for ordinary paid reads. Comparison/summary selectors retain
+      // their existing no-invoice-on-invalid-target rule.
+      if (canonicalName.startsWith("stratigraphy.") && !pass) {
+        if ([
+          "stratigraphy.get_digest",
+          "stratigraphy.get_diff",
+          "stratigraphy.get_range",
+        ].includes(canonicalName)) {
+          try {
+            await primaryBackend(canonicalName, tool.schema.parse(
+              body?.params?.arguments ?? {},
+            ) as Record<string, unknown>);
+          } catch (error) {
+            if (error instanceof RangeError) {
+              res.status(400).json({
+                jsonrpc: "2.0", id: body?.id ?? null,
+                error: { code: -32602, message: error.message },
+              });
+              return;
+            }
+            res.status(503).json({
+              jsonrpc: "2.0", id: body?.id ?? null,
+              error: { code: -32603, message: "Live stratigraphy validation unavailable" },
+            });
+            return;
+          }
+        }
+        await gates[name](req, res, next);
+        return;
+      }
+      if (canonicalName.startsWith("stratigraphy.")) {
+        try {
+          res.locals.primaryStratigraphy = await primaryBackend(
+            canonicalName,
+            tool.schema.parse(body?.params?.arguments ?? {}) as Record<string, unknown>,
+          );
+        } catch (error) {
+          res.status(error instanceof RangeError ? 400
+            : error instanceof PrimaryStratigraphyUnavailable ? error.status : 503).json({
+            jsonrpc: "2.0", id: body?.id ?? null,
+            error: {
+              code: error instanceof RangeError ? -32602 : -32603,
+              message: error instanceof RangeError || error instanceof PrimaryStratigraphyUnavailable
+                ? error.message : "Live stratigraphy source unavailable; no legacy fallback",
+            },
+          });
+          return;
+        }
+      }
       if (
         pass &&
         (pass.allowedToolSets.some(
@@ -5583,6 +5707,7 @@ export function registerMcpRoute(
               canonicalName,
               body?.params?.arguments ?? {},
               pass.maxTarget,
+              (res.locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined)?.targetHeights,
             ))))
       ) {
         res.status(403).json({
@@ -5594,40 +5719,6 @@ export function registerMcpRoute(
           },
         });
         return;
-      }
-      if (
-        canonicalName === "stratigraphy.get_digest" ||
-        canonicalName === "stratigraphy.get_diff" ||
-        canonicalName === "stratigraphy.get_range"
-      ) {
-        try {
-          if (canonicalName === "stratigraphy.get_digest") {
-            await queryStratigraphyDigest(
-              stratigraphyDigestInputSchema.parse(
-                body?.params?.arguments ?? {},
-              ),
-            );
-          } else if (canonicalName === "stratigraphy.get_range") {
-            await queryStratigraphyRange(
-              stratigraphyRangeInputSchema.parse(body?.params?.arguments ?? {}),
-            );
-          } else {
-            await queryStratigraphyDiff(
-              stratigraphyDiffInputSchema.parse(body?.params?.arguments ?? {}),
-            );
-          }
-        } catch (error) {
-          if (!(error instanceof RangeError)) return next(error);
-          res.status(400).json({
-            jsonrpc: "2.0",
-            id:
-              typeof body?.id === "string" || typeof body?.id === "number"
-                ? body.id
-                : null,
-            error: { code: -32602, message: error.message },
-          });
-          return;
-        }
       }
       if (
         name === "mesh.broadcast" &&
@@ -5787,7 +5878,7 @@ export function registerMcpRoute(
       }
       next();
     },
-    (req, res) => handleMcpRequest(req, res, mesh),
+    (req, res) => handleMcpRequest(req, res, mesh, primaryBackend),
     (_req, res) => {
       if (!res.headersSent) {
         res.status(400).json({

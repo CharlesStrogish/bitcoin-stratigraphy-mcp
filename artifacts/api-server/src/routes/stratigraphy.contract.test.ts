@@ -15,7 +15,8 @@ import { registerPublicCors } from "../middleware/publicCors";
 import { parse } from "yaml";
 import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
-import { registerMcpRequestGuard, registerMcpRoute } from "./mcp";
+import { indexedContractTestFixture, registerMcpRequestGuard, registerMcpRoute } from "./mcp";
+import { primaryStratigraphyContracts } from "../services/primaryStratigraphySchemas";
 import { verifyEpistemicDatasetReceipt } from "../services/epistemicDatasetReceipt";
 import type { SettlementRouter } from "../services/settlement";
 import {
@@ -112,6 +113,9 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "mesh.get_status":
     "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Requires L402 authorization; use mesh.broadcast to distribute a snapshot. This tool does not administer peers or edit topology.",
 };
+for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
+  expectedMcpToolDescriptions[name] = contract.description;
+}
 
 type OpenApiDocument = {
   paths: Record<string, { get?: unknown }>;
@@ -510,6 +514,7 @@ app.use(
 registerOpenApiRoute(app);
 registerMcpServerCardRoute(app);
 registerMcpRoute(app, {
+  stratigraphyBackend: indexedContractTestFixture,
   settlementRouter: mcpSettlementRouter,
   sessionSecret: "contract-mcp-secret",
   readBitcoinTip: async () => ({
@@ -722,6 +727,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
   const isolatedApp = express();
   isolatedApp.use(express.json());
   registerMcpRoute(isolatedApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-secret",
     revocationStore: createMemoryMacaroonRevocationStore(),
@@ -1224,6 +1230,7 @@ test("MCP proof.ground reads and signs Bitcoin receipts only after L402 settles"
   isolatedApp.use(express.json());
   let tipReads = 0;
   registerMcpRoute(isolatedApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-secret",
     readBitcoinTip: async () => {
@@ -1695,7 +1702,10 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
   };
   const smitheryMetadata = parse(smitheryYaml) as { description?: unknown };
   const glamaMetadata = JSON.parse(glamaJson) as { description?: unknown };
-  const xMcpTools = sharedDocument["x-mcp-tools"];
+  // Runtime metadata applies authoritative pricing and the live stratigraphy
+  // contracts; check what clients actually receive, not the YAML defaults.
+  const publicDocument = await (await fetch(`${baseUrl}/openapi.json`)).json() as Record<string, unknown>;
+  const xMcpTools = publicDocument["x-mcp-tools"] as Record<string, unknown>;
   assert.ok(
     xMcpTools && typeof xMcpTools === "object" && !Array.isArray(xMcpTools),
     "Shared OpenAPI document must define x-mcp-tools",
@@ -2243,37 +2253,31 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   > = {
     "stratigraphy.list": {
-      keys: [
-        "totalSnapshots",
-        "oldestBlock",
-        "newestBlock",
-        "availableMetrics",
-        "dateBounds",
-      ],
+      keys: Object.keys(primaryStratigraphyContracts["stratigraphy.list"].outputSchema.properties),
       readOnly: true,
       idempotent: true,
       openWorld: false,
     },
     "stratigraphy.get": {
-      keys: ["records"],
+      keys: Object.keys(primaryStratigraphyContracts["stratigraphy.get"].outputSchema.properties),
       readOnly: true,
       idempotent: true,
       openWorld: false,
     },
     "stratigraphy.get_digest": {
-      keys: ["result", "proofAvailable"],
+      keys: Object.keys(primaryStratigraphyContracts["stratigraphy.get_digest"].outputSchema.properties),
       readOnly: true,
       idempotent: true,
       openWorld: false,
     },
     "stratigraphy.get_diff": {
-      keys: ["from", "to", "delta"],
+      keys: Object.keys(primaryStratigraphyContracts["stratigraphy.get_diff"].outputSchema.properties),
       readOnly: true,
       idempotent: true,
       openWorld: false,
     },
     "stratigraphy.get_range": {
-      keys: ["range", "count", "format", "records"],
+      keys: Object.keys(primaryStratigraphyContracts["stratigraphy.get_range"].outputSchema.properties),
       readOnly: true,
       idempotent: true,
       openWorld: false,
@@ -2477,7 +2481,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   }
   assert.match(
     documentedTool("stratigraphy.list").description,
-    /^Discover indexed height and UTC date bounds, available metrics, and catalog metadata\./,
+    /^Free, metadata-only discovery of real UTC archive bounds/,
   );
   assert.match(documentedTool("proof.list").description, /free|no invoice/i);
   assert.match(
@@ -2692,12 +2696,6 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     readOnly: true,
     audience: ["assistant"],
     priority: 1,
-    zkProof: {
-      included: true,
-      scheme: "Groth16/Poseidon BN254",
-      verificationEndpoint: "POST /api/v1/zk/verify",
-      targetVerificationTime: "sub-10ms for proofs emitted by this API",
-    },
   });
   assert.deepEqual((await mcpRequest("resources/list")).result, {
     resources: [],
@@ -2921,6 +2919,7 @@ test("MCP quotes both rails without a facilitator but refuses signed x402 reques
   app.use(express.json());
   registerMcpRequestGuard(app);
   registerMcpRoute(app, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-no-facilitator-secret",
     x402ResourceServer: null,
@@ -3023,6 +3022,7 @@ test("MCP forwards failed L402 usage accounting to its JSON error handler", asyn
   const isolatedApp = express();
   isolatedApp.use(express.json());
   registerMcpRoute(isolatedApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-usage-failure-secret",
     x402ResourceServer: null,
@@ -3111,6 +3111,7 @@ test("MCP paid tools issue dual challenges and settle x402 before execution", as
   paymentApp.use(express.json());
   registerMcpRequestGuard(paymentApp);
   registerMcpRoute(paymentApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-x402-secret",
     x402ResourceServer: x402Server,
@@ -3305,6 +3306,7 @@ test("returns a paid digest of stored records without inventing a block hash or 
   digestApp.use(express.json());
   registerMcpRequestGuard(digestApp);
   registerMcpRoute(digestApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-secret",
   });
@@ -3431,14 +3433,15 @@ test("returns a paid digest of stored records without inventing a block hash or 
         ["text"],
       );
       const result = JSON.parse(content[0].text);
-      assert.deepEqual(called.result?.structuredContent.result, result);
-      assert.equal(called.result?.structuredContent.proofAvailable, false);
+      assert.deepEqual(called.result?.structuredContent, result);
+      assert.equal(result.proofAvailable, false);
+      const fingerprint = result.result;
       if (expected === null) {
-        assert.equal(result.length, 2);
-        assert.equal(result[1].hash, expectedHash);
-        assert.equal(result[0].ts, "2026-09-08");
+        assert.equal(fingerprint.length, 2);
+        assert.equal(fingerprint[1].hash, expectedHash);
+        assert.equal(fingerprint[0].ts, "2026-09-08");
       } else {
-        assert.deepEqual(result, expected);
+        assert.deepEqual(fingerprint, expected);
       }
     }
     for (const target of ["2026-09-27", "862401", "2026-09-09..2026-09-08"]) {
@@ -3462,6 +3465,7 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
   diffApp.use(express.json());
   registerMcpRequestGuard(diffApp);
   registerMcpRoute(diffApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-secret",
   });
@@ -3623,6 +3627,7 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
   const rangeApp = express();
   rangeApp.use(express.json());
   registerMcpRoute(rangeApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-secret",
     revocationStore: createMemoryMacaroonRevocationStore(),
@@ -3863,6 +3868,7 @@ test("derives authentic caveated MCP sub-tokens and enforces inherited restricti
   const attenuationApp = express();
   attenuationApp.use(express.json());
   registerMcpRoute(attenuationApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-secret",
     revocationStore,
@@ -4085,6 +4091,7 @@ test("broadcasts a freshly signed canonical snapshot and requires a peer acknowl
     next();
   });
   registerMcpRoute(broadcastApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-broadcast-secret",
     meshService: {
@@ -4179,6 +4186,7 @@ test("returns JSON-RPC -32602 for invalid arguments to every MCP tool", async ()
     next();
   });
   registerMcpRoute(invalidApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-secret",
   });
@@ -4267,6 +4275,7 @@ test("limits free MCP discovery to 100 per 15 minutes while preserving existing 
     next();
   });
   registerMcpRoute(mcpRateApp, {
+    stratigraphyBackend: indexedContractTestFixture,
     settlementRouter: mcpSettlementRouter,
     sessionSecret: "contract-mcp-rate-secret",
     x402ResourceServer: null,

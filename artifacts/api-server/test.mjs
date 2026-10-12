@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/primaryStratigraphy.test.js",
   "./dist/escrow.test.js",
   "./dist/provenancePersistence.unit.test.js",
   "./dist/stratigraphy.contract.test.js",
@@ -125,6 +126,7 @@ await build({
 
 await build({
   entryPoints: {
+    "primaryStratigraphy.test": "./tests/unit/primaryStratigraphy.test.ts",
     "escrow.test": "./src/routes/escrow.test.ts",
     "stratigraphy.contract.test": "./src/routes/stratigraphy.contract.test.ts",
     "pricing.test": "./tests/unit/pricing.test.ts",

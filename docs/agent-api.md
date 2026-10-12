@@ -169,6 +169,21 @@ verify with their own Bitcoin mainnet node. Routine retries are debug-only logs.
 
 ### Agent retrieval
 
+The primary 15-tool `/mcp` catalog now obtains its stratigraphy responses
+through an authenticated internal bridge to this licensed Python pipeline and
+the authoritative Object Storage archive. The free `stratigraphy.list` tool
+exposes only real archive bounds and live tip metadata. The four paid
+stratigraphy tools return the latest complete live pipeline snapshot (including
+the assumed 15 J/TH network power estimate and the $10M/current-price
+Finney multiple with attribution), plus exact archived JSON and the **current**
+bucket `.ots` bytes for selected UTC captures. A receipt covers its archived
+JSON only, **not** a later changing live value. No legacy video/index record
+is substituted when the pipeline or storage fails. Existing L402 tool scopes,
+prices, quotas and caveated maximum heights remain in force, using real
+observed block heights rather than synthetic date-to-block indices. Internal
+requests are HMAC-authenticated, time-limited and replay-protected; they are
+not an unpaid public tool.
+
 MCP:
 
 ```json

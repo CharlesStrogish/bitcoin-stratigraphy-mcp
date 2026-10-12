@@ -15,6 +15,7 @@ from provenance_anchor import ARCHIVE_DIRECTORY, ProvenanceAnchor
 from provenance_routes import register_provenance_routes
 from provenance_storage import ObjectArchive
 from provenance_upgrade import ProvenanceUpgrader
+from stratigraphy_bridge import register_stratigraphy_bridge
 from stratigraphy_pipeline import (
     MAX_BLOCK_HEIGHT as MAX_BLOCK_HEIGHT,
     TIP_URL as TIP_URL,
@@ -123,6 +124,7 @@ def create_app(*, proof_directory=ARCHIVE_DIRECTORY, proof_storage=None) -> Fast
             ) from exc
 
     register_provenance_routes(application, storage, API_PREFIX)
+    register_stratigraphy_bridge(application, storage, API_PREFIX)
 
     mcp = FastApiMCP(
         application,

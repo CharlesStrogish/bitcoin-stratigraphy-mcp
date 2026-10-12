@@ -4,7 +4,7 @@
 import contextlib
 import io
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 from cryptography.exceptions import InvalidSignature
@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 import agent_api
 import main
+import stratigraphy_pipeline as pipeline
 
 
 class SupplyCalculationTests(unittest.TestCase):
@@ -114,7 +115,12 @@ class AgentApiTests(unittest.TestCase):
         async def fixed_height(_client):
             return 900_001
 
-        with patch.object(main, "verify_license", return_value=True):
+        with (
+            patch.object(main, "verify_license", return_value=True),
+            patch.object(pipeline, "read_live_height", fixed_height),
+            patch.object(pipeline, "read_live_price", AsyncMock(return_value=(100_000, pipeline.PRICE_URL))) as price_reader,
+            patch.object(pipeline, "read_live_hashrate", AsyncMock(return_value=1e21)) as hashrate_reader,
+        ):
             app = agent_api.create_app()
             with TestClient(app) as client:
                 schema = client.get("/agent-api/openapi.json").json()
@@ -125,15 +131,39 @@ class AgentApiTests(unittest.TestCase):
                     if isinstance(operation, dict) and "operationId" in operation
                 ]
                 self.assertEqual(operations, ["get_supply_metrics"])
-                with patch.object(agent_api, "read_live_height", fixed_height):
-                    response = client.get("/agent-api/supply-metrics")
+                response = client.get("/agent-api/supply-metrics")
                 self.assertEqual(response.status_code, 200)
                 result = response.json()
                 self.assertEqual(result["block_height"], 900_001)
                 self.assertEqual(result["supply_limit_btc"], 21_000_000)
                 self.assertEqual(result["current_epoch"], 4)
                 self.assertIn("Not measured circulating supply", result["supply_method"])
+                self.assertEqual(result["hal_finney_horizon_multiple"], 100)
+                self.assertEqual(result["attribution"], pipeline.ATTRIBUTION)
+                keys = list(result)
+                self.assertEqual(keys[keys.index("hal_finney_horizon_multiple") + 1], "attribution")
+                self.assertEqual(result["network_energy_watts"], 15_000_000_000)
+                self.assertEqual(result["efficiency_baseline_j_th"], 15)
                 self.assertEqual(client.get("/agent-api/health").status_code, 200)
+                self.assertTrue(client.get("/agent-api/health").json()["pipeline_ready"])
+                self.assertEqual(client.get("/agent-api/supply-metrics").status_code, 200)
+                price_reader.assert_awaited_once()
+                hashrate_reader.assert_awaited_once()
+            self.assertIsNone(app.state.stratigraphy_pipeline._task)
+
+    def test_failed_pipeline_returns_explicit_service_unavailable(self):
+        with (
+            patch.object(main, "verify_license", return_value=True),
+            patch.object(pipeline, "read_live_height", AsyncMock(side_effect=pipeline.PipelineUnavailable())),
+            patch.object(pipeline, "read_live_price", AsyncMock(return_value=(100_000, pipeline.PRICE_URL))),
+            patch.object(pipeline, "read_live_hashrate", AsyncMock(return_value=1e21)),
+        ):
+            app = agent_api.create_app()
+            with TestClient(app) as client:
+                response = client.get("/agent-api/supply-metrics")
+                self.assertEqual(response.status_code, 503)
+                self.assertNotIn("block_height", response.json())
+                self.assertFalse(client.get("/agent-api/health").json()["pipeline_ready"])
 
 
 if __name__ == "__main__":

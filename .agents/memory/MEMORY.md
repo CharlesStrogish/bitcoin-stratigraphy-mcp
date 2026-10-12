@@ -25,6 +25,7 @@
 - [MCP optional response fields](mcp-optional-response-fields.md) — accept omitted JSON Schema required arrays and omitted isError on successful MCP results.
 - [MCP metadata fidelity](mcp-metadata-fidelity.md) — TDQS descriptions and schemas must match executable inputs, outputs, and side effects rather than generic rubric examples.
 - [MCP catalog size](mcp-catalog-size.md) — exactly 15 registered tools; REST and frontend additions must not change MCP definitions or registration.
+- [Enterprise pipeline models](enterprise-pipeline-models.md) — user-defined $10M price-multiple horizon, verbatim adjacent attribution, and assumed 15 J/TH network-power model.
 - [NIP-90 paid job lifecycle](nip90-paid-job-lifecycle.md) — bind DVM settlement to exact incoming invoices and preserve standard feedback/result semantics.
 - [Fixed-fee L402 attestations](fixed-fee-l402-attestations.md) — paid route macaroons are path-bound and single-use; signed attestations trust only the configured server issuer.
 - [Epistemic grounding provenance](epistemic-grounding-provenance.md) — reserve the epistemic schema for tip-grounded signing and verify every receipt alias against signed content.

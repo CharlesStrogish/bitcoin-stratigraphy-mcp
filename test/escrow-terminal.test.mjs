@@ -48,7 +48,7 @@ test("browser evaluates quoted fee and fails safely to 21 on offline or invalid 
   assert.equal((await helper.evaluateEscrowToll(signal, async () => quote(1))).toll_fee_sats, 1);
 });
 
-test("cancelled browser quote does not silently continue a settlement simulation", async () => {
+test("cancelled browser quote does not silently continue a settlement", async () => {
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(helper.evaluateEscrowToll(controller.signal), /aborted/);
@@ -59,92 +59,72 @@ test("cancelled browser quote does not silently continue a settlement simulation
   }), /aborted/);
 });
 
-function walk(node, visit) {
-  if (Array.isArray(node)) return node.forEach((child) => walk(child, visit));
-  if (!node || typeof node !== "object") return;
-  visit(node);
-  walk(node.props?.children, visit);
+function liveHelper(fetch = async () => { throw new Error("Unexpected network call"); }) {
+  return compile(read("engine/escrowLive.ts").replaceAll("import.meta.env.BASE_URL", '"/"'),
+    () => { throw new Error("Unexpected runtime import"); }, { crypto: webcrypto, fetch });
 }
 
-function text(node) {
-  if (Array.isArray(node)) return node.map(text).join("");
-  if (node === undefined || node === null || typeof node === "boolean") return "";
-  return typeof node === "object" ? text(node.props?.children) : String(node);
-}
+const preimage = "7".repeat(64);
+const hash = Array.from(new Uint8Array(await webcrypto.subtle.digest(
+  "SHA-256", Buffer.from(preimage, "hex"),
+)), (b) => b.toString(16).padStart(2, "0")).join("");
 
-function harness(evaluate) {
-  const values = [];
-  let cursor = 0;
-  const react = {
-    useState(initial) {
-      const index = cursor++;
-      if (!(index in values)) values[index] = initial;
-      return [values[index], (next) => {
-        values[index] = typeof next === "function" ? next(values[index]) : next;
-      }];
-    },
-    useRef(initial) {
-      const index = cursor++;
-      if (!(index in values)) values[index] = { current: initial };
-      return values[index];
-    },
-    useEffect() {},
-  };
-  const { EscrowTerminal } = compile(read("components/EscrowTerminal.tsx"), (path) => {
-    if (path === "react") return react;
-    if (path === "react/jsx-runtime") return { jsx, jsxs: jsx };
-    if (path === "lucide-react") return { Play: "icon" };
-    if (path === "./CopyJsonButton") return { CopyJsonButton: "copy" };
-    if (path === "../engine/escrowToll") return { evaluateEscrowToll: evaluate };
-    if (path.endsWith(".css")) return {};
-    throw new Error(`Unexpected import: ${path}`);
-  }, { crypto: webcrypto, window: {
-    setTimeout: (callback) => setTimeout(callback, 0), clearTimeout,
-  } });
-  const render = () => { cursor = 0; return EscrowTerminal(); };
-  const find = (tree, id) => {
-    let found;
-    walk(tree, (node) => { if (node.props["data-testid"] === id) found = node; });
-    return found;
-  };
-  return { render, find };
-}
-
-test("each simulation binds its dynamic fee into step 3, copied JSON and exact session total", async () => {
-  const fees = [2, 13, 21, Number.MAX_SAFE_INTEGER];
-  let index = 0;
-  const h = harness(async () => quote(fees[index++], index === 3 ? "fallback" : "market"));
-  let total = 0n;
-  for (const fee of fees) {
-    const tree = h.render();
-    await h.find(tree, "button-simulate-settlement").props.onClick();
-    const completed = h.render();
-    total += BigInt(fee);
-    assert.match(text(h.find(completed, "metric-tolls")), new RegExp(`${total} sats`));
-    assert.ok(text(h.find(completed, "stage-3")).includes(`Collects ${fee} Sats Toll`));
-    const receipt = JSON.parse(h.find(completed, "text-escrow-proof").props.children);
-    assert.equal(receipt.tollSats, fee);
-    assert.equal(receipt.pricing.toll_fee_sats, fee);
-    assert.equal(receipt.simulated, true);
-    let copy;
-    walk(completed, (node) => { if (node.type === "copy") copy = node; });
-    assert.equal(copy.props.text, h.find(completed, "text-escrow-proof").props.children);
-  }
-  assert.equal(index, fees.length);
+test("live client requires a mathematical Lightning preimage, never a reference or random proof", async () => {
+  const live = liveHelper();
+  assert.equal(await live.preimageMatches(preimage, hash), true);
+  assert.equal(await live.preimageMatches("8".repeat(64), hash), false);
+  assert.equal(await live.preimageMatches("11111111-1111-4111-8111-111111111111", hash), false);
 });
 
-test("rapid repeated clicks cannot double count a pending quote or simulation", async () => {
-  let release;
-  let calls = 0;
-  const h = harness(() => {
-    calls++;
-    return new Promise((resolve) => { release = resolve; });
+test("live client submits real fields, displays exact challenges and retries unchanged with L402", async () => {
+  const requests = [];
+  const data = { escrow_id: "11111111-1111-4111-8111-111111111111",
+    payment_hash: hash, status: "LOCKED", amount_sats: 1000, toll_fee_sats: 24 };
+  const live = liveHelper(async (url, options) => {
+    requests.push({ url, ...options });
+    return options.headers.Authorization
+      ? { ok: true, status: 201, json: async () => data }
+      : { ok: false, status: 402, json: async () => ({
+        invoice: "ln-test", token: "signed-capability", payment_hash: hash, amount_sats: 21,
+      }) };
   });
-  const start = h.find(h.render(), "button-simulate-settlement").props.onClick;
-  const first = start();
-  await start();
-  assert.equal(calls, 1);
-  release(quote(2));
-  await first;
-  assert.match(text(h.find(h.render(), "metric-tolls")), /2 sats/);
+  const body = { buyer_pubkey: "a".repeat(64), worker_pubkey: "b".repeat(64),
+    task_hash: "c".repeat(64), amount_sats: 1000 };
+  const signal = new AbortController().signal;
+  const unpaid = await live.callEscrow("/v1/escrow/create", body, "test-operator", null, signal, live.validateCreate);
+  assert.equal(unpaid.kind, "challenge");
+  assert.equal(unpaid.challenge.amount_sats, 21);
+  assert.equal(unpaid.challenge.macaroon, "signed-capability");
+  const paid = await live.callEscrow("/v1/escrow/create", body, "test-operator",
+    { macaroon: unpaid.challenge.macaroon, preimage }, signal, live.validateCreate);
+  assert.equal(paid.kind, "ok");
+  assert.equal(paid.data.toll_fee_sats, 24);
+  assert.equal(requests[0].url, "/api/v1/escrow/create");
+  assert.equal(requests[0].body, requests[1].body);
+  assert.equal(requests[1].headers.Authorization, `L402 signed-capability:${preimage}`);
+  assert.equal(requests[1].credentials, "omit");
+});
+
+test("a legacy or malformed 200 cannot claim live settlement without wallet confirmation metadata", () => {
+  const live = liveHelper();
+  const data = { status: "SETTLED", preimage, merkle_root: hash, audit_path: [],
+    article_12_receipt: { escrow_id: "test", lightning_settlement: {
+      payment_hash: hash, amount_sats: 24, provider: "coinos", confirmed_at: "2026-10-12T12:00:00Z",
+    } } };
+  assert.ok(live.validateSettle(data));
+  assert.equal(live.validateSettle({ ...data, article_12_receipt: {} }), null);
+  assert.equal(live.validateSettle({ ...data, preimage: "fabricated" }), null);
+  assert.equal(live.validateCreate({ escrow_id: "test", payment_hash: hash,
+    status: "LOCKED", amount_sats: 1000, toll_fee_sats: 0 }), null);
+});
+
+test("wallet/backend failure remains an error and never a successful receipt", async () => {
+  const live = liveHelper(async () => ({
+    ok: false, status: 502, json: async () => ({ error: "Unable to verify payment" }),
+  }));
+  const out = await live.callEscrow("/v1/escrow/settle",
+    { escrow_id: "test", execution_trace: "trace", result_payload: "result" },
+    "test-operator", null, new AbortController().signal, live.validateSettle);
+  assert.equal(out.kind, "error");
+  assert.match(out.message, /502.*Unable to verify payment/);
 });

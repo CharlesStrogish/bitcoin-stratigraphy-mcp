@@ -284,7 +284,7 @@ export const getSettleEscrowUrl = () => {
 }
 
 /**
- * Trusted operators must independently verify funding and task acceptance. Payment alone never authorizes preimage release. The recorded provider height is not a Bitcoin anchor proof.
+ * Requires X-Escrow-Operator-Token and live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 capability binds the escrow ID, exact execution trace and result payload, is single-use, and requires a SHA-256-bound Lightning preimage plus wallet-confirmed incoming settlement. No final JSON or escrow preimage is released before verification. Trusted operators must independently verify bounty funding and task acceptance; the recorded provider height is not a Bitcoin anchor proof.
  * @summary Commit authorized execution evidence and release the escrow preimage
  */
 export const settleEscrow = async (escrowExecutionInput: EscrowExecutionInput, options?: Parameters<typeof customFetch>[1]): Promise<EscrowSettlement> => {

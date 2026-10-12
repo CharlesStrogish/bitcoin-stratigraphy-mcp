@@ -29,7 +29,9 @@ def main():
                 (lambda: request["btc_usd_price"]) if "btc_usd_price" in request else None
             ),
         )
-        status, body = EscrowApi(engine).dispatch(request["operation"], request["body"])
+        status, body = EscrowApi(engine).dispatch(
+            request["operation"], request["body"], request.get("lightning_settlement"),
+        )
         print(json.dumps({"status": status, "body": body}))
     except Exception:
         # No traceback or submitted fields: these may contain private evidence.

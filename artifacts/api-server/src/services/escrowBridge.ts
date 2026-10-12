@@ -13,15 +13,22 @@ const workerResult = z.object({
   body: z.record(z.unknown()),
 });
 export type EscrowWorkerResult = z.infer<typeof workerResult>;
+export type EscrowLightningSettlement = {
+  payment_hash: string;
+  amount_sats: number;
+  provider: string;
+  confirmed_at: string;
+};
 export type EscrowExecutor = (
   operation: EscrowOperation,
   body: Record<string, unknown>,
   height?: number,
   signal?: AbortSignal,
+  lightningSettlement?: EscrowLightningSettlement,
 ) => Promise<EscrowWorkerResult>;
 
 /** Only staged source code is bundled. The custody DB never enters dist/. */
-export const executeEscrow: EscrowExecutor = async (operation, body, height, signal) => {
+export const executeEscrow: EscrowExecutor = async (operation, body, height, signal, lightningSettlement) => {
   if (signal?.aborted) throw new Error("Escrow request cancelled");
   const price = operation === "create" ? await readEscrowBitcoinPrice() : undefined;
   return new Promise((resolve, reject) => {
@@ -74,6 +81,7 @@ export const executeEscrow: EscrowExecutor = async (operation, body, height, sig
     });
     child.stdin.end(JSON.stringify({
       operation, body, strata_height: height, btc_usd_price: price,
+      lightning_settlement: lightningSettlement,
       database_path: path.resolve(process.cwd(), ".data/escrow/escrow.sqlite3"),
     }));
   });

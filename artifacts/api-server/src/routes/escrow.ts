@@ -59,6 +59,57 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
     usageStore: options.usageStore,
     revocationStore: options.revocationStore,
   });
+  // The settlement route charges the reserved protocol toll, not an additional
+  // fixed access fee. Bind the paid capability to the entire exact submission.
+  const tollGate = createL402Middleware({
+    amountSats: (req) => Number(req.res?.locals.escrowTollSats),
+    enforceCurrentAmount: true,
+    requireHexPreimage: true,
+    description: "Autonomous Escrow execution settlement toll",
+    scopePath: (req) => `/api/v1/escrow/settle/${createHash("sha256")
+      .update(JSON.stringify([
+        req.body.escrow_id, req.body.execution_trace, req.body.result_payload,
+      ])).digest("hex")}`,
+    settlementRouter,
+    sessionSecret: options.sessionSecret,
+    usageStore: options.usageStore,
+    revocationStore: options.revocationStore,
+  });
+  const prepareSettlement: RequestHandler = async (_req, res, next) => {
+    if (active >= 8) {
+      res.set("Retry-After", "5").status(503).json({ error: "Escrow service is busy" });
+      return;
+    }
+    active++;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    res.once("close", abort);
+    try {
+      const body = res.locals.escrowInput as Record<string, unknown>;
+      const lookup = await execute("lookup", { escrow_id: body.escrow_id }, undefined, controller.signal);
+      if (lookup.status !== 200) {
+        res.status(lookup.status).json(lookup.body);
+        return;
+      }
+      if (lookup.body.status !== "LOCKED") {
+        res.status(422).json({ error: "Settlement requires a LOCKED escrow" });
+        return;
+      }
+      const toll = lookup.body.toll_fee_sats;
+      if (!Number.isSafeInteger(toll) || Number(toll) <= 0) throw new Error("Invalid toll");
+      res.locals.escrowTollSats = toll;
+      const height = await readHeight();
+      if (!Number.isSafeInteger(height) || height < 0) throw new Error("Invalid strata height");
+      res.locals.escrowHeight = height;
+    } catch {
+      if (!res.destroyed) res.status(503).json({ error: "Escrow toll or chain lookup unavailable" });
+      return;
+    } finally {
+      active--;
+      res.removeListener("close", abort);
+    }
+    if (!res.destroyed) next();
+  };
   let active = 0;
   router.use((_req, res, next) => {
     res.set({ "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
@@ -120,10 +171,16 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
           res.status(422).json({ error: "Settlement requires a LOCKED escrow" });
           return;
         }
-        height = await readHeight();
-        if (!Number.isSafeInteger(height) || height < 0) throw new Error("Invalid strata height");
+        height = res.locals.escrowHeight;
+        if (typeof height !== "number" || !Number.isSafeInteger(height) || height < 0) throw new Error("Invalid strata height");
       }
-      const result = await execute(operation, body, height, controller.signal);
+      const result = await execute(operation, body, height, controller.signal,
+        operation === "settle" ? {
+          payment_hash: res.locals.l402.paymentHash,
+          amount_sats: res.locals.escrowTollSats,
+          provider: res.locals.l402.provider,
+          confirmed_at: new Date().toISOString(),
+        } : undefined);
       if (res.destroyed) return;
       if (result.status !== 200 && result.status !== 201) {
         res.status(result.status).json(result.body);
@@ -149,7 +206,7 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
     if (!res.destroyed) res.json(GetEscrowTollResponse.parse(escrowTollQuote(price)));
   });
   router.post("/create", validate("create"), gate("create"), operatorGate, run("create"));
-  router.post("/settle", validate("settle"), gate("settle"), operatorGate, run("settle"));
+  router.post("/settle", validate("settle"), operatorGate, prepareSettlement, tollGate, run("settle"));
   router.get("/receipt/:escrow_id", validate("receipt"), gate("receipt"), operatorGate, run("receipt"));
   app.use("/api/v1/escrow", router);
 }

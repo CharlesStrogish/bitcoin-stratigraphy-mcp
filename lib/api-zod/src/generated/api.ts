@@ -76,7 +76,7 @@ export const CreateEscrowResponse = zod.object({
 
 
 /**
- * Trusted operators must independently verify funding and task acceptance. Payment alone never authorizes preimage release. The recorded provider height is not a Bitcoin anchor proof.
+ * Requires X-Escrow-Operator-Token and live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 capability binds the escrow ID, exact execution trace and result payload, is single-use, and requires a SHA-256-bound Lightning preimage plus wallet-confirmed incoming settlement. No final JSON or escrow preimage is released before verification. Trusted operators must independently verify bounty funding and task acceptance; the recorded provider height is not a Bitcoin anchor proof.
  * @summary Commit authorized execution evidence and release the escrow preimage
  */
 export const settleEscrowBodyExecutionTraceMax = 262144;
@@ -92,6 +92,8 @@ export const SettleEscrowBody = zod.object({
 })
 
 export const settleEscrowResponsePreimageRegExp = new RegExp('^[0-9a-f]{64}$');
+export const settleEscrowResponseArticle12ReceiptLightningSettlementPaymentHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
 export const settleEscrowResponseArticle12ReceiptLeafIndexMin = 0;
 
 export const settleEscrowResponseArticle12ReceiptAuditPathItemRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -107,6 +109,12 @@ export const SettleEscrowResponse = zod.object({
   "merkle_root": zod.string(),
   "audit_path": zod.array(zod.string()),
   "article_12_receipt": zod.object({
+  "lightning_settlement": zod.object({
+  "payment_hash": zod.string().regex(settleEscrowResponseArticle12ReceiptLightningSettlementPaymentHashRegExp),
+  "amount_sats": zod.number().int().min(1),
+  "provider": zod.string(),
+  "confirmed_at": zod.string()
+}).optional().describe('Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage.'),
   "escrow_id": zod.string(),
   "leaf_index": zod.number().int().min(settleEscrowResponseArticle12ReceiptLeafIndexMin),
   "audit_path": zod.array(zod.string().regex(settleEscrowResponseArticle12ReceiptAuditPathItemRegExp)),
@@ -128,6 +136,8 @@ export const GetEscrowReceiptParams = zod.object({
   "escrow_id": zod.coerce.string().uuid()
 })
 
+export const getEscrowReceiptResponseProofLightningSettlementPaymentHashRegExp = new RegExp('^[0-9a-f]{64}$');
+
 export const getEscrowReceiptResponseProofLeafIndexMin = 0;
 
 export const getEscrowReceiptResponseProofAuditPathItemRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -143,6 +153,12 @@ export const GetEscrowReceiptResponse = zod.object({
   "identifier": zod.string(),
   "dateCreated": zod.string(),
   "proof": zod.object({
+  "lightning_settlement": zod.object({
+  "payment_hash": zod.string().regex(getEscrowReceiptResponseProofLightningSettlementPaymentHashRegExp),
+  "amount_sats": zod.number().int().min(1),
+  "provider": zod.string(),
+  "confirmed_at": zod.string()
+}).optional().describe('Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage.'),
   "escrow_id": zod.string(),
   "leaf_index": zod.number().int().min(getEscrowReceiptResponseProofLeafIndexMin),
   "audit_path": zod.array(zod.string().regex(getEscrowReceiptResponseProofAuditPathItemRegExp)),

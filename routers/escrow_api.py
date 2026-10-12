@@ -22,7 +22,7 @@ class EscrowApi:
     def __init__(self, engine: EscrowEngine):
         self.engine = engine
 
-    def dispatch(self, operation, body):
+    def dispatch(self, operation, body, lightning_settlement=None):
         """Return (HTTP status, JSON body) to an already authorized transport."""
         try:
             if not isinstance(body, dict):
@@ -49,7 +49,10 @@ class EscrowApi:
             if contract is None:
                 return 404, {"error": "Escrow not found"}
             if operation == "lookup":
-                return 200, {"status": contract["status"]}
+                return 200, {
+                    "status": contract["status"],
+                    "toll_fee_sats": contract["toll_fee_sats"],
+                }
             if operation == "settle":
                 if any(
                     not isinstance(body[field], str) or not body[field].strip()
@@ -57,7 +60,9 @@ class EscrowApi:
                     for field in ("execution_trace", "result_payload")
                 ):
                     return 422, {"error": "Execution trace and result must be nonempty bounded UTF-8 strings"}
-                settled = self.engine.verify_execution_and_settle(**body)
+                settled = self.engine.verify_execution_and_settle(
+                    **body, lightning_settlement=lightning_settlement,
+                )
                 receipt = settled["receipt"]
                 return 200, {
                     "status": "SETTLED", "preimage": settled["preimage"],

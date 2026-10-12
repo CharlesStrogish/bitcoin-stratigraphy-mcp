@@ -94,6 +94,18 @@ export interface EscrowTollQuote {
   quoted_at: string;
 }
 
+/**
+ * Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage.
+ */
+export type EscrowReceiptLightningSettlement = {
+  /** @pattern ^[0-9a-f]{64}$ */
+  payment_hash: string;
+  /** @minimum 1 */
+  amount_sats: number;
+  provider: string;
+  confirmed_at: string;
+};
+
 export type EscrowReceiptReceiptType = typeof EscrowReceiptReceiptType[keyof typeof EscrowReceiptReceiptType];
 
 
@@ -102,6 +114,8 @@ export const EscrowReceiptReceiptType = {
 } as const;
 
 export interface EscrowReceipt {
+  /** Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage. */
+  lightning_settlement?: EscrowReceiptLightningSettlement;
   escrow_id: string;
   /** @minimum 0 */
   leaf_index: number;

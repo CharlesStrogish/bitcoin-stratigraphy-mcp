@@ -69,7 +69,9 @@ class EscrowEngine:
             "toll_fee_sats": toll_fee_sats,
         }
 
-    def verify_execution_and_settle(self, escrow_id, execution_trace, result_payload):
+    def verify_execution_and_settle(
+        self, escrow_id, execution_trace, result_payload, lightning_settlement=None,
+    ):
         """Commit caller-authorized execution evidence; release only after commit.
 
         Hashing proves a commitment, not whether the trace completed the task.
@@ -119,6 +121,24 @@ class EscrowEngine:
                 "settled_at_strata_block": height,
                 "receipt_type": "article_12_execution_commitment",
             }
+            # Authenticated transport supplies this only after NWC confirms the
+            # exact toll and SHA-256 payment proof. Never persist its preimage.
+            if lightning_settlement is not None:
+                if (
+                    not isinstance(lightning_settlement, dict)
+                    or set(lightning_settlement) != {
+                        "payment_hash", "amount_sats", "provider", "confirmed_at",
+                    }
+                    or type(lightning_settlement["amount_sats"]) is not int
+                    or lightning_settlement["amount_sats"] != contract["toll_fee_sats"]
+                    or not isinstance(lightning_settlement["provider"], str)
+                    or not lightning_settlement["provider"]
+                    or not isinstance(lightning_settlement["confirmed_at"], str)
+                    or not lightning_settlement["confirmed_at"]
+                ):
+                    raise ValueError("Invalid verified Lightning settlement")
+                _hex32(lightning_settlement["payment_hash"], "toll payment hash")
+                receipt["lightning_settlement"] = dict(lightning_settlement)
             connection.execute(
                 """INSERT INTO escrow_execution_leaves
                    (leaf_index, escrow_id, leaf_preimage, receipt_json) VALUES (?, ?, ?, ?)""",

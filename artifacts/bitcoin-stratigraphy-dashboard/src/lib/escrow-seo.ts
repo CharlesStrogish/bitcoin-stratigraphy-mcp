@@ -14,7 +14,7 @@ export const ESCROW_APPLICATION = {
   operatingSystem: "Web",
   url: SIMULATOR_URL,
   description:
-    "Autonomous agent escrow with L402 access and RFC 6962 execution commitments. The browser terminal is an illustrative client simulation, not a live payment or Bitcoin anchor.",
+    "Autonomous agent escrow with NWC-backed Lightning toll settlement and RFC 6962 execution commitments. The terminal withholds final receipts and escrow preimages until the server confirms payment. Bounty funding and Bitcoin anchoring are separate.",
   author: { "@type": "Person", name: "Charles R. Strogish" },
   license: [
     "https://www.gnu.org/licenses/agpl-3.0.html",

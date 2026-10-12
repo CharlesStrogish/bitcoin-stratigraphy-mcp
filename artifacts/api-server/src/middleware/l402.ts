@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import {
   attenuateSubscriptionMacaroon,
   createSubscriptionMacaroon,
@@ -21,10 +21,12 @@ export type L402Authorization = {
 };
 
 export type L402MiddlewareOptions = {
-  amountSats: number | (() => number);
+  amountSats: number | ((req: Request) => number);
   description: string;
   settlementRouter: SettlementRouter;
-  scopePath?: string;
+  scopePath?: string | ((req: Request) => string);
+  enforceCurrentAmount?: boolean;
+  requireHexPreimage?: boolean;
   sessionSecret?: string;
   invoiceExpirySeconds?: number;
   now?: () => number;
@@ -51,7 +53,7 @@ export function parseL402Header(
 export function createL402Middleware(
   options: L402MiddlewareOptions,
 ): RequestHandler {
-  if (options.scopePath && !/^\/[^\s]*$/.test(options.scopePath)) {
+  if (typeof options.scopePath === "string" && !/^\/[^\s]*$/.test(options.scopePath)) {
     throw new RangeError("L402 scopePath must be an absolute path");
   }
   if (
@@ -70,10 +72,10 @@ export function createL402Middleware(
       "L402 maxChallengesPerMinute must be a positive integer",
     );
   }
-  const resolveAmountSats = () => {
+  const resolveAmountSats = (req?: Request) => {
     const amount =
       typeof options.amountSats === "function"
-        ? options.amountSats()
+        ? options.amountSats(req!)
         : options.amountSats;
     if (
       !Number.isSafeInteger(amount) ||
@@ -85,6 +87,8 @@ export function createL402Middleware(
     return amount;
   };
   if (typeof options.amountSats === "number") resolveAmountSats();
+  const resolveScope = (req: Request) =>
+    typeof options.scopePath === "function" ? options.scopePath(req) : options.scopePath ?? req.path;
   const invoiceExpirySeconds = options.invoiceExpirySeconds ?? 3_600;
   const now = options.now ?? Date.now;
   const credentialCache = new L402EdgeCache<
@@ -162,7 +166,7 @@ export function createL402Middleware(
         return;
       }
       const batchSize = requestedBatch ? 100 : 1;
-      const amountSats = resolveAmountSats() * batchSize;
+      const amountSats = resolveAmountSats(req) * batchSize;
       if (!Number.isSafeInteger(amountSats * 1_000))
         throw new RangeError("Batch price exceeds safe range");
       const amountMsats = amountSats * 1_000;
@@ -193,7 +197,7 @@ export function createL402Middleware(
         paymentProvider: invoice.provider,
       });
       const macaroon = attenuateSubscriptionMacaroon(rootMacaroon, [
-        `allowed_path=${options.scopePath ?? req.path}`,
+        `allowed_path=${resolveScope(req)}`,
         `max_requests=${batchSize}`,
       ]);
       if (!macaroon) throw new Error("Unable to attenuate L402 macaroon");
@@ -235,7 +239,7 @@ export function createL402Middleware(
           pass.expiresAt ?? pass.validUntil * 1_000,
         );
         if (
-          !options.scopePath?.startsWith("/mcp/tools/") &&
+          !resolveScope(req).startsWith("/mcp/tools/") &&
           (pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined)
         ) {
           res.status(403).json({
@@ -264,12 +268,12 @@ export function createL402Middleware(
       if (
         pass &&
         (pass.paymentHash === preimageHash ||
-          (pass.paymentProvider === "coinos" && preimageHash === null)) &&
+          (!options.requireHexPreimage && pass.paymentProvider === "coinos" && preimageHash === null)) &&
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
-        (typeof options.amountSats !== "number" ||
+        (typeof options.amountSats !== "number" && !options.enforceCurrentAmount ||
           pass.amountMsats ===
-            options.amountSats *
+            resolveAmountSats(req) *
               1_000 *
               (options.allowBatch && pass.requestLimits[0]?.maxRequests === 100
                 ? 100
@@ -278,7 +282,7 @@ export function createL402Middleware(
         pass.paymentProvider &&
         pass.allowedPaths.length > 0 &&
         pass.allowedPaths.every(
-          (path) => path === (options.scopePath ?? req.path),
+          (path) => path === resolveScope(req),
         )
       ) {
         let verification;
@@ -296,7 +300,7 @@ export function createL402Middleware(
             pass.paymentProvider,
             String(pass.amountMsats),
             description,
-            options.scopePath ?? req.path,
+            resolveScope(req),
           );
           verification = await settlementCache.resolve(
             settlementKey,

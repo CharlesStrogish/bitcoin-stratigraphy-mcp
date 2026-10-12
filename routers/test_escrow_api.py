@@ -79,6 +79,26 @@ class EscrowApiTests(unittest.TestCase):
             )
         self.assertEqual(self.api.dispatch("receipt", {"escrow_id": contract["escrow_id"]})[0], 422)
 
+    def test_verified_toll_metadata_persists_without_payment_preimage(self):
+        contract = self.create()
+        lookup = {"escrow_id": contract["escrow_id"]}
+        self.assertEqual(self.api.dispatch("lookup", lookup)[1]["toll_fee_sats"], 21)
+        execution = {**lookup, "execution_trace": "trace", "result_payload": "result"}
+        confirmation = {
+            "payment_hash": "f" * 64, "amount_sats": 20,
+            "provider": "coinos", "confirmed_at": "2026-10-12T12:00:00Z",
+        }
+        self.assertEqual(self.api.dispatch("settle", execution, confirmation)[0], 422)
+        self.assertEqual(self.store.get_contract(contract["escrow_id"])["status"], "LOCKED")
+        confirmation["amount_sats"] = 21
+        status, settled = self.api.dispatch("settle", execution, confirmation)
+        self.assertEqual(status, 200)
+        self.assertEqual(settled["article_12_receipt"]["lightning_settlement"], confirmation)
+        status, document = self.api.dispatch("receipt", lookup)
+        self.assertEqual(status, 200)
+        self.assertEqual(document["proof"]["lightning_settlement"], confirmation)
+        self.assertNotIn("preimage", json.dumps(document))
+
 
 if __name__ == "__main__":
     unittest.main()

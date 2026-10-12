@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { after, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express, { type RequestHandler } from "express";
@@ -10,6 +11,8 @@ import { registerPublicCors } from "../middleware/publicCors";
 import { openApiDocument } from "../openapi";
 import type { EscrowExecutor } from "../services/escrowBridge";
 import type { SettlementRouter } from "../services/settlement";
+import { createSettlementRouter } from "../services/settlement";
+import { createNwcSettlementProvider } from "../services/settlement/nwc-provider";
 
 const servers: Array<ReturnType<ReturnType<typeof express>["listen"]>> = [];
 const id = "11111111-1111-4111-8111-111111111111";
@@ -27,6 +30,14 @@ const paymentGate: RequestHandler = (req, res, next) => {
     res.status(402).json({ error: "Payment required" });
   } else next();
 };
+const tollPreimage = "7".repeat(64);
+const tollHash = createHash("sha256").update(Buffer.from(tollPreimage, "hex")).digest("hex");
+const tollRouter: SettlementRouter = {
+  isConfigured: () => true, activeProvider: () => "coinos", circuitState: () => "closed",
+  createInvoice: async () => ({ invoice: "ln-test-toll", paymentHash: tollHash,
+    provider: "coinos", asset: "btc-lightning" }),
+  verifyPayment: async () => ({ settledAt: 1700000000, provider: "coinos", asset: "btc-lightning" }),
+};
 
 after(async () => {
   await Promise.all(servers.map((server) => new Promise<void>((resolve, reject) =>
@@ -37,7 +48,8 @@ async function serve(options: Parameters<typeof registerEscrowRoutes>[1] = {}) {
   const app = express();
   registerPublicCors(app);
   app.use(express.json());
-  registerEscrowRoutes(app, { operatorSecret: "test-operator", paymentGate, ...options });
+  registerEscrowRoutes(app, { operatorSecret: "test-operator", paymentGate,
+    settlementRouter: tollRouter, sessionSecret: "test-session", ...options });
   const server = app.listen(0);
   servers.push(server);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -134,7 +146,7 @@ test("uses the existing real L402 middleware for well-formed challenge headers",
 
 test("returns exact create and settle envelopes and never exposes a secret in receipt", async () => {
   const execute: EscrowExecutor = async (operation, body, height) => {
-    if (operation === "lookup") return { status: 200, body: { status: "LOCKED" } };
+    if (operation === "lookup") return { status: 200, body: { status: "LOCKED", toll_fee_sats: 21 } };
     if (operation === "create") return { status: 201, body: {
       escrow_id: id, payment_hash: "f".repeat(64), status: "LOCKED",
       amount_sats: body.amount_sats, toll_fee_sats: 21 } };
@@ -156,8 +168,15 @@ test("returns exact create and settle envelopes and never exposes a secret in re
   const created = await fetch(`${base}/create`, post(input));
   assert.equal(created.status, 201);
   assert.equal((await created.json() as Record<string, unknown>).toll_fee_sats, 21);
-  const settled = await fetch(`${base}/settle`, post({
+  const settlementBody = {
     escrow_id: id, execution_trace: "trace", result_payload: "result",
+  };
+  const challenge = await fetch(`${base}/settle`, post(settlementBody));
+  assert.equal(challenge.status, 402);
+  const toll = await challenge.json() as { macaroon: string; amount_sats: number };
+  assert.equal(toll.amount_sats, 21);
+  const settled = await fetch(`${base}/settle`, post(settlementBody, {
+    authorization: `L402 ${toll.macaroon}:${tollPreimage}`,
   }));
   assert.equal(settled.status, 200);
   assert.equal((await settled.json() as Record<string, unknown>).status, "SETTLED");
@@ -172,7 +191,7 @@ test("returns 404 for absent contracts, 422 for invalid states, and 503 for prov
   for (const [lookup, expected] of [
     [{ status: 404, body: { error: "Escrow not found" } }, 404],
     [{ status: 200, body: { status: "SETTLED" } }, 422],
-    [{ status: 200, body: { status: "LOCKED" } }, 503],
+    [{ status: 200, body: { status: "LOCKED", toll_fee_sats: 21 } }, 503],
   ] as const) {
     const base = await serve({
       execute: async () => lookup, readHeight: async () => { throw new Error("private error"); },
@@ -183,4 +202,100 @@ test("returns 404 for absent contracts, 422 for invalid states, and 503 for prov
     assert.equal(response.status, expected);
     assert.doesNotMatch(await response.text(), /private error/);
   }
+});
+
+test("exact 24-sat NWC toll withholds execution until settled and binds the entire flight record", async () => {
+  let settled = false;
+  let walletAmount = 24_000;
+  let walletDescription = "Autonomous Escrow execution settlement toll";
+  let walletAvailable = true;
+  let executionCalls = 0;
+  let closes = 0;
+  const requestedAmounts: number[] = [];
+  const provider = createNwcSettlementProvider({
+    name: "coinos", uri: () => "nostr+walletconnect://test-only",
+    clientFactory: () => ({
+      makeInvoice: async (request) => {
+        requestedAmounts.push(request.amount);
+        return { invoice: "ln-test-toll", payment_hash: tollHash } as never;
+      },
+      lookupInvoice: async () => {
+        if (!walletAvailable) throw new Error("network unavailable");
+        return {
+          type: "incoming", state: settled ? "settled" : "pending",
+          amount: walletAmount, description: walletDescription,
+          payment_hash: tollHash, preimage: tollPreimage, settled_at: 1700000000,
+        } as never;
+      },
+      close: () => { closes++; },
+    }),
+  });
+  const settlementRouter = createSettlementRouter({
+    primary: provider,
+    fallback: { name: "disabled", isConfigured: () => false,
+      createInvoice: async () => { throw new Error("disabled"); },
+      verifyPayment: async () => "invalid" },
+  });
+  const base = await serve({
+    settlementRouter, readHeight: async () => 900000,
+    execute: async (operation, _body, _height, _signal, payment) => {
+      if (operation === "lookup") return { status: 200, body: { status: "LOCKED", toll_fee_sats: 24 } };
+      assert.equal(operation, "settle");
+      executionCalls++;
+      assert.equal(payment?.payment_hash, tollHash);
+      assert.equal(payment?.amount_sats, 24);
+      assert.equal(payment?.provider, "coinos");
+      assert.equal(Object.hasOwn(payment!, "preimage"), false);
+      return { status: 200, body: { status: "SETTLED", preimage: "a".repeat(64),
+        merkle_root: receipt.merkle_root, audit_path: [],
+        article_12_receipt: { ...receipt, lightning_settlement: payment } } };
+    },
+  });
+  const body = { escrow_id: id, execution_trace: "flight record", result_payload: '{"result":1}' };
+  const initial = await fetch(`${base}/settle`, post(body, { authorization: "" }));
+  assert.equal(initial.status, 402);
+  const challenge = await initial.json() as { macaroon: string; amount_sats: number; preimage?: string };
+  assert.equal(challenge.amount_sats, 24);
+  assert.equal(challenge.preimage, undefined);
+  assert.equal(executionCalls, 0);
+  assert.deepEqual(requestedAmounts, [24_000]);
+  const headers = { authorization: `L402 ${challenge.macaroon}:${tollPreimage}` };
+  const pending = await fetch(`${base}/settle`, post(body, headers));
+  assert.equal(pending.status, 402);
+  assert.equal(executionCalls, 0);
+  settled = true;
+  walletAmount = 23_000;
+  assert.equal((await fetch(`${base}/settle`, post(body, headers))).status, 402);
+  walletAmount = 24_000;
+  walletDescription = "Different product";
+  assert.equal((await fetch(`${base}/settle`, post(body, headers))).status, 402);
+  walletDescription = "Autonomous Escrow execution settlement toll";
+  for (const modified of [
+    { ...body, escrow_id: "22222222-2222-4222-8222-222222222222" },
+    { ...body, execution_trace: "different flight record" },
+    { ...body, result_payload: '{"result":2}' },
+  ]) assert.equal((await fetch(`${base}/settle`, post(modified, headers))).status, 402);
+  assert.equal(executionCalls, 0);
+  assert.equal((await fetch(`${base}/settle`, post(body, {
+    authorization: `L402 ${challenge.macaroon}:${"8".repeat(64)}`,
+  }))).status, 402);
+  const completed = await fetch(`${base}/settle`, post(body, headers));
+  assert.equal(completed.status, 200);
+  const output = await completed.json() as { preimage: string; article_12_receipt: { lightning_settlement: { amount_sats: number } } };
+  assert.equal(output.preimage, "a".repeat(64));
+  assert.equal(output.article_12_receipt.lightning_settlement.amount_sats, 24);
+  assert.equal(executionCalls, 1);
+  assert.equal((await fetch(`${base}/settle`, post(body, headers))).status, 429);
+  assert.equal(executionCalls, 1);
+  assert.ok(closes > 0);
+  // A separate capability avoids the successful proof cache in the outage check.
+  const outageBody = { ...body, execution_trace: "new unavailable flight" };
+  const issued = await fetch(`${base}/settle`, post(outageBody, { authorization: "" }));
+  const other = await issued.json() as { macaroon: string };
+  walletAvailable = false;
+  const unavailable = await fetch(`${base}/settle`, post(outageBody, {
+    authorization: `L402 ${other.macaroon}:${tollPreimage}`,
+  }));
+  assert.equal(unavailable.status, 502);
+  assert.equal(executionCalls, 1);
 });

@@ -25,3 +25,9 @@
 .escrow-term .et-err{color:hsl(var(--destructive,0 70% 60%));font-size:12px}
 @media(max-width:767px){.escrow-term .et-steps{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.escrow-term .et-step{transition:none;transform:none!important}.escrow-term .et-leaf-generation span,.escrow-term pre,.escrow-term [data-testid="text-preimage"]{animation:none}}
+.escrow-term .et-field{display:flex;flex-direction:column;gap:3px;margin:6px 0;font-size:11px;color:hsl(var(--muted-foreground));min-width:0}
+.escrow-term .et-field input,.escrow-term .et-field textarea{font:11px var(--app-font-mono);background:hsl(var(--background));color:hsl(var(--foreground));border:1px solid hsl(var(--border));padding:6px 8px;min-width:0;width:100%;resize:vertical}
+.escrow-term .et-field input:focus,.escrow-term .et-field textarea:focus{outline:none;border-color:hsl(var(--primary))}
+.escrow-term .et-form{max-width:520px}
+.escrow-term .et-pay{border:1px dashed hsl(var(--primary));padding:12px;margin:12px 0}
+.escrow-term .et-pay p{font-size:12px;margin:6px 0}

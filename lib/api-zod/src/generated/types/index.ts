@@ -48,6 +48,7 @@ export * from './escrowReceiptDocument';
 export * from './escrowReceiptDocumentContext';
 export * from './escrowReceiptDocumentType';
 export * from './escrowReceiptDocumentVerification';
+export * from './escrowReceiptLightningSettlement';
 export * from './escrowReceiptReceiptType';
 export * from './escrowSettlement';
 export * from './escrowSettlementStatus';

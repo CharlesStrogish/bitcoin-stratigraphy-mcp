@@ -707,7 +707,7 @@ paths:
       operationId: settleEscrow
       tags: [Autonomous Escrow]
       summary: Commit authorized execution evidence and release the escrow preimage
-      description: Trusted operators must independently verify funding and task acceptance. Payment alone never authorizes preimage release. The recorded provider height is not a Bitcoin anchor proof.
+      description: Requires X-Escrow-Operator-Token and live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 capability binds the escrow ID, exact execution trace and result payload, is single-use, and requires a SHA-256-bound Lightning preimage plus wallet-confirmed incoming settlement. No final JSON or escrow preimage is released before verification. Trusted operators must independently verify bounty funding and task acceptance; the recorded provider height is not a Bitcoin anchor proof.
       security:
         - L402: []
           EscrowOperator: []
@@ -719,7 +719,7 @@ paths:
               $ref: "#/components/schemas/EscrowExecutionInput"
       responses:
         "200":
-          description: Committed settlement; private preimage released to the operator
+          description: Committed settlement after verified Lightning toll payment; private escrow preimage released to the operator
           content:
             application/json:
               schema:
@@ -1956,6 +1956,21 @@ components:
       type: object
       required: [escrow_id, leaf_index, audit_path, merkle_root, timestamp, tree_size, execution_leaf_hash, settled_at_strata_block, receipt_type]
       properties:
+        lightning_settlement:
+          type: object
+          description: Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage.
+          required: [payment_hash, amount_sats, provider, confirmed_at]
+          properties:
+            payment_hash:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+            amount_sats:
+              type: integer
+              minimum: 1
+            provider:
+              type: string
+            confirmed_at:
+              type: string
         escrow_id:
           type: string
         leaf_index:

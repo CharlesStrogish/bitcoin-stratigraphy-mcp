@@ -1,0 +1,13 @@
+{
+  "payload": {
+    "issuer": "Charles R. Strogish",
+    "product": "Bitcoin Stratigraphy Data Engine",
+    "client": "Acme Corp",
+    "nodes": 100,
+    "tier": "Commercial Enterprise ($250,000/Annual)",
+    "issued_utc": "2026-10-12T01:44:37Z",
+    "expires_utc": "2027-10-12T01:44:37Z",
+    "agpl_exemption": true
+  },
+  "signature_ed25519": "wynfgetPW1d7wabrMRhpQqTr7POg3j1Z1n2C1o0bbKaVcWIlW6HIXHZVqsqudDMIBfVX2Ei43RQvfy6aqSWFDw=="
+}

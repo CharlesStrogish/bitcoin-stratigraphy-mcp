@@ -25,3 +25,10 @@ relays. A fixture key must not advertise a pretend production service.
 **How to apply:** Test isolated package startup with explicit fixture-only
 environment settings and deny egress before application import; never inherit
 workspace wallet/signing credentials into that smoke process.
+
+Dedicated SLA support is not an included enterprise feature; do not advertise it
+as such in the npm package README.
+
+**Why:** The user identified the “Dedicated SLA support” enterprise bullet as inaccurate.
+
+**How to apply:** Preserve this exclusion when editing the package's enterprise documentation.

@@ -1,4 +1,4 @@
-# @bitcoin-stratigraphy/mcp-server — 2.1.0
+# @bitcoin-stratigraphy/mcp-server — 2.1.1
 
 Exactly 15 canonical MCP tools over **Streamable HTTP**, with two free sandbox
 discovery tools and unchanged paid-tool prices.
@@ -34,7 +34,7 @@ Supply credentials through your secret manager; do not
 put secrets on a command line or in a checked-in configuration file.
 
 ```sh
-npm install @bitcoin-stratigraphy/mcp-server@2.1.0
+npm install @bitcoin-stratigraphy/mcp-server@2.1.1
 npx bitcoin-stratigraphy-mcp-server --help
 ```
 

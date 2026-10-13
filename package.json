@@ -1,7 +1,7 @@
 {
   "name": "workspace",
   "mcpName": "crstrogish/bitcoin-stratigraphy",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "license": "(AGPL-3.0-only OR LicenseRef-Commercial)",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",

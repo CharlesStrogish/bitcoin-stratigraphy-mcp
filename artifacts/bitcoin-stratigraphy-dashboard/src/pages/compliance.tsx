@@ -158,7 +158,7 @@ export default function CompliancePage() {
           <section id="licensing" className="panel cmp-sec">
             <h2>4. Enterprise Air-Gapped Licensing</h2>
             <p>
-              The public Bitcoin Stratigraphy network operates under the AGPLv3 Open-Source License. If you connect your proprietary internal AI swarms to the public network, the AGPLv3 legally mandates that you open-source your entire proprietary AI codebase and model weights to the public. For massive technology corporations that cannot expose proprietary agent logic, we provide a <strong>Commercial Enterprise License ($250k/Annual)</strong>.
+              The public Bitcoin Stratigraphy network operates under the AGPLv3 Open-Source License. If you connect your proprietary internal AI swarms to the public network, the AGPLv3 legally mandates that you open-source your entire proprietary AI codebase and model weights to the public. For massive technology corporations that cannot expose proprietary agent logic, we provide a <strong>Commercial Enterprise License (Starting at $250k/Annual)</strong>.
             </p>
             <p>The Enterprise Exemption grants:</p>
             <ul>

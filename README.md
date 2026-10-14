@@ -99,7 +99,7 @@ text and dual-licensing rider are in [LICENSE.md](LICENSE.md).
 - **Enterprise Commercial option:** For proprietary, closed-source enterprise
   swarm deployments or multi-tenant hosting without the source disclosure
   required by AGPL, a Commercial License from Charles R. Strogish is required.
-  Deployment scope, rights, fees, support and any SLA require a separate written
+  Deployment scope, rights, fees and support require a separate written
   agreement; this notice is not that agreement. Contact the repository maintainer
   to arrange commercial terms before such deployment.
 - **IP and scope:** This model applies to rights the licensor owns or is

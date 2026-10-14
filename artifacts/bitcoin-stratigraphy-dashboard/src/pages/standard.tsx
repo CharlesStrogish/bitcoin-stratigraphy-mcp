@@ -678,7 +678,7 @@ export default function StandardPage() {
                   For proprietary, closed-source enterprise swarm deployments or
                   multi-tenant hosting without the source disclosure required by
                   AGPL, a Commercial License from Charles R. Strogish is
-                  required. Deployment rights, pricing, support and any SLA
+                  required. Deployment rights, pricing and support
                   require a separate written agreement with the maintainer.
                 </dd>
               </div>

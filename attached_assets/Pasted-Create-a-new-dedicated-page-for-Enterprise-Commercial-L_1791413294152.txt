@@ -7,7 +7,7 @@ Requirements for the page:
    - The layout must be perfectly mobile-responsive, scaling cleanly from smartphones to ultrawide desktop monitors without breaking margins or text wrapping.
 3. SEO Meta Tags:
    - Title: "Enterprise Licensing | Bitcoin Stratigraphy Data Engine"
-   - Description: "Air-gapped, commercially licensed State-Anchored AI infrastructure. Protect your proprietary AI IP and ensure EU AI Act Article 12 compliance with a dedicated enterprise SLA."
+   - Description: "Air-gapped, commercially licensed State-Anchored AI infrastructure. Protect your proprietary AI IP and ensure EU AI Act Article 12 compliance."
 4. Page Content & Copywriting (Focus on Enterprise Value):
    - Hero Section: "Enterprise Swarm Infrastructure. Secure, Air-Gapped, and Commercially Licensed."
    - The AGPLv3 IP Protection: Explain that the public API uses an AGPLv3 license. For enterprises, the Commercial License grants a full exemption, allowing them to run the engine behind their own firewalls without being legally forced to open-source their proprietary AI code or weights.

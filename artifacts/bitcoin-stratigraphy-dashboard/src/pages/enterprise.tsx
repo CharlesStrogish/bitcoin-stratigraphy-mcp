@@ -158,7 +158,7 @@ export default function EnterprisePage() {
               full at the time of execution.
             </p>
             <p>
-              Scope, SLA, support and deployment rights must be agreed in
+              Scope, support and deployment rights must be agreed in
               writing. This page is not itself a grant of commercial rights and
               makes no certification claims.
             </p>

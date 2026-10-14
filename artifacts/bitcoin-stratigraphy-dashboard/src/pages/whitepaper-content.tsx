@@ -272,8 +272,8 @@ new_quote <= per_invoice_ceiling`}</code>
           AGPL does not automatically require all independent applications or
           model weights to be open-sourced. Third-party components and
           separately licensed data retain their own terms. API micropayments do
-          not purchase a commercial software license; deployment rights,
-          support, and any SLA require a written agreement.
+          not purchase a commercial software license; deployment rights
+          and support require a written agreement.
         </p>
         <p>
           Local event capture, Merkle construction, and proof checking can

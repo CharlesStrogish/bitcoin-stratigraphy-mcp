@@ -27,7 +27,6 @@ export type L402MiddlewareOptions = {
   settlementRouter: SettlementRouter;
   scopePath?: string | ((req: Request) => string);
   enforceCurrentAmount?: boolean;
-  requireHexPreimage?: boolean;
   sessionSecret?: string;
   invoiceExpirySeconds?: number;
   now?: () => number;
@@ -44,12 +43,17 @@ export function parseL402Header(
   value: string | undefined,
 ): L402Authorization | null {
   const match =
-    /^L402\s+([^:\s]+):([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$/.exec(
+    /^L402\s+([^:\s]+)(?::([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|NWC_LOOKUP)?)?$/i.exec(
       value?.trim() ?? "",
     );
   return match
-    ? { macaroon: match[1]!, preimage: match[2]!.toLowerCase() }
+    ? { macaroon: match[1]!, preimage: match[2]?.toLowerCase() ?? "nwc_lookup" }
     : null;
+}
+
+export function paymentVerificationProof(preimage: string) {
+  return { preimage, ...(!/^[0-9a-f]{64}$/.test(preimage)
+    ? { verificationMode: "merchant-lookup" as const } : {}) };
 }
 
 export function createL402Middleware(
@@ -272,8 +276,7 @@ export function createL402Middleware(
         : null;
       if (
         pass &&
-        (pass.paymentHash === preimageHash ||
-          (!options.requireHexPreimage && pass.paymentProvider === "coinos" && preimageHash === null)) &&
+        (pass.paymentHash === preimageHash || preimageHash === null) &&
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
         (typeof options.amountSats !== "number" && !options.enforceCurrentAmount ||
@@ -301,7 +304,7 @@ export function createL402Middleware(
           const settlementKey = L402EdgeCache.key(
             secret,
             pass.paymentHash,
-            authorization.preimage,
+            preimageHash === null ? "merchant-lookup" : authorization.preimage,
             pass.paymentProvider,
             String(pass.amountMsats),
             description,
@@ -314,6 +317,7 @@ export function createL402Middleware(
               options.settlementRouter.verifyPayment({
                 paymentHash: pass.paymentHash,
                 preimage: authorization.preimage,
+                ...(preimageHash === null ? { verificationMode: "merchant-lookup" as const } : {}),
                 expectedAmountMsats,
                 expectedDescription: description,
                 expectedProvider: pass.paymentProvider,
@@ -361,7 +365,7 @@ export function createL402Middleware(
                 paymentHash: pass.paymentHash,
                 ...(/^[0-9a-f]{64}$/.test(authorization.preimage)
                   ? { preimage: authorization.preimage }
-                  : { coinosPaymentId: authorization.preimage }),
+                  : { merchantVerified: true as const }),
                 clientIdentifier:
                   req.ip || req.socket.remoteAddress || "unknown",
               });
@@ -381,6 +385,16 @@ export function createL402Middleware(
             provider: verification.provider,
           };
           next();
+          return;
+        }
+        if (preimageHash === null) {
+          // Retain the original invoice while wallet state catches up. Never
+          // replace a possibly paid invoice merely because a lookup is pending.
+          res.status(409).json({
+            error: "Payment is not confirmed yet. Keep the original invoice and retry verification.",
+            payment_hash: pass.paymentHash,
+            verification_pending: true,
+          });
           return;
         }
       }

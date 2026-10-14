@@ -53,7 +53,6 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
   const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
   const gate = (suffix: string) => options.paymentGate ?? createL402Middleware({
     amountSats: 21,
-    requireHexPreimage: true,
     description: "Autonomous Escrow REST access (not escrow funding or toll collection)",
     scopePath: `/api/v1/escrow/${suffix}`,
     settlementRouter,
@@ -66,7 +65,6 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
   const tollGate = createL402Middleware({
     amountSats: (req) => Number(req.res?.locals.escrowTollSats),
     enforceCurrentAmount: true,
-    requireHexPreimage: true,
     description: "Autonomous Escrow execution settlement toll",
     scopePath: (req) => `/api/v1/escrow/settle/${createHash("sha256")
       .update(JSON.stringify([

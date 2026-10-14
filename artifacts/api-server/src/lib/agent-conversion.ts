@@ -68,6 +68,6 @@ export function awaitingPaymentPreview(amountSats: number, outputSchema: Record<
     merkle_standard: MERKLE_STANDARD,
     compliance_scope: "EU AI Act Article 12 & Article 26(6) Traceability",
     expected_output_schema: standaloneOutputSchema(outputSchema),
-    agent_instruction: "Pay the BOLT11 Lightning invoice and retry the identical request with the L402 macaroon and SHA-256-bound payment preimage. The endpoint will then generate the response described by expected_output_schema. Payload computation and proof verification have not run at this payment gate.",
+    agent_instruction: "Pay the BOLT11 Lightning invoice and retry the identical request with the issued L402 macaroon. Provide the SHA-256-bound preimage if available, or use NWC_LOOKUP (or omit the proof) for exact-invoice merchant NWC verification. A UUID is a lookup hint, not a cryptographic proof; a bare payment hash is not an authorization capability. The endpoint will then generate the response described by expected_output_schema. Payload computation and proof verification have not run at this payment gate.",
   };
 }

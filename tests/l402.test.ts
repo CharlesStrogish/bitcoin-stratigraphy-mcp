@@ -6,7 +6,7 @@ import { createMemoryMacaroonRevocationStore } from "../artifacts/api-server/src
 import { L402EdgeCache } from "../artifacts/api-server/src/lib/l402-edge-cache";
 import express from "express";
 import { finalizeEvent, getPublicKey } from "nostr-tools";
-import { createL402Middleware } from "../artifacts/api-server/src/middleware/l402";
+import { createL402Middleware, parseL402Header } from "../artifacts/api-server/src/middleware/l402";
 import {
   generateCryptographicAttestation,
   verifyCryptographicAttestation,
@@ -446,4 +446,116 @@ test("rejects non-canonical NWC proofs before wallet lookup", async () => {
     "invalid",
   );
   assert.equal(clientCreations, 0);
+});
+
+test("merchant lookup validates exact incoming invoice metadata and CoinOS credited amounts without payer access", async () => {
+  const settledAt = Math.floor(Date.now() / 1000);
+  const good = { type: "incoming", state: "settled", payment_hash: PAYMENT_HASH,
+    amount: 5000, description: "test paid route", preimage: "consumer-reference",
+    settled_at: settledAt, invoice: "ln-test-only" };
+  let transaction = { ...good };
+  let credit = { type: "incoming", state: "settled", amount: 5000,
+    invoice: "ln-test-only", created_at: settledAt };
+  let closes = 0;
+  let listings = 0;
+  const provider = createNwcSettlementProvider({
+    name: "coinos", uri: () => "nostr+walletconnect://fixture-only",
+    clientFactory: () => ({
+      makeInvoice: async () => { throw new Error("unused"); },
+      lookupInvoice: async () => transaction as never,
+      listTransactions: async (request) => {
+        assert.equal(request.type, "incoming"); listings++;
+        return { transactions: [credit] } as never;
+      },
+      close: () => { closes++; },
+    }),
+  });
+  const request = { paymentHash: PAYMENT_HASH, preimage: "NWC_LOOKUP",
+    expectedAmountMsats: 5000, expectedDescription: good.description,
+    expectedProvider: "coinos", asset: "btc-lightning" as const,
+    verificationMode: "merchant-lookup" as const };
+  for (const proof of ["", "NWC_LOOKUP", "11111111-1111-4111-8111-111111111111"]) {
+    assert.deepEqual(await provider.verifyPayment({ ...request, preimage: proof }),
+      { settledAt, provider: "coinos", asset: "btc-lightning" });
+  }
+  for (const alteration of [
+    { state: "pending" }, { type: "outgoing" }, { amount: 4999 },
+    { amount: 5001 }, { description: "different product" },
+    { payment_hash: "f".repeat(64) }, { settled_at: 0 },
+  ]) {
+    transaction = { ...good, ...alteration };
+    assert.equal(await provider.verifyPayment(request), "invalid");
+  }
+  transaction = { ...good, amount: 0 };
+  assert.deepEqual(await provider.verifyPayment(request),
+    { settledAt, provider: "coinos", asset: "btc-lightning" });
+  credit = { ...credit, amount: 4999 };
+  assert.equal(await provider.verifyPayment(request), "invalid");
+  credit = { ...credit, amount: 5000, invoice: "ln-other" };
+  assert.equal(await provider.verifyPayment(request), "invalid");
+  assert.equal(await provider.verifyPayment({ ...request, expectedProvider: "alby" }), "invalid");
+  assert.equal(await provider.verifyPayment({ ...request, asset: "l-btc" }), "invalid");
+  assert.equal(await provider.verifyPayment({ ...request, preimage: "0".repeat(64) }), "invalid");
+  assert.equal(closes, 13);
+  assert.equal(listings, 3);
+});
+
+test("token-only, empty, NWC_LOOKUP and UUID retries preserve pending invoices and enforce single-use payment", async () => {
+  for (const suffix of ["", ":", ":NWC_LOOKUP", ":11111111-1111-4111-8111-111111111111"]) {
+    const app = express();
+    const ledger = createMemoryRevenueLedger();
+    let settled = false;
+    let invoices = 0;
+    let lookups = 0;
+    const provider = createNwcSettlementProvider({
+      name: "test-wallet", uri: () => "nostr+walletconnect://fixture-only",
+      clientFactory: () => ({
+        makeInvoice: async () => { throw new Error("unused"); },
+        lookupInvoice: async (request) => {
+          lookups++;
+          assert.equal(request.payment_hash, PAYMENT_HASH);
+          return { type: "incoming", state: settled ? "settled" : "pending",
+            payment_hash: PAYMENT_HASH, amount: 5000, description: "test paid route",
+            settled_at: Math.floor(Date.now() / 1000) } as never;
+        },
+        close() {},
+      }),
+    });
+    const fake = fakeSettlementRouter();
+    const router: SettlementRouter = { ...fake,
+      createInvoice: async (input) => { invoices++; return fake.createInvoice(input); },
+      verifyPayment: async (input) => {
+        assert.equal(input.verificationMode, "merchant-lookup");
+        return provider.verifyPayment(input);
+      },
+    };
+    app.get("/paid", createL402Middleware({ amountSats: 5, description: "test paid route",
+      settlementRouter: router, sessionSecret: "test-session", ledger }), (_req, res) => res.json({ paid: true }));
+    const server = app.listen(0);
+    await once(server, "listening");
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    const url = `http://127.0.0.1:${address.port}/paid`;
+    try {
+      const challenge = await fetch(url);
+      const { macaroon } = await challenge.json() as { macaroon: string };
+      assert.ok(parseL402Header(`L402 ${macaroon}${suffix}`));
+      const headers = { Authorization: `L402 ${macaroon}${suffix}` };
+      const pending = await fetch(url, { headers });
+      assert.equal(pending.status, 409);
+      assert.equal(invoices, 1);
+      assert.equal(await ledger.getTotalVolume(), 0);
+      settled = true;
+      const paid = await fetch(url, { headers });
+      assert.equal(paid.status, 200);
+      assert.deepEqual(await paid.json(), { paid: true });
+      assert.equal(await ledger.getTotalVolume(), 5);
+      assert.equal((await fetch(url, { headers })).status, 429);
+      assert.equal(lookups, 2);
+      assert.equal(invoices, 1);
+      assert.equal((await fetch(url + "-other", { headers })).status, 404);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  }
 });

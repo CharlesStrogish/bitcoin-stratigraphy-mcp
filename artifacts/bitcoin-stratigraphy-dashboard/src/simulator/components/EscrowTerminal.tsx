@@ -5,7 +5,7 @@ import { CopyJsonButton } from "./CopyJsonButton";
 import type { EscrowTollQuote } from "@workspace/api-client-react";
 import { evaluateEscrowToll } from "../engine/escrowToll";
 import {
-  HEX64, callEscrow, preimageMatches, validateCreate, validateSettle,
+  HEX64, callEscrow, paymentRetryProof, validateCreate, validateSettle,
   type CreateBody, type CreateResult, type L402Challenge, type SettleBody, type SettleResult,
 } from "../engine/escrowLive";
 import "./escrow-terminal.css";
@@ -118,8 +118,8 @@ export function EscrowTerminal() {
 
   const onSubmitPreimage = async () => {
     if (!pending) return;
-    const p = preimage.trim().toLowerCase();
-    if (!(await preimageMatches(p, pending.challenge.payment_hash))) {
+    const p = await paymentRetryProof(preimage, pending.challenge.payment_hash);
+    if (p === null) {
       setError("Preimage does not hash (SHA-256) to the challenge payment_hash. Nothing was sent."); setLastAction(null); return;
     }
     const auth = { macaroon: pending.challenge.macaroon, preimage: p };
@@ -213,14 +213,14 @@ export function EscrowTerminal() {
       {pending && (
         <div className="et-pay" data-testid="panel-l402-challenge" role="region" aria-label="Payment required">
           <div className="section-kicker">Payment required for {pending.op} · {pending.challenge.amount_sats} sats</div>
-          <p>Pay this invoice with your own Lightning wallet, then paste the payment preimage it returns. The preimage is verified locally before the identical request is retried.</p>
+          <p>Pay this invoice with any Lightning wallet (Cash App, CoinOS, Phoenix, Alby, etc.). Paste a 64-hex preimage if your wallet provides one, or leave blank and click Verify to confirm payment directly via the server NWC oracle.</p>
           <pre tabIndex={0} data-testid="text-invoice">{pending.challenge.invoice}</pre>
           <p><code data-testid="text-challenge-hash">payment_hash {pending.challenge.payment_hash}</code></p>
-          <label className="et-field"><span>Payer preimage (64 hex)</span>
+          <label className="et-field"><span>Payer preimage (64 hex, optional)</span>
             <input value={preimage} onChange={(e) => setPreimage(e.target.value.trim())} spellCheck={false} autoComplete="off"
               disabled={busy} data-testid="input-preimage" /></label>
           <div className="et-actions">
-            <button type="button" className="sim-run" onClick={() => void onSubmitPreimage()} disabled={busy || !preimage}
+            <button type="button" className="sim-run" onClick={() => void onSubmitPreimage()} disabled={busy}
               data-testid="button-submit-preimage"><ShieldCheck size={15} aria-hidden="true" /> Verify and retry request</button>
             <button type="button" className="control-button" onClick={() => { setPending(null); setPreimage(""); }} disabled={busy}
               data-testid="button-discard-challenge">Discard challenge</button>

@@ -142,15 +142,20 @@ export function createNwcSettlementProvider(input: {
     },
     async verifyPayment(request: SettlementVerificationInput) {
       const isHexPreimage = /^[0-9a-f]{64}$/.test(request.preimage);
+      const isReference = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(request.preimage);
+      const isMerchantLookup = request.verificationMode === "merchant-lookup"
+        && request.expectedProvider === input.name && !isHexPreimage
+        && (request.preimage === "" || request.preimage.toLowerCase() === "nwc_lookup" || isReference);
       const isCoinosReference =
         input.name === "coinos" &&
-        /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(request.preimage);
+        isReference;
       if (
         !/^[0-9a-f]{64}$/.test(request.paymentHash) ||
-        (!isHexPreimage && !isCoinosReference) ||
+        (!isHexPreimage && !isCoinosReference && !isMerchantLookup) ||
         (request.asset && request.asset !== "btc-lightning") ||
         !Number.isSafeInteger(request.expectedAmountMsats) ||
-        request.expectedAmountMsats <= 0
+        request.expectedAmountMsats <= 0 ||
+        typeof request.expectedDescription !== "string" || !request.expectedDescription
       ) {
         return "invalid";
       }
@@ -196,12 +201,12 @@ export function createNwcSettlementProvider(input: {
             : undefined;
         const valid =
           transaction.type === "incoming" &&
-          transaction.state === "settled" &&
-          (isCoinosReference ||
+          (transaction.state === "settled" || isMerchantLookup && String(transaction.state) === "paid") &&
+          (isMerchantLookup || isCoinosReference ||
             transaction.amount === request.expectedAmountMsats) &&
           transaction.description === request.expectedDescription &&
           transactionPaymentHash === request.paymentHash &&
-          (isCoinosReference ||
+          (isMerchantLookup || isCoinosReference ||
             ((!transactionPreimage ||
               transactionPreimage === request.preimage) &&
               (transactionPreimage === undefined ||
@@ -211,6 +216,35 @@ export function createNwcSettlementProvider(input: {
               Number.isSafeInteger(transaction.settled_at) &&
               transaction.settled_at > 0));
         if (!valid) return "invalid";
+        if (isMerchantLookup) {
+          const settledAt = transaction.settled_at;
+          if (!Number.isSafeInteger(settledAt) || !settledAt) return "invalid";
+          if (transaction.amount !== request.expectedAmountMsats) {
+            // CoinOS internal credits can leave the node amount unset. Confirm
+            // the exact credit in the merchant's INCOMING list, never a payer UUID.
+            if (input.name !== "coinos"
+              || !(transaction.amount === 0 || transaction.amount == null)
+              || !client.listTransactions || typeof transaction.invoice !== "string"
+              || !transaction.invoice.startsWith("ln")) return "invalid";
+            const from = Math.max(0, settledAt - 3_600);
+            const until = settledAt + 3_600;
+            let credited = false;
+            for (let offset = 0; offset < 500; offset += 100) {
+              if (request.signal?.aborted) return "invalid";
+              const page = await client.listTransactions({ type: "incoming", from, until, limit: 100, offset });
+              if (!Array.isArray(page.transactions)) return "invalid";
+              credited = page.transactions.some((payment) =>
+                payment.type === "incoming" && payment.state === "settled"
+                && payment.invoice === transaction.invoice
+                && payment.amount === request.expectedAmountMsats
+                && Number.isSafeInteger(payment.created_at)
+                && payment.created_at >= from && payment.created_at <= until);
+              if (credited || page.transactions.length < 100) break;
+            }
+            if (!credited) return "invalid";
+          }
+          return { settledAt, provider: input.name, asset: "btc-lightning" };
+        }
         if (isCoinosReference) {
           // CoinOS returns the outgoing payment ID, not a Lightning preimage,
           // for internal transfers. The issuing wallet must see BOTH the paid

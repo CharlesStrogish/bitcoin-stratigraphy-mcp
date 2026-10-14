@@ -23,6 +23,8 @@ export type SettlementInvoice = {
 export type SettlementVerificationInput = {
   paymentHash: string;
   preimage: string;
+  /** Set only after the transport verifies the issued, scoped payment capability. */
+  verificationMode?: "merchant-lookup";
   expectedAmountMsats: number;
   expectedDescription: string;
   expectedProvider?: string;

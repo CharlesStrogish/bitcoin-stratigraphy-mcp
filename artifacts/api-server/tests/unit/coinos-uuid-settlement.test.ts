@@ -186,7 +186,7 @@ test("CoinOS UUID requires the exact outgoing payment and settled incoming invoi
   );
 });
 
-test("L402 UUID redemption checks CoinOS and still records a payment without treating the ID as a preimage", async () => {
+test("L402 UUID lookup hints require a valid macaroon and confirmed merchant credit, not payer-side access", async () => {
   const { router, counts } = fixture();
   const ledger = createMemoryRevenueLedger();
   const app = express();
@@ -212,7 +212,7 @@ test("L402 UUID redemption checks CoinOS and still records a payment without tre
     const { macaroon } = (await challenge.json()) as { macaroon: string };
     const wrong = await fetch(url, {
       headers: {
-        Authorization: `L402 ${macaroon}:223e4567-e89b-12d3-a456-426614174000`,
+        Authorization: `L402 ${macaroon}tampered:223e4567-e89b-12d3-a456-426614174000`,
       },
     });
     assert.equal(wrong.status, 402);
@@ -222,7 +222,7 @@ test("L402 UUID redemption checks CoinOS and still records a payment without tre
     assert.equal(paid.status, 200);
     assert.deepEqual(await paid.json(), { paid: true });
     assert.equal(await ledger.getTotalVolume(), 10);
-    assert.deepEqual(counts(), { lookups: 2, listings: 4 });
+    assert.deepEqual(counts(), { lookups: 1, listings: 1 });
     const replay = await fetch(url, {
       headers: { Authorization: `L402 ${macaroon}:${uuid}` },
     });

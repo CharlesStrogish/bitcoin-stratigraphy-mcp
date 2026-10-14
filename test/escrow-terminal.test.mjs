@@ -89,6 +89,13 @@ test("live client requires a mathematical Lightning preimage, never a reference 
   assert.equal(await live.preimageMatches(preimage, hash), true);
   assert.equal(await live.preimageMatches("8".repeat(64), hash), false);
   assert.equal(await live.preimageMatches("11111111-1111-4111-8111-111111111111", hash), false);
+  assert.equal(await live.paymentRetryProof("", hash), "NWC_LOOKUP");
+  assert.equal(await live.paymentRetryProof(" NWC_LOOKUP ", hash), "nwc_lookup");
+  assert.equal(await live.paymentRetryProof("11111111-1111-4111-8111-111111111111", hash),
+    "11111111-1111-4111-8111-111111111111");
+  assert.equal(await live.paymentRetryProof(preimage, hash), preimage);
+  assert.equal(await live.paymentRetryProof("8".repeat(64), hash), null);
+  assert.equal(await live.paymentRetryProof("not-a-proof", hash), null);
 });
 
 test("live client submits real fields, displays exact challenges and retries unchanged with L402", async () => {
@@ -121,6 +128,10 @@ test("live client submits real fields, displays exact challenges and retries unc
   assert.equal(requests[1].credentials, "omit");
   assert.equal(requests[0].headers["X-Escrow-Operator-Token"], undefined);
   assert.equal(requests[1].headers["X-Escrow-Operator-Token"], undefined);
+  await live.callEscrow("/v1/escrow/create", body, "",
+    { macaroon: unpaid.challenge.macaroon, preimage: "NWC_LOOKUP" }, signal, live.validateCreate);
+  assert.equal(requests[2].headers.Authorization, "L402 signed-capability:NWC_LOOKUP");
+  assert.equal(requests[2].body, requests[0].body);
 });
 
 test("a legacy or malformed 200 cannot claim live settlement without wallet confirmation metadata", () => {

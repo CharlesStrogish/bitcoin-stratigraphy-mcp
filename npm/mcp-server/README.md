@@ -54,6 +54,12 @@ returned by creation: public settlement requires that per-contract capability an
 the exact-toll L402 payment proof. `MACAROON_OPERATOR_SECRET` enables optional admin
 recovery and operator-only receipt diagnostics; it never bypasses payment verification.
 Never publish the private capability in audit receipts or peer attestations.
+Consumer wallets need not expose a preimage: retry the unchanged request with
+`Authorization: L402 <issued-macaroon>:NWC_LOOKUP` (or the macaroon alone).
+CoinOS UUIDs are lookup hints, never SHA-256 proofs. The issuing merchant NWC
+connection must confirm the exact invoice hash, incoming payment, amount and
+description. A payment hash alone does not grant access. Pending confirmation
+returns 409; keep the original invoice and retry instead of paying a new one.
 Use `payment.get_info` for actual
 per-tool prices and enabled payment methods; do not assume every route costs the
 same or that merely configuring a wallet proves a payment occurred.

@@ -412,27 +412,25 @@ function selectRange(req: Request, dataset: Dataset): SelectedRange | string {
 }
 
 function parseL402Authorization(value: string | undefined) {
-  if (!value) return null;
-
-  const match =
-    /^L402\s+([^:\s]+):([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$/.exec(
-      value.trim(),
-    );
-  if (!match) return null;
-
-  return /^[0-9a-fA-F]{64}$/.test(match[1])
+  const proof = parseL402Header(value);
+  if (!proof) return null;
+  return /^[0-9a-fA-F]{64}$/.test(proof.macaroon)
     ? {
         kind: "legacy" as const,
-        paymentHash: match[1].toLowerCase(),
-        preimage: match[2].toLowerCase(),
+        paymentHash: proof.macaroon.toLowerCase(),
+        preimage: proof.preimage,
       }
     : {
         kind: "subscription" as const,
-        macaroon: match[1],
-        preimage: match[2].toLowerCase(),
+        macaroon: proof.macaroon,
+        preimage: proof.preimage,
       };
 }
 
+function rangePaymentScope(path: string, key: string, amountMsats: number, description: string) {
+  return `${path}/_l402_range/${createHash("sha256")
+    .update(JSON.stringify([key.replace(/^stream:/, ""), amountMsats, description])).digest("hex")}`;
+}
 function requestSettlementAsset(
   req: Request,
 ): { asset: SettlementAsset } | { error: string } {
@@ -588,6 +586,7 @@ async function sendPaidDataset(
 }
 
 import { awaitingPaymentPreview, expectedRestOutputSchema } from "../lib/agent-conversion";
+import { parseL402Header, paymentVerificationProof } from "../middleware/l402";
 
 async function sendPaymentChallenge(
   req: Request,
@@ -737,6 +736,17 @@ async function sendPaymentChallenge(
       },
     );
 
+    const rangeMacaroon = attenuateSubscriptionMacaroon(createSubscriptionMacaroon({
+      secret, paymentHash: legacyResult.challenge.paymentHash, tier: "1-day",
+      validUntil: Math.floor((legacyResult.challenge.redeemUntil
+        ?? legacyResult.challenge.issuedAt + 3_600_000) / 1000),
+      amountMsats, paymentAsset, paymentProvider: legacyResult.challenge.provider,
+      agentIdentity: agent,
+    }), [
+      `allowed_path=${rangePaymentScope(req.path, rangeKey, amountMsats, description)}`,
+      "max_requests=1",
+    ]);
+    if (!rangeMacaroon) throw new Error("Unable to scope range payment capability");
     res.setHeader("WWW-Authenticate", [
       `L402 macaroon="${legacyResult.challenge.paymentHash}", invoice="${legacyResult.challenge.invoice}"`,
       ...passes.map(
@@ -747,6 +757,7 @@ async function sendPaymentChallenge(
     res.setHeader("Cache-Control", "no-store");
     res.status(402).json({
       invoice: legacyResult.challenge.invoice,
+      macaroon: rangeMacaroon,
       payment_hash: legacyResult.challenge.paymentHash,
       settlement_asset: paymentAsset,
       supported_assets: supportedSettlementAssets(settlementRouter),
@@ -847,7 +858,7 @@ export function registerStratigraphyRoutes(
         paymentHash: input.paymentHash,
         ...(/^[0-9a-f]{64}$/i.test(input.preimage)
           ? { preimage: input.preimage }
-          : { coinosPaymentId: input.preimage }),
+          : { merchantVerified: true as const }),
         clientIdentifier: input.clientIdentifier,
       });
     } catch (error) {
@@ -1661,7 +1672,7 @@ export function registerStratigraphyRoutes(
       const definition = SUBSCRIPTION_TIERS[parent.tier];
       const verification = await settlementRouter.verifyPayment({
         paymentHash: parent.paymentHash,
-        preimage: authorization.preimage,
+        ...paymentVerificationProof(authorization.preimage),
         expectedAmountMsats: parent.amountMsats ?? definition.amountMsats,
         expectedDescription: definition.description,
         asset: parent.paymentAsset,
@@ -1846,8 +1857,12 @@ export function registerStratigraphyRoutes(
           return;
         }
         if (pass) {
+          const rangePayment = pass.allowedPaths.length === 1 && pass.maxRequests === 1
+            && pass.amountMsats === selectedRange.amountMsats
+            && pass.allowedPaths[0] === rangePaymentScope(req.path, selectedRange.key,
+              selectedRange.amountMsats, selectedRange.description);
           if (
-            pass.allowedPaths.some((allowedPath) => allowedPath !== req.path) ||
+            (!rangePayment && pass.allowedPaths.some((allowedPath) => allowedPath !== req.path)) ||
             pass.allowedToolSets.length > 0 ||
             pass.maxTarget !== undefined
           ) {
@@ -1859,13 +1874,17 @@ export function registerStratigraphyRoutes(
           try {
             verification = await settlementRouter.verifyPayment({
               paymentHash: pass.paymentHash,
-              preimage: authorization.preimage,
+              ...paymentVerificationProof(authorization.preimage),
               expectedAmountMsats: pass.amountMsats ?? definition.amountMsats,
-              expectedDescription: definition.description,
+              expectedDescription: rangePayment ? selectedRange.description : definition.description,
               asset: pass.paymentAsset,
               expectedProvider: pass.paymentProvider,
               signal: requestController.signal,
             });
+            if (verification === "invalid" && !/^[0-9a-f]{64}$/.test(authorization.preimage)) {
+              if (!disconnected) res.status(409).json({ error: "Payment is not confirmed yet. Keep the original invoice and retry verification." });
+              return;
+            }
           } catch (error) {
             if (disconnected) return;
             throw error;
@@ -2130,10 +2149,14 @@ export function registerStratigraphyRoutes(
             return;
           }
           if (pass) {
+            const rangePayment = pass.allowedPaths.length === 1 && pass.maxRequests === 1
+              && pass.amountMsats === selectedRange.amountMsats
+              && pass.allowedPaths[0] === rangePaymentScope(req.path, selectedRange.key,
+                selectedRange.amountMsats, selectedRange.description);
             if (
-              pass.allowedPaths.some(
+              (!rangePayment && pass.allowedPaths.some(
                 (allowedPath) => allowedPath !== req.path,
-              ) ||
+              )) ||
               pass.allowedToolSets.length > 0 ||
               pass.maxTarget !== undefined
             ) {
@@ -2143,12 +2166,16 @@ export function registerStratigraphyRoutes(
             const definition = SUBSCRIPTION_TIERS[pass.tier];
             const verification = await settlementRouter.verifyPayment({
               paymentHash: pass.paymentHash,
-              preimage: authorization.preimage,
+              ...paymentVerificationProof(authorization.preimage),
               expectedAmountMsats: pass.amountMsats ?? definition.amountMsats,
-              expectedDescription: definition.description,
+              expectedDescription: rangePayment ? selectedRange.description : definition.description,
               asset: pass.paymentAsset,
               expectedProvider: pass.paymentProvider,
             });
+            if (verification === "invalid" && !/^[0-9a-f]{64}$/.test(authorization.preimage)) {
+              res.status(409).json({ error: "Payment is not confirmed yet. Keep the original invoice and retry verification." });
+              return;
+            }
             if (verification === "unavailable") {
               res.status(502).json({ error: "Unable to verify payment" });
               return;
@@ -2192,6 +2219,10 @@ export function registerStratigraphyRoutes(
           }
         }
         if (authorization.kind === "legacy") {
+          if (authorization.preimage === "nwc_lookup") {
+            res.status(401).json({ error: "Server-side NWC verification requires the issued macaroon, not a bare payment hash." });
+            return;
+          }
           const issuedChallenge = await challengeStore.findByPaymentHash(
             challengeCaller,
             authorization.paymentHash,

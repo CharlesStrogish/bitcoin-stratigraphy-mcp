@@ -1,0 +1,12 @@
+During live mainnet testing with CoinOS and Cash App, we discovered a critical real-world payment bottleneck: when a payer uses a CoinOS wallet to pay our CoinOS-backed server (coinos -> coinos internal settlement) or pays via consumer Lightning wallets like Cash App, the wallet settles the invoice into our merchant account immediately but does not expose a 64-character SHA-256 hex preimage to the payer (CoinOS internal transfers use an internal UUID instead of an HTLC preimage).
+​Currently, our frontend and backend block settlement unless the client manually supplies a 64-character hex preimage that hashes to payment_hash. Please implement Dual L402 + Server-Side NWC Verification so both external preimage clients and internal/consumer Lightning wallets work seamlessly:
+​Backend NWC lookup_invoice Verification Fallback:
+​On all L402-gated routes (including escrow create and escrow settle), keep fast-path cryptographic verification when a valid 64-hex preimage matching SHA256(preimage) === payment_hash is provided.
+​If the client retries with the L402 token/macaroon or payment_hash WITHOUT a 64-hex preimage (or with preimage: 'NWC_LOOKUP' / an internal CoinOS UUID), have the backend verify settlement by calling NWC lookup_invoice (and/or checking incoming settled transactions by payment_hash) on the server's configured NWC merchant connection.
+​If the merchant NWC wallet reports the invoice for that payment_hash is settled/paid, treat the L402 challenge as fully verified, bind it to that single request/contract so it cannot be replayed, and complete the create or settle request.
+​Frontend Live REST Escrow Challenge Box Upgrade:
+​Make the Payer preimage (64 hex) input field optional on the PAYMENT REQUIRED challenge card.
+​Update the helper text to explain: 'Pay this invoice with any Lightning wallet (Cash App, CoinOS, Phoenix, Alby, etc.). Paste a 64-hex preimage if your wallet provides one, or leave blank and click Verify to confirm payment directly via the server NWC oracle.'
+​When the user clicks Verify and retry request with the preimage box blank, skip the local browser SHA-256 preimage check and send the retry request to the backend so the server verifies the paid invoice via NWC lookup_invoice.
+​Verification:
+​Run all backend, frontend, and escrow regression tests to ensure both preimage verification and NWC lookup_invoice settlement verification pass.

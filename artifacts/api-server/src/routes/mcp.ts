@@ -40,7 +40,7 @@ import {
 } from "../lib/subscription-pass";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { createPostgresMacaroonRevocationStore } from "../lib/postgres-macaroon-revocation-store";
-import { parseL402Header } from "../middleware/l402";
+import { parseL402Header, paymentVerificationProof } from "../middleware/l402";
 import {
   createEpistemicDatasetReceipt,
   getEpistemicDatasetReceiptByHash,
@@ -504,10 +504,10 @@ const settleInputSchema = z
       ),
     preimage: z
       .string()
-      .regex(/^[0-9a-fA-F]{64}$/)
+      .regex(/^(?:[0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|NWC_LOOKUP)$/i)
       .optional()
       .describe(
-        "L402 32-byte hex preimage. Also send the server-issued L402 macaroon and the same preimage in the Authorization header.",
+        "Optional L402 preimage, NWC_LOOKUP, or CoinOS UUID hint. Without a preimage, retain the issued macaroon; the merchant NWC wallet must confirm the exact settled invoice.",
       ),
     txHash: z
       .string()
@@ -573,9 +573,9 @@ const paymentInfoInputSchema = z
       .refine(
         (value) =>
           Number(value.preimage !== undefined) +
-            Number(value.txHash !== undefined) ===
+            Number(value.txHash !== undefined) <=
           1,
-        "Provide exactly one of preimage or txHash",
+        "Do not provide both preimage and txHash; Lightning can use the issued macaroon with merchant verification",
       ),
   );
 
@@ -5337,11 +5337,11 @@ export function registerMcpRoute(
       };
       res.locals.paymentSettlement = invalid;
       const paymentHash = input.paymentHash.replace(/^0x/i, "").toLowerCase();
-      if (input.preimage !== undefined) {
+      if (input.txHash === undefined) {
         const authorization = input.paymentMacaroon
           ? {
               macaroon: input.paymentMacaroon,
-              preimage: input.preimage.toLowerCase(),
+              preimage: input.preimage?.toLowerCase() ?? "nwc_lookup",
             }
           : parseL402Header(req.header("Authorization"));
         const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
@@ -5360,11 +5360,11 @@ export function registerMcpRoute(
         if (
           !authorization ||
           !pass ||
-          authorization.preimage !== input.preimage.toLowerCase() ||
+          (input.preimage !== undefined && authorization.preimage !== input.preimage.toLowerCase()) ||
           pass.paymentHash !== paymentHash ||
-          createHash("sha256")
-            .update(Buffer.from(input.preimage, "hex"))
-            .digest("hex") !== paymentHash ||
+          (/^[0-9a-f]{64}$/.test(authorization.preimage) && createHash("sha256")
+            .update(Buffer.from(authorization.preimage, "hex"))
+            .digest("hex") !== paymentHash) ||
           pass.paymentAsset !== "btc-lightning" ||
           !pass.paymentProvider ||
           pass.allowedPaths.length !== 1 ||
@@ -5384,7 +5384,7 @@ export function registerMcpRoute(
           }
           const verified = await settlementRouter.verifyPayment({
             paymentHash,
-            preimage: input.preimage.toLowerCase(),
+            ...paymentVerificationProof(authorization.preimage),
             expectedAmountMsats: pass.amountMsats,
             expectedDescription: `Bitcoin Stratigraphy MCP ${originalTool} execution${pass.requestLimits[0]?.maxRequests === 100 ? " (100-call batch)" : ""}`,
             expectedProvider: pass.paymentProvider,

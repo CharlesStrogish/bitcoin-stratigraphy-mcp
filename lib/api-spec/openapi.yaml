@@ -167,7 +167,7 @@ x-mcp-tools:
         toolName: { type: string, minLength: 1, description: "Optional case-sensitive canonical MCP tool identifier (e.g., 'stratigraphy.get_digest' or 'proof.verify'); supported legacy aliases are also accepted and resolve to canonical names. When provided, filters output to return pricing specifically for that single tool. When omitted, returns the full pricing map across all registered catalog tools. Must match an exact registered tool name or supported legacy alias." }
         action: { type: string, enum: [query, settle], default: query }
         paymentHash: { type: string, pattern: "^(0x)?[0-9a-fA-F]{64}$" }
-        preimage: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+        preimage: { type: string, pattern: "^([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|NWC_LOOKUP|nwc_lookup)$" }
         paymentMacaroon: { type: string, minLength: 1, maxLength: 8192, description: "Original invoice macaroon for settlement checks; separate from this paid tool's Authorization credential." }
         txHash: { type: string, pattern: "^0x[0-9a-fA-F]{64}$" }
       required: []
@@ -182,13 +182,12 @@ x-mcp-tools:
           properties:
             action: { type: string, const: settle }
             paymentHash: { type: string, pattern: "^(0x)?[0-9a-fA-F]{64}$" }
-            preimage: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+            preimage: { type: string, pattern: "^([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|NWC_LOOKUP|nwc_lookup)$" }
             paymentMacaroon: { type: string, minLength: 1, maxLength: 8192 }
             txHash: { type: string, pattern: "^0x[0-9a-fA-F]{64}$" }
           required: [action, paymentHash]
-          oneOf:
-            - required: [preimage]
-            - required: [txHash]
+          not:
+            required: [preimage, txHash]
     outputSchema:
       type: object
       additionalProperties: false
@@ -706,7 +705,7 @@ paths:
       operationId: settleEscrow
       tags: [Autonomous Escrow]
       summary: Commit authorized execution evidence and release the escrow preimage
-      description: Public redemption requires the private settlement_capability returned at creation plus live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI; no operator token is required. A valid X-Escrow-Operator-Token remains an optional admin override for legacy recovery. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 macaroon binds the escrow ID, exact execution trace and result payload, is single-use, and requires a SHA-256-bound Lightning preimage plus wallet-confirmed incoming settlement. No final JSON or escrow preimage is released before verification. Caller-authorized execution commitments do not independently establish bounty funding, task correctness, or a confirmed Bitcoin anchor.
+      description: Public redemption requires the private settlement_capability returned at creation plus live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI; no operator token is required. A valid X-Escrow-Operator-Token remains an optional admin override for legacy recovery. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 macaroon binds the escrow ID, exact execution trace and result payload and is single-use. A supplied 64-hex preimage must match the invoice hash. Without a preimage, retry with the issued macaroon and NWC_LOOKUP, a CoinOS UUID hint, or no proof; the merchant must confirm the exact settled incoming invoice, amount, description and issuing provider. UUIDs are not cryptographic proofs. Pending verification returns 409 while retaining the original invoice. No final JSON or escrow preimage is released before verification. Caller-authorized execution commitments do not independently establish bounty funding, task correctness, or a confirmed Bitcoin anchor.
       security:
         - L402: []
       requestBody:
@@ -732,6 +731,8 @@ paths:
                 type: string
         "403":
           description: Creator-held settlement capability or valid admin override required
+        "409":
+          description: Merchant settlement not yet confirmed; retain the original invoice and retry verification
         "404":
           description: Escrow not found
         "422":
@@ -1868,7 +1869,7 @@ components:
       type: apiKey
       in: header
       name: Authorization
-      description: "Legacy: L402 <payment_hash>:<preimage>. Subscription: L402 <signed_macaroon>:<preimage>."
+      description: "L402 <signed_macaroon>:<preimage> verifies the SHA-256 proof and exact merchant settlement. For wallets without a preimage, use L402 <signed_macaroon>:NWC_LOOKUP, a CoinOS UUID hint, or the signed macaroon alone; merchant NWC lookup must confirm the exact incoming invoice. Bare payment hashes require the original cryptographic proof and are not authorization for merchant-only lookup. Pending merchant verification returns 409 without replacing the original invoice."
     NIP98:
       type: apiKey
       in: header
@@ -3671,6 +3672,9 @@ components:
     L402Challenge:
       type: object
       properties:
+        macaroon:
+          type: string
+          description: Single-use capability bound to the quoted record range, route, invoice amount and issuer. Retain it for merchant NWC verification when no preimage is available.
         invoice:
           type: string
           description: Invoice or payment request for the selected settlement asset

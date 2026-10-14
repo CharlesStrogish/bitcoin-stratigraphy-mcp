@@ -1427,6 +1427,24 @@ async function assertValidReceipt(
   return JSON.parse(rawBody) as unknown;
 }
 
+test("single-range merchant verification uses a scoped macaroon, rejects bare hashes and prevents replay", async () => {
+  const url = `${baseUrl}/api/v1/stratigraphy?days=1`;
+  const initial = await fetch(url);
+  assert.equal(initial.status, 402);
+  const challenge = await initial.json() as { macaroon: string; payment_hash: string };
+  assert.ok(challenge.macaroon);
+  const hashOnly = await fetch(url, { headers: {
+    Authorization: `L402 ${challenge.payment_hash}:NWC_LOOKUP`,
+  } });
+  assert.equal(hashOnly.status, 401);
+  const headers = { Authorization: `L402 ${challenge.macaroon}:NWC_LOOKUP` };
+  assert.equal((await fetch(`${baseUrl}/api/v1/stratigraphy?days=2`, { headers })).status, 403);
+  const paid = await fetch(url, { headers });
+  assert.equal(paid.status, 200);
+  assert.equal((await paid.json() as { data: unknown[] }).data.length, 1);
+  assert.equal((await fetch(url, { headers })).status, 429);
+});
+
 test("keeps served and shared payment OpenAPI contracts in parity", async () => {
   const sharedDocument = parse(
     await readFile(

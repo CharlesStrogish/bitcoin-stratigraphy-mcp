@@ -30,7 +30,7 @@
 - [Fixed-fee L402 attestations](fixed-fee-l402-attestations.md) — paid route macaroons are path-bound and single-use; signed attestations trust only the configured server issuer.
 - [Epistemic grounding provenance](epistemic-grounding-provenance.md) — reserve the epistemic schema for tip-grounded signing and verify every receipt alias against signed content.
 - [Signed dataset anchors](signed-dataset-anchors.md) — CID-to-Bitcoin-tip receipts are signed anchors, not ZK or PoW proofs; require a real circuit before claiming otherwise.
-- [CoinOS internal payment proofs](nwc-self-payment-proofs.md) — UUIDs are references, not preimages; redeem only with trusted incoming and payer-outgoing verification.
+- [CoinOS payment verification](nwc-self-payment-proofs.md) — signed capabilities allow exact merchant-only confirmation; legacy UUID proofs still require payer verification.
 - [Audit readiness](audit-readiness.md) — HTTP readiness precedes relay announcements; challenge issuance is not evidence of live paid settlement.
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
 - [Published domain changes](published-domain-changes.md) — a target change can leave the former .replit.app address at “isn't live yet”; verify the current primary URL before advertising endpoints.

@@ -39,6 +39,14 @@ export async function preimageMatches(preimage: string, paymentHash: string): Pr
   return (await sha256Hex(hexToBytes(preimage))) === paymentHash.toLowerCase();
 }
 
+/** UUIDs and NWC_LOOKUP are hints, not proofs; the server must verify the issued invoice. */
+export async function paymentRetryProof(value: string, paymentHash: string): Promise<string | null> {
+  const proof = value.trim().toLowerCase();
+  if (!proof) return "NWC_LOOKUP";
+  if (proof === "nwc_lookup" || /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(proof)) return proof;
+  return await preimageMatches(proof, paymentHash) ? proof : null;
+}
+
 function parseChallenge(j: unknown): L402Challenge | null {
   const o = j as Record<string, unknown> | null;
   const macaroon = o?.macaroon ?? o?.token;

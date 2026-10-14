@@ -15,8 +15,9 @@ type RevenueLedgerBase = {
 
 export type RevenueLedgerEntry = RevenueLedgerBase &
   (
-    | { preimage: string; coinosPaymentId?: never }
-    | { preimage?: never; coinosPaymentId: string }
+    | { preimage: string; coinosPaymentId?: never; merchantVerified?: never }
+    | { preimage?: never; coinosPaymentId: string; merchantVerified?: never }
+    | { preimage?: never; coinosPaymentId?: never; merchantVerified: true }
   );
 
 export type RevenueChannelBreakdown = Record<RevenueChannel, number>;
@@ -66,7 +67,12 @@ export function validateLedgerEntry(
   if (!/^[0-9a-f]{64}$/i.test(entry.paymentHash)) {
     throw new TypeError("paymentHash must be a 32-byte hexadecimal digest");
   }
-  if (entry.coinosPaymentId !== undefined) {
+  if (entry.merchantVerified !== undefined) {
+    if (entry.merchantVerified !== true || entry.channel !== "L402"
+      || entry.preimage !== undefined || entry.coinosPaymentId !== undefined) {
+      throw new TypeError("Invalid merchant-verified settlement record");
+    }
+  } else if (entry.coinosPaymentId !== undefined) {
     if (
       entry.channel !== "L402" ||
       !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(

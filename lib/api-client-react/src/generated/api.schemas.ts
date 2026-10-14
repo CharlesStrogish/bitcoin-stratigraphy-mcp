@@ -1568,6 +1568,8 @@ export interface L402SubscriptionPass {
 }
 
 export interface L402Challenge {
+  /** Single-use capability bound to the quoted record range, route, invoice amount and issuer. Retain it for merchant NWC verification when no preimage is available. */
+  macaroon?: string;
   /** Invoice or payment request for the selected settlement asset */
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */

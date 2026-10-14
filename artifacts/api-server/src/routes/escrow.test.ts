@@ -304,7 +304,8 @@ test("exact 24-sat NWC toll withholds execution until settled and binds the enti
   assert.equal(executionCalls, 1);
 });
 
-test("public creator can obtain and redeem L402 invoices without an operator token; capability prevents cross-contract redemption", async () => {
+for (const proof of [tollPreimage, "NWC_LOOKUP", "", "11111111-1111-4111-8111-111111111111"])
+test(`public create/settle uses ${proof.length === 64 ? "preimage" : proof || "empty proof"} and rejects cross-contract redemption`, async () => {
   let executions = 0;
   const base = await serve({
     operatorSecret: "", paymentGate: undefined, readHeight: async () => 900000,
@@ -338,7 +339,7 @@ test("public creator can obtain and redeem L402 invoices without an operator tok
   assert.equal(first.staged_preview.quoted_toll_sats, 21);
   assert.equal(first.staged_preview.merkle_standard, "RFC 6962 SHA-256");
   assert.ok(first.staged_preview.expected_output_schema);
-  const created = await fetch(`${base}/create`, publicPost(input, `L402 ${first.macaroon}:${tollPreimage}`));
+  const created = await fetch(`${base}/create`, publicPost(input, `L402 ${first.macaroon}:${proof}`));
   assert.equal(created.status, 201);
   const contract = await created.json() as { settlement_capability: string };
   assert.match(contract.settlement_capability, /^[0-9a-f]{64}$/);
@@ -364,13 +365,13 @@ test("public creator can obtain and redeem L402 invoices without an operator tok
   assert.equal(quote.staged_preview.expected_output_schema.$ref, "#/$defs/EscrowSettlement");
   assert.ok(quote.staged_preview.expected_output_schema.$defs.EscrowSettlement.properties.article_12_receipt);
   assert.ok(quote.staged_preview.expected_output_schema.$defs.EscrowReceipt);
-  const settled = await fetch(`${base}/settle`, publicPost(authorized, `L402 ${quote.macaroon}:${tollPreimage}`));
+  const settled = await fetch(`${base}/settle`, publicPost(authorized, `L402 ${quote.macaroon}:${proof}`));
   assert.equal(settled.status, 200);
   const output = await settled.json() as Record<string, unknown>;
   assert.equal(output.attestation_directive, ATTESTATION_DIRECTIVE);
   assert.equal(output.ots_calendar_standard, OTS_CALENDAR_STANDARD);
   assert.equal(Object.hasOwn(output, "settlement_capability"), false);
   assert.equal(executions, 1);
-  assert.equal((await fetch(`${base}/settle`, publicPost(authorized, `L402 ${quote.macaroon}:${tollPreimage}`))).status, 429);
+  assert.equal((await fetch(`${base}/settle`, publicPost(authorized, `L402 ${quote.macaroon}:${proof}`))).status, 429);
   assert.equal(executions, 1);
 });

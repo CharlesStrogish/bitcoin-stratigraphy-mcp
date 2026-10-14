@@ -70,7 +70,7 @@ export function createPostgresRevenueLedger(
           // Legacy encrypted proof column also stores CoinOS payment IDs;
           // the entry type keeps references distinct from true preimages.
           encrypt(
-            (entry.preimage ?? entry.coinosPaymentId).toLowerCase(),
+            (entry.preimage ?? entry.coinosPaymentId ?? "NWC_LOOKUP").toLowerCase(),
             secret,
           ),
           encrypt(entry.clientIdentifier, secret),

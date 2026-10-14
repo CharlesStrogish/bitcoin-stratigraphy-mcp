@@ -36,7 +36,7 @@ The Enterprise Exemption grants:
 - Air-Gapped Deployment: The legal right to deploy the Notary Hub and Escrow Oracle entirely on-premises or within isolated internal networks.
 - Zero-Telemetry Sovereign Guarantee: 100% offline, self-contained execution with zero vendor backdoors, network phone-home pings, or third-party dependencies.
 
-[Contact crstrogish@aol.com for Enterprise Licensing]
+[Contact licensing@bitcoinstratigraphy.com for Enterprise Licensing]
 
 ### 4. UI INTEGRATION & NAVIGATION
 - On the main homepage/dashboard, add a highly visible link or badge near the Escrow Terminal that says: "EU AI Act Article 12 Compliance Guide" and links to `/compliance`.

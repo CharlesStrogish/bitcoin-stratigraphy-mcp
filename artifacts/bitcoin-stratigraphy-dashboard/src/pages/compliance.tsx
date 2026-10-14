@@ -9,7 +9,7 @@ import {
 import "./compliance.css";
 
 const BASE = import.meta.env.BASE_URL;
-const MAIL = "mailto:crstrogish@aol.com";
+const MAIL = "mailto:licensing@bitcoinstratigraphy.com";
 
 const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],
@@ -168,7 +168,7 @@ export default function CompliancePage() {
             </ul>
             <p>
               <a href={MAIL} className="cmp-mail" data-testid="link-contact-licensing">
-                [Contact crstrogish@aol.com for Enterprise Licensing]
+                [Contact licensing@bitcoinstratigraphy.com for Enterprise Licensing]
               </a>
             </p>
             <div className="cmp-actions">

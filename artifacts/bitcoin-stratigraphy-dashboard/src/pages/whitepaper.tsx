@@ -7,7 +7,7 @@ import WhitepaperContent, { WHITEPAPER_SECTIONS } from "./whitepaper-content";
 import "./whitepaper.css";
 
 const BASE = import.meta.env.BASE_URL;
-const MAIL = "mailto:crstrogish@aol.com";
+const MAIL = "mailto:licensing@bitcoinstratigraphy.com";
 
 const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],

@@ -69,7 +69,7 @@ test("compliance marketing copy preserves approved text with live escrow pricing
   assert.equal(blocks.length, 20);
   assert.equal(
     createHash("sha256").update(blocks.join("\n")).digest("hex"),
-    "840f856279c13f5540b62f5edcdf86ec79404cee47d29c6b56468847caad340a",
+    "614a1f548a808aa799c686e811d80fa9865f9cb8facbc172b0f0da03d177f382",
   );
 });
 
@@ -87,7 +87,7 @@ test("compliance CTA returns to homepage and licensing contact uses mailto", () 
     links.find(
       (node) => node.props["data-testid"] === "link-contact-licensing",
     )?.props.href,
-    "mailto:crstrogish@aol.com",
+    "mailto:licensing@bitcoinstratigraphy.com",
   );
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "@bitcoin-stratigraphy/mcp-server",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Bitcoin MCP server: Hal Finney Horizon tracker, 15 J/TH thermodynamic energy calculation, Sovereign Node RPC telemetry, and Live L402 Satoshi settlement through NWC.",
   "mcpName": "crstrogish/bitcoin-stratigraphy",
   "license": "(AGPL-3.0-only OR LicenseRef-Commercial)",

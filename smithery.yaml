@@ -4,7 +4,7 @@
 # https://smithery.ai/docs/build/publish
 # smithery mcp publish "https://bitcoin-stratigraphy-dashboard.replit.app/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
 name: bitcoin-stratigraphy
-version: "2.1.1"
+version: "2.1.2"
 displayName: Bitcoin Stratigraphy Notary
 description: |-
   OpenTimestamps AI Notary Hub: 15 L402-gated tools (13 paid, 2 free sandbox tools), LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and Free Sandbox available through stratigraphy.list and proof.list.

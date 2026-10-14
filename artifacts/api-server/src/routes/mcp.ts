@@ -3889,7 +3889,7 @@ const paymentSettlementMetadata = {
   inputSchema: {
     type: "object",
     description:
-      "Payment identifier and one payment proof; the matching signed L402 or x402 credential must be supplied in HTTP headers.",
+      "Payment identifier and optional Lightning proof; retain the issued L402 macaroon for merchant verification. Base settlement requires a transaction hash and matching x402 credential.",
     examples: [
       { paymentHash: "ab".repeat(32), preimage: "cd".repeat(32) },
       { paymentHash: "0x" + "ab".repeat(32), txHash: "0x" + "ab".repeat(32) },
@@ -3904,9 +3904,9 @@ const paymentSettlementMetadata = {
       ),
       preimage: field(
         "string",
-        "L402 32-byte hex preimage; also send Authorization: L402 <server-issued macaroon>:<preimage>.",
+        "Optional L402 preimage, NWC_LOOKUP, or UUID hint; the issued macaroon and exact merchant settlement remain required.",
         ["cd".repeat(32)],
-        { pattern: "^[0-9a-fA-F]{64}$" },
+        { pattern: "^([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|NWC_LOOKUP|nwc_lookup)$" },
       ),
       txHash: field(
         "string",
@@ -3916,7 +3916,7 @@ const paymentSettlementMetadata = {
       ),
     },
     required: ["paymentHash"],
-    oneOf: [{ required: ["preimage"] }, { required: ["txHash"] }],
+    not: { required: ["preimage", "txHash"] },
   },
   outputSchema: {
     type: "object",
@@ -4472,7 +4472,7 @@ function createBitcoinStratigraphyMcpServer(
   const server = new McpServer(
     {
       name: "bitcoin-stratigraphy",
-      version: "2.1.0",
+      version: "2.1.2",
       description: ENGINE_DESCRIPTION,
     },
     {

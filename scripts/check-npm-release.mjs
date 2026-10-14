@@ -27,7 +27,7 @@ for (const entry of result.files) {
   );
   assert.doesNotMatch(
     entry.path,
-    /(?:\.map$|\.r1cs$|\.lic$|\.sqlite(?:3)?(?:-|$)|\.env(?:\.|$)|__pycache__|\.pyc$|audit_trail|\.coverage|snapshot_\d|node_modules)/,
+    /(?:\.map$|\.r1cs$|\.lic$|\.sqlite(?:3)?(?:-|$)|\.env(?:\.|$)|__pycache__|\.pyc$|audit_trail|\.coverage|snapshot_\d|node_modules|\.(?:test|spec)\.[^/]+$|(?:^|\/)(?:tests?|__tests__|fixtures)(?:\/|$))/,
     `Private, development, or unnecessary file: ${entry.path}`,
   );
 }

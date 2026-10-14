@@ -7,7 +7,9 @@ import {
   CreateEscrowBody, CreateEscrowResponse, SettleEscrowBody, SettleEscrowResponse,
   GetEscrowReceiptParams, GetEscrowReceiptResponse,
   GetEscrowTollResponse,
+  GetEscrowLedgerStatsResponse, GetEscrowGenesisReceiptResponse,
 } from "@workspace/api-zod";
+import { readGenesisReceipt } from "../services/escrowLedger";
 import { createL402Middleware } from "../middleware/l402";
 import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
 import { executeEscrow, type EscrowExecutor, type EscrowOperation } from "../services/escrowBridge";
@@ -227,6 +229,29 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
     }
   };
   // Public, read-only price preview. Never creates an escrow or collects a fee.
+  router.get("/stats", async (_req, res) => {
+    if (active >= 8) {
+      res.set("Retry-After", "5").status(503).json({ error: "Escrow service is busy" });
+      return;
+    }
+    active++;
+    try {
+      const result = await execute("stats", {});
+      if (result.status !== 200) throw new Error("Escrow ledger unavailable");
+      res.json(GetEscrowLedgerStatsResponse.parse(result.body));
+    } catch {
+      res.status(503).json({ error: "Durable escrow ledger unavailable" });
+    } finally {
+      active--;
+    }
+  });
+  router.get("/genesis-receipt", async (_req, res) => {
+    try {
+      res.json(GetEscrowGenesisReceiptResponse.parse(await readGenesisReceipt()));
+    } catch {
+      res.status(503).json({ error: "Durable escrow ledger unavailable" });
+    }
+  });
   router.get("/toll", async (_req, res) => {
     const price = await readPrice().catch(() => null);
     if (!res.destroyed) res.json(GetEscrowTollResponse.parse(escrowTollQuote(price)));

@@ -68,3 +68,4 @@
 - [Read-only Git audits](read-only-git-audits.md) — compare committed blobs without index refreshes; do not elevate Git permissions for an integrity check.
 - [Enterprise air-gap scope](enterprise-air-gap.md) — commercial deployments need local telemetry; distinguish pipeline isolation from other services' network requirements.
 - [Npm server distribution](npm-server-distribution.md) — distribute the self-hosted HTTP engine, not a connector; isolate npm releases from the private workspace.
+- [Escrow durable recovery](escrow-durable-recovery.md) — preserve the 24-sat historical baseline once; commit durable state before success and never fabricate its missing Merkle proof.

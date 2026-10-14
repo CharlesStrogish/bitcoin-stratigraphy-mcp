@@ -42,7 +42,9 @@ import type {
   EpistemicGroundingRequest,
   EscrowContract,
   EscrowExecutionInput,
+  EscrowGenesisReceipt,
   EscrowInput,
+  EscrowLedgerStats,
   EscrowReceiptDocument,
   EscrowSettlement,
   EscrowTollQuote,
@@ -124,6 +126,162 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetEscrowLedgerStatsUrl = () => {
+
+
+
+
+  return `/api/v1/escrow/stats`
+}
+
+/**
+ * Counts the operator-supplied 24-sat mainnet genesis exactly once plus future server-confirmed settlement tolls, excluding REST access fees and unpaid commitments. Storage failures return 503, never a zero counter.
+ * @summary Read the durable verified settlement toll total
+ */
+export const getEscrowLedgerStats = async ( options?: Parameters<typeof customFetch>[1]): Promise<EscrowLedgerStats> => {
+
+  return customFetch<EscrowLedgerStats>(getGetEscrowLedgerStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEscrowLedgerStatsQueryKey = () => {
+    return [
+    `/api/v1/escrow/stats`
+    ] as const;
+    }
+
+
+export const getGetEscrowLedgerStatsQueryOptions = <TData = Awaited<ReturnType<typeof getEscrowLedgerStats>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowLedgerStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEscrowLedgerStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEscrowLedgerStats>>> = ({ signal }) => getEscrowLedgerStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEscrowLedgerStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEscrowLedgerStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getEscrowLedgerStats>>>
+export type GetEscrowLedgerStatsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the durable verified settlement toll total
+ */
+
+export function useGetEscrowLedgerStats<TData = Awaited<ReturnType<typeof getEscrowLedgerStats>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowLedgerStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEscrowLedgerStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetEscrowGenesisReceiptUrl = () => {
+
+
+
+
+  return `/api/v1/escrow/genesis-receipt`
+}
+
+/**
+ * Operator-supplied historical settlement metadata. The stored released preimage hashes to the create payment hash; the original execution leaf and audit path were not supplied, so this endpoint does not claim independently verified Merkle inclusion or fresh NWC confirmation.
+ * @summary Read the permanently preserved historical mainnet genesis settlement
+ */
+export const getEscrowGenesisReceipt = async ( options?: Parameters<typeof customFetch>[1]): Promise<EscrowGenesisReceipt> => {
+
+  return customFetch<EscrowGenesisReceipt>(getGetEscrowGenesisReceiptUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEscrowGenesisReceiptQueryKey = () => {
+    return [
+    `/api/v1/escrow/genesis-receipt`
+    ] as const;
+    }
+
+
+export const getGetEscrowGenesisReceiptQueryOptions = <TData = Awaited<ReturnType<typeof getEscrowGenesisReceipt>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowGenesisReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEscrowGenesisReceiptQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEscrowGenesisReceipt>>> = ({ signal }) => getEscrowGenesisReceipt({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEscrowGenesisReceipt>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEscrowGenesisReceiptQueryResult = NonNullable<Awaited<ReturnType<typeof getEscrowGenesisReceipt>>>
+export type GetEscrowGenesisReceiptQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the permanently preserved historical mainnet genesis settlement
+ */
+
+export function useGetEscrowGenesisReceipt<TData = Awaited<ReturnType<typeof getEscrowGenesisReceipt>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowGenesisReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEscrowGenesisReceiptQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetEscrowTollUrl = () => {
 

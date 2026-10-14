@@ -89,6 +89,22 @@ test("public toll preview needs no payment or operator token and exposes no escr
   }
 });
 
+test("public cumulative ledger counter returns durable totals and never a zero fallback", async () => {
+  const base = await serve({ execute: async (operation) => {
+    assert.equal(operation, "stats");
+    return { status: 200, body: { verified_toll_sats: 48, settled_contracts: 2,
+      genesis_escrow_id: "ba4f25dd-7f16-420c-9264-a16f102fd5a6" } };
+  } });
+  const response = await fetch(`${base}/stats`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal((await response.json() as Record<string, unknown>).verified_toll_sats, 48);
+  const offline = await serve({ execute: async () => { throw new Error("database unavailable"); } });
+  const unavailable = await fetch(`${offline}/stats`);
+  assert.equal(unavailable.status, 503);
+  assert.equal(Object.hasOwn(await unavailable.json() as Record<string, unknown>, "verified_toll_sats"), false);
+});
+
 test("public toll quote falls back to exactly 21 when market provider fails", async () => {
   const base = await serve({ readPrice: async () => { throw new Error("offline"); } });
   const response = await fetch(`${base}/toll`);

@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
 import { startNip90Dvm } from "./services/dvm";
 import { albySettlementMode } from "./services/settlement/alby";
+import { executeEscrow } from "./services/escrowBridge";
 import {
   prewarmZkVerifier,
   shutdownZkVerifier,
@@ -23,6 +24,10 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const warmupStartedAt = performance.now();
+// Recover before accepting traffic. Never advertise a zero/empty escrow ledger
+// when durable storage is missing or unavailable.
+const escrowRecovery = await executeEscrow("stats", {});
+if (escrowRecovery.status !== 200) throw new Error("Escrow ledger recovery failed");
 await prewarmZkVerifier();
 logger.info(
   { durationMs: Number((performance.now() - warmupStartedAt).toFixed(3)) },

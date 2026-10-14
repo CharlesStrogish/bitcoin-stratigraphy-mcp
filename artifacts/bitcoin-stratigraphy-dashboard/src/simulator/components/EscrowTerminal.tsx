@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Lock, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { CopyJsonButton } from "./CopyJsonButton";
 import type { EscrowTollQuote } from "@workspace/api-client-react";
+import { getEscrowLedgerStats } from "@workspace/api-client-react";
 import { evaluateEscrowToll } from "../engine/escrowToll";
 import {
   HEX64, callEscrow, paymentRetryProof, validateCreate, validateSettle,
@@ -32,6 +33,8 @@ export function EscrowTerminal() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [preimage, setPreimage] = useState("");
   const [settled, setSettled] = useState<SettleResult | null>(null);
+  const [ledgerToll, setLedgerToll] = useState<number | null>(null);
+  const [ledgerUnavailable, setLedgerUnavailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [lastAction, setLastAction] = useState<(() => void) | null>(null);
@@ -46,6 +49,38 @@ export function EscrowTerminal() {
     void evaluateEscrowToll(c.signal).then((v) => { if (!c.signal.aborted) setQuote(v); }).catch(() => undefined);
     return () => { c.abort(); };
   }, []);
+
+  useEffect(() => {
+    const c = new AbortController();
+    let reading = false;
+    const refresh = async () => {
+      if (reading) return;
+      reading = true;
+      try {
+        const stats = await getEscrowLedgerStats({ signal: c.signal, cache: "no-store" });
+        if (!Number.isSafeInteger(stats.verified_toll_sats) || stats.verified_toll_sats < 24) {
+          throw new Error("Invalid durable escrow total");
+        }
+        if (!c.signal.aborted) {
+          setLedgerToll(stats.verified_toll_sats);
+          setLedgerUnavailable(false);
+        }
+      } catch {
+        if (!c.signal.aborted) setLedgerUnavailable(true);
+      } finally {
+        reading = false;
+      }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 30_000);
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      c.abort();
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [settled?.article_12_receipt.escrow_id]);
 
   const signal = () => ctl.current?.signal ?? new AbortController().signal;
 
@@ -130,7 +165,8 @@ export function EscrowTerminal() {
   const exportJson = settled
     ? JSON.stringify({ create_response: contract && { ...contract, settlement_capability: undefined }, settle_response: settled }, null, 2)
     : null;
-  const verifiedToll = settled?.article_12_receipt.lightning_settlement?.amount_sats ?? 0;
+  const verifiedToll = ledgerUnavailable ? "temporarily unavailable"
+    : ledgerToll === null ? "loading…" : `${ledgerToll} sats`;
   const stage = settled ? 3 : contract || existingId.trim() ? 2 : pending?.op === "create" ? 1 : 0;
   const st = (n: number) => (stage > n ? "done" : stage === n ? "active" : "idle");
   const inp = (id: string, label: string, v: string, set: (s: string) => void, extra: Record<string, unknown> = {}) => (
@@ -230,7 +266,7 @@ export function EscrowTerminal() {
 
       <div className="et-actions">
         <span className="et-metric" data-testid="metric-tolls" role="status">
-          Verified settle toll accrued: {verifiedToll} sats
+          Verified settle toll accrued: {verifiedToll}
         </span>
         <span className="et-baseline" data-testid="metric-current-toll" role="status">
           Settlement toll preview: {quoteSummary}. Server-issued invoice and contract prices are authoritative.

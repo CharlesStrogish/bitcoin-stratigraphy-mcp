@@ -7,6 +7,7 @@ process.env.NODE_ENV = "test";
 const outputs = [
   "./dist/primaryStratigraphy.test.js",
   "./dist/escrow.test.js",
+  "./dist/escrowLedger.test.js",
   "./dist/provenancePersistence.unit.test.js",
   "./dist/stratigraphy.contract.test.js",
   "./dist/pricing.test.js",
@@ -128,6 +129,7 @@ await build({
   entryPoints: {
     "primaryStratigraphy.test": "./tests/unit/primaryStratigraphy.test.ts",
     "escrow.test": "./src/routes/escrow.test.ts",
+    "escrowLedger.test": "./src/services/escrowLedger.test.ts",
     "stratigraphy.contract.test": "./src/routes/stratigraphy.contract.test.ts",
     "pricing.test": "./tests/unit/pricing.test.ts",
     "settlement_redundancy.test": "./tests/unit/settlement_redundancy.test.ts",

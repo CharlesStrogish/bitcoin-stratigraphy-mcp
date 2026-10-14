@@ -73,6 +73,43 @@ export interface EscrowContract {
   toll_fee_sats: number;
 }
 
+export interface EscrowLedgerStats {
+  /**
+     * @minimum 24
+     * @maximum 9007199254740991
+     */
+  verified_toll_sats: number;
+  /** @minimum 1 */
+  settled_contracts: number;
+  genesis_escrow_id: string;
+}
+
+export type EscrowGenesisReceiptStatus = typeof EscrowGenesisReceiptStatus[keyof typeof EscrowGenesisReceiptStatus];
+
+
+export const EscrowGenesisReceiptStatus = {
+  SETTLED: 'SETTLED',
+} as const;
+
+export type EscrowGenesisReceiptProvenance = typeof EscrowGenesisReceiptProvenance[keyof typeof EscrowGenesisReceiptProvenance];
+
+
+export const EscrowGenesisReceiptProvenance = {
+  operator_supplied_mainnet_genesis: 'operator_supplied_mainnet_genesis',
+} as const;
+
+export interface EscrowGenesisReceipt {
+  escrow_id: string;
+  create_payment_hash: string;
+  merkle_root: string;
+  amount_sats: number;
+  toll_fee_sats: number;
+  status: EscrowGenesisReceiptStatus;
+  ots_calendar_standard: string;
+  provenance: EscrowGenesisReceiptProvenance;
+  merkle_inclusion_verified: false;
+}
+
 export type EscrowTollQuoteTargetUsd = typeof EscrowTollQuoteTargetUsd[keyof typeof EscrowTollQuoteTargetUsd];
 
 

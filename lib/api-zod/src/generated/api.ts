@@ -25,6 +25,40 @@ import * as zod from 'zod';
 
 
 /**
+ * Counts the operator-supplied 24-sat mainnet genesis exactly once plus future server-confirmed settlement tolls, excluding REST access fees and unpaid commitments. Storage failures return 503, never a zero counter.
+ * @summary Read the durable verified settlement toll total
+ */
+export const getEscrowLedgerStatsResponseVerifiedTollSatsMin = 24;
+export const getEscrowLedgerStatsResponseVerifiedTollSatsMax = 9007199254740991;
+
+
+
+
+export const GetEscrowLedgerStatsResponse = zod.object({
+  "verified_toll_sats": zod.number().int().min(getEscrowLedgerStatsResponseVerifiedTollSatsMin).max(getEscrowLedgerStatsResponseVerifiedTollSatsMax),
+  "settled_contracts": zod.number().int().min(1),
+  "genesis_escrow_id": zod.string()
+})
+
+
+/**
+ * Operator-supplied historical settlement metadata. The stored released preimage hashes to the create payment hash; the original execution leaf and audit path were not supplied, so this endpoint does not claim independently verified Merkle inclusion or fresh NWC confirmation.
+ * @summary Read the permanently preserved historical mainnet genesis settlement
+ */
+export const GetEscrowGenesisReceiptResponse = zod.object({
+  "escrow_id": zod.string(),
+  "create_payment_hash": zod.string(),
+  "merkle_root": zod.string(),
+  "amount_sats": zod.number().int(),
+  "toll_fee_sats": zod.number().int(),
+  "status": zod.enum(['SETTLED']),
+  "ots_calendar_standard": zod.string(),
+  "provenance": zod.enum(['operator_supplied_mainnet_genesis']),
+  "merkle_inclusion_verified": zod.literal(false)
+})
+
+
+/**
  * Public read-only price preview. Uses the existing Bitcoin/USD market rail, a $0.02 target and a 1-satoshi minimum; unavailable or invalid rates select exactly 21 sats. No escrow creation, payment or MCP tool execution.
  * @summary Preview the current USD-normalized escrow settlement toll
  */

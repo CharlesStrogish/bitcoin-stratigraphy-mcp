@@ -32,8 +32,9 @@
 - [Epistemic grounding provenance](epistemic-grounding-provenance.md) — reserve the epistemic schema for tip-grounded signing and verify every receipt alias against signed content.
 - [Signed dataset anchors](signed-dataset-anchors.md) — CID-to-Bitcoin-tip receipts are signed anchors, not ZK or PoW proofs; require a real circuit before claiming otherwise.
 - [CoinOS payment verification](nwc-self-payment-proofs.md) — signed capabilities allow exact merchant-only confirmation; legacy UUID proofs still require payer verification.
-- [Audit readiness](audit-readiness.md) — HTTP readiness precedes relay announcements; challenge issuance is not evidence of live paid settlement.
+- [Audit readiness](audit-readiness.md) — post-publish API boot window, relay announcements and paid settlement are separate readiness stages.
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
+- [Static response headers](static-response-headers.md) — static deployments honor production responseHeaders; validator acceptance alone proves nothing.
 - [Published domain changes](published-domain-changes.md) — canonical host is bitcoinstratigraphy.com; keep serving legacy .replit.app unadvertised; verify the primary URL first.
 - [Git subdirectory SDK installs](git-subdirectory-sdk-installs.md) — pnpm Git preparation needs an explicit workspace boundary and consumer build-script trust.
 - [Vendored archive integrity](vendored-archive-integrity.md) — a repacked local SDK archive can make unrelated frozen installs fail after lockfile regeneration.

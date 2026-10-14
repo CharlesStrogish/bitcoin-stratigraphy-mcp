@@ -214,7 +214,7 @@ export const getGetEscrowGenesisReceiptUrl = () => {
 }
 
 /**
- * Operator-supplied historical settlement metadata. The stored released preimage hashes to the create payment hash; the original execution leaf and audit path were not supplied, so this endpoint does not claim independently verified Merkle inclusion or fresh NWC confirmation.
+ * Returns the exact complete operator-supplied historical export, including create_response, settle_response, released settlement preimage, RFC 6962 receipt and recorded CoinOS confirmation. Preserves original timestamps and leaf metadata; does not perform a new wallet confirmation or Bitcoin anchoring operation.
  * @summary Read the permanently preserved historical mainnet genesis settlement
  */
 export const getEscrowGenesisReceipt = async ( options?: Parameters<typeof customFetch>[1]): Promise<EscrowGenesisReceipt> => {

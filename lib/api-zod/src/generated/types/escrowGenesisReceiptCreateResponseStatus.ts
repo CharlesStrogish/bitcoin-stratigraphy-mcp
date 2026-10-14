@@ -22,9 +22,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type EscrowGenesisReceiptProvenance = typeof EscrowGenesisReceiptProvenance[keyof typeof EscrowGenesisReceiptProvenance];
+export type EscrowGenesisReceiptCreateResponseStatus = typeof EscrowGenesisReceiptCreateResponseStatus[keyof typeof EscrowGenesisReceiptCreateResponseStatus];
 
 
-export const EscrowGenesisReceiptProvenance = {
-  operator_supplied_mainnet_genesis: 'operator_supplied_mainnet_genesis',
+export const EscrowGenesisReceiptCreateResponseStatus = {
+  LOCKED: 'LOCKED',
 } as const;

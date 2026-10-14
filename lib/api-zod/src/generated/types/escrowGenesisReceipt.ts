@@ -21,17 +21,10 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
-import type { EscrowGenesisReceiptProvenance } from './escrowGenesisReceiptProvenance';
-import type { EscrowGenesisReceiptStatus } from './escrowGenesisReceiptStatus';
+import type { EscrowGenesisReceiptCreateResponse } from './escrowGenesisReceiptCreateResponse';
+import type { EscrowSettlement } from './escrowSettlement';
 
 export interface EscrowGenesisReceipt {
-  escrow_id: string;
-  create_payment_hash: string;
-  merkle_root: string;
-  amount_sats: number;
-  toll_fee_sats: number;
-  status: EscrowGenesisReceiptStatus;
-  ots_calendar_standard: string;
-  provenance: EscrowGenesisReceiptProvenance;
-  merkle_inclusion_verified: false;
+  create_response: EscrowGenesisReceiptCreateResponse;
+  settle_response: EscrowSettlement;
 }

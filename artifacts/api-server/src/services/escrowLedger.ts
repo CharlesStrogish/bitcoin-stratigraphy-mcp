@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { pool } from "@workspace/db";
+import { ESCROW_GENESIS } from "./escrowGenesis";
+export { ESCROW_GENESIS } from "./escrowGenesis";
 
-/** Released historical escrow proof, explicitly supplied by the operator.
- * This is not a replacement for the unavailable original execution leaf/path.
- */
-export const ESCROW_GENESIS = Object.freeze({
+/** Only this exact earlier seed is eligible for the automatic data upgrade. */
+export const LEGACY_ESCROW_GENESIS = Object.freeze({
   escrow_id: "ba4f25dd-7f16-420c-9264-a16f102fd5a6",
   create_payment_hash: "744001477bcd9a6654d3ad7bf4f85e5780cd2631cd46692a07d161893d0058bf",
   settle_preimage: "b32ac2f831f29f2a72efb76ced58fa9d6583128c33afd95fab8f8a78083641dd",
@@ -24,17 +25,17 @@ export type EscrowState = {
 };
 type LedgerPool = Pick<typeof pool, "connect">;
 
-export async function readGenesisReceipt() {
-  const { rows } = await pool.query(
-    "SELECT genesis FROM escrow_ledger WHERE id=$1", ["live-rest-escrow"],
+export async function readGenesisReceipt(database: Pick<typeof pool, "query"> = pool, id = "live-rest-escrow") {
+  const { rows } = await database.query(
+    "SELECT genesis FROM escrow_ledger WHERE id=$1", [id],
   );
   const genesis = rows[0]?.genesis;
-  if (!genesis || Object.entries(ESCROW_GENESIS).some(([key, value]) => genesis[key] !== value)) {
+  if (!isDeepStrictEqual(genesis, ESCROW_GENESIS)) {
     throw new Error("Escrow genesis ledger integrity failure");
   }
-  // The complete released preimage is retained privately in the durable ledger.
-  const { settle_preimage: _privateProof, ...receipt } = genesis;
-  return receipt;
+  // The operator explicitly requested the exact complete historical export,
+  // including its already-released settlement preimage.
+  return genesis as typeof ESCROW_GENESIS;
 }
 
 /** No memory/file fallback: failed database reads or commits fail the request.
@@ -59,10 +60,19 @@ export async function withEscrowLedger<T>(
     const { rows } = await client.query(
       "SELECT state, genesis FROM escrow_ledger WHERE id=$1 FOR UPDATE", [id],
     );
-    const genesis = rows[0]?.genesis;
-    if (!genesis || Object.entries(ESCROW_GENESIS).some(([key, value]) => genesis[key] !== value)
-        || createHash("sha256").update(Buffer.from(genesis.settle_preimage, "hex")).digest("hex")
-          !== genesis.create_payment_hash) {
+    let genesis = rows[0]?.genesis;
+    if (isDeepStrictEqual(genesis, LEGACY_ESCROW_GENESIS)) {
+      // Data-only upgrade under the same cross-replica lock. Never alter the
+      // escrow state, replace a different genesis, or append a synthetic leaf.
+      await client.query(
+        "UPDATE escrow_ledger SET genesis=$2::jsonb WHERE id=$1",
+        [id, JSON.stringify(ESCROW_GENESIS)],
+      );
+      genesis = ESCROW_GENESIS;
+    }
+    if (!isDeepStrictEqual(genesis, ESCROW_GENESIS)
+        || createHash("sha256").update(Buffer.from(genesis.settle_response.preimage, "hex")).digest("hex")
+          !== genesis.create_response.payment_hash) {
       throw new Error("Escrow genesis ledger integrity failure");
     }
     const out = await operation(rows[0].state);

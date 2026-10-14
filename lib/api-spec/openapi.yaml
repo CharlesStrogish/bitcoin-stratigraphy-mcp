@@ -673,11 +673,11 @@ paths:
       operationId: getEscrowGenesisReceipt
       tags: [Autonomous Escrow]
       summary: Read the permanently preserved historical mainnet genesis settlement
-      description: Operator-supplied historical settlement metadata. The stored released preimage hashes to the create payment hash; the original execution leaf and audit path were not supplied, so this endpoint does not claim independently verified Merkle inclusion or fresh NWC confirmation.
+      description: Returns the exact complete operator-supplied historical export, including create_response, settle_response, released settlement preimage, RFC 6962 receipt and recorded CoinOS confirmation. Preserves original timestamps and leaf metadata; does not perform a new wallet confirmation or Bitcoin anchoring operation.
       security: []
       responses:
         "200":
-          description: Preserved genesis receipt, without the private settlement preimage
+          description: Complete preserved genesis create and settlement export
           content:
             application/json:
               schema:
@@ -1980,17 +1980,21 @@ components:
         genesis_escrow_id: { type: string }
     EscrowGenesisReceipt:
       type: object
-      required: [escrow_id, create_payment_hash, merkle_root, amount_sats, toll_fee_sats, status, ots_calendar_standard, provenance, merkle_inclusion_verified]
+      additionalProperties: false
+      required: [create_response, settle_response]
       properties:
-        escrow_id: { type: string }
-        create_payment_hash: { type: string }
-        merkle_root: { type: string }
-        amount_sats: { type: integer }
-        toll_fee_sats: { type: integer }
-        status: { type: string, enum: [SETTLED] }
-        ots_calendar_standard: { type: string }
-        provenance: { type: string, enum: [operator_supplied_mainnet_genesis] }
-        merkle_inclusion_verified: { type: boolean, enum: [false] }
+        create_response:
+          type: object
+          additionalProperties: false
+          required: [escrow_id, payment_hash, status, amount_sats, toll_fee_sats]
+          properties:
+            escrow_id: { type: string }
+            payment_hash: { type: string }
+            status: { type: string, enum: [LOCKED] }
+            amount_sats: { type: integer }
+            toll_fee_sats: { type: integer }
+        settle_response:
+          $ref: "#/components/schemas/EscrowSettlement"
     EscrowTollQuote:
       type: object
       required: [toll_fee_sats, target_usd, btc_usd_price, source, quoted_at]

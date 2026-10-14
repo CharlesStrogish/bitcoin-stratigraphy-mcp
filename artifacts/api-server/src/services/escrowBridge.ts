@@ -100,7 +100,7 @@ export function runEscrowWorker(
     child.stdin.end(JSON.stringify({
       operation, body, strata_height: height, btc_usd_price: price,
       lightning_settlement: lightningSettlement,
-      state, genesis_id: ESCROW_GENESIS.escrow_id,
+      state, genesis_id: ESCROW_GENESIS.create_response.escrow_id,
       database_path: legacyPath,
     }));
   });

@@ -17,14 +17,18 @@ workspace is disposable; recovery and cross-replica serialization must use the
 database, and a successful response must wait for its durable commit. Storage
 failures must be explicit, not an empty ledger or a zero counter.
 
-The user-supplied genesis has a valid preimage-to-payment-hash commitment, but
-its execution leaf, audit path and original wallet confirmation were not supplied.
-Preserve it as operator-supplied historical settlement evidence, not a fabricated
-RFC 6962 proof or a newly independently confirmed Lightning payment.
+Preserve and publicly return the user's complete historical genesis export
+exactly, including create_response, settle_response and the nested
+article_12_receipt. The user explicitly requested returning the already-released
+settlement preimage as part of that export. Preserve original timestamps and
+recorded wallet confirmation; do not add qualification fields to the JSON.
 
-**Why:** A Merkle root alone cannot reconstruct or verify the original proof.
+**Why:** The user supplied the complete export after the initial metadata-only
+baseline and requested exact preservation before Republish.
 
 **How to apply:** Keep that receipt queryable without inventing missing fields.
-Do not append a synthetic genesis leaf to the original execution tree. Existing
+The export includes a single-leaf hash/root and an empty audit path, but not raw
+task/trace/result leaf bytes. Do not append a synthetic genesis leaf to the
+execution tree or imply a fresh wallet/Bitcoin confirmation. Existing
 legacy files can only be adopted while they still exist; an older deployment's
 lost container-local history cannot be recovered merely by republishing.

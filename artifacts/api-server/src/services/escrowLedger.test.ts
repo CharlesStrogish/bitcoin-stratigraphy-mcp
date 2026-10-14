@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { pool } from "@workspace/db";
-import { ESCROW_GENESIS, withEscrowLedger, type EscrowState } from "./escrowLedger";
+import {
+  ESCROW_GENESIS, LEGACY_ESCROW_GENESIS, readGenesisReceipt, withEscrowLedger, type EscrowState,
+} from "./escrowLedger";
+import { GetEscrowGenesisReceiptResponse } from "@workspace/api-zod";
 import { runEscrowWorker, type EscrowOperation, type EscrowLightningSettlement } from "./escrowBridge";
 
 // Real development PostgreSQL plus a fresh, secret-free Python process and a
@@ -17,7 +20,15 @@ test("durable escrow recovers genesis, contracts, proofs and exact totals after 
       `/nonexistent/escrow-fixture-${id}.sqlite3`,
     ), pool, id);
   try {
+    await pool.query("INSERT INTO escrow_ledger (id, genesis) VALUES ($1, $2::jsonb)",
+      [id, JSON.stringify(LEGACY_ESCROW_GENESIS)]);
     assert.equal((await execute("stats")).body.verified_toll_sats, 24);
+    const exported = await readGenesisReceipt(pool, id);
+    assert.deepEqual(exported, ESCROW_GENESIS);
+    assert.deepEqual(GetEscrowGenesisReceiptResponse.parse(exported), ESCROW_GENESIS);
+    assert.equal(exported.settle_response.article_12_receipt.settled_at_strata_block, 971341);
+    assert.equal(exported.settle_response.article_12_receipt.leaf_index, 0);
+    assert.equal(exported.settle_response.article_12_receipt.tree_size, 1);
     const created = await execute("create", {
       buyer_pubkey: "11".repeat(32), worker_pubkey: "22".repeat(32),
       task_hash: "33".repeat(32), amount_sats: 50,
@@ -44,10 +55,11 @@ test("durable escrow recovers genesis, contracts, proofs and exact totals after 
       const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
       const { rows } = await db.query("SELECT genesis, state FROM escrow_ledger WHERE id=$1", [process.argv[1]]);
       const row = rows[0];
-      if (row.genesis.escrow_id !== process.argv[2] || row.genesis.toll_fee_sats !== 24
+      if (row.genesis.create_response.escrow_id !== process.argv[2]
+          || row.genesis.settle_response.article_12_receipt.lightning_settlement.amount_sats !== 24
           || row.state.contracts[0].status !== "SETTLED" || row.state.leaves.length !== 1) process.exitCode = 1;
       await db.end();
-    `, id, ESCROW_GENESIS.escrow_id], {
+    `, id, ESCROW_GENESIS.create_response.escrow_id], {
       cwd: new URL("../../../lib/db/", import.meta.url),
       env: { PATH: process.env.PATH, DATABASE_URL: process.env.DATABASE_URL },
       encoding: "utf8", timeout: 15_000,
@@ -61,6 +73,14 @@ test("durable escrow recovers genesis, contracts, proofs and exact totals after 
     assert.ok(snapshots.every((out) => out.body.verified_toll_sats === 24 + payment.amount_sats));
     const { rows } = await pool.query("SELECT genesis FROM escrow_ledger WHERE id=$1", [id]);
     assert.deepEqual(rows[0].genesis, ESCROW_GENESIS);
+    // Upgrade an earlier metadata-only seed while a paid ledger is populated.
+    const beforeUpgrade = await pool.query("SELECT state FROM escrow_ledger WHERE id=$1", [id]);
+    await pool.query("UPDATE escrow_ledger SET genesis=$2::jsonb WHERE id=$1",
+      [id, JSON.stringify(LEGACY_ESCROW_GENESIS)]);
+    assert.equal((await execute("stats")).body.verified_toll_sats, 24 + payment.amount_sats);
+    const afterUpgrade = await pool.query("SELECT state FROM escrow_ledger WHERE id=$1", [id]);
+    assert.deepEqual(afterUpgrade.rows[0].state, beforeUpgrade.rows[0].state);
+    assert.deepEqual(await readGenesisReceipt(pool, id), ESCROW_GENESIS);
     // Transaction abort must not replace an already committed ledger.
     await assert.rejects(withEscrowLedger(async () => {
       throw new Error("simulated crash before commit");
@@ -84,7 +104,7 @@ test("durable escrow recovers genesis, contracts, proofs and exact totals after 
     assert.equal(unpaid.status, 200);
     assert.equal((await execute("stats")).body.verified_toll_sats, 24 + payment.amount_sats);
     // Corrupt genesis must fail closed instead of silently overwriting history.
-    await pool.query("UPDATE escrow_ledger SET genesis=jsonb_set(genesis, '{toll_fee_sats}', '0') WHERE id=$1", [id]);
+    await pool.query("UPDATE escrow_ledger SET genesis=jsonb_set(genesis, '{create_response,toll_fee_sats}', '0') WHERE id=$1", [id]);
     await assert.rejects(execute("stats"), /genesis ledger integrity/);
   } finally {
     await pool.query("DELETE FROM escrow_ledger WHERE id=$1", [id]);

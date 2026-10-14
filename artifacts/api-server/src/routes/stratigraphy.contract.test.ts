@@ -2,6 +2,8 @@
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
 import {
+  GetEnterpriseDueDiligenceBriefResponse,
+  GetMcpDiscoveryManifestResponse,
   QuoteMcpToolCostsResponse,
   type McpBatchCostQuote,
 } from "@workspace/api-zod";
@@ -27,6 +29,11 @@ import {
 } from "./mcp-server-card";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
+import { L402_SETTLEMENT_PATHS } from "../lib/agent-conversion";
+import { DUE_DILIGENCE_BRIEF_PATH } from "../lib/enterprise-due-diligence";
+import { CANONICAL_ORIGIN, RELEASE_VERSION } from "../lib/public-site";
+import { ESCROW_GENESIS } from "../services/escrowGenesis";
+import { registerEnterpriseRoutes } from "./enterprise";
 import { registerOpenApiRoute } from "./openapi";
 import { readDataset, registerStratigraphyRoutes } from "./stratigraphy";
 import { registerLlmExportRoutes } from "./llm-export";
@@ -525,6 +532,7 @@ registerMcpRoute(app, {
 });
 registerNostrStatusRoute(app);
 registerLlmExportRoutes(app);
+registerEnterpriseRoutes(app);
 app.use("/api", healthRouter);
 registerStratigraphyRoutes(
   app,
@@ -4828,6 +4836,89 @@ test("serves the public MCP discovery manifest with wildcard CORS and no payment
     mcpDiscoveryManifest.mcp.capabilities.tools.namespaces,
     Object.keys(MCP_TOOL_GROUPS),
   );
+  const manifest = GetMcpDiscoveryManifestResponse.parse(mcpDiscoveryManifest);
+  assert.equal(manifest.version, RELEASE_VERSION);
+  assert.equal(manifest.canonical_url, CANONICAL_ORIGIN);
+  assert.equal(manifest.mcp.version, "2024-11-25");
+  assert.deepEqual(
+    manifest.mcp.transports.map((transport) => transport.endpoint),
+    [`${CANONICAL_ORIGIN}/mcp`],
+  );
+  assert.equal(manifest.npm.package, "@bitcoin-stratigraphy/mcp-server");
+  assert.equal(manifest.npm.command, "npx -y @bitcoin-stratigraphy/mcp-server");
+  assert.deepEqual(
+    manifest.tools.map((tool) => tool.name),
+    mcpServerCard.capabilities.tools.map((tool) => tool.name),
+  );
+  assert.deepEqual(manifest.l402.settlement_capabilities, [
+    "sha256_preimage",
+    "nwc_lookup",
+  ]);
+  assert.equal(manifest.attestation.kind, 38102);
+  assert.equal(
+    manifest.l402.preflight.genesis_receipt.escrow_id,
+    "ba4f25dd-7f16-420c-9264-a16f102fd5a6",
+  );
+});
+
+test("serves the CISO due-diligence brief publicly without creating invoices", async () => {
+  const invoicesBefore = invoiceRequestCount;
+  const mcpInvoicesBefore = mcpInvoiceCount;
+  const response = await fetch(`${baseUrl}${DUE_DILIGENCE_BRIEF_PATH}`, {
+    headers: { Origin: "https://vendor-review.example" },
+  });
+  assert.equal(response.status, 200);
+  assert.match(
+    response.headers.get("content-type") ?? "",
+    /^application\/json\b/,
+  );
+  assert.equal(response.headers.get("www-authenticate"), null);
+  assert.match(
+    response.headers.get("content-disposition") ?? "",
+    /^inline; filename="bitcoin-stratigraphy-ciso-due-diligence-brief\.json"$/,
+  );
+  const brief = GetEnterpriseDueDiligenceBriefResponse.parse(
+    await response.json(),
+  );
+  assert.equal(brief.release_version, RELEASE_VERSION);
+  assert.equal(brief.canonical_url, CANONICAL_ORIGIN);
+  assert.equal(brief.brief_url, `${CANONICAL_ORIGIN}${DUE_DILIGENCE_BRIEF_PATH}`);
+  assert.equal(brief.licensing.commercial_exemption.price, "Starting at $250k/Annual");
+  assert.match(brief.licensing.commercial_exemption.delivery, /"AS IS"/);
+  assert.match(brief.licensing.commercial_exemption.service_levels, /Zero external SLAs/);
+  assert.match(brief.licensing.agpl_copyleft_scope.network_use, /Section 13/);
+  assert.deepEqual(brief.eu_ai_act.articles, ["Article 12", "Article 26(6)"]);
+  assert.deepEqual(
+    brief.mcp_catalog.settlement_paths,
+    L402_SETTLEMENT_PATHS.map((path) => path.id),
+  );
+  assert.equal(brief.mcp_catalog.tool_count, 15);
+  assert.deepEqual([...brief.mcp_catalog.free_tools].sort(), [
+    "proof.list",
+    "stratigraphy.list",
+  ]);
+  assert.deepEqual(brief.genesis_proof, {
+    escrow_id: ESCROW_GENESIS.create_response.escrow_id,
+    merkle_root: ESCROW_GENESIS.settle_response.merkle_root,
+    settled_at_strata_block:
+      ESCROW_GENESIS.settle_response.article_12_receipt.settled_at_strata_block,
+    toll_fee_sats: 24,
+    receipt_url: `${CANONICAL_ORIGIN}/api/v1/escrow/genesis-receipt`,
+    description: brief.genesis_proof.description,
+  });
+  assert.equal(brief.genesis_proof.escrow_id, "ba4f25dd-7f16-420c-9264-a16f102fd5a6");
+  assert.equal(brief.intake.email, "licensing@bitcoinstratigraphy.com");
+  assert.equal(brief.intake.questionnaire.length, 5);
+  const mailto = new URL(brief.intake.mailto);
+  assert.equal(mailto.protocol, "mailto:");
+  assert.equal(mailto.pathname, "licensing@bitcoinstratigraphy.com");
+  assert.equal(mailto.searchParams.get("subject"), brief.intake.subject);
+  const body = mailto.searchParams.get("body") ?? "";
+  for (const item of brief.intake.questionnaire) {
+    assert.ok(body.includes(`${item.number}. ${item.topic}: ${item.question}`), item.id);
+  }
+  assert.equal(invoiceRequestCount, invoicesBefore);
+  assert.equal(mcpInvoiceCount, mcpInvoicesBefore);
 });
 
 test("rejects malformed envelopes and unexpected arguments for all 15 tools without payment", async () => {
@@ -7307,10 +7398,10 @@ test("serves a public, verifiable JSONL export and a crawler schema manifest", a
     (openApiDocument as any).paths["/export/huggingface"].get.security.length,
     0,
   );
-  assert.equal(
+  assert.deepEqual(
     (openApiDocument as any).paths["/.well-known/llm-schema.json"].get
-      .servers[0].url,
-    "/",
+      .servers.map((server: { url: string }) => server.url),
+    ["https://bitcoinstratigraphy.com", "/"],
   );
 });
 

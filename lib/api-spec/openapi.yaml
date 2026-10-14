@@ -22,11 +22,15 @@ info:
     - Grounding receipts are off-chain, Schnorr-signed Bitcoin-tip attestations, not on-chain transactions, Groth16 proofs, or Bitcoin proof-of-work validity proofs. Groth16 verifies a defined statement bound to exact evidence; OTS verification requires an actual receipt and matching target digest, with Bitcoin attestation checked separately from calendar acceptance.
     - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
 servers:
+  - url: https://bitcoinstratigraphy.com/api
+    description: Canonical production API
   - url: /api
-    description: Base API path
+    description: Same-origin API path for self-hosted, preview and legacy hostnames
 tags:
   - name: Autonomous Escrow
     description: Operator-authorized L402 execution commitments; not funded custody or Bitcoin inclusion.
+  - name: Enterprise Licensing
+    description: Public CISO due-diligence and commercial exemption licensing summaries.
   - name: health
     description: Health operations
   - name: stratigraphy
@@ -652,6 +656,25 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /v1/enterprise/due-diligence-brief:
+    get:
+      operationId: getEnterpriseDueDiligenceBrief
+      tags: [Enterprise Licensing]
+      summary: Download the CISO due-diligence and licensing brief
+      description: Public, unmetered JSON summary of AGPLv3 copyleft scope, Commercial Enterprise Exemption terms, "AS IS" self-hosted air-gapped architecture, the zero external SLA policy, EU AI Act Article 12 and Article 26(6) log-retention alignment, the live genesis proof and the CISO intake questionnaire. Informational only; not legal advice, certification or a grant of rights.
+      security: []
+      responses:
+        "200":
+          description: CISO due-diligence brief
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 'inline; filename="bitcoin-stratigraphy-ciso-due-diligence-brief.json"'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseDueDiligenceBrief"
   /v1/escrow/stats:
     get:
       operationId: getEscrowLedgerStats
@@ -727,7 +750,11 @@ paths:
             WWW-Authenticate:
               schema:
                 type: string
-              description: 'L402 token="...", invoice="..."'
+              description: 'L402 token="<macaroon>", invoice="<BOLT11>"'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/L402PaymentRequired"
         "403":
           description: Invalid optional admin override
         "503":
@@ -761,6 +788,11 @@ paths:
             WWW-Authenticate:
               schema:
                 type: string
+              description: 'L402 token="<macaroon>", invoice="<BOLT11>"'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/L402PaymentRequired"
         "403":
           description: Creator-held settlement capability or valid admin override required
         "409":
@@ -802,6 +834,11 @@ paths:
             WWW-Authenticate:
               schema:
                 type: string
+              description: 'L402 token="<macaroon>", invoice="<BOLT11>"'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/L402PaymentRequired"
         "403":
           description: Trusted operator authorization required
         "404":
@@ -862,11 +899,14 @@ paths:
           $ref: "#/components/responses/PublicMetadata"
   /openapi.json:
     servers:
+      - url: https://bitcoinstratigraphy.com
+        description: Canonical production origin
       - url: /
+        description: Same origin
     get:
       operationId: getOpenApiDocument
       tags: [discovery]
-      summary: Public OpenAPI document including all 14 MCP schemas and REST operations
+      summary: Public OpenAPI document including all 15 MCP schemas and REST operations
       security: []
       responses:
         "200":
@@ -920,7 +960,10 @@ paths:
           $ref: "#/components/responses/PublicMetadata"
   /.well-known/nostr.json:
     servers:
+      - url: https://bitcoinstratigraphy.com
+        description: Canonical production origin
       - url: /
+        description: Same origin
     get:
       operationId: getNip05Identity
       tags: [discovery]
@@ -937,7 +980,10 @@ paths:
           description: Identity or requested name is not configured
   /.well-known/llms.txt:
     servers:
+      - url: https://bitcoinstratigraphy.com
+        description: Canonical production origin
       - url: /
+        description: Same origin
     get:
       operationId: getWellKnownLlms
       tags: [discovery]
@@ -952,7 +998,10 @@ paths:
                 type: string
   /.well-known/mcp/server-card.json:
     servers:
+      - url: https://bitcoinstratigraphy.com
+        description: Canonical production origin
       - url: /
+        description: Same origin
     get:
       operationId: getSmitheryServerCard
       tags: [discovery]
@@ -979,7 +1028,10 @@ paths:
           $ref: "#/components/responses/PublicPreflight"
   /mcp:
     servers:
+      - url: https://bitcoinstratigraphy.com
+        description: Canonical production origin
       - url: /
+        description: Same origin
     get:
       operationId: getMcpProbe
       tags: [discovery]
@@ -1011,9 +1063,9 @@ paths:
     post:
       operationId: executeMcpRequest
       tags: [discovery]
-      summary: JSON-RPC discovery and execution of the 14 canonical MCP tools
+      summary: JSON-RPC discovery and execution of the 15 canonical MCP tools
       description: >-
-        Call initialize, ping, tools/list or tools/call. All fourteen input and output
+        Call initialize, ping, tools/list or tools/call. All fifteen input and output
         schemas, namespaces, side effects and prices are described in x-mcp-tools
         and x-mcp-tool-groups. tools/list is the live authoritative catalog.
         Tool calls use params.name and params.arguments. Paid calls require a
@@ -1097,7 +1149,10 @@ paths:
         Public, unmetered JSON discovery document with wildcard CORS. Its declared
         version values are manifest metadata and do not configure MCP negotiation.
       servers:
+        - url: https://bitcoinstratigraphy.com
+          description: Canonical production origin
         - url: /
+          description: Same origin
       security: []
       responses:
         "200":
@@ -1179,7 +1234,10 @@ paths:
       tags: [stratigraphy]
       summary: Public machine-readable dataset export schema and verification rules
       servers:
+        - url: https://bitcoinstratigraphy.com
+          description: Canonical production origin
         - url: /
+          description: Same origin
       security: []
       responses:
         "200":
@@ -1759,7 +1817,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/L402Challenge"
+                $ref: "#/components/schemas/L402PaymentRequired"
         "429":
           description: Grounding request rate limit exceeded
         "502":
@@ -2201,8 +2259,7 @@ components:
       additionalProperties: true
     SmitheryServerCard:
       type: object
-      additionalProperties: false
-      required: [name, displayName, description, version, url]
+      required: [name, displayName, description, version, serverInfo, url, toolCount, capabilities]
       properties:
         name:
           type: string
@@ -2212,13 +2269,29 @@ components:
           const: Bitcoin Stratigraphy Data Engine
         description:
           type: string
-          const: Provides thermodynamic data, proof verification, and L402 payments.
         version:
           type: string
-          const: "1.0.0"
+          description: Registry card release metadata; not the negotiated MCP protocol version.
+        serverInfo:
+          type: object
+          required: [name, version]
+          properties:
+            name:
+              type: string
+              const: bitcoin-stratigraphy-mcp
+            version:
+              type: string
         url:
           type: string
-          const: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+          format: uri
+          description: Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp
+        toolCount:
+          type: integer
+          minimum: 15
+          maximum: 15
+        capabilities:
+          type: object
+          additionalProperties: true
     McpProbe:
       type: object
       required: [status, service]
@@ -2405,26 +2478,42 @@ components:
                 credential_scope: { type: string, const: exact MCP tool path }
     McpDiscoveryManifest:
       type: object
-      required: [$schema, name, version, description, author, homepage, mcp, pricing, verification]
+      required: [$schema, name, version, description, canonical_url, author, contact, homepage, npm, mcp, tools, l402, attestation, licensing, pricing, verification]
       properties:
         $schema:
           type: string
           format: uri
         name:
           type: string
+        title:
+          type: string
         version:
           type: string
+          description: Release version of the published engine and npm package
         description:
           type: string
+        canonical_url:
+          type: string
+          format: uri
+          description: Authoritative public origin, https://bitcoinstratigraphy.com
         author:
           type: object
           required: [name, url]
           properties:
             name:
               type: string
+            role:
+              type: string
             url:
               type: string
               format: uri
+        contact:
+          type: object
+          required: [licensing]
+          properties:
+            licensing:
+              type: string
+              format: email
         homepage:
           type: string
           format: uri
@@ -2446,6 +2535,128 @@ components:
               type: string
               format: uri
             pricing:
+              type: string
+              format: uri
+            llms_txt:
+              type: string
+              format: uri
+            llms_full_txt:
+              type: string
+              format: uri
+            openapi:
+              type: string
+              format: uri
+            server_card:
+              type: string
+              format: uri
+            genesis_receipt:
+              type: string
+              format: uri
+            due_diligence_brief:
+              type: string
+              format: uri
+        npm:
+          type: object
+          required: [package, version, command]
+          properties:
+            package:
+              type: string
+              enum: ["@bitcoin-stratigraphy/mcp-server"]
+            version:
+              type: string
+            command:
+              type: string
+              description: npx command that starts the self-hosted Streamable HTTP server
+            registry_url:
+              type: string
+              format: uri
+            runtime:
+              type: string
+        tools:
+          type: array
+          minItems: 15
+          maxItems: 15
+          description: Descriptors mirroring the live tools/list catalog; tools/list remains authoritative.
+          items:
+            type: object
+            required: [name, namespace, title, description, price_sats, payment_required, annotations]
+            properties:
+              name:
+                type: string
+              namespace:
+                type: string
+                enum: [stratigraphy, proof, mesh, payment]
+              title:
+                type: string
+              description:
+                type: string
+              price_sats:
+                type: integer
+                minimum: 0
+              payment_required:
+                type: boolean
+              batch:
+                type: object
+                properties:
+                  max_calls:
+                    type: integer
+                  header:
+                    type: string
+              annotations:
+                type: object
+                additionalProperties: true
+        l402:
+          type: object
+          required: [settlement_capabilities, settlement_paths, challenge, preflight]
+          properties:
+            settlement_capabilities:
+              type: array
+              items:
+                type: string
+                enum: [sha256_preimage, nwc_lookup]
+            settlement_paths:
+              type: array
+              items:
+                $ref: "#/components/schemas/L402SettlementPath"
+            challenge:
+              type: object
+              additionalProperties: true
+            pending_confirmation_status:
+              type: integer
+            escrow_settlement_toll:
+              type: object
+              additionalProperties: true
+            preflight:
+              $ref: "#/components/schemas/L402Preflight"
+        attestation:
+          type: object
+          required: [protocol, kind, directive]
+          properties:
+            protocol:
+              type: string
+            kind:
+              type: integer
+              enum: [38102]
+            type:
+              type: string
+            directive:
+              type: string
+            scope:
+              type: string
+        licensing:
+          type: object
+          required: [spdx, commercial_exemption, contact]
+          properties:
+            spdx:
+              type: string
+            public_license:
+              type: string
+            commercial_exemption:
+              type: string
+            contact:
+              type: string
+              format: email
+            due_diligence_brief:
               type: string
               format: uri
         mcp:
@@ -3758,6 +3969,17 @@ components:
           maxItems: 2
           items:
             $ref: "#/components/schemas/L402SubscriptionPass"
+        agent_instruction:
+          type: string
+          description: Retry guidance naming both settlement paths and the free preflight checks.
+        settlement_paths:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/L402SettlementPath"
+        preflight:
+          $ref: "#/components/schemas/L402Preflight"
       required:
         - invoice
         - payment_hash
@@ -3765,6 +3987,297 @@ components:
         - supported_assets
         - available_assets
         - passes
+    L402PaymentRequired:
+      type: object
+      description: Fixed-fee L402 challenge body. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+      properties:
+        error:
+          type: string
+        macaroon:
+          type: string
+          description: Single-use path-scoped capability bound to the invoice.
+        invoice:
+          type: string
+          description: BOLT11 Lightning invoice
+        payment_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        amount_sats:
+          type: integer
+          minimum: 1
+        max_requests:
+          type: integer
+          minimum: 1
+        agent_instruction:
+          type: string
+          description: Retry guidance naming both settlement paths and the free preflight checks.
+        settlement_paths:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/L402SettlementPath"
+        preflight:
+          $ref: "#/components/schemas/L402Preflight"
+        staged_preview:
+          type: object
+          additionalProperties: true
+          description: ENDPOINT_READY_AWAITING_L402_SETTLEMENT preview with the expected output schema; computation has not run.
+      required:
+        - macaroon
+        - invoice
+        - payment_hash
+        - amount_sats
+        - agent_instruction
+        - settlement_paths
+        - preflight
+    EnterpriseDueDiligenceBrief:
+      type: object
+      description: Executive CISO due-diligence summary; only an executed commercial agreement grants a license.
+      properties:
+        document:
+          type: string
+        schema_version:
+          type: string
+        product:
+          type: string
+        release_version:
+          type: string
+        canonical_url:
+          type: string
+          format: uri
+        brief_url:
+          type: string
+          format: uri
+        publisher:
+          type: object
+          properties:
+            name:
+              type: string
+            role:
+              type: string
+            licensing_contact:
+              type: string
+              format: email
+          required: [name, role, licensing_contact]
+        executive_summary:
+          type: string
+        licensing:
+          type: object
+          properties:
+            spdx:
+              type: string
+            agpl_copyleft_scope:
+              type: object
+              properties:
+                license:
+                  type: string
+                summary:
+                  type: string
+                network_use:
+                  type: string
+                boundaries:
+                  type: string
+              required: [license, summary, network_use, boundaries]
+            commercial_exemption:
+              type: object
+              properties:
+                name:
+                  type: string
+                price:
+                  type: string
+                grant:
+                  type: string
+                delivery:
+                  type: string
+                service_levels:
+                  type: string
+                technical_stewardship:
+                  type: string
+                settlement:
+                  type: string
+                contact:
+                  type: string
+                  format: email
+              required: [name, price, grant, delivery, service_levels, technical_stewardship, settlement, contact]
+          required: [spdx, agpl_copyleft_scope, commercial_exemption]
+        architecture:
+          type: object
+          properties:
+            deployment_model:
+              type: string
+            air_gap_boundaries:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                properties:
+                  component:
+                    type: string
+                  network_requirement:
+                    type: string
+                required: [component, network_requirement]
+          required: [deployment_model, air_gap_boundaries]
+        external_sla_policy:
+          type: string
+        eu_ai_act:
+          type: object
+          properties:
+            articles:
+              type: array
+              items:
+                type: string
+            article_12:
+              type: string
+            article_26_6:
+              type: string
+            retention_alignment:
+              type: string
+            deployer_responsibility:
+              type: string
+          required: [articles, article_12, article_26_6, retention_alignment, deployer_responsibility]
+        genesis_proof:
+          type: object
+          properties:
+            escrow_id:
+              type: string
+              format: uuid
+            merkle_root:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+            settled_at_strata_block:
+              type: integer
+            toll_fee_sats:
+              type: integer
+            receipt_url:
+              type: string
+              format: uri
+            description:
+              type: string
+          required: [escrow_id, merkle_root, settled_at_strata_block, toll_fee_sats, receipt_url, description]
+        mcp_catalog:
+          type: object
+          properties:
+            tool_count:
+              type: integer
+              minimum: 15
+              maximum: 15
+            tools:
+              type: array
+              minItems: 15
+              maxItems: 15
+              items:
+                type: string
+            free_tools:
+              type: array
+              items:
+                type: string
+            prices_sats:
+              type: object
+              additionalProperties:
+                type: integer
+                minimum: 0
+            npm_package:
+              type: string
+            command:
+              type: string
+            settlement_paths:
+              type: array
+              items:
+                type: string
+                enum: [sha256_preimage, nwc_lookup]
+          required: [tool_count, tools, free_tools, prices_sats, npm_package, command, settlement_paths]
+        intake:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            subject:
+              type: string
+            mailto:
+              type: string
+              description: Pre-populated mailto URL containing the five-question intake template
+            questionnaire:
+              type: array
+              minItems: 5
+              maxItems: 5
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  number:
+                    type: integer
+                  topic:
+                    type: string
+                  question:
+                    type: string
+                required: [id, number, topic, question]
+          required: [email, subject, mailto, questionnaire]
+        disclaimer:
+          type: string
+      required: [document, schema_version, product, release_version, canonical_url, brief_url, publisher, executive_summary, licensing, architecture, external_sla_policy, eu_ai_act, genesis_proof, mcp_catalog, intake, disclaimer]
+    L402SettlementPath:
+      type: object
+      description: One accepted proof for retrying the identical request after paying its invoice.
+      properties:
+        id:
+          type: string
+          enum: [sha256_preimage, nwc_lookup]
+        name:
+          type: string
+        authorization:
+          type: string
+          description: Authorization header template
+        description:
+          type: string
+      required: [id, name, authorization, description]
+    L402Preflight:
+      type: object
+      description: Free, unauthenticated checks a cautious agent can run before paying.
+      properties:
+        description:
+          type: string
+        genesis_receipt:
+          type: object
+          properties:
+            method:
+              type: string
+              enum: [GET]
+            path:
+              type: string
+              enum: [/api/v1/escrow/genesis-receipt]
+            canonical_url:
+              type: string
+              format: uri
+            escrow_id:
+              type: string
+              format: uuid
+            merkle_root:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+            settled_at_strata_block:
+              type: integer
+            toll_fee_sats:
+              type: integer
+          required: [method, path, canonical_url, escrow_id, merkle_root, settled_at_strata_block, toll_fee_sats]
+        discovery:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              method:
+                type: string
+              path:
+                type: string
+              canonical_url:
+                type: string
+                format: uri
+            required: [name, method, path, canonical_url]
+      required: [description, genesis_receipt, discovery]
     L402SubscriptionPass:
       type: object
       properties:

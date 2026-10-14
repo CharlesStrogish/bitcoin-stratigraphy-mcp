@@ -1,7 +1,7 @@
 # LangChain and CrewAI with Bitcoin Stratigraphy MCP
 
 This guide connects a Python project to the public Bitcoin Stratigraphy MCP
-server at [`https://bitcoin-stratigraphy-dashboard.replit.app/mcp`](https://bitcoin-stratigraphy-dashboard.replit.app/mcp)
+server at [`https://bitcoinstratigraphy.com/mcp`](https://bitcoinstratigraphy.com/mcp)
 using the official Python MCP SDK's `ClientSession` and Streamable HTTP
 transport. The wrappers below discover tools at runtime, use each tool's
 published `inputSchema` for validation, and preserve the canonical MCP tool
@@ -24,7 +24,7 @@ asset selection nor its paid SSE feed is a capability of the MCP transport.
 The following catalog is transcribed from [`CONNECT.md`](../CONNECT.md). Its
 prices are advertised sats from the server documentation, not a price
 guarantee; the live `payment.get_info` response is authoritative. The
-published MCP catalog currently contains 14 canonical tools.
+published MCP catalog currently contains 15 canonical tools.
 
 | Canonical MCP tool | Advertised sats | Use |
 | --- | ---: | --- |
@@ -33,19 +33,20 @@ published MCP catalog currently contains 14 canonical tools.
 | `stratigraphy.get_diff` | 250 | Differences between indexed historical strata; not a block-hash lookup. |
 | `stratigraphy.get_range` | 250 | Compressed records across a bounded sequence. |
 | `stratigraphy.list` | 0 | Discover dataset bounds and metrics. |
-| `proof.attenuate` | 0 | Narrow an existing parent macaroon using supported caveats; does not pay an invoice. |
+| `proof.attenuate` | 250 | Narrow an existing parent macaroon using supported caveats; requires its own L402 authorization. |
 | `proof.verify` | 250 | Verify supplied Groth16 telemetry or drift proofs, or supplied OTS receipts; validates evidence, not source-data truth. |
 | `proof.get_by_hash` | 250 | Look up a retained proof or signed receipt. |
-| `proof.list` | 10 | List indexed proof attestations. |
+| `proof.list` | 0 | List indexed proof attestations. |
 | `proof.submit` | 250 | Register a submitted proof and attempt an attestation; changes state. |
+| `proof.notarize` | 250 | Create a detached OpenTimestamps receipt for a SHA-256 digest; calendar acceptance is not Bitcoin confirmation. |
 | `proof.ground` | 250 | Issue an off-chain, Schnorr-signed Bitcoin-tip context/dataset receipt, not an on-chain proof. |
-| `payment.get_info` | 0 | Query MCP prices or verify/settle payment with required authentication; MCP payment is Lightning L402 with conditional Base USDC x402 when configured, not an invoice issuer. |
-| `mesh.get_status` | 0 | Read configured pinned-peer and quorum health; quorum is not source truth. |
+| `payment.get_info` | 250 | Query MCP prices or verify/settle payment with required authentication; MCP payment is Lightning L402 with conditional Base USDC x402 when configured, not an invoice issuer. |
+| `mesh.get_status` | 250 | Read configured pinned-peer and quorum health; quorum is not source truth. |
 | `mesh.broadcast` | 250 | Sign and distribute a stored snapshot to configured pinned peers; quorum is a cross-validation signal, and the call has side effects. |
 
 Do not hard-code any input signatures from this table. The MCP server's live
 `tools/list` response is the source of truth for names, descriptions, and
-schemas. The wrappers below derive **all 14** schemas from that response,
+schemas. The wrappers below derive **all 15** schemas from that response,
 including tools whose use is paid or side-effecting. For an agent, only expose
 the tools it is authorized to use.
 
@@ -103,7 +104,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 
-ENDPOINT = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+ENDPOINT = "https://bitcoinstratigraphy.com/mcp"
 REQUEST_TIMEOUT_SECONDS = 30
 
 

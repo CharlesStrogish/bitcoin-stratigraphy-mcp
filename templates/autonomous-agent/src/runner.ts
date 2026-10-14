@@ -86,8 +86,7 @@ export async function runWorker(intervalMs: number): Promise<void> {
     throw new Error("Polling interval must be at least 900000 ms (15 minutes)");
   }
   const origin = serverOrigin(
-    process.env.STRATIGRAPHY_SERVER_URL ??
-      "https://bitcoin-stratigraphy-dashboard.replit.app",
+    process.env.STRATIGRAPHY_SERVER_URL ?? "https://bitcoinstratigraphy.com",
   );
 
   // Production requires persistent checkpoints; establish storage before any payment.

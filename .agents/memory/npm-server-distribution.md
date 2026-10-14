@@ -26,6 +26,17 @@ relays. A fixture key must not advertise a pretend production service.
 environment settings and deny egress before application import; never inherit
 workspace wallet/signing credentials into that smoke process.
 
+Boot tests must satisfy the PostgreSQL prerequisite with a disposable,
+loopback-only cluster carrying the packaged schema.
+
+**Why:** Server startup recovers the durable escrow ledger and exits when the
+database is unreachable, so an offline smoke with a dead fixture URL can never
+become healthy. Relaxing recovery would hide real storage failures.
+
+**How to apply:** Allow only the disposable database port through the egress
+block, never a workspace or production `DATABASE_URL`. Cluster creation alone
+takes about 10 seconds here, so keep the release-check timeout generous.
+
 Contractual service guarantees are not an included enterprise feature; do not advertise them
 as such in the npm package README.
 

@@ -34,7 +34,7 @@
 - [CoinOS payment verification](nwc-self-payment-proofs.md) — signed capabilities allow exact merchant-only confirmation; legacy UUID proofs still require payer verification.
 - [Audit readiness](audit-readiness.md) — HTTP readiness precedes relay announcements; challenge issuance is not evidence of live paid settlement.
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
-- [Published domain changes](published-domain-changes.md) — a target change can leave the former .replit.app address at “isn't live yet”; verify the current primary URL before advertising endpoints.
+- [Published domain changes](published-domain-changes.md) — canonical host is bitcoinstratigraphy.com; keep serving legacy .replit.app unadvertised; verify the primary URL first.
 - [Git subdirectory SDK installs](git-subdirectory-sdk-installs.md) — pnpm Git preparation needs an explicit workspace boundary and consumer build-script trust.
 - [Vendored archive integrity](vendored-archive-integrity.md) — a repacked local SDK archive can make unrelated frozen installs fail after lockfile regeneration.
 - [Nested Replit config validation](nested-replit-config-validation.md) — the validator replaces the workspace root .replit even when its temp file lives in a subdirectory.
@@ -64,8 +64,9 @@
 - [Compliance marketing copy](compliance-marketing-copy.md) — user requires verbatim enterprise compliance-page copy, without added UI qualifications or warnings.
 - [Enterprise swarm traffic](enterprise-swarm-traffic.md) — paid MCP and notarization serve legitimate high-frequency swarm batches; avoid blanket IP ceilings.
 - [Production SEO safeguards](production-seo-safeguards.md) — align stale tests to intentional SEO; preserve crawler visibility, canonical metadata and attribution.
-- [SQLite WAL startup](sqlite-wal-startup.md) — a busy timeout does not guarantee concurrent cold journal-mode transitions; audit startup separately from steady-state writes.
+- [SQLite WAL startup](sqlite-wal-startup.md) — busy_timeout skips racing cold WAL conversions; keep the bounded fail-closed retry and loop the concurrency test.
 - [Read-only Git audits](read-only-git-audits.md) — compare committed blobs without index refreshes; do not elevate Git permissions for an integrity check.
 - [Enterprise air-gap scope](enterprise-air-gap.md) — commercial deployments need local telemetry; distinguish pipeline isolation from other services' network requirements.
-- [Npm server distribution](npm-server-distribution.md) — distribute the self-hosted HTTP engine, not a connector; isolate npm releases from the private workspace.
+- [Npm server distribution](npm-server-distribution.md) — ship the self-hosted engine; boot-test it offline against a disposable loopback PostgreSQL only.
 - [Escrow durable recovery](escrow-durable-recovery.md) — preserve the 24-sat historical baseline once; commit durable state before success and never fabricate its missing Merkle proof.
+- [Formatting baseline](format-baseline.md) — format check fails on inherited files; format only what you touch and compare HEAD blobs first.

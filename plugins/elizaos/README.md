@@ -53,7 +53,7 @@ block height (if known), and metrics. It never makes a paid request on a prompt
 and never presents a historical record as the current chain tip.
 
 The MCP endpoint defaults to
-`https://bitcoin-stratigraphy-dashboard.replit.app/mcp`. Set
+`https://bitcoinstratigraphy.com/mcp`. Set
 `BITCOIN_STRATIGRAPHY_MCP_URL` in the agent runtime settings to use a different
 full `/mcp` URL.
 

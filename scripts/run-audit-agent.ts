@@ -65,7 +65,7 @@ const { generateZkProof, verifyZkProofForSnapshot, shutdownZkVerifier } =
     shutdownZkVerifier(): Promise<void>;
   };
 
-const ENDPOINT = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
+const ENDPOINT = "https://bitcoinstratigraphy.com/mcp";
 const SATS_PER_TOOL = 250;
 type Rpc = {
   jsonrpc: "2.0";

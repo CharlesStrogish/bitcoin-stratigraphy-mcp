@@ -151,7 +151,7 @@ async def check_server_card(client: httpx.AsyncClient) -> str:
             "displayName": "Bitcoin Stratigraphy Data Engine",
             "description": "Provides thermodynamic data, proof verification, and L402 payments.",
             "version": "1.0.0",
-            "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+            "url": "https://bitcoinstratigraphy.com/mcp",
         },
         "Static server card differs from the canonical five-field contract",
     )
@@ -392,7 +392,7 @@ async def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--base-url",
         required=True,
-        help="Server origin, e.g. https://bitcoin-stratigraphy-dashboard.replit.app",
+        help="Server origin, e.g. https://bitcoinstratigraphy.com",
     )
     parser.add_argument(
         "--timeout",

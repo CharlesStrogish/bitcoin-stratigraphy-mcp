@@ -14,7 +14,7 @@ import type { SettlementRouter } from "../services/settlement";
 import type { RevenueLedger, RevenueRequestKind } from "../services/ledger";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { paymentReference, recordRevenueWithRetry } from "../services/ledger";
-import { awaitingPaymentPreview, expectedRestOutputSchema } from "../lib/agent-conversion";
+import { awaitingPaymentPreview, expectedRestOutputSchema, l402ChallengeGuidance } from "../lib/agent-conversion";
 
 export type L402Authorization = {
   macaroon: string;
@@ -219,6 +219,7 @@ export function createL402Middleware(
         payment_hash: invoice.paymentHash,
         amount_sats: amountSats,
         max_requests: batchSize,
+        ...l402ChallengeGuidance(),
         staged_preview: awaitingPaymentPreview(amountSats,
           typeof options.expectedOutputSchema === "function" ? options.expectedOutputSchema(req)
             : options.expectedOutputSchema ?? expectedRestOutputSchema(req)),

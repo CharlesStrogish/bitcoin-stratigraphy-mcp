@@ -22,6 +22,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AgentReputationMetadata } from './agentReputationMetadata';
+import type { L402Preflight } from './l402Preflight';
+import type { L402SettlementPath } from './l402SettlementPath';
 import type { L402SubscriptionPass } from './l402SubscriptionPass';
 import type { SettlementAsset } from './settlementAsset';
 
@@ -42,4 +44,12 @@ export interface L402Challenge {
      * @maxItems 2
      */
   passes: L402SubscriptionPass[];
+  /** Retry guidance naming both settlement paths and the free preflight checks. */
+  agent_instruction?: string;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  settlement_paths?: L402SettlementPath[];
+  preflight?: L402Preflight;
 }

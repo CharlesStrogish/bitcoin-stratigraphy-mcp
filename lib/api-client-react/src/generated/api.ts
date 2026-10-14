@@ -39,6 +39,7 @@ import type {
   AuditReport,
   AuditSubmission,
   DatasetHealthStatus,
+  EnterpriseDueDiligenceBrief,
   EpistemicGroundingRequest,
   EscrowContract,
   EscrowExecutionInput,
@@ -58,6 +59,7 @@ import type {
   HealthStatus,
   InvalidRangeError,
   L402Challenge,
+  L402PaymentRequired,
   LlmSchemaManifest,
   MacaroonAttenuationRequest,
   MacaroonAttenuationResponse,
@@ -126,6 +128,84 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetEnterpriseDueDiligenceBriefUrl = () => {
+
+
+
+
+  return `/api/v1/enterprise/due-diligence-brief`
+}
+
+/**
+ * Public, unmetered JSON summary of AGPLv3 copyleft scope, Commercial Enterprise Exemption terms, "AS IS" self-hosted air-gapped architecture, the zero external SLA policy, EU AI Act Article 12 and Article 26(6) log-retention alignment, the live genesis proof and the CISO intake questionnaire. Informational only; not legal advice, certification or a grant of rights.
+ * @summary Download the CISO due-diligence and licensing brief
+ */
+export const getEnterpriseDueDiligenceBrief = async ( options?: Parameters<typeof customFetch>[1]): Promise<EnterpriseDueDiligenceBrief> => {
+
+  return customFetch<EnterpriseDueDiligenceBrief>(getGetEnterpriseDueDiligenceBriefUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEnterpriseDueDiligenceBriefQueryKey = () => {
+    return [
+    `/api/v1/enterprise/due-diligence-brief`
+    ] as const;
+    }
+
+
+export const getGetEnterpriseDueDiligenceBriefQueryOptions = <TData = Awaited<ReturnType<typeof getEnterpriseDueDiligenceBrief>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEnterpriseDueDiligenceBrief>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEnterpriseDueDiligenceBriefQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEnterpriseDueDiligenceBrief>>> = ({ signal }) => getEnterpriseDueDiligenceBrief({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEnterpriseDueDiligenceBrief>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEnterpriseDueDiligenceBriefQueryResult = NonNullable<Awaited<ReturnType<typeof getEnterpriseDueDiligenceBrief>>>
+export type GetEnterpriseDueDiligenceBriefQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Download the CISO due-diligence and licensing brief
+ */
+
+export function useGetEnterpriseDueDiligenceBrief<TData = Awaited<ReturnType<typeof getEnterpriseDueDiligenceBrief>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEnterpriseDueDiligenceBrief>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEnterpriseDueDiligenceBriefQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetEscrowLedgerStatsUrl = () => {
 
@@ -388,7 +468,7 @@ export const createEscrow = async (escrowInput: EscrowInput, options?: Parameter
 
 
 
-export const getCreateEscrowMutationOptions = <TError = ErrorType<void>,
+export const getCreateEscrowMutationOptions = <TError = ErrorType<void | L402PaymentRequired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEscrow>>, TError,{data: BodyType<EscrowInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createEscrow>>, TError,{data: BodyType<EscrowInput>}, TContext> => {
 
@@ -417,12 +497,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateEscrowMutationResult = NonNullable<Awaited<ReturnType<typeof createEscrow>>>
     export type CreateEscrowMutationBody = BodyType<EscrowInput>
-    export type CreateEscrowMutationError = ErrorType<void>
+    export type CreateEscrowMutationError = ErrorType<void | L402PaymentRequired>
 
     /**
  * @summary Create a local execution escrow commitment
  */
-export const useCreateEscrow = <TError = ErrorType<void>,
+export const useCreateEscrow = <TError = ErrorType<void | L402PaymentRequired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEscrow>>, TError,{data: BodyType<EscrowInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createEscrow>>,
@@ -460,7 +540,7 @@ export const settleEscrow = async (escrowExecutionInput: EscrowExecutionInput, o
 
 
 
-export const getSettleEscrowMutationOptions = <TError = ErrorType<void>,
+export const getSettleEscrowMutationOptions = <TError = ErrorType<void | L402PaymentRequired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof settleEscrow>>, TError,{data: BodyType<EscrowExecutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof settleEscrow>>, TError,{data: BodyType<EscrowExecutionInput>}, TContext> => {
 
@@ -489,12 +569,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SettleEscrowMutationResult = NonNullable<Awaited<ReturnType<typeof settleEscrow>>>
     export type SettleEscrowMutationBody = BodyType<EscrowExecutionInput>
-    export type SettleEscrowMutationError = ErrorType<void>
+    export type SettleEscrowMutationError = ErrorType<void | L402PaymentRequired>
 
     /**
  * @summary Commit authorized execution evidence and release the escrow preimage
  */
-export const useSettleEscrow = <TError = ErrorType<void>,
+export const useSettleEscrow = <TError = ErrorType<void | L402PaymentRequired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof settleEscrow>>, TError,{data: BodyType<EscrowExecutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof settleEscrow>>,
@@ -539,7 +619,7 @@ export const getGetEscrowReceiptQueryKey = (escrowId: string,) => {
     }
 
 
-export const getGetEscrowReceiptQueryOptions = <TData = Awaited<ReturnType<typeof getEscrowReceipt>>, TError = ErrorType<void>>(escrowId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetEscrowReceiptQueryOptions = <TData = Awaited<ReturnType<typeof getEscrowReceipt>>, TError = ErrorType<void | L402PaymentRequired>>(escrowId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -558,14 +638,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetEscrowReceiptQueryResult = NonNullable<Awaited<ReturnType<typeof getEscrowReceipt>>>
-export type GetEscrowReceiptQueryError = ErrorType<void>
+export type GetEscrowReceiptQueryError = ErrorType<void | L402PaymentRequired>
 
 
 /**
  * @summary Get a standalone JSON-LD execution commitment receipt
  */
 
-export function useGetEscrowReceipt<TData = Awaited<ReturnType<typeof getEscrowReceipt>>, TError = ErrorType<void>>(
+export function useGetEscrowReceipt<TData = Awaited<ReturnType<typeof getEscrowReceipt>>, TError = ErrorType<void | L402PaymentRequired>>(
  escrowId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEscrowReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -745,7 +825,7 @@ export const getGetOpenApiDocumentUrl = () => {
 }
 
 /**
- * @summary Public OpenAPI document including all 14 MCP schemas and REST operations
+ * @summary Public OpenAPI document including all 15 MCP schemas and REST operations
  */
 export const getOpenApiDocument = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
 
@@ -792,7 +872,7 @@ export type GetOpenApiDocumentQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Public OpenAPI document including all 14 MCP schemas and REST operations
+ * @summary Public OpenAPI document including all 15 MCP schemas and REST operations
  */
 
 export function useGetOpenApiDocument<TData = Awaited<ReturnType<typeof getOpenApiDocument>>, TError = ErrorType<unknown>>(
@@ -1667,8 +1747,8 @@ export const getExecuteMcpRequestUrl = () => {
 }
 
 /**
- * Call initialize, ping, tools/list or tools/call. All fourteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
- * @summary JSON-RPC discovery and execution of the 14 canonical MCP tools
+ * Call initialize, ping, tools/list or tools/call. All fifteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * @summary JSON-RPC discovery and execution of the 15 canonical MCP tools
  */
 export const executeMcpRequest = async (mcpJsonRpcRequest: McpJsonRpcRequest, options?: Parameters<typeof customFetch>[1]): Promise<McpJsonRpcResponse> => {
 
@@ -1717,7 +1797,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ExecuteMcpRequestMutationError = ErrorType<McpJsonRpcResponse>
 
     /**
- * @summary JSON-RPC discovery and execution of the 14 canonical MCP tools
+ * @summary JSON-RPC discovery and execution of the 15 canonical MCP tools
  */
 export const useExecuteMcpRequest = <TError = ErrorType<McpJsonRpcResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeMcpRequest>>, TError,{data: BodyType<McpJsonRpcRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -3144,7 +3224,7 @@ export const groundEpistemicContext = async (epistemicGroundingRequest: Epistemi
 
 
 
-export const getGroundEpistemicContextMutationOptions = <TError = ErrorType<void | L402Challenge>,
+export const getGroundEpistemicContextMutationOptions = <TError = ErrorType<void | L402PaymentRequired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof groundEpistemicContext>>, TError,{data: BodyType<EpistemicGroundingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof groundEpistemicContext>>, TError,{data: BodyType<EpistemicGroundingRequest>}, TContext> => {
 
@@ -3173,12 +3253,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type GroundEpistemicContextMutationResult = NonNullable<Awaited<ReturnType<typeof groundEpistemicContext>>>
     export type GroundEpistemicContextMutationBody = BodyType<EpistemicGroundingRequest>
-    export type GroundEpistemicContextMutationError = ErrorType<void | L402Challenge>
+    export type GroundEpistemicContextMutationError = ErrorType<void | L402PaymentRequired>
 
     /**
  * @summary Anchor an agent context to the current Bitcoin tip
  */
-export const useGroundEpistemicContext = <TError = ErrorType<void | L402Challenge>,
+export const useGroundEpistemicContext = <TError = ErrorType<void | L402PaymentRequired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof groundEpistemicContext>>, TError,{data: BodyType<EpistemicGroundingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof groundEpistemicContext>>,

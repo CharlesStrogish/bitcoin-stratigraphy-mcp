@@ -1,10 +1,10 @@
 # Bitcoin Stratigraphy MCP Architecture
 
 Mermaid sequence and system diagrams for agent developers integrating with
-`https://bitcoin-stratigraphy-dashboard.replit.app/mcp`.
+`https://bitcoinstratigraphy.com/mcp`.
 
 The public interface uses **Streamable HTTP**, supports MCP **2025-11-25**, and
-currently exposes **14 tools**. Discover the live catalog with `tools/list` and
+currently exposes **15 tools**. Discover the live catalog with `tools/list` and
 query `payment.get_info` for current prices rather than relying on static
 diagrams as a contract.
 
@@ -50,7 +50,7 @@ flowchart LR
     Payer["Agent-owned Lightning wallet<br/>NWC / LND / Core Lightning"]
     Gateway["Public MCP endpoint<br/>Streamable HTTP / JSON-RPC"]
     Gate["L402 enforcement<br/>Credential validation and scoped redemption"]
-    Tools["14 MCP tools<br/>Four namespaces"]
+    Tools["15 MCP tools<br/>Four namespaces"]
     Data[("Indexed historical strata<br/>Dataset provenance")]
     ZK["Groth16 prover and verifier<br/>Poseidon / BN254"]
     Notary["Signed receipt notary<br/>Bitcoin-tip context binding"]
@@ -249,7 +249,7 @@ sequenceDiagram
 
 ## 4. Complete MCP namespace map
 
-The endpoint exposes **5 stratigraphy + 6 proof + 2 mesh + 1 payment = 14 tools**.
+The endpoint exposes **5 stratigraphy + 7 proof + 2 mesh + 1 payment = 15 tools**.
 Tool nodes link to public reference pages in Mermaid renderers that allow links.
 Names are canonical, case-sensitive MCP names, not Python method names.
 
@@ -268,13 +268,14 @@ flowchart TB
         s_range["stratigraphy.get_range<br/>Bounded compressed records"]
     end
 
-    subgraph Proof["proof.* · 6 tools"]
+    subgraph Proof["proof.* · 7 tools"]
         direction TB
         p_attenuate["proof.attenuate<br/>Restrict a delegated macaroon"]
         p_verify["proof.verify<br/>Groth16 or OTS verification"]
         p_get["proof.get_by_hash<br/>Retained proof / receipt lookup"]
         p_list["proof.list<br/>Indexed attestation catalog"]
         p_submit["proof.submit<br/>Proof registration and attestation"]
+        p_notarize["proof.notarize<br/>OpenTimestamps receipt for a digest"]
         p_ground["proof.ground<br/>Signed Bitcoin-tip state receipt"]
     end
 
@@ -297,8 +298,8 @@ flowchart TB
     classDef discovery fill:#f0fdf4,stroke:#15803d,color:#111827;
     classDef paid fill:#fff7ed,stroke:#c2410c,color:#111827;
     classDef credential fill:#eef2ff,stroke:#4338ca,color:#111827;
-    class s_list,m_status,pay_info discovery;
-    class s_get,s_digest,s_diff,s_range,p_verify,p_get,p_list,p_submit,p_ground,m_broadcast paid;
+    class s_list,p_list discovery;
+    class s_get,s_digest,s_diff,s_range,p_verify,p_get,p_submit,p_notarize,p_ground,m_status,m_broadcast,pay_info paid;
     class p_attenuate credential;
 
     click s_list href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/stratigraphy.list" "Dataset discovery reference" _blank
@@ -319,9 +320,9 @@ flowchart TB
 
 **Legend:** green = free discovery/query operations; orange = paid execution;
 indigo = credential attenuation. Colors describe the documented categories,
-not blanket authorization. `payment.get_info` query is free; its settlement
-mode requires the appropriate payment authentication. `proof.attenuate` has
-no invoice fee but requires a valid parent credential and enforced caveats.
+not blanket authorization. Only `stratigraphy.list` and `proof.list` are free;
+`payment.get_info` and `proof.attenuate` are L402-paid calls, and attenuation
+also requires a valid parent credential and enforced caveats.
 Always check current payment availability and prices at runtime.
 
 ### Namespace reference and link fallback
@@ -335,7 +336,7 @@ Always check current payment availability and prices at runtime.
 
 All tool-reference links are also available from the
 [Glama tool catalog](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
-and [public MCP server card](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json).
+and [public MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json).
 The definitive callable schemas come from the live MCP `tools/list` response,
 not from these diagrams or a cached registry page.
 

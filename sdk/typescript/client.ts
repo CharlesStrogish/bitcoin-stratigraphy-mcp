@@ -4,8 +4,7 @@
  * Dependency-free, one-shot L402 client for the Bitcoin Stratigraphy MCP endpoint.
  * Each paid tool call has its own path-bound, single-use credential; do not cache it.
  */
-export const DEFAULT_MCP_SERVER_URL =
-  "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
+export const DEFAULT_MCP_SERVER_URL = "https://bitcoinstratigraphy.com/mcp";
 
 export type WalletPayment =
   string | { preimage: string } | { payment_preimage: string };

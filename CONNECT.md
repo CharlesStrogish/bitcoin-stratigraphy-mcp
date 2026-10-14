@@ -1,6 +1,6 @@
 # Connect an agent to Bitcoin Stratigraphy
 
-The public MCP endpoint is **`https://bitcoin-stratigraphy-dashboard.replit.app/mcp`** (Streamable HTTP). It exposes discovery and tool calls over JSON-RPC. The examples below configure the same server; they do **not** give an agent a wallet or permission to spend. Set a spending limit and use an L402-capable wallet client before enabling paid calls.
+The public MCP endpoint is **`https://bitcoinstratigraphy.com/mcp`** (Streamable HTTP). It exposes discovery and tool calls over JSON-RPC. The examples below configure the same server; they do **not** give an agent a wallet or permission to spend. Set a spending limit and use an L402-capable wallet client before enabling paid calls.
 
 ## Capability and service boundaries
 
@@ -38,7 +38,7 @@ Add this entry to Claude Desktop's `mcpServers` configuration and restart the ap
   "mcpServers": {
     "bitcoin-stratigraphy": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"]
+      "args": ["-y", "mcp-remote", "https://bitcoinstratigraphy.com/mcp"]
     }
   }
 }
@@ -52,7 +52,7 @@ Add this to the project `.cursor/mcp.json` or your personal `~/.cursor/mcp.json`
 {
   "mcpServers": {
     "bitcoin-stratigraphy": {
-      "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+      "url": "https://bitcoinstratigraphy.com/mcp"
     }
   }
 }
@@ -66,20 +66,20 @@ If you maintain a **portable `mcpServers` JSON** alongside other clients, the eq
 {
   "mcpServers": {
     "bitcoin-stratigraphy": {
-      "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+      "url": "https://bitcoinstratigraphy.com/mcp"
     }
   }
 }
 ```
 
-**Goose does not read that JSON as its native configuration.** Add a remote Streamable HTTP extension in Goose's UI, run `goose session --with-streamable-http-extension "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"`, or put this in `~/.config/goose/config.yaml`:
+**Goose does not read that JSON as its native configuration.** Add a remote Streamable HTTP extension in Goose's UI, run `goose session --with-streamable-http-extension "https://bitcoinstratigraphy.com/mcp"`, or put this in `~/.config/goose/config.yaml`:
 
 ```yaml
 extensions:
   bitcoin-stratigraphy:
     name: Bitcoin Stratigraphy
     type: streamable_http
-    uri: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+    uri: https://bitcoinstratigraphy.com/mcp
     enabled: true
     timeout: 300
 ```
@@ -103,7 +103,7 @@ export const character: Character = {
           args: [
             "-y",
             "mcp-remote",
-            "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+            "https://bitcoinstratigraphy.com/mcp",
           ],
         },
       },
@@ -117,7 +117,7 @@ The MCP client configurations above discover tools, but **do not automatically s
 
 ## Tool catalog and pricing
 
-The MCP `tools/list` response currently contains **14 canonical tools**. The prices below describe the server code; ask `payment.get_info` at runtime rather than treating this table as a price guarantee.
+The MCP `tools/list` response currently contains **15 canonical tools**; only `stratigraphy.list` and `proof.list` are free. The prices below describe the server code; confirm them at runtime with the free `POST /api/v1/cost` quote (for example `{"tools":["stratigraphy.get_digest"]}`) or the paid `payment.get_info` tool rather than treating this table as a price guarantee.
 
 | Tool | Advertised sats | Use |
 | --- | ---: | --- |
@@ -126,14 +126,15 @@ The MCP `tools/list` response currently contains **14 canonical tools**. The pri
 | `stratigraphy.get_diff` | 250 | Differences between indexed strata. |
 | `stratigraphy.get_range` | 250 | Compressed records across a bounded sequence. |
 | `stratigraphy.list` | 0 | Discover dataset bounds and metrics. |
-| `proof.attenuate` | 0 | Narrow an existing valid macaroon; does not pay an invoice. |
+| `proof.attenuate` | 250 | Narrow an existing valid macaroon; requires its own L402 authorization and does not pay the parent invoice. |
 | `proof.verify` | 250 | Validate an existing Groth16 proof (default), or set `proofType: "ots"` with `otsProof` and `targetHash` to verify a complete OTS receipt and its Bitcoin attestation. |
 | `proof.get_by_hash` | 250 | Look up a retained proof or signed receipt. |
-| `proof.list` | 10 | List indexed proof attestations. |
+| `proof.list` | 0 | List indexed proof attestations. |
 | `proof.submit` | 250 | Register a submitted proof and attempt an attestation; changes state. |
+| `proof.notarize` | 250 | Create a detached OpenTimestamps receipt for a SHA-256 digest; calendar acceptance is not Bitcoin confirmation. |
 | `proof.ground` | 250 | Issue a signed Bitcoin-tip context/dataset receipt. |
-| `payment.get_info` | 0 | Query prices (default) or set `action: "settle"` to verify a server-issued L402 credential or settle an authenticated x402 signature. Bare preimages and hashes are not enough; settlement claims are not bearer tokens. |
-| `mesh.get_status` | 0 | Read peer and quorum health. |
+| `payment.get_info` | 250 | Query prices (default) or set `action: "settle"` to verify a server-issued L402 credential or settle an authenticated x402 signature. Bare preimages and hashes are not enough; settlement claims are not bearer tokens. |
+| `mesh.get_status` | 250 | Read peer and quorum health. |
 | `mesh.broadcast` | 250 | Sign and distribute a stored snapshot to mesh peers; has side effects. |
 
 Call `payment.get_info` with `{}` (equivalent to `{"action":"query"}`) for the complete `perToolSats` map, or `{"toolName":"stratigraphy.get_digest"}` to narrow it to one **case-sensitive, canonical** tool name. Unknown names fail validation. The query result includes accepted methods, invoice expiry, and challenge metadata. It does not issue an invoice; the actual invoice is issued only when a paid `tools/call` receives HTTP **402**. Use `{"action":"settle","paymentHash":"…","preimage":"…"}` with matching L402 Authorization, or, only when MCP Base USDC x402 is currently enabled, `{"action":"settle","paymentHash":"0x…","txHash":"0x…"}` with PAYMENT-SIGNATURE. Settlement does not authorize access to another tool.
@@ -156,7 +157,7 @@ Read the price from `result.structuredContent.perToolSats["stratigraphy.get_dige
 The server responds to an unauthenticated paid call with HTTP 402, `WWW-Authenticate: L402 macaroon="...", invoice="..."`, and JSON containing `macaroon`, `invoice`, `payment_hash`, and `amount_sats`. Pay **that exact invoice**, verify that the wallet's 32-byte preimage hashes to `payment_hash`, then retry the **same** JSON-RPC call once with `Authorization: L402 <macaroon>:<preimage>`. MCP paid-call credentials are tool/request-scoped; do not reuse one to authorize another tool or REST scope. This differs from any REST subscription credential, whose reuse is governed by its own path, request, and expiry caveats. The wallet callback below must be connected to a real wallet with its own authorization and spending policy; it is deliberately not a hard-coded credential.
 
 ```ts
-const endpoint = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
+const endpoint = "https://bitcoinstratigraphy.com/mcp";
 
 type Rpc<T> = {
   jsonrpc: "2.0";

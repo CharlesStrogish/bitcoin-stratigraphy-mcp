@@ -1,0 +1,42 @@
+We are running a comprehensive End-to-End (E2E) Production Audit, SEO Canonicalization, Autonomous Agent Discovery, and Enterprise Conversion upgrade for https://bitcoinstratigraphy.com. 
+
+CRITICAL INVARIANT: Do NOT break or reset our PostgreSQL `escrow_ledger` table, our seeded 24-satoshi mainnet genesis settlement (`ba4f25dd-7f16-420c-9264-a16f102fd5a6` at `/api/v1/escrow/genesis-receipt`), our dual L402/NWC verification logic, or any of our 15 MCP tools.
+
+Please execute the following 6 architectural upgrades end-to-end, fix any code/type/lint issues found along the way, verify with full test suites, and commit cleanly:
+
+1. FULL DOMAIN CANONICALIZATION & SEO MIGRATION TO https://bitcoinstratigraphy.com
+- Audit the entire codebase (`index.html`, frontend SEO/head components, backend metadata routes, `robots.txt`, `sitemap.xml`, OpenAPI specs, READMEs, and `@bitcoin-stratigraphy/mcp-server` package defaults) for any hardcoded references to `bitcoin-stratigraphy-dashboard.replit.app`.
+- Update all primary URLs, `<link rel="canonical">`, `og:url`, `og:image` (if absolute), `twitter:url`, OpenAPI `servers` entries, `sitemap.xml`, and `robots.txt` to use `https://bitcoinstratigraphy.com` as the authoritative canonical domain.
+- In `@bitcoin-stratigraphy/mcp-server`, update the default fallback API base URL to `https://bitcoinstratigraphy.com` (while still allowing env overrides and keeping `.replit.app` requests working smoothly on the backend so existing clients never break).
+- Inject comprehensive Schema.org JSON-LD (`SoftwareApplication` + `WebAPI`) in the document head identifying "Bitcoin Stratigraphy Data Engine", Creator & Principal Architect "Charles R. Strogish", canonical URL `https://bitcoinstratigraphy.com`, licensing contact `licensing@bitcoinstratigraphy.com`, the 15 MCP tools, L402 24-satoshi micropayment access, and the Commercial Enterprise License (Starting at $250k/Annual).
+
+2. AI-NATIVE SWARM & LLM DISCOVERY ENDPOINTS (`/llms.txt`, `/llms-full.txt`, `/.well-known/mcp.json`)
+- Create and serve public, fast, zero-auth discovery routes at:
+  a) `GET /llms.txt` and `GET /llms-full.txt`: Clean, structured Markdown documentation specifically formatted for LLM crawlers and autonomous AI agents. Include:
+     - Platform overview: Bitcoin Stratigraphy Data Engine & Cryptographic Notary Hub (Architected by Charles R. Strogish, https://bitcoinstratigraphy.com).
+     - Complete directory of all 15 MCP tools (`npx -y @bitcoin-stratigraphy/mcp-server`) with their dot-notation names and purposes.
+     - Zero-friction L402 + NWC autonomous payment instructions (showing both Path A: 64-hex preimage `Authorization: L402 <macaroon>:<preimage>` and Path B: custodial/CoinOS/CashApp server-side lookup `Authorization: L402 <macaroon>:NWC_LOOKUP`).
+     - Live verifiable mainnet genesis proof reference (`/api/v1/escrow/genesis-receipt`, `escrow_id: ba4f25dd-7f16-420c-9264-a16f102fd5a6`, `merkle_root: d8cd6fe5a388e9422ccc6006969fb01c716291c14b1e85dc4e8a75c2ad134da6`, block `971341`, `24 sats`).
+     - AGPLv3 open-source contagion warning & Commercial Enterprise Exemption License details (Starting at $250k/Annual, "AS IS" self-hosted air-gapped delivery, zero SLAs, contact `licensing@bitcoinstratigraphy.com`).
+  b) `GET /.well-known/mcp.json`: A machine-readable JSON discovery manifest listing the server name, version (`2.1.3`), canonical URL (`https://bitcoinstratigraphy.com`), npm package (`@bitcoin-stratigraphy/mcp-server`), L402 settlement capabilities (`sha256_preimage` and `nwc_lookup`), A2A Nostr Kind 38102 attestation directive, and the 15 MCP tool descriptors.
+
+3. ZERO-FRICTION HTTP 402 AGENT CHALLENGE & PREFLIGHT ENHANCEMENT
+- Inspect all HTTP 402 Payment Required responses across the API and escrow routes.
+- Ensure the 402 JSON body's `agent_instruction` and metadata explicitly tell connecting AI agents that they can settle EITHER by supplying the 64-character hex preimage OR by passing `NWC_LOOKUP` (for internal CoinOS / custodial Lightning wallets) once the BOLT11 invoice is paid.
+- Ensure `GET /api/v1/escrow/genesis-receipt` and a public discovery/preflight summary are linked in the 402 metadata so conservative ReAct agent loops can immediately verify mainnet oracle authenticity before spending 24 sats.
+
+4. CISO ENTERPRISE CONVERSION ACCELERATOR (INTAKE WORKFLOW & DUE-DILIGENCE BRIEF)
+- On the Enterprise Licensing / Enterprise Compliance frontend sections (where `Starting at $250k/Annual` and `licensing@bitcoinstratigraphy.com` are displayed):
+  - Make the `licensing@bitcoinstratigraphy.com` CTA open a pre-populated `mailto:licensing@bitcoinstratigraphy.com?subject=Commercial%20Exemption%20License%20Inquiry%20%E2%80%94%20Bitcoin%20Stratigraphy%20Data%20Engine&body=...` containing our 5-parameter CISO Intake Questionnaire (1. Swarm Scale, 2. Event Throughput, 3. Target Infrastructure [VPC vs. Air-Gapped Bare Metal], 4. Regulatory & EU AI Act Article 12 / Article 26(6) 6-Month Retention Scope, 5. In-House Technical Stewardship confirmation under strict "AS IS" no-SLA terms).
+  - Also add a clean "Copy CISO Intake Template" button right next to it (for desktop/corporate webmail users who don't use system `mailto:` handlers) and a "Download / View CISO Due-Diligence Brief (JSON)" link pointing to `GET /api/v1/enterprise/due-diligence-brief`.
+  - Implement `GET /api/v1/enterprise/due-diligence-brief` returning a structured, executive-grade JSON compliance & licensing summary (AGPLv3 copyleft scope, Commercial Exemption terms, "AS IS" self-hosted air-gapped architecture, zero external SLA policy, EU AI Act Article 12 & Article 26(6) 6-month log retention alignment, live genesis proof `ba4f25dd-7f16-420c-9264-a16f102fd5a6`, and `licensing@bitcoinstratigraphy.com`).
+
+5. CODEBASE ERROR SWEEP, SECURITY HARDENING & CREDENTIAL HYGIENE
+- Check that no `.npmrc` files, temporary auth tokens, or sensitive credentials exist in the workspace or git tree.
+- Verify clean HTTP security headers (`X-Content-Type-Options: nosniff`, `Referrer-Policy`, and appropriate CORS headers so browser and remote MCP clients can query public endpoints without CORS failures).
+- Fix any TypeScript warnings, dead imports, or stale references across frontend and backend files.
+
+6. BUMP MCP PACKAGE TO v2.1.3 & RUN FULL E2E VERIFICATION
+- Bump `@bitcoin-stratigraphy/mcp-server` version to `2.1.3` in its `package.json` and build artifacts so the updated `https://bitcoinstratigraphy.com` canonical URL, `licensing@bitcoinstratigraphy.com` contact, and dual L402/NWC documentation are packaged and ready.
+- Run the full backend test suite, Python escrow tests, frontend typechecks, compliance regression tests, and build verification.
+- Confirm that after a server restart, `Verified settle toll accrued` still reads `24 sats` from PostgreSQL and `/api/v1/escrow/genesis-receipt` returns the exact genesis receipt.

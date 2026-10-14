@@ -3,7 +3,7 @@
 This guide describes an **opt-in, agent-side** Lightning payer for the Bitcoin
 Stratigraphy MCP endpoint:
 
-`https://bitcoin-stratigraphy-dashboard.replit.app/mcp`
+`https://bitcoinstratigraphy.com/mcp`
 
 It covers the payer's wallet connection and the safeguards required before an
 agent spends. It does not enable payments on the server, configure the
@@ -46,8 +46,9 @@ application explicitly wires in a payer and calls a payment-capable client
 under a user-approved spending policy. Configure a hard per-payment and
 aggregate budget before enabling that path.
 
-Ask the service for current prices using free `payment.get_info` discovery
-rather than treating a cached price list as authoritative. See
+Ask the service for current prices with the free `GET` or `POST /api/v1/cost`
+quote endpoint (or the paid `payment.get_info` tool) rather than treating a
+cached price list as authoritative. See
 [CONNECT.md](../CONNECT.md#tool-catalog-and-pricing) for the endpoint, MCP
 setup, and published tool catalog.
 
@@ -327,7 +328,7 @@ import { BitcoinStratigraphyClient } from
 
 const payer = createAgentNwcPayer(); // no payment is sent here
 const client = new BitcoinStratigraphyClient(
-  "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+  "https://bitcoinstratigraphy.com/mcp",
   (invoice) => payer.payInvoice(invoice),
 );
 

@@ -1,7 +1,7 @@
 # Bitcoin Stratigraphy MCP client SDK
 
 Small, zero-required-dependency MCP clients with generic tool calls and typed
-convenience methods. The live server currently publishes 14 canonical tools;
+convenience methods. The live server currently publishes 15 canonical tools;
 discover them with `listTools`/`list_tools` rather than treating this guide as
 the catalog. TypeScript uses built-in `fetch` and Web Crypto APIs (Node 18+).
 Python uses the standard library, or `urllib3` automatically if already
@@ -11,7 +11,7 @@ its real 32-byte hex preimage**. For an ordinary Lightning preimage, the clients
 check the challenge hash and do not pay again after a rejected retry.
 
 The default endpoint is
-`https://bitcoin-stratigraphy-dashboard.replit.app/mcp`. To use a different
+`https://bitcoinstratigraphy.com/mcp`. To use a different
 node, pass its full `/mcp` URL to the constructor. The TypeScript package entry
 is `@bitcoin-stratigraphy/sdk/mcp` (the existing REST SDK remains at the package
 root); Python can import `sdk.python.client` from the repository root. Results

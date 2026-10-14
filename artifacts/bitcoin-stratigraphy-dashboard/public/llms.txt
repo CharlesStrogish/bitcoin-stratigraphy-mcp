@@ -1,63 +1,135 @@
-# Bitcoin Stratigraphy — Bitcoin Analytics, Proofs, and Agent Receipts
+# Bitcoin Stratigraphy Data Engine — Bitcoin Analytics, Proofs, and Agent Receipts
 
-> Bitcoin Stratigraphy serves indexed Bitcoin telemetry and agent-oriented
-> analytics, paid REST and MCP interfaces, cryptographic verification, and
-> off-chain Bitcoin-tip receipts. Historical index data is not live-tip data or
-> native per-record Bitcoin block provenance.
+> Bitcoin Stratigraphy (v2.1.3, https://bitcoinstratigraphy.com) serves indexed
+> Bitcoin telemetry, cryptographic verification, OpenTimestamps notarization and
+> off-chain Bitcoin-tip receipts through 15 canonical MCP tools and paid REST
+> routes, settled with L402 Lightning payments. MCP stratigraphy tools serve
+> captured UTC pipeline snapshots as described by `tools/list`; the REST dataset
+> and Hugging Face export use deterministic daily height labels, not live-tip
+> data or native per-record Bitcoin block provenance.
 
 ## Agent entry points
-- [Interactive Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs): live schemas and a manual playground for 15 MCP tools across 4 namespaces, including OpenTimestamps notarization.
-- [Python SDK and integration cookbooks](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks): CrewAI, LangChain and AutoGen examples; [HTTPX Python SDK/client source](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks/l402_client.py). Payments require explicit callbacks.
-- [MCP auto-discovery manifest](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json): transport, documentation links, namespaces and pricing methods.
-- [Complete tool schemas and TypeScript SDK usage](https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt)
-- [MCP Streamable HTTP endpoint](https://bitcoin-stratigraphy-dashboard.replit.app/mcp): POST JSON-RPC 2.0 requests, starting with `tools/list`; this is a protocol endpoint, not a browsable HTML page.
-- [Pre-flight price discovery](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost): GET REST tiers; POST `{"tools":["stratigraphy.get_latest","proof.verify_zk_proof"]}` for itemized MCP prices. These selectors map to canonical `stratigraphy.get` and `proof.verify` for pricing only. Quotes create no invoices. Paid MCP credentials are tool-scoped: one call by default, or 100 calls with an explicit 100x-priced batch purchase.
-- [Paid REST telemetry stream](https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/stratigraphy/stream): `GET` Server-Sent Events with a 30-second refresh interval. This is a separate REST transport, not MCP; consult `/api/v1/cost` for the current price and assets.
-- [OpenAPI document](https://bitcoin-stratigraphy-dashboard.replit.app/openapi.json)
-- [MCP server card](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json)
-- [Health](https://bitcoin-stratigraphy-dashboard.replit.app/api/healthz)
-- [Public Hugging Face JSONL dataset export](/api/export/huggingface): source-grounded instruction/response records; use `?format=json&limit=100` for a JSON array.
-- [Machine-readable LLM schema manifest](/.well-known/llm-schema.json): export parameters, field definitions, domain constraints, and verification protocols.
+- [Interactive Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs): live schemas and a manual playground for 15 MCP tools across 4 namespaces, including OpenTimestamps notarization.
+- [Python SDK and integration cookbooks](https://bitcoinstratigraphy.com/cookbooks): CrewAI, LangChain and AutoGen examples; [HTTPX Python SDK/client source](https://bitcoinstratigraphy.com/cookbooks/l402_client.py). Payments require explicit callbacks.
+- [MCP auto-discovery manifest](https://bitcoinstratigraphy.com/.well-known/mcp.json): transport, tool descriptors, settlement paths, documentation links and pricing methods.
+- [Complete tool schemas, settlement guide and TypeScript SDK usage](https://bitcoinstratigraphy.com/llms-full.txt)
+- [MCP Streamable HTTP endpoint](https://bitcoinstratigraphy.com/mcp): POST JSON-RPC 2.0 requests, starting with `tools/list`; this is a protocol endpoint, not a browsable HTML page.
+- [Pre-flight price discovery](https://bitcoinstratigraphy.com/api/v1/cost): GET REST tiers; POST `{"tools":["stratigraphy.get_latest","proof.verify_zk_proof"]}` for itemized MCP prices. These selectors map to canonical `stratigraphy.get` and `proof.verify` for pricing only. Quotes create no invoices. Paid MCP credentials are tool-scoped: one call by default, or 100 calls with an explicit 100x-priced batch purchase.
+- [Paid REST telemetry stream](https://bitcoinstratigraphy.com/api/v1/stratigraphy/stream): `GET` Server-Sent Events with a 30-second refresh interval. This is a separate REST transport, not MCP; consult `/api/v1/cost` for the current price and assets.
+- [OpenAPI document](https://bitcoinstratigraphy.com/openapi.json)
+- [MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
+- [Health](https://bitcoinstratigraphy.com/api/healthz)
+- [Public Hugging Face JSONL dataset export](https://bitcoinstratigraphy.com/api/export/huggingface): source-grounded instruction/response records; use `?format=json&limit=100` for a JSON array.
+- [Machine-readable LLM schema manifest](https://bitcoinstratigraphy.com/.well-known/llm-schema.json): export parameters, field definitions, domain constraints, and verification protocols.
+
+## Install and connect
+Hosted agents connect any MCP Streamable HTTP client to
+https://bitcoinstratigraphy.com/mcp. To run the self-hosted engine:
+
+```sh
+npx -y @bitcoin-stratigraphy/mcp-server
+```
+
+The package starts a Streamable HTTP server at `http://127.0.0.1:8008/mcp`
+(set `PORT` to change it); it is not a stdio connector. It requires Node.js 22+,
+PostgreSQL (`DATABASE_URL`), `SESSION_SECRET` and `NOSTR_PRIVATE_KEY`; live
+Lightning requires `NWC_URI`, and the canonical stratigraphy tools require the
+licensed Python companion described in the package README.
+
+## The 15 canonical MCP tools
+Only `stratigraphy.list` (alias `stratigraphy.latest`) and `proof.list` (alias
+`proof.status`) are free. The other thirteen are paid per call (currently 250
+sats each); confirm live prices with `payment.get_info` or `/api/v1/cost`.
+
+- `stratigraphy.list` (free): discover UTC archive bounds, the current Bitcoin tip height and catalog metadata, without paid snapshot or proof bytes.
+- `stratigraphy.get`: retrieve full live pipeline telemetry and selected archived UTC snapshots with their OpenTimestamps receipts.
+- `stratigraphy.get_digest`: fetch SHA-256 fingerprints of archived or live pipeline JSON (not Bitcoin block hashes or ZK proofs) with associated receipts.
+- `stratigraphy.get_diff`: compute signed deltas between two live or archived snapshots, including the 15 J/TH power change.
+- `stratigraphy.get_range`: retrieve fingerprints for a contiguous span of captured UTC snapshots bounded by heights or dates.
+- `proof.attenuate`: narrow an authentic, unexpired L402 parent macaroon with restrictive caveats and an optional TTL.
+- `proof.verify`: verify supplied Groth16 telemetry or drift proofs, or OpenTimestamps receipts.
+- `proof.get_by_hash`: retrieve a retained proof payload, signed receipt or lifecycle status by hash or job ID.
+- `proof.list` (free): discover and paginate recent proof-attestation lifecycle summaries.
+- `proof.submit`: register a new Groth16 proof with its five public signals and attempt a Nostr NIP-78 attestation.
+- `proof.notarize`: create a detached OpenTimestamps receipt for a SHA-256 digest using public calendars.
+- `proof.ground`: issue an off-chain Schnorr-signed Bitcoin-tip receipt for agent context or a dataset CID.
+- `mesh.get_status`: inspect peer counts, topology health, cross-validation rate, latency and quorum.
+- `mesh.broadcast`: sign a stored daily telemetry snapshot and distribute it to pinned mesh peers.
+- `payment.get_info`: query MCP pricing or verify authenticated settlement.
 
 ## Access and settlement
+A paid call without credentials returns HTTP 402 with
+`WWW-Authenticate: L402 macaroon="<macaroon>", invoice="<BOLT11>"` and a JSON
+body that names both settlement paths, links the genesis receipt and includes a
+pre-flight summary. Pay the exact invoice, then retry the identical request:
 
-Agents MUST use an L402-capable wrapper such as Lightning Labs `lnget` or
-`lightning-enable-mcp` to settle paid MCP calls. See
-[the canonical payment and sandbox guide](/.well-known/llms.txt).
-Only `stratigraphy.list` (alias `stratigraphy.latest`) and `proof.list`
-(alias `proof.status`) are free canonical tools. The remaining thirteen require
-payment. For 100 calls to one paid tool, request its challenge with
+- Path A (`sha256_preimage`): `Authorization: L402 <macaroon>:<preimage>` with
+  the wallet's 64-character hex preimage.
+- Path B (`nwc_lookup`): `Authorization: L402 <macaroon>:NWC_LOOKUP` when a
+  custodial wallet (for example CoinOS or Cash App) does not reveal the
+  preimage. The issuing merchant wallet must confirm the exact incoming invoice;
+  HTTP 409 means confirmation is pending, so retry with the same macaroon and do
+  not pay again.
+
+Agents can use an L402-capable wrapper such as Lightning Labs `lnget` or
+`lightning-enable-mcp`; see
+[the canonical payment and sandbox guide](https://bitcoinstratigraphy.com/.well-known/llms.txt).
+For 100 calls to one paid tool, request its challenge with
 `X-L402-Batch-Size: 100`, pay the 100x invoice once, and reuse that credential
-within its expiry and quota. Delegation does not reset the quota.
+within its expiry and quota. Delegation does not reset the quota. Never log or
+publish the bearer credential.
 
 Public metadata, health, MCP tool discovery, and the Hugging Face export need
 no payment. Paid operations use endpoint-specific prices and return the
-applicable challenge; query `/api/v1/cost` and use the actual challenge rather
-than relying on a static price. The L402 router supports `btc-lightning`,
-`l-btc`, and `taproot-assets` where available. MCP supports Lightning L402;
-Base USDC x402 is conditional and only applies to MCP when explicitly reported
-available. Do not infer Base USDC availability for REST or the SSE stream.
+applicable challenge; use the actual challenge rather than relying on a static
+price. The L402 router supports `btc-lightning`, `l-btc`, and `taproot-assets`
+where available. MCP supports Lightning L402; Base USDC x402 is conditional and
+only applies to MCP when explicitly reported available. Do not infer Base USDC
+availability for REST or the SSE stream. The SDK's REST client may use a
+REST-scoped subscription credential; MCP credentials cannot cross tools or REST
+routes.
 
-The SDK's REST client may use a REST-scoped subscription credential according
-to its own path, request, and expiry restrictions. MCP credentials are scoped
-to one operation: default credentials allow one call, while explicit batch
-credentials allow 100 calls. Neither may cross tools or REST routes.
+## Genesis settlement proof
+- Escrow ID: `ba4f25dd-7f16-420c-9264-a16f102fd5a6`
+- Merkle root: `d8cd6fe5a388e9422ccc6006969fb01c716291c14b1e85dc4e8a75c2ad134da6`
+- Settled at strata block: 971341
+- Toll: 24 sats, settled over Lightning on mainnet
+- Receipt: https://bitcoinstratigraphy.com/api/v1/escrow/genesis-receipt
+
+This is the operator's historical Lightning settlement plus an RFC 6962
+execution commitment. It is not an on-chain Bitcoin transaction or an
+OpenTimestamps confirmation.
 
 ## Capabilities and trust boundaries
-
-- `proof.attenuate` narrows an existing valid macaroon with enforced caveats,
-  including TTL and request-count limits; it does not create a paid parent
-  entitlement.
-- Proof workflows include Groth16/Poseidon BN254 telemetry verification and a
-  separate drift proof path. OpenTimestamps receipt verification is a distinct
-  mode, not a telemetry proof or a Bitcoin-tip receipt.
-- `proof.ground` issues off-chain Schnorr-signed Bitcoin-tip receipts for agent
-  context or dataset CIDs. It does not broadcast a Bitcoin transaction.
+- `proof.attenuate` cannot widen authority or create a paid parent entitlement;
+  child redemption still requires the parent's payment proof.
+- Groth16/Poseidon BN254 telemetry verification, the drift proof path and
+  OpenTimestamps receipt verification are distinct modes.
+- `proof.ground` receipts are signed anchors, not ZK proofs, proof of work or
+  Bitcoin transactions.
 - The Nostr NIP-01/78 mesh uses pinned reciprocal peers for signed broadcasts
   and quorum checks. Peer agreement is not source truth.
+- REST dataset and export heights are deterministic daily index labels, not
+  observed per-record Bitcoin blocks or the live Bitcoin tip.
 
-## Scope
-Use `stratigraphy.get`/`stratigraphy.list` for the indexed telemetry dataset, `stratigraphy.get_digest` for token-optimized record summaries (record hash, not block hash or ZK proof), `stratigraphy.get_diff` to compare two indexed entries' target multipliers, dates, and derived height labels, and `stratigraphy.get_range` for bounded indexed records. Daily heights are deterministic dataset indexes, not observed per-record Bitcoin blocks or the live Bitcoin tip. Use `proof.attenuate` to derive narrower delegation macaroons from an authentic unexpired parent (no new invoice; the parent's payment proof remains necessary). Use `proof.verify`/`proof.submit` for Groth16 telemetry/drift proof workflows, `proof.get_by_hash`/`proof.list` for process-memory proof and attestation lookups (including context receipts indexed by `contextHash`), and `proof.ground` for off-chain Bitcoin-tip grounding of either agent context or a dataset CID. A signed dataset-tip receipt is not a ZK proof, proof of work, or on-chain commitment.
+## License and commercial exemption
+The engine is licensed under AGPLv3 (`(AGPL-3.0-only OR LicenseRef-Commercial)`).
+AGPL warning: AGPLv3 is a strong network copyleft license. If you modify the
+engine and users interact with your modified version over a network, Section 13
+requires you to offer those users its complete Corresponding Source under
+AGPLv3; conveying the engine or a work based on it carries the same obligation.
+Independent programs that only exchange data with the engine over HTTP or MCP,
+and separately trained model weights, are not automatically covered. Confirm
+your architecture with counsel.
 
-## License and access
-The dataset metadata declares CC BY 4.0; access to paid API data is separately governed by L402. "Open/L402" describes discovery and payment access, not a replacement copyright license.
+Organizations that cannot meet those obligations can obtain a Commercial
+Enterprise Exemption License:
+- Price: Starting at $250k/Annual.
+- Delivery: "AS IS" self-hosted, air-gapped delivery on infrastructure you control.
+- Service levels: zero SLAs; your team installs, operates, patches and secures the deployment.
+- Contact: licensing@bitcoinstratigraphy.com. CISO due-diligence brief:
+  https://bitcoinstratigraphy.com/api/v1/enterprise/due-diligence-brief
+
+API fees and payment credentials do not purchase a software license. The
+dataset metadata declares CC BY 4.0; access to paid API data is separately
+governed by L402.

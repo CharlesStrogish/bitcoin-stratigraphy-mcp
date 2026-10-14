@@ -21,22 +21,43 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+import type { McpDiscoveryManifestAttestation } from './mcpDiscoveryManifestAttestation';
 import type { McpDiscoveryManifestAuthor } from './mcpDiscoveryManifestAuthor';
+import type { McpDiscoveryManifestContact } from './mcpDiscoveryManifestContact';
+import type { McpDiscoveryManifestL402 } from './mcpDiscoveryManifestL402';
+import type { McpDiscoveryManifestLicensing } from './mcpDiscoveryManifestLicensing';
 import type { McpDiscoveryManifestLinks } from './mcpDiscoveryManifestLinks';
 import type { McpDiscoveryManifestMcp } from './mcpDiscoveryManifestMcp';
+import type { McpDiscoveryManifestNpm } from './mcpDiscoveryManifestNpm';
 import type { McpDiscoveryManifestPricing } from './mcpDiscoveryManifestPricing';
+import type { McpDiscoveryManifestToolsItem } from './mcpDiscoveryManifestToolsItem';
 import type { McpDiscoveryManifestVerification } from './mcpDiscoveryManifestVerification';
 
 export interface McpDiscoveryManifest {
   $schema: string;
   name: string;
+  title?: string;
+  /** Release version of the published engine and npm package */
   version: string;
   description: string;
+  /** Authoritative public origin, https://bitcoinstratigraphy.com */
+  canonical_url: string;
   author: McpDiscoveryManifestAuthor;
+  contact: McpDiscoveryManifestContact;
   homepage: string;
   /** Direct link to the interactive Developer Portal and Live Tool Explorer */
   documentation?: string;
   links?: McpDiscoveryManifestLinks;
+  npm: McpDiscoveryManifestNpm;
+  /**
+     * Descriptors mirroring the live tools/list catalog; tools/list remains authoritative.
+     * @minItems 15
+     * @maxItems 15
+     */
+  tools: McpDiscoveryManifestToolsItem[];
+  l402: McpDiscoveryManifestL402;
+  attestation: McpDiscoveryManifestAttestation;
+  licensing: McpDiscoveryManifestLicensing;
   mcp: McpDiscoveryManifestMcp;
   pricing: McpDiscoveryManifestPricing;
   verification: McpDiscoveryManifestVerification;

@@ -3,21 +3,28 @@
 > Indexed Bitcoin stratigraphy analytics, agent-context receipts, proof
 > verification, and L402-gated REST and MCP services. This root-level file is
 > an informational mirror; the maintained public machine-readable overview is
-> [`/llms.txt`](https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt),
+> [`/llms.txt`](https://bitcoinstratigraphy.com/llms.txt),
 > with the complete MCP reference at
-> [`/llms-full.txt`](https://bitcoin-stratigraphy-dashboard.replit.app/llms-full.txt).
+> [`/llms-full.txt`](https://bitcoinstratigraphy.com/llms-full.txt).
 
 ## Current service overview
 
-- [Interactive Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs): 14 live MCP tools across 4 namespaces.
-- [Python SDK and integration cookbooks](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks): public HTTPX client and CrewAI, LangChain and AutoGen examples with explicit L402 Lightning payment callbacks.
+- [Interactive Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs): 15 live MCP tools across 4 namespaces.
+- [Python SDK and integration cookbooks](https://bitcoinstratigraphy.com/cookbooks): public HTTPX client and CrewAI, LangChain and AutoGen examples with explicit L402 Lightning payment callbacks.
 - `POST /api/v1/cost` accepts a `tools` array and returns free itemized satoshi
   quotes, a total and per-tool invoice-generation instructions. Quoting creates
   no invoice or aggregate entitlement; each paid MCP call requires its own proof.
 
-- MCP Streamable HTTP: `https://bitcoin-stratigraphy-dashboard.replit.app/mcp`.
+- MCP Streamable HTTP: `https://bitcoinstratigraphy.com/mcp`.
   It exposes tool discovery and calls; client configuration does not supply a
-  wallet or settle invoices.
+  wallet or settle invoices. The self-hosted engine (v2.1.3) runs with
+  `npx -y @bitcoin-stratigraphy/mcp-server` as a Streamable HTTP server, not a
+  stdio connector.
+- Paid calls return HTTP 402 with an invoice and macaroon. After paying, retry
+  with Path A, `Authorization: L402 <macaroon>:<preimage>`, or Path B,
+  `Authorization: L402 <macaroon>:NWC_LOOKUP`, when a custodial wallet hides
+  the preimage. The 24-sat mainnet genesis settlement is public at
+  `https://bitcoinstratigraphy.com/api/v1/escrow/genesis-receipt`.
 - `GET /api/v1/cost` reports current pricing and settlement availability. The
   L402 router supports `btc-lightning`, `l-btc`, and `taproot-assets` where
   enabled. MCP uses Lightning L402; Base USDC x402 is conditional for MCP only
@@ -34,3 +41,8 @@
 Historical daily index entries are not live-tip readings or native Bitcoin
 block provenance. Nostr quorum is not source truth. Prices and payment assets
 can vary; consult `/api/v1/cost` and the actual challenge before payment.
+
+The engine is AGPLv3; modified versions offered over a network must offer their
+Corresponding Source. Commercial Enterprise Exemption Licenses (Starting at
+$250k/Annual, "AS IS" self-hosted air-gapped delivery, zero SLAs) are available
+from licensing@bitcoinstratigraphy.com.

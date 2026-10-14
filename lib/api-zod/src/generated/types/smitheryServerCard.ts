@@ -21,12 +21,22 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+import type { SmitheryServerCardCapabilities } from './smitheryServerCardCapabilities';
+import type { SmitheryServerCardServerInfo } from './smitheryServerCardServerInfo';
 
-export const SmitheryServerCardValue = {
-  name: 'bitcoin-stratigraphy-mcp',
-  displayName: 'Bitcoin Stratigraphy Data Engine',
-  description: 'Provides thermodynamic data, proof verification, and L402 payments.',
-  version: '1.0.0',
-  url: 'https://bitcoin-stratigraphy-dashboard.replit.app/mcp',
-} as const;
-export type SmitheryServerCard = typeof SmitheryServerCardValue;
+export interface SmitheryServerCard {
+  name: 'bitcoin-stratigraphy-mcp';
+  displayName: 'Bitcoin Stratigraphy Data Engine';
+  description: string;
+  /** Registry card release metadata; not the negotiated MCP protocol version. */
+  version: string;
+  serverInfo: SmitheryServerCardServerInfo;
+  /** Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp */
+  url: string;
+  /**
+     * @minimum 15
+     * @maximum 15
+     */
+  toolCount: number;
+  capabilities: SmitheryServerCardCapabilities;
+}

@@ -32,9 +32,9 @@ installation only after auditing a safe, complete dependency tree.
 
 | Surface | URL |
 | --- | --- |
-| Streamable HTTP MCP | `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` |
-| Developer portal | `https://bitcoin-stratigraphy-dashboard.replit.app/docs` |
-| Live OpenAPI | `https://bitcoin-stratigraphy-dashboard.replit.app/openapi.json` |
+| Streamable HTTP MCP | `https://bitcoinstratigraphy.com/mcp` |
+| Developer portal | `https://bitcoinstratigraphy.com/docs` |
+| Live OpenAPI | `https://bitcoinstratigraphy.com/openapi.json` |
 
 Use the MCP URL in any Streamable HTTP client. Import [mcp.json](mcp.json) where
 your client supports URL-based MCP configuration; some hosts require an explicit
@@ -110,7 +110,7 @@ not pay an invoice:
 
 ```sh
 curl --include --request POST \
-  'https://bitcoin-stratigraphy-dashboard.replit.app/mcp' \
+  'https://bitcoinstratigraphy.com/mcp' \
   --header 'Content-Type: application/json' \
   --header 'Accept: application/json, text/event-stream' \
   --header 'X-L402-Batch-Size: 100' \
@@ -170,7 +170,7 @@ from langchain_openai import ChatOpenAI
 
 async def main():
     transport = StreamableHttpTransport(
-        url="https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+        url="https://bitcoinstratigraphy.com/mcp"
     )
     client = Client(transport, mode="legacy", timeout=30)
     async with MCPAdapter(client) as adapter:
@@ -214,7 +214,7 @@ from llama_index.llms.openai import OpenAI
 
 async def main():
     client = BasicMCPClient(
-        "https://bitcoin-stratigraphy-dashboard.replit.app/mcp", timeout=30
+        "https://bitcoinstratigraphy.com/mcp", timeout=30
     )
     try:
         tools = await McpToolSpec(client=client).to_tool_list_async()

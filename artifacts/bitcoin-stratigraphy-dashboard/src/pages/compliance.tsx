@@ -6,10 +6,12 @@ import {
   COMPLIANCE_URL,
   COMPLIANCE_ARTICLE,
 } from "@/lib/compliance-seo";
+import { CISO_MAILTO_HREF } from "@/lib/ciso-intake";
+import { CisoIntakeActions } from "@/components/ciso-intake-actions";
 import "./compliance.css";
 
 const BASE = import.meta.env.BASE_URL;
-const MAIL = "mailto:licensing@bitcoinstratigraphy.com";
+const MAIL = CISO_MAILTO_HREF;
 
 const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],
@@ -53,6 +55,7 @@ function useComplianceHead() {
       { ...meta("property", "og:type"), value: "article" },
       { ...meta("name", "twitter:title"), value: COMPLIANCE_TITLE },
       { ...meta("name", "twitter:description"), value: COMPLIANCE_DESCRIPTION },
+      { ...meta("name", "twitter:url"), value: COMPLIANCE_URL },
     ];
     const restores = specs.map((s) => {
       let el = document.head.querySelector(s.sel);
@@ -171,6 +174,7 @@ export default function CompliancePage() {
                 [Contact licensing@bitcoinstratigraphy.com for Enterprise Licensing]
               </a>
             </p>
+            <CisoIntakeActions testIdPrefix="compliance" />
             <div className="cmp-actions">
               <a href={BASE} className="cmp-cta" data-testid="link-access-simulator">
                 Access Live REST Escrow

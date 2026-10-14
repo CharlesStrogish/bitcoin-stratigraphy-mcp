@@ -120,7 +120,7 @@ json("package.json", {
 json("mcp.json", {
   mcpServers: {
     "bitcoin-stratigraphy": {
-      url: "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+      url: "https://bitcoinstratigraphy.com/mcp",
     },
   },
 });

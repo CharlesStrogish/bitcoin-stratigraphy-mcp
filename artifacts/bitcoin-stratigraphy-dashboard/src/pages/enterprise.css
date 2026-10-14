@@ -53,6 +53,16 @@
   opacity: 0.9;
   transform: translateY(-1px);
 }
+.ent-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-top: 24px;
+}
+.ent-cta-row .ent-cta {
+  margin-top: 0;
+}
 .ent-main {
   display: grid;
   gap: 18px;

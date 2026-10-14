@@ -24,5 +24,6 @@
 
 export type McpDiscoveryManifestAuthor = {
   name: string;
+  role?: string;
   url: string;
 };

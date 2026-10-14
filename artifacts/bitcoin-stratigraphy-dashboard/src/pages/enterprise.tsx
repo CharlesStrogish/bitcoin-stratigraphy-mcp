@@ -3,10 +3,12 @@ import {
   ENTERPRISE_TITLE as TITLE,
   ENTERPRISE_DESCRIPTION as DESC,
 } from "@/lib/enterprise-seo";
+import { CISO_MAILTO_HREF } from "@/lib/ciso-intake";
+import { CisoIntakeActions } from "@/components/ciso-intake-actions";
 import "./enterprise.css";
 
 const BASE = import.meta.env.BASE_URL;
-const MAIL = "mailto:licensing@bitcoinstratigraphy.com";
+const MAIL = CISO_MAILTO_HREF;
 
 const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],
@@ -119,9 +121,12 @@ export default function EnterprisePage() {
               For CISOs protecting private AI swarm IP and needing auditable
               reconstruction of agent activity.
             </p>
-            <a href={MAIL} className="ent-cta" data-testid="link-contact-sales">
-              Contact Sales for Enterprise Sizing
-            </a>
+            <div className="ent-cta-row">
+              <a href={MAIL} className="ent-cta" data-testid="link-contact-sales">
+                Contact Sales for Enterprise Sizing
+              </a>
+              <CisoIntakeActions testIdPrefix="hero" />
+            </div>
           </div>
         </header>
 
@@ -162,13 +167,16 @@ export default function EnterprisePage() {
               writing. This page is not itself a grant of commercial rights and
               makes no certification claims.
             </p>
-            <a
-              href={MAIL}
-              className="ent-cta"
-              data-testid="link-contact-sales-bottom"
-            >
-              Contact Sales for Enterprise Sizing
-            </a>
+            <div className="ent-cta-row">
+              <a
+                href={MAIL}
+                className="ent-cta"
+                data-testid="link-contact-sales-bottom"
+              >
+                Contact Sales for Enterprise Sizing
+              </a>
+              <CisoIntakeActions testIdPrefix="bottom" />
+            </div>
           </section>
         </main>
       </div>

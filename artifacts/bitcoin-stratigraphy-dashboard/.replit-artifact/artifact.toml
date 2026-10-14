@@ -47,6 +47,26 @@ to = "/compliance/index.html"
 from = "/*"
 to = "/index.html"
 
+[[services.production.responseHeaders]]
+path = "/*"
+name = "X-Content-Type-Options"
+value = "nosniff"
+
+[[services.production.responseHeaders]]
+path = "/*"
+name = "Referrer-Policy"
+value = "strict-origin-when-cross-origin"
+
+[[services.production.responseHeaders]]
+path = "/llms.txt"
+name = "Access-Control-Allow-Origin"
+value = "*"
+
+[[services.production.responseHeaders]]
+path = "/llms-full.txt"
+name = "Access-Control-Allow-Origin"
+value = "*"
+
 [services.env]
 PORT = "20948"
 BASE_PATH = "/"

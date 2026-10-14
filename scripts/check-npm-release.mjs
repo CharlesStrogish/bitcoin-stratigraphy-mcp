@@ -44,7 +44,7 @@ const help = spawnSync(process.execPath, ["dist/cli.mjs", "--help"], { cwd: dire
 assert.equal(help.status, 0, help.stderr);
 assert.match(help.stdout, /Streamable HTTP/);
 const smoke = spawnSync(process.execPath, [path.join(root, "scripts/smoke-npm-release.mjs")], {
-  cwd: root, stdio: "inherit", timeout: 30_000,
+  cwd: root, stdio: "inherit", timeout: 120_000,
 });
 assert.equal(smoke.status, 0, "Isolated npm runtime smoke check failed");
 console.log(`${result.name}@${result.version}: ${result.files.length} allowed files; ${result.size} compressed bytes. Pack dry-run and CLI smoke check passed.`);

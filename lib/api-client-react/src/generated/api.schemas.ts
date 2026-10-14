@@ -330,14 +330,29 @@ export interface AuditReport {
 
 export interface PublicMetadata { [key: string]: unknown }
 
-export const SmitheryServerCardValue = {
-  name: 'bitcoin-stratigraphy-mcp',
-  displayName: 'Bitcoin Stratigraphy Data Engine',
-  description: 'Provides thermodynamic data, proof verification, and L402 payments.',
-  version: '1.0.0',
-  url: 'https://bitcoin-stratigraphy-dashboard.replit.app/mcp',
-} as const;
-export type SmitheryServerCard = typeof SmitheryServerCardValue;
+export type SmitheryServerCardServerInfo = {
+  name: 'bitcoin-stratigraphy-mcp';
+  version: string;
+};
+
+export type SmitheryServerCardCapabilities = { [key: string]: unknown };
+
+export interface SmitheryServerCard {
+  name: 'bitcoin-stratigraphy-mcp';
+  displayName: 'Bitcoin Stratigraphy Data Engine';
+  description: string;
+  /** Registry card release metadata; not the negotiated MCP protocol version. */
+  version: string;
+  serverInfo: SmitheryServerCardServerInfo;
+  /** Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp */
+  url: string;
+  /**
+     * @minimum 15
+     * @maximum 15
+     */
+  toolCount: number;
+  capabilities: SmitheryServerCardCapabilities;
+}
 
 export const McpProbeValue = {
   status: 'ok',
@@ -446,7 +461,12 @@ export interface McpBatchCostQuote {
 
 export type McpDiscoveryManifestAuthor = {
   name: string;
+  role?: string;
   url: string;
+};
+
+export type McpDiscoveryManifestContact = {
+  licensing: string;
 };
 
 export type McpDiscoveryManifestLinks = {
@@ -454,6 +474,161 @@ export type McpDiscoveryManifestLinks = {
   cookbooks: string;
   python_sdk: string;
   pricing: string;
+  llms_txt?: string;
+  llms_full_txt?: string;
+  openapi?: string;
+  server_card?: string;
+  genesis_receipt?: string;
+  due_diligence_brief?: string;
+};
+
+export type McpDiscoveryManifestNpmPackage = typeof McpDiscoveryManifestNpmPackage[keyof typeof McpDiscoveryManifestNpmPackage];
+
+
+export const McpDiscoveryManifestNpmPackage = {
+  '@bitcoin-stratigraphy/mcp-server': '@bitcoin-stratigraphy/mcp-server',
+} as const;
+
+export type McpDiscoveryManifestNpm = {
+  package: McpDiscoveryManifestNpmPackage;
+  version: string;
+  /** npx command that starts the self-hosted Streamable HTTP server */
+  command: string;
+  registry_url?: string;
+  runtime?: string;
+};
+
+export type McpDiscoveryManifestToolsItemNamespace = typeof McpDiscoveryManifestToolsItemNamespace[keyof typeof McpDiscoveryManifestToolsItemNamespace];
+
+
+export const McpDiscoveryManifestToolsItemNamespace = {
+  stratigraphy: 'stratigraphy',
+  proof: 'proof',
+  mesh: 'mesh',
+  payment: 'payment',
+} as const;
+
+export type McpDiscoveryManifestToolsItemBatch = {
+  max_calls?: number;
+  header?: string;
+};
+
+export type McpDiscoveryManifestToolsItemAnnotations = { [key: string]: unknown };
+
+export type McpDiscoveryManifestToolsItem = {
+  name: string;
+  namespace: McpDiscoveryManifestToolsItemNamespace;
+  title: string;
+  description: string;
+  /** @minimum 0 */
+  price_sats: number;
+  payment_required: boolean;
+  batch?: McpDiscoveryManifestToolsItemBatch;
+  annotations: McpDiscoveryManifestToolsItemAnnotations;
+};
+
+export type McpDiscoveryManifestL402SettlementCapabilitiesItem = typeof McpDiscoveryManifestL402SettlementCapabilitiesItem[keyof typeof McpDiscoveryManifestL402SettlementCapabilitiesItem];
+
+
+export const McpDiscoveryManifestL402SettlementCapabilitiesItem = {
+  sha256_preimage: 'sha256_preimage',
+  nwc_lookup: 'nwc_lookup',
+} as const;
+
+export type McpDiscoveryManifestL402Challenge = { [key: string]: unknown };
+
+export type McpDiscoveryManifestL402EscrowSettlementToll = { [key: string]: unknown };
+
+export type L402SettlementPathId = typeof L402SettlementPathId[keyof typeof L402SettlementPathId];
+
+
+export const L402SettlementPathId = {
+  sha256_preimage: 'sha256_preimage',
+  nwc_lookup: 'nwc_lookup',
+} as const;
+
+/**
+ * One accepted proof for retrying the identical request after paying its invoice.
+ */
+export interface L402SettlementPath {
+  id: L402SettlementPathId;
+  name: string;
+  /** Authorization header template */
+  authorization: string;
+  description: string;
+}
+
+export type L402PreflightGenesisReceiptMethod = typeof L402PreflightGenesisReceiptMethod[keyof typeof L402PreflightGenesisReceiptMethod];
+
+
+export const L402PreflightGenesisReceiptMethod = {
+  GET: 'GET',
+} as const;
+
+export type L402PreflightGenesisReceiptPath = typeof L402PreflightGenesisReceiptPath[keyof typeof L402PreflightGenesisReceiptPath];
+
+
+export const L402PreflightGenesisReceiptPath = {
+  '/api/v1/escrow/genesis-receipt': '/api/v1/escrow/genesis-receipt',
+} as const;
+
+export type L402PreflightGenesisReceipt = {
+  method: L402PreflightGenesisReceiptMethod;
+  path: L402PreflightGenesisReceiptPath;
+  canonical_url: string;
+  escrow_id: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  merkle_root: string;
+  settled_at_strata_block: number;
+  toll_fee_sats: number;
+};
+
+export type L402PreflightDiscoveryItem = {
+  name: string;
+  method: string;
+  path: string;
+  canonical_url: string;
+};
+
+/**
+ * Free, unauthenticated checks a cautious agent can run before paying.
+ */
+export interface L402Preflight {
+  description: string;
+  genesis_receipt: L402PreflightGenesisReceipt;
+  discovery: L402PreflightDiscoveryItem[];
+}
+
+export type McpDiscoveryManifestL402 = {
+  settlement_capabilities: McpDiscoveryManifestL402SettlementCapabilitiesItem[];
+  settlement_paths: L402SettlementPath[];
+  challenge: McpDiscoveryManifestL402Challenge;
+  pending_confirmation_status?: number;
+  escrow_settlement_toll?: McpDiscoveryManifestL402EscrowSettlementToll;
+  preflight: L402Preflight;
+};
+
+export type McpDiscoveryManifestAttestationKind = typeof McpDiscoveryManifestAttestationKind[keyof typeof McpDiscoveryManifestAttestationKind];
+
+
+export const McpDiscoveryManifestAttestationKind = {
+  NUMBER_38102: 38102,
+} as const;
+
+export type McpDiscoveryManifestAttestation = {
+  protocol: string;
+  kind: McpDiscoveryManifestAttestationKind;
+  type?: string;
+  directive: string;
+  scope?: string;
+};
+
+export type McpDiscoveryManifestLicensing = {
+  spdx: string;
+  public_license?: string;
+  commercial_exemption: string;
+  contact: string;
+  due_diligence_brief?: string;
 };
 
 export type McpDiscoveryManifestMcpTransportsItemType = typeof McpDiscoveryManifestMcpTransportsItemType[keyof typeof McpDiscoveryManifestMcpTransportsItemType];
@@ -510,13 +685,28 @@ export type McpDiscoveryManifestVerification = {
 export interface McpDiscoveryManifest {
   $schema: string;
   name: string;
+  title?: string;
+  /** Release version of the published engine and npm package */
   version: string;
   description: string;
+  /** Authoritative public origin, https://bitcoinstratigraphy.com */
+  canonical_url: string;
   author: McpDiscoveryManifestAuthor;
+  contact: McpDiscoveryManifestContact;
   homepage: string;
   /** Direct link to the interactive Developer Portal and Live Tool Explorer */
   documentation?: string;
   links?: McpDiscoveryManifestLinks;
+  npm: McpDiscoveryManifestNpm;
+  /**
+     * Descriptors mirroring the live tools/list catalog; tools/list remains authoritative.
+     * @minItems 15
+     * @maxItems 15
+     */
+  tools: McpDiscoveryManifestToolsItem[];
+  l402: McpDiscoveryManifestL402;
+  attestation: McpDiscoveryManifestAttestation;
+  licensing: McpDiscoveryManifestLicensing;
   mcp: McpDiscoveryManifestMcp;
   pricing: McpDiscoveryManifestPricing;
   verification: McpDiscoveryManifestVerification;
@@ -1615,6 +1805,174 @@ export interface L402Challenge {
      * @maxItems 2
      */
   passes: L402SubscriptionPass[];
+  /** Retry guidance naming both settlement paths and the free preflight checks. */
+  agent_instruction?: string;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  settlement_paths?: L402SettlementPath[];
+  preflight?: L402Preflight;
+}
+
+/**
+ * ENDPOINT_READY_AWAITING_L402_SETTLEMENT preview with the expected output schema; computation has not run.
+ */
+export type L402PaymentRequiredStagedPreview = { [key: string]: unknown };
+
+/**
+ * Fixed-fee L402 challenge body. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+ */
+export interface L402PaymentRequired {
+  error?: string;
+  /** Single-use path-scoped capability bound to the invoice. */
+  macaroon: string;
+  /** BOLT11 Lightning invoice */
+  invoice: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  payment_hash: string;
+  /** @minimum 1 */
+  amount_sats: number;
+  /** @minimum 1 */
+  max_requests?: number;
+  /** Retry guidance naming both settlement paths and the free preflight checks. */
+  agent_instruction: string;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  settlement_paths: L402SettlementPath[];
+  preflight: L402Preflight;
+  /** ENDPOINT_READY_AWAITING_L402_SETTLEMENT preview with the expected output schema; computation has not run. */
+  staged_preview?: L402PaymentRequiredStagedPreview;
+}
+
+export type EnterpriseDueDiligenceBriefPublisher = {
+  name: string;
+  role: string;
+  licensing_contact: string;
+};
+
+export type EnterpriseDueDiligenceBriefLicensingAgplCopyleftScope = {
+  license: string;
+  summary: string;
+  network_use: string;
+  boundaries: string;
+};
+
+export type EnterpriseDueDiligenceBriefLicensingCommercialExemption = {
+  name: string;
+  price: string;
+  grant: string;
+  delivery: string;
+  service_levels: string;
+  technical_stewardship: string;
+  settlement: string;
+  contact: string;
+};
+
+export type EnterpriseDueDiligenceBriefLicensing = {
+  spdx: string;
+  agpl_copyleft_scope: EnterpriseDueDiligenceBriefLicensingAgplCopyleftScope;
+  commercial_exemption: EnterpriseDueDiligenceBriefLicensingCommercialExemption;
+};
+
+export type EnterpriseDueDiligenceBriefArchitectureAirGapBoundariesItem = {
+  component: string;
+  network_requirement: string;
+};
+
+export type EnterpriseDueDiligenceBriefArchitecture = {
+  deployment_model: string;
+  /** @minItems 1 */
+  air_gap_boundaries: EnterpriseDueDiligenceBriefArchitectureAirGapBoundariesItem[];
+};
+
+export type EnterpriseDueDiligenceBriefEuAiAct = {
+  articles: string[];
+  article_12: string;
+  article_26_6: string;
+  retention_alignment: string;
+  deployer_responsibility: string;
+};
+
+export type EnterpriseDueDiligenceBriefGenesisProof = {
+  escrow_id: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  merkle_root: string;
+  settled_at_strata_block: number;
+  toll_fee_sats: number;
+  receipt_url: string;
+  description: string;
+};
+
+export type EnterpriseDueDiligenceBriefMcpCatalogPricesSats = {[key: string]: number};
+
+export type EnterpriseDueDiligenceBriefMcpCatalogSettlementPathsItem = typeof EnterpriseDueDiligenceBriefMcpCatalogSettlementPathsItem[keyof typeof EnterpriseDueDiligenceBriefMcpCatalogSettlementPathsItem];
+
+
+export const EnterpriseDueDiligenceBriefMcpCatalogSettlementPathsItem = {
+  sha256_preimage: 'sha256_preimage',
+  nwc_lookup: 'nwc_lookup',
+} as const;
+
+export type EnterpriseDueDiligenceBriefMcpCatalog = {
+  /**
+     * @minimum 15
+     * @maximum 15
+     */
+  tool_count: number;
+  /**
+     * @minItems 15
+     * @maxItems 15
+     */
+  tools: string[];
+  free_tools: string[];
+  prices_sats: EnterpriseDueDiligenceBriefMcpCatalogPricesSats;
+  npm_package: string;
+  command: string;
+  settlement_paths: EnterpriseDueDiligenceBriefMcpCatalogSettlementPathsItem[];
+};
+
+export type EnterpriseDueDiligenceBriefIntakeQuestionnaireItem = {
+  id: string;
+  number: number;
+  topic: string;
+  question: string;
+};
+
+export type EnterpriseDueDiligenceBriefIntake = {
+  email: string;
+  subject: string;
+  /** Pre-populated mailto URL containing the five-question intake template */
+  mailto: string;
+  /**
+     * @minItems 5
+     * @maxItems 5
+     */
+  questionnaire: EnterpriseDueDiligenceBriefIntakeQuestionnaireItem[];
+};
+
+/**
+ * Executive CISO due-diligence summary; only an executed commercial agreement grants a license.
+ */
+export interface EnterpriseDueDiligenceBrief {
+  document: string;
+  schema_version: string;
+  product: string;
+  release_version: string;
+  canonical_url: string;
+  brief_url: string;
+  publisher: EnterpriseDueDiligenceBriefPublisher;
+  executive_summary: string;
+  licensing: EnterpriseDueDiligenceBriefLicensing;
+  architecture: EnterpriseDueDiligenceBriefArchitecture;
+  external_sla_policy: string;
+  eu_ai_act: EnterpriseDueDiligenceBriefEuAiAct;
+  genesis_proof: EnterpriseDueDiligenceBriefGenesisProof;
+  mcp_catalog: EnterpriseDueDiligenceBriefMcpCatalog;
+  intake: EnterpriseDueDiligenceBriefIntake;
+  disclaimer: string;
 }
 
 export interface InvalidRangeError {

@@ -5,13 +5,13 @@ import {
   type Event,
   type EventTemplate,
 } from "nostr-tools";
+import { canonicalUrl } from "../lib/public-site";
 
 export const ANNOUNCEMENT_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 export const DVM_NAME = "Bitcoin Stratigraphy Data Engine & ZK Oracle";
 export const DVM_ABOUT =
   "Quantitative Bitcoin thermodynamic dataset, Groth16 zk-SNARK state verification, and L402 payment oracle.";
-export const DVM_MCP_ENDPOINT =
-  "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
+export const DVM_MCP_ENDPOINT = canonicalUrl("/mcp");
 export const NIP90_5050_FEE_SATS = 250;
 
 export type RelayConnectionStatus = {

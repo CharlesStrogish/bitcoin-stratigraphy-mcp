@@ -1,8 +1,8 @@
 # Bitcoin Stratigraphy MCP Server
 
-**[Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks)**
+**[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)**
 
-## v2.1.0 — 15 Canonical Tools
+## v2.1.3 — 15 Canonical Tools
 
 **OpenTimestamps AI Notary Hub · LangChain/LlamaIndex Native · 100-call Macro-Macaroons · Free Sandbox available**
 
@@ -34,7 +34,7 @@ Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin tele
 
 ### Npm server release
 
-`@bitcoin-stratigraphy/mcp-server@2.1.0` is staged separately from this private
+`@bitcoin-stratigraphy/mcp-server@2.1.3` is staged separately from this private
 workspace. It packages the HTTP MCP runtime, required proof assets, isolated
 workers, and the license-gated Python companion inside `dist/`, with README.md,
 LICENSE, and npm's mandatory package.json. No wallet secrets, customer license,
@@ -245,33 +245,34 @@ proof-of-work validity proofs.
 ## Tool Directory
 
 The directory uses bulleted definitions rather than multi-column tables so each
-tool description can wrap independently on mobile. These are the **14 canonical
+tool description can wrap independently on mobile. These are the **15 canonical
 MCP names** returned by `tools/list`.
 
 ### `stratigraphy.*` — 5 tools
 
-- **`stratigraphy.list`** — Discover indexed date/height bounds, available metrics,
-  and catalog metadata.
+- **`stratigraphy.list`** — Discover UTC archive bounds, the current Bitcoin tip
+  height, and catalog metadata without paid snapshot or proof bytes.
   - Access: free, parameterless discovery.
-- **`stratigraphy.get`** — Retrieve full indexed telemetry records by date or
-  height, recent days, or bounded ranges; optionally select metrics.
+- **`stratigraphy.get`** — Retrieve full live pipeline telemetry and selected
+  archived UTC snapshots by date or height, recent days, or bounded ranges, with
+  their OpenTimestamps receipts; optionally select metrics.
   - Access: paid, read-only. The record limit is 1–100, default 10.
-- **`stratigraphy.get_digest`** — Retrieve compact source-record fingerprints
-  and indexed metadata when full telemetry is unnecessary.
+- **`stratigraphy.get_digest`** — Retrieve SHA-256 fingerprints of archived or
+  live pipeline JSON, with associated receipts, when full telemetry is unnecessary.
   - Access: paid, read-only. A fingerprint is not a verification receipt.
-- **`stratigraphy.get_diff`** — Compute numerical deltas between two indexed
-  entries, including height, target multiplier, percentage change, and elapsed days.
+- **`stratigraphy.get_diff`** — Compute signed deltas between two live or archived
+  snapshots, including the 15 J/TH power change.
   - Access: paid, read-only. `fromTarget` is required; `toTarget` defaults to `latest`.
-- **`stratigraphy.get_range`** — Retrieve compressed, contiguous summaries across
-  inclusive indexed height or UTC date bounds.
+- **`stratigraphy.get_range`** — Retrieve fingerprints for a contiguous span of
+  captured UTC snapshots across inclusive height or date bounds.
   - Access: paid, read-only. `startTarget` is required; the batch limit is 1–100,
     default 50.
 
-### `proof.*` — 6 tools
+### `proof.*` — 7 tools
 
 - **`proof.attenuate`** — Append restrictive caveats to an authentic, unexpired
   parent macaroon, including tool, target, path, expiration, and request budgets.
-  - Access: free. Supply `macaroon` and `caveats`; `ttlSeconds` is optional.
+  - Access: paid. Supply `macaroon` and `caveats`; `ttlSeconds` is optional.
     At least one restriction is required. A child cannot widen inherited authority,
     and later redemption still requires the parent's payment proof.
 - **`proof.verify`** — Verify supplied Groth16 telemetry proofs, drift zk-SNARKs,
@@ -284,12 +285,17 @@ MCP names** returned by `tools/list`.
     reconstruct missing proof payloads.
 - **`proof.list`** — Discover, filter, and paginate recent proof lifecycle
   summaries from bounded process-local memory.
-  - Access: paid, currently 10 sats without valid credentials. Supports
-    `limit`, `offset`, and optional `status`; returns summaries, not full proofs.
+  - Access: free sandbox discovery (alias `proof.status`). Supports `limit`,
+    `offset`, and optional `status`; returns summaries, not full proofs.
 - **`proof.submit`** — Register a Groth16 proof with its five public signals,
   then attempt a NIP-78 attestation.
   - Access: paid; changes proof registry state. Nostr publication can fail
     separately, and registration does not append the proof to a Merkle tree.
+- **`proof.notarize`** — Create a detached OpenTimestamps `.ots` receipt for a
+  SHA-256 digest using public calendars.
+  - Access: paid; `X-L402-Batch-Size: 100` buys 100 tool-scoped calls for
+    25,000 sats. Returns `pending_calendar`; calendar acceptance is not Bitcoin
+    confirmation.
 - **`proof.ground`** — Issue a signed Bitcoin-tip receipt for agent context
   (`contextHash` plus `agentId`) or for a dataset CID.
   - Access: paid; the input modes are exclusive. This is an off-chain signed
@@ -299,7 +305,7 @@ MCP names** returned by `tools/list`.
 
 - **`mesh.get_status`** — Inspect configured peer health, quorum status, node
   provenance, and cross-validation metrics.
-  - Access: free, read-only. Status describes the configured pinned-peer mesh,
+  - Access: paid, read-only. Status describes the configured pinned-peer mesh,
     not arbitrary-peer trust or proof of source truth.
 - **`mesh.broadcast`** — Send signed indexed telemetry to configured peers
   through the outbound broadcast and cross-validation flow.
@@ -310,9 +316,9 @@ MCP names** returned by `tools/list`.
 
 - **`payment.get_info`** — Discover current MCP pricing and settlement methods,
   or check authenticated settlement status.
-  - Access: `action: "query"` is free and is the default. `action: "settle"`
+  - Access: paid L402 call; `action: "query"` is the default and `action: "settle"`
     requires authenticated payment evidence. Neither mode mints a macaroon or
-    creates an invoice; paid tool calls issue HTTP 402 challenges.
+    creates an invoice. Free price quotes are available from `/api/v1/cost`.
 
 Most paid MCP calls currently cost **250 sats** without valid credentials.
 Check `payment.get_info` and the actual challenge for current terms; do not
@@ -331,10 +337,10 @@ The manifest is public and unmetered, returns `application/json`, and sets
 it from the deployment:
 
 ```sh
-curl -i https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json
+curl -i https://bitcoinstratigraphy.com/.well-known/mcp.json
 ```
 
-The supplied manifest declares document version `2.0.0` and
+The manifest declares release version `2.1.3` and
 `mcp.version: "2024-11-25"`. Those are metadata values, not protocol configuration.
 The installed MCP SDK negotiates supported protocol versions, including
 `2025-11-25`, which is the protocol shown in the badge and connection guidance.
@@ -342,11 +348,11 @@ Let clients negotiate rather than forcing the manifest's declared version.
 
 ## Quick Connect
 
-**Live MCP endpoint:** `https://bitcoin-stratigraphy-dashboard.replit.app/mcp`
+**Live MCP endpoint:** `https://bitcoinstratigraphy.com/mcp`
 
 **Transport:** Streamable HTTP · **Protocol:** MCP `2025-11-25`
 
-Discovery with `stratigraphy.list` and `payment.get_info` is free. These connection
+Discovery with `stratigraphy.list` and `proof.list` is free. These connection
 examples do **not** provide a wallet or pay L402 invoices automatically. Check
 `payment.get_info` for current per-tool prices before enabling paid calls; the
 published price for most paid tools is 250 sats, not 10 sats.
@@ -362,7 +368,7 @@ bridge connects Claude Desktop's local stdio client to the remote HTTP server:
   "mcpServers": {
     "bitcoin-stratigraphy": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"]
+      "args": ["-y", "mcp-remote", "https://bitcoinstratigraphy.com/mcp"]
     }
   }
 }
@@ -381,7 +387,7 @@ Add to `.cursor/mcp.json` or `~/.cursor/mcp.json`:
 {
   "mcpServers": {
     "bitcoin-stratigraphy": {
-      "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+      "url": "https://bitcoinstratigraphy.com/mcp"
     }
   }
 }
@@ -413,7 +419,7 @@ const client = new Client({
 try {
   await client.connect(
     new StreamableHTTPClientTransport(
-      new URL("https://bitcoin-stratigraphy-dashboard.replit.app/mcp"),
+      new URL("https://bitcoinstratigraphy.com/mcp"),
     ),
   );
 
@@ -460,7 +466,7 @@ export const character: Character = {
           args: [
             "-y",
             "mcp-remote",
-            "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+            "https://bitcoinstratigraphy.com/mcp",
           ],
         },
       },
@@ -478,8 +484,8 @@ See [CONNECT.md — ElizaOS character](CONNECT.md#elizaos-character) for setup a
   · root connection metadata: [`smithery.yaml`](smithery.yaml).
 - [Glama listing and live score](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
   · root metadata: [`glama.json`](glama.json).
-- [Public MCP server card](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json)
-  · [Agent discovery guide](https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt).
+- [Public MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
+  · [Agent discovery guide](https://bitcoinstratigraphy.com/llms.txt).
 
 Root metadata makes the repository easier to inspect, but does not automatically
 submit it to every index. For Smithery's current remote-server registration flow,
@@ -487,7 +493,7 @@ submit the live MCP URL at [smithery.ai/new](https://smithery.ai/new), or use it
 from an authenticated maintainer account:
 
 ```sh
-smithery mcp publish "https://bitcoin-stratigraphy-dashboard.replit.app/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
+smithery mcp publish "https://bitcoinstratigraphy.com/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
 ```
 
 See [Smithery's publishing documentation](https://smithery.ai/docs/build/publish).

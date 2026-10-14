@@ -1,12 +1,11 @@
 (function () {
   "use strict";
-  var PROD = "https://bitcoin-stratigraphy-dashboard.replit.app";
-  var FREE = [
-    "stratigraphy.list",
-    "proof.attenuate",
-    "payment.get_info",
-    "mesh.get_status",
+  // The canonical domain and the legacy .replit.app address serve one deployment.
+  var PROD = [
+    "https://bitcoinstratigraphy.com",
+    "https://bitcoin-stratigraphy-dashboard.replit.app",
   ];
+  var FREE = ["stratigraphy.list", "proof.list"];
   var NS_COLOR = {
     stratigraphy: "hsl(42 96% 57%)",
     proof: "hsl(13 58% 62%)",
@@ -127,7 +126,7 @@
 
   /* host */
   var here = location.origin,
-    isProd = location.origin === PROD;
+    isProd = PROD.indexOf(location.origin) >= 0;
   $("#host-badge").textContent = isProd
     ? "PRODUCTION"
     : "PREVIEW / NON-PRODUCTION";

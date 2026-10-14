@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const origin = "https://bitcoin-stratigraphy-dashboard.replit.app";
+const origin = "https://bitcoinstratigraphy.com";
 const load = (file) => readFile(new URL(`../${file}`, import.meta.url), "utf8");
 
 function meta(html, key) {
@@ -40,6 +40,7 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
       assert.match(content, feature, key);
   }
   assert.equal(meta(html, "og:url"), origin + "/");
+  assert.equal(meta(html, "twitter:url"), origin + "/");
   assert.match(
     html,
     new RegExp(`rel="canonical" href="${origin.replaceAll(".", "\\.")}/"`),
@@ -59,7 +60,10 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   const person = graph.find((entry) => entry["@type"] === "Person");
   assert.equal(person["@id"], origin + "/#creator");
   assert.equal(person.name, "Charles R. Strogish");
-  assert.equal(person.jobTitle, "Founder & Lead Architect");
+  assert.deepEqual(person.jobTitle, [
+    "Creator & Principal Architect",
+    "Founder & Lead Architect",
+  ]);
   const dataset = graph.find((entry) => entry["@type"] === "Dataset");
   assert.equal(dataset.url, origin + "/");
   assert.equal(dataset.author["@id"], person["@id"]);
@@ -82,6 +86,29 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
         entry.target.httpMethod === "POST" &&
         entry.target.urlTemplate === origin + "/api/v1/cost",
     ),
+  );
+  assert.match(api.description, /Path A preimage or Path B NWC_LOOKUP/);
+  const software = graph.find(
+    (entry) => entry["@type"] === "SoftwareApplication",
+  );
+  assert.equal(software["@id"], origin + "/#software");
+  assert.equal(software.url, origin + "/");
+  assert.equal(software.author["@id"], person["@id"]);
+  assert.match(software.description, /npx -y @bitcoin-stratigraphy\/mcp-server/);
+  const pkg = JSON.parse(await load("package.json"));
+  assert.equal(software.softwareVersion, pkg.version);
+  const offers = new Map(software.offers.map((offer) => [offer["@id"], offer]));
+  const l402 = offers.get(origin + "/#l402-access");
+  assert.equal(l402.price, "0.00000024");
+  assert.equal(l402.priceCurrency, "BTC");
+  assert.match(l402.description, /<macaroon>:<preimage>/);
+  assert.match(l402.description, /<macaroon>:NWC_LOOKUP/);
+  const license = offers.get(origin + "/#commercial-license");
+  assert.equal(license.name, "Commercial Enterprise License (Starting at $250k/Annual)");
+  assert.match(license.description, /licensing@bitcoinstratigraphy\.com/);
+  assert.deepEqual(
+    api.offers.map((offer) => offer["@id"]).sort(),
+    [...offers.keys()].sort(),
   );
 });
 
@@ -156,8 +183,41 @@ test("developer pages, README and AI guides expose canonical documentation links
       "Python SDK",
       "POST",
       "invoice",
+      "npx -y @bitcoin-stratigraphy/mcp-server",
+      "Authorization: L402 <macaroon>:<preimage>",
+      "Authorization: L402 <macaroon>:NWC_LOOKUP",
+      origin + "/api/v1/escrow/genesis-receipt",
+      "ba4f25dd-7f16-420c-9264-a16f102fd5a6",
+      "AGPL",
+      "Starting at $250k/Annual",
+      "licensing@bitcoinstratigraphy.com",
     ]) {
       assert.ok(guide.includes(term), `${file}: ${term}`);
     }
+    assert.doesNotMatch(guide, /replit\.app/, file);
+  }
+  // The full guide documents every canonical tool from the live registry.
+  const full = await load(
+    "artifacts/bitcoin-stratigraphy-dashboard/public/llms-full.txt",
+  );
+  for (const name of [
+    "stratigraphy.list",
+    "stratigraphy.get",
+    "stratigraphy.get_digest",
+    "stratigraphy.get_diff",
+    "stratigraphy.get_range",
+    "proof.attenuate",
+    "proof.verify",
+    "proof.get_by_hash",
+    "proof.list",
+    "proof.submit",
+    "proof.notarize",
+    "proof.ground",
+    "mesh.get_status",
+    "mesh.broadcast",
+    "payment.get_info",
+  ]) {
+    const escaped = name.replace(".", "\\.");
+    assert.match(full, new RegExp(`^#{2,4} (?:\\d+\\. )?${escaped} — `, "m"), name);
   }
 });

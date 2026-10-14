@@ -26,7 +26,7 @@ from urllib.request import parse_http_list
 
 import httpx
 
-MCP_URL = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+MCP_URL = "https://bitcoinstratigraphy.com/mcp"
 CANONICAL_TOOLS = frozenset(
     {
         "stratigraphy.list",
@@ -39,6 +39,7 @@ CANONICAL_TOOLS = frozenset(
         "proof.get_by_hash",
         "proof.list",
         "proof.submit",
+        "proof.notarize",
         "proof.ground",
         "mesh.get_status",
         "mesh.broadcast",
@@ -464,9 +465,9 @@ class BitcoinStratigraphyClient:
 
 def validate_catalog(tools: list[dict]) -> list[dict]:
     names = [tool["name"] for tool in tools]
-    if len(names) != 14 or len(set(names)) != 14 or set(names) != CANONICAL_TOOLS:
+    if len(names) != 15 or len(set(names)) != 15 or set(names) != CANONICAL_TOOLS:
         raise ValueError(
-            "Remote catalog does not match the 14 canonical Stratigraphy tools"
+            "Remote catalog does not match the 15 canonical Stratigraphy tools"
         )
     return tools
 
@@ -551,7 +552,7 @@ def client_from_args(args) -> BitcoinStratigraphyClient:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     add_cli_arguments(parser)
-    parser.add_argument("--tool", default="payment.get_info")
+    parser.add_argument("--tool", default="stratigraphy.list")
     parser.add_argument(
         "--arguments", default="{}", help="JSON object of tool arguments"
     )

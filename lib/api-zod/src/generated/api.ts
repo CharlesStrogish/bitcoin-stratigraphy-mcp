@@ -25,6 +25,104 @@ import * as zod from 'zod';
 
 
 /**
+ * Public, unmetered JSON summary of AGPLv3 copyleft scope, Commercial Enterprise Exemption terms, "AS IS" self-hosted air-gapped architecture, the zero external SLA policy, EU AI Act Article 12 and Article 26(6) log-retention alignment, the live genesis proof and the CISO intake questionnaire. Informational only; not legal advice, certification or a grant of rights.
+ * @summary Download the CISO due-diligence and licensing brief
+ */
+
+export const getEnterpriseDueDiligenceBriefResponseGenesisProofMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolCountMin = 15;
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolCountMax = 15;
+
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolsMin = 15;
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolsMax = 15;
+
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogPricesSatsMinOne = 0;
+
+export const getEnterpriseDueDiligenceBriefResponseIntakeQuestionnaireMin = 5;
+export const getEnterpriseDueDiligenceBriefResponseIntakeQuestionnaireMax = 5;
+
+
+
+export const GetEnterpriseDueDiligenceBriefResponse = zod.object({
+  "document": zod.string(),
+  "schema_version": zod.string(),
+  "product": zod.string(),
+  "release_version": zod.string(),
+  "canonical_url": zod.string().url(),
+  "brief_url": zod.string().url(),
+  "publisher": zod.object({
+  "name": zod.string(),
+  "role": zod.string(),
+  "licensing_contact": zod.string().email()
+}),
+  "executive_summary": zod.string(),
+  "licensing": zod.object({
+  "spdx": zod.string(),
+  "agpl_copyleft_scope": zod.object({
+  "license": zod.string(),
+  "summary": zod.string(),
+  "network_use": zod.string(),
+  "boundaries": zod.string()
+}),
+  "commercial_exemption": zod.object({
+  "name": zod.string(),
+  "price": zod.string(),
+  "grant": zod.string(),
+  "delivery": zod.string(),
+  "service_levels": zod.string(),
+  "technical_stewardship": zod.string(),
+  "settlement": zod.string(),
+  "contact": zod.string().email()
+})
+}),
+  "architecture": zod.object({
+  "deployment_model": zod.string(),
+  "air_gap_boundaries": zod.array(zod.object({
+  "component": zod.string(),
+  "network_requirement": zod.string()
+})).min(1)
+}),
+  "external_sla_policy": zod.string(),
+  "eu_ai_act": zod.object({
+  "articles": zod.array(zod.string()),
+  "article_12": zod.string(),
+  "article_26_6": zod.string(),
+  "retention_alignment": zod.string(),
+  "deployer_responsibility": zod.string()
+}),
+  "genesis_proof": zod.object({
+  "escrow_id": zod.string().uuid(),
+  "merkle_root": zod.string().regex(getEnterpriseDueDiligenceBriefResponseGenesisProofMerkleRootRegExp),
+  "settled_at_strata_block": zod.number().int(),
+  "toll_fee_sats": zod.number().int(),
+  "receipt_url": zod.string().url(),
+  "description": zod.string()
+}),
+  "mcp_catalog": zod.object({
+  "tool_count": zod.number().int().min(getEnterpriseDueDiligenceBriefResponseMcpCatalogToolCountMin).max(getEnterpriseDueDiligenceBriefResponseMcpCatalogToolCountMax),
+  "tools": zod.array(zod.string()).min(getEnterpriseDueDiligenceBriefResponseMcpCatalogToolsMin).max(getEnterpriseDueDiligenceBriefResponseMcpCatalogToolsMax),
+  "free_tools": zod.array(zod.string()),
+  "prices_sats": zod.record(zod.string(), zod.number().int().min(getEnterpriseDueDiligenceBriefResponseMcpCatalogPricesSatsMinOne)),
+  "npm_package": zod.string(),
+  "command": zod.string(),
+  "settlement_paths": zod.array(zod.enum(['sha256_preimage', 'nwc_lookup']))
+}),
+  "intake": zod.object({
+  "email": zod.string().email(),
+  "subject": zod.string(),
+  "mailto": zod.string().describe('Pre-populated mailto URL containing the five-question intake template'),
+  "questionnaire": zod.array(zod.object({
+  "id": zod.string(),
+  "number": zod.number().int(),
+  "topic": zod.string(),
+  "question": zod.string()
+})).min(getEnterpriseDueDiligenceBriefResponseIntakeQuestionnaireMin).max(getEnterpriseDueDiligenceBriefResponseIntakeQuestionnaireMax)
+}),
+  "disclaimer": zod.string()
+}).describe('Executive CISO due-diligence summary; only an executed commercial agreement grants a license.')
+
+
+/**
  * Counts the operator-supplied 24-sat mainnet genesis exactly once plus future server-confirmed settlement tolls, excluding REST access fees and unpaid commitments. Storage failures return 503, never a zero counter.
  * @summary Read the durable verified settlement toll total
  */
@@ -313,7 +411,7 @@ export const GetApiDiscoveryResponse = zod.record(zod.string(), zod.unknown())
 
 
 /**
- * @summary Public OpenAPI document including all 14 MCP schemas and REST operations
+ * @summary Public OpenAPI document including all 15 MCP schemas and REST operations
  */
 export const GetOpenApiDocumentResponse = zod.record(zod.string(), zod.unknown())
 
@@ -372,12 +470,23 @@ export const GetWellKnownLlmsResponse = zod.string()
  * Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
  * @summary Static Smithery server discovery
  */
+export const getSmitheryServerCardResponseToolCountMin = 15;
+export const getSmitheryServerCardResponseToolCountMax = 15;
+
+
+
 export const GetSmitheryServerCardResponse = zod.object({
   "name": zod.literal("bitcoin-stratigraphy-mcp"),
   "displayName": zod.literal("Bitcoin Stratigraphy Data Engine"),
-  "description": zod.literal("Provides thermodynamic data, proof verification, and L402 payments."),
-  "version": zod.literal("1.0.0"),
-  "url": zod.literal("https://bitcoin-stratigraphy-dashboard.replit.app/mcp")
+  "description": zod.string(),
+  "version": zod.string().describe('Registry card release metadata; not the negotiated MCP protocol version.'),
+  "serverInfo": zod.object({
+  "name": zod.literal("bitcoin-stratigraphy-mcp"),
+  "version": zod.string()
+}),
+  "url": zod.string().url().describe('Canonical Streamable HTTP endpoint, https:\/\/bitcoinstratigraphy.com\/mcp'),
+  "toolCount": zod.number().int().min(getSmitheryServerCardResponseToolCountMin).max(getSmitheryServerCardResponseToolCountMax),
+  "capabilities": zod.record(zod.string(), zod.unknown())
 })
 
 
@@ -409,8 +518,8 @@ export const PreflightMcpResponse = zod.unknown()
 
 
 /**
- * Call initialize, ping, tools/list or tools/call. All fourteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
- * @summary JSON-RPC discovery and execution of the 14 canonical MCP tools
+ * Call initialize, ping, tools/list or tools/call. All fifteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * @summary JSON-RPC discovery and execution of the 15 canonical MCP tools
  */
 export const ExecuteMcpRequestHeader = zod.object({
   "MCP-Protocol-Version": zod.string().optional().describe('Negotiated MCP protocol version, for example 2025-11-25'),
@@ -441,14 +550,28 @@ export const ExecuteMcpRequestResponse = zod.union([zod.unknown(),zod.unknown()]
  * Public, unmetered JSON discovery document with wildcard CORS. Its declared version values are manifest metadata and do not configure MCP negotiation.
  * @summary Public MCP auto-discovery manifest
  */
+export const getMcpDiscoveryManifestResponseToolsItemPriceSatsMin = 0;
+
+export const getMcpDiscoveryManifestResponseToolsMin = 15;
+export const getMcpDiscoveryManifestResponseToolsMax = 15;
+
+export const getMcpDiscoveryManifestResponseL402PreflightGenesisReceiptMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
 export const GetMcpDiscoveryManifestResponse = zod.object({
   "$schema": zod.string().url(),
   "name": zod.string(),
-  "version": zod.string(),
+  "title": zod.string().optional(),
+  "version": zod.string().describe('Release version of the published engine and npm package'),
   "description": zod.string(),
+  "canonical_url": zod.string().url().describe('Authoritative public origin, https:\/\/bitcoinstratigraphy.com'),
   "author": zod.object({
   "name": zod.string(),
+  "role": zod.string().optional(),
   "url": zod.string().url()
+}),
+  "contact": zod.object({
+  "licensing": zod.string().email()
 }),
   "homepage": zod.string().url(),
   "documentation": zod.string().url().optional().describe('Direct link to the interactive Developer Portal and Live Tool Explorer'),
@@ -456,8 +579,78 @@ export const GetMcpDiscoveryManifestResponse = zod.object({
   "documentation": zod.string().url(),
   "cookbooks": zod.string().url(),
   "python_sdk": zod.string().url(),
-  "pricing": zod.string().url()
+  "pricing": zod.string().url(),
+  "llms_txt": zod.string().url().optional(),
+  "llms_full_txt": zod.string().url().optional(),
+  "openapi": zod.string().url().optional(),
+  "server_card": zod.string().url().optional(),
+  "genesis_receipt": zod.string().url().optional(),
+  "due_diligence_brief": zod.string().url().optional()
 }).optional(),
+  "npm": zod.object({
+  "package": zod.enum(['@bitcoin-stratigraphy/mcp-server']),
+  "version": zod.string(),
+  "command": zod.string().describe('npx command that starts the self-hosted Streamable HTTP server'),
+  "registry_url": zod.string().url().optional(),
+  "runtime": zod.string().optional()
+}),
+  "tools": zod.array(zod.object({
+  "name": zod.string(),
+  "namespace": zod.enum(['stratigraphy', 'proof', 'mesh', 'payment']),
+  "title": zod.string(),
+  "description": zod.string(),
+  "price_sats": zod.number().int().min(getMcpDiscoveryManifestResponseToolsItemPriceSatsMin),
+  "payment_required": zod.boolean(),
+  "batch": zod.object({
+  "max_calls": zod.number().int().optional(),
+  "header": zod.string().optional()
+}).optional(),
+  "annotations": zod.record(zod.string(), zod.unknown())
+})).min(getMcpDiscoveryManifestResponseToolsMin).max(getMcpDiscoveryManifestResponseToolsMax).describe('Descriptors mirroring the live tools\/list catalog; tools\/list remains authoritative.'),
+  "l402": zod.object({
+  "settlement_capabilities": zod.array(zod.enum(['sha256_preimage', 'nwc_lookup'])),
+  "settlement_paths": zod.array(zod.object({
+  "id": zod.enum(['sha256_preimage', 'nwc_lookup']),
+  "name": zod.string(),
+  "authorization": zod.string().describe('Authorization header template'),
+  "description": zod.string()
+}).describe('One accepted proof for retrying the identical request after paying its invoice.')),
+  "challenge": zod.record(zod.string(), zod.unknown()),
+  "pending_confirmation_status": zod.number().int().optional(),
+  "escrow_settlement_toll": zod.record(zod.string(), zod.unknown()).optional(),
+  "preflight": zod.object({
+  "description": zod.string(),
+  "genesis_receipt": zod.object({
+  "method": zod.enum(['GET']),
+  "path": zod.enum(['/api/v1/escrow/genesis-receipt']),
+  "canonical_url": zod.string().url(),
+  "escrow_id": zod.string().uuid(),
+  "merkle_root": zod.string().regex(getMcpDiscoveryManifestResponseL402PreflightGenesisReceiptMerkleRootRegExp),
+  "settled_at_strata_block": zod.number().int(),
+  "toll_fee_sats": zod.number().int()
+}),
+  "discovery": zod.array(zod.object({
+  "name": zod.string(),
+  "method": zod.string(),
+  "path": zod.string(),
+  "canonical_url": zod.string().url()
+}))
+}).describe('Free, unauthenticated checks a cautious agent can run before paying.')
+}),
+  "attestation": zod.object({
+  "protocol": zod.string(),
+  "kind": zod.literal(38102),
+  "type": zod.string().optional(),
+  "directive": zod.string(),
+  "scope": zod.string().optional()
+}),
+  "licensing": zod.object({
+  "spdx": zod.string(),
+  "public_license": zod.string().optional(),
+  "commercial_exemption": zod.string(),
+  "contact": zod.string().email(),
+  "due_diligence_brief": zod.string().url().optional()
+}),
   "mcp": zod.object({
   "version": zod.string(),
   "transports": zod.array(zod.object({

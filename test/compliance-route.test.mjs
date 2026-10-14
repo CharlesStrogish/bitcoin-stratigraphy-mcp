@@ -17,6 +17,14 @@ const metadata = await tsImport(
   root + "src/lib/compliance-seo.ts",
   import.meta.url,
 );
+const cisoIntake = await tsImport(
+  root + "src/lib/ciso-intake.ts",
+  import.meta.url,
+);
+// The interactive intake buttons render client-side; the copy hash covers page text.
+function CisoIntakeActions() {
+  return null;
+}
 
 function renderPage() {
   const source = read("src/pages/compliance.tsx").replace(
@@ -38,6 +46,8 @@ function renderPage() {
       if (path === "react") return { useEffect() {} };
       if (path === "react/jsx-runtime") return { jsx, jsxs: jsx };
       if (path === "@/lib/compliance-seo") return metadata;
+      if (path === "@/lib/ciso-intake") return cisoIntake;
+      if (path === "@/components/ciso-intake-actions") return { CisoIntakeActions };
       if (path.endsWith(".css")) return {};
       throw new Error(`Unexpected dependency: ${path}`);
     },
@@ -73,21 +83,32 @@ test("compliance marketing copy preserves approved text with live escrow pricing
   );
 });
 
-test("compliance CTA returns to homepage and licensing contact uses mailto", () => {
+test("compliance CTA returns to homepage and licensing contact uses the CISO intake mailto", () => {
   const links = [];
+  const intakeActions = [];
   walk(renderPage(), (node) => {
     if (node.type === "a") links.push(node);
+    if (node.type === CisoIntakeActions) intakeActions.push(node);
   });
   assert.equal(
     links.find((node) => text(node).trim() === "Access Live REST Escrow")
       ?.props.href,
     "/",
   );
+  const href = links.find(
+    (node) => node.props["data-testid"] === "link-contact-licensing",
+  )?.props.href;
+  assert.equal(href, cisoIntake.CISO_MAILTO_HREF);
+  const mailto = new URL(href);
+  assert.equal(mailto.pathname, "licensing@bitcoinstratigraphy.com");
+  assert.equal(mailto.searchParams.get("subject"), cisoIntake.CISO_INTAKE_SUBJECT);
   assert.equal(
-    links.find(
-      (node) => node.props["data-testid"] === "link-contact-licensing",
-    )?.props.href,
-    "mailto:licensing@bitcoinstratigraphy.com",
+    mailto.searchParams.get("body"),
+    cisoIntake.cisoIntakeTemplate("\r\n"),
+  );
+  assert.deepEqual(
+    intakeActions.map((node) => node.props.testIdPrefix),
+    ["compliance"],
   );
 });
 

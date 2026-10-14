@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 
-const MCP_URL =
-  process.env.MCP_URL ??
-  "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
+const MCP_URL = process.env.MCP_URL ?? "https://bitcoinstratigraphy.com/mcp";
 const RECIPIENT = "0x7a4183ce5b9989833bb33133dcbb8efd6a84e775";
 const BASE_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const TIMEOUT_MS = 30_000;

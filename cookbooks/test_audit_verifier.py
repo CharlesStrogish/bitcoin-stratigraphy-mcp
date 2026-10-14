@@ -313,14 +313,14 @@ class AuditVerifierTests(unittest.TestCase):
     def test_network_guard_blocks_mcp_and_untrusted_calendar_urls(self):
         network = PublicNetwork()
         for url in (
-            "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+            "https://bitcoinstratigraphy.com/mcp",
             "http://127.0.0.1:5000/mcp",
             "https://attacker.example/timestamp/11",
         ):
             with self.assertRaises(VerificationUnavailable):
                 network.get(url, 100)
         for uri in (
-            "https://bitcoin-stratigraphy-dashboard.replit.app",
+            "https://bitcoinstratigraphy.com",
             "https://user:password@alice.btc.calendar.opentimestamps.org",
             "https://alice.btc.calendar.opentimestamps.org/mcp",
         ):

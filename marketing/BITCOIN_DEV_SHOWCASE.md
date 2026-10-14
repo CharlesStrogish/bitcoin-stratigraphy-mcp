@@ -12,7 +12,7 @@ proof material, and an explicit payment boundary.
 
 The public endpoint is:
 
-**https://bitcoin-stratigraphy-dashboard.replit.app/mcp**
+**https://bitcoinstratigraphy.com/mcp**
 
 It exposes 14 tools over Streamable HTTP, supports MCP `2025-11-25`, and uses
 Lightning L402 plus conditional Base USDC x402 when that settlement path is
@@ -251,7 +251,7 @@ const client = new Client({ name: "bitcoin-dev-discovery", version: "1.0.0" });
 
 try {
   await client.connect(new StreamableHTTPClientTransport(
-    new URL("https://bitcoin-stratigraphy-dashboard.replit.app/mcp"),
+    new URL("https://bitcoinstratigraphy.com/mcp"),
   ));
   const catalog = await client.listTools();
   console.log(catalog.tools.map((tool) => tool.name));
@@ -273,10 +273,10 @@ checked-in examples, or logs.
 
 Public references:
 
-- [MCP endpoint](https://bitcoin-stratigraphy-dashboard.replit.app/mcp)
+- [MCP endpoint](https://bitcoinstratigraphy.com/mcp)
   — use an MCP client; this is not a conventional HTML landing page.
-- [Server card](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json)
-- [Agent discovery guide](https://bitcoin-stratigraphy-dashboard.replit.app/llms.txt)
+- [Server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
+- [Agent discovery guide](https://bitcoinstratigraphy.com/llms.txt)
 - [Glama tool catalog and current rating](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
 
 I'd welcome technical feedback on the payment/proof trust boundaries:

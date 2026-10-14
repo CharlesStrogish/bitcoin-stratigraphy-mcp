@@ -2,9 +2,9 @@
 # No Docker build, local start command, wallet secrets, or server changes needed.
 # Smithery currently registers remote servers by URL, not by deploying this YAML:
 # https://smithery.ai/docs/build/publish
-# smithery mcp publish "https://bitcoin-stratigraphy-dashboard.replit.app/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
+# smithery mcp publish "https://bitcoinstratigraphy.com/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
 name: bitcoin-stratigraphy
-version: "2.1.2"
+version: "2.1.3"
 displayName: Bitcoin Stratigraphy Notary
 description: |-
   OpenTimestamps AI Notary Hub: 15 L402-gated tools (13 paid, 2 free sandbox tools), LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and Free Sandbox available through stratigraphy.list and proof.list.
@@ -39,16 +39,16 @@ tags:
   - thermodynamic
   - mcp
   - streamable-http
-homepage: https://bitcoin-stratigraphy-dashboard.replit.app
+homepage: https://bitcoinstratigraphy.com
 transport:
   # MCP 2025-11-25 negotiated successfully at this public endpoint.
   type: streamable-http
-  url: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+  url: https://bitcoinstratigraphy.com/mcp
 connection:
   sdk: "@modelcontextprotocol/sdk"
   clientTransportImport: "@modelcontextprotocol/sdk/client/streamableHttp.js"
   clientTransportClass: StreamableHTTPClientTransport
-  url: https://bitcoin-stratigraphy-dashboard.replit.app/mcp
+  url: https://bitcoinstratigraphy.com/mcp
   note: >-
     No connection-time credentials are required for discovery. A wallet-enabled
     client must handle HTTP 402 and retry with Authorization: L402

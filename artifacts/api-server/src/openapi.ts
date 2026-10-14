@@ -3,9 +3,10 @@ import openApiSource from "../../../lib/api-spec/openapi.yaml";
 import { mcpToolPrices } from "./lib/mcp-pricing";
 import { primaryStratigraphyContracts } from "./services/primaryStratigraphySchemas";
 import { mcpToolDefinitions } from "./routes/mcp";
+import { RELEASE_VERSION } from "./lib/public-site";
 
 export const openApiDocument = parse(openApiSource) as Record<string, unknown>;
-(openApiDocument.info as Record<string, unknown>).version = "2.1.0";
+(openApiDocument.info as Record<string, unknown>).version = RELEASE_VERSION;
 const tools = openApiDocument["x-mcp-tools"] as Record<
   string,
   { annotations?: Record<string, unknown> }

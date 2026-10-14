@@ -19,6 +19,7 @@ import {
 import {
   ESCROW_APPLICATION, SIMULATOR_DESCRIPTION, SIMULATOR_TITLE, SIMULATOR_URL,
 } from "./src/lib/escrow-seo";
+import { siteUrl } from "./src/lib/site";
 
 const routes = [
   {
@@ -31,7 +32,7 @@ const routes = [
     path: "standard",
     title: "API Access & Pricing | Bitcoin Stratigraphy",
     description: "Discover Bitcoin Stratigraphy API access, live L402 micropayment pricing, and commercial licensing for autonomous agents.",
-    url: "https://bitcoin-stratigraphy-dashboard.replit.app/standard",
+    url: siteUrl("/standard"),
   },
   {
     path: "enterprise",
@@ -67,6 +68,7 @@ function pageHead(html: string, page: (typeof routes)[number]): string {
     ["twitter:title", page.title],
     ["twitter:description", page.description],
     ["og:url", page.url],
+    ["twitter:url", page.url],
   ]) {
     const tag = new RegExp(
       `<meta\\b(?=[^>]*\\b(?:name|property)="${key}")[^>]*>`,

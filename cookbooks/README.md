@@ -35,7 +35,7 @@ dependencies, prepaid 100-call L402 Macro-Macaroon headers, local wallet proxies
 safe discovery mode, and explicit agent execution.
 
 Connect Python agents to the remote Bitcoin Stratigraphy server at
-**https://bitcoin-stratigraphy-dashboard.replit.app/mcp**. No local server is
+**https://bitcoinstratigraphy.com/mcp**. No local server is
 needed. MCP uses **Streamable HTTP**, not a legacy `/sse` transport.
 
 The scripts default to **free discovery**. They do not ask an LLM to act, pay an
@@ -49,13 +49,14 @@ From the repository root, with Python available:
 ```sh
 python -m pip install "httpx==0.28.1" "langchain-mcp-adapters==0.3.2"
 python cookbooks/crewai_example.py
-python cookbooks/langchain_example.py --payment-info
+python cookbooks/langchain_example.py
 python cookbooks/autogen_example.py
 ```
 
-The CrewAI and AutoGen commands validate the remote 14-tool catalog and fetch
+The CrewAI and AutoGen commands validate the remote 15-tool catalog and fetch
 free REST pricing. LangChain discovers real framework tools through
-`MultiServerMCPClient` and optionally calls free `payment.get_info`.
+`MultiServerMCPClient`; its optional `--payment-info` flag calls the L402-paid
+`payment.get_info` tool and needs a configured payment hook.
 No OpenAI key or wallet is required. Each command normally finishes in seconds;
 network outages or uncached package downloads can take longer. LangChain has a
 55-second overall timeout.
@@ -66,7 +67,7 @@ For the standalone HTTPX client only:
 python cookbooks/l402_client.py
 ```
 
-This calls free `payment.get_info`. The default API URL can be changed with
+This calls the free `stratigraphy.list` tool. The default API URL can be changed with
 `--url https://your-server.example/mcp`; REST requests use that URL's origin.
 
 ### Dependencies for actual agent execution
@@ -106,7 +107,7 @@ than a different `python` binary that may still be on the shell's PATH:
 
 ```sh
 uv run --no-sync python cookbooks/crewai_example.py
-uv run --no-sync python cookbooks/langchain_example.py --payment-info
+uv run --no-sync python cookbooks/langchain_example.py
 uv run --no-sync python cookbooks/autogen_example.py
 uv run --no-sync python -m unittest cookbooks.test_l402_client -v
 ```
@@ -149,7 +150,7 @@ but an OTS receipt is not a ZK proof. These cookbooks do not generate dummy
 proofs, fabricate verification keys, or claim successful verification without a
 server result. Each Crew task permits only one paid tool invocation.
 
-### LangChain + LangGraph: all 14 tools, four namespaces
+### LangChain + LangGraph: all 15 tools, four namespaces
 
 `langchain_example.py` uses `MultiServerMCPClient` with
 `transport="streamable_http"` and a supported `httpx_client_factory`. It
@@ -157,7 +158,7 @@ discovers and validates all canonical tools before giving them to a
 LangGraph `create_react_agent`:
 
 - **stratigraphy (5):** `list`, `get`, `get_digest`, `get_diff`, `get_range`.
-- **proof (6):** `attenuate`, `verify`, `get_by_hash`, `list`, `submit`, `ground`.
+- **proof (7):** `attenuate`, `verify`, `get_by_hash`, `list`, `submit`, `notarize`, `ground`.
 - **mesh (2):** `get_status`, `broadcast`.
 - **payment (1):** `get_info`.
 
@@ -172,10 +173,10 @@ python cookbooks/langchain_example.py --run \
 
 The model sees underscore aliases such as `stratigraphy_get` because OpenAI
 function names do not allow dots. The adapter still sends the canonical dotted
-MCP names on the wire. All 14 tools, including state-changing `proof.submit` and
+MCP names on the wire. All 15 tools, including state-changing `proof.submit` and
 `mesh.broadcast`, are available in agent mode: enable it only for an authorized
-agent. The demo prompt starts with free pricing discovery; it does not require
-a paid call to produce an answer.
+agent. The demo prompt asks for `payment.get_info` pricing, which is an
+L402-paid call; configure a payment hook and spending limits before `--run`.
 
 `create_react_agent` remains available but is deprecated in current LangGraph
 in favor of LangChain's `create_agent`. It is used here to demonstrate the

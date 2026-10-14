@@ -17,7 +17,7 @@ Network Status: {metrics.get("network_resilience") or "Optimal"}
 • Query daily micro-update (10 sats): /api/latest
 • Access 422+ day dataset (100 sats): /api/v1/stratigraphy
 
-🔗 Live Endpoint: https://bitcoin-stratigraphy-dashboard.replit.app
+🔗 Live Endpoint: https://bitcoinstratigraphy.com
 ⚡ Zaps appreciated via CRSTROGISH@COINOS.IO
 """
     print("=== Daily Nostr Teaser Payload ===")

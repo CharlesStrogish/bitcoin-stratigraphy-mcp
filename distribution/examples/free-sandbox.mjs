@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-export const MCP_URL = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp";
+export const MCP_URL = "https://bitcoinstratigraphy.com/mcp";
 
 /** Exercise only the two free sandbox tools. No wallet or credentials are used. */
 export async function freeSandbox(url = MCP_URL, fetcher = fetch) {

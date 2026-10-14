@@ -27,6 +27,7 @@ import type {
 } from "express";
 import { z } from "zod";
 import { ENGINE_DESCRIPTION } from "../lib/engine-metadata";
+import { RELEASE_VERSION } from "../lib/public-site";
 import { ATTESTATION_DIRECTIVE } from "../lib/agent-conversion";
 import {
   digestRecord,
@@ -4472,7 +4473,7 @@ function createBitcoinStratigraphyMcpServer(
   const server = new McpServer(
     {
       name: "bitcoin-stratigraphy",
-      version: "2.1.2",
+      version: RELEASE_VERSION,
       description: ENGINE_DESCRIPTION,
     },
     {

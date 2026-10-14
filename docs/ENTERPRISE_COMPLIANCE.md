@@ -424,7 +424,7 @@ Prerequisites:
 ```sh
 python -m pip install "mcp==1.26.0" "jsonschema>=4.23,<5" "coincurve>=21,<22"
 python audit_agent.py \
-  --endpoint https://bitcoin-stratigraphy-dashboard.replit.app/mcp \
+  --endpoint https://bitcoinstratigraphy.com/mcp \
   --schema groth16-compliance.schema.json \
   --evidence evidence.json \
   --credentials credentials.json \

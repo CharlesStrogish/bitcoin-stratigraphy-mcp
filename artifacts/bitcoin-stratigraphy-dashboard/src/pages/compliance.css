@@ -31,6 +31,7 @@
 .cmp-mail { color: #e8b04a; text-underline-offset: 4px; }
 .cmp-page .cmp-nav .control-button { white-space: normal; }
 .cmp-page .cmp-mail { overflow-wrap: anywhere; }
+.cmp-page .ciso-actions { margin: 0 0 18px; }
 @media (prefers-reduced-motion: reduce) {
   .cmp-page .cmp-cta { transition: none; }
   .cmp-page .cmp-cta:hover { transform: none; }

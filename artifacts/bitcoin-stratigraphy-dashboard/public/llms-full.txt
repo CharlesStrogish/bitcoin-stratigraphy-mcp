@@ -1,157 +1,257 @@
-# Bitcoin Stratigraphy - Complete MCP Tool Reference
+# Bitcoin Stratigraphy Data Engine — Complete Agent Reference (v2.1.3)
 
-> Static reference for the fourteen canonical tools returned by `tools/list` at https://bitcoin-stratigraphy-dashboard.replit.app/mcp. JSON Schemas below include every input property, type, required field, enum, range, pattern, and additional-properties rule. Human-readable examples and property descriptions are condensed; `tools/list` is authoritative for the live metadata and any later schema changes.
+> Static reference for the fifteen canonical MCP tools returned by `tools/list` at https://bitcoinstratigraphy.com/mcp, plus installation, L402 settlement, the genesis settlement proof and licensing terms. Tool descriptions below are the published live descriptions; JSON Schemas keep every property, type, required field, enum, range, pattern and additional-properties rule, with descriptive annotations and sample values removed. `tools/list` is authoritative for live metadata and any later schema changes.
+
+## Overview
+
+Bitcoin Stratigraphy (canonical origin https://bitcoinstratigraphy.com) serves Bitcoin pipeline telemetry, cryptographic verification, OpenTimestamps notarization and off-chain Bitcoin-tip receipts to autonomous agents. It exposes 15 canonical MCP tools in 4 namespaces (`stratigraphy`, `proof`, `mesh`, `payment`) over MCP Streamable HTTP, plus paid REST routes, all settled with L402 Lightning payments. Two tools are free sandbox discovery tools: `stratigraphy.list` and `proof.list`. The other thirteen are paid per call (currently 250 sats each); confirm live prices with `payment.get_info` or the free pre-flight quote endpoint.
+
+- MCP endpoint (Streamable HTTP, JSON-RPC 2.0): https://bitcoinstratigraphy.com/mcp
+- MCP discovery manifest: https://bitcoinstratigraphy.com/.well-known/mcp.json
+- Concise guide: https://bitcoinstratigraphy.com/llms.txt
+- OpenAPI document: https://bitcoinstratigraphy.com/openapi.json
+- CISO due-diligence brief: https://bitcoinstratigraphy.com/api/v1/enterprise/due-diligence-brief
 
 ## Developer portal, Python SDK and integration cookbooks
 
-- [Interactive Developer Portal & Live Tool Explorer](https://bitcoin-stratigraphy-dashboard.replit.app/docs): inspect live schemas and manually test the 14 canonical MCP tools across 4 namespaces.
-- [Integration suite](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks): setup guide and CrewAI, LangChain and AutoGen examples.
-- [Python SDK/client source](https://bitcoin-stratigraphy-dashboard.replit.app/cookbooks/l402_client.py): HTTPX-based remote JSON-RPC client with bounded, explicit L402 Lightning payment callbacks. It never pays automatically.
-- [MCP discovery manifest](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp.json): direct documentation and SDK links.
+- [Interactive Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs): inspect live schemas and manually test the 15 canonical MCP tools across 4 namespaces.
+- [Integration suite](https://bitcoinstratigraphy.com/cookbooks): setup guide and CrewAI, LangChain and AutoGen examples.
+- [Python SDK/client source](https://bitcoinstratigraphy.com/cookbooks/l402_client.py): HTTPX-based remote JSON-RPC client with bounded, explicit L402 Lightning payment callbacks. It never pays automatically.
+- [MCP discovery manifest](https://bitcoinstratigraphy.com/.well-known/mcp.json): direct documentation and SDK links.
 
-For free batch pricing, POST `{"tools":["stratigraphy.get_latest","proof.verify_zk_proof"]}` as JSON to `https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost`. The response includes `perToolSats`, itemized `items`, `total_sats` and `l402` invoice-generation details. These two descriptive pricing selectors resolve to canonical `stratigraphy.get` and `proof.verify` only for quoting; they are not new callable MCP tools. No invoice is created or paid by a quote, and the aggregate total is not a multi-tool credential. Each paid tools/call obtains its own path-bound, single-use L402 challenge. Existing GET tier/asset discovery remains available.
+## Install and connect
+
+Hosted agents connect any MCP Streamable HTTP client to https://bitcoinstratigraphy.com/mcp; tool discovery needs no wallet credential. To run the self-hosted engine:
+
+```sh
+npx -y @bitcoin-stratigraphy/mcp-server
+```
+
+The package starts a Streamable HTTP server at `http://127.0.0.1:8008/mcp` (set `PORT` to change it); it is an HTTP server, not a stdio connector. It requires Node.js 22+, PostgreSQL (`DATABASE_URL`, with the packaged `dist/database.sql` applied once to a new database), `SESSION_SECRET` and `NOSTR_PRIVATE_KEY`. Live Lightning requires `NWC_URI`, and the canonical stratigraphy tools require the licensed Python companion on `127.0.0.1:8000`. Supply credentials through a secret manager, never on a command line. See the package README for companion setup and Sovereign Node RPC configuration.
+
+## The 15 canonical tools at a glance
+
+- `stratigraphy.list` (free): discover UTC archive bounds, the current Bitcoin tip height and catalog metadata, without paid snapshot or proof bytes.
+- `stratigraphy.get` (250 sats): retrieve full live pipeline telemetry and selected archived UTC snapshots with their OpenTimestamps receipts.
+- `stratigraphy.get_digest` (250 sats): fetch SHA-256 fingerprints of archived or live pipeline JSON (not Bitcoin block hashes or ZK proofs) with associated receipts.
+- `stratigraphy.get_diff` (250 sats): compute signed deltas between two live or archived snapshots, including the 15 J/TH power change.
+- `stratigraphy.get_range` (250 sats): retrieve fingerprints for a contiguous span of captured UTC snapshots bounded by heights or dates.
+- `proof.attenuate` (250 sats): narrow an authentic, unexpired L402 parent macaroon with restrictive caveats and an optional TTL.
+- `proof.verify` (250 sats): verify supplied Groth16 telemetry or drift proofs, or OpenTimestamps receipts.
+- `proof.get_by_hash` (250 sats): retrieve a retained proof payload, signed receipt or lifecycle status by hash or job ID.
+- `proof.list` (free): discover and paginate recent proof-attestation lifecycle summaries.
+- `proof.submit` (250 sats): register a new Groth16 proof with its five public signals and attempt a Nostr NIP-78 attestation.
+- `proof.notarize` (250 sats): create a detached OpenTimestamps receipt for a SHA-256 digest using public calendars.
+- `proof.ground` (250 sats): issue an off-chain Schnorr-signed Bitcoin-tip receipt for agent context or a dataset CID.
+- `mesh.get_status` (250 sats): inspect peer counts, topology health, cross-validation rate, latency and quorum.
+- `mesh.broadcast` (250 sats): sign a stored daily telemetry snapshot and distribute it to pinned mesh peers.
+- `payment.get_info` (250 sats): query MCP pricing or verify authenticated settlement.
+
+## Protocol and payment
+
+Use Streamable HTTP: POST JSON-RPC 2.0 to `https://bitcoinstratigraphy.com/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`, and `MCP-Protocol-Version: 2025-11-25`. List tools using `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`; call one using `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"stratigraphy.list","arguments":{}}}`. `tools/list`, `stratigraphy.list` and `proof.list` are free. Paid calls return an HTTP 402 L402 invoice challenge before they can return their tool result. Prices and supported assets are endpoint- and policy-dependent: confirm MCP terms with `payment.get_info`, REST prices/assets with GET `https://bitcoinstratigraphy.com/api/v1/cost`, and use the actual challenge. Never send a wallet secret in an MCP request.
+
+For free batch pricing, POST `{"tools":["stratigraphy.get_latest","proof.verify_zk_proof"]}` as JSON to `https://bitcoinstratigraphy.com/api/v1/cost`. The response includes `perToolSats`, itemized `items`, `total_sats` and `l402` invoice-generation details. These two descriptive pricing selectors resolve to canonical `stratigraphy.get` and `proof.verify` only for quoting; they are not new callable MCP tools. No invoice is created or paid by a quote, and the aggregate total is not a multi-tool credential. Each paid `tools/call` obtains its own path-bound L402 challenge. For 100 calls to one paid tool, request its challenge with `X-L402-Batch-Size: 100`, pay the 100x invoice once, and reuse that credential within its expiry and quota.
+
+### L402 settlement paths
+
+A paid request without credentials returns HTTP 402 with `WWW-Authenticate: L402 macaroon="<macaroon>", invoice="<BOLT11>"` (escrow routes use the equivalent `token=` alias). The JSON body repeats the macaroon and invoice and adds `agent_instruction`, `settlement_paths` and a `preflight` summary that links the genesis receipt. Pay the exact BOLT11 invoice, then retry the identical request with one of two proofs:
+
+- Path A (`sha256_preimage`): `Authorization: L402 <macaroon>:<preimage>`. Supply the 64-character hex preimage revealed by a self-custodial wallet; the server checks that its SHA-256 equals the invoice payment hash.
+- Path B (`nwc_lookup`): `Authorization: L402 <macaroon>:NWC_LOOKUP`. Use this when a custodial wallet such as CoinOS or Cash App does not reveal the preimage. The issuing merchant NWC wallet must confirm the exact incoming invoice, amount and description. HTTP 409 means confirmation is still pending: retry with the same macaroon and do not pay a new invoice.
+
+A payment hash alone never grants access, and invoice creation is not payment. Do not log or publish the bearer credential.
+
+The L402 router supports `btc-lightning`, `l-btc`, and `taproot-assets` where enabled. MCP uses Lightning L402; Base USDC x402 is conditional and applies only to MCP when explicitly reported available. Do not infer Base USDC support for REST. The paid REST route `GET /api/v1/stratigraphy/stream` is a separate Server-Sent Events (SSE) transport with a 30-second refresh interval, not an MCP transport. It uses L402 assets reported by `/api/v1/cost`; Base USDC is not promised for this stream.
+
+## Genesis settlement proof
+
+The operator's first mainnet escrow settlement is published for independent inspection before any payment:
+
+- Escrow ID: `ba4f25dd-7f16-420c-9264-a16f102fd5a6`
+- Merkle root: `d8cd6fe5a388e9422ccc6006969fb01c716291c14b1e85dc4e8a75c2ad134da6`
+- Settled at strata block: 971341
+- Toll: 24 sats, settled over Lightning on mainnet
+- Receipt: https://bitcoinstratigraphy.com/api/v1/escrow/genesis-receipt
+- Settlement counter: https://bitcoinstratigraphy.com/api/v1/escrow/stats
+
+The receipt is a Lightning settlement plus an RFC 6962 execution commitment (a one-leaf tree, so the root equals the execution leaf hash). It is not an on-chain Bitcoin transaction or an OpenTimestamps confirmation. The 24-sat escrow toll is USD-normalized and indicative (about $0.02); the server quotes the live amount for each new contract.
+
+## License and commercial exemption
+
+The engine is licensed under AGPLv3 (SPDX `(AGPL-3.0-only OR LicenseRef-Commercial)`).
+
+AGPL warning: AGPLv3 is a strong network copyleft license. If you modify the engine and users interact with your modified version over a network, Section 13 requires you to offer those users its complete Corresponding Source under AGPLv3; conveying the engine or a work based on it carries the same obligation. Independent programs that only exchange data with the engine over HTTP or MCP, and separately trained model weights, are not automatically covered; combining engine code into your own codebase can bring that combined work within the license. Confirm your architecture with counsel.
+
+Organizations that cannot meet those obligations can obtain a Commercial Enterprise Exemption License:
+
+- Price: Starting at $250k/Annual.
+- Delivery: "AS IS" self-hosted, air-gapped delivery on licensee-controlled private or isolated infrastructure.
+- Service levels: zero SLAs. No uptime, availability, response-time, support or maintenance commitments; your own staff install, operate, monitor, patch and secure the deployment.
+- Settlement: pricing is customized by swarm size and deployment needs, settled via a single Bitcoin transaction paid in full at the time of execution.
+- Contact: licensing@bitcoinstratigraphy.com, using the five-question CISO intake (swarm scale, event throughput, target infrastructure, EU AI Act Article 12 / Article 26(6) retention scope, and in-house technical stewardship).
+
+API fees and payment credentials do not purchase a software license; only an executed commercial agreement grants one. The dataset metadata declares CC BY 4.0; access to paid API data is separately governed by L402.
 
 ## Public dataset export for fine-tuning
 
 `GET /api/export/huggingface` requires no L402 authorization. It returns newline-delimited JSON (`application/x-ndjson`) by default, one Hugging Face instruction-tuning row per line. Use `?format=json` for a JSON array and `?limit=N` for the most recent N rows (1–500, default 500), returned oldest-to-newest. Each row has `height`, UTC `timestamp`, `target_multiplier`, `record_hash`, `zk_proof_status`, `instruction`, a formatted `prompt`, `response`, and the validated source fields needed to reproduce the fingerprint. `GET /.well-known/llm-schema.json` publishes the parameter definitions, JSON Schema, domain constraints, and hash/verification protocol for crawlers.
 
-Indexed heights and dates are deterministic daily labels, not observed per-record Bitcoin blocks. `target_multiplier` is a title-derived target-distance proxy, not measured energy. `record_hash` is SHA-256 over the listed source fields; the historical dataset has no per-record ZK proofs, so `zk_proof_status` is `unavailable`. This public export does not change the L402 requirements of interactive MCP tools.
+Export heights and dates are deterministic daily labels, not observed per-record Bitcoin blocks. `target_multiplier` is a title-derived target-distance proxy, not measured energy. `record_hash` is SHA-256 over the listed source fields; the historical dataset has no per-record ZK proofs, so `zk_proof_status` is `unavailable`. This public export does not change the L402 requirements of interactive MCP tools.
 
-## Protocol and payment
+## Tool reference
 
-Use Streamable HTTP: POST JSON-RPC 2.0 to `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`, and `MCP-Protocol-Version: 2025-11-25`. List tools using `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`; call one using `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mesh.get_status","arguments":{}}}`. `mesh.get_status`, `payment.get_info`, `stratigraphy.list`, and `tools/list` are free. Paid calls return an HTTP 402 L402 invoice challenge before they can return their tool result. Prices and supported assets are endpoint- and policy-dependent: confirm MCP terms with `payment.get_info`, REST prices/assets with GET `https://bitcoin-stratigraphy-dashboard.replit.app/api/v1/cost`, and use the actual challenge. Never send a wallet secret in an MCP request.
+Input schemas are JSON Schema objects. Annotation summaries come from each tool's MCP hints.
 
-The L402 router supports `btc-lightning`, `l-btc`, and `taproot-assets` where
-enabled. MCP uses Lightning L402; Base USDC x402 is conditional and applies
-only to MCP when explicitly reported available. Do not infer Base USDC support
-for REST. The paid REST route `GET /api/v1/stratigraphy/stream` is a separate
-Server-Sent Events (SSE) transport with a 30-second refresh interval, not an
-MCP transport. It uses L402 assets reported by `/api/v1/cost`; Base USDC is not
-promised for this stream.
+### 1. stratigraphy.list — free
 
-The seven capability areas are macaroon attenuation (including TTL/request
-limits), multi-asset payment routing, Groth16/Poseidon BN254 telemetry and
-drift verification plus separate OTS receipt verification, off-chain Schnorr
-Bitcoin-tip context/CID receipts, pinned reciprocal Nostr NIP-01/78 peer
-broadcast and quorum, indexed stratigraphy diffs/digests for efficient context,
-and the separate paid SSE stream. Nostr quorum is not source truth. Indexed
-historical daily heights are not live-tip readings or native per-record
-Bitcoin block provenance.
+**List Stratigraphy Catalog** (read-only, idempotent, closed-world).
 
-Input schemas (JSON Schema objects; descriptive fields and sample values are shortened, but validation constraints match the published tool definitions):
+Free, metadata-only discovery of real UTC archive bounds and current Bitcoin tip height; no paid snapshot or proof bytes. Historical height fields are actual captured heights. Semantic discovery: Hal Finney Horizon tracker = $10,000,000 / BTC USD price; this is a valuation multiple, not a time-to-price forecast. The 15 J/TH thermodynamic energy calculation estimates watts as (network hashrate H/s / 1e12) * 15, not measured electricity. Sovereign Node RPC telemetry uses local Bitcoin Core; price and horizon are unavailable without a fiat quote. Free metadata discovery: no Live L402 Satoshi settlement is required for this sandbox tool; no paid payload is released.
 
-## 1. stratigraphy.get — 250 sats
+```json
+{"type":"object","additionalProperties":false,"properties":{},"required":[]}
+```
 
-Retrieve indexed telemetry by recent-day count, one date, indexed block height, or a bounded/open date or block range. Selector modes cannot be combined; range upper bounds must not precede lower bounds.
+### 2. stratigraphy.get — 250 sats
+
+**Get Bitcoin Stratigraphy** (read-only, idempotent, closed-world).
+
+Paid, full fresh pipeline telemetry and exact selected historical Object Storage JSON/.ots receipts; records contain live or archived pipeline snapshots, never video-index data. Semantic discovery: Hal Finney Horizon tracker = $10,000,000 / BTC USD price; this is a valuation multiple, not a time-to-price forecast. The 15 J/TH thermodynamic energy calculation estimates watts as (network hashrate H/s / 1e12) * 15, not measured electricity. Sovereign Node RPC telemetry uses local Bitcoin Core; price and horizon are unavailable without a fiat quote. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"days":{"type":"integer","minimum":1,"maximum":365},"date":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$","minLength":1},"blockHeight":{"type":"integer","minimum":0},"metrics":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","enum":["target_multiplier","difficulty_epoch_progress","thermodynamic_signal"]}},"startDate":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$","minLength":1},"endDate":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$","minLength":1},"startBlock":{"type":"integer","minimum":0},"endBlock":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":100,"default":10}},"required":[]}
 ```
 
-## 2. stratigraphy.get_digest — 250 sats
+### 3. stratigraphy.get_digest — 250 sats
 
-Return a compressed summary for an indexed block height, ISO date, or inclusive date range such as `2026-09-01..2026-09-09` (at most 100 days). The default `latest` selects the latest *indexed dataset entry*, not the live Bitcoin tip. `minimal` returns `[height,date,target_multiplier,record_hash]`; `kv` returns `{h,ts,tm,hash}`; `compact` returns `HEIGHT:...|DATE:...|TM:...|HASH:...`. A range returns an array of these results. The hash is SHA-256 of the validated source record fields, not a Bitcoin block hash. MCP `structuredContent.proofAvailable` is `false` because the indexed dataset has no per-record ZK proof; the text content retains the exact requested compact shape.
+**Get Compressed Stratigraphy Digest** (read-only, idempotent, closed-world).
+
+Paid SHA-256 fingerprints of actual cloud JSON bytes or current live pipeline JSON, with full live telemetry and associated archived receipts alongside them. Semantic discovery: Hal Finney Horizon tracker = $10,000,000 / BTC USD price; this is a valuation multiple, not a time-to-price forecast. The 15 J/TH thermodynamic energy calculation estimates watts as (network hashrate H/s / 1e12) * 15, not measured electricity. Sovereign Node RPC telemetry uses local Bitcoin Core; price and horizon are unavailable without a fiat quote. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"target":{"type":"string","pattern":"^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2}(?:\\.\\.\\d{4}-\\d{2}-\\d{2})?)$","default":"latest"},"format":{"type":"string","enum":["compact","minimal","kv"],"default":"compact"}},"required":[]}
 ```
 
-## 3. stratigraphy.get_diff — 250 sats
+### 4. stratigraphy.get_diff — 250 sats
 
-Compare two indexed daily strata by height or ISO date. `fromTarget` is required; `toTarget` defaults to the latest indexed dataset entry, not the live Bitcoin tip. Returns `from` and `to` with `height`, `date`, and `target_multiplier`, and `delta` with signed `heightDelta`, `multiplierDelta`, `percentageChange` (a percentage string rounded to two decimals), and `timeSpanDays`. Height is a deterministic daily dataset index and the stored multiplier is not a direct measurement of energy or difficulty. Reversed targets yield negative height/day differences. A zero starting multiplier cannot produce a percentage change; unavailable targets are rejected before an L402 challenge.
+**Compare Stratigraphy Strata** (read-only, idempotent, closed-world).
+
+Paid signed deltas between real-height live/archived snapshots, including 15 J/TH power change; includes live metrics and exact archived proof bytes. Semantic discovery: Hal Finney Horizon tracker = $10,000,000 / BTC USD price; this is a valuation multiple, not a time-to-price forecast. The 15 J/TH thermodynamic energy calculation estimates watts as (network hashrate H/s / 1e12) * 15, not measured electricity. Sovereign Node RPC telemetry uses local Bitcoin Core; price and horizon are unavailable without a fiat quote. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"fromTarget":{"type":"string","pattern":"^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"},"toTarget":{"type":"string","pattern":"^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$","default":"latest"}},"required":["fromTarget"]}
 ```
 
-## 4. stratigraphy.get_range — 250 sats
+### 5. stratigraphy.get_range — 250 sats
 
-Retrieve ascending daily-index entries between inclusive `startTarget` and `endTarget` bounds, identified by exact indexed height or ISO UTC date. Mixed height/date bounds are allowed; `endTarget` defaults to the latest indexed entry, not the live tip. Reversed or unavailable targets are rejected before an invoice. `limit` defaults to 50 and caps at 100; results are truncated to the first matching records. Each item uses the same compact, minimal, or kv source-record digest format as `stratigraphy.get_digest` (fingerprint, not block hash or proof). One L402 challenge pays for the batch, not for each record.
+**Get Stratigraphy Range** (read-only, idempotent, closed-world).
+
+Paid contiguous captured UTC snapshot fingerprints bounded by actual Bitcoin heights/dates, plus full live metrics and matching upgraded archived receipts. Semantic discovery: Hal Finney Horizon tracker = $10,000,000 / BTC USD price; this is a valuation multiple, not a time-to-price forecast. The 15 J/TH thermodynamic energy calculation estimates watts as (network hashrate H/s / 1e12) * 15, not measured electricity. Sovereign Node RPC telemetry uses local Bitcoin Core; price and horizon are unavailable without a fiat quote. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"startTarget":{"type":"string","pattern":"^(?:(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$"},"endTarget":{"type":"string","pattern":"^(?:latest|(?:0|[1-9]\\d*)|\\d{4}-\\d{2}-\\d{2})$","default":"latest"},"limit":{"type":"number","minimum":1,"maximum":100,"default":50},"format":{"type":"string","enum":["compact","minimal","kv"],"default":"compact"}},"required":["startTarget"]}
 ```
 
-## 5. stratigraphy.list — free
+### 6. proof.attenuate — 250 sats
 
-List available indexed stratigraphy catalog entries.
+**Attenuate a Macaroon** (read-only, idempotent, closed-world).
 
-```json
-{"type":"object","additionalProperties":false,"properties":{},"required":[]}
-```
-
-## 6. proof.attenuate — no new invoice
-
-Derive a narrower child from an authentic, unexpired subscription macaroon. The supplied caveats accept `time_before = YYYY-MM-DD` (inclusive UTC calendar date), `time_before = ISO-UTC-timestamp`, `max_target = indexed-height`, `allowed_tools = tool.name,tool.name`, `allowed_path = /path`, and `max_requests = positive-integer`. An optional `ttlSeconds` appends an expiration caveat. The response lists canonical `key=value` caveats and a new encoded macaroon. Parent signature, expiry, and revocation are checked; a forged, expired, or revoked parent cannot produce a child. This call creates no invoice but **does not pay for the child**: using it still requires the parent's valid payment preimage and all inherited restrictions. Existing tool-scoped single-use L402 macaroons cannot be widened to other tools by delegation. Target bounds are enforced on indexed MCP telemetry selectors; a target-bound token is denied on unrelated tools and REST routes rather than silently ignoring the bound. Similarly, tool-restricted tokens are denied on REST routes.
+Attenuate an authentic, unexpired L402 parent `macaroon` by appending restrictive `caveats` and optionally `ttlSeconds`. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"macaroon":{"type":"string","minLength":1,"maxLength":8192},"caveats":{"type":"array","maxItems":16,"items":{"type":"string","minLength":1,"maxLength":256}},"ttlSeconds":{"type":"number","minimum":1,"maximum":2592000}},"required":["macaroon","caveats"]}
 ```
 
-## 7. proof.verify — 250 sats
+### 7. proof.verify — 250 sats
 
-Perform offline/stateless proof verification. The telemetry path verifies an encoded Groth16/Poseidon BN254 proof against committed public inputs and the supplied telemetry snapshot; the separate drift circuit is not described by the telemetry schema below. A distinct OTS mode verifies a complete OpenTimestamps receipt and Bitcoin attestation; neither proof-verification mode creates an off-chain Bitcoin-tip context/CID receipt (use `proof.ground`) or submits a Bitcoin transaction. Verification is distinct from attestation submission. The output requires `valid` (boolean), `verifiedAt` (ISO 8601 timestamp), and `computationTimeMs` (non-negative number).
+**Verify Groth16 or OpenTimestamps Proof** (may change state, not idempotent, open-world).
 
-```json
-{"type":"object","additionalProperties":false,"properties":{"proof":{"type":"string","minLength":1},"publicInputs":{"type":"object","additionalProperties":false,"properties":{"blockHeight":{"type":"integer","minimum":0},"snapshotDigest":{"type":"string","minLength":1},"thermodynamicHash":{"type":"string","minLength":1},"timestamp":{"type":"integer","minimum":0},"valuationSat":{"type":"integer","minimum":0}},"required":["blockHeight","snapshotDigest","thermodynamicHash","timestamp","valuationSat"]},"verificationKeyId":{"type":"string","minLength":1},"data":{"type":["object","array"]}},"required":["proof","publicInputs","verificationKeyId","data"]}
-```
-
-## 8. proof.get_by_hash — 250 sats
-
-Fetch a recorded ZK proof or receipt by hash fingerprint/CID. Do NOT use to generate new proofs or anchors. Provide either `hash` or `jobId`: `hash` accepts a proof/receipt SHA-256 fingerprint (`0x` optional), exact IPFS CID, decimal snapshot digest, UUID job ID, or an agent grounding receipt's `contextHash`; `jobId` accepts the UUID returned by `proof.submit`. Results use `kind` values `zk-proof`, `dataset-receipt`, `context-receipt`, or `zk-proof-status`. Every result has `kind`, `hash`, `status`, and `timestamp`; optional fields are `jobId`, `attestationCount`, `meshQuorum`, and `proofPayload`. A status-only result omits `proofPayload` unless a payload is actually retained—status history is never fabricated into a proof. A missing or evicted record returns HTTP 404 before an invoice. The index is bounded process memory, not a permanent archive.
+Execute cryptographic verification for supplied Groth16 telemetry or drift zk-SNARK proofs, or OpenTimestamps receipts. Returns proof validity; verification can update a bounded in-memory lifecycle index, and drift checks require a Bitcoin block provider. Use this tool to verify supplied proofs; use `proof.submit` to register new Groth16 proofs and `proof.get_by_hash` to retrieve retained proofs or signed receipts by a known identifier. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
-{"type":"object","additionalProperties":false,"properties":{"hash":{"type":"string","pattern":"^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"},"jobId":{"type":"string","format":"uuid"}},"required":[],"oneOf":[{"required":["hash"]},{"required":["jobId"]}]}
+{"type":"object","oneOf":[{"type":"object","additionalProperties":false,"properties":{"proof":{"type":"string","minLength":1},"publicInputs":{"type":"object","additionalProperties":false,"properties":{"blockHeight":{"type":"integer","minimum":0},"snapshotDigest":{"type":"string","minLength":1},"thermodynamicHash":{"type":"string","minLength":1},"timestamp":{"type":"integer","minimum":0},"valuationSat":{"type":"integer","minimum":0}},"required":["blockHeight","snapshotDigest","thermodynamicHash","timestamp","valuationSat"]},"verificationKeyId":{"type":"string","minLength":1},"data":{"type":["object","array"]},"proofType":{"type":"string","const":"groth16","default":"groth16"}},"required":["proof","publicInputs","verificationKeyId","data"]},{"type":"object","additionalProperties":false,"properties":{"circuit":{"type":"string","const":"zk.drift.v1"},"sessionContextHash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"},"targetBlockHeight":{"type":"integer","minimum":0,"maximum":4294967295},"entropyThreshold":{"type":"number","minimum":0,"maximum":1},"proof":{"type":"object","additionalProperties":false,"properties":{"circuit":{"type":"string","const":"zk.drift.v1"},"pi_a":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","minLength":1}},"pi_b":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"array","minItems":2,"maxItems":2,"items":{"type":"string","minLength":1}}},"pi_c":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","minLength":1}},"publicSignals":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},"verificationKeyId":{"type":"string","minLength":1}},"required":["circuit","pi_a","pi_b","pi_c","publicSignals","verificationKeyId"]},"driftScore":{"type":"number"},"isAligned":{"type":"boolean"},"thermodynamicEntropyBits":{"type":"number","minimum":0},"blockHash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"},"compactTarget":{"type":"integer","minimum":0,"maximum":4294967295},"proofType":{"type":"string","const":"groth16","default":"groth16"}},"required":["circuit","sessionContextHash","targetBlockHeight","entropyThreshold","proof"]},{"type":"object","additionalProperties":false,"properties":{"proofType":{"type":"string","const":"ots"},"otsProof":{"type":"string","minLength":1,"maxLength":1048576},"targetHash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"}},"required":["proofType","otsProof","targetHash"]}]}
 ```
 
-## 9. proof.list — 10 sats
+### 8. proof.get_by_hash — 250 sats
 
-List the bounded process-memory attestation index with optional pagination and status filtering; it is not a durable archive.
+**Get Proof or Receipt by Hash** (read-only, idempotent, closed-world).
+
+Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"hash":{"type":"string","pattern":"^(?:(?:0x)?[0-9a-fA-F]{64}|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|\\d{1,77}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"},"jobId":{"type":"string","format":"uuid"}},"oneOf":[{"required":["hash"]},{"required":["jobId"]}]}
+```
+
+### 9. proof.list — free
+
+**List Proof Attestations** (read-only, idempotent, closed-world).
+
+Freely discover, filter, and paginate recent zk-proof attestation lifecycle summaries. Use limit (1-100), offset (0-1000), and optional status (verified, cached, pending, invalid). Returns bounded summaries, not full proofs or receipts. Alias: proof.status. No invoice is created. Free metadata discovery: no Live L402 Satoshi settlement is required for this sandbox tool; no paid payload is released.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"maximum":100,"default":20},"offset":{"type":"integer","minimum":0,"maximum":1000,"default":0},"status":{"type":"string","enum":["verified","cached","pending","invalid"]}},"required":[]}
 ```
 
-## 10. proof.submit — 250 sats
+### 10. proof.submit — 250 sats
 
-Submit new ZK proof instances to process memory. Do NOT use to verify existing proofs (use `proof.verify`). Submit Groth16 coordinates in camelCase (`piA`, `piB`, `piC`) and five public signals, in order: block height, thermodynamic hash, timestamp, valuation in sats, and snapshot digest. The result requires `proofHash`, UUID `jobId`, `status`, `submittedAt`, and `attestationStatus`; `jobId` is indexed for lookup with `proof.get_by_hash`.
+**Submit ZK Proof** (may change state, not idempotent, open-world).
+
+PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{"proof":{"type":"object","additionalProperties":false,"properties":{"piA":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","pattern":"^\\d+$"}},"piB":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"array","minItems":2,"maxItems":2,"items":{"type":"string","pattern":"^\\d+$"}}},"piC":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","pattern":"^\\d+$"}}},"required":["piA","piB","piC"]},"publicSignals":{"type":"array","minItems":5,"maxItems":5,"items":{"type":"string","pattern":"^\\d+$"}},"snapshotDigest":{"type":"string","pattern":"^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"}},"required":["proof","publicSignals"]}
 ```
 
-## 11. proof.ground — 250 sats
+### 11. proof.notarize — 250 sats
 
-Issue an off-chain Schnorr-signed receipt binding agent context or a dataset CID to an observed Bitcoin tip. This is not a Bitcoin transaction or on-chain anchor. Do NOT use for stateless proof verification (use `proof.verify`) or querying existing hashes (use `proof.get_by_hash`). The input accepts either agent context (`contextHash`, `agentId`, optional `metadata`) or a dataset identifier (`cid`, optional `nostrEventId` and `context`). The output nests the result under `receipt`. For CID input, `receipt` is the original dataset wrapper with `receiptHash`, `blockTip`, `blockHash`, `ipfsCid`, `attestation: {proofPayload, verified: true}`, and `timestamp`; parse the original signed dataset payload with `JSON.parse(receipt.attestation.proofPayload)`. Context grounding receipts are also indexed under their `contextHash` for `proof.get_by_hash`. These receipts are not Groth16 proofs or proof of work. Context metadata must fit the server's 16 KiB serialized limit.
+**Notarize a SHA256 Digest with OpenTimestamps** (may change state, not idempotent, open-world).
 
-```json
-{"type":"object","oneOf":[{"type":"object","additionalProperties":false,"properties":{"contextHash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$","minLength":64,"maxLength":64},"agentId":{"type":"string","minLength":1,"maxLength":256},"metadata":{"type":"object","additionalProperties":true}},"required":["contextHash","agentId"]},{"type":"object","additionalProperties":false,"properties":{"cid":{"type":"string","pattern":"^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$","maxLength":256},"nostrEventId":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"},"context":{"type":"object","additionalProperties":true}},"required":["cid"]}]}
-```
-
-## 12. payment.get_info — free
-
-Return the standard 250-sat amount, actual per-tool prices (0 for free tools and 10 for `proof.list`; `stratigraphy.list` is free and `proof.get_by_hash` is 250 sats), 3,600-second Lightning L402 invoice expiry, HTTP 402 challenge fields, and path-bound single-use Macaroon requirements. Pass an advertised `toolName` to narrow the pricing map; omit it for every canonical tool. This call does not create an invoice.
+PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
-{"type":"object","additionalProperties":false,"properties":{"toolName":{"type":"string","minLength":1}},"required":[]}
+{"type":"object","additionalProperties":false,"properties":{"hash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$","minLength":64,"maxLength":64}},"required":["hash"]}
 ```
 
-## 13. mesh.get_status — free
+### 12. proof.ground — 250 sats
 
-Inspect mesh topology, configured and active peers, and quorum readiness without making a paid call.
+**Ground Agent Context in Bitcoin State** (may change state, not idempotent, open-world).
+
+PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"contextHash":{"type":"string","pattern":"^[0-9a-fA-F]{64}$","minLength":64,"maxLength":64},"agentId":{"type":"string","minLength":1,"maxLength":256},"metadata":{"type":"object","additionalProperties":true},"cid":{"type":"string","pattern":"^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,}|(?:0x)?[0-9a-fA-F]{64})$","maxLength":256},"nostrEventId":{"type":"string","pattern":"^[0-9a-fA-F]{64}$"},"context":{"type":"object","additionalProperties":true}},"oneOf":[{"required":["contextHash","agentId"]},{"required":["cid"]}]}
+```
+
+### 13. mesh.get_status — 250 sats
+
+**Get Mesh Status** (read-only, idempotent, open-world).
+
+Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Requires L402 authorization; use mesh.broadcast to distribute a snapshot. This tool does not administer peers or edit topology. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
 {"type":"object","additionalProperties":false,"properties":{},"required":[]}
 ```
 
-## 14. mesh.broadcast — 250 sats
+### 14. mesh.broadcast — 250 sats
 
-Broadcast a freshly signed existing telemetry record to configured mesh peers. The payload is a date selector, not arbitrary caller-provided telemetry; this can change peer state.
+**Broadcast Telemetry Snapshot to Mesh** (may change state, not idempotent, open-world).
+
+PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
-{"type":"object","additionalProperties":false,"properties":{"signalType":{"type":"string","enum":["telemetry_snapshot"]},"payload":{"type":"object","additionalProperties":false,"properties":{"date":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$"}},"required":["date"]}},"required":["signalType","payload"]}
+{"type":"object","additionalProperties":false,"properties":{"signalType":{"type":"string","enum":["telemetry_snapshot"]},"payload":{"type":"object","additionalProperties":false,"properties":{"date":{"type":"string","format":"date","pattern":"^\\d{4}-\\d{2}-\\d{2}$"}},"required":["date"]},"agentEvent":{"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[0-9a-f]{64}$"},"pubkey":{"type":"string","pattern":"^[0-9a-f]{64}$"},"sig":{"type":"string","pattern":"^[0-9a-f]{128}$"},"kind":{"type":"integer","const":20079},"created_at":{"type":"integer"},"tags":{"type":"array","items":{"type":"array","items":{"type":"string"}}},"content":{"type":"string"}},"required":["id","pubkey","sig","kind","created_at","tags","content"]}},"required":["signalType","payload"]}
 ```
 
+### 15. payment.get_info — 250 sats
+
+**Query MCP Prices or Verify Payment Settlement** (may change state, not idempotent, open-world).
+
+Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
+
+```json
+{"type":"object","additionalProperties":false,"properties":{"toolName":{"type":"string","minLength":1},"action":{"type":"string","enum":["query","settle"],"default":"query"},"paymentHash":{"type":"string","pattern":"^(0x)?[0-9a-fA-F]{64}$"},"preimage":{"type":"string","pattern":"^([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|NWC_LOOKUP|nwc_lookup)$"},"txHash":{"type":"string","pattern":"^0x[0-9a-fA-F]{64}$"},"paymentMacaroon":{"type":"string","minLength":1,"maxLength":8192}},"required":[],"oneOf":[{"type":"object","additionalProperties":false,"properties":{"toolName":{"type":"string","minLength":1},"action":{"type":"string","const":"query","default":"query"}}},{"type":"object","additionalProperties":false,"properties":{"action":{"type":"string","const":"settle"},"paymentHash":{"type":"string","pattern":"^(0x)?[0-9a-fA-F]{64}$"},"preimage":{"type":"string","pattern":"^([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|NWC_LOOKUP|nwc_lookup)$"},"txHash":{"type":"string","pattern":"^0x[0-9a-fA-F]{64}$"},"paymentMacaroon":{"type":"string","minLength":1,"maxLength":8192}},"required":["action","paymentHash"],"not":{"required":["preimage","txHash"]}}]}
+```
 ## TypeScript SDK
 
 The repository's TypeScript SDK supplies an L402-aware REST client and an NWC wallet adapter. Pass an NWC client obtained by your application; never hardcode a pairing URI, private key or invoice preimage in source. REST subscription credentials have REST-specific path/request/expiry scope; they are distinct from MCP paid-call authorizations and cannot be carried across scopes.
@@ -160,7 +260,7 @@ The repository's TypeScript SDK supplies an L402-aware REST client and an NWC wa
 import { BitcoinStratigraphyClient, NwcWalletAdapter } from "@bitcoin-stratigraphy/sdk";
 
 const client = new BitcoinStratigraphyClient({
-  baseUrl: "https://bitcoin-stratigraphy-dashboard.replit.app",
+  baseUrl: "https://bitcoinstratigraphy.com",
   wallet: new NwcWalletAdapter(yourNwcClient),
 });
 

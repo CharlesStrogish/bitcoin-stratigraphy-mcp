@@ -585,7 +585,7 @@ async function sendPaidDataset(
   res.status(200).type("application/json").send(body);
 }
 
-import { awaitingPaymentPreview, expectedRestOutputSchema } from "../lib/agent-conversion";
+import { awaitingPaymentPreview, expectedRestOutputSchema, l402ChallengeGuidance } from "../lib/agent-conversion";
 import { parseL402Header, paymentVerificationProof } from "../middleware/l402";
 
 async function sendPaymentChallenge(
@@ -771,6 +771,7 @@ async function sendPaymentChallenge(
           }
         : undefined,
       passes,
+      ...l402ChallengeGuidance(),
       staged_preview: awaitingPaymentPreview(Math.ceil(amountMsats / 1000), expectedRestOutputSchema(req)),
     });
   } catch (error) {

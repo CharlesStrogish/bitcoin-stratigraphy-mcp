@@ -50,7 +50,7 @@ AGENT_TIMEOUT_SECONDS = 55.0
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Discover the live 14-tool MCP catalog without a model, or run an "
+            "Discover the live 15-tool MCP catalog without a model, or run an "
             "optional payment-enabled LangGraph agent."
         )
     )
@@ -58,12 +58,15 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--run",
         action="store_true",
-        help="Run a ChatOpenAI/LangGraph agent over all 14 discovered tools.",
+        help="Run a ChatOpenAI/LangGraph agent over all 15 discovered tools.",
     )
     parser.add_argument(
         "--payment-info",
         action="store_true",
-        help="Also call the free payment.get_info(action='query') tool.",
+        help=(
+            "Also call payment.get_info(action='query'). It is an L402-paid "
+            "tool, so configure --pay-hook and spending limits first."
+        ),
     )
     args = parser.parse_args()
     if not getattr(args, "url", None):
@@ -79,9 +82,9 @@ def _parse_args() -> argparse.Namespace:
 
 def _validate_catalog(tools: list[Any]) -> dict[str, Any]:
     """Validate names and namespaces before displaying or exposing tools."""
-    if len(CANONICAL_TOOLS) != 14:
+    if len(CANONICAL_TOOLS) != 15:
         raise RuntimeError(
-            "l402_client.CANONICAL_TOOLS must contain exactly 14 canonical names"
+            "l402_client.CANONICAL_TOOLS must contain exactly 15 canonical names"
         )
     if not REQUIRED_CANONICAL_TOOLS.issubset(CANONICAL_TOOLS):
         raise RuntimeError(
@@ -130,9 +133,9 @@ def _validate_catalog(tools: list[Any]) -> dict[str, Any]:
         raise RuntimeError("MCP tool catalog validation failed: " + "; ".join(details))
 
     by_name = {tool.name: tool for tool in tools}
-    if len(by_name) != 14:
+    if len(by_name) != 15:
         raise RuntimeError(
-            f"Expected 14 unique MCP tools; server returned {len(by_name)}"
+            f"Expected 15 unique MCP tools; server returned {len(by_name)}"
         )
     return by_name
 
@@ -225,7 +228,7 @@ async def _run(args: argparse.Namespace) -> None:
             info = await by_name["payment.get_info"].ainvoke({"action": "query"})
         except Exception as error:
             raise RuntimeError(
-                "Free payment.get_info(action='query') failed: "
+                "Paid payment.get_info(action='query') failed: "
                 f"{type(error).__name__}: {error}"
             ) from error
         print("payment.get_info(action='query'):")

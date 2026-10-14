@@ -18,7 +18,7 @@ except ImportError:
     urllib3 = None
 
 
-DEFAULT_MCP_SERVER_URL = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+DEFAULT_MCP_SERVER_URL = "https://bitcoinstratigraphy.com/mcp"
 WalletHandler = Callable[[str], str | Mapping[str, Any]]
 _CHALLENGE = re.compile(r'L402\s+macaroon="([^"\r\n]+)",\s*invoice="([^"\r\n]+)"', re.I)
 _PREIMAGE = re.compile(r"[0-9a-fA-F]{64}")

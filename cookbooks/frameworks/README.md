@@ -2,7 +2,7 @@
 
 All **15 canonical tools** are discovered through Streamable HTTP MCP at:
 
-`https://bitcoin-stratigraphy-dashboard.replit.app/mcp`
+`https://bitcoinstratigraphy.com/mcp`
 
 The examples demonstrate native connections, without the older custom Python client:
 

@@ -6,8 +6,7 @@ import {
   type VerifiedEvent,
 } from "nostr-tools";
 
-const DEFAULT_API_BASE_URL =
-  "https://bitcoin-stratigraphy-dashboard.replit.app";
+const DEFAULT_API_BASE_URL = "https://bitcoinstratigraphy.com";
 const DEFAULT_RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",

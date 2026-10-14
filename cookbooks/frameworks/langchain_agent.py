@@ -18,7 +18,7 @@ import re
 import sys
 from urllib.parse import urlsplit
 
-MCP_URL = "https://bitcoin-stratigraphy-dashboard.replit.app/mcp"
+MCP_URL = "https://bitcoinstratigraphy.com/mcp"
 DEMO_TOOLS = {"proof.notarize", "stratigraphy.list"}
 SAMPLE_HASH = hashlib.sha256(b"Bitcoin Stratigraphy framework quickstart").hexdigest()
 

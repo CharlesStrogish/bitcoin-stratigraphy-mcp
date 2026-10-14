@@ -98,6 +98,37 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     assert.equal(quoted.staged_preview.merkle_standard, "RFC 6962 SHA-256");
     assert.deepEqual(quoted.staged_preview.expected_output_schema.required, ["paid"]);
     assert.match(quoted.staged_preview.agent_instruction, /have not run/);
+    const guidance = quoted as unknown as {
+      agent_instruction: string;
+      settlement_paths: Array<{ id: string; authorization: string }>;
+      preflight: {
+        genesis_receipt: {
+          path: string;
+          canonical_url: string;
+          escrow_id: string;
+          settled_at_strata_block: number;
+          toll_fee_sats: number;
+        };
+      };
+    };
+    assert.deepEqual(
+      guidance.settlement_paths.map(({ id, authorization }) => ({ id, authorization })),
+      [
+        { id: "sha256_preimage", authorization: "Authorization: L402 <macaroon>:<preimage>" },
+        { id: "nwc_lookup", authorization: "Authorization: L402 <macaroon>:NWC_LOOKUP" },
+      ],
+    );
+    assert.match(guidance.agent_instruction, /<macaroon>:<preimage>/);
+    assert.match(guidance.agent_instruction, /<macaroon>:NWC_LOOKUP/);
+    assert.match(guidance.agent_instruction, /409/);
+    assert.equal(guidance.preflight.genesis_receipt.path, "/api/v1/escrow/genesis-receipt");
+    assert.equal(
+      guidance.preflight.genesis_receipt.canonical_url,
+      "https://bitcoinstratigraphy.com/api/v1/escrow/genesis-receipt",
+    );
+    assert.equal(guidance.preflight.genesis_receipt.escrow_id, "ba4f25dd-7f16-420c-9264-a16f102fd5a6");
+    assert.equal(guidance.preflight.genesis_receipt.settled_at_strata_block, 971341);
+    assert.equal(guidance.preflight.genesis_receipt.toll_fee_sats, 24);
 
     dynamicAmountSats = 9;
     const paid = await fetch(`${baseUrl}/paid`, {

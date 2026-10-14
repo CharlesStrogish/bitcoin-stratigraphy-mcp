@@ -5,10 +5,10 @@ installing or changing the server.
 
 | Setting | Value |
 | --- | --- |
-| Public MCP URL | `https://bitcoin-stratigraphy-dashboard.replit.app/mcp` |
+| Public MCP URL | `https://bitcoinstratigraphy.com/mcp` |
 | Remote transport | Streamable HTTP |
 | Supported protocol | MCP `2025-11-25` |
-| Tool catalog | 14 tools; retrieve the current catalog from the server |
+| Tool catalog | 15 tools; retrieve the current catalog from the server |
 | Connection-time wallet requirement | None |
 | Paid execution | Lightning L402; conditional Base USDC x402 only when configured, with a separate payment integration |
 
@@ -76,7 +76,7 @@ If the configuration is empty, use:
       "args": [
         "-y",
         "mcp-remote",
-        "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+        "https://bitcoinstratigraphy.com/mcp",
         "--transport",
         "http-only"
       ]
@@ -123,7 +123,7 @@ escape backslashes, for example:
       "args": [
         "-y",
         "mcp-remote",
-        "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+        "https://bitcoinstratigraphy.com/mcp",
         "--transport",
         "http-only"
       ]
@@ -149,7 +149,7 @@ GUI does not inherit your shell's Node.js version-manager environment.
 4. Open the MCP/connector management area and find `bitcoin-stratigraphy`.
    Labels vary by desktop version; check **Developer** settings or the
    conversation's **Connectors / Manage connectors** menu.
-5. Inspect the available tools. The current server exposes 14 tools. A future
+5. Inspect the available tools. The current server exposes 15 tools. A future
    catalog change should be checked against the live server rather than hidden.
 
 ## 5. Verify with free, read-only requests
@@ -232,7 +232,7 @@ and sensitive tool arguments.
 To test whether the bridge can start independently of Claude:
 
 ```sh
-npx -y mcp-remote https://bitcoin-stratigraphy-dashboard.replit.app/mcp --transport http-only
+npx -y mcp-remote https://bitcoinstratigraphy.com/mcp --transport http-only
 ```
 
 This is a stdio bridge, so it may remain running while waiting for an MCP client
@@ -253,4 +253,4 @@ revoke that connection in your wallet if it is no longer needed.
 - [mcp-remote bridge documentation](https://github.com/geelen/mcp-remote)
 - [MCP Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 - [Project connection reference](../CONNECT.md)
-- [Live MCP server card](https://bitcoin-stratigraphy-dashboard.replit.app/.well-known/mcp/server-card.json)
+- [Live MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)

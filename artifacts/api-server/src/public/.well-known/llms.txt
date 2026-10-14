@@ -21,9 +21,19 @@ limits; never treat a quote, unpaid invoice, or macaroon alone as payment.
 
 Read the HTTP 402 WWW-Authenticate header:
 `L402 macaroon="<macaroon>", invoice="<BOLT11>"`.
-Pay the exact invoice, obtain the matching payment proof, then retry the same
-tool with `Authorization: L402 <macaroon>:<preimage>`.
-Do not log or publish that bearer credential.
+Pay the exact invoice, then retry the same request with either proof:
+
+- Path A: `Authorization: L402 <macaroon>:<preimage>` with the wallet's
+  64-character hex preimage.
+- Path B: `Authorization: L402 <macaroon>:NWC_LOOKUP` when a custodial wallet
+  (for example CoinOS or Cash App) does not reveal the preimage. The issuing
+  merchant wallet must confirm the exact incoming invoice; HTTP 409 means
+  confirmation is pending, so retry with the same macaroon and do not pay again.
+
+Do not log or publish that bearer credential. Before paying, you can check the
+operator's historical 24-sat mainnet genesis receipt at
+`GET /api/v1/escrow/genesis-receipt`. Canonical origin:
+https://bitcoinstratigraphy.com
 
 ## Freemium sandbox
 

@@ -12,13 +12,14 @@ import { dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { readDataset, refreshDataset } from "../routes/stratigraphy";
 import { logger } from "./logger";
+import { CANONICAL_ORIGIN } from "./public-site";
 
 const RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",
   "wss://relay.nostr.band",
 ] as const;
-const DEFAULT_BASE_URL = "https://bitcoin-stratigraphy-dashboard.replit.app";
+const DEFAULT_BASE_URL = CANONICAL_ORIGIN;
 const KEY_PATH = resolve(
   process.env.NOSTR_EPHEMERAL_KEY_PATH ?? ".data/nostr-heartbeat-private-key",
 );

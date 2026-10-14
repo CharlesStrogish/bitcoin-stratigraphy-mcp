@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from routers.escrow_api import EscrowApi
-from services.escrow_db import EscrowStore, SCHEMA
+from services.escrow_db import EscrowStore, SCHEMA, enable_wal
 from services.escrow_engine import EscrowEngine
 from services.escrow_pricing import get_dynamic_escrow_toll
 
@@ -181,6 +181,55 @@ class TollConstraintMigrationTests(unittest.TestCase):
                     "SELECT * FROM agent_escrow_contracts ORDER BY escrow_id"
                 ).fetchall(), self.before,
             )
+
+
+class _LockedJournalConnection:
+    """Raises a fixed number of SQLite errors before reporting WAL mode."""
+
+    def __init__(self, failures, message="database is locked"):
+        self.failures = failures
+        self.message = message
+        self.calls = 0
+
+    def execute(self, sql):
+        assert sql == "PRAGMA journal_mode=WAL"
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise sqlite3.OperationalError(self.message)
+        return self
+
+    def fetchone(self):
+        return ("wal",)
+
+
+class WalTransitionRetryTests(unittest.TestCase):
+    """SQLite can reject a racing WAL conversion without using busy_timeout."""
+
+    def test_lock_contention_is_retried_until_wal_is_reported(self):
+        connection = _LockedJournalConnection(failures=2)
+        with patch("services.escrow_db.time.sleep") as sleep:
+            self.assertEqual(enable_wal(connection), "wal")
+        self.assertEqual(connection.calls, 3)
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_other_operational_errors_fail_immediately(self):
+        connection = _LockedJournalConnection(failures=1, message="disk I/O error")
+        with patch("services.escrow_db.time.sleep") as sleep:
+            with self.assertRaisesRegex(sqlite3.OperationalError, "disk I/O error"):
+                enable_wal(connection)
+        self.assertEqual(connection.calls, 1)
+        sleep.assert_not_called()
+
+    def test_persistent_lock_fails_closed_at_the_deadline(self):
+        connection = _LockedJournalConnection(failures=10**6)
+        clock = iter([0.0, 1.0, 2.0, 5.0])
+        with (
+            patch("services.escrow_db.time.monotonic", side_effect=lambda: next(clock)),
+            patch("services.escrow_db.time.sleep"),
+        ):
+            with self.assertRaisesRegex(sqlite3.OperationalError, "database is locked"):
+                enable_wal(connection)
+        self.assertEqual(connection.calls, 3)
 
 
 if __name__ == "__main__":

@@ -250,13 +250,13 @@ class L402Tests(unittest.TestCase):
         with BitcoinStratigraphyClient(
             URL, transport=httpx.MockTransport(server)
         ) as client:
-            self.assertEqual(len(validate_catalog(client.list_tools())), 14)
+            self.assertEqual(len(validate_catalog(client.list_tools())), 15)
             with self.assertRaises(RuntimeError):
                 client.call_tool("proof.verify", {})
         self.assertEqual(len(notifications), 1)
 
     def test_catalog_rejects_duplicates_and_missing(self):
-        for names in ([], ["payment.get_info"] * 14):
+        for names in ([], ["payment.get_info"] * 15):
             with self.assertRaises(ValueError):
                 validate_catalog([{"name": name} for name in names])
 

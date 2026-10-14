@@ -28,6 +28,7 @@ import { registerZkDriftRoute } from "./routes/zk-drift";
 import { registerPublicCors } from "./middleware/publicCors";
 import { registerAuditRoutes } from "./routes/audit";
 import { registerEscrowRoutes } from "./routes/escrow";
+import { registerEnterpriseRoutes } from "./routes/enterprise";
 
 const app: Express = express();
 const meshService = createMeshGossipService();
@@ -92,6 +93,7 @@ registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);
 registerLlmExportRoutes(app);
+registerEnterpriseRoutes(app);
 registerProvenanceRoutes(app, { schedule: true });
 registerZkDriftRoute(app);
 registerEscrowRoutes(app, {

@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { ESCROW_APPLICATION } from "@/lib/escrow-seo";
+import { siteUrl } from "@/lib/site";
 
 /** Keep crawler-facing URLs and escrow attribution correct after SPA navigation. */
 export function PublicRouteHead() {
@@ -10,9 +11,10 @@ export function PublicRouteHead() {
     const path = location.split("?")[0]!.replace(/\/$/, "") || "/";
     const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance"];
     if (!publicPaths.includes(path)) return;
-    const url = `https://bitcoin-stratigraphy-dashboard.replit.app${path}`;
+    const url = siteUrl(path);
     document.querySelector('link[rel="canonical"]')?.setAttribute("href", url);
     document.querySelector('meta[property="og:url"]')?.setAttribute("content", url);
+    document.querySelector('meta[name="twitter:url"]')?.setAttribute("content", url);
     let script = document.getElementById("escrow-application-jsonld");
     if (!script) {
       script = document.createElement("script");

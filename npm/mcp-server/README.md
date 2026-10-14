@@ -1,7 +1,19 @@
-# @bitcoin-stratigraphy/mcp-server — 2.1.2
+# @bitcoin-stratigraphy/mcp-server — 2.1.3
 
 Exactly 15 canonical MCP tools over **Streamable HTTP**, with two free sandbox
 discovery tools and unchanged paid-tool prices.
+
+- Canonical site: https://bitcoinstratigraphy.com
+- Hosted MCP endpoint: https://bitcoinstratigraphy.com/mcp (connect any MCP
+  Streamable HTTP client; no local install is required)
+- Agent guides: https://bitcoinstratigraphy.com/llms.txt and
+  https://bitcoinstratigraphy.com/llms-full.txt
+
+Run the self-hosted engine after provisioning the requirements below:
+
+```sh
+npx -y @bitcoin-stratigraphy/mcp-server
+```
 
 ## Semantic capabilities
 
@@ -34,7 +46,9 @@ Supply credentials through your secret manager; do not
 put secrets on a command line or in a checked-in configuration file.
 
 ```sh
-npm install @bitcoin-stratigraphy/mcp-server@2.1.2
+npx -y @bitcoin-stratigraphy/mcp-server --help
+# or pin the release in a project:
+npm install @bitcoin-stratigraphy/mcp-server@2.1.3
 npx bitcoin-stratigraphy-mcp-server --help
 ```
 
@@ -104,3 +118,10 @@ and refresh those listings separately using their own publishing workflows.
 
 Copyright (c) 2026 Charles R. Strogish. Dual-licensed under AGPLv3 and Commercial
 terms. See LICENSE for the full text and commercial licensing rider.
+
+AGPLv3 is a network copyleft license: if you modify the engine and users interact
+with your modified version over a network, Section 13 requires offering them its
+complete Corresponding Source. Organizations that cannot meet those obligations
+can request a Commercial Enterprise Exemption License (Starting at $250k/Annual;
+"AS IS" self-hosted, air-gapped delivery; zero SLAs) from
+licensing@bitcoinstratigraphy.com.

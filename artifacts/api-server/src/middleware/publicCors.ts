@@ -1,12 +1,17 @@
 import type { Express, RequestHandler } from "express";
 
-/** Public API CORS is token-based, not cross-origin cookie authentication. */
+/**
+ * Public API CORS is token-based, not cross-origin cookie authentication.
+ * Baseline security headers ride along; routes may tighten them further.
+ */
 export function registerPublicCors(
   app: Express,
   publicRateLimit?: RequestHandler,
 ): void {
   app.use((_req, res, next) => {
     res.set({
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "*",

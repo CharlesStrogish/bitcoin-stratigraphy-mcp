@@ -20,12 +20,14 @@ test("registry manifests agree on the live remote MCP endpoint and release", () 
   assert.equal(pkg.mcpName, "crstrogish/bitcoin-stratigraphy");
   assert.equal(smithery.version, pkg.version);
   assert.equal(pkg.version, npmPackage.version);
+  assert.equal(npmPackage.homepage, "https://bitcoinstratigraphy.com");
+  assert.match(npmPackage.author, /^Charles R\. Strogish\b/);
   assert.equal(glama.version, smithery.version);
   assert.equal(glama.toolCount, 15);
   assert.equal(smithery.transport.type, "streamable-http");
   assert.equal(
     smithery.transport.url,
-    "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+    "https://bitcoinstratigraphy.com/mcp",
   );
   assert.equal(smithery.connection.url, smithery.transport.url);
   assert.equal(glama.url, smithery.transport.url);
@@ -63,7 +65,10 @@ test("registry sandbox and notarization pricing claims match the release", () =>
 });
 
 test("README prominently links native frameworks and all three readiness badges", () => {
-  assert.match(readme.slice(0, 2200), /v2\.1\.0 — 15 Canonical Tools/);
+  assert.match(
+    readme.slice(0, 2200),
+    new RegExp(`v${pkg.version.replaceAll(".", "\\.")} — 15 Canonical Tools`),
+  );
   assert.match(readme, /\]\(cookbooks\/frameworks\/\)/);
   for (const badge of [
     "LangChain Ready",

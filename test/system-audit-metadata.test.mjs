@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { tsImport } from "tsx/esm/api";
 
-const origin = "https://bitcoin-stratigraphy-dashboard.replit.app";
+const origin = "https://bitcoinstratigraphy.com";
 const load = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const { enterpriseSeoPlugin } = await tsImport(
   "../artifacts/bitcoin-stratigraphy-dashboard/enterprise-seo-plugin.ts", import.meta.url,

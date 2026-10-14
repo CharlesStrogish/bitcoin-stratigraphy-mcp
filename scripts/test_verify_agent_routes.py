@@ -41,7 +41,7 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
                         "displayName": "Bitcoin Stratigraphy Data Engine",
                         "description": "Provides thermodynamic data, proof verification, and L402 payments.",
                         "version": "1.0.0",
-                        "url": "https://bitcoin-stratigraphy-dashboard.replit.app/mcp",
+                        "url": "https://bitcoinstratigraphy.com/mcp",
                     },
                 )
             seen.append(request)

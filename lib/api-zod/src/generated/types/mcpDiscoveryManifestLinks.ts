@@ -27,4 +27,10 @@ export type McpDiscoveryManifestLinks = {
   cookbooks: string;
   python_sdk: string;
   pricing: string;
+  llms_txt?: string;
+  llms_full_txt?: string;
+  openapi?: string;
+  server_card?: string;
+  genesis_receipt?: string;
+  due_diligence_brief?: string;
 };

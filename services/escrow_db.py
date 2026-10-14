@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
+import time
 
 
 SCHEMA = """
@@ -33,6 +34,26 @@ CREATE TABLE IF NOT EXISTS escrow_execution_leaves (
     receipt_json TEXT NOT NULL
 );
 """
+
+
+# SQLite skips the busy handler when connections race to convert a cold
+# rollback-journal database to WAL (deadlock avoidance). Retry only that lock
+# contention within the same 5-second window, then fail closed.
+WAL_TRANSITION_TIMEOUT_SECONDS = 5.0
+
+
+def enable_wal(connection, timeout=WAL_TRANSITION_TIMEOUT_SECONDS):
+    """Request WAL and return the resulting journal mode."""
+    deadline = time.monotonic() + timeout
+    delay = 0.01
+    while True:
+        try:
+            return connection.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+        except sqlite3.OperationalError as error:
+            if "locked" not in str(error).lower() or time.monotonic() >= deadline:
+                raise
+        time.sleep(delay)
+        delay = min(delay * 2, 0.2)
 
 
 class EscrowStore:
@@ -122,7 +143,7 @@ class EscrowStore:
         connection.row_factory = sqlite3.Row
         try:
             connection.execute("PRAGMA busy_timeout=5000")
-            mode = connection.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+            mode = enable_wal(connection)
             if mode.lower() != "wal":
                 raise RuntimeError("Escrow database requires WAL")
             connection.execute("PRAGMA synchronous=NORMAL")

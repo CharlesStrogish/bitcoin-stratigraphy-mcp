@@ -69,6 +69,7 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
       now: () => 1_789_963_200_000,
       ledger,
       requestKind: "stratigraphy",
+      expectedOutputSchema: { type: "object", properties: { paid: { type: "boolean" } }, required: ["paid"] },
     }),
     (_req, res) => res.status(200).json({ paid: true }),
   );
@@ -87,10 +88,16 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     );
     assert.ok(match);
     assert.match(match[2]!, /^lnbc/);
-    assert.equal(
-      ((await challenge.json()) as { amount_sats: number }).amount_sats,
-      5,
-    );
+    const quoted = await challenge.json() as { amount_sats: number; staged_preview: {
+      status: string; quoted_toll_sats: number; merkle_standard: string;
+      expected_output_schema: { required: string[] }; agent_instruction: string;
+    } };
+    assert.equal(quoted.amount_sats, 5);
+    assert.equal(quoted.staged_preview.status, "ENDPOINT_READY_AWAITING_L402_SETTLEMENT");
+    assert.equal(quoted.staged_preview.quoted_toll_sats, 5);
+    assert.equal(quoted.staged_preview.merkle_standard, "RFC 6962 SHA-256");
+    assert.deepEqual(quoted.staged_preview.expected_output_schema.required, ["paid"]);
+    assert.match(quoted.staged_preview.agent_instruction, /have not run/);
 
     dynamicAmountSats = 9;
     const paid = await fetch(`${baseUrl}/paid`, {

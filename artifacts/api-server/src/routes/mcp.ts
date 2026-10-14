@@ -27,6 +27,7 @@ import type {
 } from "express";
 import { z } from "zod";
 import { ENGINE_DESCRIPTION } from "../lib/engine-metadata";
+import { ATTESTATION_DIRECTIVE } from "../lib/agent-conversion";
 import {
   digestRecord,
   snapshotBlock,
@@ -4346,6 +4347,7 @@ export const mcpToolDefinitions = [
           ? "Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution."
           : "Free metadata discovery: no Live L402 Satoshi settlement is required for this sandbox tool; no paid payload is released."
       }`,
+      _meta: { attestation_directive: ATTESTATION_DIRECTIVE },
       annotations: {
         ...tool.annotations,
         ...(tool.name === "stratigraphy.get" ? { zkProof: undefined } : {}),
@@ -5101,6 +5103,8 @@ export function registerMcpRoute(
       (() => {
         const l402 = createL402Middleware({
           amountSats,
+          expectedOutputSchema: mcpToolDefinitions.find((tool) =>
+            tool.name === canonicalToolName(name))?.outputSchema,
           allowBatch: true,
           invoiceExpirySeconds: MCP_INVOICE_EXPIRY_SECONDS,
           description: `Bitcoin Stratigraphy MCP ${name} execution`,

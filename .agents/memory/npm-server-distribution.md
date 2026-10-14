@@ -32,3 +32,12 @@ as such in the npm package README.
 **Why:** The user identified the “Dedicated SLA support” enterprise bullet as inaccurate.
 
 **How to apply:** Preserve this exclusion when editing the package's enterprise documentation.
+
+Serialize release builds and API workflow restarts against backend test runs.
+
+**Why:** These operations share generated runtime output. A concurrent build
+can delete compiled tests while the runner is executing, producing missing-file
+failures unrelated to application regressions.
+
+**How to apply:** Finish builds and server restarts before starting backend tests,
+or wait until tests finish before building again.

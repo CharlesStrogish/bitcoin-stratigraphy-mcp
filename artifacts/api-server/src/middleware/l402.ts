@@ -14,6 +14,7 @@ import type { SettlementRouter } from "../services/settlement";
 import type { RevenueLedger, RevenueRequestKind } from "../services/ledger";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { paymentReference, recordRevenueWithRetry } from "../services/ledger";
+import { awaitingPaymentPreview, expectedRestOutputSchema } from "../lib/agent-conversion";
 
 export type L402Authorization = {
   macaroon: string;
@@ -36,6 +37,7 @@ export type L402MiddlewareOptions = {
   revocationStore?: MacaroonRevocationStore;
   requestKind?: RevenueRequestKind;
   allowBatch?: boolean;
+  expectedOutputSchema?: Record<string, unknown> | ((req: Request) => Record<string, unknown>);
 };
 
 export function parseL402Header(
@@ -213,6 +215,9 @@ export function createL402Middleware(
         payment_hash: invoice.paymentHash,
         amount_sats: amountSats,
         max_requests: batchSize,
+        staged_preview: awaitingPaymentPreview(amountSats,
+          typeof options.expectedOutputSchema === "function" ? options.expectedOutputSchema(req)
+            : options.expectedOutputSchema ?? expectedRestOutputSchema(req)),
       });
     } catch (error) {
       req.log?.error({ err: error }, "L402 invoice creation failed");

@@ -24,6 +24,11 @@
 import type { EscrowContractStatus } from './escrowContractStatus';
 
 export interface EscrowContract {
+  /**
+     * Private bearer capability authorizing redemption of this escrow only. Never publish it in audit receipts or peer attestations.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  settlement_capability: string;
   escrow_id: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;

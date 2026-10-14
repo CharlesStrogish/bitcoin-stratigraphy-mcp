@@ -8,17 +8,18 @@ const require = createRequire(
 );
 const { parse } = require("yaml");
 const root = new URL("../", import.meta.url);
-const [smithery, glama, pkg, readme] = await Promise.all([
+const [smithery, glama, pkg, readme, npmPackage] = await Promise.all([
   readFile(new URL("smithery.yaml", root), "utf8").then(parse),
   readFile(new URL("glama.json", root), "utf8").then(JSON.parse),
   readFile(new URL("package.json", root), "utf8").then(JSON.parse),
   readFile(new URL("README.md", root), "utf8"),
+  readFile(new URL("npm/mcp-server/package.json", root), "utf8").then(JSON.parse),
 ]);
 
 test("registry manifests agree on the live remote MCP endpoint and release", () => {
   assert.equal(pkg.mcpName, "crstrogish/bitcoin-stratigraphy");
   assert.equal(smithery.version, pkg.version);
-  assert.equal(pkg.version, "2.1.0");
+  assert.equal(pkg.version, npmPackage.version);
   assert.equal(glama.version, smithery.version);
   assert.equal(glama.toolCount, 15);
   assert.equal(smithery.transport.type, "streamable-http");

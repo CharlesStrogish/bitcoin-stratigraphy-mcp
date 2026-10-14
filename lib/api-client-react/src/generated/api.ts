@@ -212,7 +212,7 @@ export const getCreateEscrowUrl = () => {
 }
 
 /**
- * Requires L402 access plus X-Escrow-Operator-Token. The 21-sat access invoice is separate from the contract toll reservation; LOCKED does not establish funding.
+ * Public L402 access without an operator token. The 21-sat access invoice is separate from the contract toll reservation; LOCKED does not establish funding. Returns a private creator-held settlement_capability; retain it securely to authorize redemption. X-Escrow-Operator-Token is an optional admin override, not a public requirement.
  * @summary Create a local execution escrow commitment
  */
 export const createEscrow = async (escrowInput: EscrowInput, options?: Parameters<typeof customFetch>[1]): Promise<EscrowContract> => {
@@ -284,7 +284,7 @@ export const getSettleEscrowUrl = () => {
 }
 
 /**
- * Requires X-Escrow-Operator-Token and live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 capability binds the escrow ID, exact execution trace and result payload, is single-use, and requires a SHA-256-bound Lightning preimage plus wallet-confirmed incoming settlement. No final JSON or escrow preimage is released before verification. Trusted operators must independently verify bounty funding and task acceptance; the recorded provider height is not a Bitcoin anchor proof.
+ * Public redemption requires the private settlement_capability returned at creation plus live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI; no operator token is required. A valid X-Escrow-Operator-Token remains an optional admin override for legacy recovery. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 macaroon binds the escrow ID, exact execution trace and result payload, is single-use, and requires a SHA-256-bound Lightning preimage plus wallet-confirmed incoming settlement. No final JSON or escrow preimage is released before verification. Caller-authorized execution commitments do not independently establish bounty funding, task correctness, or a confirmed Bitcoin anchor.
  * @summary Commit authorized execution evidence and release the escrow preimage
  */
 export const settleEscrow = async (escrowExecutionInput: EscrowExecutionInput, options?: Parameters<typeof customFetch>[1]): Promise<EscrowSettlement> => {

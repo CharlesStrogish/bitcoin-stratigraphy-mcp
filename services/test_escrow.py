@@ -83,6 +83,11 @@ class EscrowTests(unittest.TestCase):
         self.assertNotIn("preimage", json.dumps(settled["receipt"]))
         self.assertEqual(self.store.get_contract(created["escrow_id"])["status"], "SETTLED")
         self.assertEqual(settled["receipt"]["settled_at_strata_block"], 900000)
+        self.assertEqual(
+            settled["receipt"]["ots_calendar_standard"],
+            "OpenTimestamps / RFC 6962 SHA-256",
+        )
+        self.assertIn("Nostr Kind 38102", settled["receipt"]["attestation_directive"])
         with self.assertRaises(EscrowStateError):
             self.engine.verify_execution_and_settle(created["escrow_id"], trace, result)
 

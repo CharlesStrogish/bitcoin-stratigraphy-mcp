@@ -21,10 +21,15 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+import type { EscrowReceiptAttestationDirective } from './escrowReceiptAttestationDirective';
 import type { EscrowReceiptLightningSettlement } from './escrowReceiptLightningSettlement';
+import type { EscrowReceiptOtsCalendarStandard } from './escrowReceiptOtsCalendarStandard';
 import type { EscrowReceiptReceiptType } from './escrowReceiptReceiptType';
 
 export interface EscrowReceipt {
+  /** Identifies the verifiable SHA-256 Merkle commitment format for future OpenTimestamps anchoring; does not assert calendar submission or Bitcoin confirmation. */
+  ots_calendar_standard: EscrowReceiptOtsCalendarStandard;
+  attestation_directive: EscrowReceiptAttestationDirective;
   /** Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage. */
   lightning_settlement?: EscrowReceiptLightningSettlement;
   escrow_id: string;

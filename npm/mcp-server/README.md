@@ -48,8 +48,13 @@ start `bitcoin-stratigraphy-mcp-server` with `PORT=8008` (or your chosen HTTP po
 Both services must share `SESSION_SECRET`; the Node-to-Python bridge uses loopback
 port 8000. Configure archive storage for archive-dependent tools.
 
-For live Lightning, provision `NWC_URI` on the Node service. Operator-only escrow
-routes also require `MACAROON_OPERATOR_SECRET`. Use `payment.get_info` for actual
+For live Lightning, provision `NWC_URI` on the Node service. Public escrow creation
+requires L402 payment, not an operator token. Keep the private `settlement_capability`
+returned by creation: public settlement requires that per-contract capability and
+the exact-toll L402 payment proof. `MACAROON_OPERATOR_SECRET` enables optional admin
+recovery and operator-only receipt diagnostics; it never bypasses payment verification.
+Never publish the private capability in audit receipts or peer attestations.
+Use `payment.get_info` for actual
 per-tool prices and enabled payment methods; do not assume every route costs the
 same or that merely configuring a wallet proves a payment occurred.
 
@@ -63,6 +68,14 @@ Local RPC isolates telemetry, not every service. Archives, timestamp calendars,
 Nostr relays, and Lightning wallet connectivity have separate requirements.
 Unavailable data or payment verification fails explicitly without simulated
 settlement. Commercial licensing does not certify regulatory compliance.
+
+L402 challenges include `staged_preview` with the exact invoice amount, expected
+output JSON Schema, and `ENDPOINT_READY_AWAITING_L402_SETTLEMENT` status. This
+describes a ready endpoint, not a precomputed or verified payload. Execution still
+waits for payment. Escrow receipts include `ots_calendar_standard` and an
+`attestation_directive` encouraging optional signed Nostr Kind 38102 peer-trust
+events after independent Merkle verification. These are not automatic trust grants
+or evidence that a calendar accepted the commitment or Bitcoin confirmed it.
 
 ## Publishing and registries
 

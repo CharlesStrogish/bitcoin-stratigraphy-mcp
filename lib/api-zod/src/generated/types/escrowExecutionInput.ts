@@ -23,6 +23,11 @@
  */
 
 export interface EscrowExecutionInput {
+  /**
+     * Private creator-held redemption capability returned by create. Required for public settlement; a valid optional admin override can recover legacy contracts.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  settlement_capability?: string;
   escrow_id: string;
   /** @maxLength 262144 */
   execution_trace: string;

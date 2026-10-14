@@ -25,6 +25,7 @@ export function EscrowTerminal() {
   const [taskHash, setTaskHash] = useState("");
   const [amount, setAmount] = useState("");
   const [existingId, setExistingId] = useState("");
+  const [existingCapability, setExistingCapability] = useState("");
   const [trace, setTrace] = useState("");
   const [result, setResult] = useState("");
   const [contract, setContract] = useState<CreateResult | null>(null);
@@ -85,7 +86,6 @@ export function EscrowTerminal() {
   };
 
   const createErrors = (): string | null => {
-    if (!token) return "Operator token required";
     if (![buyer, worker, taskHash].every((h) => HEX64.test(h))) return "Pubkeys and task hash must be 64 lowercase hex";
     if (!/^\d+$/.test(amount) || !Number.isSafeInteger(Number(amount)) || Number(amount) < 1) return "Amount must be a positive integer";
     return null;
@@ -109,9 +109,11 @@ export function EscrowTerminal() {
 
   const onSettle = () => {
     if (pending) return;
-    if (!token) { setError("Operator token required"); setLastAction(null); return; }
+    const capability = contract?.settlement_capability ?? existingCapability.trim();
+    if (!token && !HEX64.test(capability)) { setError("Provide the creator-held settlement capability or create an escrow first."); setLastAction(null); return; }
     if (!escrowId || !trace.trim() || !result.trim()) { setError("escrow_id, execution trace and result payload are required"); setLastAction(null); return; }
-    void runSettle({ escrow_id: escrowId, execution_trace: trace, result_payload: result }, null);
+    void runSettle({ escrow_id: escrowId, execution_trace: trace, result_payload: result,
+      ...(capability ? { settlement_capability: capability } : {}) }, null);
   };
 
   const onSubmitPreimage = async () => {
@@ -126,7 +128,7 @@ export function EscrowTerminal() {
   };
 
   const exportJson = settled
-    ? JSON.stringify({ create_response: contract, settle_response: settled }, null, 2)
+    ? JSON.stringify({ create_response: contract && { ...contract, settlement_capability: undefined }, settle_response: settled }, null, 2)
     : null;
   const verifiedToll = settled?.article_12_receipt.lightning_settlement?.amount_sats ?? 0;
   const stage = settled ? 3 : contract || existingId.trim() ? 2 : pending?.op === "create" ? 1 : 0;
@@ -148,11 +150,14 @@ export function EscrowTerminal() {
         {settled
           ? <span className="et-tag et-ok" data-testid="badge-settled">SERVER CONFIRMED: {settled.status}</span>
           : <span className="et-tag" data-testid="badge-awaiting">AWAITING LIVE CONFIRMATION</span>}
-        <span className="et-tag">LOCKED = LOCAL SERVER COMMITMENT · NO BITCOIN ANCHOR · RECEIPT IS NOT LEGAL CERTIFICATION</span>
+        <span className="et-tag">LOCKED = RFC 6962 MERKLE COMMITMENT · OPENTIMESTAMPS READY · TECHNICAL AUDIT RECEIPT</span>
       </div>
 
       <div className="et-form">
-        {inp("operator-token", "Operator token (X-Escrow-Operator-Token, kept in memory only)", token, setToken, { type: "password" })}
+        <details>
+          <summary>Optional Admin Override</summary>
+          {inp("operator-token", "Operator token (X-Escrow-Operator-Token, kept in memory only)", token, setToken, { type: "password" })}
+        </details>
       </div>
 
       <div className="et-steps">
@@ -179,6 +184,12 @@ export function EscrowTerminal() {
             </div>
           ) : <p>No contract created in this session. Recover an existing one to retry settlement without creating again.</p>}
           {inp("escrow-id", "Existing escrow_id (recovery)", existingId, setExistingId, { disabled: busy || !!contract })}
+          {!contract && inp("settlement-capability", "Private settlement capability (recovery)", existingCapability, setExistingCapability, { type: "password" })}
+          {contract && <>
+            <p>Save your private settlement capability for recovery. Do not publish it.</p>
+            <CopyJsonButton text={JSON.stringify({ escrow_id: contract.escrow_id, settlement_capability: contract.settlement_capability })}
+              testId="button-copy-settlement-capability" label="Copy Private Recovery Capability" copiedLabel="Copied!" />
+          </>}
           {!contract && <button type="button" className="control-button" onClick={onUseExisting} disabled={busy}
             data-testid="button-use-existing-escrow">Use existing escrow_id</button>}
         </div>

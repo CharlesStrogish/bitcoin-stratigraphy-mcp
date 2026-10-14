@@ -23,7 +23,7 @@ export default function SiteFooter() {
           </span>
           <span>
             ARCHITECTED BY CHARLES R. STROGISH | POWERED BY L402 MICROPAYMENTS,
-            GROTH16 ZK-SNARK PROOFS &amp; NOSTR P2P MESH CONSENSUS.
+            RFC 6962 MERKLE PROOFS &amp; OPENTIMESTAMPS STATE ANCHORING.
           </span>
         </div>
       </div>

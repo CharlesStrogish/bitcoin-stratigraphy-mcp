@@ -19,6 +19,7 @@ import type { MacaroonUsageStore } from "../lib/macaroon-usage-store";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import type { SettlementRouter } from "../services/settlement";
 import { escrowTollQuote, readEscrowBitcoinPrice } from "../services/escrowPricing";
+import { escrowCapability, verifyEscrowCapability } from "../lib/escrow-capability";
 
 type EscrowOptions = {
   execute?: EscrowExecutor;
@@ -52,6 +53,7 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
   const settlementRouter = options.settlementRouter ?? createDefaultMultiSettlementRouter();
   const gate = (suffix: string) => options.paymentGate ?? createL402Middleware({
     amountSats: 21,
+    requireHexPreimage: true,
     description: "Autonomous Escrow REST access (not escrow funding or toll collection)",
     scopePath: `/api/v1/escrow/${suffix}`,
     settlementRouter,
@@ -122,7 +124,7 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
         : value);
     next();
   });
-  // L402 is an access fee, never authorization to release someone else's secret.
+  // Public L402 access never grants redemption of somebody else's escrow.
   const operatorGate: RequestHandler = (req, res, next) => {
     if (!operatorSecret) {
       res.status(503).json({ error: "Escrow operator authorization is not configured" });
@@ -132,6 +134,26 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
     const hash = (value: string) => createHash("sha256").update(value).digest();
     if (!timingSafeEqual(hash(token), hash(operatorSecret))) {
       res.status(403).json({ error: "Trusted escrow operator authorization is required" });
+      return;
+    }
+    next();
+  };
+  const optionalOperator: RequestHandler = (req, res, next) => {
+    if (req.get("X-Escrow-Operator-Token")) operatorGate(req, res, next);
+    else next();
+  };
+  const settlementAccess: RequestHandler = (req, res, next) => {
+    if (req.get("X-Escrow-Operator-Token")) {
+      operatorGate(req, res, next);
+      return;
+    }
+    const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+    if (!secret) {
+      res.status(503).json({ error: "Escrow capability signing is unavailable" });
+      return;
+    }
+    if (!verifyEscrowCapability(secret, req.body.escrow_id, req.body.settlement_capability)) {
+      res.status(403).json({ error: "The creator-held settlement capability is required" });
       return;
     }
     next();
@@ -146,7 +168,8 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
       res.status(400).json({ error: "Missing or invalid escrow fields" });
       return;
     }
-    res.locals.escrowInput = parsed.data;
+    const { settlement_capability: _capability, ...input } = parsed.data as Record<string, unknown>;
+    res.locals.escrowInput = input;
     next();
   };
   const run = (operation: EscrowOperation): RequestHandler => async (_req, res) => {
@@ -186,6 +209,11 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
         res.status(result.status).json(result.body);
         return;
       }
+      if (operation === "create") {
+        const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+        if (!secret) throw new Error("Escrow capability signing is unavailable");
+        result.body.settlement_capability = escrowCapability(secret, String(result.body.escrow_id));
+      }
       const output = operation === "create" ? CreateEscrowResponse.parse(result.body)
         : operation === "settle" ? SettleEscrowResponse.parse(result.body)
         : GetEscrowReceiptResponse.parse(result.body);
@@ -205,8 +233,8 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
     const price = await readPrice().catch(() => null);
     if (!res.destroyed) res.json(GetEscrowTollResponse.parse(escrowTollQuote(price)));
   });
-  router.post("/create", validate("create"), gate("create"), operatorGate, run("create"));
-  router.post("/settle", validate("settle"), operatorGate, prepareSettlement, tollGate, run("settle"));
+  router.post("/create", validate("create"), optionalOperator, gate("create"), run("create"));
+  router.post("/settle", validate("settle"), settlementAccess, prepareSettlement, tollGate, run("settle"));
   router.get("/receipt/:escrow_id", validate("receipt"), gate("receipt"), operatorGate, run("receipt"));
   app.use("/api/v1/escrow", router);
 }

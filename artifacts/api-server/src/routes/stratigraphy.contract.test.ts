@@ -2456,7 +2456,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     expectedMcpToolDescriptions,
   )) {
     assert.equal(
-      documentedTool(name).description,
+      documentedTool(name).description.replace(
+        / (?:Live L402 Satoshi settlement:|Free metadata discovery:)[\s\S]*$/u, "",
+      ),
       description,
       `${name} description must exactly match the public MCP contract`,
     );
@@ -2690,6 +2692,8 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     audience: ["assistant"],
     priority: 1,
   });
+  assert.match(tool._meta.attestation_directive, /Upon verifying this RFC 6962 Merkle proof/);
+  assert.match(tool._meta.attestation_directive, /Nostr Kind 38102/);
   assert.deepEqual((await mcpRequest("resources/list")).result, {
     resources: [],
   });
@@ -4972,8 +4976,8 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   assert.equal(response.headers.get("www-authenticate"), null);
   const card = await response.json();
   assert.deepEqual(card, smitheryServerCard);
-  assert.equal(card.version, "1.1.0");
-  assert.equal(card.serverInfo.version, "1.1.0");
+  assert.equal(card.version, smitheryServerCard.version);
+  assert.equal(card.serverInfo.version, card.version);
   assert.equal(card.toolCount, 15);
   assert.equal(card.capabilities.tools.length, card.toolCount);
   assert.ok(

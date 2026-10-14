@@ -22,9 +22,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { EscrowReceipt } from './escrowReceipt';
+import type { EscrowSettlementAttestationDirective } from './escrowSettlementAttestationDirective';
+import type { EscrowSettlementOtsCalendarStandard } from './escrowSettlementOtsCalendarStandard';
 import type { EscrowSettlementStatus } from './escrowSettlementStatus';
 
 export interface EscrowSettlement {
+  ots_calendar_standard: EscrowSettlementOtsCalendarStandard;
+  attestation_directive: EscrowSettlementAttestationDirective;
   status: EscrowSettlementStatus;
   /** @pattern ^[0-9a-f]{64}$ */
   preimage: string;

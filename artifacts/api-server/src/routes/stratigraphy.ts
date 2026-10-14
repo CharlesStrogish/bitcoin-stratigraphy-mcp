@@ -587,6 +587,8 @@ async function sendPaidDataset(
   res.status(200).type("application/json").send(body);
 }
 
+import { awaitingPaymentPreview, expectedRestOutputSchema } from "../lib/agent-conversion";
+
 async function sendPaymentChallenge(
   req: Request,
   res: Response,
@@ -758,6 +760,7 @@ async function sendPaymentChallenge(
           }
         : undefined,
       passes,
+      staged_preview: awaitingPaymentPreview(Math.ceil(amountMsats / 1000), expectedRestOutputSchema(req)),
     });
   } catch (error) {
     req.log.error({ err: error }, "Payment challenge creation failed");

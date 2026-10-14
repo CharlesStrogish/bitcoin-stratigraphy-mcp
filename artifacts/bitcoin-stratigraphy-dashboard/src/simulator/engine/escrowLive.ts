@@ -67,8 +67,9 @@ export async function callEscrow<T>(
   const t = setTimeout(abort, timeoutMs);
   try {
     const headers: Record<string, string> = {
-      "Content-Type": "application/json", "X-Escrow-Operator-Token": operatorToken,
+      "Content-Type": "application/json",
     };
+    if (operatorToken.trim()) headers["X-Escrow-Operator-Token"] = operatorToken.trim();
     if (auth) headers.Authorization = `L402 ${auth.macaroon}:${auth.preimage}`;
     const res = await fetch(apiUrl(path), {
       method: "POST", headers, body: JSON.stringify(body), signal: c.signal,
@@ -99,7 +100,9 @@ export function validateCreate(j: unknown): CreateResult | null {
   const o = j as Record<string, unknown> | null;
   return o && typeof o.escrow_id === "string" && o.status === "LOCKED" && typeof o.payment_hash === "string"
     && HEX64.test(o.payment_hash) && Number.isSafeInteger(o.amount_sats) && Number(o.amount_sats) > 0
-    && Number.isSafeInteger(o.toll_fee_sats) && Number(o.toll_fee_sats) > 0 ? (j as CreateResult) : null;
+     && Number.isSafeInteger(o.toll_fee_sats) && Number(o.toll_fee_sats) > 0
+     && typeof o.settlement_capability === "string" && HEX64.test(o.settlement_capability)
+     ? (j as CreateResult) : null;
 }
 export function validateSettle(j: unknown): SettleResult | null {
   const o = j as Record<string, unknown> | null;
@@ -111,5 +114,9 @@ export function validateSettle(j: unknown): SettleResult | null {
     && Number.isSafeInteger(payment.amount_sats) && payment.amount_sats > 0
     && typeof payment.provider === "string" && payment.provider.length > 0
     && typeof payment.confirmed_at === "string" && payment.confirmed_at.length > 0
+     && o.ots_calendar_standard === "OpenTimestamps / RFC 6962 SHA-256"
+     && receipt.ots_calendar_standard === o.ots_calendar_standard
+     && typeof o.attestation_directive === "string"
+     && receipt.attestation_directive === o.attestation_directive
     ? (j as SettleResult) : null;
 }

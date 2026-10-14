@@ -12,7 +12,9 @@ from bitcoin_stratigraphy_enterprise.swarm_merkle import (
     leaf_hash,
     verify_merkle_inclusion,
 )
-from services.escrow_engine import EscrowEngine, EscrowStateError
+from services.escrow_engine import (
+    EscrowEngine, EscrowStateError, OTS_CALENDAR_STANDARD, ATTESTATION_DIRECTIVE,
+)
 
 
 class EscrowApi:
@@ -69,6 +71,8 @@ class EscrowApi:
                     "merkle_root": receipt["merkle_root"],
                     "audit_path": receipt["audit_path"],
                     "article_12_receipt": receipt,
+                    "ots_calendar_standard": OTS_CALENDAR_STANDARD,
+                    "attestation_directive": ATTESTATION_DIRECTIVE,
                 }
             if operation == "receipt":
                 return self._receipt(escrow_id, contract)
@@ -93,6 +97,11 @@ class EscrowApi:
             return 404, {"error": "Settled escrow receipt not found"}
         try:
             receipt = json.loads(row["receipt_json"])
+            # Legacy receipts acquire algorithm metadata only after proof verification.
+            if receipt.get("ots_calendar_standard", OTS_CALENDAR_STANDARD) != OTS_CALENDAR_STANDARD:
+                return 422, {"error": "Stored escrow proof standard is invalid"}
+            if receipt.get("attestation_directive", ATTESTATION_DIRECTIVE) != ATTESTATION_DIRECTIVE:
+                return 422, {"error": "Stored escrow attestation directive is invalid"}
             data = row["leaf_preimage"]
             expected = {
                 "escrow_id": escrow_id,
@@ -111,6 +120,10 @@ class EscrowApi:
                 )
             ):
                 return 422, {"error": "Stored escrow proof does not verify"}
+            receipt = {
+                **receipt, "ots_calendar_standard": OTS_CALENDAR_STANDARD,
+                "attestation_directive": ATTESTATION_DIRECTIVE,
+            }
             return 200, {
                 "@context": {
                     "@vocab": "https://schema.org/",

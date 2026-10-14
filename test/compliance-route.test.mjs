@@ -69,7 +69,7 @@ test("compliance marketing copy preserves approved text with live escrow pricing
   assert.equal(blocks.length, 20);
   assert.equal(
     createHash("sha256").update(blocks.join("\n")).digest("hex"),
-    "37c21f09f8127cc2503120c4dd5262b2663b0ee23706b8a047764d2355082dae",
+    "840f856279c13f5540b62f5edcdf86ec79404cee47d29c6b56468847caad340a",
   );
 });
 

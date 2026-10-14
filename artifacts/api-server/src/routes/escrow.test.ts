@@ -13,6 +13,7 @@ import type { EscrowExecutor } from "../services/escrowBridge";
 import type { SettlementRouter } from "../services/settlement";
 import { createSettlementRouter } from "../services/settlement";
 import { createNwcSettlementProvider } from "../services/settlement/nwc-provider";
+import { ATTESTATION_DIRECTIVE, OTS_CALENDAR_STANDARD } from "../lib/agent-conversion";
 
 const servers: Array<ReturnType<ReturnType<typeof express>["listen"]>> = [];
 const id = "11111111-1111-4111-8111-111111111111";
@@ -23,6 +24,7 @@ const receipt = {
   timestamp: "2026-10-09T12:00:00+00:00", tree_size: 1,
   execution_leaf_hash: "e".repeat(64), settled_at_strata_block: 900000,
   receipt_type: "article_12_execution_commitment",
+  ots_calendar_standard: OTS_CALENDAR_STANDARD, attestation_directive: ATTESTATION_DIRECTIVE,
 };
 const paymentGate: RequestHandler = (req, res, next) => {
   if (req.get("authorization") !== "L402 test:proof") {
@@ -114,7 +116,7 @@ test("returns 400 for missing/unknown fields without reaching payment or Python"
   }
 });
 
-test("blocks unpaid requests and paid non-operators; keeps standard CORS", async () => {
+test("blocks unpaid requests and invalid optional admin overrides; keeps standard CORS", async () => {
   let calls = 0;
   const base = await serve({ execute: async () => { calls++; throw new Error(); } });
   const unpaid = await fetch(`${base}/create`, post(input, { authorization: "" }));
@@ -153,9 +155,10 @@ test("returns exact create and settle envelopes and never exposes a secret in re
     if (operation === "settle") {
       assert.equal(height, 900000);
       return { status: 200, body: { status: "SETTLED", preimage: "a".repeat(64),
-        merkle_root: receipt.merkle_root, audit_path: [], article_12_receipt: receipt } };
+        merkle_root: receipt.merkle_root, audit_path: [], article_12_receipt: receipt,
+        ots_calendar_standard: OTS_CALENDAR_STANDARD, attestation_directive: ATTESTATION_DIRECTIVE } };
     }
-    return { status: 200, body: {
+      return { status: 200, body: {
       "@context": { "@vocab": "https://schema.org/" }, "@type": "DigitalDocument",
       identifier: id, dateCreated: receipt.timestamp, proof: receipt,
       verification: { merkle_inclusion: true, bitcoin_anchor_verified: false,
@@ -248,6 +251,7 @@ test("exact 24-sat NWC toll withholds execution until settled and binds the enti
       assert.equal(Object.hasOwn(payment!, "preimage"), false);
       return { status: 200, body: { status: "SETTLED", preimage: "a".repeat(64),
         merkle_root: receipt.merkle_root, audit_path: [],
+        ots_calendar_standard: OTS_CALENDAR_STANDARD, attestation_directive: ATTESTATION_DIRECTIVE,
         article_12_receipt: { ...receipt, lightning_settlement: payment } } };
     },
   });
@@ -298,4 +302,75 @@ test("exact 24-sat NWC toll withholds execution until settled and binds the enti
   }));
   assert.equal(unavailable.status, 502);
   assert.equal(executionCalls, 1);
+});
+
+test("public creator can obtain and redeem L402 invoices without an operator token; capability prevents cross-contract redemption", async () => {
+  let executions = 0;
+  const base = await serve({
+    operatorSecret: "", paymentGate: undefined, readHeight: async () => 900000,
+    execute: async (operation, body, _height, _signal, payment) => {
+      assert.equal(Object.hasOwn(body, "settlement_capability"), false);
+      if (operation === "create") return { status: 201, body: {
+        escrow_id: id, payment_hash: "f".repeat(64), status: "LOCKED",
+        amount_sats: body.amount_sats, toll_fee_sats: 24,
+      } };
+      if (operation === "lookup") return { status: 200, body: { status: "LOCKED", toll_fee_sats: 24 } };
+      assert.equal(payment?.amount_sats, 24);
+      executions++;
+      return { status: 200, body: {
+        status: "SETTLED", preimage: "a".repeat(64), merkle_root: receipt.merkle_root,
+        audit_path: [], ots_calendar_standard: OTS_CALENDAR_STANDARD,
+        attestation_directive: ATTESTATION_DIRECTIVE,
+        article_12_receipt: { ...receipt, lightning_settlement: payment },
+      } };
+    },
+  });
+  const publicPost = (body: unknown, authorization = "") => ({
+    method: "POST", headers: { "content-type": "application/json", authorization },
+    body: JSON.stringify(body),
+  });
+  const createdChallenge = await fetch(`${base}/create`, publicPost(input));
+  assert.equal(createdChallenge.status, 402);
+  const first = await createdChallenge.json() as { macaroon: string; staged_preview: {
+    status: string; quoted_toll_sats: number; merkle_standard: string; expected_output_schema: object;
+  } };
+  assert.equal(first.staged_preview.status, "ENDPOINT_READY_AWAITING_L402_SETTLEMENT");
+  assert.equal(first.staged_preview.quoted_toll_sats, 21);
+  assert.equal(first.staged_preview.merkle_standard, "RFC 6962 SHA-256");
+  assert.ok(first.staged_preview.expected_output_schema);
+  const created = await fetch(`${base}/create`, publicPost(input, `L402 ${first.macaroon}:${tollPreimage}`));
+  assert.equal(created.status, 201);
+  const contract = await created.json() as { settlement_capability: string };
+  assert.match(contract.settlement_capability, /^[0-9a-f]{64}$/);
+  const submission = { escrow_id: id, execution_trace: "trace", result_payload: "result" };
+  assert.equal((await fetch(`${base}/settle`, publicPost(submission))).status, 403);
+  assert.equal((await fetch(`${base}/settle`, publicPost({
+    ...submission, settlement_capability: "0".repeat(64),
+  }))).status, 403);
+  assert.equal((await fetch(`${base}/settle`, publicPost({
+    ...submission, escrow_id: "22222222-2222-4222-8222-222222222222",
+    settlement_capability: contract.settlement_capability,
+  }))).status, 403);
+  const authorized = { ...submission, settlement_capability: contract.settlement_capability };
+  const challenge = await fetch(`${base}/settle`, publicPost(authorized));
+  assert.equal(challenge.status, 402);
+  assert.equal(executions, 0);
+  const quote = await challenge.json() as { macaroon: string; amount_sats: number;
+    staged_preview: { quoted_toll_sats: number; expected_output_schema: {
+      $ref: string; $defs: { EscrowSettlement: { properties: { article_12_receipt: unknown } }; EscrowReceipt: unknown };
+    } } };
+  assert.equal(quote.amount_sats, 24);
+  assert.equal(quote.staged_preview.quoted_toll_sats, 24);
+  assert.equal(quote.staged_preview.expected_output_schema.$ref, "#/$defs/EscrowSettlement");
+  assert.ok(quote.staged_preview.expected_output_schema.$defs.EscrowSettlement.properties.article_12_receipt);
+  assert.ok(quote.staged_preview.expected_output_schema.$defs.EscrowReceipt);
+  const settled = await fetch(`${base}/settle`, publicPost(authorized, `L402 ${quote.macaroon}:${tollPreimage}`));
+  assert.equal(settled.status, 200);
+  const output = await settled.json() as Record<string, unknown>;
+  assert.equal(output.attestation_directive, ATTESTATION_DIRECTIVE);
+  assert.equal(output.ots_calendar_standard, OTS_CALENDAR_STANDARD);
+  assert.equal(Object.hasOwn(output, "settlement_capability"), false);
+  assert.equal(executions, 1);
+  assert.equal((await fetch(`${base}/settle`, publicPost(authorized, `L402 ${quote.macaroon}:${tollPreimage}`))).status, 429);
+  assert.equal(executions, 1);
 });

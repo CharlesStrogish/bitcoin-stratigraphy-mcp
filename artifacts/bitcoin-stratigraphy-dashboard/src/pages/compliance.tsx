@@ -144,7 +144,7 @@ export default function CompliancePage() {
                 <strong>Navigate to the Escrow Terminal:</strong> Return to the main dashboard.
               </li>
               <li>
-                <strong>Execute the Simulation:</strong> Click the yellow "Simulate Agent Settlement" button.
+                <strong>Run the Enterprise Interactive Preview:</strong> Click the yellow "Run Preview" button.
               </li>
               <li>
                 <strong>Analyze the Flow:</strong> The UI visually guides you through the machine settlement: Agent A locks the bounty, Agent B submits the execution trace, and the Stratigraphy Hub validates the RFC 6962 Merkle leaf. The live terminal shows a current 24-sat (~$0.02) toll preview; settlement uses the contract's dynamic server price.

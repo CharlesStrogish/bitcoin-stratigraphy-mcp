@@ -158,7 +158,7 @@ function Header({
   return (
     <header className="topbar">
       <div className="eyebrow">
-        <span className="eyebrow-line" /> RESEARCH DESK / BTC-STRATIGRAPHY
+        <span className="eyebrow-line" /> ENTERPRISE MCP SERVER / L402 ORACLE
       </div>
       <div className="header-main">
         <div>

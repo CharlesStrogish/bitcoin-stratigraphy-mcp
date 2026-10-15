@@ -15,11 +15,16 @@ test("homepage places the live escrow terminal above the command center", () => 
   assert.match(app, /const LIVE_ESCROW_TERMINAL_ID = "live-escrow-terminal";/);
   const anchor = "id={LIVE_ESCROW_TERMINAL_ID}";
   assert.equal(app.split(anchor).length, 2, "the terminal id is rendered once");
-  const stats = app.indexOf('<div className="stats-row">');
+  const header = app.indexOf("<Header");
   const terminal = app.indexOf(anchor);
   const commandCenter = app.indexOf("<CommandCenter />");
-  assert.ok(stats > 0, "KPI cards are rendered");
-  assert.ok(terminal > stats, "terminal follows the KPI cards");
+  assert.ok(header > 0, "hero and quick actions are rendered");
+  assert.ok(terminal > header, "terminal follows the hero");
+  assert.match(
+    app.slice(header, terminal),
+    /\/>\s*<section\s*$/,
+    "nothing renders between the hero and escrow section",
+  );
   assert.ok(commandCenter > terminal, "command center follows the terminal");
   assert.match(
     app.slice(terminal, commandCenter),

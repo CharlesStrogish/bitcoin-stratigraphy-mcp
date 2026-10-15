@@ -164,6 +164,16 @@ test("legacy video-archive UI is removed while the hero and escrow stay", () => 
     "TableCard",
     "Insights",
     "recharts",
+    "StatCard",
+    "stats-row",
+    "INDEXED ENTRIES",
+    "STRATA SPAN",
+    "10M SIGNAL",
+    "SERIES COMPLETION",
+    "records in view",
+    "Uploaded JSON",
+    "planned day layers",
+    "source-badge",
   ]) {
     assert.ok(!app.includes(legacy), `${legacy} is gone from the homepage`);
   }

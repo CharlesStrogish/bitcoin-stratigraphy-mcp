@@ -27,7 +27,14 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
     assert.equal(meta(html, key), "Bitcoin Stratigraphy Enterprise | State-Anchored AI");
   }
   assert.equal(meta(html, "robots"), "index, follow");
-  assert.ok(meta(html, "google-site-verification").length > 0);
+  const verificationTags = [
+    ...html.matchAll(/<meta name="google-site-verification" content="([^"]+)" \/>/g),
+  ].map(([, token]) => token);
+  assert.deepEqual(verificationTags, [
+    "gD8puclen7IOEc0MSQGVzV61VebIvL3fn1VRWLVc-BE",
+    "gD8puclen7lOEc0MSQGVzV61VeblvL3fn1VRWLVc-BE",
+    "5-KfH4O096Z1k7nLsVu8839zUzv8mz0ItthQIGYjC28",
+  ]);
   for (const key of ["description", "og:description", "twitter:description"]) {
     const content = meta(html, key);
     for (const feature of [

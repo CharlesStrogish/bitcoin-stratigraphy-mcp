@@ -164,6 +164,20 @@ test("homepage metadata stays unchanged and dedicated static pages remain emitte
     ["simulator/index.html", "standard/index.html", "enterprise/index.html",
       "whitepaper/index.html", "compliance/index.html"],
   );
+  for (const asset of emitted) {
+    for (const token of [
+      "gD8puclen7IOEc0MSQGVzV61VebIvL3fn1VRWLVc-BE",
+      "gD8puclen7lOEc0MSQGVzV61VeblvL3fn1VRWLVc-BE",
+      "5-KfH4O096Z1k7nLsVu8839zUzv8mz0ItthQIGYjC28",
+    ]) {
+      assert.ok(
+        asset.source.includes(
+          `<meta name="google-site-verification" content="${token}" />`,
+        ),
+        `${asset.fileName} preserves verification ${token}`,
+      );
+    }
+  }
   for (const existing of emitted.filter((asset) =>
     ["enterprise/index.html", "whitepaper/index.html"].includes(asset.fileName))) {
     assert.ok(!existing.source.includes('id="compliance-article-jsonld"'));

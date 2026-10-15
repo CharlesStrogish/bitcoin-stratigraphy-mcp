@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useMemo } from "react";
+import { type MouseEvent, useEffect } from "react";
 import {
   QueryClient,
   QueryClientProvider,
@@ -6,15 +6,7 @@ import {
 } from "@tanstack/react-query";
 import type { StratigraphyEntry } from "@workspace/api-client-react";
 import stratigraphyDataset from "../../api-server/data/stratigraphy.json";
-import {
-  Check,
-  Database,
-  Download,
-  FileText,
-  Play,
-  RefreshCw,
-  Zap,
-} from "lucide-react";
+import { Check, Download, FileText, Play, RefreshCw, Zap } from "lucide-react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -130,10 +122,6 @@ async function loadCompleteDataset() {
   return completeDataset;
 }
 
-function formatDay(day: number) {
-  return String(day).padStart(3, "0");
-}
-
 function csvCell(value: unknown) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
@@ -156,33 +144,15 @@ function downloadCsv(rows: StratigraphyEntry[]) {
   URL.revokeObjectURL(url);
 }
 
-function getSignals(title: string) {
-  const text = title.toLowerCase();
-  const result: string[] = [];
-  if (text.includes("million") || text.includes("$10m") || text.includes("10m"))
-    result.push("10M framing");
-  if (text.includes("price") || text.includes("dollar") || text.includes("$"))
-    result.push("price thesis");
-  if (text.includes("halving") || text.includes("cycle"))
-    result.push("cycle marker");
-  if (text.includes("prediction") || text.includes("forecast"))
-    result.push("forecast");
-  if (text.includes("day") || text.includes("update"))
-    result.push("series note");
-  return result.length ? result : ["general signal"];
-}
-
 function Header({
   onRefresh,
   onExport,
   refreshing,
-  lastRefreshed,
   rowCount,
 }: {
   onRefresh: () => void;
   onExport: () => void;
   refreshing: boolean;
-  lastRefreshed: string | null;
   rowCount: number;
 }) {
   return (
@@ -201,17 +171,6 @@ function Header({
             for EU AI Act Article 12 compliance — Created &amp; Architected by
             Charles R. Strogish.
           </p>
-          <div className="source-row">
-            <span className="source-badge">
-              <Database size={12} /> Uploaded JSON
-            </span>
-            <span className="source-caption">
-              {rowCount ? `${rowCount} records in view` : "Awaiting dataset"}
-            </span>
-            {lastRefreshed && (
-              <span className="source-caption">Updated {lastRefreshed}</span>
-            )}
-          </div>
           <TrustBadges />
         </div>
         <div className="header-actions">
@@ -274,26 +233,6 @@ function Header({
   );
 }
 
-function StatCard({
-  label,
-  value,
-  detail,
-  accent = "gold",
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  accent?: string;
-}) {
-  return (
-    <div className={`stat-card stat-${accent}`}>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-      <div className="stat-detail">{detail}</div>
-    </div>
-  );
-}
-
 function Home() {
   const query = useQuery({
     queryKey: ["stratigraphy", "complete-primary-dataset"],
@@ -301,7 +240,6 @@ function Home() {
     staleTime: Infinity,
   });
   const allRows = query.data || [];
-  const loading = query.isLoading || query.isFetching;
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
@@ -322,26 +260,6 @@ function Home() {
       window.removeEventListener("hashchange", revealFromHash);
     };
   }, []);
-  const stats = useMemo(() => {
-    const days = allRows.map((entry) => entry.day);
-    const signals = allRows.filter((entry) =>
-      getSignals(entry.title).includes("10M framing"),
-    ).length;
-    return {
-      first: Math.min(...days),
-      last: Math.max(...days),
-      signals,
-      density: allRows.length
-        ? Math.round((signals / allRows.length) * 100)
-        : 0,
-    };
-  }, [allRows]);
-  const lastRefreshed = query.dataUpdatedAt
-    ? new Date(query.dataUpdatedAt).toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : null;
   return (
     <div className="app-shell">
       <div className="grain" />
@@ -350,63 +268,8 @@ function Home() {
           onRefresh={() => query.refetch()}
           onExport={() => downloadCsv(allRows)}
           refreshing={query.isFetching}
-          lastRefreshed={lastRefreshed}
           rowCount={allRows.length}
         />
-        {query.isError ? (
-          <div className="error-state panel">
-            <div className="empty-glyph">
-              <RefreshCw size={20} />
-            </div>
-            <strong>Dataset connection interrupted</strong>
-            <span>We couldn't read the uploaded JSON right now.</span>
-            <button className="reset-button" onClick={() => query.refetch()}>
-              Try again
-            </button>
-          </div>
-        ) : (
-          <div className="stats-row">
-            <StatCard
-              label="INDEXED ENTRIES"
-              value={loading ? "—" : allRows.length.toLocaleString()}
-              detail={
-                loading
-                  ? "Reading dataset"
-                  : `${allRows.length.toLocaleString()} total in source`
-              }
-            />
-            <StatCard
-              label="STRATA SPAN"
-              value={
-                loading || !allRows.length
-                  ? "—"
-                  : `${formatDay(stats.first)}–${formatDay(stats.last)}`
-              }
-              detail="Indexed day range"
-              accent="rust"
-            />
-            <StatCard
-              label="10M SIGNAL"
-              value={loading ? "—" : `${stats.density}%`}
-              detail={
-                loading
-                  ? "Calculating signals"
-                  : `${stats.signals} titles reference the thesis`
-              }
-              accent="teal"
-            />
-            <StatCard
-              label="SERIES COMPLETION"
-              value={
-                loading || !allRows.length
-                  ? "—"
-                  : `${Math.round((allRows.length / 422) * 100)}%`
-              }
-              detail="Of 422 planned day layers"
-              accent="slate"
-            />
-          </div>
-        )}
         <section
           id={LIVE_ESCROW_TERMINAL_ID}
           className="live-escrow-section"

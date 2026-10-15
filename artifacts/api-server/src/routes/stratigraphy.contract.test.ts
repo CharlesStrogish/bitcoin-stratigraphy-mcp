@@ -4839,7 +4839,7 @@ test("serves the public MCP discovery manifest with wildcard CORS and no payment
   const manifest = GetMcpDiscoveryManifestResponse.parse(mcpDiscoveryManifest);
   assert.equal(manifest.version, RELEASE_VERSION);
   assert.equal(manifest.canonical_url, CANONICAL_ORIGIN);
-  assert.equal(manifest.mcp.version, "2024-11-25");
+  assert.equal(manifest.mcp.version, "2025-11-25");
   assert.deepEqual(
     manifest.mcp.transports.map((transport) => transport.endpoint),
     [`${CANONICAL_ORIGIN}/mcp`],

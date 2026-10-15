@@ -82,7 +82,7 @@ export const mcpDiscoveryManifest = {
       "Self-hosted Streamable HTTP server at /mcp, not a stdio connector. Requires PostgreSQL, the licensed Python companion and operator-provisioned secrets; see the package README.",
   },
   mcp: {
-    version: "2024-11-25",
+    version: "2025-11-25",
     transports: [
       {
         type: "streamable-http",

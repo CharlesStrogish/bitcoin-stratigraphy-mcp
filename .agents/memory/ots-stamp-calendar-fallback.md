@@ -1,0 +1,26 @@
+---
+name: OTS stamp calendar fallback
+description: How the Node API's OpenTimestamps stamping treats slow or unreachable public calendars, and why boot-time stamping is delayed.
+---
+
+Stamp through one calendar per CLI attempt: a.pool, then b.pool, then alice.
+Each attempt has a short calendar wait and its own process cap. Only a process
+timeout, or the CLI's "need at least N attestation(s) but received N" exit,
+counts as a calendar outage that moves to the next calendar. Any other failure
+is a real error and must surface immediately. When every calendar fails, log
+a warning and retry once later, never an error. The first scheduled stamp
+waits five minutes after boot. The Python anchor's resume and the proof
+upgrader wait the same time.
+
+**Why:** The boot-time timeout came from cold-starting the Nix Python CLI
+while both APIs were booting; that start-up consumed the whole 20 s process
+timeout. The CLI's calendar submission thread is not a daemon, so a stalled
+calendar is bounded only by its socket timeout. The per-attempt process cap is
+what bounds it. Tests against local fake calendars confirmed the CLI reports a
+refused, silent or erroring calendar with exit status 1 and that message.
+
+**How to apply:** Keep the approved calendar set unchanged and retries
+stamping the same bytes. A pending calendar receipt is not Bitcoin
+verification. Test the real CLI only against local fake calendars, never the
+public ones. When testing locally, use the PATH caveat in
+python-environment-checks.md.

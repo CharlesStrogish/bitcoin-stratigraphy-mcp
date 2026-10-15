@@ -55,7 +55,9 @@ def register_stratigraphy_bridge(app, storage, prefix):
             data = json.loads(body)
             if not isinstance(data, dict) or not isinstance(data.get("arguments"), dict):
                 raise ValueError("Invalid internal query")
-            live = app.state.stratigraphy_pipeline.get_snapshot().model_dump()
+            pipeline = app.state.stratigraphy_pipeline
+            await pipeline.wait_for_first_refresh()
+            live = pipeline.get_snapshot().model_dump()
             return await asyncio.to_thread(source.query, data["tool"], data["arguments"], live)
         except PipelineUnavailable as exc:
             raise HTTPException(503, "Live stratigraphy pipeline unavailable") from exc

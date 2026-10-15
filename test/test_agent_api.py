@@ -1,9 +1,17 @@
 # Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 """Deterministic supply math, bounded upstream reads and fail-closed ASGI startup."""
 
+import asyncio
 import contextlib
 import io
+import json
+import subprocess
+import sys
+import textwrap
+import threading
+import time
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -165,6 +173,126 @@ class AgentApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 503)
                 self.assertNotIn("block_height", response.json())
                 self.assertFalse(client.get("/agent-api/health").json()["pipeline_ready"])
+
+
+class ColdStartTests(unittest.TestCase):
+    """Startup does not wait for upstream data; live reads wait for it, bounded."""
+
+    def live_inputs(self, release: threading.Event):
+        async def read_height(_client):
+            while not release.is_set():
+                await asyncio.sleep(0.01)
+            return 900_001
+
+        stack = contextlib.ExitStack()
+        stack.enter_context(patch.object(main, "verify_license", return_value=True))
+        stack.enter_context(patch.object(pipeline, "read_live_height", read_height))
+        stack.enter_context(
+            patch.object(pipeline, "read_live_price", AsyncMock(return_value=(100_000, pipeline.PRICE_URL)))
+        )
+        stack.enter_context(patch.object(pipeline, "read_live_hashrate", AsyncMock(return_value=1e21)))
+        return stack
+
+    def test_health_answers_at_once_and_metrics_wait_for_the_first_refresh(self):
+        release = threading.Event()
+        self.addCleanup(release.set)
+        with self.live_inputs(release):
+            app = agent_api.create_app(proof_storage=MemoryArchive())
+            with TestClient(app) as client:
+                health = client.get("/agent-api/health")
+                self.assertEqual(health.status_code, 200)
+                self.assertFalse(health.json()["pipeline_ready"])
+                timer = threading.Timer(0.2, release.set)
+                self.addCleanup(timer.cancel)
+                started = time.monotonic()
+                timer.start()
+                metrics = client.get("/agent-api/supply-metrics")
+                self.assertEqual(metrics.status_code, 200)
+                self.assertEqual(metrics.json()["block_height"], 900_001)
+                self.assertGreaterEqual(time.monotonic() - started, 0.15)
+                self.assertTrue(client.get("/agent-api/health").json()["pipeline_ready"])
+
+    def test_metrics_answer_503_when_the_first_refresh_outlasts_the_wait(self):
+        release = threading.Event()
+        self.addCleanup(release.set)
+        with self.live_inputs(release), patch.object(pipeline, "FIRST_REFRESH_WAIT_SECONDS", 0.2):
+            app = agent_api.create_app(proof_storage=MemoryArchive())
+            with TestClient(app) as client:
+                started = time.monotonic()
+                response = client.get("/agent-api/supply-metrics")
+                elapsed = time.monotonic() - started
+                self.assertEqual(response.status_code, 503)
+                self.assertNotIn("block_height", response.json())
+                self.assertGreaterEqual(elapsed, 0.15)
+                self.assertLess(elapsed, 3)
+
+
+class DeferredDependencyTests(unittest.TestCase):
+    def test_heavy_dependencies_load_only_when_first_needed(self):
+        # A fresh interpreter, loading the app exactly as the server does.
+        script = textwrap.dedent(
+            """
+            import json, sys
+            import main
+            main.verify_license = lambda *args, **kwargs: True
+            import agent_startup
+            app = agent_startup._load_agent_api()
+            heavy = ("fastapi_mcp", "mcp", "google.cloud.storage", "replit.object_storage",
+                     "opentimestamps", "bitcoin", "rich", "pygments")
+            loaded = [name for name in heavy if name in sys.modules]
+            server, _transport = app.state.mcp.start().result(timeout=120)
+            print(json.dumps({"loaded": loaded, "tools": [tool.name for tool in server.tools]}))
+            """
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=Path(agent_api.__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+        report = json.loads(result.stdout.strip().splitlines()[-1])
+        self.assertEqual(report["loaded"], [])
+        self.assertEqual(report["tools"], ["get_supply_metrics", "get_historical_proof"])
+
+
+class LazyMcpServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_disconnecting_request_does_not_cancel_the_shared_build(self):
+        release = threading.Event()
+        builds = []
+
+        def build():
+            builds.append(threading.current_thread().name)
+            release.wait(5)
+            return "server", "transport"
+
+        server = agent_api.LazyMcpServer(build)
+        waiting = asyncio.ensure_future(server.get())
+        await asyncio.sleep(0.05)
+        waiting.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await waiting
+        release.set()
+        self.assertEqual(await server.get(), ("server", "transport"))
+        self.assertIs(server.start(), server.start())
+        self.assertEqual(builds, ["agent-api-mcp"])
+
+    def test_a_failed_build_answers_503_without_affecting_rest_routes(self):
+        with (
+            patch.object(main, "verify_license", return_value=True),
+            patch.object(pipeline, "read_live_height", AsyncMock(return_value=900_001)),
+            patch.object(pipeline, "read_live_price", AsyncMock(return_value=(100_000, pipeline.PRICE_URL))),
+            patch.object(pipeline, "read_live_hashrate", AsyncMock(return_value=1e21)),
+            patch("fastapi_mcp.FastApiMCP", side_effect=RuntimeError("unavailable")),
+            self.assertLogs("agent_api", level="ERROR"),
+        ):
+            app = agent_api.create_app(proof_storage=MemoryArchive())
+            with TestClient(app) as client:
+                response = client.post("/agent-api/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "ping"})
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json(), {"detail": "MCP server unavailable"})
+                self.assertEqual(client.get("/agent-api/supply-metrics").status_code, 200)
 
 
 if __name__ == "__main__":

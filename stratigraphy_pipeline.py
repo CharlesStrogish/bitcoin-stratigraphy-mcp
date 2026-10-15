@@ -27,6 +27,9 @@ INITIAL_SUBSIDY_SATS = 50 * SATOSHIS_PER_BTC
 MAX_BLOCK_HEIGHT = 2**31 - 1
 HORIZON_PRICE_USD = 10_000_000.0
 EFFICIENCY_BASELINE_J_TH = 15
+# How long a live read waits for the first refresh after startup (normally
+# under a second) before answering 503. Kept well below common 10 s timeouts.
+FIRST_REFRESH_WAIT_SECONDS = 5.0
 ATTRIBUTION = (
     "Projected by Hal Finney on January 10, 2009 "
     "($10M per coin valuation under total global wealth absorption)."
@@ -335,12 +338,33 @@ class StratigraphyPipeline:
         self._task: asyncio.Task | None = None
         self._initial_attempt_done = asyncio.Event()
 
-    async def start(self):
+    async def start(self, *, wait=True):
+        """Start the refresh worker and, unless ``wait`` is false, await its first attempt.
+
+        The Enterprise Agent API starts without waiting, so that it can answer
+        requests at once; live readers then call ``wait_for_first_refresh``.
+        """
         if self._task is not None:
             return
         self._initial_attempt_done.clear()
         self._task = asyncio.create_task(self._run(), name="bitcoin-stratigraphy-pipeline")
-        await self._initial_attempt_done.wait()
+        if wait:
+            await self._initial_attempt_done.wait()
+
+    async def wait_for_first_refresh(self, timeout: float | None = None):
+        """Wait, at most ``timeout`` seconds, for the worker's first refresh attempt.
+
+        Returns at once when that attempt has finished or the worker is stopped.
+        Nothing is published here: afterwards ``get_snapshot`` still returns only
+        a complete live snapshot, or raises ``PipelineUnavailable``.
+        """
+        if self._task is None or self._initial_attempt_done.is_set():
+            return
+        try:
+            async with asyncio.timeout(FIRST_REFRESH_WAIT_SECONDS if timeout is None else timeout):
+                await self._initial_attempt_done.wait()
+        except TimeoutError:
+            pass
 
     async def stop(self):
         task, self._task = self._task, None

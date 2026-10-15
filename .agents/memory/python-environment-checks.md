@@ -50,6 +50,17 @@ load the expected OpenSSL symbols; the Nix dependency closure worked correctly.
 **How to apply:** Isolate Python import-path overrides for those subprocesses,
 without stripping unrelated runtime settings or altering the parent's environment.
 
+Under `uv run`, PATH puts the workspace environment's `ots` script ahead of
+the Nix OTS CLI. That script fails with "undefined symbol: BN_add". The API
+server process resolves the Nix CLI first, so production is unaffected.
+
+**Why:** A manual CLI check run through `uv run` reached the broken workspace
+script, although the server's own stamping worked.
+
+**How to apply:** For manual or harness runs of the real CLI, remove the
+workspace environment's bin directory from PATH as well as PYTHONPATH and
+PYTHONHOME. Confirm with `command -v ots` that the Nix store path is used.
+
 Use a verified system SSL context for Python HTTP clients in this environment,
 not disabled certificate verification.
 

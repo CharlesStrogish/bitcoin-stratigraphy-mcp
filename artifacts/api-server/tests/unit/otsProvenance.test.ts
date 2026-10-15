@@ -3,7 +3,12 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   createOtsProvenanceService,
+  OtsCalendarsUnavailableError,
+  OtsCliExitError,
+  OtsCliTimeoutError,
   otsCliEnvironment,
+  STAMP_CALENDARS,
+  stampWithCalendarFallback,
   verifyOtsProofRecord,
   type ProvenanceAnchor,
 } from "../../src/services/otsProvenance";
@@ -29,6 +34,79 @@ test("isolates the Nix OTS CLI from workspace Python imports without changing ot
   });
   assert.equal(inherited.PYTHONPATH, "/workspace/python-packages");
   assert.equal(inherited.PYTHONHOME, "/workspace/python");
+});
+
+// What the CLI prints, then exits 1, when its calendar gives no attestation.
+const NO_ATTESTATION =
+  "Failed to create timestamp: need at least 1 attestation but received 0 within timeout\n";
+
+test("stamps through the standard calendars in order, skipping any that time out or give no attestation", async () => {
+  assert.deepEqual(
+    [...STAMP_CALENDARS],
+    [
+      "https://a.pool.opentimestamps.org",
+      "https://b.pool.opentimestamps.org",
+      "https://alice.btc.calendar.opentimestamps.org",
+    ],
+  );
+  const receipt = Buffer.from([0x4f, 0x54, 0x53, 9]);
+  const tried: string[] = [];
+  const stamped = await stampWithCalendarFallback(async (calendar) => {
+    tried.push(calendar);
+    if (tried.length === 1) throw new OtsCliTimeoutError();
+    if (tried.length === 2) throw new OtsCliExitError(1, NO_ATTESTATION);
+    return receipt;
+  });
+  assert.equal(stamped, receipt);
+  assert.deepEqual(tried, [...STAMP_CALENDARS]);
+
+  tried.length = 0;
+  await stampWithCalendarFallback(async (calendar) => {
+    tried.push(calendar);
+    return receipt;
+  });
+  assert.deepEqual(
+    tried,
+    [STAMP_CALENDARS[0]],
+    "the first receipt ends the search",
+  );
+});
+
+test("reports a calendar outage only when every calendar fails, and rethrows other failures at once", async () => {
+  await assert.rejects(
+    stampWithCalendarFallback(async (calendar) => {
+      throw calendar === STAMP_CALENDARS[1]
+        ? new OtsCliExitError(1, NO_ATTESTATION)
+        : new OtsCliTimeoutError();
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof OtsCalendarsUnavailableError);
+      assert.deepEqual(error.failures, [
+        { calendar: STAMP_CALENDARS[0], reason: "timed_out" },
+        { calendar: STAMP_CALENDARS[1], reason: "no_attestation" },
+        { calendar: STAMP_CALENDARS[2], reason: "timed_out" },
+      ]);
+      return true;
+    },
+  );
+  const missingCli = Object.assign(new Error("spawn ots ENOENT"), {
+    code: "ENOENT",
+  });
+  for (const failure of [
+    missingCli,
+    new OtsCliExitError(1, "Error! merkle-root-1.ots already exists"),
+    new TypeError("OpenTimestamps proof is empty"),
+  ]) {
+    let attempts = 0;
+    await assert.rejects(
+      stampWithCalendarFallback(async () => {
+        attempts += 1;
+        throw failure;
+      }),
+      (error: unknown) => error === failure,
+    );
+    assert.equal(attempts, 1, `${failure.message} is not a calendar outage`);
+  }
 });
 
 test("verifies OTS digest, Bitcoin attestation, and canonical header without trusting calendar receipts", async () => {

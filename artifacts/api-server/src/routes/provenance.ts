@@ -6,6 +6,7 @@ import { logger } from "../lib/logger";
 import {
   anchorProvenance,
   getProvenanceAnchor,
+  OtsCalendarsUnavailableError,
   type ProvenanceAnchor,
 } from "../services/otsProvenance";
 import { buildProvenanceChain } from "../services/provenanceChain";
@@ -16,13 +17,15 @@ type RouteOptions = {
   getAnchor?: typeof getProvenanceAnchor;
   anchor?: typeof anchorProvenance;
   operatorSecret?: string;
+  calendarRetryDelayMs?: number;
 };
 
 export type ProvenanceAnchoringSchedule = {
   /**
    * Starts the background OpenTimestamps stamping timers (first stamp after
    * delayMs, then every six hours). Calendar calls never block HTTP startup;
-   * each CLI operation has its own timeout. Returns a stop function.
+   * each calendar attempt has its own timeout, and a scheduled stamp that no
+   * calendar accepts is retried once, later. Returns a stop function.
    */
   start(delayMs?: number): () => void;
 };
@@ -30,7 +33,11 @@ export type ProvenanceAnchoringSchedule = {
 type ChainState = ReturnType<typeof buildProvenanceChain>;
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1_000;
-const STARTUP_STAMP_DELAY_MS = 5_000;
+// The first stamp waits until a freshly booted server has settled: during a
+// cold boot the CLI's own start-up competes with both APIs starting.
+const STARTUP_STAMP_DELAY_MS = 5 * 60 * 1_000;
+// A scheduled stamp that no calendar accepted is retried once, after this.
+const CALENDAR_RETRY_DELAY_MS = 15 * 60 * 1_000;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 5;
 
@@ -67,6 +74,8 @@ export function registerProvenanceRoutes(
   const anchor = options.anchor ?? anchorProvenance;
   const operatorSecret =
     options.operatorSecret ?? process.env.MACAROON_OPERATOR_SECRET;
+  const calendarRetryDelayMs =
+    options.calendarRetryDelayMs ?? CALENDAR_RETRY_DELAY_MS;
   const requestsByAddress = new Map<string, number[]>();
 
   async function readCurrentState(): Promise<ChainState> {
@@ -189,10 +198,14 @@ export function registerProvenanceRoutes(
       const result = await stampCurrentState();
       res.json(result);
     } catch (error) {
-      if (req.log) {
-        req.log.error({ err: error }, "Provenance anchor operation failed");
+      const log = req.log ?? logger;
+      if (error instanceof OtsCalendarsUnavailableError) {
+        log.warn(
+          { calendars: error.failures },
+          "Provenance anchor operation deferred: OpenTimestamps calendars unavailable",
+        );
       } else {
-        logger.error({ err: error }, "Provenance anchor operation failed");
+        log.error({ err: error }, "Provenance anchor operation failed");
       }
       res
         .status(503)
@@ -204,21 +217,48 @@ export function registerProvenanceRoutes(
     start(delayMs = STARTUP_STAMP_DELAY_MS) {
       if (backgroundTimersScheduled) return () => {};
       backgroundTimersScheduled = true;
-      const runScheduledStamp = () => {
+      let stopped = false;
+      let retryTimer: NodeJS.Timeout | undefined;
+      const runScheduledStamp = (isRetry = false) => {
         void stampCurrentState().catch((error: unknown) => {
-          logger.error(
-            { err: error },
-            "Scheduled provenance anchor operation failed",
+          if (!(error instanceof OtsCalendarsUnavailableError)) {
+            logger.error(
+              { err: error },
+              "Scheduled provenance anchor operation failed",
+            );
+            return;
+          }
+          // A transient calendar outage: retry once, then wait for the
+          // next scheduled stamp rather than retrying indefinitely.
+          const retry = !isRetry && !stopped && !retryTimer;
+          logger.warn(
+            {
+              calendars: error.failures,
+              retryInMs: retry ? calendarRetryDelayMs : undefined,
+            },
+            "Scheduled provenance anchor deferred: OpenTimestamps calendars unavailable",
           );
+          if (retry) {
+            retryTimer = setTimeout(() => {
+              retryTimer = undefined;
+              runScheduledStamp(true);
+            }, calendarRetryDelayMs);
+            retryTimer.unref();
+          }
         });
       };
-      const startupTimer = setTimeout(runScheduledStamp, delayMs);
-      const intervalTimer = setInterval(runScheduledStamp, SIX_HOURS_MS);
+      const startupTimer = setTimeout(() => runScheduledStamp(), delayMs);
+      const intervalTimer = setInterval(
+        () => runScheduledStamp(),
+        SIX_HOURS_MS,
+      );
       startupTimer.unref();
       intervalTimer.unref();
       return () => {
+        stopped = true;
         clearTimeout(startupTimer);
         clearInterval(intervalTimer);
+        clearTimeout(retryTimer);
         backgroundTimersScheduled = false;
       };
     },

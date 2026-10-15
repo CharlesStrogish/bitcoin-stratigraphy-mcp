@@ -35,6 +35,18 @@ opens. Holding probes is safe.
   messages) appear late. Time boots from stderr logger lines and Node's
   portBoundMs/applicationLoadedMs instead.
 
+**Python application load (2026-10-15 change):** MCP (fastapi_mcp and the MCP
+SDK), the App Storage/Google Cloud SDK, OpenTimestamps with python-bitcoinlib,
+and httpx's `rich` command-line module now load only where used. The MCP server
+builds on a daemon thread shortly after startup. The application import fell
+from 907 to 325 modules. Local timings: 0.84 s versus 2.1 s with warm
+bytecode, and 1.8 s versus 4.4–5.8 s without bytecode. uv does not compile
+bytecode by default, so the production build passes `--compile-bytecode`.
+Readiness no longer waits for the first live refresh. `supply-metrics` waits a
+bounded 5 s for it and otherwise returns the documented 503. Never serve a
+cached or archived snapshot there: that breaks the no-stale contract (90 s
+maximum age).
+
 **How to apply:** Never import application modules from the entry bootstrap;
 keep heavy libraries lazily imported and expensive module-level work (such as
 YAML parsing) out of evaluation. In Python, even `import asyncio` costs about

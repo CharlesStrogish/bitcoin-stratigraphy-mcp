@@ -196,3 +196,24 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
     def test_default_interval_is_six_hours(self):
         self.assertEqual(UPGRADE_INTERVAL, 21600)
         self.assertEqual(ProvenanceUpgrader(MemoryArchive()).interval, 21600)
+
+    async def test_start_delay_defers_the_first_pass(self):
+        loop = asyncio.get_running_loop()
+        calls = []
+        worker = ProvenanceUpgrader(MemoryArchive(), start_delay=0.2)
+        worker.upgrade_all = lambda: calls.append(loop.time())
+        started = loop.time()
+        await worker.start()
+        try:
+            await asyncio.sleep(0.1)
+            self.assertEqual(calls, [], "the first pass must wait for the start delay")
+            for _ in range(200):
+                if calls:
+                    break
+                await asyncio.sleep(0.01)
+            self.assertEqual(len(calls), 1)
+            self.assertGreaterEqual(calls[0] - started, 0.2)
+        finally:
+            await worker.stop()
+        with self.assertRaises(ValueError):
+            ProvenanceUpgrader(MemoryArchive(), start_delay=-1)

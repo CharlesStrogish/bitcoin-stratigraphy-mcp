@@ -6,12 +6,6 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from opentimestamps.core.notary import BitcoinBlockHeaderAttestation, PendingAttestation
-from opentimestamps.core.op import OpSHA256
-from opentimestamps.core.serialize import BytesDeserializationContext
-from opentimestamps.core.timestamp import DetachedTimestampFile
-
-from bitcoin_stratigraphy_enterprise.audit_verifier_ots import OtsVerifier, deserialize, serialize
 from provenance_anchor import MAX_FILE_SIZE, ProofUnavailable, proof_status
 
 UPGRADE_INTERVAL = 6 * 60 * 60
@@ -25,6 +19,14 @@ def finalize_proof(proof: bytes, *, verifier=None) -> bytes | None:
     shared verifier additionally checks two matching public headers, header hash,
     proof of work and the OTS Merkle root. This is not full-node chain validation.
     """
+    # Imported on first use, off the Enterprise Agent API's startup path.
+    from opentimestamps.core.notary import BitcoinBlockHeaderAttestation, PendingAttestation
+    from opentimestamps.core.op import OpSHA256
+    from opentimestamps.core.serialize import BytesDeserializationContext
+    from opentimestamps.core.timestamp import DetachedTimestampFile
+
+    from bitcoin_stratigraphy_enterprise.audit_verifier_ots import OtsVerifier, deserialize, serialize
+
     if not proof or len(proof) > MAX_FILE_SIZE:
         raise ProofUnavailable("Invalid archived proof size")
     context = BytesDeserializationContext(proof)
@@ -70,10 +72,12 @@ def finalize_proof(proof: bytes, *, verifier=None) -> bytes | None:
 class ProvenanceUpgrader:
     """Single sequential worker, separate from asyncio and the pipeline executor."""
 
-    def __init__(self, storage, *, interval=UPGRADE_INTERVAL):
+    def __init__(self, storage, *, interval=UPGRADE_INTERVAL, start_delay=0.0):
         if interval <= 0:
             raise ValueError("Upgrade interval must be positive")
-        self.storage, self.interval = storage, interval
+        if start_delay < 0:
+            raise ValueError("Upgrade start delay must not be negative")
+        self.storage, self.interval, self.start_delay = storage, interval, start_delay
         self._task = None
         self._executor = None
         self._stopped = threading.Event()
@@ -123,6 +127,9 @@ class ProvenanceUpgrader:
 
     async def _run(self):
         loop = asyncio.get_running_loop()
+        if self.start_delay:
+            # Let a freshly booted server settle before the first calendar pass.
+            await asyncio.sleep(self.start_delay)
         due = loop.time()
         while True:
             try:

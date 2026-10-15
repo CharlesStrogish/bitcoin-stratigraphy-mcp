@@ -18,6 +18,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from fastapi_mcp import FastApiMCP
+from opentimestamps.calendar import DEFAULT_AGGREGATORS
 from opentimestamps.core.notary import BitcoinBlockHeaderAttestation, PendingAttestation
 from opentimestamps.core.op import OpSHA256
 from opentimestamps.core.serialize import BytesSerializationContext
@@ -205,6 +206,45 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
                 await service._run()
             self.assertEqual(captured, ["2027-01-01", "2027-01-02"])
 
+    async def test_start_delay_defers_resuming_but_not_the_midnight_capture(self):
+        class Clock(datetime):
+            current = datetime(2026, 12, 31, 23, 58, tzinfo=timezone.utc)
+
+        Clock.now = classmethod(lambda cls, _timezone=None: cls.current)
+        booted = Clock.current
+        with tempfile.TemporaryDirectory() as folder:
+            storage = MemoryArchive()
+            service = anchor.ProvenanceAnchor(None, None, directory=folder, storage=storage, start_delay=300)
+            surveys, captured = [], []
+
+            def days():
+                surveys.append(Clock.current)
+                return set(), set()
+
+            async def capture(day):
+                captured.append((day, Clock.current))
+
+            async def advance(seconds):
+                if surveys:
+                    raise asyncio.CancelledError()
+                Clock.current += timedelta(seconds=seconds)
+
+            storage.days = days
+            service.anchor_date = capture
+            with (
+                patch.object(anchor, "datetime", Clock),
+                patch.object(anchor.asyncio, "sleep", advance),
+                self.assertRaises(asyncio.CancelledError),
+            ):
+                await service._run()
+        # Booted two minutes before midnight: the new UTC day is still captured
+        # on schedule, while the first archive survey waits for the delay.
+        self.assertEqual(captured, [("2027-01-01", datetime(2027, 1, 1, tzinfo=timezone.utc))])
+        self.assertEqual(len(surveys), 1)
+        self.assertGreaterEqual(surveys[0], booted + timedelta(seconds=300))
+        with self.assertRaises(ValueError):
+            anchor.ProvenanceAnchor(None, None, storage=MemoryArchive(), start_delay=-1)
+
     async def test_mcp_executor_delivers_exact_json_and_binary_proof(self):
         with tempfile.TemporaryDirectory() as folder:
             day = "2026-10-12"
@@ -235,7 +275,7 @@ class AnchorTests(unittest.IsolatedAsyncioTestCase):
         body = snapshot().model_dump_json().encode()
         async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as client:
             proof = await anchor.stamp_snapshot(body, client)
-        self.assertEqual(len(digests), len(anchor.DEFAULT_AGGREGATORS))
+        self.assertEqual(len(digests), len(DEFAULT_AGGREGATORS))
         self.assertTrue(all(digest == digests[0] for digest in digests))
         self.assertNotEqual(digests[0], hashlib.sha256(body).digest())
         self.assertEqual(anchor.proof_status(body, proof), "pending_bitcoin_confirmation")

@@ -176,6 +176,34 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(first_task.done())
             self.assertFalse(worker.ready)
 
+    async def test_start_without_waiting_and_bounded_wait_for_the_first_refresh(self):
+        release = asyncio.Event()
+
+        async def response(request):
+            await release.wait()
+            return live_response(request)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as client:
+            worker = pipeline.StratigraphyPipeline(client)
+            loop = asyncio.get_running_loop()
+            await worker.wait_for_first_refresh(5)  # Not started: returns at once.
+            try:
+                await worker.start(wait=False)
+                self.assertFalse(worker.ready)
+                started = loop.time()
+                await worker.wait_for_first_refresh(0.05)  # Upstream still blocked.
+                self.assertGreaterEqual(loop.time() - started, 0.04)
+                self.assertFalse(worker.ready)
+                release.set()
+                with patch.object(pipeline, "FIRST_REFRESH_WAIT_SECONDS", 2.0):
+                    await worker.wait_for_first_refresh()
+                self.assertTrue(worker.ready)
+                started = loop.time()
+                await worker.wait_for_first_refresh(5)  # Already attempted: at once.
+                self.assertLess(loop.time() - started, 1)
+            finally:
+                await worker.stop()
+
     async def test_snapshot_expiry_and_no_network_on_reads(self):
         requests = 0
         def response(request):

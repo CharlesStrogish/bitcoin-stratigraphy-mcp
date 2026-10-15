@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { logger } from "../lib/logger";
 
 export type ProvenanceAnchor = {
   headHash: string;
@@ -36,9 +37,19 @@ type OtsCli = {
 
 const MAX_PROOF_BYTES = 512 * 1024;
 const MAX_CLI_OUTPUT_BYTES = 64 * 1024;
-const STAMP_TIMEOUT_MS = 20_000;
+// Each stamp attempt submits to one calendar. The CLI waits up to
+// STAMP_CALENDAR_WAIT_SECONDS for that calendar's reply; the whole attempt,
+// including the CLI's own start-up, is capped at STAMP_ATTEMPT_TIMEOUT_MS.
+const STAMP_CALENDAR_WAIT_SECONDS = 5;
+const STAMP_ATTEMPT_TIMEOUT_MS = 15_000;
 const UPGRADE_TIMEOUT_MS = 15_000;
 const VERIFY_TIMEOUT_MS = 10_000;
+/** Standard public calendars, tried in this order until one accepts a stamp. */
+export const STAMP_CALENDARS = [
+  "https://a.pool.opentimestamps.org",
+  "https://b.pool.opentimestamps.org",
+  "https://alice.btc.calendar.opentimestamps.org",
+] as const;
 const PUBLIC_CALENDARS = [
   "https://a.pool.opentimestamps.org",
   "https://b.pool.opentimestamps.org",
@@ -84,6 +95,96 @@ function checkedProof(proof: Buffer): Buffer {
     );
   }
   return proof;
+}
+
+/** The OpenTimestamps CLI did not finish within its time limit. */
+export class OtsCliTimeoutError extends Error {
+  constructor() {
+    super("OpenTimestamps CLI operation timed out");
+    this.name = "OtsCliTimeoutError";
+  }
+}
+
+/** The OpenTimestamps CLI exited with a failure status. */
+export class OtsCliExitError extends Error {
+  readonly exitCode: number | null;
+  readonly stderr: string;
+
+  constructor(exitCode: number | null, stderr: string) {
+    const excerpt = stderr.slice(0, 1_024);
+    super(`OpenTimestamps CLI failed (${exitCode}): ${excerpt}`);
+    this.name = "OtsCliExitError";
+    this.exitCode = exitCode;
+    this.stderr = excerpt;
+  }
+}
+
+export type CalendarFailure = {
+  calendar: string;
+  reason: "timed_out" | "no_attestation";
+};
+
+/**
+ * No calendar accepted a commitment in time. Public calendars are sometimes
+ * briefly unreachable, so this is a transient outage, not a fault.
+ */
+export class OtsCalendarsUnavailableError extends Error {
+  readonly failures: readonly CalendarFailure[];
+
+  constructor(failures: readonly CalendarFailure[]) {
+    super(
+      `No OpenTimestamps calendar accepted the commitment: ${failures
+        .map(({ calendar, reason }) => `${calendar} (${reason})`)
+        .join(", ")}`,
+    );
+    this.name = "OtsCalendarsUnavailableError";
+    this.failures = failures;
+  }
+}
+
+// How the CLI reports a calendar that did not reply in time, refused the
+// connection or returned an error, before exiting with status 1.
+const NO_CALENDAR_ATTESTATION =
+  /Failed to create timestamp: need at least \d+ attestations? but received \d+/;
+
+function calendarFailureReason(
+  error: unknown,
+): CalendarFailure["reason"] | undefined {
+  if (error instanceof OtsCliTimeoutError) return "timed_out";
+  if (
+    error instanceof OtsCliExitError &&
+    NO_CALENDAR_ATTESTATION.test(error.stderr)
+  ) {
+    return "no_attestation";
+  }
+  return undefined;
+}
+
+/**
+ * Submits a commitment to each calendar in turn, each attempt with its own
+ * time limit, and returns the first receipt. A calendar that times out or
+ * gives no attestation is skipped. Any other failure, such as a missing CLI,
+ * is not a calendar outage and is thrown at once.
+ */
+export async function stampWithCalendarFallback(
+  attempt: (calendar: string) => Promise<Buffer>,
+  calendars: readonly string[] = STAMP_CALENDARS,
+): Promise<Buffer> {
+  const failures: CalendarFailure[] = [];
+  for (const calendar of calendars) {
+    try {
+      return await attempt(calendar);
+    } catch (error) {
+      const reason = calendarFailureReason(error);
+      if (!reason) throw error;
+      failures.push({ calendar, reason });
+      logger.info(
+        { calendar, reason },
+        "OpenTimestamps calendar did not accept the stamp",
+      );
+    }
+  }
+  throw new OtsCalendarsUnavailableError(failures);
 }
 
 export function otsCliEnvironment(
@@ -133,7 +234,7 @@ function runOts(
     };
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      finish(new Error("OpenTimestamps CLI operation timed out"));
+      finish(new OtsCliTimeoutError());
     }, timeoutMs);
     child.stdout.on("data", (chunk: Buffer) => collect("stdout", chunk));
     child.stderr.on("data", (chunk: Buffer) => collect("stderr", chunk));
@@ -141,12 +242,7 @@ function runOts(
     child.once("close", (code) => {
       if (settled) return;
       if (code === 0) finish(undefined, stdout);
-      else
-        finish(
-          new Error(
-            `OpenTimestamps CLI failed (${code}): ${stderr.slice(0, 1_024)}`,
-          ),
-        );
+      else finish(new OtsCliExitError(code, stderr));
     });
   });
 }
@@ -169,14 +265,29 @@ function calendarArgs(): string[] {
 const otsCli: OtsCli = {
   async stamp(rootBytes) {
     return inTempDirectory(async (directory) => {
-      const inputPath = join(directory, "merkle-root");
-      await writeFile(inputPath, rootBytes, { flag: "wx" });
-      await runOts(
-        ["stamp", "--timeout", "4", ...calendarArgs(), inputPath],
-        directory,
-        STAMP_TIMEOUT_MS,
-      );
-      return checkedProof(await readFile(`${inputPath}.ots`));
+      let attempts = 0;
+      return stampWithCalendarFallback(async (calendar) => {
+        // Every attempt stamps a fresh copy of the same bytes: the CLI will
+        // not overwrite a receipt left behind by an interrupted attempt.
+        attempts += 1;
+        const inputPath = join(directory, `merkle-root-${attempts}`);
+        await writeFile(inputPath, rootBytes, { flag: "wx" });
+        await runOts(
+          [
+            "stamp",
+            "-m",
+            "1",
+            "--timeout",
+            String(STAMP_CALENDAR_WAIT_SECONDS),
+            "-c",
+            calendar,
+            inputPath,
+          ],
+          directory,
+          STAMP_ATTEMPT_TIMEOUT_MS,
+        );
+        return checkedProof(await readFile(`${inputPath}.ots`));
+      });
     });
   },
   async upgrade(proof) {

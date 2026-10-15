@@ -449,18 +449,16 @@ class AgentApiBehindGateTests(RefusalAssertions, unittest.IsolatedAsyncioTestCas
                 await until(lambda: gate.held == 2)
                 loader.release.set()
 
-                # Waiting requests are answered only after the real lifespan,
-                # including the pipeline's first refresh, has completed.
+                # Waiting requests are answered once the real lifespan has
+                # started; the pipeline's first refresh no longer delays them,
+                # so health may still report that it is in progress.
                 health = await health
                 self.assertEqual(health.status_code, 200)
                 self.assertEqual(
-                    health.json(),
-                    {
-                        "status": "ok",
-                        "service": "enterprise-agent-api",
-                        "pipeline_ready": True,
-                    },
+                    {key: health.json()[key] for key in ("status", "service")},
+                    {"status": "ok", "service": "enterprise-agent-api"},
                 )
+                self.assertIsInstance(health.json()["pipeline_ready"], bool)
                 initialize = await initialize
                 self.assertEqual(initialize.status_code, 200)
                 server_info = initialize.json()["result"]["serverInfo"]
@@ -502,12 +500,20 @@ class AgentApiBehindGateTests(RefusalAssertions, unittest.IsolatedAsyncioTestCas
                 self.assertEqual(metrics.json()["block_height"], 900_001)
                 self.assertEqual(metrics.json()["hal_finney_horizon_multiple"], 100)
                 self.assertEqual(metrics.json()["attribution"], pipeline.ATTRIBUTION)
+                self.assertEqual(
+                    (await client.get("/agent-api/health")).json(),
+                    {
+                        "status": "ok",
+                        "service": "enterprise-agent-api",
+                        "pipeline_ready": True,
+                    },
+                )
                 index = await client.get("/agent-api")
                 self.assertEqual(index.status_code, 307)
                 self.assertEqual(index.headers["location"], "/agent-api/docs")
 
             app = gate.app
-            await app.state.mcp._http_transport.shutdown()
+            await app.state.mcp.shutdown()
             shutdown = await harness.stop()
         self.assertEqual(shutdown, {"type": "lifespan.shutdown.complete"})
         self.assertIsNone(app.state.stratigraphy_pipeline._task)

@@ -41,7 +41,7 @@ run = "cd ../.. && PORT=8000 uv run --no-sync python main.py"
 [services.production]
 
 [services.production.build]
-args = ["uv", "sync", "--frozen"]
+args = ["uv", "sync", "--frozen", "--compile-bytecode"]
 
 [services.production.run]
 args = ["uv", "run", "--no-sync", "python", "main.py"]

@@ -4,8 +4,13 @@ import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import express from "express";
 import type { AddressInfo } from "node:net";
+import { logger } from "../lib/logger";
 import { buildProvenanceChain } from "../services/provenanceChain";
-import type { ProvenanceAnchor } from "../services/otsProvenance";
+import {
+  OtsCalendarsUnavailableError,
+  STAMP_CALENDARS,
+  type ProvenanceAnchor,
+} from "../services/otsProvenance";
 import { readDataset } from "./stratigraphy";
 import { registerProvenanceRoutes } from "./provenance";
 
@@ -168,4 +173,85 @@ test("registration never stamps; scheduled anchoring starts once, after its dela
   stop();
   await new Promise((resolve) => setTimeout(resolve, 50));
   assert.equal(anchorCalls, 1);
+});
+
+test("a calendar outage is a warning with one later retry, never an error", async (t) => {
+  const records = await readDataset();
+  const warnings = t.mock.method(logger, "warn", () => undefined);
+  const errors = t.mock.method(logger, "error", () => undefined);
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+  const waitFor = async (condition: () => boolean) => {
+    const deadline = Date.now() + 5_000;
+    while (!condition() && Date.now() < deadline) await sleep(5);
+  };
+  const register = (outages: number, calendarRetryDelayMs: number) => {
+    const app = express();
+    const state = { calls: 0 };
+    const anchoring = registerProvenanceRoutes(app, {
+      readRecords: async () => records,
+      getAnchor: async () => undefined,
+      operatorSecret: "operator-test-secret",
+      calendarRetryDelayMs,
+      anchor: async (input) => {
+        state.calls += 1;
+        if (state.calls <= outages) {
+          throw new OtsCalendarsUnavailableError(
+            STAMP_CALENDARS.map((calendar) => ({
+              calendar,
+              reason: "timed_out" as const,
+            })),
+          );
+        }
+        return {
+          ...input,
+          otsProof: Buffer.from("genuine-test-receipt").toString("base64"),
+          otsStatus: "pending_calendar",
+          updatedAt: "2025-01-01T00:00:00.000Z",
+        };
+      },
+    });
+    return { app, anchoring, state };
+  };
+
+  // Recovers on the single retry.
+  const recovered = register(1, 20);
+  let stop = recovered.anchoring.start(0);
+  await waitFor(() => recovered.state.calls === 2);
+  stop();
+  assert.equal(recovered.state.calls, 2);
+  assert.equal(warnings.mock.callCount(), 1);
+
+  // A repeated outage waits for the next scheduled stamp, not another retry.
+  const repeated = register(2, 20);
+  stop = repeated.anchoring.start(0);
+  await waitFor(() => warnings.mock.callCount() === 3);
+  await sleep(100);
+  stop();
+  assert.equal(repeated.state.calls, 2);
+  assert.equal(warnings.mock.callCount(), 3);
+
+  // Stopping cancels a pending retry.
+  const stopped = register(1, 100);
+  stop = stopped.anchoring.start(0);
+  await waitFor(() => warnings.mock.callCount() === 4);
+  stop();
+  await sleep(200);
+  assert.equal(stopped.state.calls, 1);
+
+  // An operator request during an outage still answers 503, with a warning.
+  const operator = register(1, 20);
+  const response = await fetch(
+    `${await serve(operator.app)}/api/provenance/anchor`,
+    {
+      method: "POST",
+      headers: { authorization: "Bearer operator-test-secret" },
+    },
+  );
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: "Unable to anchor current provenance state",
+  });
+  assert.equal(warnings.mock.callCount(), 5);
+  assert.equal(errors.mock.callCount(), 0);
 });

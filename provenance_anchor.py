@@ -15,13 +15,12 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
-from opentimestamps.calendar import DEFAULT_AGGREGATORS
-from opentimestamps.core.notary import BitcoinBlockHeaderAttestation, PendingAttestation
-from opentimestamps.core.op import OpAppend, OpSHA256
-from opentimestamps.core.serialize import BytesDeserializationContext, BytesSerializationContext
-from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
 
 from stratigraphy_pipeline import StratigraphyMetrics
+
+# The OpenTimestamps library (with python-bitcoinlib, pycryptodomex and cffi)
+# is imported by the functions that use it, so that it does not delay the
+# Enterprise Agent API becoming ready on a cold start.
 
 ARCHIVE_DIRECTORY = Path(__file__).resolve().parent / "generated-artifacts" / "provenance"
 MAX_FILE_SIZE = 512 * 1024
@@ -69,6 +68,11 @@ def read_archive_file(path: Path) -> bytes:
 
 
 def proof_status(snapshot: bytes, proof: bytes) -> str:
+    from opentimestamps.core.notary import BitcoinBlockHeaderAttestation, PendingAttestation
+    from opentimestamps.core.op import OpSHA256
+    from opentimestamps.core.serialize import BytesDeserializationContext
+    from opentimestamps.core.timestamp import DetachedTimestampFile
+
     try:
         context = BytesDeserializationContext(proof)
         detached = DetachedTimestampFile.deserialize(context)
@@ -105,6 +109,11 @@ def load_historical_proof(directory: Path, day: str) -> tuple[bytes, bytes, str]
 
 async def stamp_snapshot(snapshot: bytes, client: httpx.AsyncClient) -> bytes:
     """Use the official library and CLI-default pools, without blocking asyncio."""
+    from opentimestamps.calendar import DEFAULT_AGGREGATORS
+    from opentimestamps.core.op import OpAppend, OpSHA256
+    from opentimestamps.core.serialize import BytesDeserializationContext, BytesSerializationContext
+    from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
+
     detached = DetachedTimestampFile.from_fd(OpSHA256(), io.BytesIO(snapshot))
     # The standard client blinds file digests before public calendar submission.
     tip = detached.timestamp.ops.add(OpAppend(os.urandom(16))).ops.add(OpSHA256())
@@ -190,13 +199,18 @@ def save_once(path: Path, body: bytes):
 class ProvenanceAnchor:
     """Midnight scheduler; retries preserve saved bytes rather than recapturing."""
 
-    def __init__(self, pipeline, client: httpx.AsyncClient, *, directory=ARCHIVE_DIRECTORY, storage=None):
+    def __init__(
+        self, pipeline, client: httpx.AsyncClient, *, directory=ARCHIVE_DIRECTORY, storage=None, start_delay=0.0,
+    ):
         from provenance_storage import ObjectArchive
 
+        if start_delay < 0:
+            raise ValueError("Anchor start delay must not be negative")
         self.pipeline = pipeline
         self.client = client
         self.directory = Path(directory)
         self.storage = storage if storage is not None else ObjectArchive()
+        self.start_delay = start_delay
         self._task: asyncio.Task | None = None
 
     async def start(self):
@@ -273,7 +287,9 @@ class ProvenanceAnchor:
                 except ValueError:
                     continue
         due = next_midnight_utc(datetime.now(timezone.utc))
-        retry_at = datetime.now(timezone.utc)
+        # Resume stamping only after a freshly booted server has settled. The
+        # midnight schedule is fixed first, so the delay cannot skip a capture.
+        retry_at = datetime.now(timezone.utc) + timedelta(seconds=self.start_delay)
         survey_at = retry_at
         while True:
             now = datetime.now(timezone.utc)

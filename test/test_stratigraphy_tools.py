@@ -38,6 +38,9 @@ class Pipeline:
         self.metrics = metrics
         self.ready = True
 
+    async def wait_for_first_refresh(self, timeout=None):
+        return None
+
     def get_snapshot(self):
         if not self.ready:
             raise PipelineUnavailable()

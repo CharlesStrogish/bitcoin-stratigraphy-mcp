@@ -41,6 +41,11 @@ def bind_listening_socket(host, port, backlog=LISTEN_BACKLOG):
 def _load_agent_api():
     # Runs in a background thread once the port is listening. Importing the
     # module builds the application, which re-checks the enterprise license.
+    #
+    # httpx imports its optional command-line client (rich and pygments, about
+    # 70 modules) whenever those packages are installed. The server never uses
+    # it, so mark it unavailable; httpx then defines its standard fallback.
+    sys.modules.setdefault("httpx._main", None)
     from agent_api import app
 
     return app
@@ -83,7 +88,9 @@ def serve(*, host="0.0.0.0", port=None, load_app=_load_agent_api):
         from agent_startup_gate import StartupGate, logger
 
         gate = StartupGate(load_app, listening_since=listening_since)
-        config = uvicorn.Config(gate, host=host, port=port)
+        # The API has no WebSocket routes; ws="none" also skips importing the
+        # installed websockets package while the server starts.
+        config = uvicorn.Config(gate, host=host, port=port, ws="none")
         server = _create_server(uvicorn, config, gate)
         logger.info(
             "Enterprise Agent API listening on http://%s:%d; requests wait "

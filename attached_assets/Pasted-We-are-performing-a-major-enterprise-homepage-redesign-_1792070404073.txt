@@ -1,0 +1,21 @@
+We are performing a major enterprise homepage redesign on https://bitcoinstratigraphy.com to replace the legacy video/YouTube series archive section (the "Search the Strata", Series Index table, "How the framing moves" chart, and "Title-signal breakdown" pie chart) with a high-conversion "Enterprise & Machine-Native Command Center" tailored for AI agents and Fortune 500 CISOs.
+
+CRITICAL INVARIANTS: Do NOT touch or remove the top Hero section, the Trust Badges, or the newly positioned `Live REST Escrow` terminal (`id="live-escrow-terminal"`). Keep our PostgreSQL `escrow_ledger`, our 24-satoshi genesis receipt (`ba4f25dd-7f16-420c-9264-a16f102fd5a6`), dual L402/NWC verification logic, and all 15 MCP tools 100% intact.
+
+Please execute the following UI/UX replacement cleanly:
+
+1. Remove Legacy Media Archive Components:
+   - Completely remove the old video series data table ("Search the Strata", "Series Index", video IDs, summary status), the longitudinal signal chart ("How the framing moves"), and the vocabulary map pie chart ("Title-signal breakdown") from the homepage and component tree.
+
+2. Build and Insert the New "Enterprise & Machine-Native Command Center" (Placed directly below the Live REST Escrow terminal and KPI cards):
+   - Module A: "The 15 Canonical MCP Tools Matrix"
+     - An interactive or beautifully styled grid showcasing the 15 enterprise-grade MCP tools across namespaces (`stratigraphy`, `proof`, `mesh`, etc.).
+     - Display their exact dot-notation methods, 24-satoshi L402 access fee, and a prominent one-click "Copy npx install" command (`npx -y @bitcoin-stratigraphy/mcp-server`).
+   - Module B: "Live Cryptographic & Merkle Telemetry Feed"
+     - A live component querying `/api/v1/escrow/stats` and recent ledger entries to display real-time RFC 6962 Merkle roots, OpenTimestamps verification status, and mainnet satoshi volume accrued.
+   - Module C: "Autonomous AI Framework Adapters"
+     - Clean code snippets or tabs showing zero-friction integration with LangChain, LlamaIndex, CrewAI, and AutoGen using L402 macro-macaroon headers and batch-payment support.
+
+3. Verification:
+   - Ensure responsive mobile/desktop layout containment, clean dark-theme styling matching our existing aesthetic, and zero broken links.
+   - Run the full frontend and backend test suites, typecheck, and `pnpm build:npm`, and commit cleanly so I can republish.

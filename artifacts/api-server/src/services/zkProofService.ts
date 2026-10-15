@@ -666,6 +666,10 @@ export async function verifyZkProof(payload: unknown): Promise<boolean> {
   }
 }
 
+// One verification of the bundled proof loads snarkjs and the verification
+// key and builds the bn128 curve, so the first uncached verification after it
+// skips that set-up. The pairing runs on the calling thread, so callers keep
+// this away from startup. Verification never depends on it having run.
 export function prewarmZkVerifier(): Promise<void> {
   verifierWarmupPromise ??= readFile(warmupProofUrl, "utf8")
     .then((raw) => JSON.parse(raw) as unknown)
@@ -694,10 +698,8 @@ export function prewarmZkVerifier(): Promise<void> {
         String(candidate.publicInputs.valuationSat),
         candidate.publicInputs.snapshotDigest,
       ];
-      for (let pass = 0; pass < 5; pass += 1) {
-        if (!(await verifyCryptographically(signals, proof))) {
-          throw new Error("zk verifier warm-up proof was rejected");
-        }
+      if (!(await verifyCryptographically(signals, proof))) {
+        throw new Error("zk verifier warm-up proof was rejected");
       }
     })
     .catch((error) => {

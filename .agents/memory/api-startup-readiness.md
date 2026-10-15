@@ -5,7 +5,12 @@ description: Why the Node API and the Python Enterprise Agent API bind their por
 
 Both API processes bind their port first and hold early requests; the
 application loads afterwards. Node: escrow routes wait on durable-ledger
-recovery; zk warm-up and the OpenTimestamps schedule start in the background.
+recovery. The one-pass zk warm-up and the first OpenTimestamps stamp both wait
+5 minutes after the first recovery attempt (user decision, 2026-10-15), and
+proofs are verified on demand until the warm-up runs. The first pass carries
+most of the cost (library load and curve build: about 1.3 s locally versus
+0.1 s for each further pass), so the delay, not the pass count, keeps it off
+the boot.
 Python (`/agent-api`): the license check stays ahead of the bind, and held
 requests are released only after the application's real lifespan startup.
 

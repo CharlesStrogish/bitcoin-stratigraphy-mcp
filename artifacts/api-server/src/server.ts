@@ -13,6 +13,10 @@ import {
 } from "./services/zkProofService";
 
 const ZK_PREWARM_TIMEOUT_MS = 60_000;
+// The verifier warm-up is synchronous CPU work on this thread. On a freshly
+// booted production machine it held waiting requests for seconds, so it waits,
+// like the first OpenTimestamps stamp, until both APIs have settled.
+const ZK_PREWARM_DELAY_MS = 5 * 60 * 1_000;
 
 const milliseconds = (value: number) => Number(value.toFixed(3));
 
@@ -46,6 +50,7 @@ export function startApplication({
   let stopDvm: (() => Promise<void>) | undefined;
   let stopHeartbeat: (() => Promise<void>) | undefined;
   let stopAnchoring: (() => void) | undefined;
+  let zkWarmupTimer: NodeJS.Timeout | undefined;
 
   // Escrow routes wait on this gate and answer 503 until the durable ledger
   // has been recovered; every other route is served as soon as it attaches.
@@ -89,30 +94,40 @@ export function startApplication({
       logger.error({ err: error }, "NIP-90 DVM startup failed");
     });
 
-  // Heavy warm-up and external calendar calls run only after requests are
-  // being served, and after the first recovery attempt so they never compete
-  // with it. Failures are logged; the work they warm up still runs on demand.
+  async function warmZkVerifier(): Promise<void> {
+    if (stopping) return;
+    const warmupStartedAt = performance.now();
+    try {
+      await withTimeout(
+        prewarmZkVerifier(),
+        ZK_PREWARM_TIMEOUT_MS,
+        `zk verifier warm-up exceeded ${ZK_PREWARM_TIMEOUT_MS} ms`,
+      );
+      logger.info(
+        { durationMs: milliseconds(performance.now() - warmupStartedAt) },
+        "zk verifier pre-warmed",
+      );
+    } catch (error) {
+      logger.warn(
+        { err: error },
+        "zk verifier warm-up failed; proofs are still verified on demand",
+      );
+    }
+  }
+
+  // Background work is scheduled only after the first recovery attempt, so it
+  // never competes with it, and it runs only once the boot has settled: the
+  // first OpenTimestamps stamp and the zk verifier warm-up both wait minutes.
+  // Until the warm-up runs, or if it fails, proofs are verified on demand.
   void firstRecovery
-    .then(async () => {
+    .then(() => {
       if (stopping) return;
-      const warmupStartedAt = performance.now();
-      try {
-        await withTimeout(
-          prewarmZkVerifier(),
-          ZK_PREWARM_TIMEOUT_MS,
-          `zk verifier warm-up exceeded ${ZK_PREWARM_TIMEOUT_MS} ms`,
-        );
-        logger.info(
-          { durationMs: milliseconds(performance.now() - warmupStartedAt) },
-          "zk verifier pre-warmed",
-        );
-      } catch (error) {
-        logger.warn(
-          { err: error },
-          "zk verifier warm-up failed; proofs are still verified on demand",
-        );
-      }
-      if (!stopping) stopAnchoring = provenanceAnchoring.start();
+      stopAnchoring = provenanceAnchoring.start();
+      zkWarmupTimer = setTimeout(() => {
+        zkWarmupTimer = undefined;
+        void warmZkVerifier();
+      }, ZK_PREWARM_DELAY_MS);
+      zkWarmupTimer.unref();
     })
     .catch((error) => {
       logger.error({ err: error }, "Background startup tasks failed");
@@ -124,6 +139,7 @@ export function startApplication({
     logger.info({ signal }, "Stopping server");
     escrowRecovery.stop();
     stopAnchoring?.();
+    clearTimeout(zkWarmupTimer);
     await Promise.all([dvmStartup, heartbeatStartup]);
     await stopHeartbeat?.();
     await stopDvm?.();

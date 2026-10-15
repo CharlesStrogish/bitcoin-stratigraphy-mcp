@@ -2,7 +2,7 @@
 // snarkjs and poseidon-lite pull in large module graphs (ffjavascript,
 // wasmcurves, worker pools) that take hundreds of milliseconds to load. They
 // are imported on first use, so the API serves requests without waiting for
-// them; the background verifier warm-up loads them shortly after startup.
+// them; the background verifier warm-up loads them once startup has settled.
 // Both stay external to esbuild bundles (see snark worker bundling notes).
 type Snarkjs = typeof import("snarkjs");
 type Poseidon = typeof import("poseidon-lite");

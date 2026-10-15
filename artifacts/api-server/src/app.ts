@@ -97,7 +97,8 @@ registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);
 registerLlmExportRoutes(app);
 registerEnterpriseRoutes(app);
-// Scheduled OpenTimestamps anchoring starts only after startup warm-up.
+// server.ts starts scheduled OpenTimestamps anchoring after the first escrow
+// recovery attempt; the first stamp waits until the boot has settled.
 export const provenanceAnchoring = registerProvenanceRoutes(app);
 registerZkDriftRoute(app);
 registerEscrowRoutes(app, {

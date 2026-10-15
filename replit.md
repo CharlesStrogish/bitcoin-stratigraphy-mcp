@@ -28,7 +28,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-- API startup is listen-first: `artifacts/api-server/src/index.ts` binds the port and holds early requests, then imports the application bundle (`dist/server.mjs`). Escrow routes wait for durable-ledger recovery (503 otherwise, never a zero counter); zk verifier warm-up and OpenTimestamps stamping run in the background afterwards. Keep application imports out of the bootstrap.
+- API startup is listen-first: `artifacts/api-server/src/index.ts` binds the port and holds early requests, then imports the application bundle (`dist/server.mjs`). Escrow routes wait for durable-ledger recovery (503 otherwise, never a zero counter); the one-pass zk verifier warm-up and the first OpenTimestamps stamp wait 5 minutes after the first recovery attempt, so neither runs during a boot (proofs are verified on demand until then). Keep application imports and synchronous CPU work out of the boot window.
 - The Enterprise Agent API (`/agent-api`, port 8000) is listen-first too: `main.py` verifies the license, then `agent_startup.serve()` binds the port before importing uvicorn, the request-holding gate (`agent_startup_gate.py`) and, on a daemon thread, `agent_api`. Early requests wait for the application's lifespan startup (503 with `Retry-After` after 60 s or on a load failure). `agent_startup.py` may import only lightweight standard-library modules.
 
 ## Product

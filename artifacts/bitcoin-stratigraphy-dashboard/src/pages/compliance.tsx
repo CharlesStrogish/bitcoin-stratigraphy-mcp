@@ -176,7 +176,7 @@ export default function CompliancePage() {
             </p>
             <CisoIntakeActions testIdPrefix="compliance" />
             <div className="cmp-actions">
-              <a href={BASE} className="cmp-cta" data-testid="link-access-simulator">
+              <a href={`${BASE}#live-escrow-terminal`} className="cmp-cta" data-testid="link-access-simulator">
                 Access Live REST Escrow
               </a>
             </div>

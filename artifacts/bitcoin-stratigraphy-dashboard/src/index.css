@@ -539,6 +539,17 @@ h1 span {
   padding: 0 11px;
   font-size: 11px;
 }
+.control-button.live-escrow-button {
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+}
+.live-escrow-section {
+  margin-bottom: 20px;
+}
+/* Programmatic focus target for in-page navigation, not an interactive control. */
+.live-escrow-section:focus {
+  outline: none;
+}
 .icon-button {
   width: 32px;
   height: 32px;

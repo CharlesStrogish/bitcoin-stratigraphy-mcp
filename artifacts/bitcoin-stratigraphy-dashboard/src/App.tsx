@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type MouseEvent, useEffect, useMemo, useState } from "react";
 import {
   QueryClient,
   QueryClientProvider,
@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Search,
   X,
+  Zap,
 } from "lucide-react";
 import {
   Area,
@@ -65,6 +66,39 @@ const queryClient = new QueryClient({
 const CHART_COLORS = ["#d99a16", "#b9533c", "#3f766a", "#53657d", "#c57b3d"];
 const PAGE_SIZE = 10;
 const EXPECTED_DATASET_LENGTH = 422;
+const LIVE_ESCROW_TERMINAL_ID = "live-escrow-terminal";
+const LIVE_ESCROW_HASH = `#${LIVE_ESCROW_TERMINAL_ID}`;
+
+function revealLiveEscrowTerminal() {
+  const terminal = document.getElementById(LIVE_ESCROW_TERMINAL_ID);
+  if (!terminal) return;
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  terminal.scrollIntoView({
+    behavior: reduceMotion ? "auto" : "smooth",
+    block: "start",
+  });
+  // Native in-page links move keyboard focus with the scroll; keep that parity.
+  terminal.focus({ preventScroll: true });
+}
+
+function jumpToLiveEscrowTerminal(event: MouseEvent<HTMLAnchorElement>) {
+  // Modified clicks keep their browser meaning, such as opening a new tab.
+  if (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  )
+    return;
+  event.preventDefault();
+  if (window.location.hash !== LIVE_ESCROW_HASH) {
+    window.history.pushState(null, "", LIVE_ESCROW_HASH);
+  }
+  revealLiveEscrowTerminal();
+}
 
 type RawStratigraphyEntry = Omit<StratigraphyEntry, "quantitative_alpha"> & {
   quantitative_alpha?: Partial<StratigraphyEntry["quantitative_alpha"]>;
@@ -216,6 +250,14 @@ function Header({
           <TrustBadges />
         </div>
         <div className="header-actions">
+          <a
+            className="control-button live-escrow-button"
+            href={LIVE_ESCROW_HASH}
+            onClick={jumpToLiveEscrowTerminal}
+            data-testid="link-live-escrow"
+          >
+            <Zap size={14} /> Live REST Escrow
+          </a>
           <EnterpriseLicenseLink />
           <WhitepaperLink />
           <a
@@ -830,6 +872,23 @@ function Home() {
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
+  useEffect(() => {
+    let frame = 0;
+    const revealFromHash = () => {
+      if (window.location.hash !== LIVE_ESCROW_HASH) return;
+      cancelAnimationFrame(frame);
+      // Two frames: measure the terminal only after the committed layout.
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(revealLiveEscrowTerminal);
+      });
+    };
+    revealFromHash();
+    window.addEventListener("hashchange", revealFromHash);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", revealFromHash);
+    };
+  }, []);
   const filteredRows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return allRows.filter((entry) => {
@@ -911,77 +970,82 @@ function Home() {
             </button>
           </div>
         ) : (
-          <>
-            <div className="stats-row">
-              <StatCard
-                label="VISIBLE ENTRIES"
-                value={loading ? "—" : filteredRows.length.toLocaleString()}
-                detail={
-                  loading
-                    ? "Reading dataset"
-                    : `${allRows.length.toLocaleString()} total in source`
-                }
-              />
-              <StatCard
-                label="STRATA SPAN"
-                value={
-                  loading || !filteredRows.length
-                    ? "—"
-                    : `${formatDay(stats.first)}–${formatDay(stats.last)}`
-                }
-                detail="Day range in current view"
-                accent="rust"
-              />
-              <StatCard
-                label="10M SIGNAL"
-                value={loading ? "—" : `${stats.density}%`}
-                detail={
-                  loading
-                    ? "Calculating signals"
-                    : `${stats.signals} titles reference the thesis`
-                }
-                accent="teal"
-              />
-              <StatCard
-                label="SERIES COMPLETION"
-                value={
-                  loading || !allRows.length
-                    ? "—"
-                    : `${Math.round((allRows.length / 422) * 100)}%`
-                }
-                detail="Of 422 planned day layers"
-                accent="slate"
-              />
-            </div>
-            <div className="workspace-grid">
-              <FilterRail
-                search={search}
-                setSearch={setSearch}
-                minDay={minDay}
-                setMinDay={setMinDay}
-                maxDay={maxDay}
-                setMaxDay={setMaxDay}
-                reset={reset}
-                total={allRows.length}
-                filtered={filteredRows.length}
-              />
-              <main className="content-column">
-                <TableCard
-                  rows={sortedRows}
-                  loading={loading}
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={onSort}
-                />
-                <Insights rows={filteredRows} />
-              </main>
-            </div>
-          </>
+          <div className="stats-row">
+            <StatCard
+              label="VISIBLE ENTRIES"
+              value={loading ? "—" : filteredRows.length.toLocaleString()}
+              detail={
+                loading
+                  ? "Reading dataset"
+                  : `${allRows.length.toLocaleString()} total in source`
+              }
+            />
+            <StatCard
+              label="STRATA SPAN"
+              value={
+                loading || !filteredRows.length
+                  ? "—"
+                  : `${formatDay(stats.first)}–${formatDay(stats.last)}`
+              }
+              detail="Day range in current view"
+              accent="rust"
+            />
+            <StatCard
+              label="10M SIGNAL"
+              value={loading ? "—" : `${stats.density}%`}
+              detail={
+                loading
+                  ? "Calculating signals"
+                  : `${stats.signals} titles reference the thesis`
+              }
+              accent="teal"
+            />
+            <StatCard
+              label="SERIES COMPLETION"
+              value={
+                loading || !allRows.length
+                  ? "—"
+                  : `${Math.round((allRows.length / 422) * 100)}%`
+              }
+              detail="Of 422 planned day layers"
+              accent="slate"
+            />
+          </div>
         )}
-        <section id="escrow-terminal" data-testid="section-escrow-terminal">
+        <section
+          id={LIVE_ESCROW_TERMINAL_ID}
+          className="live-escrow-section"
+          tabIndex={-1}
+          data-testid="section-escrow-terminal"
+        >
           <ComplianceGuideLink />
           <EscrowTerminal />
         </section>
+        {!query.isError && (
+          <div className="workspace-grid">
+            <FilterRail
+              search={search}
+              setSearch={setSearch}
+              minDay={minDay}
+              setMinDay={setMinDay}
+              maxDay={maxDay}
+              setMaxDay={setMaxDay}
+              reset={reset}
+              total={allRows.length}
+              filtered={filteredRows.length}
+            />
+            <main className="content-column">
+              <TableCard
+                rows={sortedRows}
+                loading={loading}
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={onSort}
+              />
+              <Insights rows={filteredRows} />
+            </main>
+          </div>
+        )}
       </div>
     </div>
   );

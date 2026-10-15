@@ -39,3 +39,13 @@ The user designated the supplied dark rounded tile with a white “M” and ambe
 **How to apply:** Use the supplied mark for this project's MCP branding rather
 than inventing a replacement. It is project branding, not a protocol-wide
 certification or a third-party verification seal.
+
+The Live REST Escrow terminal sits directly below the homepage KPI cards and
+above the long records table. `/#live-escrow-terminal` is its stable deep
+link, used by the header quick action and the compliance page CTA.
+
+**Why:** The user asked (2026-10-15) for visitors to see the terminal
+immediately and to land on it directly from other pages.
+
+**How to apply:** Keep this placement and anchor when reorganizing the
+homepage, and point any new link to the terminal at `/#live-escrow-terminal`.

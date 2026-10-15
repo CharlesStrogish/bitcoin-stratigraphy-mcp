@@ -64,7 +64,7 @@
 - [Swarm disclosure trust](swarm-disclosure-trust.md) — blinded Merkle paths are not ZK proofs; local membership, recorder authority and Bitcoin inclusion are separate findings.
 - [Stdlib trace coverage](stdlib-trace-coverage.md) — trace can exit successfully despite wrapped test failures; confirm plain unittest independently.
 - [Enterprise SDK compatibility](enterprise-sdk-compatibility.md) — preserve legacy module identity for patches; verify staged audit workers independently of the checkout.
-- [Dashboard visual standards](dashboard-visual-standards.md) — dark default, mobile containment, authentic trust claims and the user-supplied official MCP mark.
+- [Dashboard visual standards](dashboard-visual-standards.md) — dark default, mobile containment, authentic trust claims, official MCP mark, escrow terminal placement and deep link.
 - [Compliance marketing copy](compliance-marketing-copy.md) — user requires verbatim enterprise compliance-page copy, without added UI qualifications or warnings.
 - [Enterprise swarm traffic](enterprise-swarm-traffic.md) — paid MCP and notarization serve legitimate high-frequency swarm batches; avoid blanket IP ceilings.
 - [Production SEO safeguards](production-seo-safeguards.md) — align stale tests to intentional SEO; preserve crawler visibility, canonical metadata and attribution.

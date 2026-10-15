@@ -83,7 +83,7 @@ test("compliance marketing copy preserves approved text with live escrow pricing
   );
 });
 
-test("compliance CTA returns to homepage and licensing contact uses the CISO intake mailto", () => {
+test("compliance CTA opens the homepage live escrow terminal and licensing contact uses the CISO intake mailto", () => {
   const links = [];
   const intakeActions = [];
   walk(renderPage(), (node) => {
@@ -93,7 +93,7 @@ test("compliance CTA returns to homepage and licensing contact uses the CISO int
   assert.equal(
     links.find((node) => text(node).trim() === "Access Live REST Escrow")
       ?.props.href,
-    "/",
+    "/#live-escrow-terminal",
   );
   const href = links.find(
     (node) => node.props["data-testid"] === "link-contact-licensing",

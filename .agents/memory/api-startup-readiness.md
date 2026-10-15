@@ -14,12 +14,26 @@ opened only after module evaluation, escrow recovery and zk warm-up. The user
 requires no 500 window for connecting agents, escrow never served before
 recovery, and non-critical network/warm-up work never blocking listening.
 
-**Platform behaviour (deployment log, 2026-10-14 publish):** the checker probes
-every service path prefix (`/agent-api`, `/api`, `/mcp`, `/docs`, ...) and
-retried failures every few seconds for about 50 seconds before promoting, then
-logged "all artifact ports are open; application health checks may still be
-pending". Holding probes is therefore safe. On that cold VM the Python API
-became ready about 54 s after the first failed probe, versus about 3 s locally.
+**Platform behaviour (deployment logs):** the checker probes every service path
+prefix (`/agent-api`, `/api`, `/mcp`, `/docs`, ...) through the public router,
+retrying failures every second or two; each probe times out after about 10 s
+while held. "all artifact ports are open" is logged the moment the last port
+opens. Holding probes is safe.
+
+**Production evidence (seconds from "starting up user application"):**
+- Before listen-first (2026-10-14): 500s for 45 s (Node) and 51 s (Python).
+  Python became ready at 51 s.
+- After listen-first (2026-10-15):
+  - Node: the process itself started only at 8.6 s, and its port opened at
+    10.5 s.
+  - Python: port at 12.8 s, ready at 32 s. The application load took 16 s on
+    the cold VM, versus 0.8 s locally.
+  - 500s lasted 10 s (Node) and 13 s (Python).
+- The remaining window is mostly process launch on a cold VM, not application
+  code.
+- Production Python stdout is block-buffered, so `print` lines (license
+  messages) appear late. Time boots from stderr logger lines and Node's
+  portBoundMs/applicationLoadedMs instead.
 
 **How to apply:** Never import application modules from the entry bootstrap;
 keep heavy libraries lazily imported and expensive module-level work (such as

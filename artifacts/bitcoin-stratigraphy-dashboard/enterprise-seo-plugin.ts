@@ -19,7 +19,7 @@ import {
 import {
   ESCROW_APPLICATION, SIMULATOR_DESCRIPTION, SIMULATOR_TITLE, SIMULATOR_URL,
 } from "./src/lib/escrow-seo";
-import { siteUrl } from "./src/lib/site";
+import { pageUrl } from "./src/lib/site";
 
 const routes = [
   {
@@ -32,7 +32,7 @@ const routes = [
     path: "standard",
     title: "API Access & Pricing | Bitcoin Stratigraphy",
     description: "Discover Bitcoin Stratigraphy API access, live L402 micropayment pricing, and commercial licensing for autonomous agents.",
-    url: siteUrl("/standard"),
+    url: pageUrl("/standard"),
   },
   {
     path: "enterprise",

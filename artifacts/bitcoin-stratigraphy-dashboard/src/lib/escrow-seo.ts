@@ -1,11 +1,11 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
-import { siteUrl } from "./site";
+import { pageUrl, siteUrl } from "./site";
 
 export const SIMULATOR_TITLE =
   "Enterprise Interactive Preview & Live REST Escrow | Bitcoin Stratigraphy";
 export const SIMULATOR_DESCRIPTION =
   "Enterprise Interactive Preview visualizes client-side swarm evidence with SHA-256 and RFC 6962 Merkle proofs. The separate Live REST Escrow terminal executes real Lightning Network micropayments via L402 and Nostr Wallet Connect, with dynamic market toll pricing targeting ~$0.02.";
-export const SIMULATOR_URL = siteUrl("/simulator");
+export const SIMULATOR_URL = pageUrl("/simulator");
 
 export const ESCROW_APPLICATION = {
   "@type": "SoftwareApplication",

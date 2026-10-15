@@ -451,10 +451,11 @@ export const GetNostrDiscoveryInfoResponse = zod.record(zod.string(), zod.unknow
 
 
 /**
- * @summary Public NIP-05 name-to-pubkey mapping when configured
+ * Always HTTP 200 JSON with wildcard CORS. Maps the announcing Nostr key to the configured NIP-05 name on its own domain, or to the root identity "_" when no name is configured. A name that is not served returns an empty names object. Also served at /api/.well-known/nostr.json.
+ * @summary Public NIP-05 name-to-pubkey mapping
  */
 export const GetNip05IdentityQueryParams = zod.object({
-  "name": zod.coerce.string().optional()
+  "name": zod.coerce.string().optional().describe('Optional NIP-05 local part; omit it for the full mapping.')
 })
 
 export const GetNip05IdentityResponse = zod.record(zod.string(), zod.unknown())

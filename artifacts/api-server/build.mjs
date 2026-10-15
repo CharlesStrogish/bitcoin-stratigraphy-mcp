@@ -51,6 +51,11 @@ async function buildAll() {
     path.resolve(distDir, "zk/artifacts"),
     { recursive: true },
   );
+  // The verifier worker is loaded as a file at runtime, never bundled.
+  await cp(
+    path.resolve(artifactDir, "src/services/zk/verifier-worker.mjs"),
+    path.resolve(distDir, "zk/verifier-worker.mjs"),
+  );
   await cp(
     path.resolve(artifactDir, "src/public/.well-known"),
     path.resolve(distDir, "public/.well-known"),

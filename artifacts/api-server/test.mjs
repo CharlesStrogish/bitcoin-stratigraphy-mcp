@@ -33,6 +33,7 @@ const outputs = [
   "./dist/otsNotarization.test.js",
   "./dist/audit.test.js",
   "./dist/public-rate-limit.test.js",
+  "./dist/api-root-aliases.test.js",
   "./dist/provenanceChain.test.js",
   "./dist/provenanceRoutes.test.js",
 ];
@@ -159,6 +160,7 @@ await build({
     "otsNotarization.test": "./tests/unit/otsNotarization.test.ts",
     "audit.test": "./src/routes/audit.test.ts",
     "public-rate-limit.test": "./tests/unit/public-rate-limit.test.ts",
+    "api-root-aliases.test": "./tests/unit/api-root-aliases.test.ts",
   },
   outdir: "./dist",
   bundle: true,
@@ -186,6 +188,10 @@ globalThis.__dirname = __testPath.dirname(globalThis.__filename);`,
 await cp("./src/services/zk/artifacts", "./dist/zk/artifacts", {
   recursive: true,
 });
+await cp(
+  "./src/services/zk/verifier-worker.mjs",
+  "./dist/zk/verifier-worker.mjs",
+);
 
 const { spawnSync } = await import("node:child_process");
 const results = outputs.map((output) =>

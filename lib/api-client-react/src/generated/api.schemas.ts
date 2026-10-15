@@ -2050,6 +2050,9 @@ limit?: number;
 };
 
 export type GetNip05IdentityParams = {
+/**
+ * Optional NIP-05 local part; omit it for the full mapping.
+ */
 name?: string;
 };
 

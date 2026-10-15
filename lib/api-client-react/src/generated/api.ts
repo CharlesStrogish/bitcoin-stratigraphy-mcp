@@ -1225,7 +1225,8 @@ export const getGetNip05IdentityUrl = (params?: GetNip05IdentityParams,) => {
 }
 
 /**
- * @summary Public NIP-05 name-to-pubkey mapping when configured
+ * Always HTTP 200 JSON with wildcard CORS. Maps the announcing Nostr key to the configured NIP-05 name on its own domain, or to the root identity "_" when no name is configured. A name that is not served returns an empty names object. Also served at /api/.well-known/nostr.json.
+ * @summary Public NIP-05 name-to-pubkey mapping
  */
 export const getNip05Identity = async (params?: GetNip05IdentityParams, options?: Parameters<typeof customFetch>[1]): Promise<PublicMetadataResponse> => {
 
@@ -1249,7 +1250,7 @@ export const getGetNip05IdentityQueryKey = (params?: GetNip05IdentityParams,) =>
     }
 
 
-export const getGetNip05IdentityQueryOptions = <TData = Awaited<ReturnType<typeof getNip05Identity>>, TError = ErrorType<void>>(params?: GetNip05IdentityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNip05Identity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetNip05IdentityQueryOptions = <TData = Awaited<ReturnType<typeof getNip05Identity>>, TError = ErrorType<unknown>>(params?: GetNip05IdentityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNip05Identity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1268,14 +1269,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetNip05IdentityQueryResult = NonNullable<Awaited<ReturnType<typeof getNip05Identity>>>
-export type GetNip05IdentityQueryError = ErrorType<void>
+export type GetNip05IdentityQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Public NIP-05 name-to-pubkey mapping when configured
+ * @summary Public NIP-05 name-to-pubkey mapping
  */
 
-export function useGetNip05Identity<TData = Awaited<ReturnType<typeof getNip05Identity>>, TError = ErrorType<void>>(
+export function useGetNip05Identity<TData = Awaited<ReturnType<typeof getNip05Identity>>, TError = ErrorType<unknown>>(
  params?: GetNip05IdentityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNip05Identity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

@@ -10,9 +10,12 @@ suite separately with the project interpreter (`uv run --no-sync`):
   package.
 - `routers` and `services`: run as packages from the root, with
   `PYTHONPATH=sdk/python:.`.
-- `cookbooks`: discover from inside that directory.
+- `cookbooks`: discover from inside that directory with
+  `PYTHONPATH=../sdk/python:..`. Without it, the enterprise package tests fail
+  with 17 import errors.
 - `scripts`: `scripts.test_verify_agent_routes`, from the root.
-- SDK: `test_client`, from inside `sdk/python`.
+- SDK: `test_client`, from inside `sdk/python` with `PYTHONPATH=../..`. It
+  imports `sdk.python.client`, so without it the import fails.
 - `scripts/test-stratigraphy-coverage.sh`: the 100% stratigraphy pipeline
   coverage gate.
 

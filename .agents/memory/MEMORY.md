@@ -3,7 +3,7 @@
 - [Nostr payload attestation cache](nostr-payload-attestation-cache.md) — cache signatures by unsigned content, deep-detach payloads, and keep transport receipts bound to final bytes.
 - [Workspace-root package installs](workspace-root-package-installs.md) — root dependency installs need pnpm's workspace-root check handled explicitly.
 - [ElizaOS type-only dependency](elizaos-type-only-dependency.md) — keep the peer contract while pruning vulnerable browser crypto from this workspace's type-only development install.
-- [API artifact root routes](api-artifact-root-routes.md) — root-level API endpoints must be listed in artifact service paths or the Replit proxy returns 404.
+- [API artifact root routes](api-artifact-root-routes.md) — root API endpoints need artifact service paths or the proxy 404s; root discovery docs are also aliased under /api.
 - [Macaroon attenuation budgets](macaroon-attenuation-budgets.md) — descendants must consume every inherited request-cap scope atomically, not only their final token cap.
 - [Macaroon delegation caveats](macaroon-delegation-caveats.md) — enforce tool and target restrictions at redemption, and deny routes that cannot honor them.
 - [Macaroon revocation scope](macaroon-revocation-scope.md) — revoke exact final signatures, keep relatives valid, and fail closed when the shared index is unavailable.
@@ -14,7 +14,7 @@
 - [L402 SDK payment coordination](l402-sdk-payment-coordination.md) — bind preimages to challenge hashes and never let delayed 402 responses replace or repay newer credentials.
 - [Agent-bound L402 identity](agent-bound-l402-identity.md) — discounted passes bind NIP-98 pubkey and tier; every use must present the same fresh identity.
 - [Multi-asset settlement ownership](multi-asset-settlement-ownership.md) — bind every payment to asset, issuer, caller, and the full invoice redemption window.
-- [SNARK worker bundling](snark-worker-bundling.md) — keep worker-spawning cryptography external to server/test bundles and tear workers down only in test processes.
+- [SNARK worker bundling](snark-worker-bundling.md) — keep worker-spawning crypto out of bundles; Groth16 verifies on one worker thread (single-threaded curve, web-worker shim).
 - [Telemetry proof semantics](telemetry-proof-semantics.md) — require exact payload binding and derive public fields from emitted snapshot semantics, not independent request state.
 - [Mesh consensus trust](mesh-consensus-trust.md) — peer certificates require pinned reciprocal membership, canonical snapshots, fresh source signatures, and external quorum policy.
 - [Nostr agent trust](nostr-agent-trust.md) — require network-bound vouchers from pinned mesh keys; never treat a bare pubkey, follow, or cached event verification as proof.
@@ -34,7 +34,7 @@
 - [CoinOS payment verification](nwc-self-payment-proofs.md) — signed capabilities allow exact merchant-only confirmation; legacy UUID proofs still require payer verification.
 - [Audit readiness](audit-readiness.md) — post-publish API boot window, relay announcements and paid settlement are separate readiness stages.
 - [API startup readiness](api-startup-readiness.md) — both APIs bind before loading; heavy Python libraries stay lazy; never serve cached supply data during the first refresh.
-- [OTS stamp calendar fallback](ots-stamp-calendar-fallback.md) — one calendar per bounded CLI attempt; only timeouts/no-attestation fall back; first CLI runs after a publish can exceed 10 s.
+- [OTS stamp calendar fallback](ots-stamp-calendar-fallback.md) — one calendar per bounded CLI attempt; cold CLI is warmed at 90 s, inspections cached, failed stamps retried once.
 - [Python test suites](python-test-suites.md) — pnpm test runs no Python; each suite needs its own import root, plus the coverage gate.
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
 - [Static response headers](static-response-headers.md) — static deployments honor production responseHeaders; validator acceptance alone proves nothing.
@@ -68,6 +68,7 @@
 - [Compliance marketing copy](compliance-marketing-copy.md) — user requires verbatim enterprise compliance-page copy, without added UI qualifications or warnings.
 - [Enterprise swarm traffic](enterprise-swarm-traffic.md) — paid MCP and notarization serve legitimate high-frequency swarm batches; avoid blanket IP ceilings.
 - [Production SEO safeguards](production-seo-safeguards.md) — align stale tests to intentional SEO; preserve crawler visibility, canonical metadata and attribution.
+- [Static page rewrites](static-page-rewrites.md) — prerendered pages need bare and slash rewrites before the SPA catch-all; canonicals use the trailing-slash form.
 - [SQLite WAL startup](sqlite-wal-startup.md) — busy_timeout skips racing cold WAL conversions; keep the bounded fail-closed retry and loop the concurrency test.
 - [Read-only Git audits](read-only-git-audits.md) — compare committed blobs without index refreshes; do not elevate Git permissions for an integrity check.
 - [Enterprise air-gap scope](enterprise-air-gap.md) — commercial deployments need local telemetry; distinguish pipeline isolation from other services' network requirements.

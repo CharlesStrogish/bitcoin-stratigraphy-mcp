@@ -13,10 +13,11 @@ import {
 } from "./services/zkProofService";
 
 const ZK_PREWARM_TIMEOUT_MS = 60_000;
-// The verifier warm-up is synchronous CPU work on this thread. On a freshly
-// booted production machine it held waiting requests for seconds, so it waits,
-// like the first OpenTimestamps stamp, until both APIs have settled.
-const ZK_PREWARM_DELAY_MS = 5 * 60 * 1_000;
+// The verifier warm-up runs on the verifier worker thread, but starting the
+// worker and building its curve still costs CPU on a freshly booted machine.
+// It runs at 2.5 minutes: after the OpenTimestamps CLI warm-up (90 seconds)
+// and before the first stamp (5 minutes), so the three never overlap.
+const ZK_PREWARM_DELAY_MS = 150 * 1_000;
 
 const milliseconds = (value: number) => Number(value.toFixed(3));
 
@@ -116,9 +117,10 @@ export function startApplication({
   }
 
   // Background work is scheduled only after the first recovery attempt, so it
-  // never competes with it, and it runs only once the boot has settled: the
-  // first OpenTimestamps stamp and the zk verifier warm-up both wait minutes.
-  // Until the warm-up runs, or if it fails, proofs are verified on demand.
+  // never competes with it, and it is staggered once the boot has settled:
+  // OpenTimestamps CLI warm-up at 90 seconds, zk verifier warm-up at 2.5
+  // minutes, first stamp at 5 minutes. Until the warm-ups run, or if they
+  // fail, the CLI and the verifier simply start on demand.
   void firstRecovery
     .then(() => {
       if (stopping) return;

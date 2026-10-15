@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import {
+  cacheReceiptInspections,
   createOtsProvenanceService,
   OtsCalendarsUnavailableError,
   OtsCliExitError,
@@ -294,4 +295,47 @@ test("does not assert Bitcoin attestation when verify fails", async () => {
     totalDepth: 7,
   });
   assert.equal(anchor.otsStatus, "pending_calendar");
+});
+
+test("reuses successful receipt inspections by content, shares concurrent runs, and never caches failures", async () => {
+  const runs: string[] = [];
+  let failNext = false;
+  const inspect = cacheReceiptInspections(async (proof) => {
+    runs.push(proof.toString("utf8"));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    if (failNext) {
+      failNext = false;
+      throw new OtsCliTimeoutError();
+    }
+    return createHash("sha256").update(proof).digest("hex");
+  }, 2);
+  const digestOf = (text: string) =>
+    createHash("sha256").update(Buffer.from(text)).digest("hex");
+
+  const [first, concurrent] = await Promise.all([
+    inspect(Buffer.from("receipt-a")),
+    inspect(Buffer.from("receipt-a")),
+  ]);
+  assert.equal(first, digestOf("receipt-a"));
+  assert.equal(concurrent, first);
+  assert.equal(await inspect(Buffer.from("receipt-a")), first);
+  assert.deepEqual(runs, ["receipt-a"]);
+
+  failNext = true;
+  await assert.rejects(inspect(Buffer.from("receipt-b")), OtsCliTimeoutError);
+  assert.equal(await inspect(Buffer.from("receipt-b")), digestOf("receipt-b"));
+  assert.deepEqual(runs, ["receipt-a", "receipt-b", "receipt-b"]);
+
+  // At the size limit the least recently used receipt is inspected again.
+  await inspect(Buffer.from("receipt-a"));
+  await inspect(Buffer.from("receipt-c"));
+  await inspect(Buffer.from("receipt-a"));
+  await inspect(Buffer.from("receipt-b"));
+  assert.deepEqual(runs, [
+    "receipt-a",
+    "receipt-b",
+    "receipt-b",
+    "receipt-c",
+    "receipt-b",
+  ]);
 });

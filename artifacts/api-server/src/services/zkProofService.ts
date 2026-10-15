@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { publishNip78Attestation } from "./nostrAttestation";
 import { loadPoseidon, loadSnarkjs } from "./zkLibraries";
+import {
+  terminateZkVerifierWorker,
+  verifyGroth16OffThread,
+} from "./zkVerifierWorker";
 
 export type ZkPublicInputs = {
   blockHeight: number;
@@ -461,20 +465,9 @@ async function verifyCryptographically(
     throw new ZkVerifierOverloadedError();
   }
   queuedVerifications += 1;
-  const run = verifierTail.then(async () => {
-    try {
-      const { groth16 } = await loadSnarkjs();
-      return await groth16.verify(
-        await verificationKey(),
-        publicSignals,
-        proof,
-      );
-    } finally {
-      if (process.env.NODE_ENV === "test") {
-        await shutdownZkVerifier();
-      }
-    }
-  });
+  const run = verifierTail.then(async () =>
+    verifyGroth16OffThread(await verificationKey(), publicSignals, proof),
+  );
   verifierTail = run.then(
     () => undefined,
     () => undefined,
@@ -486,13 +479,14 @@ async function verifyCryptographically(
   }
 }
 
+/** Stops the verifier worker and any multi-threaded curve on this thread. */
 export async function shutdownZkVerifier(): Promise<void> {
   const globals = globalThis as typeof globalThis & {
     curve_bn128?: { terminate(): Promise<void> } | null;
   };
   const curve = globals.curve_bn128;
   globals.curve_bn128 = null;
-  await curve?.terminate();
+  await Promise.all([terminateZkVerifierWorker(), curve?.terminate()]);
 }
 
 async function verificationKey(): Promise<unknown> {
@@ -666,10 +660,10 @@ export async function verifyZkProof(payload: unknown): Promise<boolean> {
   }
 }
 
-// One verification of the bundled proof loads snarkjs and the verification
-// key and builds the bn128 curve, so the first uncached verification after it
-// skips that set-up. The pairing runs on the calling thread, so callers keep
-// this away from startup. Verification never depends on it having run.
+// One verification of the bundled proof reads the verification key and starts
+// the verifier worker, which loads snarkjs and builds its bn128 curve, so the
+// first uncached verification after it skips that set-up. The pairing runs on
+// the worker thread. Verification never depends on this having run.
 export function prewarmZkVerifier(): Promise<void> {
   verifierWarmupPromise ??= readFile(warmupProofUrl, "utf8")
     .then((raw) => JSON.parse(raw) as unknown)

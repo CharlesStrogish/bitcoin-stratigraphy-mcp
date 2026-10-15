@@ -7,6 +7,8 @@ import {
   anchorProvenance,
   getProvenanceAnchor,
   OtsCalendarsUnavailableError,
+  OtsCliTimeoutError,
+  prewarmOtsCli,
   type ProvenanceAnchor,
 } from "../services/otsProvenance";
 import { buildProvenanceChain } from "../services/provenanceChain";
@@ -16,16 +18,21 @@ type RouteOptions = {
   readRecords?: typeof readDataset;
   getAnchor?: typeof getProvenanceAnchor;
   anchor?: typeof anchorProvenance;
+  prewarmCli?: () => Promise<void>;
   operatorSecret?: string;
-  calendarRetryDelayMs?: number;
+  /** Delay before a failed scheduled stamp is retried, once. */
+  retryDelayMs?: number;
+  /** Delay after start() before the CLI warm-up runs. */
+  warmupDelayMs?: number;
 };
 
 export type ProvenanceAnchoringSchedule = {
   /**
-   * Starts the background OpenTimestamps stamping timers (first stamp after
-   * delayMs, then every six hours). Calendar calls never block HTTP startup;
-   * each calendar attempt has its own timeout, and a scheduled stamp that no
-   * calendar accepts is retried once, later. Returns a stop function.
+   * Starts the background OpenTimestamps timers: one quiet CLI warm-up, the
+   * first stamp after delayMs, then a stamp every six hours. Calendar calls
+   * never block HTTP startup; each calendar attempt has its own timeout, and
+   * a scheduled stamp that fails is retried once, later. Returns a stop
+   * function.
    */
   start(delayMs?: number): () => void;
 };
@@ -36,8 +43,13 @@ const SIX_HOURS_MS = 6 * 60 * 60 * 1_000;
 // The first stamp waits until a freshly booted server has settled: during a
 // cold boot the CLI's own start-up competes with both APIs starting.
 const STARTUP_STAMP_DELAY_MS = 5 * 60 * 1_000;
-// A scheduled stamp that no calendar accepted is retried once, after this.
-const CALENDAR_RETRY_DELAY_MS = 15 * 60 * 1_000;
+// Well before the first stamp, and apart from the zk verifier warm-up at
+// 2.5 minutes, one CLI run loads the OpenTimestamps client and primes the
+// receipt check that public anchor reads use.
+const CLI_WARMUP_DELAY_MS = 90 * 1_000;
+// A scheduled stamp that fails for any reason is retried once, after this,
+// instead of waiting for the next six-hourly stamp.
+const RETRY_DELAY_MS = 10 * 60 * 1_000;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 5;
 
@@ -72,10 +84,11 @@ export function registerProvenanceRoutes(
   const readRecords = options.readRecords ?? readDataset;
   const getAnchor = options.getAnchor ?? getProvenanceAnchor;
   const anchor = options.anchor ?? anchorProvenance;
+  const prewarmCli = options.prewarmCli ?? prewarmOtsCli;
   const operatorSecret =
     options.operatorSecret ?? process.env.MACAROON_OPERATOR_SECRET;
-  const calendarRetryDelayMs =
-    options.calendarRetryDelayMs ?? CALENDAR_RETRY_DELAY_MS;
+  const retryDelayMs = options.retryDelayMs ?? RETRY_DELAY_MS;
+  const warmupDelayMs = options.warmupDelayMs ?? CLI_WARMUP_DELAY_MS;
   const requestsByAddress = new Map<string, number[]>();
 
   async function readCurrentState(): Promise<ChainState> {
@@ -219,43 +232,68 @@ export function registerProvenanceRoutes(
       backgroundTimersScheduled = true;
       let stopped = false;
       let retryTimer: NodeJS.Timeout | undefined;
+      const warmUp = async () => {
+        const startedAt = performance.now();
+        try {
+          await prewarmCli();
+          // Leaves the stored receipt's inspection cached for public reads.
+          await getAnchor((await readCurrentState()).headHash);
+          logger.info(
+            {
+              durationMs: Number((performance.now() - startedAt).toFixed(3)),
+            },
+            "OpenTimestamps CLI pre-warmed",
+          );
+        } catch (error) {
+          logger.warn(
+            { err: error },
+            "OpenTimestamps CLI warm-up failed; CLI calls still run on demand",
+          );
+        }
+      };
       const runScheduledStamp = (isRetry = false) => {
         void stampCurrentState().catch((error: unknown) => {
-          if (!(error instanceof OtsCalendarsUnavailableError)) {
+          // Retry once, then wait for the next scheduled stamp rather than
+          // retrying indefinitely.
+          const retry = !isRetry && !stopped && !retryTimer;
+          const retryInMs = retry ? retryDelayMs : undefined;
+          if (error instanceof OtsCalendarsUnavailableError) {
+            logger.warn(
+              { calendars: error.failures, retryInMs },
+              "Scheduled provenance anchor deferred: OpenTimestamps calendars unavailable",
+            );
+          } else if (error instanceof OtsCliTimeoutError) {
+            logger.warn(
+              { retryInMs },
+              "Scheduled provenance anchor deferred: OpenTimestamps CLI timed out",
+            );
+          } else {
             logger.error(
-              { err: error },
+              { err: error, retryInMs },
               "Scheduled provenance anchor operation failed",
             );
-            return;
           }
-          // A transient calendar outage: retry once, then wait for the
-          // next scheduled stamp rather than retrying indefinitely.
-          const retry = !isRetry && !stopped && !retryTimer;
-          logger.warn(
-            {
-              calendars: error.failures,
-              retryInMs: retry ? calendarRetryDelayMs : undefined,
-            },
-            "Scheduled provenance anchor deferred: OpenTimestamps calendars unavailable",
-          );
           if (retry) {
             retryTimer = setTimeout(() => {
               retryTimer = undefined;
               runScheduledStamp(true);
-            }, calendarRetryDelayMs);
+            }, retryDelayMs);
             retryTimer.unref();
           }
         });
       };
+      const warmupTimer = setTimeout(() => void warmUp(), warmupDelayMs);
       const startupTimer = setTimeout(() => runScheduledStamp(), delayMs);
       const intervalTimer = setInterval(
         () => runScheduledStamp(),
         SIX_HOURS_MS,
       );
+      warmupTimer.unref();
       startupTimer.unref();
       intervalTimer.unref();
       return () => {
         stopped = true;
+        clearTimeout(warmupTimer);
         clearTimeout(startupTimer);
         clearInterval(intervalTimer);
         clearTimeout(retryTimer);

@@ -7,7 +7,16 @@ export const SITE_ORIGIN = "https://bitcoinstratigraphy.com";
 export const LICENSING_EMAIL = "licensing@bitcoinstratigraphy.com";
 export const COMMERCIAL_LICENSE_PRICE = "Starting at $250k/Annual";
 
-/** Absolute canonical URL for a root-relative path such as "/enterprise". */
+/** Absolute URL for a root-relative path such as "/llms.txt". */
 export function siteUrl(path = "/"): string {
   return `${SITE_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+/**
+ * Canonical URL of a dedicated page such as "/enterprise". Each one is a
+ * static directory index, so the canonical form ends with a slash; the bare
+ * path answers with a redirect to it.
+ */
+export function pageUrl(path: string): string {
+  return siteUrl(`${path.replace(/\/+$/, "")}/`);
 }

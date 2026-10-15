@@ -44,6 +44,13 @@ const STAMP_CALENDAR_WAIT_SECONDS = 5;
 const STAMP_ATTEMPT_TIMEOUT_MS = 15_000;
 const UPGRADE_TIMEOUT_MS = 15_000;
 const VERIFY_TIMEOUT_MS = 10_000;
+// `ots info` only parses a local receipt, but every CLI run first imports the
+// client's whole Python module tree. On a freshly published machine that
+// start-up alone took more than 10 seconds, so inspections get a wider limit.
+const INSPECT_TIMEOUT_MS = 30_000;
+// The background warm-up is a single run that nothing waits on.
+const PREWARM_TIMEOUT_MS = 60_000;
+const INSPECTION_CACHE_ENTRIES = 128;
 /** Standard public calendars, tried in this order until one accepts a stamp. */
 export const STAMP_CALENDARS = [
   "https://a.pool.opentimestamps.org",
@@ -262,6 +269,77 @@ function calendarArgs(): string[] {
   return PUBLIC_CALENDARS.flatMap((url) => ["-c", url]);
 }
 
+/**
+ * Runs the OpenTimestamps CLI once without touching a receipt. `--version`
+ * imports the same module tree as every other command, so later CLI calls
+ * start from a warm interpreter and file cache.
+ */
+export async function prewarmOtsCli(): Promise<void> {
+  await runOts(["--version"], tmpdir(), PREWARM_TIMEOUT_MS);
+}
+
+/**
+ * Reuses successful receipt inspections. `ots info` output depends only on
+ * the receipt bytes, so results are keyed by their SHA-256; concurrent
+ * inspections of the same bytes share one CLI run. Failures, including
+ * timeouts and non-approved calendars, are never cached.
+ */
+export function cacheReceiptInspections(
+  inspect: (proof: Buffer) => Promise<string>,
+  limit = INSPECTION_CACHE_ENTRIES,
+): (proof: Buffer) => Promise<string> {
+  const inspections = new Map<string, Promise<string>>();
+  return (proof) => {
+    const key = createHash("sha256").update(proof).digest("hex");
+    const cached = inspections.get(key);
+    if (cached) {
+      inspections.delete(key);
+      inspections.set(key, cached);
+      return cached;
+    }
+    const inspection = inspect(proof);
+    inspections.set(key, inspection);
+    if (inspections.size > limit) {
+      inspections.delete(inspections.keys().next().value!);
+    }
+    inspection.catch(() => {
+      if (inspections.get(key) === inspection) inspections.delete(key);
+    });
+    return inspection;
+  };
+}
+
+async function inspectReceiptDigest(proof: Buffer): Promise<string> {
+  return inTempDirectory(async (directory) => {
+    const proofPath = join(directory, "anchor.ots");
+    await writeFile(proofPath, checkedProof(proof), { flag: "wx" });
+    const info = await runOts(
+      ["info", proofPath],
+      directory,
+      INSPECT_TIMEOUT_MS,
+    );
+    const digest = /^File sha256 hash: ([0-9a-f]{64})$/im.exec(info)?.[1];
+    if (!digest) {
+      throw new Error(
+        "OpenTimestamps receipt does not contain a SHA-256 file digest",
+      );
+    }
+    const referencedCalendars: string[] = [
+      ...(info.match(/https?:\/\/[^\s]+/g) ?? []),
+    ];
+    if (
+      referencedCalendars.some(
+        (url) => !PUBLIC_CALENDAR_SET.has(url.replace(/[\])},.;'"]+$/, "")),
+      )
+    ) {
+      throw new Error(
+        "OpenTimestamps receipt references a non-approved calendar",
+      );
+    }
+    return digest;
+  });
+}
+
 const otsCli: OtsCli = {
   async stamp(rootBytes) {
     return inTempDirectory(async (directory) => {
@@ -308,36 +386,8 @@ const otsCli: OtsCli = {
       }
     });
   },
-  async inspectDigest(proof) {
-    return inTempDirectory(async (directory) => {
-      const proofPath = join(directory, "anchor.ots");
-      await writeFile(proofPath, checkedProof(proof), { flag: "wx" });
-      const info = await runOts(
-        ["info", proofPath],
-        directory,
-        VERIFY_TIMEOUT_MS,
-      );
-      const digest = /^File sha256 hash: ([0-9a-f]{64})$/im.exec(info)?.[1];
-      if (!digest) {
-        throw new Error(
-          "OpenTimestamps receipt does not contain a SHA-256 file digest",
-        );
-      }
-      const referencedCalendars: string[] = [
-        ...(info.match(/https?:\/\/[^\s]+/g) ?? []),
-      ];
-      if (
-        referencedCalendars.some(
-          (url) => !PUBLIC_CALENDAR_SET.has(url.replace(/[\])},.;'"]+$/, "")),
-        )
-      ) {
-        throw new Error(
-          "OpenTimestamps receipt references a non-approved calendar",
-        );
-      }
-      return digest;
-    });
-  },
+  // Public anchor reads inspect the stored receipt on every request.
+  inspectDigest: cacheReceiptInspections(inspectReceiptDigest),
   async verifyDigest(proof, digest) {
     return inTempDirectory(async (directory) => {
       const proofPath = join(directory, "anchor.ots");
@@ -414,7 +464,7 @@ export async function verifyOtsProofRecord(
         const info = await runOts(
           ["info", proofPath],
           directory,
-          VERIFY_TIMEOUT_MS,
+          INSPECT_TIMEOUT_MS,
         );
         return [
           ...info.matchAll(/BitcoinBlockHeaderAttestation\((\d+)\)/g),

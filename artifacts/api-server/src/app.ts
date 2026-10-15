@@ -25,6 +25,7 @@ import { registerLlmExportRoutes } from "./routes/llm-export";
 import { registerProvenanceRoutes } from "./routes/provenance";
 import { createMeshGossipService } from "./services/meshGossipService";
 import { registerZkDriftRoute } from "./routes/zk-drift";
+import { apiRootAliases } from "./middleware/apiRootAliases";
 import { registerPublicCors } from "./middleware/publicCors";
 import { registerAuditRoutes } from "./routes/audit";
 import { registerEscrowRoutes } from "./routes/escrow";
@@ -49,6 +50,9 @@ app.set("trust proxy", 1);
 
 const publicRateLimiter = createPublicRateLimiter();
 app.disable("x-powered-by");
+// First: /api/openapi.json, /api/mcp and /api/.well-known/* are served as
+// their root routes, through the same middleware.
+app.use(apiRootAliases);
 registerPublicCors(app, createPublicWebRateLimitMiddleware(publicRateLimiter));
 app.use(
   pinoHttp({

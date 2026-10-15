@@ -5,9 +5,11 @@ description: Why the Node API and the Python Enterprise Agent API bind their por
 
 Both API processes bind their port first and hold early requests; the
 application loads afterwards. Node: escrow routes wait on durable-ledger
-recovery. The one-pass zk warm-up and the first OpenTimestamps stamp both wait
-5 minutes after the first recovery attempt (user decision, 2026-10-15), and
-proofs are verified on demand until the warm-up runs. The first pass carries
+recovery. Background work is staggered after the first recovery attempt (user
+decision, revised 2026-10-15): OpenTimestamps CLI warm-up at 90 s, the
+one-pass zk warm-up at 2.5 minutes on the verifier worker thread, and the
+first stamp at 5 minutes, so none of them overlap. Proofs are verified on
+demand until the warm-up runs. The first pass carries
 most of the cost (library load and curve build: about 1.3 s locally versus
 0.1 s for each further pass), so the delay, not the pass count, keeps it off
 the boot.
@@ -84,6 +86,6 @@ for executor threads at exit, so SIGTERM during the import would hang until it
 finished. Measure with the startup harnesses, comparing against a copy of the
 previous build rather than trusting a single run, and confirm with the phase
 timings in the deployment log after each republish. Synchronous CPU work after
-the port opens, such as the main-thread zk warm-up, still blocks held requests.
-A burst of trivial health checks completing together in the log shows a
-blocked event loop.
+the port opens still blocks held requests; that is why zk verification now runs
+on a worker thread (see snark-worker-bundling.md). A burst of trivial health
+checks completing together in the log shows a blocked event loop.

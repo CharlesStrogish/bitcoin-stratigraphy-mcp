@@ -44,6 +44,22 @@ from = "/compliance/"
 to = "/compliance/index.html"
 
 [[services.production.rewrites]]
+from = "/simulator"
+to = "/simulator/index.html"
+
+[[services.production.rewrites]]
+from = "/simulator/"
+to = "/simulator/index.html"
+
+[[services.production.rewrites]]
+from = "/standard"
+to = "/standard/index.html"
+
+[[services.production.rewrites]]
+from = "/standard/"
+to = "/standard/index.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

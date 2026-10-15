@@ -967,17 +967,21 @@ paths:
     get:
       operationId: getNip05Identity
       tags: [discovery]
-      summary: Public NIP-05 name-to-pubkey mapping when configured
+      summary: Public NIP-05 name-to-pubkey mapping
+      description: >-
+        Always HTTP 200 JSON with wildcard CORS. Maps the announcing Nostr key
+        to the configured NIP-05 name on its own domain, or to the root
+        identity "_" when no name is configured. A name that is not served
+        returns an empty names object. Also served at /api/.well-known/nostr.json.
       security: []
       parameters:
         - name: name
           in: query
+          description: Optional NIP-05 local part; omit it for the full mapping.
           schema: { type: string }
       responses:
         "200":
           $ref: "#/components/responses/PublicMetadata"
-        "404":
-          description: Identity or requested name is not configured
   /.well-known/llms.txt:
     servers:
       - url: https://bitcoinstratigraphy.com

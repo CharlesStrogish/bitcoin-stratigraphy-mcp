@@ -40,6 +40,7 @@ for (const filename of [
   await mkdir(path.dirname(target), { recursive: true });
   await cp(path.join(runtime, "zk/artifacts", filename), target);
 }
+await cp(path.join(runtime, "zk/verifier-worker.mjs"), path.join(destination, "dist/zk/verifier-worker.mjs"));
 const enterprise = path.join(destination, "dist/enterprise");
 const exportedSchema = spawnSync("pnpm", [
   "--filter", "@workspace/db", "exec", "drizzle-kit", "export",

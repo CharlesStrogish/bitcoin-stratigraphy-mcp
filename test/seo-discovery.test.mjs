@@ -135,13 +135,14 @@ test("crawler rules and sitemap include developer pages and MCP discovery", asyn
     (match) => match[1],
   );
   assert.equal(urls.length, new Set(urls).size);
+  // Dedicated pages are static directory indexes: the bare path redirects to
+  // the trailing-slash URL, so only the final URL belongs in the sitemap.
+  for (const page of ["simulator", "compliance", "standard", "enterprise", "whitepaper"]) {
+    assert.ok(urls.includes(`${origin}/${page}/`), page);
+    assert.ok(!urls.includes(`${origin}/${page}`), page);
+  }
   for (const path of [
     "/",
-    "/simulator",
-    "/compliance",
-    "/standard",
-    "/enterprise",
-    "/whitepaper",
     "/docs",
     "/cookbooks",
     "/.well-known/mcp.json",

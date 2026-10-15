@@ -20,6 +20,7 @@ import {
   type AnnouncerConfig,
 } from "../artifacts/api-server/src/services/announcer";
 import { registerNostrStatusRoute } from "../artifacts/api-server/src/routes/nostr-status";
+import { apiRootAliases } from "../artifacts/api-server/src/middleware/apiRootAliases";
 
 function config(): AnnouncerConfig {
   const privateKey = generateSecretKey();
@@ -254,16 +255,92 @@ test("serves discovery status and binds NIP-05 to its configured domain", async 
       { headers: { "X-Forwarded-Host": "example.com" } },
     );
     assert.equal(identity.status, 200);
-    const identityBody = (await identity.json()) as {
-      names: Record<string, string>;
-    };
-    assert.equal(identityBody.names.stratigraphy, body.public_key.hex);
-
-    const wrongDomain = await fetch(
-      `${baseUrl}/.well-known/nostr.json?name=stratigraphy`,
-      { headers: { "X-Forwarded-Host": "other.example" } },
+    assert.match(
+      identity.headers.get("content-type") ?? "",
+      /^application\/json/,
     );
-    assert.equal(wrongDomain.status, 404);
+    assert.equal(identity.headers.get("access-control-allow-origin"), "*");
+    assert.deepEqual(await identity.json(), {
+      names: { stratigraphy: body.public_key.hex },
+      relays: { [body.public_key.hex]: ["wss://relay.one", "wss://relay.two"] },
+    });
+
+    // The full document, without ?name=, on the configured domain.
+    const document = await fetch(`${baseUrl}/.well-known/nostr.json`, {
+      headers: { "X-Forwarded-Host": "example.com" },
+    });
+    assert.equal(document.status, 200);
+    assert.deepEqual(
+      ((await document.json()) as { names: Record<string, string> }).names,
+      { stratigraphy: body.public_key.hex },
+    );
+
+    // Other domains and other names get valid JSON that claims nothing.
+    for (const [query, host] of [
+      ["?name=stratigraphy", "other.example"],
+      ["", "other.example"],
+      ["?name=someone-else", "example.com"],
+    ] as const) {
+      const unserved = await fetch(
+        `${baseUrl}/.well-known/nostr.json${query}`,
+        {
+          headers: { "X-Forwarded-Host": host },
+        },
+      );
+      assert.equal(unserved.status, 200, `${host}${query}`);
+      assert.equal(unserved.headers.get("access-control-allow-origin"), "*");
+      assert.deepEqual(await unserved.json(), { names: {} });
+    }
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("without a configured name, serves the announcing key as the root NIP-05 identity at both URLs", async () => {
+  const input = { ...config(), nip05: undefined };
+  createServiceAnnouncer(input, {
+    async publish() {},
+    relayStatuses: () =>
+      input.relays.map((relay) => ({ relay, status: "connected" as const })),
+  });
+  assert.equal(getNostrDiscoveryStatus().nip05, null);
+  const app = express();
+  app.set("trust proxy", 1);
+  app.use(apiRootAliases);
+  registerNostrStatusRoute(app);
+  const server = app.listen(0);
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const expected = {
+    names: { _: input.publicKey },
+    relays: { [input.publicKey]: input.relays },
+  };
+  try {
+    for (const path of [
+      "/.well-known/nostr.json",
+      "/.well-known/nostr.json?name=_",
+      "/api/.well-known/nostr.json",
+      "/api/.well-known/nostr.json?name=_",
+    ]) {
+      const response = await fetch(`${baseUrl}${path}`, {
+        headers: { "X-Forwarded-Host": "bitcoinstratigraphy.com" },
+      });
+      assert.equal(response.status, 200, path);
+      assert.match(
+        response.headers.get("content-type") ?? "",
+        /^application\/json/,
+      );
+      assert.equal(response.headers.get("access-control-allow-origin"), "*");
+      assert.deepEqual(await response.json(), expected, path);
+    }
+    const otherName = await fetch(
+      `${baseUrl}/api/.well-known/nostr.json?name=stratigraphy`,
+    );
+    assert.equal(otherName.status, 200);
+    assert.deepEqual(await otherName.json(), { names: {} });
   } finally {
     server.close();
     await once(server, "close");

@@ -1,0 +1,16 @@
+Yes, please fix the slow first OpenTimestamps runs, the 5-minute warm-up collision, and the broken OpenAPI / Nostr discovery routes before I publish v2.1.3 to npm:
+
+1. Fix the OpenTimestamps First-Run Timeout, Stagger Warm-Ups, & Add Fast Retry:
+   - Pre-warm the `ots` CLI binary quietly in the background (e.g., ~90 seconds after boot with a generous timeout) so its cold-disk Python/library load is already cached in OS memory before any scheduled anchor or `/api/provenance/*` request runs.
+   - Stagger the ZK verifier warm-up (e.g., at 2.5 minutes post-boot, and if feasible run the heavy verification inside a Node `worker_threads` worker so it does not pause the main HTTP event loop for 6.4s on production) and run the first OpenTimestamps anchor at 5 minutes post-boot so they never compete for CPU.
+   - If the scheduled 5-minute OpenTimestamps anchor times out or fails, retry after 5–10 minutes instead of waiting 6 hours for the next cycle.
+   - Ensure `/api/provenance/chain` and `/api/provenance/anchor` have sufficient timeout headroom or pre-warmed state so their first call after boot returns 200 OK instead of 503.
+
+2. Fix `/.well-known/nostr.json` & the OpenAPI `/api` Root-Route 404s:
+   - Ensure `/.well-known/nostr.json` serves valid NIP-05 JSON (`application/json` with `Access-Control-Allow-Origin: *`) both at the root (`https://bitcoinstratigraphy.com/.well-known/nostr.json` via static public artifact + backend route) and at `/api/.well-known/nostr.json` rather than returning HTML or 404.
+   - Fix the published OpenAPI document path/server mapping AND/OR mount clean `/api` aliases (`/api/openapi.json`, `/api/mcp`, `/api/.well-known/*`) so that every URL advertised in `/openapi.json` returns 200 OK instead of 404.
+   - Align the 5 trailing-slash sitemap entries (`/simulator/`, `/standard/`, `/enterprise/`, `/whitepaper/`, `/compliance/`) in `sitemap.xml` if needed so crawlers hit 200 directly without unnecessary redirects.
+
+3. Rebuild & Verify `v2.1.3`:
+   - Keep the 24-satoshi genesis ledger (`ba4f25dd-7f16-420c-9264-a16f102fd5a6`) and all 15 MCP tools strictly intact.
+   - Run the test suites, typecheck, `pnpm build:npm`, and `release:npm:check` so the `@bitcoin-stratigraphy/mcp-server@2.1.3` tarball in `generated-artifacts/npm/mcp-server` includes all of these fixes, and commit cleanly.

@@ -8,6 +8,7 @@ import { logger } from "../lib/logger";
 import { buildProvenanceChain } from "../services/provenanceChain";
 import {
   OtsCalendarsUnavailableError,
+  OtsCliTimeoutError,
   STAMP_CALENDARS,
   type ProvenanceAnchor,
 } from "../services/otsProvenance";
@@ -185,14 +186,14 @@ test("a calendar outage is a warning with one later retry, never an error", asyn
     const deadline = Date.now() + 5_000;
     while (!condition() && Date.now() < deadline) await sleep(5);
   };
-  const register = (outages: number, calendarRetryDelayMs: number) => {
+  const register = (outages: number, retryDelayMs: number) => {
     const app = express();
     const state = { calls: 0 };
     const anchoring = registerProvenanceRoutes(app, {
       readRecords: async () => records,
       getAnchor: async () => undefined,
       operatorSecret: "operator-test-secret",
-      calendarRetryDelayMs,
+      retryDelayMs,
       anchor: async (input) => {
         state.calls += 1;
         if (state.calls <= outages) {
@@ -254,4 +255,127 @@ test("a calendar outage is a warning with one later retry, never an error", asyn
   });
   assert.equal(warnings.mock.callCount(), 5);
   assert.equal(errors.mock.callCount(), 0);
+});
+
+test("any failed scheduled stamp is retried once; CLI timeouts warn and other failures are errors", async (t) => {
+  const records = await readDataset();
+  const warnings = t.mock.method(logger, "warn", () => undefined);
+  const errors = t.mock.method(logger, "error", () => undefined);
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+  const waitFor = async (condition: () => boolean) => {
+    const deadline = Date.now() + 5_000;
+    while (!condition() && Date.now() < deadline) await sleep(5);
+  };
+  const retryInMs = (call: { arguments: unknown[] }) =>
+    (call.arguments[0] as { retryInMs?: number }).retryInMs;
+  const register = (failures: Error[]) => {
+    const state = { calls: 0 };
+    const anchoring = registerProvenanceRoutes(express(), {
+      readRecords: async () => records,
+      getAnchor: async () => undefined,
+      retryDelayMs: 20,
+      anchor: async (input) => {
+        const failure = failures[state.calls];
+        state.calls += 1;
+        if (failure) throw failure;
+        return {
+          ...input,
+          otsProof: Buffer.from("genuine-test-receipt").toString("base64"),
+          otsStatus: "pending_calendar",
+          updatedAt: "2025-01-01T00:00:00.000Z",
+        };
+      },
+    });
+    return { anchoring, state };
+  };
+
+  // A CLI timeout is transient: a warning, then a successful retry.
+  const timedOut = register([new OtsCliTimeoutError()]);
+  let stop = timedOut.anchoring.start(0);
+  await waitFor(() => timedOut.state.calls === 2);
+  stop();
+  assert.equal(timedOut.state.calls, 2);
+  assert.equal(warnings.mock.callCount(), 1);
+  assert.equal(retryInMs(warnings.mock.calls[0]!), 20);
+  assert.equal(errors.mock.callCount(), 0);
+
+  // Any other failure is an error, and is also retried once, not repeatedly.
+  const failed = register([
+    new Error("database offline"),
+    new Error("database offline"),
+  ]);
+  stop = failed.anchoring.start(0);
+  await waitFor(() => errors.mock.callCount() === 2);
+  await sleep(100);
+  stop();
+  assert.equal(failed.state.calls, 2);
+  assert.deepEqual(errors.mock.calls.map(retryInMs), [20, undefined]);
+  assert.equal(warnings.mock.callCount(), 1);
+});
+
+test("start pre-warms the CLI once, primes the anchor read, and stop cancels a pending warm-up", async (t) => {
+  const records = await readDataset();
+  const state = buildProvenanceChain(records);
+  const infos = t.mock.method(logger, "info", () => undefined);
+  const warnings = t.mock.method(logger, "warn", () => undefined);
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+  const waitFor = async (condition: () => boolean) => {
+    const deadline = Date.now() + 5_000;
+    while (!condition() && Date.now() < deadline) await sleep(5);
+  };
+  const register = (prewarmCli: () => Promise<void>, warmupDelayMs: number) => {
+    const calls = { prewarm: 0, anchorReads: [] as string[], stamps: 0 };
+    const anchoring = registerProvenanceRoutes(express(), {
+      readRecords: async () => records,
+      getAnchor: async (headHash) => {
+        calls.anchorReads.push(headHash);
+        return undefined;
+      },
+      anchor: async () => {
+        calls.stamps += 1;
+        throw new Error("stamping is not under test");
+      },
+      prewarmCli: async () => {
+        calls.prewarm += 1;
+        await prewarmCli();
+      },
+      warmupDelayMs,
+    });
+    return { anchoring, calls };
+  };
+
+  const warmed = register(async () => undefined, 20);
+  let stop = warmed.anchoring.start(60_000);
+  const duplicateStop = warmed.anchoring.start(0);
+  await waitFor(() => warmed.calls.anchorReads.length === 1);
+  await sleep(50);
+  duplicateStop();
+  stop();
+  assert.equal(warmed.calls.prewarm, 1);
+  assert.deepEqual(warmed.calls.anchorReads, [state.headHash]);
+  assert.equal(warmed.calls.stamps, 0);
+  assert.ok(
+    infos.mock.calls.some(
+      (call) => call.arguments[1] === "OpenTimestamps CLI pre-warmed",
+    ),
+  );
+
+  // A failed warm-up is only a warning; nothing depends on it.
+  const failing = register(async () => {
+    throw new OtsCliTimeoutError();
+  }, 0);
+  stop = failing.anchoring.start(60_000);
+  await waitFor(() => warnings.mock.callCount() === 1);
+  stop();
+  assert.equal(failing.calls.anchorReads.length, 0);
+  assert.match(String(warnings.mock.calls[0]!.arguments[1]), /warm-up failed/);
+
+  // Stopping before the delay cancels the warm-up.
+  const cancelled = register(async () => undefined, 50);
+  stop = cancelled.anchoring.start(60_000);
+  stop();
+  await sleep(120);
+  assert.equal(cancelled.calls.prewarm, 0);
 });

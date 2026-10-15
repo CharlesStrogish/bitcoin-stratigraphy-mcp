@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { loadPoseidon, loadSnarkjs } from "./zkLibraries";
+import { verifyGroth16OffThread } from "./zkVerifierWorker";
 
 const wasmPath = fileURLToPath(
   new URL("./zk/artifacts/drift_js/drift.wasm", import.meta.url),
@@ -325,19 +326,7 @@ async function verifyCryptographically(
   publicSignals: string[],
   proof: Groth16Proof,
 ): Promise<boolean> {
-  try {
-    const { groth16 } = await loadSnarkjs();
-    return await groth16.verify(await verificationKey(), publicSignals, proof);
-  } finally {
-    if (process.env.NODE_ENV === "test") {
-      const globals = globalThis as typeof globalThis & {
-        curve_bn128?: { terminate(): Promise<void> } | null;
-      };
-      const curve = globals.curve_bn128;
-      globals.curve_bn128 = null;
-      await curve?.terminate();
-    }
-  }
+  return verifyGroth16OffThread(await verificationKey(), publicSignals, proof);
 }
 
 async function runProof(witness: Record<string, string>): Promise<{

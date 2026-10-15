@@ -37,6 +37,7 @@ const required = [
   "dist/enterprise/stratigraphy_pipeline.py", "dist/enterprise/main.py",
   "dist/enterprise/requirements.txt", "dist/escrow-worker/routers/escrow_worker.py",
   "dist/zk/artifacts/telemetry.wasm", "dist/zk/artifacts/drift_js/drift.wasm",
+  "dist/zk/verifier-worker.mjs",
 ];
 for (const filename of required) assert.ok(result.files.some((entry) => entry.path === filename), filename);
 assert.equal(await readFile(path.join(directory, "LICENSE"), "utf8"), await readFile(path.join(root, "LICENSE.md"), "utf8"));

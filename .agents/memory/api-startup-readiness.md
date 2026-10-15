@@ -29,8 +29,22 @@ opens. Holding probes is safe.
   - Python: port at 12.8 s, ready at 32 s. The application load took 16 s on
     the cold VM, versus 0.8 s locally.
   - 500s lasted 10 s (Node) and 13 s (Python).
+- After the lazy Python imports (second publish, 2026-10-15):
+  - Python: port at 13.1 s, ready at 27.1 s. That is 14.0 s after the port
+    opened: uvicorn import 3.1 s, application load 10.5 s (0.33 s in dev),
+    startup 0.3 s.
+  - Node: the process started 11.5 s after launch and its port opened at
+    15.0 s. Health checks were first answered at 26.7 s, because the zk
+    warm-up's single-threaded Groth16 passes block the event loop (6.9 s on
+    the VM versus 0.5 s locally).
+  - A dashboard page load's escrow requests reached the new machine 18.8 s
+    into the boot.
+- The deployment is a Reserved VM (gce): cold boots happen on publish or
+  restart. The checker probes the new machine's local router (127.0.0.1:1104),
+  but other requests can also arrive before its checks pass.
 - The remaining window is mostly process launch on a cold VM, not application
-  code.
+  code. Boot-time CPU and file work there runs 10–30 times slower than
+  locally, so local measurements cannot prove a production target.
 - Production Python stdout is block-buffered, so `print` lines (license
   messages) appear late. Time boots from stderr logger lines and Node's
   portBoundMs/applicationLoadedMs instead.
@@ -55,4 +69,7 @@ application on a daemon thread, not `asyncio.to_thread`: `asyncio.run` waits
 for executor threads at exit, so SIGTERM during the import would hang until it
 finished. Measure with the startup harnesses, comparing against a copy of the
 previous build rather than trusting a single run, and confirm with the phase
-timings in the deployment log after each republish.
+timings in the deployment log after each republish. Synchronous CPU work after
+the port opens, such as the main-thread zk warm-up, still blocks held requests.
+A burst of trivial health checks completing together in the log shows a
+blocked event loop.

@@ -7,6 +7,8 @@ Right after a republish, the live domain can route to the new VM before the API 
 
 **Why:** A first live audit landed inside that boot window and briefly looked like a release regression; the deployment logs showed platform healthcheck failures until the API logged "Server listening".
 
+On 2026-10-15 the window was ~12 s of health-check 500s before the API port opened. One `/agent-api` health check also timed out while the Python app finished loading; its held request was released at readiness. Neither recurred.
+
 **How to apply:** Before treating live API 500s after a publish as a code failure, check deployment logs for the API's listening line and re-probe. Since the listen-first startup (see api-startup-readiness.md), refused connections should be gone; the "Server listening" line carries portBoundMs and applicationLoadedMs for the boot breakdown.
 
 HTTP readiness does not imply Nostr announcement readiness; allow a bounded wait for missing announcement state, but fail malformed state immediately.

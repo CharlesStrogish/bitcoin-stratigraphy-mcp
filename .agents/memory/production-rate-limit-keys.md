@@ -10,7 +10,10 @@ Evidence gathered 2026-10-15 on the production Reserved VM (`trust proxy` 1):
   by Replit's router, so keying on Express's `req.ip` gave every request an
   almost fresh bucket. Per Google's documentation the chain is
   `[caller-supplied…], client, load balancer, front end`; the client sits at
-  [-3]. The load-balancer hop at [-2] was inferred from those docs, not observed.
+  [-3]. The post-publish chain check confirmed this on 2026-10-15 (90 samples,
+  0 short chains, 8 clients, 2 load-balancer values; it needed ~80 minutes of
+  light traffic to reach 8 clients). One client across four connections then
+  drew down a single bucket, and 40 probe bursts × 15 paths were all 200.
 - Platform health/discovery probes arrive from loopback with no X-Forwarded-For.
   They hit every service path in pairs 80 s apart every 5 minutes, plus ~75
   boot-time checks. When probes shared one budget, they were refused for

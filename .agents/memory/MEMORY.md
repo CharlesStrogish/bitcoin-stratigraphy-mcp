@@ -76,3 +76,4 @@
 - [Escrow durable recovery](escrow-durable-recovery.md) — preserve the 24-sat historical baseline once; commit durable state before success and never fabricate its missing Merkle proof.
 - [Formatting baseline](format-baseline.md) — format check fails on inherited files; format only what you touch and compare HEAD blobs first.
 - [Production rate-limit keys](production-rate-limit-keys.md) — clients are the [-3] forwarded entry behind Google front ends; verify the post-publish chain-check log line.
+- [Deployment log retrieval](deployment-log-retrieval.md) — fetches cap at ~100 recent lines and cover only the live deployment; page small time slices.

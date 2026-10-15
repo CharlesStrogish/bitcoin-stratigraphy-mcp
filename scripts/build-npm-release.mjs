@@ -51,7 +51,8 @@ if (sqlStart < 0) throw new Error("Database schema export did not contain SQL");
 await writeFile(path.join(destination, "dist/database.sql"), exportedSchema.stdout.slice(sqlStart));
 await mkdir(enterprise, { recursive: true });
 for (const filename of [
-  "main.py", "license_verifier.py", "agent_api.py", "stratigraphy_pipeline.py",
+  "main.py", "license_verifier.py", "agent_startup.py", "agent_startup_gate.py",
+  "agent_api.py", "stratigraphy_pipeline.py",
   "stratigraphy_bridge.py", "stratigraphy_tools.py", "provenance_anchor.py",
   "provenance_storage.py", "provenance_upgrade.py", "provenance_routes.py",
 ]) await cp(path.join(root, filename), path.join(enterprise, filename));

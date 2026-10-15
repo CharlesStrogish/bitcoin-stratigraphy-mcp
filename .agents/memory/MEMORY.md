@@ -33,7 +33,7 @@
 - [Signed dataset anchors](signed-dataset-anchors.md) — CID-to-Bitcoin-tip receipts are signed anchors, not ZK or PoW proofs; require a real circuit before claiming otherwise.
 - [CoinOS payment verification](nwc-self-payment-proofs.md) — signed capabilities allow exact merchant-only confirmation; legacy UUID proofs still require payer verification.
 - [Audit readiness](audit-readiness.md) — post-publish API boot window, relay announcements and paid settlement are separate readiness stages.
-- [API startup readiness](api-startup-readiness.md) — bind the port before loading the app; keep heavy imports and warm-up off the startup path.
+- [API startup readiness](api-startup-readiness.md) — Node and Python APIs bind before loading; platform probes retry, so holding early requests is safe.
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
 - [Static response headers](static-response-headers.md) — static deployments honor production responseHeaders; validator acceptance alone proves nothing.
 - [Published domain changes](published-domain-changes.md) — canonical host is bitcoinstratigraphy.com; keep serving legacy .replit.app unadvertised; verify the primary URL first.

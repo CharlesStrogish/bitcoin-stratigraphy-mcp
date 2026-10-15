@@ -7,4 +7,4 @@ The combined Prettier/ruff format check already failed on many committed files, 
 
 **Why:** Mass reformatting would bury audit diffs and rewrite escrow code the user protects. The inherited debt was deliberately left in place and reported.
 
-**How to apply:** Compare the committed blob through the formatter's stdin mode (`git cat-file -p HEAD:<path> | prettier --check --stdin-filepath <path>`, or ruff's `--stdin-filename`) to separate new regressions from inherited debt. Reformat the whole repository only when the user asks.
+**How to apply:** Compare the committed blob through the formatter's stdin mode (`git cat-file -p HEAD:<path> | prettier --check --stdin-filepath <path>`, or ruff's `--stdin-filename`) to separate new regressions from inherited debt. Never check a copy outside the project (such as `/tmp`): it misses project-local settings and can falsely pass, as happened with an inherited script whose in-place format would have rewritten the whole file. Reformat the whole repository only when the user asks.

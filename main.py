@@ -28,10 +28,12 @@ def require_enterprise_license():
 
 
 def start_engine():
-    # Import only after authorization; direct ASGI imports are gated separately.
-    from agent_api import run_server
+    # Runs only after authorization. The launcher opens the port before the
+    # application's heavy imports; loading the application re-checks the
+    # license, and direct ASGI imports are gated separately.
+    from agent_startup import serve
 
-    run_server()
+    serve()
 
 
 def main():

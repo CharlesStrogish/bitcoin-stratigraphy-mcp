@@ -10,6 +10,7 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `node scripts/measure-api-startup.mjs --runs 5` — measure API cold-start readiness against a disposable local PostgreSQL (`--bundle` compares another build)
+- `node scripts/measure-agent-api-startup.mjs --runs 5` — measure Enterprise Agent API (`/agent-api`, port 8000) cold-start readiness with network and storage cut off (`--root` compares a copy of earlier Python files)
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -28,6 +29,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 ## Architecture decisions
 
 - API startup is listen-first: `artifacts/api-server/src/index.ts` binds the port and holds early requests, then imports the application bundle (`dist/server.mjs`). Escrow routes wait for durable-ledger recovery (503 otherwise, never a zero counter); zk verifier warm-up and OpenTimestamps stamping run in the background afterwards. Keep application imports out of the bootstrap.
+- The Enterprise Agent API (`/agent-api`, port 8000) is listen-first too: `main.py` verifies the license, then `agent_startup.serve()` binds the port before importing uvicorn, the request-holding gate (`agent_startup_gate.py`) and, on a daemon thread, `agent_api`. Early requests wait for the application's lifespan startup (503 with `Retry-After` after 60 s or on a load failure). `agent_startup.py` may import only lightweight standard-library modules.
 
 ## Product
 

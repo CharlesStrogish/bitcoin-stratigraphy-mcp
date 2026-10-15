@@ -53,6 +53,14 @@ opens. Holding probes is safe.
   - Python: unchanged, with the port at 14.0 s and ready at 27.1 s (load 9.7 s).
   - At +5 min, the single warm-up pass took 6.4 s on the VM (1.3 s locally)
     and holds Node requests while it runs.
+- After moving the warm-ups to 90 s / 2.5 min (fourth publish, 2026-10-15):
+  - Node: the process started 12.1 s after launch, the port opened at 15.0 s
+    (3.0 s after start) and health checks were first answered at 18.7 s. The
+    longer window was launch variance; the bootstrap was unchanged.
+  - Python: port at 21.2 s, ready at 34.3 s (load 9.7 s); one held
+    `/agent-api` probe timed out just before readiness.
+  - The OTS warm-up (14.0 s) and the zk warm-up on the worker thread (9.7 s;
+    requests during it took 1–9 ms) did not block requests.
 - Deployment logs return only the current deployment's lines; earlier boots
   vanish on republish. Record each boot's numbers right after publishing.
 - The deployment is a Reserved VM (gce): cold boots happen on publish or

@@ -37,9 +37,12 @@ about 1.1 s.
 - Public reads still check the stored receipt's digest binding and fail closed
   (503) when that check fails. The cache keeps reads fast; never skip the
   inspection.
-- Unproven: whether a cold production `ots info` before the 90 s warm-up
-  always finishes within 30 s. After a publish, read the warm-up's durationMs
-  and the first provenance reads in the deployment log.
+- Production check (fourth publish, 2026-10-15): the cold warm-up took 14.0 s
+  (it would have failed the old 10 s cap), the 5-minute stamp succeeded, and
+  the first provenance reads returned 200 in 257 ms and 52 ms. Still
+  unobserved: a public read before the 90 s warm-up. The measured cold cost
+  is about half the 30 s limit; after a publish, read the warm-up's
+  durationMs and any early provenance reads in the deployment log.
 
 **How to apply:** Keep the approved calendar set unchanged and retries
 stamping the same bytes. A pending calendar receipt is not Bitcoin

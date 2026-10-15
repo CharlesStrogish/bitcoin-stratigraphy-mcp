@@ -75,3 +75,4 @@
 - [Npm server distribution](npm-server-distribution.md) — ship the self-hosted engine; boot-test it offline against a disposable loopback PostgreSQL only.
 - [Escrow durable recovery](escrow-durable-recovery.md) — preserve the 24-sat historical baseline once; commit durable state before success and never fabricate its missing Merkle proof.
 - [Formatting baseline](format-baseline.md) — format check fails on inherited files; format only what you touch and compare HEAD blobs first.
+- [Production rate-limit keys](production-rate-limit-keys.md) — edge requests lack stable keys; platform probes share one bucket and get unlogged 429s for ~14 min after each boot.

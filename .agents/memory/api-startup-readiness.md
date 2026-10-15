@@ -44,6 +44,15 @@ opens. Holding probes is safe.
     the VM versus 0.5 s locally).
   - A dashboard page load's escrow requests reached the new machine 18.8 s
     into the boot.
+- After deferring the zk warm-up (third publish, 2026-10-15):
+  - Node: the process started at 9.3 s, the port opened at 11.3 s and health
+    checks were first answered at 15.3 s. Port-to-first-answer fell from
+    11.7 s to 4.0 s; the rest of the gain is launch-time variance.
+  - Python: unchanged, with the port at 14.0 s and ready at 27.1 s (load 9.7 s).
+  - At +5 min, the single warm-up pass took 6.4 s on the VM (1.3 s locally)
+    and holds Node requests while it runs.
+- Deployment logs return only the current deployment's lines; earlier boots
+  vanish on republish. Record each boot's numbers right after publishing.
 - The deployment is a Reserved VM (gce): cold boots happen on publish or
   restart. The checker probes the new machine's local router (127.0.0.1:1104),
   but other requests can also arrive before its checks pass.

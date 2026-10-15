@@ -19,6 +19,13 @@ calendar is bounded only by its socket timeout. The per-attempt process cap is
 what bounds it. Tests against local fake calendars confirmed the CLI reports a
 refused, silent or erroring calendar with exit status 1 and that message.
 
+The slow start outlasts the boot. On 2026-10-15, the first `ots` runs after a
+publish still exceeded the 10 s info limit on the production VM: the 5-minute
+scheduled anchor failed and is not retried until the 6-hour run. Provenance
+chain and anchor lookups returned 503 after 10 s, 12 minutes after boot. After
+a few killed attempts the same lookup took 1–3 s; locally `ots info` takes
+about 1.1 s.
+
 **How to apply:** Keep the approved calendar set unchanged and retries
 stamping the same bytes. A pending calendar receipt is not Bitcoin
 verification. Test the real CLI only against local fake calendars, never the

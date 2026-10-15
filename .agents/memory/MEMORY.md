@@ -34,7 +34,7 @@
 - [CoinOS payment verification](nwc-self-payment-proofs.md) — signed capabilities allow exact merchant-only confirmation; legacy UUID proofs still require payer verification.
 - [Audit readiness](audit-readiness.md) — post-publish API boot window, relay announcements and paid settlement are separate readiness stages.
 - [API startup readiness](api-startup-readiness.md) — both APIs bind before loading; heavy Python libraries stay lazy; never serve cached supply data during the first refresh.
-- [OTS stamp calendar fallback](ots-stamp-calendar-fallback.md) — one calendar per bounded CLI attempt; only timeouts/no-attestation fall back; outages warn and retry once.
+- [OTS stamp calendar fallback](ots-stamp-calendar-fallback.md) — one calendar per bounded CLI attempt; only timeouts/no-attestation fall back; first CLI runs after a publish can exceed 10 s.
 - [Python test suites](python-test-suites.md) — pnpm test runs no Python; each suite needs its own import root, plus the coverage gate.
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
 - [Static response headers](static-response-headers.md) — static deployments honor production responseHeaders; validator acceptance alone proves nothing.

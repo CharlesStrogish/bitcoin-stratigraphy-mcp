@@ -1,43 +1,37 @@
-import { isIP } from "node:net";
-import type { Request, RequestHandler } from "express";
+import { createHmac, randomBytes } from "node:crypto";
+import type { Request, RequestHandler, Response } from "express";
+import {
+  addressKey,
+  clientKey,
+  resolveClientAddress,
+  type ClientAddressSource,
+} from "../lib/client-address";
 
 export const PUBLIC_RATE_LIMIT = 100;
 export const PUBLIC_RATE_WINDOW_MS = 15 * 60_000;
 
-/** Express resolves the trusted proxy chain; never read raw forwarding headers. */
+/** Resolved client budget key; see lib/client-address for the proxy chain. */
 export function rateLimitIpKey(request: Request): string {
-  const rawAddress = request.ip || request.socket.remoteAddress || "unknown";
-  // URL parsers reject IPv6 scope identifiers even though socket addresses
-  // and net.isIP accept them. Interface names must not split a subnet budget.
-  const address = rawAddress.includes(":")
-    ? rawAddress.split("%")[0]!
-    : rawAddress;
-  if (isIP(address) !== 6) return address;
-  const normalized = new URL(`http://[${address}]`).hostname.slice(1, -1);
-  const [left, right] = normalized.split("::");
-  const leading = left ? left.split(":") : [];
-  const trailing = right ? right.split(":") : [];
-  const groups =
-    right === undefined
-      ? leading
-      : [
-          ...leading,
-          ...Array(8 - leading.length - trailing.length).fill("0"),
-          ...trailing,
-        ];
-  // IPv4-mapped sockets share the IPv4 budget; native IPv6 rotates within /64.
-  if (
-    groups.slice(0, 5).every((group) => parseInt(group, 16) === 0) &&
-    parseInt(groups[5]!, 16) === 0xffff
-  ) {
-    const high = parseInt(groups[6]!, 16);
-    const low = parseInt(groups[7]!, 16);
-    return `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`;
-  }
-  return `${groups
-    .slice(0, 4)
-    .map((group) => parseInt(group, 16).toString(16))
-    .join(":")}::/64`;
+  return clientKey(request);
+}
+
+/** Attached to refused responses for the request log; never a raw address. */
+export type RateLimitRefusal = {
+  limiter: string;
+  retryAfterSeconds: number;
+  clientRef: string;
+  clientSource?: ClientAddressSource;
+};
+
+// A per-process key lets operators correlate refusals from one client within
+// a boot without logging addresses or hashes that can be reversed offline.
+const clientReferenceKey = randomBytes(32);
+
+export function clientReference(key: string): string {
+  return createHmac("sha256", clientReferenceKey)
+    .update(key)
+    .digest("hex")
+    .slice(0, 12);
 }
 
 export type RateLimitResult = {
@@ -138,33 +132,52 @@ export function createSlidingWindowRateLimiter(options: {
   };
 }
 
+function applyRateLimit(
+  limiter: SlidingWindowRateLimiter,
+  key: string,
+  res: Response,
+  next: () => void,
+  label: string,
+  policy?: { limit: number; windowMs: number },
+  clientSource?: ClientAddressSource,
+): void {
+  const result = limiter.check(key);
+  res.setHeader("X-RateLimit-Remaining", String(result.remaining));
+  res.setHeader("RateLimit-Remaining", String(result.remaining));
+  if (policy) {
+    res.setHeader(
+      "RateLimit-Policy",
+      `${policy.limit};w=${policy.windowMs / 1_000}`,
+    );
+    res.setHeader("RateLimit-Limit", String(policy.limit));
+  }
+  if (!result.allowed) {
+    res.locals.rateLimit = {
+      limiter: label,
+      retryAfterSeconds: result.retryAfterSeconds,
+      clientRef: clientReference(key),
+      ...(clientSource ? { clientSource } : {}),
+    } satisfies RateLimitRefusal;
+    res.setHeader("Retry-After", String(result.retryAfterSeconds));
+    res.setHeader("Cache-Control", "no-store");
+    res.status(429).json({
+      error: "Too many requests",
+      code: "rate_limit_exceeded",
+      retry_after: result.retryAfterSeconds,
+    });
+    return;
+  }
+  next();
+}
+
 export function createHttpRateLimitMiddleware(
   limiter: SlidingWindowRateLimiter,
   keyForRequest: (request: Request) => string = rateLimitIpKey,
   policy?: { limit: number; windowMs: number },
+  label = "http",
 ): RequestHandler {
   return (req, res, next) => {
-    const result = limiter.check(keyForRequest(req));
-    res.setHeader("X-RateLimit-Remaining", String(result.remaining));
-    res.setHeader("RateLimit-Remaining", String(result.remaining));
-    if (policy) {
-      res.setHeader(
-        "RateLimit-Policy",
-        `${policy.limit};w=${policy.windowMs / 1_000}`,
-      );
-      res.setHeader("RateLimit-Limit", String(policy.limit));
-    }
-    if (!result.allowed) {
-      res.setHeader("Retry-After", String(result.retryAfterSeconds));
-      res.setHeader("Cache-Control", "no-store");
-      res.status(429).json({
-        error: "Too many requests",
-        code: "rate_limit_exceeded",
-        retry_after: result.retryAfterSeconds,
-      });
-      return;
-    }
-    next();
+    applyRateLimit(limiter, keyForRequest(req), res, next, label, policy);
   };
 }
 
@@ -175,30 +188,85 @@ export function createPublicRateLimiter(): SlidingWindowRateLimiter {
   });
 }
 
+export type PublicRateLimitOptions = {
+  /**
+   * Skip loopback GET/HEAD/OPTIONS requests that carry no X-Forwarded-For.
+   * In a published deployment those are Replit's own health and discovery
+   * probes: every external request arrives through the router, which always
+   * appends X-Forwarded-For. Defaults to published deployments only.
+   */
+  exemptPlatformProbes?: boolean;
+};
+
+const probeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
+
 export function createPublicRateLimitMiddleware(
   limiter: SlidingWindowRateLimiter = createPublicRateLimiter(),
+  options: PublicRateLimitOptions = {},
 ): RequestHandler {
-  return createHttpRateLimitMiddleware(limiter, rateLimitIpKey, {
-    limit: PUBLIC_RATE_LIMIT,
-    windowMs: PUBLIC_RATE_WINDOW_MS,
-  });
+  const exemptPlatformProbes =
+    options.exemptPlatformProbes ?? process.env.REPLIT_DEPLOYMENT === "1";
+  const policy = { limit: PUBLIC_RATE_LIMIT, windowMs: PUBLIC_RATE_WINDOW_MS };
+  return (req, res, next) => {
+    const client = resolveClientAddress(req);
+    if (
+      exemptPlatformProbes &&
+      client.source === "loopback" &&
+      probeMethods.has(req.method)
+    ) {
+      next();
+      return;
+    }
+    applyRateLimit(
+      limiter,
+      addressKey(client.address),
+      res,
+      next,
+      "public",
+      policy,
+      client.source,
+    );
+  };
+}
+
+/**
+ * Routes whose payment gate is the request control. Unauthenticated calls get
+ * a 402 challenge capped per client by the L402 challenge limiter, and paid
+ * retries carrying Authorization: L402 must never spend the free budget.
+ */
+const existingPaidRestRoutes = new Set([
+  "/api/v1/stratigraphy",
+  "/api/v1/stratigraphy/l402",
+  "/api/v1/stratigraphy/stream",
+  "/api/v1/zk/ground",
+  "/api/v1/zk/attest",
+]);
+
+function isPaidEscrowRoute(method: string, path: string): boolean {
+  if (method === "POST") {
+    return path === "/api/v1/escrow/create" || path === "/api/v1/escrow/settle";
+  }
+  return (
+    (method === "GET" || method === "HEAD") &&
+    /^\/api\/v1\/escrow\/receipt\/[^/]+$/.test(path)
+  );
 }
 
 /** Apply before body parsing. MCP classification happens after its bounded parser. */
 export function createPublicWebRateLimitMiddleware(
   limiter: SlidingWindowRateLimiter,
+  options: PublicRateLimitOptions = {},
 ): RequestHandler {
-  const enforce = createPublicRateLimitMiddleware(limiter);
-  const existingPaidRestRoutes = new Set([
-    "/api/v1/stratigraphy",
-    "/api/v1/stratigraphy/l402",
-    "/api/v1/stratigraphy/stream",
-    "/api/v1/zk/ground",
-    "/api/v1/zk/attest",
-  ]);
+  const enforce = createPublicRateLimitMiddleware(limiter, options);
   return (req, res, next) => {
     const path = req.path.toLowerCase().replace(/\/$/, "") || "/";
-    if (path === "/mcp" || existingPaidRestRoutes.has(path)) return next();
+    if (
+      path === "/mcp" ||
+      existingPaidRestRoutes.has(path) ||
+      isPaidEscrowRoute(req.method, path)
+    ) {
+      return next();
+    }
     enforce(req, res, next);
   };
 }

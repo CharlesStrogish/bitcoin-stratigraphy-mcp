@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import type { Express, Request } from "express";
+import { clientKey } from "../lib/client-address";
 import { generateDriftProof } from "../services/zkDriftService";
 
 type DriftProofResult = Awaited<ReturnType<typeof generateDriftProof>>;
@@ -142,7 +143,7 @@ export function registerZkDriftRoute(
       return;
     }
 
-    const address = req.ip || req.socket.remoteAddress || "unknown";
+    const address = clientKey(req);
     if (rateLimited(address)) {
       res
         .status(429)

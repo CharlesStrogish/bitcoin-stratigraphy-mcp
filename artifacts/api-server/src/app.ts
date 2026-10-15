@@ -1,5 +1,7 @@
 import express, { type Express, type Request } from "express";
 import pinoHttp from "pino-http";
+import { createClientChainCheck } from "./lib/client-address";
+import { requestLogHooks } from "./lib/request-log";
 import router from "./routes";
 import { registerStratigraphyRoutes } from "./routes/stratigraphy";
 import { registerOpenApiRoute } from "./routes/openapi";
@@ -53,10 +55,11 @@ app.disable("x-powered-by");
 // First: /api/openapi.json, /api/mcp and /api/.well-known/* are served as
 // their root routes, through the same middleware.
 app.use(apiRootAliases);
-registerPublicCors(app, createPublicWebRateLimitMiddleware(publicRateLimiter));
+// Logged ahead of CORS and the public limiter so refusals reach deployment logs.
 app.use(
   pinoHttp({
     logger,
+    ...requestLogHooks,
     serializers: {
       req(req) {
         return {
@@ -73,6 +76,15 @@ app.use(
     },
   }),
 );
+app.use(
+  createClientChainCheck((summary) => {
+    const message = "client address chain check";
+    if (summary.layout === "unexpected") {
+      logger.warn({ clientAddressChain: summary }, message);
+    } else logger.info({ clientAddressChain: summary }, message);
+  }),
+);
+registerPublicCors(app, createPublicWebRateLimitMiddleware(publicRateLimiter));
 registerMcpRequestGuard(app);
 registerAuditRoutes(app);
 app.use(

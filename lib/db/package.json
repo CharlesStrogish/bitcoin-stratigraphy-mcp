@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./connection-string": "./src/connection-string.ts",
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {

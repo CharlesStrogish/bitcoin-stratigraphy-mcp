@@ -2,6 +2,7 @@
 // Dual-licensed under AGPLv3 and Commercial terms.
 import { timingSafeEqual } from "node:crypto";
 import type { Express } from "express";
+import { clientKey } from "../lib/client-address";
 import { logger } from "../lib/logger";
 import {
   anchorProvenance,
@@ -199,7 +200,7 @@ export function registerProvenanceRoutes(
       return;
     }
 
-    const address = req.ip || req.socket.remoteAddress || "unknown";
+    const address = clientKey(req);
     if (isRateLimited(address)) {
       res
         .status(429)

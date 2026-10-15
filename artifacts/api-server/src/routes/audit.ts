@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import express, { type Express, type ErrorRequestHandler } from "express";
+import { clientKey } from "../lib/client-address";
 import { createSlidingWindowRateLimiter } from "../middleware/rateLimiter";
 import {
   AuditWorkerError,
@@ -28,9 +29,7 @@ export function registerAuditRoutes(
   router.post(
     "/verify",
     (req, res, next) => {
-      const budget = limiter.check(
-        req.ip ?? req.socket.remoteAddress ?? "unknown",
-      );
+      const budget = limiter.check(clientKey(req));
       if (!budget.allowed) {
         res.setHeader("Retry-After", budget.retryAfterSeconds);
         res

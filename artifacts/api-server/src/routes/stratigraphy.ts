@@ -97,6 +97,7 @@ import {
   createSlidingWindowRateLimiter,
   type SlidingWindowRateLimiter,
 } from "../middleware/rateLimiter";
+import { clientKey } from "../lib/client-address";
 import { runtimePricingLoad } from "../services/orchestrator";
 import {
   createMeshGossipService,
@@ -295,7 +296,7 @@ const defaultChallengePolicy: ChallengePolicy = {
 };
 
 function callerKey(req: Request) {
-  return req.ip || req.socket.remoteAddress || "unknown";
+  return clientKey(req);
 }
 
 function singleQueryValue(value: unknown) {

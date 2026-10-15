@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { clientKey } from "../lib/client-address";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
 import type { Request, RequestHandler } from "express";
 import {
@@ -122,7 +123,7 @@ export function createL402Middleware(
       res.status(500).json({ error: "Lightning settlement is not configured" });
       return;
     }
-    const caller = req.ip || req.socket.remoteAddress || "unknown";
+    const caller = clientKey(req);
     const currentTime = now();
     if (
       currentTime - challengeWindowsCleanedAt >= 60_000 ||
@@ -367,8 +368,7 @@ export function createL402Middleware(
                 ...(/^[0-9a-f]{64}$/.test(authorization.preimage)
                   ? { preimage: authorization.preimage }
                   : { merchantVerified: true as const }),
-                clientIdentifier:
-                  req.ip || req.socket.remoteAddress || "unknown",
+                clientIdentifier: clientKey(req),
               });
             } catch (error) {
               req.log?.error(

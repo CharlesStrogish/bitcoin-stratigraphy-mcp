@@ -1,35 +1,38 @@
 ---
 name: Production rate-limit keys
-description: How the shared public rate limit keys requests on the production Reserved VM, why the platform's own probes get 429s after each boot, and why those refusals are mostly missing from deployment logs.
+description: How production requests reach the API (forwarded-address chain), how clients and platform probes are keyed, what to check after a publish, and how to read rate-limit refusals in deployment logs.
 ---
 
-Observed in production on 2026-10-15 (`trust proxy` 1, shared public budget
-of 100 requests per 15 minutes):
+Evidence gathered 2026-10-15 on the production Reserved VM (`trust proxy` 1):
 
-- Requests through the public edge do not keep a stable key. Ten requests from
-  one client, four of them on a single connection, each landed in an almost
-  fresh bucket, so the per-client limit is not actually enforced per client.
-- The platform's own probes share one stable key. They hit every service path
-  (including `/agent-api`) in pairs 80 s apart, every 5 minutes. They are
-  joined by roughly 75 boot-time health checks and probes in the first 20 s
-  after the port opens. That filled the bucket about 3 minutes after launch.
-  Probes then got 429 until the boot traffic left the window (05:12:53 to
-  05:26:33 for that boot), and recovered exactly as predicted.
-- Steady-state probe load is 15 paths × 6 bursts = 90 of the 100 per window.
-  Each added service path adds 6.
-- The general limiter runs before the request logger, so its 429s never reach
-  the deployment log; only `/mcp` refusals (checked after the logger) appear.
-  A probe burst that logs only `/agent-api` and `GET /mcp 429` means the other
-  paths were refused, not skipped.
+- External requests carry `via: 1.1 google`. The rightmost X-Forwarded-For entry
+  is a rotating Google front end (35.191.0.0/16, also 130.211.0.0/22) appended
+  by Replit's router, so keying on Express's `req.ip` gave every request an
+  almost fresh bucket. Per Google's documentation the chain is
+  `[caller-supplied…], client, load balancer, front end`; the client sits at
+  [-3]. The load-balancer hop at [-2] was inferred from those docs, not observed.
+- Platform health/discovery probes arrive from loopback with no X-Forwarded-For.
+  They hit every service path in pairs 80 s apart every 5 minutes, plus ~75
+  boot-time checks. When probes shared one budget, they were refused for
+  ~14 minutes after each boot.
 
-**Why:** An audit based on request logs reported green while the platform's
-probes were being refused. The user asks for verified, fully green production
-checks after each publish.
+Since 2.1.3, clients are keyed on the [-3] entry only when Express accepted a
+Google front end from the trusted router. Probe reads are exempt only in
+published deployments (`REPLIT_DEPLOYMENT=1`). Refusals log at warn as "request
+rate limited", with a per-boot client reference and never an address.
 
-**How to apply:** Do not infer a client's budget from its own production
-requests. Before changing the `trust proxy` depth, verify the real forwarded
-chain: the wrong depth makes keys either global or spoofable. Count
-service-path additions against the steady-state budget, and remember paid
-swarm traffic must not get a blanket IP ceiling (enterprise-swarm-traffic.md).
-When auditing deployment logs, treat missing burst paths as possible unlogged
-429s.
+**Why:** an audit based on request logs once reported green while probes were
+being refused, and the user asks for verified, fully green production checks
+after each publish.
+
+**How to apply:**
+- After publishing, find the one-time "client address chain check" line. A
+  `confirmed` layout supports the [-3] rule. `unexpected` (short chains or a
+  widely varying load-balancer hop) means re-examine the chain before trusting
+  per-client budgets. Never change `trust proxy` without re-verifying the chain.
+- Accurate keys made per-client caps effective for the first time, including
+  the public 100 per 15 minutes and unpaid L402 challenge issuance (10 per
+  minute per paid tool). Paid swarms (enterprise-swarm-traffic.md) should use
+  batch passes. Credentialed paid retries never reach these limits.
+- Logs from boots before 2.1.3 still hide public-limiter 429s: treat missing
+  burst paths there as possible unlogged refusals.

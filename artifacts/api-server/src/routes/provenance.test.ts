@@ -37,7 +37,6 @@ test("public provenance endpoints expose the current chain and unanchored state"
   registerProvenanceRoutes(app, {
     readRecords: async () => records,
     getAnchor: async () => undefined,
-    schedule: false,
   });
   const baseUrl = await serve(app);
 
@@ -81,7 +80,6 @@ test("operator anchor endpoint fails closed and requires the Bearer secret", asy
       return anchored;
     },
     operatorSecret: "test-operator-secret",
-    schedule: false,
   });
   const baseUrl = await serve(app);
 
@@ -122,7 +120,6 @@ test("operator anchor endpoint returns 503 when no operator secret is configured
   registerProvenanceRoutes(app, {
     readRecords: async () => records,
     operatorSecret: "",
-    schedule: false,
   });
   const baseUrl = await serve(app);
 
@@ -131,4 +128,44 @@ test("operator anchor endpoint returns 503 when no operator secret is configured
     headers: { authorization: "Bearer anything" },
   });
   assert.equal(response.status, 503);
+});
+
+test("registration never stamps; scheduled anchoring starts once, after its delay, and stops", async () => {
+  const records = await readDataset();
+  const app = express();
+  let anchorCalls = 0;
+  const anchoring = registerProvenanceRoutes(app, {
+    readRecords: async () => records,
+    getAnchor: async () => undefined,
+    anchor: async (input) => {
+      anchorCalls += 1;
+      return {
+        ...input,
+        otsProof: Buffer.from("genuine-test-receipt").toString("base64"),
+        otsStatus: "pending_calendar",
+        updatedAt: "2025-01-01T00:00:00.000Z",
+      };
+    },
+  });
+  // Startup registration must not reach OpenTimestamps calendars.
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(anchorCalls, 0);
+
+  const stop = anchoring.start(20);
+  const duplicateStop = anchoring.start(0);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(
+    anchorCalls,
+    0,
+    "a second start must not schedule another stamp",
+  );
+  const deadline = Date.now() + 5_000;
+  while (anchorCalls === 0 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.equal(anchorCalls, 1);
+  duplicateStop();
+  stop();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(anchorCalls, 1);
 });

@@ -1,9 +1,8 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
-import { parse } from "yaml";
-import openApiSource from "../../../../lib/api-spec/openapi.yaml";
 import type { Request } from "express";
 import { ESCROW_GENESIS } from "../services/escrowGenesis";
 import { canonicalUrl } from "./public-site";
+import { readOpenApiContract } from "./openapi-contract";
 
 export const MERKLE_STANDARD = "RFC 6962 SHA-256";
 export const OTS_CALENDAR_STANDARD = "OpenTimestamps / RFC 6962 SHA-256";
@@ -61,7 +60,7 @@ export function l402ChallengeGuidance() {
 }
 
 // Read the source contract without importing openapi.ts (which imports MCP).
-const contract = parse(openApiSource);
+const contract: any = readOpenApiContract();
 const schemaCache = new Map<string, Record<string, unknown>>();
 
 /** Publish a standalone schema with only its transitively referenced definitions. */

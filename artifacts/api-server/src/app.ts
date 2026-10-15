@@ -29,8 +29,11 @@ import { registerPublicCors } from "./middleware/publicCors";
 import { registerAuditRoutes } from "./routes/audit";
 import { registerEscrowRoutes } from "./routes/escrow";
 import { registerEnterpriseRoutes } from "./routes/enterprise";
+import { createEscrowRecovery } from "./services/escrowRecovery";
 
 const app: Express = express();
+// Started by the server entry once the HTTP port is bound; escrow routes wait on it.
+export const escrowRecovery = createEscrowRecovery({ logger });
 const meshService = createMeshGossipService();
 const revenueLedger = createPostgresRevenueLedger();
 const pricingEngine = createPricingEngine({
@@ -94,9 +97,11 @@ registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);
 registerLlmExportRoutes(app);
 registerEnterpriseRoutes(app);
-registerProvenanceRoutes(app, { schedule: true });
+// Scheduled OpenTimestamps anchoring starts only after startup warm-up.
+export const provenanceAnchoring = registerProvenanceRoutes(app);
 registerZkDriftRoute(app);
 registerEscrowRoutes(app, {
+  ready: () => escrowRecovery.whenReady(),
   usageStore: macaroonUsageStore,
   revocationStore: createPostgresMacaroonRevocationStore(),
 });

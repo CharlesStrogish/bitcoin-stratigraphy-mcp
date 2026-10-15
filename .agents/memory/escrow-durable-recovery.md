@@ -15,7 +15,10 @@ session or container-local filesystem.
 **How to apply:** Keep the durable ledger authoritative. A container-local SQLite
 workspace is disposable; recovery and cross-replica serialization must use the
 database, and a successful response must wait for its durable commit. Storage
-failures must be explicit, not an empty ledger or a zero counter.
+failures must be explicit, not an empty ledger or a zero counter. Startup
+recovery gates every /api/v1/escrow/* route (wait, else 503 + Retry-After)
+instead of blocking the whole server from listening; a failed recovery retries
+in the background rather than crashing the process.
 
 Preserve and publicly return the user's complete historical genesis export
 exactly, including create_response, settle_response and the nested

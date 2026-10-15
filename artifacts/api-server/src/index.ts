@@ -1,13 +1,10 @@
-import app from "./app";
-import { logger } from "./lib/logger";
-import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
-import { startNip90Dvm } from "./services/dvm";
-import { albySettlementMode } from "./services/settlement/alby";
-import { executeEscrow } from "./services/escrowBridge";
-import {
-  prewarmZkVerifier,
-  shutdownZkVerifier,
-} from "./services/zkProofService";
+// Process entry. Binds the HTTP port first, then loads the application bundle
+// (dist/server.mjs). While the application loads, the platform proxy and
+// connecting agents are held instead of refused, so a republish or container
+// restart does not surface connection failures as HTTP 500s. Keep this file
+// free of application imports: everything imported here is evaluated before
+// the port opens.
+import { createStartupServer } from "./lib/startup-server";
 
 const rawPort = process.env["PORT"];
 
@@ -23,77 +20,21 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const warmupStartedAt = performance.now();
-// Recover before accepting traffic. Never advertise a zero/empty escrow ledger
-// when durable storage is missing or unavailable.
-const escrowRecovery = await executeEscrow("stats", {});
-if (escrowRecovery.status !== 200) throw new Error("Escrow ledger recovery failed");
-await prewarmZkVerifier();
-logger.info(
-  { durationMs: Number((performance.now() - warmupStartedAt).toFixed(3)) },
-  "zk verifier pre-warmed",
-);
+const startup = createStartupServer();
+await startup.listen(port, "0.0.0.0");
+const portBoundMs = performance.now();
 
-let stopDvm: (() => Promise<void>) | undefined;
-let dvmStartup: Promise<void> | undefined;
-let stopHeartbeat: (() => Promise<void>) | undefined;
-let heartbeatStartup: Promise<void> | undefined;
-const server = app.listen(port, "0.0.0.0", (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-
-  logger.info({ port }, "Server listening");
-  if (albySettlementMode() === "standby") {
-    logger.warn(
-      { settlementProvider: "alby", mode: "standby" },
-      "Alby settlement fallback is in standby mode; set ALBY_NWC_URI to enable live failover",
-    );
-  }
-  heartbeatStartup = startNostrHeartbeat()
-    .then(async (stop) => {
-      if (stopping) {
-        await stop();
-        return;
-      }
-      stopHeartbeat = stop;
-    })
-    .catch((error) => {
-      logger.warn({ err: error }, "Nostr heartbeat startup failed");
-    });
-  dvmStartup = startNip90Dvm()
-    .then(async (stop) => {
-      if (stopping) {
-        await stop();
-        return;
-      }
-      stopDvm = stop;
-    })
-    .catch((error) => {
-      logger.error({ err: error }, "NIP-90 DVM startup failed");
-    });
-});
-
-let stopping = false;
-async function stopServer(signal: string) {
-  if (stopping) return;
-  stopping = true;
-  logger.info({ signal }, "Stopping server");
-  await Promise.all([dvmStartup, heartbeatStartup]);
-  await stopHeartbeat?.();
-  await stopDvm?.();
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  await shutdownZkVerifier();
+// A computed specifier keeps the application out of this entry chunk.
+const applicationUrl = new URL("./server.mjs", import.meta.url).href;
+let application: typeof import("./server") | undefined;
+try {
+  application = (await import(applicationUrl)) as typeof import("./server");
+} catch (error) {
+  console.error("API application failed to load", error);
+  // Answer held requests with 503, then exit so the platform restarts us.
+  startup.fail();
+  startup.server.close();
+  process.exitCode = 1;
+  setTimeout(() => process.exit(1), 1_000).unref();
 }
-
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    void stopServer(signal)
-      .then(() => process.exit(0))
-      .catch((error) => {
-        logger.error({ err: error }, "Server shutdown failed");
-        process.exit(1);
-      });
-  });
-}
+application?.startApplication({ startup, port, portBoundMs });

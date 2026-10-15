@@ -25,7 +25,7 @@ await cp(path.join(template, "cli.mjs"), path.join(destination, "dist/cli.mjs"))
 await chmod(path.join(destination, "dist/cli.mjs"), 0o755);
 const runtime = path.join(root, "artifacts/api-server/dist");
 for (const filename of [
-  "index.mjs", "pino-file.mjs", "pino-pretty.mjs", "pino-worker.mjs", "thread-stream-worker.mjs",
+  "index.mjs", "server.mjs", "pino-file.mjs", "pino-pretty.mjs", "pino-worker.mjs", "thread-stream-worker.mjs",
 ]) await cp(path.join(runtime, filename), path.join(destination, "dist", filename));
 for (const folder of ["escrow-worker", "audit-worker", "public"]) {
   await cp(path.join(runtime, folder), path.join(destination, "dist", folder), { recursive: true });

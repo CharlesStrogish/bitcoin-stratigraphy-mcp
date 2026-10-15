@@ -9,7 +9,8 @@ import express, { type RequestHandler } from "express";
 import { registerEscrowRoutes, assertEscrowMcpRegistryIntegrity } from "./escrow";
 import { registerPublicCors } from "../middleware/publicCors";
 import { openApiDocument } from "../openapi";
-import type { EscrowExecutor } from "../services/escrowBridge";
+import type { EscrowExecutor, EscrowWorkerResult } from "../services/escrowBridge";
+import { createEscrowRecovery } from "../services/escrowRecovery";
 import type { SettlementRouter } from "../services/settlement";
 import { createSettlementRouter } from "../services/settlement";
 import { createNwcSettlementProvider } from "../services/settlement/nwc-provider";
@@ -103,6 +104,94 @@ test("public cumulative ledger counter returns durable totals and never a zero f
   const unavailable = await fetch(`${offline}/stats`);
   assert.equal(unavailable.status, 503);
   assert.equal(Object.hasOwn(await unavailable.json() as Record<string, unknown>, "verified_toll_sats"), false);
+});
+
+const recoveredLedger = { verified_toll_sats: 24, settled_contracts: 1,
+  genesis_escrow_id: "ba4f25dd-7f16-420c-9264-a16f102fd5a6" };
+
+async function untilTrue(condition: () => boolean, label: string) {
+  const deadline = Date.now() + 5_000;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${label}`);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+test("escrow routes wait for startup ledger recovery and never serve an unrecovered counter", async () => {
+  let finishRecovery: ((result: EscrowWorkerResult) => void) | undefined;
+  let calls = 0;
+  const execute: EscrowExecutor = async (operation) => {
+    assert.equal(operation, "stats");
+    calls += 1;
+    if (calls === 1) return new Promise((resolve) => { finishRecovery = resolve; });
+    return { status: 200, body: recoveredLedger };
+  };
+  const recovery = createEscrowRecovery({ execute, retryDelaysMs: [60_000] });
+  const base = await serve({ execute, readPrice: async () => 1_000_000,
+    ready: () => recovery.whenReady() });
+
+  // Accepting traffic before recovery has started must fail closed.
+  for (const route of ["stats", "genesis-receipt", "toll"]) {
+    const early = await fetch(`${base}/${route}`);
+    assert.equal(early.status, 503, route);
+    assert.equal(early.headers.get("retry-after"), "5");
+    assert.equal(early.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await early.json(), { error: "Durable escrow ledger is recovering" });
+  }
+  assert.equal(calls, 0);
+
+  void recovery.start();
+  let answered = false;
+  const waiting = fetch(`${base}/stats`).then((response) => { answered = true; return response; });
+  await untilTrue(() => finishRecovery !== undefined, "the recovery attempt");
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(answered, false, "stats must wait for the recovery attempt");
+  assert.equal(calls, 1, "only the recovery attempt may touch the ledger");
+  finishRecovery!({ status: 200, body: recoveredLedger });
+  const response = await waiting;
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), recoveredLedger);
+  assert.equal(calls, 2);
+  const quote = await fetch(`${base}/toll`);
+  assert.equal(quote.status, 200);
+  recovery.stop();
+});
+
+test("failed startup recovery keeps escrow routes at 503 until a background retry succeeds", async () => {
+  let healthy = false;
+  let recoveryCalls = 0;
+  let routeCalls = 0;
+  // Separate executors: background retries run on their own schedule, so only
+  // the route's executor shows whether a gated request reached the ledger.
+  const recovery = createEscrowRecovery({
+    execute: async () => {
+      recoveryCalls += 1;
+      if (!healthy) throw new Error("database unavailable");
+      return { status: 200, body: recoveredLedger };
+    },
+    retryDelaysMs: [25],
+  });
+  const execute: EscrowExecutor = async () => {
+    routeCalls += 1;
+    return { status: 200, body: recoveredLedger };
+  };
+  const base = await serve({ execute, ready: () => recovery.whenReady() });
+  assert.equal(await recovery.start(), false);
+  assert.equal(recovery.status, "retrying");
+  const unavailable = await fetch(`${base}/stats`);
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.headers.get("retry-after"), "5");
+  assert.equal(unavailable.headers.get("cache-control"), "no-store");
+  assert.equal(Object.hasOwn(await unavailable.json() as Record<string, unknown>, "verified_toll_sats"), false);
+  assert.equal(routeCalls, 0, "a gated request must not reach the ledger while recovery is failing");
+  healthy = true;
+  await untilTrue(() => recovery.status === "ready", "the recovery retry");
+  assert.ok(recoveryCalls >= 2, "recovery succeeded through a background retry");
+  const recovered = await fetch(`${base}/stats`);
+  assert.equal(recovered.status, 200);
+  assert.deepEqual(await recovered.json(), recoveredLedger);
+  assert.equal(routeCalls, 1);
+  recovery.stop();
 });
 
 test("public toll quote falls back to exactly 21 when market provider fails", async () => {

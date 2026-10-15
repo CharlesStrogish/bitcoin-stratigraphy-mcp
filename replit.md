@@ -9,6 +9,7 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `node scripts/measure-api-startup.mjs --runs 5` — measure API cold-start readiness against a disposable local PostgreSQL (`--bundle` compares another build)
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -26,7 +27,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- API startup is listen-first: `artifacts/api-server/src/index.ts` binds the port and holds early requests, then imports the application bundle (`dist/server.mjs`). Escrow routes wait for durable-ledger recovery (503 otherwise, never a zero counter); zk verifier warm-up and OpenTimestamps stamping run in the background afterwards. Keep application imports out of the bootstrap.
 
 ## Product
 

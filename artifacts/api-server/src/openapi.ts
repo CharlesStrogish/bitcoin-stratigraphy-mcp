@@ -1,11 +1,10 @@
-import { parse } from "yaml";
-import openApiSource from "../../../lib/api-spec/openapi.yaml";
+import { readOpenApiContract } from "./lib/openapi-contract";
 import { mcpToolPrices } from "./lib/mcp-pricing";
 import { primaryStratigraphyContracts } from "./services/primaryStratigraphySchemas";
 import { mcpToolDefinitions } from "./routes/mcp";
 import { RELEASE_VERSION } from "./lib/public-site";
 
-export const openApiDocument = parse(openApiSource) as Record<string, unknown>;
+export const openApiDocument = readOpenApiContract();
 (openApiDocument.info as Record<string, unknown>).version = RELEASE_VERSION;
 const tools = openApiDocument["x-mcp-tools"] as Record<
   string,

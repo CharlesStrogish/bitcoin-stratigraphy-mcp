@@ -25,6 +25,11 @@ import { escrowCapability, verifyEscrowCapability } from "../lib/escrow-capabili
 
 type EscrowOptions = {
   execute?: EscrowExecutor;
+  /**
+   * Startup recovery gate. Every escrow route waits for it; a rejection is an
+   * explicit 503 so an unrecovered ledger is never served as zero or empty.
+   */
+  ready?: () => Promise<void>;
   readHeight?: () => Promise<number>;
   readPrice?: () => Promise<number | null>;
   paymentGate?: RequestHandler;
@@ -48,6 +53,21 @@ export function assertEscrowMcpRegistryIntegrity(): void {
 export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}): void {
   assertEscrowMcpRegistryIntegrity();
   const router = express.Router();
+  const ready = options.ready;
+  if (ready) {
+    router.use(async (_req, res, next) => {
+      try {
+        await ready();
+      } catch {
+        if (!res.destroyed) {
+          res.set({ "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Retry-After": "5" })
+            .status(503).json({ error: "Durable escrow ledger is recovering" });
+        }
+        return;
+      }
+      next();
+    });
+  }
   const execute = options.execute ?? executeEscrow;
   const readHeight = options.readHeight ?? (async () => (await fetchCurrentBitcoinTip()).height);
   const readPrice = options.readPrice ?? readEscrowBitcoinPrice;

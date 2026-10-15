@@ -32,7 +32,7 @@ for (const entry of result.files) {
   );
 }
 const required = [
-  "package.json", "README.md", "LICENSE", "dist/index.mjs", "dist/cli.mjs",
+  "package.json", "README.md", "LICENSE", "dist/index.mjs", "dist/server.mjs", "dist/cli.mjs",
   "dist/database.sql",
   "dist/enterprise/stratigraphy_pipeline.py", "dist/enterprise/main.py",
   "dist/enterprise/requirements.txt", "dist/escrow-worker/routers/escrow_worker.py",

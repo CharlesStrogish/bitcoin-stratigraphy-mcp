@@ -1,9 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { groth16 } from "snarkjs";
-import { poseidon5 } from "poseidon-lite";
 import { publishNip78Attestation } from "./nostrAttestation";
+import { loadPoseidon, loadSnarkjs } from "./zkLibraries";
 
 export type ZkPublicInputs = {
   blockHeight: number;
@@ -433,10 +432,15 @@ async function prove(
     throw new Error("zk proof generation queue is full");
   }
   lane.queued += 1;
-  const run = lane.tail.then(() =>
-    groth16.fullProve(witness, wasmPath, zkeyPath, undefined, undefined, {
-      singleThread: true,
-    }),
+  const run = lane.tail.then(async () =>
+    (await loadSnarkjs()).groth16.fullProve(
+      witness,
+      wasmPath,
+      zkeyPath,
+      undefined,
+      undefined,
+      { singleThread: true },
+    ),
   );
   lane.tail = run.then(
     () => undefined,
@@ -459,6 +463,7 @@ async function verifyCryptographically(
   queuedVerifications += 1;
   const run = verifierTail.then(async () => {
     try {
+      const { groth16 } = await loadSnarkjs();
       return await groth16.verify(
         await verificationKey(),
         publicSignals,
@@ -530,6 +535,7 @@ async function generateZkProofUncached(input: {
   );
   const valuationSat = valuationMultiplierMicros * 100;
   const snapshotDigest = BigInt(zkSnapshotDigest(input.snapshot));
+  const { poseidon5 } = await loadPoseidon();
   const thermodynamicHash = poseidon5([
     BigInt(input.blockHeight),
     BigInt(input.timestamp),

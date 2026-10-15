@@ -1,14 +1,34 @@
+import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm } from "node:fs/promises";
+import { parse as parseYaml } from "yaml";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+const openApiSpec = path.resolve(artifactDir, "../../lib/api-spec/openapi.yaml");
+
+// The contract stays authored in YAML, but parsing it at startup costs hundreds
+// of milliseconds before the application can serve. Embed the equivalent JSON
+// text instead (src/lib/openapi-contract.ts reads either form).
+const openApiAsJson = {
+  name: "openapi-yaml-as-json",
+  setup(build) {
+    build.onLoad({ filter: /openapi\.yaml$/ }, async (args) => {
+      if (path.resolve(args.path) !== openApiSpec) return undefined;
+      const document = parseYaml(await readFile(args.path, "utf8"));
+      const json = JSON.stringify(document);
+      assert.deepStrictEqual(JSON.parse(json), document,
+        "openapi.yaml must contain only JSON-compatible values");
+      return { contents: json, loader: "text" };
+    });
+  },
+};
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
@@ -117,7 +137,11 @@ async function buildAll() {
   }
 
   await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/index.ts")],
+    // index.mjs binds the port first, then imports server.mjs (the application).
+    entryPoints: {
+      index: path.resolve(artifactDir, "src/index.ts"),
+      server: path.resolve(artifactDir, "src/server.ts"),
+    },
     platform: "node",
     bundle: true,
     format: "esm",
@@ -208,6 +232,7 @@ async function buildAll() {
     ],
     sourcemap: "linked",
     plugins: [
+      openApiAsJson,
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
       esbuildPluginPino({ transports: ["pino-pretty"] }),
     ],

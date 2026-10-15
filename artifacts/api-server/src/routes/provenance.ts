@@ -16,7 +16,15 @@ type RouteOptions = {
   getAnchor?: typeof getProvenanceAnchor;
   anchor?: typeof anchorProvenance;
   operatorSecret?: string;
-  schedule?: boolean;
+};
+
+export type ProvenanceAnchoringSchedule = {
+  /**
+   * Starts the background OpenTimestamps stamping timers (first stamp after
+   * delayMs, then every six hours). Calendar calls never block HTTP startup;
+   * each CLI operation has its own timeout. Returns a stop function.
+   */
+  start(delayMs?: number): () => void;
 };
 
 type ChainState = ReturnType<typeof buildProvenanceChain>;
@@ -53,7 +61,7 @@ function isMatchingAnchor(
 export function registerProvenanceRoutes(
   app: Express,
   options: RouteOptions = {},
-): void {
+): ProvenanceAnchoringSchedule {
   const readRecords = options.readRecords ?? readDataset;
   const getAnchor = options.getAnchor ?? getProvenanceAnchor;
   const anchor = options.anchor ?? anchorProvenance;
@@ -192,19 +200,27 @@ export function registerProvenanceRoutes(
     }
   });
 
-  if (options.schedule && !backgroundTimersScheduled) {
-    backgroundTimersScheduled = true;
-    const runScheduledStamp = () => {
-      void stampCurrentState().catch((error: unknown) => {
-        logger.error(
-          { err: error },
-          "Scheduled provenance anchor operation failed",
-        );
-      });
-    };
-    const startupTimer = setTimeout(runScheduledStamp, STARTUP_STAMP_DELAY_MS);
-    const intervalTimer = setInterval(runScheduledStamp, SIX_HOURS_MS);
-    startupTimer.unref();
-    intervalTimer.unref();
-  }
+  return {
+    start(delayMs = STARTUP_STAMP_DELAY_MS) {
+      if (backgroundTimersScheduled) return () => {};
+      backgroundTimersScheduled = true;
+      const runScheduledStamp = () => {
+        void stampCurrentState().catch((error: unknown) => {
+          logger.error(
+            { err: error },
+            "Scheduled provenance anchor operation failed",
+          );
+        });
+      };
+      const startupTimer = setTimeout(runScheduledStamp, delayMs);
+      const intervalTimer = setInterval(runScheduledStamp, SIX_HOURS_MS);
+      startupTimer.unref();
+      intervalTimer.unref();
+      return () => {
+        clearTimeout(startupTimer);
+        clearInterval(intervalTimer);
+        backgroundTimersScheduled = false;
+      };
+    },
+  };
 }

@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { groth16 } from "snarkjs";
-import { poseidon2 } from "poseidon-lite";
+import { loadPoseidon, loadSnarkjs } from "./zkLibraries";
 
 const wasmPath = fileURLToPath(
   new URL("./zk/artifacts/drift_js/drift.wasm", import.meta.url),
@@ -247,7 +246,12 @@ function asCircuitField(value: bigint): string {
   return value.toString();
 }
 
-function computeMetrics(contextHash: string, block: Block, threshold: number) {
+function computeMetrics(
+  contextHash: string,
+  block: Block,
+  threshold: number,
+  poseidon2: (inputs: bigint[]) => bigint,
+) {
   const context = strictContextHalves(contextHash);
   const contextValue = (context.high << 128n) | context.low;
   const blockValue = BigInt(`0x${block.hash}`);
@@ -322,6 +326,7 @@ async function verifyCryptographically(
   proof: Groth16Proof,
 ): Promise<boolean> {
   try {
+    const { groth16 } = await loadSnarkjs();
     return await groth16.verify(await verificationKey(), publicSignals, proof);
   } finally {
     if (process.env.NODE_ENV === "test") {
@@ -343,10 +348,15 @@ async function runProof(witness: Record<string, string>): Promise<{
     throw new Error("zk drift proof generation queue is full");
   }
   queuedProofs += 1;
-  const run = proofQueueTail.then(() =>
-    groth16.fullProve(witness, wasmPath, zkeyPath, undefined, undefined, {
-      singleThread: true,
-    }),
+  const run = proofQueueTail.then(async () =>
+    (await loadSnarkjs()).groth16.fullProve(
+      witness,
+      wasmPath,
+      zkeyPath,
+      undefined,
+      undefined,
+      { singleThread: true },
+    ),
   );
   proofQueueTail = run.then(
     () => undefined,
@@ -404,7 +414,12 @@ export async function generateDriftProof(
   const height = parseBlockHeight(input.blockHeight);
   const threshold = parseThreshold(input.entropyThreshold);
   const block = await fetchBlock(height, deps);
-  const metrics = computeMetrics(input.sessionContextHash, block, threshold);
+  const metrics = computeMetrics(
+    input.sessionContextHash,
+    block,
+    threshold,
+    (await loadPoseidon()).poseidon2,
+  );
   const generated = await runProof(metrics.witness);
   const keyId = await verificationKeyId();
   const proof: DriftProof = {
@@ -522,7 +537,12 @@ export async function verifyDriftProof(
     (input.compactTarget !== undefined && input.compactTarget !== block.bits)
   )
     return false;
-  const metrics = computeMetrics(input.sessionContextHash, block, threshold);
+  const metrics = computeMetrics(
+    input.sessionContextHash,
+    block,
+    threshold,
+    (await loadPoseidon()).poseidon2,
+  );
   if (
     (input.driftScore !== undefined &&
       input.driftScore !== metrics.driftUnits / 512) ||

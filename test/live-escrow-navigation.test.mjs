@@ -11,20 +11,20 @@ const app = readFileSync(
   "utf8",
 );
 
-test("homepage places the live escrow terminal above the records workspace", () => {
+test("homepage places the live escrow terminal above the command center", () => {
   assert.match(app, /const LIVE_ESCROW_TERMINAL_ID = "live-escrow-terminal";/);
   const anchor = "id={LIVE_ESCROW_TERMINAL_ID}";
   assert.equal(app.split(anchor).length, 2, "the terminal id is rendered once");
   const stats = app.indexOf('<div className="stats-row">');
   const terminal = app.indexOf(anchor);
-  const workspace = app.indexOf('<div className="workspace-grid">');
+  const commandCenter = app.indexOf("<CommandCenter />");
   assert.ok(stats > 0, "KPI cards are rendered");
   assert.ok(terminal > stats, "terminal follows the KPI cards");
-  assert.ok(workspace > terminal, "records table follows the terminal");
+  assert.ok(commandCenter > terminal, "command center follows the terminal");
   assert.match(
-    app.slice(terminal, workspace),
-    /<EscrowTerminal \/>\s*<\/section>\s*\{!query\.isError && \(\s*$/,
-    "the terminal renders whether or not the dataset loads",
+    app.slice(terminal, commandCenter),
+    /<EscrowTerminal \/>\s*<\/section>\s*<main>\s*$/,
+    "the terminal and command center render whether or not the dataset loads",
   );
 });
 

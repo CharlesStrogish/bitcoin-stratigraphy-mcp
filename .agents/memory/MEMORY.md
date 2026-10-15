@@ -77,3 +77,6 @@
 - [Formatting baseline](format-baseline.md) — format check fails on inherited files; format only what you touch and compare HEAD blobs first.
 - [Production rate-limit keys](production-rate-limit-keys.md) — clients are the [-3] forwarded entry behind Google front ends; verify the post-publish chain-check log line.
 - [Deployment log retrieval](deployment-log-retrieval.md) — fetches cap at ~100 recent lines and cover only the live deployment; page small time slices.
+- [Homepage polling budget](homepage-polling-budget.md) — public limit is 100 requests per IP per 15 minutes across free routes; homepage polls must stay under 60%.
+- [Dead CSS pruning](dead-css-pruning.md) — token scans miss common-word and template-family classes; diff HEAD vs now with a strict string pass, review by hand.
+- [Layout overflow checks](layout-overflow-checks.md) — drive the workspace Chromium over DevTools protocol to measure containment; leave the screenshot tool's browsers alone.

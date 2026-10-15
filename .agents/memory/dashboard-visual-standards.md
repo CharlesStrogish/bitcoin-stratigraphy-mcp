@@ -41,8 +41,10 @@ than inventing a replacement. It is project branding, not a protocol-wide
 certification or a third-party verification seal.
 
 The Live REST Escrow terminal sits directly below the homepage KPI cards and
-above the long records table. `/#live-escrow-terminal` is its stable deep
-link, used by the header quick action and the compliance page CTA.
+above the Enterprise & Machine-Native Command Center. The user replaced the
+old records table, filters and charts with that section and named the hero,
+trust badges and terminal as untouchable. `/#live-escrow-terminal` is its
+stable deep link, used by the header quick action and the compliance page CTA.
 
 **Why:** The user asked (2026-10-15) for visitors to see the terminal
 immediately and to land on it directly from other pages.

@@ -9,5 +9,5 @@ langchain-openai>=1.6.7,<2
 autogen-agentchat==0.7.5
 autogen-ext[openai]==0.7.5
 # Shared MCP/OpenAI versions used by the supported examples.
-mcp>=1.28.1,<1.29
+mcp>=1.30.0,<2
 openai>=2.45,<3

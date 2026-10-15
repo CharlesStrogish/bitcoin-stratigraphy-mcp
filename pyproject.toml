@@ -15,7 +15,7 @@ dependencies = [
     "langchain-mcp-adapters==0.3.2",
     "langchain-openai>=1,<2",
     "langgraph==1.2.12",
-    "mcp>=1.28.1,<1.29",
+    "mcp>=1.30.0,<2",
     "openai>=2.45,<3",
     "opentimestamps>=0.4.5",
     "opentimestamps-client>=0.7.2",

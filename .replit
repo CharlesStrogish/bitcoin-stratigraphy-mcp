@@ -61,6 +61,10 @@ channel = "stable-25_05"
 packages = ["cargo", "gitFull", "libiconv", "libxcrypt", "openssl", "opentimestamps-client", "pkg-config", "rustc"]
 
 [[ports]]
+localPort = 5000
+externalPort = 5000
+
+[[ports]]
 localPort = 8000
 externalPort = 8000
 

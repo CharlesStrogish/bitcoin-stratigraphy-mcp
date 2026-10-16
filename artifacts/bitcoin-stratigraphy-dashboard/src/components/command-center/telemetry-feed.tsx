@@ -1,12 +1,13 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import type { ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import type {
-  EscrowGenesisReceipt,
-  ProvenanceAnchorStatus,
-  ProvenanceChainStatus,
-} from "@workspace/api-client-react";
+  GenesisTelemetry,
+  AnchorTelemetry,
+  ChainTelemetry,
+} from "./telemetry-contracts";
+import { telemetryFeedState } from "./telemetry-cache";
 import { CopyTextButton } from "./copy-text-button";
 import {
   formatSats,
@@ -26,14 +27,14 @@ import {
 } from "./live-data";
 
 type Accent = "gold" | "rust" | "teal" | "slate";
-type Query<T> = UseQueryResult<T, Error>;
+type Query<T> = UseQueryResult<T, unknown>;
 
 const sitePath = (path: string) => `${import.meta.env.BASE_URL}${path}`;
 const count = (value: number) => value.toLocaleString("en-US");
 
 /** OpenTimestamps states as reported by the server, never upgraded client-side. */
 const OTS_STATUS: Record<
-  ProvenanceAnchorStatus["otsStatus"],
+  AnchorTelemetry["otsStatus"],
   { value: string; detail: string }
 > = {
   not_anchored: {
@@ -50,23 +51,10 @@ const OTS_STATUS: Record<
   },
 };
 
-function RetryButton({
-  query,
-  context,
-}: {
-  query: Query<unknown>;
-  context: string;
-}) {
-  return (
-    <button
-      type="button"
-      className="cc-retry"
-      onClick={() => void query.refetch()}
-    >
-      <RefreshCw size={12} aria-hidden="true" /> Retry
-      <span className="sr-only"> {context}</span>
-    </button>
-  );
+function freshness(query: Query<unknown>) {
+  return query.isError || !query.isFetchedAfterMount
+    ? ` · last verified ${formatUtcDateTime(query.dataUpdatedAt)} · refreshing automatically`
+    : "";
 }
 
 function Metric<T>({
@@ -87,12 +75,10 @@ function Metric<T>({
   if (query.data !== undefined) {
     const rendered = render(query.data);
     value = rendered.value;
-    detail = query.isError
-      ? `${rendered.detail} · last refresh failed`
-      : rendered.detail;
+    detail = rendered.detail + freshness(query);
   } else if (query.isError) {
-    value = "Unavailable";
-    detail = <RetryButton query={query} context={label} />;
+    value = "Connecting…";
+    detail = "Awaiting a verified response · reconnecting automatically";
   }
   return (
     <div className={`cc-metric cc-accent-${accent}`} data-testid={testId}>
@@ -138,25 +124,24 @@ function RootRow<T>({
       </div>
       {data === undefined ? (
         <div className="cc-root-meta">
-          {query.isError ? (
-            <>
-              Unavailable <RetryButton query={query} context={label} />
-            </>
-          ) : (
-            "Loading…"
-          )}
+          {query.isError
+            ? "Awaiting a verified root · reconnecting automatically"
+            : "Loading verified root…"}
         </div>
       ) : (
         <>
           <code className="cc-root-value">{value}</code>
-          <div className="cc-root-meta">{meta(data)}</div>
+          <div className="cc-root-meta">
+            {meta(data)}
+            {freshness(query)}
+          </div>
         </>
       )}
     </div>
   );
 }
 
-function escrowRootMeta(genesis: EscrowGenesisReceipt) {
+function escrowRootMeta(genesis: GenesisTelemetry) {
   const receipt = genesis.settle_response.article_12_receipt;
   const settlement = receipt.lightning_settlement;
   return [
@@ -170,8 +155,8 @@ function escrowRootMeta(genesis: EscrowGenesisReceipt) {
 }
 
 function strataRootMeta(
-  chain: ProvenanceChainStatus,
-  anchor: ProvenanceAnchorStatus | undefined,
+  chain: ChainTelemetry,
+  anchor: AnchorTelemetry | undefined,
 ) {
   const parts = [`${count(chain.totalDepth)} verifiable telemetry strata`];
   if (anchor && anchor.otsStatus !== "not_anchored") {
@@ -188,9 +173,8 @@ function SettlementList({ query }: { query: Query<SettlementRecord[]> }) {
   let body: ReactNode;
   if (query.data === undefined) {
     body = query.isError ? (
-      <p className="cc-empty" role="alert">
-        Settlement records unavailable.{" "}
-        <RetryButton query={query} context="settlement records" />
+      <p className="cc-empty" role="status">
+        Connecting to verified settlements · reconnecting automatically.
       </p>
     ) : (
       <p className="cc-empty">Loading settlement records…</p>
@@ -231,6 +215,9 @@ function SettlementList({ query }: { query: Query<SettlementRecord[]> }) {
       <div className="cc-subhead">
         Recent verified settlements <span>Latest 5 · sanitized</span>
       </div>
+      {query.data !== undefined && freshness(query) && (
+        <p className="cc-empty">Last verified records{freshness(query)}</p>
+      )}
       {body}
     </div>
   );
@@ -245,8 +232,7 @@ export function TelemetryFeed() {
   const genesis = useGenesisReceipt();
   const settlements = useRecentSettlements();
   const feeds = [volume, stats, toll, anchor, chain, genesis, settlements];
-  const failing = feeds.filter((feed) => feed.isError).length;
-  const lastUpdated = Math.max(0, ...feeds.map((feed) => feed.dataUpdatedAt));
+  const status = telemetryFeedState(feeds);
 
   return (
     <section
@@ -267,16 +253,17 @@ export function TelemetryFeed() {
           </p>
         </div>
         <div
-          className={`cc-live${failing ? " cc-live-degraded" : ""}`}
+          className={`cc-live${status.live ? "" : " cc-live-degraded"}`}
           data-testid="status-telemetry-live"
+          role="status"
+          aria-live="polite"
         >
           <span className="cc-live-dot" aria-hidden="true" />
-          {failing
-            ? `${failing} ${failing === 1 ? "feed" : "feeds"} unavailable`
-            : "Live"}
-          {lastUpdated > 0 && (
+          {status.label}
+          {status.updatedAt > 0 && Number.isFinite(status.updatedAt) && (
             <span className="cc-live-time">
-              Updated {formatUtcTime(lastUpdated)}
+              {status.live ? "Updated" : "Oldest reading"}{" "}
+              {formatUtcTime(status.updatedAt)}
             </span>
           )}
         </div>

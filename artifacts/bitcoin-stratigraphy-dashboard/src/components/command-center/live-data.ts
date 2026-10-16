@@ -6,17 +6,27 @@ import {
   getGetEscrowTollQueryKey,
   getGetProvenanceAnchorQueryKey,
   getGetProvenanceChainQueryKey,
+  getEscrowGenesisReceipt,
+  getEscrowLedgerStats,
+  getEscrowToll,
+  getProvenanceAnchor,
+  getProvenanceChain,
   getRevenueAnalytics,
   getRevenueAudit,
   quoteMcpToolCosts,
-  useGetEscrowGenesisReceipt,
-  useGetEscrowLedgerStats,
-  useGetEscrowToll,
-  useGetProvenanceAnchor,
-  useGetProvenanceChain,
   type McpBatchCostQuoteL402Batch,
 } from "@workspace/api-client-react";
 import { CANONICAL_MCP_TOOL_NAMES } from "./catalog";
+import { HOUR, telemetryQueryOptions } from "./telemetry-cache";
+import {
+  anchorSchema,
+  chainSchema,
+  genesisSchema,
+  ledgerStatsSchema,
+  settlementSchema,
+  tollQuoteSchema,
+  volumeSchema,
+} from "./telemetry-contracts";
 
 /*
  * Every telemetry read counts against the API's public limit: 100 requests per
@@ -64,48 +74,71 @@ export function useMcpToolQuote() {
 }
 
 export function useEscrowLedgerStats() {
-  return useGetEscrowLedgerStats({
-    query: {
+  return useQuery({
+    ...telemetryQueryOptions({
+      key: "escrow-stats",
       queryKey: getGetEscrowLedgerStatsQueryKey(),
-      refetchInterval: SETTLEMENT_POLL_MS,
-    },
+      load: (signal) => getEscrowLedgerStats({ signal }),
+      parse: (value) => ledgerStatsSchema.parse(value),
+      maxAge: HOUR,
+    }),
+    refetchInterval: SETTLEMENT_POLL_MS,
   });
 }
 
 export function useEscrowTollQuote() {
-  return useGetEscrowToll({
-    query: {
+  return useQuery({
+    ...telemetryQueryOptions({
+      key: "toll-quote",
       queryKey: getGetEscrowTollQueryKey(),
-      refetchInterval: SETTLEMENT_POLL_MS,
-    },
+      load: (signal) => getEscrowToll({ signal }),
+      parse: (value) => tollQuoteSchema.parse(value),
+      maxAge: 15 * 60_000,
+    }),
+    refetchInterval: SETTLEMENT_POLL_MS,
   });
 }
 
-/** The genesis receipt is an immutable historical record. */
+/** Retry reads of the immutable historical commitment, never mutate its ledger. */
 export function useGenesisReceipt() {
-  return useGetEscrowGenesisReceipt({
-    query: {
-      queryKey: getGetEscrowGenesisReceiptQueryKey(),
-      staleTime: Infinity,
-    },
+  return useQuery({
+    ...telemetryQueryOptions({
+      key: "genesis-commitment",
+      // A separate key keeps this display-only projection out of receipt clients.
+      queryKey: [...getGetEscrowGenesisReceiptQueryKey(), "public-display"],
+      load: (signal) => getEscrowGenesisReceipt({ signal }),
+      parse: (value) => genesisSchema.parse(value),
+      maxAge: 24 * HOUR,
+    }),
+    // The historical receipt never changes. Poll only to recover a failed read.
+    refetchInterval: (query) =>
+      query.state.status === "error" ? PROVENANCE_POLL_MS : false,
   });
 }
 
 export function useProvenanceChain() {
-  return useGetProvenanceChain({
-    query: {
-      queryKey: getGetProvenanceChainQueryKey(),
-      refetchInterval: PROVENANCE_POLL_MS,
-    },
+  return useQuery({
+    ...telemetryQueryOptions({
+      key: "strata-chain",
+      queryKey: [...getGetProvenanceChainQueryKey(), "public-display"],
+      load: (signal) => getProvenanceChain({ signal }),
+      parse: (value) => chainSchema.parse(value),
+      maxAge: 24 * HOUR,
+    }),
+    refetchInterval: PROVENANCE_POLL_MS,
   });
 }
 
 export function useProvenanceAnchor() {
-  return useGetProvenanceAnchor({
-    query: {
-      queryKey: getGetProvenanceAnchorQueryKey(),
-      refetchInterval: PROVENANCE_POLL_MS,
-    },
+  return useQuery({
+    ...telemetryQueryOptions({
+      key: "strata-anchor",
+      queryKey: [...getGetProvenanceAnchorQueryKey(), "public-display"],
+      load: (signal) => getProvenanceAnchor({ signal }),
+      parse: (value) => anchorSchema.parse(value),
+      maxAge: 24 * HOUR,
+    }),
+    refetchInterval: PROVENANCE_POLL_MS,
   });
 }
 
@@ -171,6 +204,7 @@ export function parseSettlementRecords(value: unknown): SettlementRecord[] {
       typeof entry.requestKind !== "string" ||
       !isSats(entry.satsReceived) ||
       (entry.paymentReference !== undefined &&
+        entry.paymentReference !== null &&
         typeof entry.paymentReference !== "string")
     ) {
       throw new Error("Unexpected settlement audit record");
@@ -188,19 +222,34 @@ export function parseSettlementRecords(value: unknown): SettlementRecord[] {
 
 export function useLightningVolume() {
   return useQuery({
-    queryKey: ["command-center", "lightning-volume"],
-    queryFn: async () => parseLightningVolume(await getRevenueAnalytics()),
+    ...telemetryQueryOptions({
+      key: "lightning-volume",
+      queryKey: ["command-center", "lightning-volume"],
+      load: async (signal) =>
+        parseLightningVolume(await getRevenueAnalytics({ signal })),
+      parse: (value) => volumeSchema.parse(value),
+      maxAge: HOUR,
+    }),
     refetchInterval: SETTLEMENT_POLL_MS,
   });
 }
 
 export function useRecentSettlements() {
   return useQuery({
-    queryKey: ["command-center", "recent-settlements", RECENT_SETTLEMENT_LIMIT],
-    queryFn: async () =>
-      parseSettlementRecords(
-        await getRevenueAudit({ limit: RECENT_SETTLEMENT_LIMIT }),
-      ),
+    ...telemetryQueryOptions({
+      key: "recent-settlements",
+      queryKey: [
+        "command-center",
+        "recent-settlements",
+        RECENT_SETTLEMENT_LIMIT,
+      ],
+      load: async (signal) =>
+        parseSettlementRecords(
+          await getRevenueAudit({ limit: RECENT_SETTLEMENT_LIMIT }, { signal }),
+        ),
+      parse: (value) => settlementSchema.parse(value),
+      maxAge: HOUR,
+    }),
     refetchInterval: SETTLEMENT_POLL_MS,
   });
 }

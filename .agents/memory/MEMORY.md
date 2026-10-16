@@ -80,3 +80,4 @@
 - [Homepage polling budget](homepage-polling-budget.md) — public limit is 100 requests per IP per 15 minutes across free routes; homepage polls must stay under 60%.
 - [Dead CSS pruning](dead-css-pruning.md) — token scans miss common-word and template-family classes; diff HEAD vs now with a strict string pass, review by hand.
 - [Layout overflow checks](layout-overflow-checks.md) — drive the workspace Chromium over DevTools protocol to measure containment; leave the screenshot tool's browsers alone.
+- [Public telemetry recovery](public-telemetry-recovery.md) — correlated feed failures can be a disabled database; cache minimal public readings, never full payment receipts.

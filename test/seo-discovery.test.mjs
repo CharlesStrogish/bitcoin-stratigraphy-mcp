@@ -5,6 +5,20 @@ import test from "node:test";
 const origin = "https://bitcoinstratigraphy.com";
 const load = (file) => readFile(new URL(`../${file}`, import.meta.url), "utf8");
 
+test("homepage favicon points to a public square PNG", async () => {
+  const html = await load("artifacts/bitcoin-stratigraphy-dashboard/index.html");
+  assert.ok(
+    html.includes('<link rel="icon" type="image/png" href="/favicon.png" />'),
+  );
+  assert.equal((html.match(/<link rel="icon"/g) ?? []).length, 1);
+  const png = await readFile(
+    new URL("../artifacts/bitcoin-stratigraphy-dashboard/public/favicon.png", import.meta.url),
+  );
+  assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(png.readUInt32BE(16), png.readUInt32BE(20));
+  assert.ok(png.readUInt32BE(16) >= 48);
+});
+
 function meta(html, key) {
   const tags = html.match(/<meta\b[^>]*>/g) ?? [];
   const matching = tags.filter(

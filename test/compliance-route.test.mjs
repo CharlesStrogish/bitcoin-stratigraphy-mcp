@@ -165,6 +165,10 @@ test("homepage metadata stays unchanged and dedicated static pages remain emitte
       "whitepaper/index.html", "compliance/index.html"],
   );
   for (const asset of emitted) {
+    assert.ok(
+      asset.source.includes('<link rel="icon" type="image/png" href="/favicon.png" />'),
+      `${asset.fileName} preserves the public PNG favicon`,
+    );
     for (const token of [
       "gD8puclen7IOEc0MSQGVzV61VebIvL3fn1VRWLVc-BE",
       "gD8puclen7lOEc0MSQGVzV61VeblvL3fn1VRWLVc-BE",

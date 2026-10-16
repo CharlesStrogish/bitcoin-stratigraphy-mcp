@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import "./enterprise-licensing-matrix.css";
+import { CopyTextButton } from "./copy-text-button";
 
+const LICENSING_EMAIL = "licensing@bitcoinstratigraphy.com";
 const INTAKE_HREF =
   "mailto:licensing@bitcoinstratigraphy.com?subject=" +
   encodeURIComponent("CISO Enterprise Licensing Intake");
@@ -27,10 +29,9 @@ export function EnterpriseLicensingMatrix() {
       data-testid="module-enterprise-licensing"
     >
       <header className="elm-head">
-        <p className="elm-kicker">
-          <span className="elm-kicker-index">Module 02</span>
-          The Dual-Licensing &amp; Compliance Matrix
-        </p>
+        <div className="section-kicker">
+          02 · DUAL-LICENSING &amp; COMPLIANCE MATRIX
+        </div>
         <h3 id="cc-licensing-title">
           Enterprise Licensing &amp; Compliance Architecture
         </h3>
@@ -79,6 +80,20 @@ export function EnterpriseLicensingMatrix() {
               →
             </span>
           </a>
+          <div className="elm-direct-inquiry">
+            <span>
+              Direct inquiry:{" "}
+              <span className="elm-email">{LICENSING_EMAIL}</span>
+            </span>
+            <CopyTextButton
+              text={LICENSING_EMAIL}
+              label="Copy"
+              context="licensing email address"
+              description="Copy licensing email address"
+              testId="button-copy-licensing-email"
+              variant="compact"
+            />
+          </div>
         </article>
       </div>
     </section>

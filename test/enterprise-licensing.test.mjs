@@ -16,8 +16,8 @@ const source = readFileSync(
   "utf8",
 );
 
-function renderMatrix() {
-  const code = ts.transpileModule(source, {
+function loadComponent(componentSource) {
+  const code = ts.transpileModule(componentSource, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
       jsx: ts.JsxEmit.ReactJSX,
@@ -27,13 +27,33 @@ function renderMatrix() {
   vm.runInNewContext(code, {
     module,
     exports: module.exports,
-    require: (path) => (path.endsWith(".css") ? {} : require(path)),
+    require: (path) => {
+      if (path.endsWith(".css")) return {};
+      if (path === "./copy-text-button") {
+        return loadComponent(
+          readFileSync(
+            new URL(
+              `${root}src/components/command-center/copy-text-button.tsx`,
+              import.meta.url,
+            ),
+            "utf8",
+          ),
+        );
+      }
+      return require(path);
+    },
     fetch: () => {
       assert.fail("The licensing matrix must not make network requests");
     },
   });
+  return module.exports;
+}
+
+function renderMatrix() {
   return require("react-dom/server").renderToStaticMarkup(
-    require("react").createElement(module.exports.EnterpriseLicensingMatrix),
+    require("react").createElement(
+      loadComponent(source).EnterpriseLicensingMatrix,
+    ),
   );
 }
 
@@ -45,7 +65,7 @@ test("licensing renders both tiers with every requested entitlement and price", 
     .replaceAll("&quot;", '"');
   for (const label of [
     "Enterprise Licensing & Compliance Architecture",
-    "The Dual-Licensing & Compliance Matrix",
+    "02 · DUAL-LICENSING & COMPLIANCE MATRIX",
     "Community Open Source",
     "AGPLv3 License",
     "Public Network Node",
@@ -66,6 +86,19 @@ test("licensing renders both tiers with every requested entitlement and price", 
     text,
     /Unavailable|MAINNET SATS ACCRUED|RECENT VERIFIED SETTLEMENTS|Live Cryptographic/,
   );
+});
+
+test("licensing uses the shared module kicker and offers a copyable email fallback", () => {
+  const html = renderMatrix();
+  assert.match(
+    html,
+    /class="section-kicker">02 · DUAL-LICENSING &amp; COMPLIANCE MATRIX/,
+  );
+  assert.doesNotMatch(html, /elm-kicker-index|Module 02/);
+  assert.match(html, /Direct inquiry:.*licensing@bitcoinstratigraphy\.com/);
+  assert.match(html, /<button[^>]*data-testid="button-copy-licensing-email"/);
+  assert.ok(html.indexOf("elm-direct-inquiry") > html.indexOf("elm-cta-arrow"));
+  assert.match(source, /text=\{LICENSING_EMAIL\}/);
 });
 
 test("enterprise intake is a prominent accessible email link to licensing", () => {

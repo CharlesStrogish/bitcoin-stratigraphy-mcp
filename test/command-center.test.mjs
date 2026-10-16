@@ -36,6 +36,11 @@ test("command center lists exactly the 15 priced canonical MCP tools", () => {
 });
 
 test("command center titles match the server tool registry", () => {
+  assert.equal(
+    catalogTools.find((tool) => tool.name === "stratigraphy.get")?.title,
+    "Get Bitcoin Stratigraphy",
+  );
+  assert.doesNotMatch(catalog, /Bitooin/);
   for (const { name, title } of catalogTools) {
     const registered = [
       ...serverTools.matchAll(
@@ -103,6 +108,17 @@ test("framework adapters cover the four frameworks and link to real cookbooks", 
 test("telemetry labels each Merkle construction honestly", () => {
   assert.match(
     telemetry,
+    /\$\{count\(chain\.totalDepth\)\} verifiable telemetry strata/,
+  );
+  assert.match(telemetry, /OpenTimestamps cryptographic state root/);
+  assert.doesNotMatch(
+    telemetry,
+    /linked strata records|submission covers this root/,
+  );
+  assert.match(telemetry, /anchor\.merkleRoot === chain\.merkleRoot/);
+  assert.match(telemetry, /OpenTimestamps submission covers an earlier root/);
+  assert.match(
+    telemetry,
     /label="Escrow execution root"\s*scheme="RFC 6962"/,
     "only the escrow tree is RFC 6962",
   );
@@ -113,6 +129,31 @@ test("telemetry labels each Merkle construction honestly", () => {
   const pending = telemetry.match(/pending_calendar: \{\s*value: "([^"]+)"/);
   assert.ok(pending, "pending calendar state is rendered explicitly");
   assert.doesNotMatch(pending[1], /bitcoin|confirmed/i);
+});
+
+test("homepage keeps CSV and PDF together in a balanced responsive action grid", () => {
+  assert.match(app, /className="header-actions homepage-actions"/);
+  const exports = app.match(
+    /<div\s+className="header-exports"\s+role="group"\s+aria-label="Export options"\s*>([\s\S]*?)<\/div>/,
+  );
+  assert.ok(exports, "exports share one grid cell");
+  assert.match(exports[1], /onClick=\{onExport\}/);
+  assert.match(exports[1], /onClick=\{\(\) => window\.print\(\)\}/);
+  assert.match(exports[1], /> CSV/);
+  assert.match(exports[1], /> PDF/);
+  assert.equal(exports[1].match(/<button/g)?.length, 2);
+  assert.match(
+    css,
+    /\.header-actions\.homepage-actions\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 767px\)\s*\{\s*\.header-actions\.homepage-actions\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
+  );
+  assert.match(
+    css,
+    /\.live-escrow-section > \[data-testid="link-compliance-guide"\]\s*\{[^}]*margin: 20px 0 16px/,
+  );
 });
 
 test("homepage polling leaves most of the public rate budget to the visitor", () => {

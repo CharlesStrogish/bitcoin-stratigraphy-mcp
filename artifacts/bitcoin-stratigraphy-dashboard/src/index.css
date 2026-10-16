@@ -544,6 +544,17 @@ h1 span {
 .live-escrow-section {
   margin-bottom: 20px;
 }
+.live-escrow-section > [data-testid="link-compliance-guide"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: auto;
+  min-height: 32px;
+  max-width: 100%;
+  margin: 20px 0 16px;
+  padding-block: 7px;
+  text-decoration: none;
+}
 /* Programmatic focus target for in-page navigation, not an interactive control. */
 .live-escrow-section:focus {
   outline: none;
@@ -1683,6 +1694,44 @@ h1,
 }
 .header-actions {
   flex-wrap: wrap;
+}
+/* Eight grid cells: seven actions and a paired CSV/PDF export group. */
+.homepage-header-main {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 24px;
+}
+.header-actions.homepage-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  padding-bottom: 0;
+}
+.homepage-actions .control-button {
+  justify-content: center;
+  min-width: 0;
+  height: auto;
+  min-height: 36px;
+  padding: 8px;
+  text-align: center;
+  line-height: 1.35;
+}
+.homepage-actions .control-button svg,
+.live-escrow-section > [data-testid="link-compliance-guide"] svg {
+  flex-shrink: 0;
+}
+.header-exports {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .header-actions.homepage-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .sim-pre,
 .sim-details pre,

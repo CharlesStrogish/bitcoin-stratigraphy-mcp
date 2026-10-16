@@ -173,11 +173,11 @@ function strataRootMeta(
   chain: ProvenanceChainStatus,
   anchor: ProvenanceAnchorStatus | undefined,
 ) {
-  const parts = [`${count(chain.totalDepth)} linked strata records`];
+  const parts = [`${count(chain.totalDepth)} verifiable telemetry strata`];
   if (anchor && anchor.otsStatus !== "not_anchored") {
     parts.push(
       anchor.merkleRoot === chain.merkleRoot
-        ? "OpenTimestamps submission covers this root"
+        ? "OpenTimestamps cryptographic state root"
         : "OpenTimestamps submission covers an earlier root",
     );
   }

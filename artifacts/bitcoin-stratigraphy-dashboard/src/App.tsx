@@ -160,7 +160,7 @@ function Header({
       <div className="eyebrow">
         <span className="eyebrow-line" /> ENTERPRISE MCP SERVER / L402 ORACLE
       </div>
-      <div className="header-main">
+      <div className="header-main homepage-header-main">
         <div>
           <h1>
             Bitcoin <span>Stratigraphy</span>
@@ -173,7 +173,7 @@ function Header({
           </p>
           <TrustBadges />
         </div>
-        <div className="header-actions">
+        <div className="header-actions homepage-actions">
           <a
             className="control-button live-escrow-button"
             href={LIVE_ESCROW_HASH}
@@ -211,22 +211,28 @@ function Header({
           >
             <RefreshCw size={14} className={refreshing ? "spin" : ""} /> Refresh
           </button>
-          <button
-            className="control-button"
-            onClick={onExport}
-            disabled={!rowCount}
+          <div
+            className="header-exports"
+            role="group"
+            aria-label="Export options"
           >
-            <Download size={14} /> CSV
-          </button>
-          <button
-            className="icon-button"
-            onClick={() => window.print()}
-            aria-label="Export as PDF"
-            title="Export as PDF"
-            disabled={!rowCount}
-          >
-            <FileText size={15} />
-          </button>
+            <button
+              className="control-button"
+              onClick={onExport}
+              disabled={!rowCount}
+            >
+              <Download size={14} /> CSV
+            </button>
+            <button
+              className="control-button"
+              onClick={() => window.print()}
+              aria-label="Export as PDF"
+              title="Export as PDF"
+              disabled={!rowCount}
+            >
+              <FileText size={14} /> PDF
+            </button>
+          </div>
         </div>
       </div>
     </header>

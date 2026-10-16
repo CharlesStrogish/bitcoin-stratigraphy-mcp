@@ -12,7 +12,8 @@ const app = read(`${dashboard}/src/App.tsx`);
 const css = read(`${dashboard}/src/index.css`);
 const catalog = read(`${commandCenterDir}/catalog.ts`);
 const snippets = read(`${commandCenterDir}/snippets.ts`);
-const telemetry = read(`${commandCenterDir}/telemetry-feed.tsx`);
+const commandCenter = read(`${commandCenterDir}/command-center.tsx`);
+const licensing = read(`${commandCenterDir}/enterprise-licensing-matrix.tsx`);
 const pricing = read("artifacts/api-server/src/lib/mcp-pricing.ts");
 const serverTools = read("artifacts/api-server/src/routes/mcp.ts");
 const publicSite = read("artifacts/api-server/src/lib/public-site.ts");
@@ -105,30 +106,28 @@ test("framework adapters cover the four frameworks and link to real cookbooks", 
   );
 });
 
-test("telemetry labels each Merkle construction honestly", () => {
+test("static enterprise licensing replaces the removed telemetry module", () => {
   assert.match(
-    telemetry,
-    /\$\{count\(chain\.totalDepth\)\} verifiable telemetry strata/,
+    commandCenter,
+    /<McpToolsMatrix \/>\s*<EnterpriseLicensingMatrix \/>\s*<FrameworkAdapters \/>/,
   );
-  assert.match(telemetry, /OpenTimestamps cryptographic state root/);
+  assert.doesNotMatch(commandCenter, /TelemetryFeed|Merkle telemetry/);
+  assert.match(licensing, /Enterprise Licensing &amp; Compliance Architecture/);
   assert.doesNotMatch(
-    telemetry,
-    /linked strata records|submission covers this root/,
+    licensing,
+    /useQuery|useEffect|fetch\(|@workspace\/api-client|\.\/live-data|Unavailable/,
   );
-  assert.match(telemetry, /anchor\.merkleRoot === chain\.merkleRoot/);
-  assert.match(telemetry, /OpenTimestamps submission covers an earlier root/);
-  assert.match(
-    telemetry,
-    /label="Escrow execution root"\s*scheme="RFC 6962"/,
-    "only the escrow tree is RFC 6962",
-  );
-  assert.match(
-    telemetry,
-    /label="Strata provenance root"\s*scheme="SHA-256 Merkle"/,
-  );
-  const pending = telemetry.match(/pending_calendar: \{\s*value: "([^"]+)"/);
-  assert.ok(pending, "pending calendar state is rendered explicitly");
-  assert.doesNotMatch(pending[1], /bitcoin|confirmed/i);
+  for (const file of [
+    "telemetry-feed.tsx",
+    "telemetry-cache.ts",
+    "telemetry-contracts.ts",
+  ]) {
+    assert.equal(
+      existsSync(new URL(`../${commandCenterDir}/${file}`, import.meta.url)),
+      false,
+      `${file} is removed, not merely hidden`,
+    );
+  }
 });
 
 test("homepage keeps CSV and PDF together in a balanced responsive action grid", () => {
@@ -178,20 +177,13 @@ test("homepage polling leaves most of the public rate budget to the visitor", ()
   // Each poller fetches once on mount, then once per elapsed interval.
   const perWindow = (pollers, intervalMs) =>
     pollers * (Math.ceil(windowMs / intervalMs) + 1);
-  const pollers = (name) =>
-    liveData.split(`refetchInterval: ${name}`).length - 1;
-  const oneShotReads = 2; // MCP price quote and genesis receipt
-  const used =
-    perWindow(
-      pollers("SETTLEMENT_POLL_MS"),
-      minutes(liveData, "SETTLEMENT_POLL_MS"),
-    ) +
-    perWindow(
-      pollers("PROVENANCE_POLL_MS"),
-      minutes(liveData, "PROVENANCE_POLL_MS"),
-    ) +
-    perWindow(1, terminalMs) +
-    oneShotReads;
+  assert.doesNotMatch(
+    liveData,
+    /refetchInterval|getRevenueAnalytics|getRevenueAudit|getProvenance|genesis-receipt|getEscrowLedgerStats|getEscrowToll/,
+    "Command Center no longer mounts any database-backed telemetry pollers",
+  );
+  const oneShotReads = 1; // Free MCP price discovery; licensing is static.
+  const used = perWindow(1, terminalMs) + oneShotReads;
   assert.ok(used <= limit * 0.6, `${used} of ${limit} requests per window`);
 });
 

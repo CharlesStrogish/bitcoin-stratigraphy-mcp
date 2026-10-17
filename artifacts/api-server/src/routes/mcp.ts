@@ -86,6 +86,7 @@ import {
   type PrimaryStratigraphyResult,
 } from "../services/primaryStratigraphy";
 import { primaryStratigraphyContracts } from "../services/primaryStratigraphySchemas";
+import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
 import { buildProvenanceChain } from "../services/provenanceChain";
 import {
   getProvenanceAnchor,
@@ -1683,7 +1684,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "Retrieve compressed SHA-256 fingerprints and minimal telemetry tuples for indexed Bitcoin strata to minimize token usage. Returns compact hash structures and validation receipts rather than full snapshots. Use this tool to verify state integrity or check data existence at minimal bandwidth. Use stratigraphy.get when full stratigraphy metrics are required, stratigraphy.get_diff for delta comparisons, or stratigraphy.get_range for interval sequences. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
+      STRATIGRAPHY_TOOL_DESCRIPTIONS["stratigraphy.get_digest"],
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1751,7 +1752,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_diff",
     title: "Compare Stratigraphy Strata",
     description:
-      "Calculate signed deltas and thermodynamic variances between two Bitcoin heights or UTC timestamps. Returns power changes (15 J/TH baseline), difficulty shifts, and telemetry deltas between fromTarget and toTarget. Use this tool when comparing historical states or evaluating block-to-block divergence. Use stratigraphy.get for single snapshots, stratigraphy.get_range for contiguous spans, or stratigraphy.get_digest for compact fingerprints. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
+      STRATIGRAPHY_TOOL_DESCRIPTIONS["stratigraphy.get_diff"],
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1853,7 +1854,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "Fetch a contiguous series of verified Bitcoin stratigraphy snapshots bounded by block heights or UTC ISO dates. Returns chronologically ordered telemetry records and associated cryptographic proof receipts across the requested window. Use this tool when analyzing multi-block trends, historical intervals, or time-series strata. Use stratigraphy.get for an individual block snapshot, stratigraphy.get_diff for two-point delta comparisons, or stratigraphy.get_digest for compact hashes. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
+      STRATIGRAPHY_TOOL_DESCRIPTIONS["stratigraphy.get_range"],
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1962,7 +1963,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "List available historical stratigraphy catalog entries, indexed block heights, and date boundaries. Returns paginated index summaries without heavy telemetry payloads. Use this tool to discover available historical snapshots, inspect index ranges, or locate specific timestamps before fetching data. Use stratigraphy.get to retrieve a specific record or stratigraphy.get_range for sequential telemetry. Read-only and idempotent.",
+      STRATIGRAPHY_TOOL_DESCRIPTIONS["stratigraphy.list"],
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -4343,7 +4344,7 @@ export const mcpToolDefinitions = [
     .map((tool) => ({
       ...tool,
       ...(primaryStratigraphyContracts[tool.name] ?? {}),
-      description: `${primaryStratigraphyContracts[tool.name]?.description ?? tool.description} ${
+      description: STRATIGRAPHY_TOOL_DESCRIPTIONS[tool.name] ?? `${primaryStratigraphyContracts[tool.name]?.description ?? tool.description} ${
         mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0
           ? "Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution."
           : "Free metadata discovery: no Live L402 Satoshi settlement is required for this sandbox tool; no paid payload is released."

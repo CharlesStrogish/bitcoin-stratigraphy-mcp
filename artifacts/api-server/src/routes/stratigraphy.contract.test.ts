@@ -19,6 +19,7 @@ import { openApiDocument } from "../openapi";
 import healthRouter from "./health";
 import { indexedContractTestFixture, registerMcpRequestGuard, registerMcpRoute } from "./mcp";
 import { primaryStratigraphyContracts } from "../services/primaryStratigraphySchemas";
+import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
 import { verifyEpistemicDatasetReceipt } from "../services/epistemicDatasetReceipt";
 import type { SettlementRouter } from "../services/settlement";
 import {
@@ -1699,6 +1700,28 @@ test("reports public peer mesh status without payment", async () => {
   assert.equal(body.quorumThreshold, 1);
 });
 
+test("serves exact stratigraphy descriptions across tools/list and all discovery documents", async () => {
+  const listed = await mcpRequest("tools/list") as {
+    result: { tools: Array<{ name: string; description: string }> };
+  };
+  const sharedDocument = parse(
+    await readFile(resolve(process.cwd(), "../../lib/api-spec/openapi.yaml"), "utf8"),
+  ) as { "x-mcp-tools": Record<string, { description: string }> };
+  const servedDocument = openApiDocument["x-mcp-tools"] as Record<
+    string,
+    { description: string }
+  >;
+  assert.equal(listed.result.tools.length, 15);
+  for (const [name, expected] of Object.entries(STRATIGRAPHY_TOOL_DESCRIPTIONS)) {
+    assert.equal(listed.result.tools.find((tool) => tool.name === name)?.description, expected, `${name} tools/list`);
+    assert.equal(primaryStratigraphyContracts[name].description, expected, `${name} contract overlay`);
+    assert.equal(mcpDiscoveryManifest.tools.find((tool) => tool.name === name)?.description, expected, `${name} discovery manifest`);
+    assert.equal(mcpServerCard.capabilities.tools.find((tool) => tool.name === name)?.description, expected, `${name} server card`);
+    assert.equal(sharedDocument["x-mcp-tools"][name].description, expected, `${name} shared OpenAPI`);
+    assert.equal(servedDocument[name].description, expected, `${name} served OpenAPI`);
+  }
+});
+
 test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity", async () => {
   const [sharedYaml, smitheryYaml, glamaJson] = await Promise.all([
     readFile(resolve(process.cwd(), "../../lib/api-spec/openapi.yaml"), "utf8"),
@@ -1784,7 +1807,21 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
       `${name} OpenAPI and tools/list descriptions must match exactly`,
     );
     assert.ok(listedTool.description.startsWith(expectedDescription), `${name} must preserve its contract guidance`);
-    assert.ok(listedTool.description.includes("Live L402 Satoshi settlement"), name);
+    if (STRATIGRAPHY_TOOL_DESCRIPTIONS[name]) {
+      assert.equal(listedTool.description, STRATIGRAPHY_TOOL_DESCRIPTIONS[name]);
+      assert.equal(
+        mcpDiscoveryManifest.tools.find((tool) => tool.name === name)?.description,
+        listedTool.description,
+        `${name} public discovery must match tools/list exactly`,
+      );
+      assert.equal(
+        mcpServerCard.capabilities.tools.find((tool) => tool.name === name)?.description,
+        listedTool.description,
+        `${name} server card must match tools/list exactly`,
+      );
+    } else {
+      assert.ok(listedTool.description.includes("Live L402 Satoshi settlement"), name);
+    }
   }
 
   const requiredSchemaTools = [

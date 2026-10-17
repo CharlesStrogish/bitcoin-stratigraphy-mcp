@@ -252,7 +252,7 @@ x-mcp-tools:
         - required: [verified, settlementToken]
   stratigraphy.get_range:
     legacyNames: [stratigraphy.range]
-    description: "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only and L402-paid, without HTTP IP rate limiting; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries."
+    description: "Fetch a contiguous sequence of Bitcoin stratigraphy records between startTarget and endTarget (block heights or YYYY-MM-DD UTC dates, in ascending order, capped by the limit parameter). Use this tool when analyzing multi-block trends or time-series intervals. Use stratigraphy.list to browse available catalog bounds, stratigraphy.get for a single snapshot, stratigraphy.get_diff to compare two endpoints without intermediate records, or stratigraphy.get_digest for compact hashes. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>."
     annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
@@ -317,7 +317,7 @@ x-mcp-tools:
       required: [status, attenuatedMacaroon, appliedCaveats, issuedAt]
   stratigraphy.get_diff:
     legacyNames: [stratigraphy.diff]
-    description: "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to L402 payment, without HTTP IP rate limiting; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool."
+    description: "Calculate signed arithmetic and thermodynamic deltas between fromTarget (baseline height or UTC date) and toTarget (comparison height, UTC date, or 'latest' indexed entry). Use this tool when measuring block-to-block divergence or net change between two points without fetching intermediate records. Use stratigraphy.get_range for full interval series, stratigraphy.get for a single snapshot, stratigraphy.get_digest for compact hashes, or stratigraphy.list for catalog discovery. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>."
     annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
@@ -358,7 +358,7 @@ x-mcp-tools:
       required: [from, to, delta]
   stratigraphy.get_digest:
     legacyNames: [stratigraphy.digest]
-    description: "Fetch compact source-record fingerprints and metadata for an indexed stratum height, date, or bounded date range. Returns no full record telemetry or Bitcoin block-header hash; the fingerprint is not a verification receipt. Use this tool instead of `stratigraphy.get` when a compact fingerprint is enough; use `stratigraphy.get_range` for contiguous multi-record summaries and `stratigraphy.list` for catalog discovery."
+    description: "Retrieve compact SHA-256 fingerprints and minimal telemetry tuples for a target height, UTC date, or 'start..end' date range using the chosen format ('compact', 'minimal', or 'kv'). Use this tool to verify state integrity or minimize token consumption when full payloads are unnecessary. Use stratigraphy.get for full single-record telemetry, stratigraphy.get_range for full multi-record series, stratigraphy.get_diff for two-point deltas, or stratigraphy.list for free catalog browsing. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>."
     annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
@@ -651,7 +651,7 @@ x-mcp-tools:
     description: "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only and L402-paid, without HTTP IP rate limiting. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds."
     annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"readOnly":true,"audience":["assistant"],"priority":1,"zkProof":{"included":true,"scheme":"Groth16/Poseidon BN254","verificationEndpoint":"POST /api/v1/zk/verify"},"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
   stratigraphy.list:
-    description: "Discover indexed height and UTC date bounds, available metrics, and catalog metadata. Free, parameterless, read-only discovery entry point for selecting valid strata. Once bounds are known, use `stratigraphy.get` for full record bodies, `stratigraphy.get_range` for compact contiguous spans, or `stratigraphy.get_digest` for lightweight source-record fingerprints."
+    description: "List the Bitcoin stratigraphy catalog, returning paginated index summaries of available block heights and UTC dates without heavy telemetry payloads. Use this free discovery tool first to inspect available start/end boundaries and verify which heights or dates are indexed before calling paid retrieval tools. Use stratigraphy.get for a single full record, stratigraphy.get_range for a contiguous sequence, stratigraphy.get_diff for two-point deltas, or stratigraphy.get_digest for compact SHA-256 hashes. Use limit and offset parameters to paginate."
     annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":0}}
 security:
   - L402: []

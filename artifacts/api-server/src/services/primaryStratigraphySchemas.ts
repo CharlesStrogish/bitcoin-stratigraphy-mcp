@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
+import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
 /** The established tool names/prices remain fixed; these schemas describe live values. */
 const attribute = (type: string | string[], description: string, example: unknown) => ({
   type, description, example, examples: [example],
@@ -75,7 +76,7 @@ function contract(description: string, example: Record<string, unknown>, propert
   };
 }
 
-export const primaryStratigraphyContracts: Record<string, ReturnType<typeof contract>> = {
+const primaryStratigraphySchemaContracts: Record<string, ReturnType<typeof contract>> = {
   "stratigraphy.list": contract(
     "Free, metadata-only discovery of real UTC archive bounds and current Bitcoin tip height; no paid snapshot or proof bytes. Historical height fields are actual captured heights.",
     {
@@ -129,3 +130,14 @@ export const primaryStratigraphyContracts: Record<string, ReturnType<typeof cont
       records: { type: "array", description: "Selected actual snapshot summaries, not a synthetic daily index.", items: { type: ["string", "array", "object"], description: "One requested compact, minimal or kv summary.", examples: ["HEIGHT:920000|DATE:2026-10-12T00:00:00+00:00|TM:125|HASH:" + "ab".repeat(32)] }, examples: [["HEIGHT:920000|DATE:2026-10-12T00:00:00+00:00|TM:125|HASH:" + "ab".repeat(32)]] }, ...common },
   ),
 };
+
+/** Keep tool marketing copy separate from unchanged output-schema documentation. */
+export const primaryStratigraphyContracts = Object.fromEntries(
+  Object.entries(primaryStratigraphySchemaContracts).map(([name, schemaContract]) => [
+    name,
+    {
+      ...schemaContract,
+      description: STRATIGRAPHY_TOOL_DESCRIPTIONS[name] ?? schemaContract.description,
+    },
+  ]),
+);

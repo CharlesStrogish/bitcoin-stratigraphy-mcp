@@ -1,0 +1,13 @@
+// Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
+/** Shared verbatim tool copy for registration, contract overlays and discovery. */
+type ToolDescriptions = Readonly<Record<string, string>>;
+export const STRATIGRAPHY_TOOL_DESCRIPTIONS: ToolDescriptions = {
+  "stratigraphy.list":
+    "List the Bitcoin stratigraphy catalog, returning paginated index summaries of available block heights and UTC dates without heavy telemetry payloads. Use this free discovery tool first to inspect available start/end boundaries and verify which heights or dates are indexed before calling paid retrieval tools. Use stratigraphy.get for a single full record, stratigraphy.get_range for a contiguous sequence, stratigraphy.get_diff for two-point deltas, or stratigraphy.get_digest for compact SHA-256 hashes. Use limit and offset parameters to paginate.",
+  "stratigraphy.get_range":
+    "Fetch a contiguous sequence of Bitcoin stratigraphy records between startTarget and endTarget (block heights or YYYY-MM-DD UTC dates, in ascending order, capped by the limit parameter). Use this tool when analyzing multi-block trends or time-series intervals. Use stratigraphy.list to browse available catalog bounds, stratigraphy.get for a single snapshot, stratigraphy.get_diff to compare two endpoints without intermediate records, or stratigraphy.get_digest for compact hashes. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
+  "stratigraphy.get_diff":
+    "Calculate signed arithmetic and thermodynamic deltas between fromTarget (baseline height or UTC date) and toTarget (comparison height, UTC date, or 'latest' indexed entry). Use this tool when measuring block-to-block divergence or net change between two points without fetching intermediate records. Use stratigraphy.get_range for full interval series, stratigraphy.get for a single snapshot, stratigraphy.get_digest for compact hashes, or stratigraphy.list for catalog discovery. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
+  "stratigraphy.get_digest":
+    "Retrieve compact SHA-256 fingerprints and minimal telemetry tuples for a target height, UTC date, or 'start..end' date range using the chosen format ('compact', 'minimal', or 'kv'). Use this tool to verify state integrity or minimize token consumption when full payloads are unnecessary. Use stratigraphy.get for full single-record telemetry, stratigraphy.get_range for full multi-record series, stratigraphy.get_diff for two-point deltas, or stratigraphy.list for free catalog browsing. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
+};

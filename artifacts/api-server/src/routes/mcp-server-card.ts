@@ -5,6 +5,7 @@ import { mcpToolPrices } from "../lib/mcp-pricing";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 import { RELEASE_VERSION, canonicalUrl } from "../lib/public-site";
+import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
 
 export const MCP_RELEASE_VERSION = RELEASE_VERSION;
 export const MCP_RELEASE_DESCRIPTION =
@@ -196,6 +197,9 @@ export const mcpServerCard = {
     ...baseServerCard.capabilities,
     tools: baseServerCard.capabilities.tools.map((tool) => ({
       ...tool,
+      ...(STRATIGRAPHY_TOOL_DESCRIPTIONS[tool.name]
+        ? { description: STRATIGRAPHY_TOOL_DESCRIPTIONS[tool.name] }
+        : {}),
       annotations: {
         ...tool.annotations,
         l402: {

@@ -5,6 +5,12 @@ description: Rules for improving MCP discovery quality without creating schema o
 
 MCP quality-score work must preserve contract fidelity: metadata, JSON Schema, and Zod validators should describe the fields, outputs, execution model, and side effects the handlers actually implement. Do not add rubric example fields as metadata-only aliases.
 
+Verify requested description changes against the final live `tools/list` response, not just a base registration string. Contract overlays and automatic settlement suffixes can replace or alter that copy. Share verbatim descriptions across runtime and discovery metadata while keeping output-schema documentation separate.
+
+**Why:** Earlier description-only edits saved and rebuilt successfully but were overwritten during final registry assembly, so external clients continued receiving older text.
+
+**How to apply:** Compare the exact final strings across `POST /mcp`, public discovery, server cards and OpenAPI after rebuilding. Publishing and client-side discovery refreshes remain separate from restarting the development server.
+
 **Why:** Generic optimization guidance may assume asynchronous jobs, pagination fields, or proof shapes that differ from this server. Advertising unsupported fields would improve superficial metadata while breaking agents at runtime.
 
 **How to apply:** Keep tool names and return payloads stable unless explicitly migrating the contract. Add requested constraints to real fields, implement additive inputs end-to-end when safe, and describe actual synchronous/stateful behavior.

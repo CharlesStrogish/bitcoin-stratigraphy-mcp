@@ -1683,7 +1683,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_digest",
     title: "Get Compressed Stratigraphy Digest",
     description:
-      "Fetch compact source-record fingerprints and metadata for an indexed stratum height, date, or bounded date range. Returns no full record telemetry or Bitcoin block-header hash; the fingerprint is not a verification receipt. Use this tool instead of `stratigraphy.get` when a compact fingerprint is enough; use `stratigraphy.get_range` for contiguous multi-record summaries and `stratigraphy.list` for catalog discovery.",
+      "Retrieve compressed SHA-256 fingerprints and minimal telemetry tuples for indexed Bitcoin strata to minimize token usage. Returns compact hash structures and validation receipts rather than full snapshots. Use this tool to verify state integrity or check data existence at minimal bandwidth. Use stratigraphy.get when full stratigraphy metrics are required, stratigraphy.get_diff for delta comparisons, or stratigraphy.get_range for interval sequences. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1751,7 +1751,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_diff",
     title: "Compare Stratigraphy Strata",
     description:
-      "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to L402 payment, without HTTP IP rate limiting; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool.",
+      "Calculate signed deltas and thermodynamic variances between two Bitcoin heights or UTC timestamps. Returns power changes (15 J/TH baseline), difficulty shifts, and telemetry deltas between fromTarget and toTarget. Use this tool when comparing historical states or evaluating block-to-block divergence. Use stratigraphy.get for single snapshots, stratigraphy.get_range for contiguous spans, or stratigraphy.get_digest for compact fingerprints. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -1853,7 +1853,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get_range",
     title: "Get Stratigraphy Range",
     description:
-      "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only and L402-paid, without HTTP IP rate limiting; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries.",
+      "Fetch a contiguous series of verified Bitcoin stratigraphy snapshots bounded by block heights or UTC ISO dates. Returns chronologically ordered telemetry records and associated cryptographic proof receipts across the requested window. Use this tool when analyzing multi-block trends, historical intervals, or time-series strata. Use stratigraphy.get for an individual block snapshot, stratigraphy.get_diff for two-point delta comparisons, or stratigraphy.get_digest for compact hashes. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,

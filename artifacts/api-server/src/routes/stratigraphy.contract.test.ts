@@ -5149,16 +5149,17 @@ test("serves Smithery verification text at both public root paths", async () => 
 });
 
 test("serves all public Glama connector discovery routes exactly", async () => {
+  const expectedConnector = {
+    $schema: "https://glama.ai/mcp/schemas/connector.json",
+    claim: "glama_claim_4N7ubcwaGOadHJjd-Go2ue11blsBugXo",
+  };
+  assert.deepEqual(glamaConnector, expectedConnector);
   for (const path of [
     "/.well-known/mcp/connector.json",
     "/.well-known/glama-mcp-connector.json",
     "/.well-known/glama.json",
   ]) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      headers: {
-        Authorization: `L402 ${paymentHash}:${preimage}`,
-      },
-    });
+    const response = await fetch(`${baseUrl}${path}`);
 
     assert.equal(response.status, 200);
     assert.match(
@@ -5166,7 +5167,7 @@ test("serves all public Glama connector discovery routes exactly", async () => {
       /^application\/json\b/,
     );
     assert.equal(response.headers.get("www-authenticate"), null);
-    assert.deepEqual(await response.json(), glamaConnector);
+    assert.deepEqual(await response.json(), expectedConnector);
   }
 });
 

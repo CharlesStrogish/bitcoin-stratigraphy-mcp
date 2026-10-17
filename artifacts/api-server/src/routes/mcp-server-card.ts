@@ -233,7 +233,7 @@ export const smitheryServerCard = {
 
 export const glamaConnector = {
   $schema: "https://glama.ai/mcp/schemas/connector.json",
-  claim: "glama_claim_4N7ubcwaG0adHJjd-Go2ue11blsBugXo",
+  claim: "glama_claim_4N7ubcwaGOadHJjd-Go2ue11blsBugXo",
 } as const;
 
 export function registerMcpServerCardRoute(app: Express): void {

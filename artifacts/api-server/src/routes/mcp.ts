@@ -2740,7 +2740,7 @@ const baseMcpToolDefinitions = [
     name: "proof.list",
     title: "List Proof Attestations",
     description:
-      "Freely discover, filter, and paginate recent zk-proof attestation lifecycle summaries. Use limit (1-100), offset (0-1000), and optional status (verified, cached, pending, invalid). Returns bounded summaries, not full proofs or receipts. Alias: proof.status. No invoice is created.",
+      "List available cryptographic proof attestations, including OpenTimestamps receipts and Groth16 zero-knowledge state proofs. Returns paginated index summaries of archived proofs without downloading the full byte payloads. Use this tool to discover existing proofs for specific block heights or dataset digests before verifying them. Use proof.get_by_hash to retrieve a specific full proof, proof.verify to validate one, or proof.submit to attest a new record. Read-only and idempotent.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",

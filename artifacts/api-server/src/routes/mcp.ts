@@ -1570,7 +1570,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.get",
     title: "Get Bitcoin Stratigraphy",
     description:
-      "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only and L402-paid, without HTTP IP rate limiting. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds.",
+      "Retrieve a single authoritative Bitcoin stratigraphy snapshot for an exact block height, UTC date, or latest tip. Returns full thermodynamic metrics (15 J/TH baseline), network telemetry, and associated cryptographic proof receipts. Use this tool when validating an individual state snapshot or grounding an agent at a specific moment. Use stratigraphy.get_range for spans, stratigraphy.get_diff for delta comparisons, or stratigraphy.get_digest for minimal token consumption. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -1962,7 +1962,7 @@ const baseMcpToolDefinitions = [
     name: "stratigraphy.list",
     title: "List Stratigraphy Catalog",
     description:
-      "Discover indexed height and UTC date bounds, available metrics, and catalog metadata. Free, parameterless, read-only discovery entry point for selecting valid strata. Once bounds are known, use `stratigraphy.get` for full record bodies, `stratigraphy.get_range` for compact contiguous spans, or `stratigraphy.get_digest` for lightweight source-record fingerprints.",
+      "List available historical stratigraphy catalog entries, indexed block heights, and date boundaries. Returns paginated index summaries without heavy telemetry payloads. Use this tool to discover available historical snapshots, inspect index ranges, or locate specific timestamps before fetching data. Use stratigraphy.get to retrieve a specific record or stratigraphy.get_range for sequential telemetry. Read-only and idempotent.",
     annotations: readOnlyToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2171,7 +2171,7 @@ const baseMcpToolDefinitions = [
     name: "proof.verify",
     title: "Verify Stratigraphy ZK Proof",
     description:
-      "PURPOSE & BOUNDARIES: Verify cryptographic integrity of a Groth16 telemetry or drift zk-SNARK proof without modifying proof registry state; this does not verify OTS records. Telemetry verification is offline, while drift checks consult a Bitcoin block provider. USAGE GUIDELINES: Use `proof.verify` instead of `proof.submit` for read-only validation of existing proofs, and use `proof.submit` exclusively when registering a new proof attestation. Use `proof.ground` when a signed Bitcoin-tip receipt is needed. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed or mismatched proof inputs fail validation, and drift verification requires a reachable block provider.",
+      "Verify cryptographic proof receipts, including OpenTimestamps calendar attestations and Groth16 zero-knowledge state proofs. Validates Bitcoin block header anchoring or mathematical circuit correctness without requiring access to private inputs. Use this tool to validate proof receipts returned by stratigraphy endpoints or external verifiers before committing actions. Use proof.submit to post new proofs or proof.get_by_hash to retrieve archived attestations.",
     annotations: proofVerificationToolAnnotations,
     inputSchema: {
       type: "object",
@@ -2887,7 +2887,7 @@ const baseMcpToolDefinitions = [
     name: "proof.submit",
     title: "Submit ZK Proof",
     description:
-      "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
+      "Submit a generated Groth16 zero-knowledge proof or transaction attestation to the Bitcoin Stratigraphy validation pipeline. Ingests verification keys, public inputs, and proof bytes for engine attestation. Use this tool when external agent systems need their cryptographic state verified and anchored into the stratigraphy index. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -3083,7 +3083,7 @@ const baseMcpToolDefinitions = [
     name: "proof.ground",
     title: "Ground Agent Context in Bitcoin State",
     description:
-      "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
+      "Ground an AI agent context window directly in immutable Bitcoin consensus state to eliminate temporal and factual hallucinations. Binds input claims to real-time proof-of-work difficulty, block height, and thermodynamic entropy. Use this tool during critical reasoning steps or pre-execution checks when agent outputs require deterministic verification against physical reality. Use proof.notarize to timestamp arbitrary digests or stratigraphy.get for raw metrics.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",
@@ -3604,7 +3604,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Requires L402 authorization; use mesh.broadcast to distribute a snapshot. This tool does not administer peers or edit topology.",
+      "Inspect local mesh network topology, active peer connections, and relay synchronization state. Returns connected peer counts, latency figures, and gossip protocol health. Use this tool to check node network connectivity prior to broadcasting or querying distributed telemetry. Read-only and idempotent.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -3638,7 +3638,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.broadcast",
     title: "Broadcast Telemetry Snapshot to Mesh",
     description:
-      "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
+      "Broadcast local telemetry snapshots and stratigraphy receipts to peer nodes across the Stratigraphy mesh network. Use this tool to propagate sovereign node state, sync multi-agent clusters, or announce new block validation events. Use mesh.get_status to inspect local peer connectivity before broadcasting. Requires network authorization or L402 settlement token.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",

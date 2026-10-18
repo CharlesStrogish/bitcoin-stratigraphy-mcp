@@ -99,6 +99,7 @@ import {
   type SlidingWindowRateLimiter,
 } from "../middleware/rateLimiter";
 import { clientKey } from "../lib/client-address";
+import { verifyRequestAgent } from "../lib/nip98-request";
 import { runtimePricingLoad } from "../services/orchestrator";
 import {
   createMeshGossipService,
@@ -463,35 +464,6 @@ function availableSettlementAssets(
     : router.isConfigured()
       ? ["btc-lightning"]
       : [];
-}
-
-function requestNip98Url(req: Request): string {
-  const configuredOrigin = process.env.NIP98_PUBLIC_ORIGIN;
-  const origin = configuredOrigin
-    ? new URL(configuredOrigin).origin
-    : `${req.protocol}://${req.get("host")}`;
-  return new URL(req.originalUrl, `${origin}/`).toString();
-}
-
-function verifyRequestAgent(
-  req: Request,
-  reputation: AgentReputationService,
-  nowMs: number,
-  payload?: Uint8Array,
-): { provided: boolean; identity?: AgentIdentity } {
-  const supplemental = req.header("X-Nostr-Authorization");
-  const primary = req.header("Authorization");
-  const authorization =
-    supplemental ?? (primary?.startsWith("Nostr ") ? primary : undefined);
-  if (!authorization) return { provided: false };
-  const identity = reputation.verifyNip98Authorization({
-    authorization,
-    method: req.method,
-    url: requestNip98Url(req),
-    nowSeconds: Math.floor(nowMs / 1_000),
-    payload,
-  });
-  return identity ? { provided: true, identity } : { provided: true };
 }
 
 function operatorAuthorized(value: string | undefined, secret: string) {

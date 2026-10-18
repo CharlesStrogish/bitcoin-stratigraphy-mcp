@@ -181,7 +181,8 @@ export const GetEscrowGenesisReceiptResponse = zod.object({
   "confirmed_at": zod.string()
 }).optional().describe('Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage.'),
   "escrow_id": zod.string(),
-  "agent_id": zod.string().regex(getEscrowGenesisReceiptResponseSettleResponseArticle12ReceiptAgentIdRegExp).optional().describe('Sub-agent named by the paid credential\'s agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical JSON {\"agent_id\":\"<agent_id>\"}, so execution_leaf_hash and merkle_root commit to it.'),
+  "agent_id": zod.string().regex(getEscrowGenesisReceiptResponseSettleResponseArticle12ReceiptAgentIdRegExp).optional().describe('Sub-agent named by the paid credential\'s agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical attribution JSON, {\"agent_id\":\"<agent_id>\"} when self-declared, so execution_leaf_hash and merkle_root commit to it.'),
+  "agent_authentication": zod.enum(['nip98']).optional().describe('Present only when agent_id is a Nostr pubkey bound by NIP-98: the server verified that key\'s Schnorr signature on the paid settlement request. The leaf then commits SHA-256 of {\"agent_authentication\":\"nip98\",\"agent_id\":\"<pubkey>\"}. Records the server\'s verification, not the signed event itself.'),
   "leaf_index": zod.number().int().min(getEscrowGenesisReceiptResponseSettleResponseArticle12ReceiptLeafIndexMin),
   "audit_path": zod.array(zod.string().regex(getEscrowGenesisReceiptResponseSettleResponseArticle12ReceiptAuditPathItemRegExp)),
   "merkle_root": zod.string().regex(getEscrowGenesisReceiptResponseSettleResponseArticle12ReceiptMerkleRootRegExp),
@@ -249,7 +250,7 @@ export const CreateEscrowResponse = zod.object({
 
 
 /**
- * Public redemption requires the private settlement_capability returned at creation plus live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI; no operator token is required. A valid X-Escrow-Operator-Token remains an optional admin override for legacy recovery. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 macaroon binds the escrow ID, exact execution trace and result payload and is single-use. A supplied 64-hex preimage must match the invoice hash. Without a preimage, retry with the issued macaroon and NWC_LOOKUP, a CoinOS UUID hint, or no proof; the merchant must confirm the exact settled incoming invoice, amount, description and issuing provider. UUIDs are not cryptographic proofs. Pending verification returns 409 while retaining the original invoice. No final JSON or escrow preimage is released before verification. Caller-authorized execution commitments do not independently establish bounty funding, task correctness, or a confirmed Bitcoin anchor. For optional sub-agent attribution, declare agent_id in the X-Agent-Id header or the body when requesting the 402 challenge; the macaroon then carries the strict caveat "agent_id = <agent_id>", and the paid retry must declare the same value. The settlement records it in the durable PostgreSQL ledger and commits SHA-256 of {"agent_id":"<agent_id>"} as a fourth segment of the receipt's RFC 6962 leaf. The value is caller-declared and HMAC-bound, not an authenticated identity.
+ * Public redemption requires the private settlement_capability returned at creation plus live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI; no operator token is required. A valid X-Escrow-Operator-Token remains an optional admin override for legacy recovery. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 macaroon binds the escrow ID, exact execution trace and result payload and is single-use. A supplied 64-hex preimage must match the invoice hash. Without a preimage, retry with the issued macaroon and NWC_LOOKUP, a CoinOS UUID hint, or no proof; the merchant must confirm the exact settled incoming invoice, amount, description and issuing provider. UUIDs are not cryptographic proofs. Pending verification returns 409 while retaining the original invoice. No final JSON or escrow preimage is released before verification. Caller-authorized execution commitments do not independently establish bounty funding, task correctness, or a confirmed Bitcoin anchor. Optional sub-agent attribution has two modes. For NIP-98 authentication, sign the 402 challenge request with a kind 27235 event in Authorization (Nostr <base64_event>) or X-Nostr-Authorization whose u, method and payload tags bind this URL, POST and the SHA-256 of the exact body; the verified signer pubkey becomes agent_id, the macaroon adds "agent_authentication = nip98", and the paid retry must carry a fresh NIP-98 event from the same key in X-Nostr-Authorization. An invalid or forged event returns 401 before any invoice. For self-declared attribution without NIP-98, declare agent_id in the X-Agent-Id header or the body; the macaroon carries the strict caveat "agent_id = <agent_id>", and the paid retry must declare the same value. The settlement records agent_id and is_authenticated (true only for NIP-98) in the durable PostgreSQL ledger and commits SHA-256 of the canonical attribution JSON, {"agent_id":"<agent_id>"} or {"agent_authentication":"nip98","agent_id":"<pubkey>"}, as a fourth segment of the receipt's RFC 6962 leaf. A self-declared value is HMAC-bound, not an authenticated identity.
  * @summary Commit authorized execution evidence and release the escrow preimage
  */
 export const settleEscrowHeaderXAgentIdMax = 128;
@@ -259,7 +260,8 @@ export const settleEscrowHeaderXAgentIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0
 
 
 export const SettleEscrowHeader = zod.object({
-  "X-Agent-Id": zod.string().max(settleEscrowHeaderXAgentIdMax).regex(settleEscrowHeaderXAgentIdRegExp).optional().describe('Optional sub-agent attribution, identical to the body agent_id when both are sent. A credential bound to an agent_id requires the same declaration on every use.')
+  "X-Agent-Id": zod.string().max(settleEscrowHeaderXAgentIdMax).regex(settleEscrowHeaderXAgentIdRegExp).optional().describe('Optional self-declared sub-agent attribution, identical to the body agent_id when both are sent and to the signer pubkey when the request is NIP-98 signed. A credential bound to an agent_id requires the same declaration on every use.'),
+  "X-Nostr-Authorization": zod.string().optional().describe('Optional NIP-98 event, Nostr <base64_event>. On the challenge request it authenticates the agent, like Authorization Nostr; on the paid retry it is required for a credential carrying agent_authentication = nip98 and must be signed by its agent_id. The payload tag must contain the SHA-256 of the exact request body.')
 })
 
 export const settleEscrowBodySettlementCapabilityRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -275,7 +277,7 @@ export const settleEscrowBodyResultPayloadMax = 262144;
 
 export const SettleEscrowBody = zod.object({
   "settlement_capability": zod.string().regex(settleEscrowBodySettlementCapabilityRegExp).optional().describe('Private creator-held redemption capability returned by create. Required for public settlement; a valid optional admin override can recover legacy contracts.'),
-  "agent_id": zod.string().max(settleEscrowBodyAgentIdMax).regex(settleEscrowBodyAgentIdRegExp).optional().describe('Optional sub-agent attribution, equivalent to the X-Agent-Id header. Bound into the 402 challenge\'s agent_id caveat; the paid retry must declare the same value. Recorded with the settlement and committed into the receipt leaf. Caller-declared, not an authenticated identity.'),
+  "agent_id": zod.string().max(settleEscrowBodyAgentIdMax).regex(settleEscrowBodyAgentIdRegExp).optional().describe('Optional self-declared sub-agent attribution, equivalent to the X-Agent-Id header. Bound into the 402 challenge\'s agent_id caveat; the paid retry must declare the same value. Recorded with the settlement (is_authenticated false) and committed into the receipt leaf. Caller-declared, not an authenticated identity; sign the request with NIP-98 instead for an authenticated agent_id. When sent with a NIP-98 signature it must equal the signer pubkey.'),
   "escrow_id": zod.string().uuid(),
   "execution_trace": zod.string().max(settleEscrowBodyExecutionTraceMax),
   "result_payload": zod.string().max(settleEscrowBodyResultPayloadMax)
@@ -311,7 +313,8 @@ export const SettleEscrowResponse = zod.object({
   "confirmed_at": zod.string()
 }).optional().describe('Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage.'),
   "escrow_id": zod.string(),
-  "agent_id": zod.string().regex(settleEscrowResponseArticle12ReceiptAgentIdRegExp).optional().describe('Sub-agent named by the paid credential\'s agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical JSON {\"agent_id\":\"<agent_id>\"}, so execution_leaf_hash and merkle_root commit to it.'),
+  "agent_id": zod.string().regex(settleEscrowResponseArticle12ReceiptAgentIdRegExp).optional().describe('Sub-agent named by the paid credential\'s agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical attribution JSON, {\"agent_id\":\"<agent_id>\"} when self-declared, so execution_leaf_hash and merkle_root commit to it.'),
+  "agent_authentication": zod.enum(['nip98']).optional().describe('Present only when agent_id is a Nostr pubkey bound by NIP-98: the server verified that key\'s Schnorr signature on the paid settlement request. The leaf then commits SHA-256 of {\"agent_authentication\":\"nip98\",\"agent_id\":\"<pubkey>\"}. Records the server\'s verification, not the signed event itself.'),
   "leaf_index": zod.number().int().min(settleEscrowResponseArticle12ReceiptLeafIndexMin),
   "audit_path": zod.array(zod.string().regex(settleEscrowResponseArticle12ReceiptAuditPathItemRegExp)),
   "merkle_root": zod.string().regex(settleEscrowResponseArticle12ReceiptMerkleRootRegExp),
@@ -360,7 +363,8 @@ export const GetEscrowReceiptResponse = zod.object({
   "confirmed_at": zod.string()
 }).optional().describe('Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage.'),
   "escrow_id": zod.string(),
-  "agent_id": zod.string().regex(getEscrowReceiptResponseProofAgentIdRegExp).optional().describe('Sub-agent named by the paid credential\'s agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical JSON {\"agent_id\":\"<agent_id>\"}, so execution_leaf_hash and merkle_root commit to it.'),
+  "agent_id": zod.string().regex(getEscrowReceiptResponseProofAgentIdRegExp).optional().describe('Sub-agent named by the paid credential\'s agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical attribution JSON, {\"agent_id\":\"<agent_id>\"} when self-declared, so execution_leaf_hash and merkle_root commit to it.'),
+  "agent_authentication": zod.enum(['nip98']).optional().describe('Present only when agent_id is a Nostr pubkey bound by NIP-98: the server verified that key\'s Schnorr signature on the paid settlement request. The leaf then commits SHA-256 of {\"agent_authentication\":\"nip98\",\"agent_id\":\"<pubkey>\"}. Records the server\'s verification, not the signed event itself.'),
   "leaf_index": zod.number().int().min(getEscrowReceiptResponseProofLeafIndexMin),
   "audit_path": zod.array(zod.string().regex(getEscrowReceiptResponseProofAuditPathItemRegExp)),
   "merkle_root": zod.string().regex(getEscrowReceiptResponseProofMerkleRootRegExp),
@@ -377,7 +381,7 @@ export const GetEscrowReceiptResponse = zod.object({
   "task_hash": zod.string(),
   "trace_hash": zod.string(),
   "result_hash": zod.string(),
-  "agent_attribution_hash": zod.string().regex(getEscrowReceiptResponseVerificationAgentAttributionHashRegExp).optional().describe('Fourth leaf segment of an attributed settlement: SHA-256 of {\"agent_id\":\"<agent_id>\"}, verified against proof.agent_id.')
+  "agent_attribution_hash": zod.string().regex(getEscrowReceiptResponseVerificationAgentAttributionHashRegExp).optional().describe('Fourth leaf segment of an attributed settlement: SHA-256 of {\"agent_id\":\"<agent_id>\"}, or of {\"agent_authentication\":\"nip98\",\"agent_id\":\"<pubkey>\"} when NIP-98 authenticated, verified against proof.agent_id and proof.agent_authentication.')
 }),
   "description": zod.string()
 })

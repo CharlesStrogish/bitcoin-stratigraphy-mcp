@@ -21,6 +21,9 @@ ATTESTATION_DIRECTIVE = (
 
 # Mirrors the L402 `agent_id = <id>` caveat grammar enforced by the transport.
 AGENT_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}")
+# `agent_authentication = nip98` qualifies only a Nostr pubkey agent_id.
+NOSTR_PUBKEY_PATTERN = re.compile(r"[0-9a-f]{64}")
+AGENT_AUTHENTICATION_METHODS = frozenset({"nip98"})
 
 
 def _hex32(value, name):
@@ -29,17 +32,28 @@ def _hex32(value, name):
     return value.lower()
 
 
-def agent_attribution_digest(agent_id):
-    """SHA-256 of the canonical attribution payload ``{"agent_id":"<id>"}``.
+def agent_attribution_digest(agent_id, agent_authentication=None):
+    """SHA-256 of the canonical, key-sorted compact attribution payload.
 
     An attributed leaf appends this digest to the original 96 bytes:
-    task_hash || sha256(trace) || sha256(result) || sha256(payload). The ID is
-    the caller-declared value bound by the paid credential's caveat; it is not
-    an authenticated identity.
+    task_hash || sha256(trace) || sha256(result) || sha256(payload).
+    A self-declared ID, bound only by the paid credential's caveat, hashes
+    ``{"agent_id":"<id>"}``. A NIP-98 authenticated ID, a Nostr pubkey whose
+    signature the transport verified, hashes
+    ``{"agent_authentication":"nip98","agent_id":"<pubkey>"}``, so the leaf
+    also commits to the authentication mode.
     """
     if not isinstance(agent_id, str) or AGENT_ID_PATTERN.fullmatch(agent_id) is None:
         raise ValueError("agent_id does not match the caveat grammar")
-    payload = json.dumps({"agent_id": agent_id}, separators=(",", ":"), sort_keys=True)
+    attribution = {"agent_id": agent_id}
+    if agent_authentication is not None:
+        if (
+            agent_authentication not in AGENT_AUTHENTICATION_METHODS
+            or NOSTR_PUBKEY_PATTERN.fullmatch(agent_id) is None
+        ):
+            raise ValueError("agent_authentication requires a NIP-98 pubkey agent_id")
+        attribution["agent_authentication"] = agent_authentication
+    payload = json.dumps(attribution, separators=(",", ":"), sort_keys=True)
     return hashlib.sha256(payload.encode("ascii")).digest()
 
 
@@ -95,17 +109,23 @@ class EscrowEngine:
 
     def verify_execution_and_settle(
         self, escrow_id, execution_trace, result_payload, lightning_settlement=None,
-        agent_id=None,
+        agent_id=None, agent_authentication=None,
     ):
         """Commit caller-authorized execution evidence; release only after commit.
 
         Hashing proves a commitment, not whether the trace completed the task.
         Authentication/task validation and real Lightning custody remain upstream.
-        A supplied agent_id is committed into the leaf and named in the receipt.
+        A supplied agent_id, with its optional authentication mode, is committed
+        into the leaf and named in the receipt.
         """
         if not isinstance(execution_trace, str) or not isinstance(result_payload, str):
             raise ValueError("execution_trace and result_payload must be UTF-8 strings")
-        attribution = b"" if agent_id is None else agent_attribution_digest(agent_id)
+        if agent_id is None and agent_authentication is not None:
+            raise ValueError("agent_authentication requires an agent_id")
+        attribution = (
+            b"" if agent_id is None
+            else agent_attribution_digest(agent_id, agent_authentication)
+        )
         with self.store.transaction() as connection:
             contract = connection.execute(
                 "SELECT * FROM agent_escrow_contracts WHERE escrow_id = ?",
@@ -153,6 +173,8 @@ class EscrowEngine:
             }
             if agent_id is not None:
                 receipt["agent_id"] = agent_id
+            if agent_authentication is not None:
+                receipt["agent_authentication"] = agent_authentication
             # Authenticated transport supplies this only after NWC confirms the
             # exact toll and SHA-256 payment proof. Never persist its preimage.
             if lightning_settlement is not None:
@@ -211,7 +233,10 @@ def create_l402_escrow(buyer_pubkey, worker_pubkey, task_hash, amount_sats):
     )
 
 
-def verify_execution_and_settle(escrow_id, execution_trace, result_payload, agent_id=None):
+def verify_execution_and_settle(
+    escrow_id, execution_trace, result_payload, agent_id=None, agent_authentication=None,
+):
     return _configured_engine().verify_execution_and_settle(
         escrow_id, execution_trace, result_payload, agent_id=agent_id,
+        agent_authentication=agent_authentication,
     )

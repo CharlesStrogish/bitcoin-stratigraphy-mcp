@@ -25,15 +25,19 @@ class EscrowApi:
     def __init__(self, engine: EscrowEngine):
         self.engine = engine
 
-    def dispatch(self, operation, body, lightning_settlement=None, agent_id=None):
+    def dispatch(
+        self, operation, body, lightning_settlement=None, agent_id=None,
+        agent_authentication=None,
+    ):
         """Return (HTTP status, JSON body) to an already authorized transport.
 
-        agent_id is the transport-verified L402 caveat, never a body field.
+        agent_id and agent_authentication are the transport-verified L402
+        caveats, never body fields.
         """
         try:
             if not isinstance(body, dict):
                 return 400, {"error": "Request must be a JSON object"}
-            if agent_id is not None and operation != "settle":
+            if (agent_id is not None or agent_authentication is not None) and operation != "settle":
                 return 400, {"error": "agent_id attributes settlements only"}
             if operation == "create":
                 fields = {"buyer_pubkey", "worker_pubkey", "task_hash", "amount_sats"}
@@ -70,6 +74,7 @@ class EscrowApi:
                     return 422, {"error": "Execution trace and result must be nonempty bounded UTF-8 strings"}
                 settled = self.engine.verify_execution_and_settle(
                     **body, lightning_settlement=lightning_settlement, agent_id=agent_id,
+                    agent_authentication=agent_authentication,
                 )
                 receipt = settled["receipt"]
                 return 200, {
@@ -109,12 +114,18 @@ class EscrowApi:
             if receipt.get("attestation_directive", ATTESTATION_DIRECTIVE) != ATTESTATION_DIRECTIVE:
                 return 422, {"error": "Stored escrow attestation directive is invalid"}
             data = row["leaf_preimage"]
-            # 128-byte leaves commit sha256({"agent_id":...}) as a fourth segment;
-            # the receipt must name exactly that agent, and 96-byte leaves none.
+            # 128-byte leaves commit the canonical attribution digest as a fourth
+            # segment; the receipt must name exactly that agent and authentication
+            # mode, and 96-byte leaves neither.
             if len(data) == 128:
-                if agent_attribution_digest(receipt["agent_id"]) != data[96:]:
+                if agent_attribution_digest(
+                    receipt["agent_id"], receipt.get("agent_authentication"),
+                ) != data[96:]:
                     return 422, {"error": "Stored escrow proof does not verify"}
-            elif len(data) != 96 or "agent_id" in receipt:
+            elif (
+                len(data) != 96 or "agent_id" in receipt
+                or "agent_authentication" in receipt
+            ):
                 return 422, {"error": "Stored escrow proof does not verify"}
             expected = {
                 "escrow_id": escrow_id,

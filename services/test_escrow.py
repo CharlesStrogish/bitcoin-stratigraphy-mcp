@@ -128,6 +128,54 @@ class EscrowTests(unittest.TestCase):
         self.verify_receipt(unattributed)
         self.assertNotEqual(unattributed["execution_leaf_hash"], settled["execution_leaf_hash"])
 
+    def test_nip98_authenticated_attribution_commits_the_mode(self):
+        created = self.create()
+        pubkey = "ab" * 32
+        settled = self.engine.verify_execution_and_settle(
+            created["escrow_id"], "trace", "result",
+            agent_id=pubkey, agent_authentication="nip98",
+        )["receipt"]
+        self.assertEqual(settled["agent_id"], pubkey)
+        self.assertEqual(settled["agent_authentication"], "nip98")
+        canonical = ('{"agent_authentication":"nip98","agent_id":"%s"}' % pubkey).encode()
+        digest = hashlib.sha256(canonical).digest()
+        self.assertEqual(agent_attribution_digest(pubkey, "nip98"), digest)
+        # The same pubkey, self-declared, commits a different leaf segment.
+        self.assertNotEqual(agent_attribution_digest(pubkey), digest)
+        data = (
+            bytes.fromhex(self.task)
+            + hashlib.sha256(b"trace").digest()
+            + hashlib.sha256(b"result").digest()
+            + digest
+        )
+        self.assertEqual(len(data), 128)
+        self.assertEqual(
+            hashlib.sha256(b"\x00" + data).hexdigest(), settled["execution_leaf_hash"],
+        )
+        self.assertTrue(verify_merkle_inclusion(
+            data, settled["leaf_index"], settled["tree_size"],
+            [bytes.fromhex(item) for item in settled["audit_path"]],
+            bytes.fromhex(settled["merkle_root"]),
+        ))
+
+    def test_invalid_agent_authentication_never_settles(self):
+        created = self.create()
+        pubkey = "ab" * 32
+        for agent_id, authentication in (
+            (None, "nip98"), ("planner-7", "nip98"), (pubkey.upper(), "nip98"),
+            (pubkey, "NIP98"), (pubkey, "nip-98"), (pubkey, True), (pubkey, ""),
+        ):
+            with self.assertRaises(ValueError):
+                self.engine.verify_execution_and_settle(
+                    created["escrow_id"], "trace", "result",
+                    agent_id=agent_id, agent_authentication=authentication,
+                )
+        self.assertEqual(self.store.get_contract(created["escrow_id"])["status"], "LOCKED")
+        with self.store.connection() as connection:
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM escrow_execution_leaves").fetchone()[0], 0,
+            )
+
     def test_invalid_agent_attribution_never_settles(self):
         created = self.create()
         for invalid in ("", " planner", "planner 7", "-lead", "a" * 129, 7, b"planner"):

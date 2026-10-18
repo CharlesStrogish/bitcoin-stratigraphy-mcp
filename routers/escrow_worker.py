@@ -46,7 +46,7 @@ def main():
             else:
                 status, body = EscrowApi(engine).dispatch(
                     request["operation"], request["body"], request.get("lightning_settlement"),
-                    request.get("agent_id"),
+                    request.get("agent_id"), request.get("agent_authentication"),
                 )
             print(json.dumps({"status": status, "body": body, "state": export_state(store)}))
     except Exception:

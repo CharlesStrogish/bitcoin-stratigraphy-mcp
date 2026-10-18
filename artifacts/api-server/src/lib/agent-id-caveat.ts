@@ -11,6 +11,12 @@ import type { Request } from "express";
  * canonical caveat, and every redemption must declare the same ID. The HMAC
  * chain proves the credential was issued for that ID; it does not prove that
  * the caller controls it. Any spacing or character variant fails closed.
+ *
+ *   agent_authentication = nip98
+ *
+ * A challenge request signed with NIP-98 instead binds the verified signer:
+ * `agent_id` is its 64-character lowercase hex pubkey, and this companion
+ * caveat makes every redemption present a fresh NIP-98 event from that key.
  */
 export const AGENT_ID_HEADER = "X-Agent-Id";
 const AGENT_ID = "[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}";
@@ -18,6 +24,10 @@ export const AGENT_ID_PATTERN = new RegExp(`^${AGENT_ID}$`);
 const AGENT_ID_CAVEAT = new RegExp(`^agent_id = (${AGENT_ID})$`);
 const AGENT_ID_RULE =
   "1-128 characters from A-Z a-z 0-9 . _ : @ / + = % ~ # -, starting with a letter or digit";
+/** Nostr pubkey form required of a NIP-98 authenticated agent_id. */
+export const NOSTR_PUBKEY_PATTERN = /^[0-9a-f]{64}$/;
+export type AgentAuthentication = "nip98";
+export const AGENT_AUTHENTICATION_CAVEAT = "agent_authentication = nip98";
 
 export function formatAgentIdCaveat(agentId: string): string {
   if (!AGENT_ID_PATTERN.test(agentId)) {
@@ -29,6 +39,26 @@ export function formatAgentIdCaveat(agentId: string): string {
 /** Returns the bound ID only for the exact canonical caveat encoding. */
 export function parseAgentIdCaveat(caveat: string): string | null {
   return AGENT_ID_CAVEAT.exec(caveat)?.[1] ?? null;
+}
+
+/** Returns the method only for the exact canonical caveat encoding. */
+export function parseAgentAuthenticationCaveat(
+  caveat: string,
+): AgentAuthentication | null {
+  return caveat === AGENT_AUTHENTICATION_CAVEAT ? "nip98" : null;
+}
+
+/** Valid only when the authenticated agent_id is a Nostr pubkey. */
+export function isAgentAttribution(
+  agentId: string,
+  authentication?: AgentAuthentication,
+): boolean {
+  return (
+    typeof agentId === "string" &&
+    AGENT_ID_PATTERN.test(agentId) &&
+    (authentication === undefined ||
+      (authentication === "nip98" && NOSTR_PUBKEY_PATTERN.test(agentId)))
+  );
 }
 
 export type AgentIdDeclaration =
@@ -90,4 +120,36 @@ export function agentIdCaveatRejection(
         ? `L402 credential is bound to an agent_id; declare it with ${AGENT_ID_HEADER}`
         : "L402 credential agent_id caveat does not match the declared agent",
   };
+}
+
+/**
+ * Redemption rule for both binding modes. A NIP-98 authenticated credential
+ * requires a fresh NIP-98 event from its bound pubkey on every use; a
+ * declaration alone never satisfies it. A self-declared binding keeps the
+ * declaration rule, where a verified NIP-98 signer counts as the declaration.
+ */
+export function agentBindingRejection(
+  bound: { agentId?: string; agentAuthentication?: AgentAuthentication },
+  presented: { declared?: string; nip98Pubkey?: string },
+): { status: 401 | 403; error: string } | null {
+  if (bound.agentAuthentication !== undefined) {
+    if (presented.nip98Pubkey === undefined) {
+      return {
+        status: 401,
+        error:
+          "L402 credential is bound to a NIP-98 authenticated agent_id; sign this request with that key and send the event in X-Nostr-Authorization",
+      };
+    }
+    return presented.nip98Pubkey === bound.agentId
+      ? null
+      : {
+          status: 403,
+          error:
+            "NIP-98 signer does not match the credential's authenticated agent_id",
+        };
+  }
+  return agentIdCaveatRejection(
+    bound.agentId,
+    presented.nip98Pubkey ?? presented.declared,
+  );
 }

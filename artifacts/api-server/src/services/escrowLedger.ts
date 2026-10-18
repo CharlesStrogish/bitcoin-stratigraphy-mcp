@@ -28,12 +28,14 @@ type LedgerPool = Pick<typeof pool, "connect">;
 /**
  * One committed settlement, appended to escrow_ledger_settlements in the same
  * transaction as the snapshot. agentId is the verified agent_id caveat (null
- * when the paid credential carried none); payment fields are null for
+ * when the paid credential carried none); isAuthenticated is true only when
+ * that agent_id is a NIP-98 verified Nostr pubkey. Payment fields are null for
  * settlements without a verified Lightning toll.
  */
 export type EscrowSettlementRecord = {
   escrowId: string;
   agentId: string | null;
+  isAuthenticated: boolean;
   leafIndex: number;
   executionLeafHash: string;
   merkleRoot: string;
@@ -101,13 +103,13 @@ export async function withEscrowLedger<T>(
       // Append-only attribution record; a failed insert rolls back the settlement.
       const record = out.settlement;
       await client.query(
-        `INSERT INTO escrow_ledger_settlements (ledger_id, escrow_id, agent_id, leaf_index,
-           execution_leaf_hash, merkle_root, settled_at_strata_block, settled_at,
+        `INSERT INTO escrow_ledger_settlements (ledger_id, escrow_id, agent_id, is_authenticated,
+           leaf_index, execution_leaf_hash, merkle_root, settled_at_strata_block, settled_at,
            payment_hash, toll_sats, settlement_provider)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9, $10, $11)`,
-        [id, record.escrowId, record.agentId, record.leafIndex, record.executionLeafHash,
-          record.merkleRoot, record.settledAtStrataBlock, record.settledAt,
-          record.paymentHash, record.tollSats, record.settlementProvider],
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10, $11, $12)`,
+        [id, record.escrowId, record.agentId, record.isAuthenticated, record.leafIndex,
+          record.executionLeafHash, record.merkleRoot, record.settledAtStrataBlock,
+          record.settledAt, record.paymentHash, record.tollSats, record.settlementProvider],
       );
     }
     await client.query(

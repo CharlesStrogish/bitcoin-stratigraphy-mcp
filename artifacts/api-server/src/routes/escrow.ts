@@ -227,8 +227,12 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
           provider: res.locals.l402.provider,
           confirmed_at: new Date().toISOString(),
         } : undefined,
-        // Only the verified agent_id caveat attributes a settlement.
-        operation === "settle" ? res.locals.l402.agentId : undefined);
+        // Only the verified agent caveats attribute a settlement.
+        operation === "settle" && res.locals.l402.agentId !== undefined ? {
+          agentId: res.locals.l402.agentId,
+          ...(res.locals.l402.agentAuthentication === undefined ? {}
+            : { authentication: res.locals.l402.agentAuthentication }),
+        } : undefined);
       if (res.destroyed) return;
       if (result.status !== 200 && result.status !== 201) {
         res.status(result.status).json(result.body);

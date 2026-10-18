@@ -816,18 +816,24 @@ paths:
       operationId: settleEscrow
       tags: [Autonomous Escrow]
       summary: Commit authorized execution evidence and release the escrow preimage
-      description: Public redemption requires the private settlement_capability returned at creation plus live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI; no operator token is required. A valid X-Escrow-Operator-Token remains an optional admin override for legacy recovery. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 macaroon binds the escrow ID, exact execution trace and result payload and is single-use. A supplied 64-hex preimage must match the invoice hash. Without a preimage, retry with the issued macaroon and NWC_LOOKUP, a CoinOS UUID hint, or no proof; the merchant must confirm the exact settled incoming invoice, amount, description and issuing provider. UUIDs are not cryptographic proofs. Pending verification returns 409 while retaining the original invoice. No final JSON or escrow preimage is released before verification. Caller-authorized execution commitments do not independently establish bounty funding, task correctness, or a confirmed Bitcoin anchor. For optional sub-agent attribution, declare agent_id in the X-Agent-Id header or the body when requesting the 402 challenge; the macaroon then carries the strict caveat "agent_id = <agent_id>", and the paid retry must declare the same value. The settlement records it in the durable PostgreSQL ledger and commits SHA-256 of {"agent_id":"<agent_id>"} as a fourth segment of the receipt's RFC 6962 leaf. The value is caller-declared and HMAC-bound, not an authenticated identity.
+      description: Public redemption requires the private settlement_capability returned at creation plus live L402 settlement of exactly the contract's reserved toll_fee_sats via NWC_URI; no operator token is required. A valid X-Escrow-Operator-Token remains an optional admin override for legacy recovery. This route replaces the fixed REST access fee with the protocol toll; create and receipt access remain separately priced at 21 sats. The 402 macaroon binds the escrow ID, exact execution trace and result payload and is single-use. A supplied 64-hex preimage must match the invoice hash. Without a preimage, retry with the issued macaroon and NWC_LOOKUP, a CoinOS UUID hint, or no proof; the merchant must confirm the exact settled incoming invoice, amount, description and issuing provider. UUIDs are not cryptographic proofs. Pending verification returns 409 while retaining the original invoice. No final JSON or escrow preimage is released before verification. Caller-authorized execution commitments do not independently establish bounty funding, task correctness, or a confirmed Bitcoin anchor. Optional sub-agent attribution has two modes. For NIP-98 authentication, sign the 402 challenge request with a kind 27235 event in Authorization (Nostr <base64_event>) or X-Nostr-Authorization whose u, method and payload tags bind this URL, POST and the SHA-256 of the exact body; the verified signer pubkey becomes agent_id, the macaroon adds "agent_authentication = nip98", and the paid retry must carry a fresh NIP-98 event from the same key in X-Nostr-Authorization. An invalid or forged event returns 401 before any invoice. For self-declared attribution without NIP-98, declare agent_id in the X-Agent-Id header or the body; the macaroon carries the strict caveat "agent_id = <agent_id>", and the paid retry must declare the same value. The settlement records agent_id and is_authenticated (true only for NIP-98) in the durable PostgreSQL ledger and commits SHA-256 of the canonical attribution JSON, {"agent_id":"<agent_id>"} or {"agent_authentication":"nip98","agent_id":"<pubkey>"}, as a fourth segment of the receipt's RFC 6962 leaf. A self-declared value is HMAC-bound, not an authenticated identity.
       security:
         - L402: []
       parameters:
         - name: X-Agent-Id
           in: header
           required: false
-          description: Optional sub-agent attribution, identical to the body agent_id when both are sent. A credential bound to an agent_id requires the same declaration on every use.
+          description: Optional self-declared sub-agent attribution, identical to the body agent_id when both are sent and to the signer pubkey when the request is NIP-98 signed. A credential bound to an agent_id requires the same declaration on every use.
           schema:
             type: string
             pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$"
             maxLength: 128
+        - name: X-Nostr-Authorization
+          in: header
+          required: false
+          description: Optional NIP-98 event, Nostr <base64_event>. On the challenge request it authenticates the agent, like Authorization Nostr; on the paid retry it is required for a credential carrying agent_authentication = nip98 and must be signed by its agent_id. The payload tag must contain the SHA-256 of the exact request body.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -842,7 +848,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/EscrowSettlement"
         "400":
-          description: Missing or malformed fields, including a malformed agent_id or a header and body agent_id that differ
+          description: Missing or malformed fields, including a malformed agent_id, a header and body agent_id that differ, or a declared agent_id that differs from the NIP-98 signer
+        "401":
+          description: Invalid or forged NIP-98 authorization, a NIP-98 bound credential redeemed without a fresh NIP-98 event, or an expired or revoked macaroon
         "402":
           description: L402 payment required
           headers:
@@ -855,7 +863,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/L402PaymentRequired"
         "403":
-          description: Creator-held settlement capability or valid admin override required, or the declared agent_id does not match the credential's agent_id caveat
+          description: Creator-held settlement capability or valid admin override required, or the declared agent_id or NIP-98 signer does not match the credential's agent_id caveat
         "409":
           description: Merchant settlement not yet confirmed; retain the original invoice and retry verification
         "404":
@@ -2133,7 +2141,7 @@ components:
           type: string
           pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$"
           maxLength: 128
-          description: Optional sub-agent attribution, equivalent to the X-Agent-Id header. Bound into the 402 challenge's agent_id caveat; the paid retry must declare the same value. Recorded with the settlement and committed into the receipt leaf. Caller-declared, not an authenticated identity.
+          description: Optional self-declared sub-agent attribution, equivalent to the X-Agent-Id header. Bound into the 402 challenge's agent_id caveat; the paid retry must declare the same value. Recorded with the settlement (is_authenticated false) and committed into the receipt leaf. Caller-declared, not an authenticated identity; sign the request with NIP-98 instead for an authenticated agent_id. When sent with a NIP-98 signature it must equal the signer pubkey.
         escrow_id:
           type: string
           format: uuid
@@ -2241,7 +2249,11 @@ components:
         agent_id:
           type: string
           pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$"
-          description: 'Sub-agent named by the paid credential''s agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical JSON {"agent_id":"<agent_id>"}, so execution_leaf_hash and merkle_root commit to it.'
+          description: 'Sub-agent named by the paid credential''s agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical attribution JSON, {"agent_id":"<agent_id>"} when self-declared, so execution_leaf_hash and merkle_root commit to it.'
+        agent_authentication:
+          type: string
+          enum: [nip98]
+          description: 'Present only when agent_id is a Nostr pubkey bound by NIP-98: the server verified that key''s Schnorr signature on the paid settlement request. The leaf then commits SHA-256 of {"agent_authentication":"nip98","agent_id":"<pubkey>"}. Records the server''s verification, not the signed event itself.'
         leaf_index:
           type: integer
           minimum: 0
@@ -2325,7 +2337,7 @@ components:
             agent_attribution_hash:
               type: string
               pattern: "^[0-9a-f]{64}$"
-              description: 'Fourth leaf segment of an attributed settlement: SHA-256 of {"agent_id":"<agent_id>"}, verified against proof.agent_id.'
+              description: 'Fourth leaf segment of an attributed settlement: SHA-256 of {"agent_id":"<agent_id>"}, or of {"agent_authentication":"nip98","agent_id":"<pubkey>"} when NIP-98 authenticated, verified against proof.agent_id and proof.agent_authentication.'
         description:
           type: string
     AuditSubmission:
@@ -4156,7 +4168,11 @@ components:
         agent_id:
           type: string
           pattern: "^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$"
-          description: Present when the challenge request declared X-Agent-Id or a body agent_id. The macaroon carries the matching "agent_id = <agent_id>" caveat, and every redemption must declare the same value.
+          description: Present when the challenge request was NIP-98 signed (the verified signer pubkey) or declared X-Agent-Id or a body agent_id. The macaroon carries the matching "agent_id = <agent_id>" caveat, and every redemption must declare the same value, or re-sign with NIP-98 when agent_authentication is present.
+        agent_authentication:
+          type: string
+          enum: [nip98]
+          description: Present when a valid NIP-98 event signed the challenge request. The macaroon also carries "agent_authentication = nip98", so every redemption must send a fresh NIP-98 event from agent_id in X-Nostr-Authorization; a missing event returns 401 and a different signer 403.
         agent_instruction:
           type: string
           description: Retry guidance naming both settlement paths and the free preflight checks.

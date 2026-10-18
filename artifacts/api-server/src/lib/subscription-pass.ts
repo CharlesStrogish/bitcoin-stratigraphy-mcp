@@ -11,7 +11,14 @@ import {
 } from "../services/l402Caveats";
 import type { SettlementAsset } from "../services/settlement/types";
 import { parseDelegationCaveat } from "./delegation-caveats";
-import { formatAgentIdCaveat, parseAgentIdCaveat } from "./agent-id-caveat";
+import {
+  AGENT_AUTHENTICATION_CAVEAT,
+  formatAgentIdCaveat,
+  isAgentAttribution,
+  parseAgentAuthenticationCaveat,
+  parseAgentIdCaveat,
+  type AgentAuthentication,
+} from "./agent-id-caveat";
 import { equivalentToolNames } from "./mcp-pricing";
 
 export type SubscriptionTier = "1-day" | "30-day";
@@ -57,6 +64,11 @@ export type VerifiedSubscriptionMacaroon = {
   agentTier?: AgentTier;
   /** Caller-declared sub-agent from the single `agent_id = <id>` caveat. */
   agentId?: string;
+  /**
+   * Present with `agent_authentication = nip98`: agentId is a Nostr pubkey,
+   * and every use must carry a fresh NIP-98 event signed by it.
+   */
+  agentAuthentication?: AgentAuthentication;
   paymentAsset: SettlementAsset;
   paymentProvider?: string;
 };
@@ -125,11 +137,22 @@ export function createSubscriptionMacaroon(input: {
   agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
   /** Sub-agent attribution; every use must declare the same ID. */
   agentId?: string;
+  /** NIP-98 verified agentId (a Nostr pubkey); every use must re-sign. */
+  agentAuthentication?: AgentAuthentication;
   paymentAsset?: SettlementAsset;
   paymentProvider?: string;
 }): string {
   if (input.paymentAsset && !input.paymentProvider) {
     throw new Error("Asset-bound macaroons require a settlement provider");
+  }
+  if (
+    input.agentAuthentication !== undefined &&
+    (input.agentId === undefined ||
+      !isAgentAttribution(input.agentId, input.agentAuthentication))
+  ) {
+    throw new RangeError(
+      "NIP-98 authenticated agent_id must be a 64-character lowercase hex pubkey",
+    );
   }
   const identifier = "bitcoin-stratigraphy-subscription-v1";
   const caveats = [
@@ -145,6 +168,9 @@ export function createSubscriptionMacaroon(input: {
     ...(input.agentId === undefined
       ? []
       : [formatAgentIdCaveat(input.agentId)]),
+    ...(input.agentAuthentication === undefined
+      ? []
+      : [AGENT_AUTHENTICATION_CAVEAT]),
   ];
   const token: SerializedMacaroon = {
     identifier,
@@ -191,6 +217,7 @@ export function inspectSubscriptionMacaroon(
     let maxTarget: number | undefined;
     let timeCaveatDeadline: number | undefined;
     let agentId: string | undefined;
+    let agentAuthentication: AgentAuthentication | undefined;
     const requestLimits: number[] = [];
     const meteredScopes: Array<{ tokenId: string; maxRequests: number }> = [];
     for (const caveat of token.caveats) {
@@ -200,6 +227,12 @@ export function inspectSubscriptionMacaroon(
         // One sub-agent per credential: a second binding is never resolved.
         if (agentId !== undefined) return null;
         agentId = boundAgent;
+        continue;
+      }
+      const authentication = parseAgentAuthenticationCaveat(caveat);
+      if (authentication !== null) {
+        if (agentAuthentication !== undefined) return null;
+        agentAuthentication = authentication;
         continue;
       }
       const delegation = parseDelegationCaveat(caveat);
@@ -264,6 +297,10 @@ export function inspectSubscriptionMacaroon(
       agentCaveats === null ||
       paymentAssetCaveat === null ||
       paymentProviderCaveat === null ||
+      // Authentication qualifies exactly one Nostr pubkey agent_id.
+      (agentAuthentication !== undefined &&
+        (agentId === undefined ||
+          !isAgentAttribution(agentId, agentAuthentication))) ||
       (presentingAgent !== undefined &&
         !presentingAgentMatchesCaveats(
           agentCaveats,
@@ -296,6 +333,7 @@ export function inspectSubscriptionMacaroon(
       agentPubkey: agentCaveats?.agentPubkey,
       agentTier: agentCaveats?.agentTier,
       ...(agentId === undefined ? {} : { agentId }),
+      ...(agentAuthentication === undefined ? {} : { agentAuthentication }),
       paymentAsset: paymentAssetCaveat ?? "btc-lightning",
       paymentProvider: paymentProviderCaveat,
     };

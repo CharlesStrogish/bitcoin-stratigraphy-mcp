@@ -82,4 +82,4 @@
 - [Layout overflow checks](layout-overflow-checks.md) — drive the workspace Chromium over DevTools protocol to measure containment; leave the screenshot tool's browsers alone.
 - [Homepage licensing policy](homepage-licensing-policy.md) — keep Module 02 a static enterprise licensing matrix; no database-backed telemetry for visiting CISOs.
 - [Tool integrity trust](tool-integrity-trust.md) — signed descriptions need independently pinned client trust; preserve signing identity across publish cycles and coordinate secret rotation.
-- [Agent ID attribution](agent-id-attribution.md) — self-declared agent_id: HMAC caveat, per-settlement PG rows, 128-byte leaf; never call it authenticated identity.
+- [Agent ID attribution](agent-id-attribution.md) — self-declared vs NIP-98 authenticated agent_id: caveats, is_authenticated rows, leaf digests, rollback hazards.

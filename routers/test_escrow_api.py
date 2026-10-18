@@ -136,6 +136,41 @@ class EscrowApiTests(unittest.TestCase):
                 )
             self.assertEqual(self.api.dispatch("receipt", lookup)[0], 422, forged)
 
+    def test_nip98_attribution_receipt_verifies_and_rejects_downgrade(self):
+        contract = self.create()
+        pubkey = "cd" * 32
+        lookup = {"escrow_id": contract["escrow_id"]}
+        execution = {**lookup, "execution_trace": "trace", "result_payload": "result"}
+        self.assertEqual(self.api.dispatch("lookup", lookup, None, None, "nip98")[0], 400)
+        for agent_id in (None, "planner-7"):
+            self.assertEqual(
+                self.api.dispatch("settle", execution, None, agent_id, "nip98")[0], 422,
+            )
+        self.assertEqual(self.store.get_contract(contract["escrow_id"])["status"], "LOCKED")
+        status, settled = self.api.dispatch("settle", execution, None, pubkey, "nip98")
+        self.assertEqual(status, 200)
+        self.assertEqual(settled["article_12_receipt"]["agent_id"], pubkey)
+        self.assertEqual(settled["article_12_receipt"]["agent_authentication"], "nip98")
+        status, document = self.api.dispatch("receipt", lookup)
+        self.assertEqual(status, 200)
+        self.assertEqual(document["proof"]["agent_authentication"], "nip98")
+        self.assertEqual(
+            document["verification"]["agent_attribution_hash"],
+            agent_attribution_digest(pubkey, "nip98").hex(),
+        )
+        for forged in (None, "nip99"):
+            with self.store.transaction() as connection:
+                row = connection.execute("SELECT receipt_json FROM escrow_execution_leaves").fetchone()
+                receipt = json.loads(row[0])
+                if forged is None:
+                    receipt.pop("agent_authentication", None)
+                else:
+                    receipt["agent_authentication"] = forged
+                connection.execute(
+                    "UPDATE escrow_execution_leaves SET receipt_json=?", (json.dumps(receipt),)
+                )
+            self.assertEqual(self.api.dispatch("receipt", lookup)[0], 422, forged)
+
     def test_unattributed_leaf_cannot_claim_an_agent(self):
         contract = self.create()
         lookup = {"escrow_id": contract["escrow_id"]}
@@ -147,13 +182,17 @@ class EscrowApiTests(unittest.TestCase):
         status, document = self.api.dispatch("receipt", lookup)
         self.assertEqual(status, 200)
         self.assertNotIn("agent_attribution_hash", document["verification"])
-        with self.store.transaction() as connection:
-            row = connection.execute("SELECT receipt_json FROM escrow_execution_leaves").fetchone()
-            receipt = {**json.loads(row[0]), "agent_id": "planner-7"}
-            connection.execute(
-                "UPDATE escrow_execution_leaves SET receipt_json=?", (json.dumps(receipt),)
-            )
-        self.assertEqual(self.api.dispatch("receipt", lookup)[0], 422)
+        with self.store.connection() as connection:
+            original = connection.execute(
+                "SELECT receipt_json FROM escrow_execution_leaves",
+            ).fetchone()[0]
+        for claim in ({"agent_id": "planner-7"}, {"agent_authentication": "nip98"}):
+            with self.store.transaction() as connection:
+                receipt = {**json.loads(original), **claim}
+                connection.execute(
+                    "UPDATE escrow_execution_leaves SET receipt_json=?", (json.dumps(receipt),)
+                )
+            self.assertEqual(self.api.dispatch("receipt", lookup)[0], 422, claim)
 
 
 if __name__ == "__main__":

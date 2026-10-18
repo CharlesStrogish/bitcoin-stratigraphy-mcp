@@ -21,6 +21,7 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+import type { L402PaymentRequiredAgentAuthentication } from './l402PaymentRequiredAgentAuthentication';
 import type { L402PaymentRequiredStagedPreview } from './l402PaymentRequiredStagedPreview';
 import type { L402Preflight } from './l402Preflight';
 import type { L402SettlementPath } from './l402SettlementPath';
@@ -41,10 +42,12 @@ export interface L402PaymentRequired {
   /** @minimum 1 */
   max_requests?: number;
   /**
-     * Present when the challenge request declared X-Agent-Id or a body agent_id. The macaroon carries the matching "agent_id = <agent_id>" caveat, and every redemption must declare the same value.
+     * Present when the challenge request was NIP-98 signed (the verified signer pubkey) or declared X-Agent-Id or a body agent_id. The macaroon carries the matching "agent_id = <agent_id>" caveat, and every redemption must declare the same value, or re-sign with NIP-98 when agent_authentication is present.
      * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
      */
   agent_id?: string;
+  /** Present when a valid NIP-98 event signed the challenge request. The macaroon also carries "agent_authentication = nip98", so every redemption must send a fresh NIP-98 event from agent_id in X-Nostr-Authorization; a missing event returns 401 and a different signer 403. */
+  agent_authentication?: L402PaymentRequiredAgentAuthentication;
   /** Retry guidance naming both settlement paths and the free preflight checks. */
   agent_instruction: string;
   /**

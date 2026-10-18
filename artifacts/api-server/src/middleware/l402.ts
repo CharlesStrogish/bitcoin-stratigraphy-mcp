@@ -9,7 +9,13 @@ import {
   inspectSubscriptionMacaroon,
 } from "../lib/subscription-pass";
 import { MCP_TOOL_NAME_PATTERN } from "../lib/delegation-caveats";
-import { agentIdCaveatRejection, declaredAgentId } from "../lib/agent-id-caveat";
+import {
+  AGENT_ID_HEADER,
+  agentBindingRejection,
+  declaredAgentId,
+  type AgentAuthentication,
+} from "../lib/agent-id-caveat";
+import { verifyRequestNip98Signer } from "../lib/nip98-request";
 import {
   createMemoryMacaroonUsageStore,
   type MacaroonUsageStore,
@@ -125,7 +131,11 @@ export function createL402Middleware(
   const maxChallengeCallers = 10_000;
   let challengeWindowsCleanedAt = 0;
 
-  const sendChallenge = async (req: Request, res: Response, agentId?: string) => {
+  const sendChallenge = async (
+    req: Request,
+    res: Response,
+    agent?: { agentId: string; authentication?: AgentAuthentication },
+  ) => {
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
     if (!secret) {
       res.status(500).json({ error: "SESSION_SECRET is not configured" });
@@ -214,7 +224,14 @@ export function createL402Middleware(
         amountMsats,
         paymentAsset: "btc-lightning",
         paymentProvider: invoice.provider,
-        ...(agentId === undefined ? {} : { agentId }),
+        ...(agent === undefined
+          ? {}
+          : {
+              agentId: agent.agentId,
+              ...(agent.authentication === undefined
+                ? {}
+                : { agentAuthentication: agent.authentication }),
+            }),
       });
       const macaroon = attenuateSubscriptionMacaroon(rootMacaroon, [
         `allowed_path=${resolveScope(req)}`,
@@ -233,7 +250,10 @@ export function createL402Middleware(
         payment_hash: invoice.paymentHash,
         amount_sats: amountSats,
         max_requests: batchSize,
-        ...(agentId === undefined ? {} : { agent_id: agentId }),
+        ...(agent === undefined ? {} : { agent_id: agent.agentId }),
+        ...(agent?.authentication === undefined
+          ? {}
+          : { agent_authentication: agent.authentication }),
         ...l402ChallengeGuidance(),
         staged_preview: awaitingPaymentPreview(amountSats,
           typeof options.expectedOutputSchema === "function" ? options.expectedOutputSchema(req)
@@ -251,6 +271,26 @@ export function createL402Middleware(
     const declaration = declaredAgentId(req);
     if (!declaration.ok) {
       res.status(400).json({ error: declaration.error });
+      return;
+    }
+    // Optional NIP-98 proof of the agent: `Authorization: Nostr <event>` on a
+    // challenge request, X-Nostr-Authorization beside an L402 credential. The
+    // Schnorr-signed event must bind this URL, method and exact body. A
+    // present but invalid or forged event is refused before any invoice.
+    const signer = verifyRequestNip98Signer(req, now());
+    if (signer.provided && signer.pubkey === null) {
+      res.status(401).json({ error: "Invalid NIP-98 authorization" });
+      return;
+    }
+    const nip98Pubkey = signer.provided ? signer.pubkey ?? undefined : undefined;
+    if (
+      nip98Pubkey !== undefined &&
+      declaration.agentId !== undefined &&
+      declaration.agentId !== nip98Pubkey
+    ) {
+      res.status(400).json({
+        error: `${AGENT_ID_HEADER} and body agent_id must equal the NIP-98 signer pubkey`,
+      });
       return;
     }
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
@@ -278,7 +318,11 @@ export function createL402Middleware(
           delegationCaveatRejection(pass, {
             nowMs: requestTime,
             tool: options.tool,
-          }) ?? agentIdCaveatRejection(pass.agentId, declaration.agentId);
+          }) ??
+          agentBindingRejection(pass, {
+            declared: declaration.agentId,
+            nip98Pubkey,
+          });
         if (rejection) {
           res.status(rejection.status).json({ error: rejection.error });
           return;
@@ -410,6 +454,9 @@ export function createL402Middleware(
             settledAt: verification.settledAt,
             provider: verification.provider,
             ...(pass.agentId === undefined ? {} : { agentId: pass.agentId }),
+            ...(pass.agentAuthentication === undefined
+              ? {}
+              : { agentAuthentication: pass.agentAuthentication }),
           };
           next();
           return;
@@ -426,6 +473,16 @@ export function createL402Middleware(
         }
       }
     }
-    await sendChallenge(req, res, declaration.agentId);
+    // A verified signer becomes the authenticated agent_id; otherwise any
+    // self-declared agent_id is bound unauthenticated.
+    await sendChallenge(
+      req,
+      res,
+      nip98Pubkey !== undefined
+        ? { agentId: nip98Pubkey, authentication: "nip98" }
+        : declaration.agentId === undefined
+          ? undefined
+          : { agentId: declaration.agentId },
+    );
   };
 }

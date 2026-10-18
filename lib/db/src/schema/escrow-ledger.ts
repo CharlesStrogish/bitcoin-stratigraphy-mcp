@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   index,
   integer,
   jsonb,
@@ -27,6 +28,9 @@ export type EscrowLedgerRow = typeof escrowLedgerTable.$inferSelect;
 // snapshot. agent_id is the sub-agent named by the paid credential's verified
 // `agent_id` caveat and committed into the receipt's Merkle leaf. The column is
 // nullable with no other default, so it is NULL when no caveat was present.
+// is_authenticated is true only for a NIP-98 bound agent_id (a Nostr pubkey):
+// the server verified that key's Schnorr signature over the paid settlement
+// request itself. Self-declared and unattributed settlements are false.
 export const escrowLedgerSettlementsTable = pgTable(
   "escrow_ledger_settlements",
   {
@@ -35,6 +39,7 @@ export const escrowLedgerSettlementsTable = pgTable(
       .references(() => escrowLedgerTable.id),
     escrowId: text("escrow_id").notNull(),
     agentId: varchar("agent_id", { length: 128 }),
+    isAuthenticated: boolean("is_authenticated").notNull().default(false),
     leafIndex: integer("leaf_index").notNull(),
     executionLeafHash: text("execution_leaf_hash").notNull(),
     merkleRoot: text("merkle_root").notNull(),

@@ -6,10 +6,13 @@ import { createHash } from "node:crypto";
 import { after, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express, { type RequestHandler } from "express";
+import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import { registerEscrowRoutes, assertEscrowMcpRegistryIntegrity } from "./escrow";
 import { registerPublicCors } from "../middleware/publicCors";
 import { openApiDocument } from "../openapi";
-import type { EscrowExecutor, EscrowWorkerResult } from "../services/escrowBridge";
+import type {
+  EscrowAgentAttribution, EscrowExecutor, EscrowWorkerResult,
+} from "../services/escrowBridge";
 import { createEscrowRecovery } from "../services/escrowRecovery";
 import type { SettlementRouter } from "../services/settlement";
 import { createSettlementRouter } from "../services/settlement";
@@ -481,26 +484,36 @@ test(`public create/settle uses ${proof.length === 64 ? "preimage" : proof || "e
   assert.equal(executions, 1);
 });
 
+/** Settles every LOCKED lookup and echoes the forwarded attribution into the receipt. */
+function attributingExecutor(
+  executions: Array<{ body: Record<string, unknown>; attribution?: EscrowAgentAttribution }>,
+): EscrowExecutor {
+  return async (operation, body, _height, _signal, payment, attribution) => {
+    if (operation === "lookup") {
+      assert.equal(attribution, undefined);
+      return { status: 200, body: { status: "LOCKED", toll_fee_sats: 24 } };
+    }
+    assert.equal(operation, "settle");
+    executions.push({ body, ...(attribution === undefined ? {} : { attribution }) });
+    return { status: 200, body: {
+      status: "SETTLED", preimage: "a".repeat(64), merkle_root: receipt.merkle_root,
+      audit_path: [], ots_calendar_standard: OTS_CALENDAR_STANDARD,
+      attestation_directive: ATTESTATION_DIRECTIVE,
+      article_12_receipt: {
+        ...receipt, lightning_settlement: payment,
+        ...(attribution === undefined ? {} : { agent_id: attribution.agentId }),
+        ...(attribution?.authentication === undefined ? {}
+          : { agent_authentication: attribution.authentication }),
+      },
+    } };
+  };
+}
+
 test("settle binds a declared agent_id into the toll macaroon and forwards only the verified caveat", async () => {
-  const executions: Array<{ body: Record<string, unknown>; agentId?: string }> = [];
+  const executions: Array<{ body: Record<string, unknown>; attribution?: EscrowAgentAttribution }> = [];
   const base = await serve({
     readHeight: async () => 900000,
-    execute: async (operation, body, _height, _signal, payment, agentId) => {
-      if (operation === "lookup") {
-        assert.equal(agentId, undefined);
-        return { status: 200, body: { status: "LOCKED", toll_fee_sats: 24 } };
-      }
-      assert.equal(operation, "settle");
-      executions.push({ body, agentId });
-      return { status: 200, body: {
-        status: "SETTLED", preimage: "a".repeat(64), merkle_root: receipt.merkle_root,
-        audit_path: [], ots_calendar_standard: OTS_CALENDAR_STANDARD,
-        attestation_directive: ATTESTATION_DIRECTIVE,
-        article_12_receipt: {
-          ...receipt, lightning_settlement: payment, ...(agentId ? { agent_id: agentId } : {}),
-        },
-      } };
-    },
+    execute: attributingExecutor(executions),
   });
   const challengeFor = async (body: Record<string, unknown>, headers = {}) => {
     const response = await fetch(`${base}/settle`, post(body, { authorization: "", ...headers }));
@@ -530,7 +543,7 @@ test("settle binds a declared agent_id into the toll macaroon and forwards only 
   const output = await settled.json() as { article_12_receipt: { agent_id?: string } };
   assert.equal(output.article_12_receipt.agent_id, "planner-7");
   assert.equal(executions.length, 1);
-  assert.equal(executions[0]!.agentId, "planner-7");
+  assert.deepEqual(executions[0]!.attribution, { agentId: "planner-7" });
   assert.deepEqual(Object.keys(executions[0]!.body).sort(), ["escrow_id", "execution_trace", "result_payload"]);
 
   // Body declaration: the field is stripped; only the caveat reaches the engine.
@@ -541,7 +554,7 @@ test("settle binds a declared agent_id into the toll macaroon and forwards only 
     authorization: `L402 ${bodyQuote.macaroon}:${tollPreimage}`,
   }));
   assert.equal(bodySettled.status, 200);
-  assert.equal(executions[1]!.agentId, "auditor.eu-12");
+  assert.deepEqual(executions[1]!.attribution, { agentId: "auditor.eu-12" });
   assert.equal(Object.hasOwn(executions[1]!.body, "agent_id"), false);
 
   // Undeclared settlements stay unattributed, and late declarations are refused.
@@ -551,7 +564,7 @@ test("settle binds a declared agent_id into the toll macaroon and forwards only 
   const plainPaid = { authorization: `L402 ${plainQuote.macaroon}:${tollPreimage}` };
   assert.equal((await fetch(`${base}/settle`, post(plain, { ...plainPaid, "X-Agent-Id": "planner-7" }))).status, 403);
   assert.equal((await fetch(`${base}/settle`, post(plain, plainPaid))).status, 200);
-  assert.equal(executions[2]!.agentId, undefined);
+  assert.equal(executions[2]!.attribution, undefined);
 
   // Malformed or conflicting declarations never reach a challenge or the engine.
   for (const [attempt, headers] of [
@@ -564,4 +577,52 @@ test("settle binds a declared agent_id into the toll macaroon and forwards only 
     assert.equal(rejected.headers.has("www-authenticate"), false);
   }
   assert.equal(executions.length, 3);
+});
+
+test("settle binds a NIP-98 signer as the authenticated agent_id and refuses forged signatures", async () => {
+  const executions: Array<{ body: Record<string, unknown>; attribution?: EscrowAgentAttribution }> = [];
+  const base = await serve({ readHeight: async () => 900000, execute: attributingExecutor(executions) });
+  const url = `${base}/settle`;
+  const agentKey = generateSecretKey();
+  const agentPubkey = getPublicKey(agentKey);
+  const submission = { escrow_id: id, execution_trace: "signed trace", result_payload: "signed result" };
+  // post() sends JSON.stringify(body), so the payload tag hashes those exact bytes.
+  const sign = (body: unknown) => {
+    const event = finalizeEvent({
+      kind: 27_235, created_at: Math.floor(Date.now() / 1_000), content: "",
+      tags: [["u", url], ["method", "POST"],
+        ["payload", createHash("sha256").update(JSON.stringify(body)).digest("hex")]],
+    }, agentKey);
+    return `Nostr ${Buffer.from(JSON.stringify(event)).toString("base64")}`;
+  };
+
+  // An event claiming another pubkey fails Schnorr verification: 401, no invoice.
+  const genuine = sign(submission);
+  const event = JSON.parse(Buffer.from(genuine.slice("Nostr ".length), "base64").toString("utf8"));
+  const forged = `Nostr ${Buffer.from(JSON.stringify({
+    ...event, pubkey: getPublicKey(generateSecretKey()),
+  })).toString("base64")}`;
+  const refused = await fetch(url, post(submission, { authorization: forged }));
+  assert.equal(refused.status, 401);
+  assert.deepEqual(await refused.json(), { error: "Invalid NIP-98 authorization" });
+  assert.equal(refused.headers.has("www-authenticate"), false);
+
+  const challenge = await fetch(url, post(submission, { authorization: genuine }));
+  assert.equal(challenge.status, 402);
+  const quote = await challenge.json() as { macaroon: string; agent_id?: string; agent_authentication?: string };
+  assert.equal(quote.agent_id, agentPubkey);
+  assert.equal(quote.agent_authentication, "nip98");
+  const paid = { authorization: `L402 ${quote.macaroon}:${tollPreimage}` };
+  // Declaring the pubkey without a fresh signature does not redeem it.
+  assert.equal((await fetch(url, post(submission, { ...paid, "X-Agent-Id": agentPubkey }))).status, 401);
+  assert.equal(executions.length, 0);
+  const settled = await fetch(url, post(submission, { ...paid, "X-Nostr-Authorization": sign(submission) }));
+  assert.equal(settled.status, 200);
+  const output = await settled.json() as {
+    article_12_receipt: { agent_id?: string; agent_authentication?: string };
+  };
+  assert.equal(output.article_12_receipt.agent_id, agentPubkey);
+  assert.equal(output.article_12_receipt.agent_authentication, "nip98");
+  assert.deepEqual(executions.map((execution) => execution.attribution),
+    [{ agentId: agentPubkey, authentication: "nip98" }]);
 });

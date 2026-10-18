@@ -117,6 +117,67 @@ function inspectTag(
     : { state: "invalid" };
 }
 
+/**
+ * Verifies a NIP-98 HTTP Auth event and returns its signer's lowercase pubkey.
+ * The kind 27235 event must have empty content, be at most maxAgeSeconds old
+ * and never future-dated, and carry exactly one `u` tag equal to the absolute
+ * request URL and one `method` tag equal to the HTTP method. With a payload,
+ * exactly one `payload` tag must equal its SHA-256 hex; without one, the event
+ * must carry no payload tag. Any other event, or a bad Schnorr signature,
+ * returns null.
+ */
+export function verifyNip98Signer(input: {
+  authorization: string;
+  method: string;
+  url: string;
+  nowSeconds: number;
+  payload?: Uint8Array | string;
+  maxAgeSeconds?: number;
+}): string | null {
+  const { nowSeconds, payload } = input;
+  const maxAgeSeconds = input.maxAgeSeconds ?? 60;
+  const event = decodeNip98Event(input.authorization);
+  if (
+    !event ||
+    event.kind !== 27_235 ||
+    !Number.isSafeInteger(event.created_at) ||
+    event.created_at > nowSeconds ||
+    nowSeconds - event.created_at > maxAgeSeconds ||
+    event.content !== ""
+  ) {
+    return null;
+  }
+  const eventUrl = inspectTag(event, "u");
+  const eventMethod = inspectTag(event, "method");
+  const eventPayload = inspectTag(event, "payload");
+  if (
+    eventUrl.state !== "valid" ||
+    eventMethod.state !== "valid" ||
+    eventUrl.value !== input.url ||
+    eventMethod.value !== input.method
+  ) {
+    return null;
+  }
+  if (payload !== undefined) {
+    const expectedPayload = createHash("sha256").update(payload).digest("hex");
+    if (
+      eventPayload.state !== "valid" ||
+      eventPayload.value !== expectedPayload
+    ) {
+      return null;
+    }
+  } else if (eventPayload.state !== "absent") {
+    return null;
+  }
+  try {
+    if (!verifyEvent(event)) return null;
+    const pubkey = event.pubkey.toLowerCase();
+    return PUBKEY_PATTERN.test(pubkey) ? pubkey : null;
+  } catch {
+    return null;
+  }
+}
+
 export function createAgentReputationService(input?: {
   tiers?: Record<string, AgentTier>;
   now?: () => number;
@@ -148,47 +209,15 @@ export function createAgentReputationService(input?: {
       nowSeconds = Math.floor(now() / 1_000),
       payload,
     }) {
-      const event = decodeNip98Event(authorization);
-      if (
-        !event ||
-        event.kind !== 27_235 ||
-        !Number.isSafeInteger(event.created_at) ||
-        event.created_at > nowSeconds ||
-        nowSeconds - event.created_at > maxAgeSeconds ||
-        event.content !== ""
-      ) {
-        return null;
-      }
-      const eventUrl = inspectTag(event, "u");
-      const eventMethod = inspectTag(event, "method");
-      const eventPayload = inspectTag(event, "payload");
-      if (
-        eventUrl.state !== "valid" ||
-        eventMethod.state !== "valid" ||
-        eventUrl.value !== url ||
-        eventMethod.value !== method
-      ) {
-        return null;
-      }
-      if (payload !== undefined) {
-        const expectedPayload = createHash("sha256")
-          .update(payload)
-          .digest("hex");
-        if (
-          eventPayload.state !== "valid" ||
-          eventPayload.value !== expectedPayload
-        ) {
-          return null;
-        }
-      } else if (eventPayload.state !== "absent") {
-        return null;
-      }
-      try {
-        if (!verifyEvent(event)) return null;
-        return identityForPubkey(event.pubkey);
-      } catch {
-        return null;
-      }
+      const pubkey = verifyNip98Signer({
+        authorization,
+        method,
+        url,
+        nowSeconds,
+        payload,
+        maxAgeSeconds,
+      });
+      return pubkey === null ? null : identityForPubkey(pubkey);
     },
     applyPricing(originalPriceSats, identity) {
       if (!Number.isSafeInteger(originalPriceSats) || originalPriceSats < 1) {

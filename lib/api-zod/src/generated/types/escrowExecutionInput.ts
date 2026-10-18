@@ -29,7 +29,7 @@ export interface EscrowExecutionInput {
      */
   settlement_capability?: string;
   /**
-     * Optional sub-agent attribution, equivalent to the X-Agent-Id header. Bound into the 402 challenge's agent_id caveat; the paid retry must declare the same value. Recorded with the settlement and committed into the receipt leaf. Caller-declared, not an authenticated identity.
+     * Optional self-declared sub-agent attribution, equivalent to the X-Agent-Id header. Bound into the 402 challenge's agent_id caveat; the paid retry must declare the same value. Recorded with the settlement (is_authenticated false) and committed into the receipt leaf. Caller-declared, not an authenticated identity; sign the request with NIP-98 instead for an authenticated agent_id. When sent with a NIP-98 signature it must equal the signer pubkey.
      * @maxLength 128
      * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
      */

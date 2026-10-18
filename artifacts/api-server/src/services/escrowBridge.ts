@@ -8,9 +8,17 @@ import { readEscrowBitcoinPrice } from "./escrowPricing";
 import {
   withEscrowLedger, ESCROW_GENESIS, type EscrowSettlementRecord, type EscrowState,
 } from "./escrowLedger";
-import { AGENT_ID_PATTERN } from "../lib/agent-id-caveat";
+import {
+  AGENT_ID_PATTERN, isAgentAttribution, type AgentAuthentication,
+} from "../lib/agent-id-caveat";
 
 export type EscrowOperation = "create" | "settle" | "lookup" | "receipt" | "stats";
+/** Verified agent caveats of the paid settlement credential. */
+export type EscrowAgentAttribution = {
+  agentId: string;
+  /** Present when agentId is a NIP-98 verified Nostr pubkey. */
+  authentication?: AgentAuthentication;
+};
 const workerResult = z.object({
   status: z.union([z.literal(200), z.literal(201), z.literal(400),
     z.literal(404), z.literal(422), z.literal(503)]),
@@ -29,8 +37,7 @@ export type EscrowExecutor = (
   height?: number,
   signal?: AbortSignal,
   lightningSettlement?: EscrowLightningSettlement,
-  /** Verified agent_id caveat of the paid settlement credential. */
-  agentId?: string,
+  attribution?: EscrowAgentAttribution,
 ) => Promise<EscrowWorkerResult>;
 
 const hex64 = z.string().regex(/^[0-9a-f]{64}$/);
@@ -43,6 +50,7 @@ const settledReceipt = z.object({
   settled_at_strata_block: z.number().int().nonnegative(),
   timestamp: z.string().datetime({ offset: true }),
   agent_id: z.string().regex(AGENT_ID_PATTERN).optional(),
+  agent_authentication: z.literal("nip98").optional(),
   lightning_settlement: z.object({
     payment_hash: hex64,
     amount_sats: z.number().int().positive(),
@@ -51,12 +59,18 @@ const settledReceipt = z.object({
 }).passthrough();
 
 /** Derives the attribution row and fails unless the receipt names exactly the requested agent. */
-function settlementRecord(body: Record<string, unknown>, agentId?: string): EscrowSettlementRecord {
+function settlementRecord(
+  body: Record<string, unknown>, attribution?: EscrowAgentAttribution,
+): EscrowSettlementRecord {
   const receipt = settledReceipt.parse(body.article_12_receipt);
-  if (receipt.agent_id !== agentId) throw new Error("Escrow receipt agent attribution mismatch");
+  if (receipt.agent_id !== attribution?.agentId
+      || receipt.agent_authentication !== attribution?.authentication) {
+    throw new Error("Escrow receipt agent attribution mismatch");
+  }
   return {
     escrowId: receipt.escrow_id,
     agentId: receipt.agent_id ?? null,
+    isAuthenticated: receipt.agent_authentication === "nip98",
     leafIndex: receipt.leaf_index,
     executionLeafHash: receipt.execution_leaf_hash,
     merkleRoot: receipt.merkle_root,
@@ -70,12 +84,12 @@ function settlementRecord(body: Record<string, unknown>, agentId?: string): Escr
 
 /** Only staged source code is bundled. The custody DB never enters dist/. */
 export const executeEscrow: EscrowExecutor = async (
-  operation, body, height, signal, lightningSettlement, agentId,
+  operation, body, height, signal, lightningSettlement, attribution,
 ) => {
   if (signal?.aborted) throw new Error("Escrow request cancelled");
   const price = operation === "create" ? await readEscrowBitcoinPrice() : undefined;
   return withEscrowLedger((state) => runEscrowWorker(
-    operation, body, state, height, signal, lightningSettlement, price, undefined, agentId,
+    operation, body, state, height, signal, lightningSettlement, price, undefined, attribution,
   ));
 };
 
@@ -83,11 +97,12 @@ export function runEscrowWorker(
   operation: EscrowOperation, body: Record<string, unknown>, state: EscrowState | null,
   height?: number, signal?: AbortSignal, lightningSettlement?: EscrowLightningSettlement,
   price?: number | null, legacyPath = path.resolve(process.cwd(), ".data/escrow/escrow.sqlite3"),
-  agentId?: string,
+  attribution?: EscrowAgentAttribution,
 ): Promise<{ state: EscrowState; result: EscrowWorkerResult; settlement?: EscrowSettlementRecord }> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error("Escrow request cancelled"));
-    if (agentId !== undefined && (operation !== "settle" || !AGENT_ID_PATTERN.test(agentId))) {
+    if (attribution !== undefined && (operation !== "settle"
+        || !isAgentAttribution(attribution.agentId, attribution.authentication))) {
       return reject(new Error("Invalid escrow agent attribution"));
     }
     const managedPython = fileURLToPath(
@@ -140,7 +155,7 @@ export function runEscrowWorker(
           throw new Error("Missing durable escrow state");
         }
         const settlement = operation === "settle" && result.status === 200
-          ? settlementRecord(result.body, agentId) : undefined;
+          ? settlementRecord(result.body, attribution) : undefined;
         finish(undefined, { result, state: output.state, ...(settlement ? { settlement } : {}) });
       } catch {
         finish(new Error("Invalid escrow worker response"));
@@ -149,7 +164,11 @@ export function runEscrowWorker(
     child.stdin.end(JSON.stringify({
       operation, body, strata_height: height, btc_usd_price: price,
       lightning_settlement: lightningSettlement,
-      ...(agentId === undefined ? {} : { agent_id: agentId }),
+      ...(attribution === undefined ? {} : {
+        agent_id: attribution.agentId,
+        ...(attribution.authentication === undefined ? {}
+          : { agent_authentication: attribution.authentication }),
+      }),
       state, genesis_id: ESCROW_GENESIS.create_response.escrow_id,
       database_path: legacyPath,
     }));

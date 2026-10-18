@@ -123,11 +123,14 @@ test("durable escrow recovers genesis, contracts, proofs and exact totals after 
 test("settlements record the verified agent_id in PostgreSQL and commit it into the receipt leaf", async () => {
   const id = `escrow-agent-${randomUUID()}`;
   const execute = (op: EscrowOperation, body: Record<string, unknown> = {},
-    payment?: EscrowLightningSettlement, agentId?: string) =>
+    payment?: EscrowLightningSettlement, agentId?: string, authentication?: "nip98") =>
     withEscrowLedger((state) => runEscrowWorker(
       op, body, state, 900000, undefined, payment, 100_000,
-      `/nonexistent/escrow-fixture-${id}.sqlite3`, agentId,
+      `/nonexistent/escrow-fixture-${id}.sqlite3`,
+      agentId === undefined ? undefined
+        : { agentId, ...(authentication === undefined ? {} : { authentication }) },
     ), pool, id);
+  const agentPubkey = "ab".repeat(32);
   const sha256 = (data: string | Buffer) => createHash("sha256").update(data).digest();
   try {
     await pool.query("INSERT INTO escrow_ledger (id, genesis) VALUES ($1, $2::jsonb)",
@@ -140,9 +143,15 @@ test("settlements record the verified agent_id in PostgreSQL and commit it into 
       assert.equal(created.status, 201);
       return { escrowId: String(created.body.escrow_id), tollSats: Number(created.body.toll_fee_sats) };
     };
+    const { rows: [column] } = await pool.query(
+      `SELECT data_type, is_nullable, column_default FROM information_schema.columns
+       WHERE table_name='escrow_ledger_settlements' AND column_name='is_authenticated'`);
+    assert.deepEqual(column, { data_type: "boolean", is_nullable: "NO", column_default: "false" });
     const attributedTask = "33".repeat(32);
     const { escrowId: attributed, tollSats } = await create(attributedTask);
     const unattributed = (await create("44".repeat(32))).escrowId;
+    const authenticatedTask = "88".repeat(32);
+    const authenticated = (await create(authenticatedTask)).escrowId;
     assert.ok(Number.isSafeInteger(tollSats) && tollSats > 0);
     const toll = (paymentHash: string): EscrowLightningSettlement => ({
       payment_hash: paymentHash, amount_sats: tollSats,
@@ -154,6 +163,12 @@ test("settlements record the verified agent_id in PostgreSQL and commit it into 
     await assert.rejects(execute("settle", {
       escrow_id: attributed, execution_trace: "agent trace", result_payload: "agent result",
     }, toll("55".repeat(32)), "planner 7"), /agent attribution/);
+    // NIP-98 authentication qualifies only a lowercase Nostr pubkey.
+    for (const agentId of ["planner-7", agentPubkey.toUpperCase()]) {
+      await assert.rejects(execute("settle", {
+        escrow_id: authenticated, execution_trace: "signed trace", result_payload: "signed result",
+      }, toll("77".repeat(32)), agentId, "nip98"), /agent attribution/);
+    }
 
     const settled = await execute("settle", {
       escrow_id: attributed, execution_trace: "agent trace", result_payload: "agent result",
@@ -182,24 +197,53 @@ test("settlements record the verified agent_id in PostgreSQL and commit it into 
     assert.equal(plainReceipt.execution_leaf_hash,
       sha256(Buffer.concat([Buffer.from([0]), plainLeaf])).toString("hex"));
 
+    // A NIP-98 authenticated agent also commits its authentication mode.
+    const signed = await execute("settle", {
+      escrow_id: authenticated, execution_trace: "signed trace", result_payload: "signed result",
+    }, toll("77".repeat(32)), agentPubkey, "nip98");
+    assert.equal(signed.status, 200);
+    const signedReceipt = signed.body.article_12_receipt as Record<string, unknown>;
+    assert.equal(signedReceipt.agent_id, agentPubkey);
+    assert.equal(signedReceipt.agent_authentication, "nip98");
+    assert.equal(Object.hasOwn(receipt, "agent_authentication"), false);
+    // Canonical key-sorted JSON: {"agent_authentication":"nip98","agent_id":"<pubkey>"}.
+    const signedAttribution = sha256(JSON.stringify({
+      agent_authentication: "nip98", agent_id: agentPubkey,
+    }));
+    const signedLeaf = Buffer.concat([
+      Buffer.from(authenticatedTask, "hex"), sha256("signed trace"), sha256("signed result"),
+      signedAttribution,
+    ]);
+    assert.equal(signedReceipt.execution_leaf_hash,
+      sha256(Buffer.concat([Buffer.from([0]), signedLeaf])).toString("hex"));
+
     // bigint columns arrive as strings from the raw driver; the fixtures fit in int.
     const { rows } = await pool.query(
-      `SELECT escrow_id, agent_id, leaf_index, execution_leaf_hash, merkle_root,
+      `SELECT escrow_id, agent_id, is_authenticated, leaf_index, execution_leaf_hash, merkle_root,
          settled_at_strata_block::int AS settled_at_strata_block, settled_at, payment_hash,
          toll_sats::int AS toll_sats, settlement_provider
        FROM escrow_ledger_settlements WHERE ledger_id=$1 ORDER BY leaf_index`, [id]);
     assert.deepEqual(rows.map((row) => ({ ...row, settled_at: row.settled_at.toISOString() })), [
       {
-        escrow_id: attributed, agent_id: "planner-7", leaf_index: receipt.leaf_index,
+        escrow_id: attributed, agent_id: "planner-7", is_authenticated: false,
+        leaf_index: receipt.leaf_index,
         execution_leaf_hash: receipt.execution_leaf_hash, merkle_root: receipt.merkle_root,
         settled_at_strata_block: 900000, settled_at: new Date(String(receipt.timestamp)).toISOString(),
         payment_hash: "55".repeat(32), toll_sats: tollSats, settlement_provider: "test-confirmed",
       },
       {
-        escrow_id: unattributed, agent_id: null, leaf_index: plainReceipt.leaf_index,
+        escrow_id: unattributed, agent_id: null, is_authenticated: false,
+        leaf_index: plainReceipt.leaf_index,
         execution_leaf_hash: plainReceipt.execution_leaf_hash, merkle_root: plainReceipt.merkle_root,
         settled_at_strata_block: 900000, settled_at: new Date(String(plainReceipt.timestamp)).toISOString(),
         payment_hash: "66".repeat(32), toll_sats: tollSats, settlement_provider: "test-confirmed",
+      },
+      {
+        escrow_id: authenticated, agent_id: agentPubkey, is_authenticated: true,
+        leaf_index: signedReceipt.leaf_index,
+        execution_leaf_hash: signedReceipt.execution_leaf_hash, merkle_root: signedReceipt.merkle_root,
+        settled_at_strata_block: 900000, settled_at: new Date(String(signedReceipt.timestamp)).toISOString(),
+        payment_hash: "77".repeat(32), toll_sats: tollSats, settlement_provider: "test-confirmed",
       },
     ]);
 
@@ -210,7 +254,12 @@ test("settlements record the verified agent_id in PostgreSQL and commit it into 
     assert.equal(verification.merkle_inclusion, true);
     assert.equal(verification.agent_attribution_hash, attribution.toString("hex"));
     assert.equal((document.body.proof as Record<string, unknown>).agent_id, "planner-7");
-    assert.equal((await execute("stats")).body.verified_toll_sats, 24 + 2 * tollSats);
+    const signedDocument = await execute("receipt", { escrow_id: authenticated });
+    assert.equal(signedDocument.status, 200);
+    assert.equal((signedDocument.body.verification as Record<string, unknown>).agent_attribution_hash,
+      signedAttribution.toString("hex"));
+    assert.equal((signedDocument.body.proof as Record<string, unknown>).agent_authentication, "nip98");
+    assert.equal((await execute("stats")).body.verified_toll_sats, 24 + 3 * tollSats);
 
     // A rejected settlement records nothing, and a second settlement never duplicates the row.
     assert.equal((await execute("settle", {
@@ -218,7 +267,7 @@ test("settlements record the verified agent_id in PostgreSQL and commit it into 
     }, toll("55".repeat(32)), "planner-7")).status, 422);
     const count = await pool.query(
       "SELECT COUNT(*)::int AS n FROM escrow_ledger_settlements WHERE ledger_id=$1", [id]);
-    assert.equal(count.rows[0].n, 2);
+    assert.equal(count.rows[0].n, 3);
 
     // Rewriting the attributed agent in the durable snapshot fails verification.
     const { rows: [snapshot] } = await pool.query("SELECT state FROM escrow_ledger WHERE id=$1", [id]);
@@ -227,8 +276,18 @@ test("settlements record the verified agent_id in PostgreSQL and commit it into 
     forged.receipt_json = JSON.stringify({
       ...JSON.parse(String(forged.receipt_json)), agent_id: "planner-8",
     });
+    // Claiming or dropping authentication changes the committed digest too.
+    const upgraded = state.leaves.find((row) => row.escrow_id === unattributed)!;
+    upgraded.receipt_json = JSON.stringify({
+      ...JSON.parse(String(upgraded.receipt_json)), agent_authentication: "nip98",
+    });
+    const downgraded = state.leaves.find((row) => row.escrow_id === authenticated)!;
+    const { agent_authentication: _dropped, ...unsigned } = JSON.parse(String(downgraded.receipt_json));
+    downgraded.receipt_json = JSON.stringify(unsigned);
     await pool.query("UPDATE escrow_ledger SET state=$2::jsonb WHERE id=$1", [id, JSON.stringify(state)]);
-    assert.equal((await execute("receipt", { escrow_id: attributed })).status, 422);
+    for (const escrowId of [attributed, unattributed, authenticated]) {
+      assert.equal((await execute("receipt", { escrow_id: escrowId })).status, 422);
+    }
   } finally {
     await deleteLedgerFixture(id);
   }
@@ -245,7 +304,8 @@ test("a failed settlement record rolls back the snapshot and releases nothing", 
     release() {},
   };
   const settlement: EscrowSettlementRecord = {
-    escrowId: "11111111-1111-4111-8111-111111111111", agentId: "planner-7", leafIndex: 1,
+    escrowId: "11111111-1111-4111-8111-111111111111", agentId: "planner-7", isAuthenticated: false,
+    leafIndex: 1,
     executionLeafHash: "a".repeat(64), merkleRoot: "b".repeat(64), settledAtStrataBlock: 900000,
     settledAt: "2026-10-18T12:00:00Z", paymentHash: null, tollSats: null, settlementProvider: null,
   };

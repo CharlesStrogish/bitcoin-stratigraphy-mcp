@@ -21,6 +21,7 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+import type { EscrowReceiptAgentAuthentication } from './escrowReceiptAgentAuthentication';
 import type { EscrowReceiptAttestationDirective } from './escrowReceiptAttestationDirective';
 import type { EscrowReceiptLightningSettlement } from './escrowReceiptLightningSettlement';
 import type { EscrowReceiptOtsCalendarStandard } from './escrowReceiptOtsCalendarStandard';
@@ -34,10 +35,12 @@ export interface EscrowReceipt {
   lightning_settlement?: EscrowReceiptLightningSettlement;
   escrow_id: string;
   /**
-     * Sub-agent named by the paid credential's agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical JSON {"agent_id":"<agent_id>"}, so execution_leaf_hash and merkle_root commit to it.
+     * Sub-agent named by the paid credential's agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical attribution JSON, {"agent_id":"<agent_id>"} when self-declared, so execution_leaf_hash and merkle_root commit to it.
      * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
      */
   agent_id?: string;
+  /** Present only when agent_id is a Nostr pubkey bound by NIP-98: the server verified that key's Schnorr signature on the paid settlement request. The leaf then commits SHA-256 of {"agent_authentication":"nip98","agent_id":"<pubkey>"}. Records the server's verification, not the signed event itself. */
+  agent_authentication?: EscrowReceiptAgentAuthentication;
   /** @minimum 0 */
   leaf_index: number;
   /** @items.pattern ^[0-9a-f]{64}$ */

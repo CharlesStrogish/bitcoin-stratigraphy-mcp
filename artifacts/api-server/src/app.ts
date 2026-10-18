@@ -14,6 +14,8 @@ import {
 import { registerToolIntegrityRoute } from "./routes/tool-integrity";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
 import { logger } from "./lib/logger";
+import { createMcpAsyncTaskRunner } from "./lib/mcp-async-tasks";
+import { loadToolIntegrityKey } from "./lib/tool-integrity";
 import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
 import { registerNostrStatusRoute } from "./routes/nostr-status";
 import { createPostgresMacaroonUsageStore } from "./lib/postgres-macaroon-usage-store";
@@ -107,13 +109,17 @@ const macaroonUsageStore = createPostgresMacaroonUsageStore();
 registerOpenApiRoute(app);
 registerDocsRoutes(app);
 registerMcpServerCardRoute(app);
+// One Ed25519 identity signs the tool-description manifest and every async
+// webhook callback, so receivers verify both with the same public key.
+const toolIntegrityKey = loadToolIntegrityKey();
 registerMcpRoute(app, {
   usageStore: macaroonUsageStore,
   ledger: revenueLedger,
   meshService,
   publicRateLimiter,
+  asyncTaskRunner: createMcpAsyncTaskRunner({ signingKey: toolIntegrityKey }),
 });
-registerToolIntegrityRoute(app, mcpToolDefinitions);
+registerToolIntegrityRoute(app, mcpToolDefinitions, toolIntegrityKey);
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);

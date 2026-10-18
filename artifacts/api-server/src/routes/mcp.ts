@@ -16,6 +16,7 @@ import {
   WEBHOOK_URL_EXAMPLE,
   WEBHOOK_URL_MAX_LENGTH,
   WEBHOOK_URL_PATTERN,
+  WebhookTargetError,
   createMcpAsyncTaskRunner,
   requestedWebhookUrl,
   runMcpToolCallInMemory,
@@ -5399,7 +5400,18 @@ export function registerMcpRoute(
     try {
       await asyncTasks.checkWebhookTarget(webhookUrl);
       return undefined;
-    } catch {
+    } catch (error) {
+      if (!(error instanceof WebhookTargetError)) {
+        // Callbacks are always signed; without the key no task is accepted.
+        return {
+          status: 503,
+          error: {
+            code: -32603,
+            message:
+              "Signed webhook delivery is unavailable; retry later or omit webhook_url for a synchronous result",
+          },
+        };
+      }
       // One message for every DNS outcome, so callers cannot map internal names.
       return {
         status: 400,

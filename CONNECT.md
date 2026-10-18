@@ -307,7 +307,8 @@ argument. Add it to the paid call; the rest of the L402 flow is unchanged.
    ```
 
 3. **Callback.** When the tool finishes, the server sends one `POST` to the
-   callback with `Content-Type: application/json` and an `X-MCP-Task-Id` header:
+   callback with `Content-Type: application/json`, an `X-MCP-Task-Id` header
+   and Standard Webhooks signature headers (see below):
 
    ```json
    {"task_id":"5d0c6f1e-6a43-4c8e-9f0b-2f1d4c7b9a10","status":"completed","tool":"stratigraphy.get_range","request_id":7,"created_at":"2026-10-18T14:03:11.204Z","completed_at":"2026-10-18T14:03:12.877Z","result":{"content":[{"type":"text","text":"…"}],"structuredContent":{"…":"…"}}}
@@ -320,13 +321,31 @@ argument. Add it to the paid call; the rest of the L402 flow is unchanged.
    arrives with `"status":"failed"` and an `error` object instead of `result`.
    A task that runs longer than 120 seconds is delivered as failed.
 
+Every callback is signed with the server's Ed25519 tool-integrity key under the
+[Standard Webhooks](https://www.standardwebhooks.com/) asymmetric scheme:
+
+```text
+Webhook-Id: 5d0c6f1e-6a43-4c8e-9f0b-2f1d4c7b9a10
+Webhook-Timestamp: 1792332192
+Webhook-Signature: v1a,<base64 Ed25519 signature>
+```
+
+`Webhook-Id` is the `task_id`, `Webhook-Timestamp` is the Unix time in seconds
+of the delivery attempt, and the signature covers the UTF-8 string
+`<Webhook-Id>.<Webhook-Timestamp>.<raw body>`. Fetch `server_public_key` once
+from `https://bitcoinstratigraphy.com/.well-known/integrity.json`, pin it, and
+verify each callback against the exact body bytes before parsing it. Reject
+timestamps more than five minutes old, accept only a `task_id` you received in
+a 202, and process each `Webhook-Id` once. See
+[docs/tool-integrity.md](docs/tool-integrity.md#webhook-callback-signatures)
+for a Node.js verifier.
+
 Delivery is best effort. The server makes up to three attempts, retries only
 network errors and HTTP 408, 425, 429 and 5xx, never follows redirects, and
-expects any 2xx answer. Callbacks are not signed, so use an unguessable path or
-query token and accept only a `task_id` you received in a 202. Tasks are kept in
-server memory: a restart loses pending work, and there is no endpoint to poll.
-This is not the MCP Tasks extension (`tasks/get`). Omit `webhook_url` to keep
-the standard synchronous result.
+expects any 2xx answer. Each retry is signed again with a new timestamp. Tasks
+are kept in server memory: a restart loses pending work, and there is no
+endpoint to poll. This is not the MCP Tasks extension (`tasks/get`). Omit
+`webhook_url` to keep the standard synchronous result.
 
 Credentials with a `max_target` caveat still fetch the range before the 202, so
 the caveat is enforced before the payment is used. The official MCP SDK clients

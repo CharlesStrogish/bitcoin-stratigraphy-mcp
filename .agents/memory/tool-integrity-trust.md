@@ -18,7 +18,9 @@ in documentation and claims.
 
 Coordinate signing-key rotation with client pin distribution. Do not treat
 ordinary secret rotation or an ephemeral published filesystem as a harmless
-integrity-key storage change.
+integrity-key storage change. Since 2026-10-18 the same key also signs async
+webhook callbacks (Standard Webhooks `v1a`), so rotation affects webhook
+receivers as well as description verifiers.
 
 **Why:** Published local files do not survive republishing. Persistent-secret
 derivation was deliberately selected to keep this deployment's key stable

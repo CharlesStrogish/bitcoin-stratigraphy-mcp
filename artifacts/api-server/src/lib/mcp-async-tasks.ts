@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
-import { randomUUID } from "node:crypto";
+import { randomUUID, sign, type KeyObject } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
@@ -13,6 +13,7 @@ import {
 import { z } from "zod";
 import { logger } from "./logger";
 import { RELEASE_VERSION } from "./public-site";
+import { loadToolIntegrityKey } from "./tool-integrity";
 
 /**
  * Zero-polling execution for long-running paid tools. A paid call that names
@@ -314,7 +315,41 @@ export type McpTaskWebhookPayload = {
 
 type TaskLogger = Pick<typeof logger, "info" | "warn" | "error">;
 
+/** Standard Webhooks signature identifier for asymmetric Ed25519 signatures. */
+export const WEBHOOK_SIGNATURE_VERSION = "v1a";
+
+/**
+ * Standard Webhooks asymmetric signature: Ed25519 over the UTF-8 bytes of
+ * `${webhookId}.${timestamp}.${body}`, where body is the exact request body
+ * and timestamp is integer Unix seconds. Returns the `Webhook-Signature` value.
+ */
+export function signStandardWebhook(
+  privateKey: KeyObject,
+  webhookId: string,
+  timestamp: number,
+  body: string,
+): string {
+  // A "." in the id or a non-integer time would make the signed content ambiguous.
+  if (!webhookId || webhookId.includes(".")) {
+    throw new Error("Webhook id must be non-empty and contain no '.'");
+  }
+  if (!Number.isSafeInteger(timestamp) || timestamp < 0) {
+    throw new Error("Webhook timestamp must be integer Unix seconds");
+  }
+  const signature = sign(
+    null,
+    Buffer.from(`${webhookId}.${timestamp}.${body}`, "utf8"),
+    privateKey,
+  );
+  return `${WEBHOOK_SIGNATURE_VERSION},${signature.toString("base64")}`;
+}
+
 export type McpAsyncTaskRunnerOptions = {
+  /**
+   * Ed25519 private key that signs every callback. Defaults to the
+   * tool-integrity key, whose public key /.well-known/integrity.json serves.
+   */
+  signingKey?: KeyObject | (() => KeyObject);
   transport?: WebhookTransport;
   resolveHost?: ResolveHost;
   isAllowedAddress?: (address: string) => boolean;
@@ -331,7 +366,10 @@ export type McpAsyncTaskRunnerOptions = {
 export type McpAsyncTaskRunner = {
   /** False once accepted-but-undelivered tasks reach the pending cap. */
   hasCapacity(): boolean;
-  /** Pre-payment DNS policy check; throws WebhookTargetError. */
+  /**
+   * Pre-payment check. Throws WebhookTargetError for a refused URL or DNS
+   * answer, and a plain Error when callbacks cannot be signed.
+   */
   checkWebhookTarget(webhookUrl: string): Promise<void>;
   /** Queues a paid task; call only after payment has been verified. */
   accept(input: {
@@ -392,12 +430,41 @@ export function createMcpAsyncTaskRunner(
   const inflight = new Set<Promise<void>>();
   let pending = 0;
   let running = 0;
+  let signingKey: KeyObject | undefined;
 
-  const headersFor = (task: QueuedTask): Record<string, string> => ({
-    "Content-Type": "application/json",
-    "User-Agent": `bitcoin-stratigraphy-mcp-webhook/${RELEASE_VERSION}`,
-    "X-MCP-Task-Id": task.id,
-  });
+  /** Loads and checks the signing key once; throws while it is unavailable. */
+  const webhookSigningKey = (): KeyObject => {
+    if (signingKey) return signingKey;
+    try {
+      const configured = options.signingKey ?? loadToolIntegrityKey;
+      const key = typeof configured === "function" ? configured() : configured;
+      if (key.type !== "private" || key.asymmetricKeyType !== "ed25519") {
+        throw new Error("Webhook signing requires an Ed25519 private key");
+      }
+      signingKey = key;
+      return key;
+    } catch (error) {
+      log.error({ err: error }, "MCP async webhook signing key unavailable");
+      throw error;
+    }
+  };
+
+  /** Standard Webhooks headers, signed afresh for each delivery attempt. */
+  const headersFor = (
+    task: QueuedTask,
+    body: string,
+    key: KeyObject,
+  ): Record<string, string> => {
+    const timestamp = Math.floor(now() / 1000);
+    return {
+      "Content-Type": "application/json",
+      "User-Agent": `bitcoin-stratigraphy-mcp-webhook/${RELEASE_VERSION}`,
+      "X-MCP-Task-Id": task.id,
+      "Webhook-Id": task.id,
+      "Webhook-Timestamp": String(timestamp),
+      "Webhook-Signature": signStandardWebhook(key, task.id, timestamp, body),
+    };
+  };
 
   async function execute(task: QueuedTask): Promise<McpTaskOutcome> {
     const controller = new AbortController();
@@ -442,13 +509,24 @@ export function createMcpAsyncTaskRunner(
       webhookHost: task.webhook.host,
       status: payload.status,
     };
+    let key: KeyObject;
+    try {
+      key = webhookSigningKey();
+    } catch {
+      // Fail closed: a callback is never sent unsigned.
+      log.warn(
+        { ...context, reason: "signing key unavailable" },
+        "MCP async task webhook delivery failed",
+      );
+      return;
+    }
     let reason = "delivery error";
     for (let attempt = 1; attempt <= deliveryAttempts; attempt += 1) {
       try {
         const status = await transport({
           url: task.webhook,
           body,
-          headers: headersFor(task),
+          headers: headersFor(task, body, key),
           signal: AbortSignal.timeout(deliveryTimeoutMs),
         });
         if (status >= 200 && status < 300) {
@@ -515,6 +593,8 @@ export function createMcpAsyncTaskRunner(
   return {
     hasCapacity: () => pending < maxPending,
     async checkWebhookTarget(webhookUrl) {
+      // No paid task is accepted while its callback could not be signed.
+      webhookSigningKey();
       const problem = webhookUrlProblem(webhookUrl);
       if (problem) throw new WebhookTargetError(problem);
       await resolvePublicAddresses(

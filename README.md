@@ -318,7 +318,9 @@ MCP names** returned by `tools/list`.
 `webhook_url`. After the L402 payment is verified, the server answers
 **HTTP 202 Accepted** with a `task_id` and status `pending`, runs the tool in the
 background, then POSTs the final MCP result (or JSON-RPC error) with the same
-`task_id` to the callback. Without `webhook_url` the call stays synchronous.
+`task_id` to the callback. Each callback is signed under the Standard Webhooks
+scheme (`Webhook-Signature: v1a,…`, Ed25519) with the key published at
+`/.well-known/integrity.json`. Without `webhook_url` the call stays synchronous.
 Unsafe callback targets are refused before an invoice is issued, and tasks live
 in server memory, so a restart loses pending work. See
 [CONNECT.md](CONNECT.md#zero-polling-execution-with-webhook_url) for the request

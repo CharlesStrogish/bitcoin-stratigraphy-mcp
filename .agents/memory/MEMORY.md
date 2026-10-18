@@ -81,8 +81,8 @@
 - [Dead CSS pruning](dead-css-pruning.md) — token scans miss common-word and template-family classes; diff HEAD vs now with a strict string pass, review by hand.
 - [Layout overflow checks](layout-overflow-checks.md) — drive the workspace Chromium over DevTools protocol to measure containment; leave the screenshot tool's browsers alone.
 - [Homepage licensing policy](homepage-licensing-policy.md) — keep Module 02 a static enterprise licensing matrix; no database-backed telemetry for visiting CISOs.
-- [Tool integrity trust](tool-integrity-trust.md) — signed descriptions need independently pinned client trust; preserve signing identity across publish cycles and coordinate secret rotation.
+- [Tool integrity trust](tool-integrity-trust.md) — pinned client trust; the key also signs webhooks, so preserve identity across publishes and coordinate rotation.
 - [Agent ID attribution](agent-id-attribution.md) — self-declared vs NIP-98 authenticated agent_id: caveats, is_authenticated rows, leaf digests, rollback hazards.
 - [Dual-era MCP transport](mcp-stateless-transport.md) — stateless 2026-07-28 beside handshake clients; strict JSON-RPC errors, header checks, per-instance limits.
 - [API server shared dist](api-server-shared-dist.md) — workflow builds and pnpm test both rewrite api-server dist; never overlap them, restart the server after tests.
-- [MCP async webhooks](mcp-async-webhooks.md) — user-defined 202 + POST callback, not the Tasks extension; check callbacks before invoicing, dispatch after payment.
+- [MCP async webhooks](mcp-async-webhooks.md) — user-defined 202 + POST callback, not Tasks; check before invoicing, dispatch after payment; v1a Ed25519 signatures.

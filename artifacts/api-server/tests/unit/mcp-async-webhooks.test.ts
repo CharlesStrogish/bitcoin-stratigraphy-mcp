@@ -1,6 +1,13 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import {
+  createHash,
+  createPublicKey,
+  generateKeyPairSync,
+  randomUUID,
+  verify,
+  type KeyObject,
+} from "node:crypto";
 import http, { type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, test } from "node:test";
@@ -25,8 +32,16 @@ import {
   mcpToolDefinitions,
   registerMcpRoute,
 } from "../../src/routes/mcp";
+import { registerToolIntegrityRoute } from "../../src/routes/tool-integrity";
 import type { PrimaryStratigraphyBackend } from "../../src/services/primaryStratigraphy";
 import type { SettlementRouter } from "../../src/services/settlement";
+
+// Zero-configuration signing: runners and the integrity manifest both default
+// to the tool-integrity key. Pin it for this process so no key file is written.
+const integrityKeyBefore = process.env.TOOL_INTEGRITY_PRIVATE_KEY;
+process.env.TOOL_INTEGRITY_PRIVATE_KEY = generateKeyPairSync("ed25519")
+  .privateKey.export({ type: "pkcs8", format: "pem" })
+  .toString();
 
 const MODERN = "2026-07-28";
 const LEGACY = "2025-11-25";
@@ -87,6 +102,8 @@ function testRunner(
 type Delivery = {
   path: string;
   headers: IncomingHttpHeaders;
+  /** Exact bytes received: the signature covers these, not a re-serialization. */
+  raw: Buffer;
   body: McpTaskWebhookPayload;
 };
 const deliveries: Delivery[] = [];
@@ -95,10 +112,12 @@ const receiver = http.createServer((req, res) => {
   const chunks: Buffer[] = [];
   req.on("data", (chunk: Buffer) => chunks.push(chunk));
   req.on("end", () => {
+    const raw = Buffer.concat(chunks);
     deliveries.push({
       path: req.url ?? "",
       headers: req.headers,
-      body: JSON.parse(Buffer.concat(chunks).toString("utf8")),
+      raw,
+      body: JSON.parse(raw.toString("utf8")),
     });
     res.statusCode = receiverStatuses.shift() ?? 204;
     res.end();
@@ -192,6 +211,8 @@ async function startApp(runner: McpAsyncTaskRunner): Promise<{ url: string }> {
     revocationStore: createMemoryMacaroonRevocationStore(),
     asyncTaskRunner: runner,
   });
+  // Default key, as for a runner without signingKey: receivers pin this one.
+  registerToolIntegrityRoute(app, mcpToolDefinitions);
   const server = app.listen(0, "127.0.0.1");
   servers.push(server);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -222,6 +243,11 @@ after(async () => {
     ),
   );
   await pool.end();
+  if (integrityKeyBefore === undefined) {
+    delete process.env.TOOL_INTEGRITY_PRIVATE_KEY;
+  } else {
+    process.env.TOOL_INTEGRITY_PRIVATE_KEY = integrityKeyBefore;
+  }
 });
 
 type RpcBody = {
@@ -336,6 +362,74 @@ function assertAcknowledgement(
   return { task_id: ack.task_id!, created_at: ack.created_at! };
 }
 
+/** The key a receiver pins: fetched from the app's integrity manifest. */
+async function manifestPublicKey(url = endpoint): Promise<KeyObject> {
+  const response = await fetch(new URL("/.well-known/integrity.json", url));
+  assert.equal(response.status, 200);
+  const manifest = (await response.json()) as {
+    algorithm: string;
+    server_public_key: string;
+  };
+  assert.equal(manifest.algorithm, "Ed25519");
+  return createPublicKey(manifest.server_public_key);
+}
+
+/**
+ * Independent Standard Webhooks check: accept a space-delimited "v1a,<base64>"
+ * Ed25519 entry over `${id}.${timestamp}.` followed by the raw body bytes.
+ */
+function webhookSignatureValid(
+  publicKey: KeyObject,
+  id: string,
+  timestamp: string,
+  raw: Buffer,
+  signatureHeader: string,
+): boolean {
+  const content = Buffer.concat([
+    Buffer.from(`${id}.${timestamp}.`, "utf8"),
+    raw,
+  ]);
+  return signatureHeader.split(" ").some((entry) => {
+    const [version, signature] = entry.split(",");
+    return (
+      version === "v1a" &&
+      signature !== undefined &&
+      verify(null, content, publicKey, Buffer.from(signature, "base64"))
+    );
+  });
+}
+
+function header(delivery: Delivery, name: string): string {
+  const value = delivery.headers[name];
+  assert.equal(typeof value, "string", name);
+  return value as string;
+}
+
+/** Asserts the Standard Webhooks headers and signature; returns the timestamp. */
+function assertSignedDelivery(
+  delivery: Delivery,
+  publicKey: KeyObject,
+): number {
+  const id = header(delivery, "webhook-id");
+  const timestamp = header(delivery, "webhook-timestamp");
+  const signature = header(delivery, "webhook-signature");
+  assert.equal(id, delivery.body.task_id);
+  assert.equal(id, header(delivery, "x-mcp-task-id"));
+  assert.match(timestamp, /^[1-9]\d*$/);
+  assert.ok(
+    Math.abs(Date.now() / 1000 - Number(timestamp)) <= 300,
+    "timestamp within the five-minute tolerance",
+  );
+  // A single entry: the asymmetric identifier and a 64-byte Ed25519 signature.
+  assert.match(signature, /^v1a,[A-Za-z0-9+/]{86}==$/);
+  assert.equal(Buffer.from(signature.slice(4), "base64").length, 64);
+  assert.ok(
+    webhookSignatureValid(publicKey, id, timestamp, delivery.raw, signature),
+    "signature verifies against the manifest public key",
+  );
+  return Number(timestamp);
+}
+
 const proofArguments = {
   proof: {
     piA: ["1", "2", "1"],
@@ -397,6 +491,41 @@ test(
     assert.match(
       delivery!.headers["user-agent"] ?? "",
       /^bitcoin-stratigraphy-mcp-webhook\/\S+$/,
+    );
+
+    // Standard Webhooks: Ed25519 (v1a) over task_id.timestamp.raw_body,
+    // verified with the public key a receiver fetches from integrity.json.
+    const publicKey = await manifestPublicKey();
+    assert.equal(header(delivery!, "webhook-id"), ack.task_id);
+    const signedAt = assertSignedDelivery(delivery!, publicKey);
+    assert.ok(signedAt >= Math.floor(Date.parse(ack.created_at) / 1000));
+    const signature = header(delivery!, "webhook-signature");
+    const tamperedBody = Buffer.from(
+      delivery!.raw.toString("utf8").replace('"completed"', '"failed"'),
+    );
+    assert.notDeepEqual(tamperedBody, delivery!.raw);
+    for (const [id, timestamp, raw, signed] of [
+      [ack.task_id, String(signedAt), tamperedBody, signature],
+      [ack.task_id, String(signedAt + 1), delivery!.raw, signature],
+      [randomUUID(), String(signedAt), delivery!.raw, signature],
+      // v1 is the HMAC-SHA256 identifier; an Ed25519 value is only valid as v1a.
+      [ack.task_id, String(signedAt), delivery!.raw, `v1${signature.slice(3)}`],
+    ] as const) {
+      assert.equal(
+        webhookSignatureValid(publicKey, id, timestamp, raw, signed),
+        false,
+      );
+    }
+    const otherKey = createPublicKey(generateKeyPairSync("ed25519").privateKey);
+    assert.equal(
+      webhookSignatureValid(
+        otherKey,
+        ack.task_id,
+        String(signedAt),
+        delivery!.raw,
+        signature,
+      ),
+      false,
     );
     const payload = delivery!.body;
     assert.deepEqual(Object.keys(payload).sort(), [
@@ -674,6 +803,8 @@ test(
         "stratigraphy.get_range",
       );
       await runner.drain();
+      // Failure callbacks are signed exactly like completed ones.
+      assertSignedDelivery(deliveries.at(-1)!, await manifestPublicKey());
       const payload = deliveries.at(-1)!.body;
       assert.equal(payload.task_id, ack.task_id);
       assert.equal(payload.status, "failed");
@@ -738,7 +869,12 @@ test(
   "delivery retries transient failures only, and stalled or crashed tasks report failure",
   bounded,
   async () => {
-    const runnerUnderTest = testRunner({ taskTimeoutMs: 50 });
+    // Each clock reading advances one second, so every attempt gets its own time.
+    let clock = Date.now();
+    const runnerUnderTest = testRunner({
+      taskTimeoutMs: 50,
+      now: () => (clock += 1_000),
+    });
     const completed = async () => ({ result: { ok: true } });
     const deliveredFor = (taskId: string) =>
       deliveries.filter((delivery) => delivery.body.task_id === taskId);
@@ -751,7 +887,27 @@ test(
       execute: completed,
     });
     await runnerUnderTest.drain();
-    assert.equal(deliveredFor(retried.task_id).length, 3);
+    const attempts = deliveredFor(retried.task_id);
+    assert.equal(attempts.length, 3);
+    // Retries keep the Webhook-Id and body but are re-signed for a fresh time.
+    const publicKey = await manifestPublicKey();
+    const signedAt = attempts.map((attempt) =>
+      assertSignedDelivery(attempt, publicKey),
+    );
+    assert.ok(signedAt[0]! < signedAt[1]! && signedAt[1]! < signedAt[2]!);
+    assert.equal(
+      new Set(attempts.map((attempt) => header(attempt, "webhook-id"))).size,
+      1,
+    );
+    assert.equal(
+      new Set(attempts.map((attempt) => attempt.raw.toString("hex"))).size,
+      1,
+    );
+    assert.equal(
+      new Set(attempts.map((attempt) => header(attempt, "webhook-signature")))
+        .size,
+      3,
+    );
 
     receiverStatuses.push(404);
     const rejected = runnerUnderTest.accept({
@@ -802,6 +958,73 @@ test(
           JSON.stringify(entry.fields).includes("target rejected"),
       ),
     );
+  },
+);
+
+test(
+  "callbacks are never sent unsigned: without a signing key, webhook calls are refused before invoicing",
+  bounded,
+  async () => {
+    const unsigned = testRunner({
+      signingKey: () => {
+        throw new Error("signing key unavailable");
+      },
+    });
+    const { url } = await startApp(unsigned);
+    const invoicesBefore = invoiceCount;
+    const deliveredBefore = deliveries.length;
+    const refused = await post(
+      call(111, "stratigraphy.get_range", {
+        startTarget: "919712",
+        webhook_url: hookUrl("/unsigned"),
+      }),
+      undefined,
+      url,
+    );
+    assert.equal(refused.response.status, 503);
+    assert.equal(refused.response.headers.get("retry-after"), "30");
+    assert.deepEqual(refused.body?.error, {
+      code: -32603,
+      message:
+        "Signed webhook delivery is unavailable; retry later or omit webhook_url for a synchronous result",
+    });
+    assert.equal(invoiceCount, invoicesBefore);
+    // Synchronous calls are unaffected and still receive the 402 challenge.
+    const sync = await post(
+      call(112, "stratigraphy.get_range", { startTarget: "919712" }),
+      undefined,
+      url,
+    );
+    assert.equal(sync.response.status, 402);
+
+    // A task that reaches the runner anyway is dropped, never posted unsigned.
+    const dropped = unsigned.accept({
+      tool: "proof.submit",
+      webhookUrl: hookUrl("/unsigned"),
+      execute: async () => ({ result: { ok: true } }),
+    });
+    await unsigned.drain();
+    assert.equal(deliveries.length, deliveredBefore);
+    assert.ok(
+      logs.some(
+        (entry) =>
+          entry.level === "warn" &&
+          JSON.stringify(entry.fields).includes(dropped.task_id) &&
+          JSON.stringify(entry.fields).includes("signing key unavailable"),
+      ),
+    );
+
+    // Only an Ed25519 private key can sign.
+    for (const signingKey of [
+      generateKeyPairSync("x25519").privateKey,
+      generateKeyPairSync("ed25519").publicKey,
+    ]) {
+      await assert.rejects(
+        testRunner({ signingKey }).checkWebhookTarget(hookUrl("/wrong-key")),
+        (error: Error) =>
+          error.name === "Error" && /Ed25519 private key/.test(error.message),
+      );
+    }
   },
 );
 

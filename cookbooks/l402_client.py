@@ -44,6 +44,7 @@ CANONICAL_TOOLS = frozenset(
         "mesh.get_status",
         "mesh.broadcast",
         "payment.get_info",
+        "workflow.audit_trajectory",
     }
 )
 
@@ -465,9 +466,9 @@ class BitcoinStratigraphyClient:
 
 def validate_catalog(tools: list[dict]) -> list[dict]:
     names = [tool["name"] for tool in tools]
-    if len(names) != 15 or len(set(names)) != 15 or set(names) != CANONICAL_TOOLS:
+    if len(names) != 16 or len(set(names)) != 16 or set(names) != CANONICAL_TOOLS:
         raise ValueError(
-            "Remote catalog does not match the 15 canonical Stratigraphy tools"
+            "Remote catalog does not match the 16 canonical Stratigraphy tools"
         )
     return tools
 

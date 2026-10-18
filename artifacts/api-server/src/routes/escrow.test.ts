@@ -65,9 +65,9 @@ function post(body: unknown, headers = {}) {
     body: JSON.stringify(body) };
 }
 
-test("preserves exactly 15 MCP tool schemas and documents all three REST routes", () => {
+test("preserves exactly 16 MCP tool schemas and documents all three REST routes", () => {
   assertEscrowMcpRegistryIntegrity();
-  assert.equal(Object.keys(openApiDocument["x-mcp-tools"] as object).length, 15);
+  assert.equal(Object.keys(openApiDocument["x-mcp-tools"] as object).length, 16);
   const paths = openApiDocument.paths as Record<string, Record<string, { tags: string[] }>>;
   for (const [path, method] of [
     ["/v1/escrow/create", "post"], ["/v1/escrow/settle", "post"],

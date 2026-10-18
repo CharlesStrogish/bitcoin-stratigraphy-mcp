@@ -7,7 +7,7 @@ The batch-cost probe intentionally POSTs {"tools": [...]} using the requested
 descriptive names. It does NOT silently replace this with the existing GET cost
 route or payment.get_info. A passing batch response must expose perToolSats (or
 costs) keyed by both requested names, with positive integer satoshi prices.
-The other probes use the existing canonical 15-tool catalog.
+The other probes use the canonical 16-tool catalog.
 
 A protected call may create an unpaid invoice. No payment is attempted.
 Challenge validation checks syntax/checksum, not cryptographic authenticity.
@@ -46,9 +46,10 @@ EXPECTED_TOOLS = frozenset(
         "mesh.get_status",
         "mesh.broadcast",
         "payment.get_info",
+        "workflow.audit_trajectory",
     }
 )
-NAMESPACES = {"stratigraphy": 5, "proof": 7, "mesh": 2, "payment": 1}
+NAMESPACES = {"stratigraphy": 5, "proof": 7, "mesh": 2, "payment": 1, "workflow": 1}
 COST_TOOLS = ["stratigraphy.get_latest", "proof.verify_zk_proof"]
 PROTOCOL_VERSION = "2025-03-26"
 MCP_HEADERS = {
@@ -183,27 +184,27 @@ async def check_manifest(client: httpx.AsyncClient) -> str:
         isinstance(capability, dict), "Manifest MCP tool capability must be an object"
     )
     require(
-        type(capability.get("count")) is int and capability["count"] == 15,
-        "Manifest must declare 15 tools",
+        type(capability.get("count")) is int and capability["count"] == 16,
+        "Manifest must declare 16 tools",
     )
     declared = capability.get("namespaces")
     require(
         isinstance(declared, list)
-        and len(declared) == 4
+        and len(declared) == 5
         and set(declared) == set(NAMESPACES),
-        "Manifest must declare the four expected namespaces",
+        "Manifest must declare the five expected namespaces",
     )
     # This manifest declares count/namespaces, not individual tool schemas.
     # Verify those declarations against the real capability catalog.
     catalog = await rpc(client, "tools/list", "health-tools", {})
     tools = catalog.get("tools")
     require(
-        isinstance(tools, list) and len(tools) == 15,
-        "Live catalog must contain exactly 15 tools",
+        isinstance(tools, list) and len(tools) == 16,
+        "Live catalog must contain exactly 16 tools",
     )
     require(
         not catalog.get("nextCursor"),
-        "15-tool catalog unexpectedly requires pagination",
+        "16-tool catalog unexpectedly requires pagination",
     )
     require(
         all(isinstance(tool, dict) for tool in tools),
@@ -213,7 +214,7 @@ async def check_manifest(client: httpx.AsyncClient) -> str:
     require(all(isinstance(name, str) for name in names), "Every tool must have a name")
     require(
         set(names) == EXPECTED_TOOLS,
-        "Live catalog does not match the canonical 15 tools",
+        "Live catalog does not match the canonical 16 tools",
     )
     require(
         Counter(name.split(".", 1)[0] for name in names) == NAMESPACES,
@@ -225,7 +226,7 @@ async def check_manifest(client: httpx.AsyncClient) -> str:
             isinstance(schema, dict) and schema.get("type") == "object",
             f"{tool['name']} must expose an object input schema",
         )
-    return "HTTP 200; wildcard CORS; 15 live schemas across four namespaces"
+    return "HTTP 200; wildcard CORS; 16 live schemas across five namespaces"
 
 
 async def check_cost(client: httpx.AsyncClient) -> str:

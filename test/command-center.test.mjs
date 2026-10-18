@@ -23,7 +23,7 @@ const catalogTools = [
   ...catalog.matchAll(/\{\s*name: "([a-z_]+\.[a-z_]+)",\s*title: "([^"]+)"/g),
 ].map(([, name, title]) => ({ name, title }));
 
-test("command center lists exactly the 15 priced canonical MCP tools", () => {
+test("command center lists exactly the 16 priced canonical MCP tools", () => {
   const priceTable = pricing.match(
     /export const mcpToolPrices = Object\.freeze\(\{([\s\S]*?)\}\);/,
   );
@@ -31,7 +31,7 @@ test("command center lists exactly the 15 priced canonical MCP tools", () => {
   const priced = [...priceTable[1].matchAll(/"([a-z_]+\.[a-z_]+)":/g)]
     .map(([, name]) => name)
     .sort();
-  assert.equal(priced.length, 15);
+  assert.equal(priced.length, 16);
   assert.deepEqual(catalogTools.map((tool) => tool.name).sort(), priced);
   assert.doesNotMatch(catalog, /\bprice\w*\s*:/i, "fees are quoted live");
 });

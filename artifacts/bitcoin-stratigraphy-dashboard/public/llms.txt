@@ -2,7 +2,7 @@
 
 > Bitcoin Stratigraphy (v2.1.3, https://bitcoinstratigraphy.com) serves indexed
 > Bitcoin telemetry, cryptographic verification, OpenTimestamps notarization and
-> off-chain Bitcoin-tip receipts through 15 canonical MCP tools and paid REST
+> off-chain Bitcoin-tip receipts through 16 canonical MCP tools and paid REST
 > routes, settled with L402 Lightning payments. MCP stratigraphy tools serve
 > captured UTC pipeline snapshots as described by `tools/list`; the REST dataset
 > and Hugging Face export use deterministic daily height labels, not live-tip
@@ -36,7 +36,12 @@ PostgreSQL (`DATABASE_URL`), `SESSION_SECRET` and `NOSTR_PRIVATE_KEY`; live
 Lightning requires `NWC_URI`, and the canonical stratigraphy tools require the
 licensed Python companion described in the package README.
 
-## The 15 canonical MCP tools
+## The 16 canonical MCP tools
+
+- `workflow.audit_trajectory` (250 sats): one deterministic diff and compact
+  SHA-256/OTS receipt-reference report for required `fromTarget` and `toTarget`.
+  Accepts the same real-height/UTC-date selectors as get_diff. Live boundaries
+  have a fingerprint and null archived receipt, not fabricated Bitcoin proof.
 Only `stratigraphy.list` (alias `stratigraphy.latest`) and `proof.list` (alias
 `proof.status`) are free. The other thirteen are paid per call (currently 250
 sats each); confirm live prices with `payment.get_info` or `/api/v1/cost`.

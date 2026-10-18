@@ -91,9 +91,9 @@ async def main() -> None:
         spec = McpToolSpec(client=client)
         tools = await spec.to_tool_list_async()
         names = {tool.metadata.name for tool in tools}
-        if len(tools) != 15 or not DEMO_TOOLS.issubset(names):
+        if len(tools) != 16 or not DEMO_TOOLS.issubset(names):
             raise RuntimeError(
-                "Expected the published 15-tool catalog; publish Phase 1 or check --url"
+                "Expected the published 16-tool catalog; publish the latest build or check --url"
             )
         print(
             f"Discovered {len(tools)} canonical MCP tools: {', '.join(sorted(names))}"
@@ -108,7 +108,7 @@ async def main() -> None:
         from llama_index.llms.openai import OpenAI
 
         # A single notarization credential cannot unlock every paid capability.
-        # Keep all 15 discovered tools in `tools`, but expose only these two for
+        # Keep all 16 discovered tools in `tools`, but expose only these two for
         # the demo: proof.notarize (paid) and stratigraphy.list (free).
         demo = [tool for tool in tools if tool.metadata.name in DEMO_TOOLS]
         for tool in demo:
@@ -145,7 +145,7 @@ if __name__ == "__main__":
         # Avoid dumping HTTP exceptions that can contain paid credentials.
         print(
             f"Quickstart failed ({type(error).__name__}). Check framework dependencies, "
-            "the published 15-tool endpoint, and your L402 pass/proxy. "
+            "the published 16-tool endpoint, and your L402 pass/proxy. "
             "A 402 requires an explicitly funded or renewed tool-scoped pass.",
             file=sys.stderr,
         )

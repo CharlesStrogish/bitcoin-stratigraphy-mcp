@@ -87,6 +87,7 @@ import {
 } from "../services/primaryStratigraphy";
 import { primaryStratigraphyContracts } from "../services/primaryStratigraphySchemas";
 import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
+import { AUDIT_TRAJECTORY_DESCRIPTION, AUDIT_TRAJECTORY_OUTPUT_SCHEMA } from "../lib/workflow-audit";
 import { buildProvenanceChain } from "../services/provenanceChain";
 import {
   getProvenanceAnchor,
@@ -395,6 +396,14 @@ const stratigraphyDiffInputSchema = z
       .default("latest"),
   })
   .strict();
+
+const auditTrajectoryInputSchema = stratigraphyDiffInputSchema.extend({
+  toTarget: stratigraphyDiffInputSchema.shape.toTarget.removeDefault(),
+});
+
+function isPrimaryDataTool(name: string): boolean {
+  return name.startsWith("stratigraphy.") || name === "workflow.audit_trajectory";
+}
 
 const stratigraphyRangeInputSchema = z
   .object({
@@ -1482,7 +1491,7 @@ async function withinMcpTargetBound(
   actualHeights?: number[],
 ): Promise<boolean> {
   name = canonicalToolName(name);
-  if (name.startsWith("stratigraphy.")) {
+  if (isPrimaryDataTool(name)) {
     return Boolean(actualHeights?.length) &&
       actualHeights!.every((height) => height <= maxTarget);
   }
@@ -4361,9 +4370,35 @@ export const mcpToolDefinitions = [
         },
       },
     })),
+  {
+    name: "workflow.audit_trajectory",
+    title: "Audit Thermodynamic Trajectory",
+    description: AUDIT_TRAJECTORY_DESCRIPTION,
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      description: "Two required exact real Bitcoin height or UTC date boundaries; toTarget also accepts latest.",
+      examples: [{ fromTarget: "2026-10-12", toTarget: "latest" }],
+      properties: {
+        fromTarget: field("string", "Baseline real Bitcoin height or valid YYYY-MM-DD UTC date; latest is not a baseline.", ["2026-10-12"], { pattern: diffTargetPattern }),
+        toTarget: field("string", "Required comparison real Bitcoin height, valid YYYY-MM-DD UTC date, or latest.", ["latest"], { pattern: diffEndTargetPattern }),
+      },
+      required: ["fromTarget", "toTarget"],
+    },
+    outputSchema: AUDIT_TRAJECTORY_OUTPUT_SCHEMA,
+    annotations: {
+      ...readOnlyToolAnnotations,
+      l402: { amountSats: mcpToolPrices["workflow.audit_trajectory"], batchSize: 100, batchHeader: "X-L402-Batch-Size" },
+    },
+    _meta: { attestation_directive: ATTESTATION_DIRECTIVE },
+  },
 ];
 
 const paidTools = {
+  "workflow.audit_trajectory": {
+    amountSats: mcpToolPrices["workflow.audit_trajectory"],
+    schema: auditTrajectoryInputSchema,
+  },
   "proof.notarize": {
     amountSats: mcpToolPrices["proof.notarize"],
     schema: notarizeInputSchema,
@@ -4503,7 +4538,7 @@ function createBitcoinStratigraphyMcpServer(
     if (!mcpToolDefinitions.some((tool) => tool.name === name)) {
       throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
     }
-    if (name.startsWith("stratigraphy.")) {
+    if (isPrimaryDataTool(name)) {
       const schema = name === "stratigraphy.list" ? stratigraphyCatalogInputSchema
         : paidTools[name as keyof typeof paidTools]?.schema;
       const parsed = schema?.safeParse(args);
@@ -5658,7 +5693,7 @@ export function registerMcpRoute(
       // Anonymous calls get the existing 402 without invoking the cloud-backed
       // source for ordinary paid reads. Comparison/summary selectors retain
       // their existing no-invoice-on-invalid-target rule.
-      if (canonicalName.startsWith("stratigraphy.") && !pass) {
+      if (isPrimaryDataTool(canonicalName) && !pass) {
         if ([
           "stratigraphy.get_digest",
           "stratigraphy.get_diff",
@@ -5686,7 +5721,7 @@ export function registerMcpRoute(
         await gates[name](req, res, next);
         return;
       }
-      if (canonicalName.startsWith("stratigraphy.")) {
+      if (isPrimaryDataTool(canonicalName)) {
         try {
           res.locals.primaryStratigraphy = await primaryBackend(
             canonicalName,

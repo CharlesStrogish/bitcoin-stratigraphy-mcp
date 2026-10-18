@@ -35,7 +35,7 @@ import { apiRootAliases } from "../../src/middleware/apiRootAliases";
 
 const publicPem = (key: ReturnType<typeof loadToolIntegrityKey>) =>
   createPublicKey(key).export({ type: "spki", format: "pem" });
-const fixtureTools = Array.from({ length: 15 }, (_, i) => ({
+const fixtureTools = Array.from({ length: 16 }, (_, i) => ({
   name: `fixture.${i}`,
   description: `Exact description ${i}: é, e\u0301, ₿.\n Keep  whitespace. `,
 }));
@@ -106,7 +106,7 @@ test("persistent environment seeds survive ephemeral filesystems and dedicated k
   }
 });
 
-test("all 15 exact description digests verify, and tampering, normalization and wrong keys fail", () => {
+test("all 16 exact description digests verify, and tampering, normalization and wrong keys fail", () => {
   const key = generateKeyPairSync("ed25519").privateKey;
   const manifest = createToolIntegrityManifest(
     fixtureTools,
@@ -115,7 +115,7 @@ test("all 15 exact description digests verify, and tampering, normalization and 
   );
   assert.equal(manifest.algorithm, "Ed25519");
   assert.equal(manifest.timestamp, "2026-10-18T00:00:00.000Z");
-  assert.equal(manifest.tools.length, 15);
+  assert.equal(manifest.tools.length, 16);
   assert.equal(manifest.server_public_key, publicPem(key));
   assert.equal(
     manifest.key_id,
@@ -158,7 +158,7 @@ test("all 15 exact description digests verify, and tampering, normalization and 
   assert.ok(manifest.tools.every(Object.isFrozen));
   assert.throws(
     () => createToolIntegrityManifest(fixtureTools.slice(1), key),
-    /15/,
+    /16/,
   );
   assert.throws(
     () =>
@@ -230,7 +230,7 @@ test("public integrity route matches live tools/list after final overlays, witho
     const body = (await list.json()) as {
       result: { tools: Array<{ name: string; description: string }> };
     };
-    assert.equal(body.result.tools.length, 15);
+    assert.equal(body.result.tools.length, 16);
     assert.deepEqual(
       manifest.tools.map((t) => t.name),
       body.result.tools.map((t) => t.name),

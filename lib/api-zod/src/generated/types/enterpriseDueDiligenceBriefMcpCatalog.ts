@@ -26,13 +26,13 @@ import type { EnterpriseDueDiligenceBriefMcpCatalogSettlementPathsItem } from '.
 
 export type EnterpriseDueDiligenceBriefMcpCatalog = {
   /**
-     * @minimum 15
-     * @maximum 15
+     * @minimum 16
+     * @maximum 16
      */
   tool_count: number;
   /**
-     * @minItems 15
-     * @maxItems 15
+     * @minItems 16
+     * @maxItems 16
      */
   tools: string[];
   free_tools: string[];

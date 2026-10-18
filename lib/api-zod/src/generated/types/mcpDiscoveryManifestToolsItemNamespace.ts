@@ -30,4 +30,5 @@ export const McpDiscoveryManifestToolsItemNamespace = {
   proof: 'proof',
   mesh: 'mesh',
   payment: 'payment',
+  workflow: 'workflow',
 } as const;

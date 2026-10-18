@@ -29,6 +29,7 @@ NAMES = [
     "mesh.get_status",
     "mesh.broadcast",
     "proof.notarize",
+    "workflow.audit_trajectory",
 ]
 
 

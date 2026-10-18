@@ -47,7 +47,7 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
             seen.append(request)
             self.assertNotIn("authorization", request.headers)
             if request.url.path == "/.well-known/mcp.json":
-                namespaces = ["stratigraphy", "proof", "mesh", "payment"]
+                namespaces = ["stratigraphy", "proof", "mesh", "payment", "workflow"]
                 if fault == "namespace":
                     namespaces[-1] = "unknown"
                 return httpx.Response(
@@ -60,7 +60,7 @@ class RouteChecks(unittest.IsolatedAsyncioTestCase):
                     json={
                         "mcp": {
                             "capabilities": {
-                                "tools": {"count": 15, "namespaces": namespaces}
+                                "tools": {"count": 16, "namespaces": namespaces}
                             }
                         }
                     },

@@ -1,0 +1,19 @@
+Let's implement a Deterministic Composite Tool to drastically reduce LLM context token usage and orchestration hallucination for our enterprise clients.
+
+1. Create a New Composite Tool: `workflow.audit_trajectory`
+   - Add this as our 16th tool in the MCP registry.
+   - Input Schema: Require `fromTarget` and `toTarget` (using the same height/UTC date validation constraints as our existing diff tool).
+   - Execution Logic: When called, the server must internally execute the logic for `stratigraphy.get_diff` (to calculate the signed thermodynamic deltas) AND fetch the minimal proof receipts (like `stratigraphy.get_digest`) for the boundary targets.
+   - Output: Combine these results into a single, unified JSON payload (e.g., `{ "trajectory_deltas": {...}, "cryptographic_proofs": {...} }`).
+
+2. Inject the Glama 'A' Grade Description:
+   - Use this exact description string:
+     "A deterministic composite workflow that executes a complete end-to-end thermodynamic audit between fromTarget and toTarget. It automatically calculates signed difficulty deltas, fetches compressed SHA-256 proof receipts, and returns a unified cryptographic report. Use this composite workflow to save LLM context tokens and eliminate multi-step agent orchestration when auditing historical divergence. Use individual stratigraphy or proof tools for single-purpose queries. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>."
+
+3. Auto-Sign the New Tool:
+   - Ensure `workflow.audit_trajectory` is automatically included in the `/.well-known/integrity.json` signing routine we built in the last commit, so its description is hashed and cryptographically signed on server boot alongside the other 15.
+
+4. Verification:
+   - Run the frontend typecheck and tests.
+   - Verify that a local `POST /mcp` `tools/list` request now returns 16 tools, and that the new workflow tool requires the standard 250-sat L402 settlement.
+   - Commit cleanly so I can republish.

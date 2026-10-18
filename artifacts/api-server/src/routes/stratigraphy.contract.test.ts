@@ -92,6 +92,8 @@ const fullDatasetDescription =
   "Bitcoin Stratigraphy days 1-422 (422 days) access";
 const expectedMcpOverview = ENGINE_DESCRIPTION;
 const expectedMcpToolDescriptions: Record<string, string> = {
+  "workflow.audit_trajectory":
+    "A deterministic composite workflow that executes a complete end-to-end thermodynamic audit between fromTarget and toTarget. It automatically calculates signed difficulty deltas, fetches compressed SHA-256 proof receipts, and returns a unified cryptographic report. Use this composite workflow to save LLM context tokens and eliminate multi-step agent orchestration when auditing historical divergence. Use individual stratigraphy or proof tools for single-purpose queries. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
   "proof.get_by_hash":
     "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs.",
   "proof.list":
@@ -759,7 +761,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: string;
       inputSchema: { oneOf?: Array<Record<string, any>> };
     }>;
-    assert.equal(listedTools.length, 15);
+    assert.equal(listedTools.length, 16);
     const paymentTool = listedTools.find(
       ({ name }) => name === "payment.get_info",
     );
@@ -838,7 +840,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       url,
     );
     const prices = paymentInfo.result?.structuredContent.perToolSats;
-    assert.equal(Object.keys(prices).length, 15);
+    assert.equal(Object.keys(prices).length, 16);
     assert.equal(prices["proof.verify"], 250);
     assert.equal(prices["payment.get_info"], 250);
     assert.equal(Object.hasOwn(prices, "payment.info"), false);
@@ -1711,7 +1713,7 @@ test("serves exact stratigraphy descriptions across tools/list and all discovery
     string,
     { description: string }
   >;
-  assert.equal(listed.result.tools.length, 15);
+  assert.equal(listed.result.tools.length, 16);
   for (const [name, expected] of Object.entries(STRATIGRAPHY_TOOL_DESCRIPTIONS)) {
     assert.equal(listed.result.tools.find((tool) => tool.name === name)?.description, expected, `${name} tools/list`);
     assert.equal(primaryStratigraphyContracts[name].description, expected, `${name} contract overlay`);
@@ -1807,8 +1809,8 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
       `${name} OpenAPI and tools/list descriptions must match exactly`,
     );
     assert.ok(listedTool.description.startsWith(expectedDescription), `${name} must preserve its contract guidance`);
-    if (STRATIGRAPHY_TOOL_DESCRIPTIONS[name]) {
-      assert.equal(listedTool.description, STRATIGRAPHY_TOOL_DESCRIPTIONS[name]);
+    if (STRATIGRAPHY_TOOL_DESCRIPTIONS[name] || name === "workflow.audit_trajectory") {
+      assert.equal(listedTool.description, STRATIGRAPHY_TOOL_DESCRIPTIONS[name] ?? expectedDescription);
       assert.equal(
         mcpDiscoveryManifest.tools.find((tool) => tool.name === name)?.description,
         listedTool.description,
@@ -1825,6 +1827,7 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
   }
 
   const requiredSchemaTools = [
+    "workflow.audit_trajectory",
     "proof.notarize",
     "mesh.get_status",
     "proof.get_by_hash",
@@ -1917,6 +1920,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "mesh.get_status",
       "mesh.broadcast",
       "proof.notarize",
+      "workflow.audit_trajectory",
     ],
   );
   for (const unregisteredTool of [
@@ -2278,6 +2282,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       openWorld: boolean;
     }
   > = {
+    "workflow.audit_trajectory": {
+      keys: ["trajectory_deltas", "cryptographic_proofs"],
+      readOnly: true,
+      idempotent: true,
+      openWorld: false,
+    },
     "stratigraphy.list": {
       keys: Object.keys(primaryStratigraphyContracts["stratigraphy.list"].outputSchema.properties),
       readOnly: true,
@@ -4915,7 +4925,7 @@ test("serves the CISO due-diligence brief publicly without creating invoices", a
     brief.mcp_catalog.settlement_paths,
     L402_SETTLEMENT_PATHS.map((path) => path.id),
   );
-  assert.equal(brief.mcp_catalog.tool_count, 15);
+  assert.equal(brief.mcp_catalog.tool_count, 16);
   assert.deepEqual([...brief.mcp_catalog.free_tools].sort(), [
     "proof.list",
     "stratigraphy.list",
@@ -4944,10 +4954,10 @@ test("serves the CISO due-diligence brief publicly without creating invoices", a
   assert.equal(mcpInvoiceCount, mcpInvoicesBefore);
 });
 
-test("rejects malformed envelopes and unexpected arguments for all 15 tools without payment", async () => {
+test("rejects malformed envelopes and unexpected arguments for all 16 tools without payment", async () => {
   const invoicesBefore = mcpInvoiceCount;
   const names = mcpServerCard.capabilities.tools.map((tool) => tool.name);
-  assert.equal(names.length, 15);
+  assert.equal(names.length, 16);
   const headers = {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -5042,7 +5052,7 @@ test("exactly two canonical sandbox tools and their aliases execute without invo
     name: string;
     annotations: { l402: { amountSats: number } };
   }>;
-  assert.equal(tools.length, 15);
+  assert.equal(tools.length, 16);
   assert.deepEqual(
     tools
       .filter((tool) => tool.annotations.l402.amountSats === 0)
@@ -5052,7 +5062,7 @@ test("exactly two canonical sandbox tools and their aliases execute without invo
   );
   assert.equal(
     tools.filter((tool) => tool.annotations.l402.amountSats > 0).length,
-    13,
+    14,
   );
   for (const name of ["mesh.get_status", "payment.get_info"]) {
     const response = await fetch(`${baseUrl}/mcp`, {
@@ -5094,7 +5104,7 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   assert.deepEqual(card, smitheryServerCard);
   assert.equal(card.version, smitheryServerCard.version);
   assert.equal(card.serverInfo.version, card.version);
-  assert.equal(card.toolCount, 15);
+  assert.equal(card.toolCount, 16);
   assert.equal(card.capabilities.tools.length, card.toolCount);
   assert.ok(
     card.capabilities.tools.some(

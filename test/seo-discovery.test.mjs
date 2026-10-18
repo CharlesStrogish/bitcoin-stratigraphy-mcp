@@ -94,7 +94,7 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   );
   assert.equal(api.documentation, origin + "/docs");
   assert.equal(api.url, origin + "/mcp");
-  assert.match(api.description, /15 canonical MCP tools/);
+  assert.match(api.description, /16 canonical MCP tools/);
   assert.match(api.description, /L402 Lightning micropayment settlement/);
   assert.ok(
     api.potentialAction.some(

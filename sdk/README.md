@@ -1,7 +1,7 @@
 # Bitcoin Stratigraphy MCP client SDK
 
 Small, zero-required-dependency MCP clients with generic tool calls and typed
-convenience methods. The live server currently publishes 15 canonical tools;
+convenience methods. The live server currently publishes 16 canonical tools;
 discover them with `listTools`/`list_tools` rather than treating this guide as
 the catalog. TypeScript uses built-in `fetch` and Web Crypto APIs (Node 18+).
 Python uses the standard library, or `urllib3` automatically if already

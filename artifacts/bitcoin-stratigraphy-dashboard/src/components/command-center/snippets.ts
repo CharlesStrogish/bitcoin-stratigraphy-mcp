@@ -48,7 +48,7 @@ async def main() -> None:
     transport = StreamableHttpTransport(url=MCP_URL, headers=HEADERS)
     client = Client(transport, mode="legacy", timeout=30)
     async with MCPAdapter(client) as adapter:
-        tools = await adapter.list_tools()  # all 15 canonical tools
+        tools = await adapter.list_tools()  # all 16 canonical tools
         # Least privilege: the credential's tool plus free discovery.
         allowed = {"proof.notarize", "stratigraphy.list"}
         agent_tools = [

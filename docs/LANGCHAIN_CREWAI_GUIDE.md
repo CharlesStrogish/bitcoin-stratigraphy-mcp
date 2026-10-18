@@ -24,7 +24,7 @@ asset selection nor its paid SSE feed is a capability of the MCP transport.
 The following catalog is transcribed from [`CONNECT.md`](../CONNECT.md). Its
 prices are advertised sats from the server documentation, not a price
 guarantee; the live `payment.get_info` response is authoritative. The
-published MCP catalog currently contains 15 canonical tools.
+published MCP catalog currently contains 16 canonical tools.
 
 | Canonical MCP tool | Advertised sats | Use |
 | --- | ---: | --- |

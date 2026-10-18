@@ -26,7 +26,7 @@ disclosure is not cryptographic zero knowledge.
 
 ## Native framework toolkits (Phase 2)
 
-For the 15-tool server and `proof.notarize`, use the standalone
+For the 16-tool server and `proof.notarize`, use the standalone
 [LangChain MCPAdapter](frameworks/langchain_agent.py) quickstart.
 The [LlamaIndex MCP](frameworks/llamaindex_agent.py) source is preserved, but
 installation is temporarily unavailable because it requires vulnerable NLTK.
@@ -53,7 +53,7 @@ python cookbooks/langchain_example.py
 python cookbooks/autogen_example.py
 ```
 
-The CrewAI and AutoGen commands validate the remote 15-tool catalog and fetch
+The CrewAI and AutoGen commands validate the remote 16-tool catalog and fetch
 free REST pricing. LangChain discovers real framework tools through
 `MultiServerMCPClient`; its optional `--payment-info` flag calls the L402-paid
 `payment.get_info` tool and needs a configured payment hook.
@@ -150,7 +150,7 @@ but an OTS receipt is not a ZK proof. These cookbooks do not generate dummy
 proofs, fabricate verification keys, or claim successful verification without a
 server result. Each Crew task permits only one paid tool invocation.
 
-### LangChain + LangGraph: all 15 tools, four namespaces
+### LangChain + LangGraph: all 16 tools, five namespaces
 
 `langchain_example.py` uses `MultiServerMCPClient` with
 `transport="streamable_http"` and a supported `httpx_client_factory`. It
@@ -173,7 +173,7 @@ python cookbooks/langchain_example.py --run \
 
 The model sees underscore aliases such as `stratigraphy_get` because OpenAI
 function names do not allow dots. The adapter still sends the canonical dotted
-MCP names on the wire. All 15 tools, including state-changing `proof.submit` and
+MCP names on the wire. All 16 tools, including state-changing `proof.submit` and
 `mesh.broadcast`, are available in agent mode: enable it only for an authorized
 agent. The demo prompt asks for `payment.get_info` pricing, which is an
 L402-paid call; configure a payment hook and spending limits before `--run`.

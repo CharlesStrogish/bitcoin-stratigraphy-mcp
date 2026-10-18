@@ -10,7 +10,7 @@ export const NPM_PACKAGE = "@bitcoin-stratigraphy/mcp-server";
 export const NPX_INSTALL_COMMAND = `npx -y ${NPM_PACKAGE}`;
 export const NPM_PACKAGE_URL = `https://www.npmjs.com/package/${NPM_PACKAGE}`;
 
-export type McpNamespace = "stratigraphy" | "proof" | "mesh" | "payment";
+export type McpNamespace = "stratigraphy" | "proof" | "mesh" | "payment" | "workflow";
 
 export interface CanonicalMcpTool {
   name: string;
@@ -18,6 +18,7 @@ export interface CanonicalMcpTool {
 }
 
 export const MCP_NAMESPACE_SUMMARIES: Readonly<Record<McpNamespace, string>> = {
+  workflow: "Deterministic thermodynamic audits with compact boundary proof receipts.",
   stratigraphy:
     "Indexed daily strata: catalog, records, digests, diffs and ranges.",
   proof:
@@ -29,6 +30,7 @@ export const MCP_NAMESPACE_SUMMARIES: Readonly<Record<McpNamespace, string>> = {
 export const CANONICAL_MCP_TOOLS: Readonly<
   Record<McpNamespace, readonly CanonicalMcpTool[]>
 > = {
+  workflow: [{ name: "workflow.audit_trajectory", title: "Audit Thermodynamic Trajectory" }],
   stratigraphy: [
     { name: "stratigraphy.list", title: "List Stratigraphy Catalog" },
     { name: "stratigraphy.get", title: "Get Bitcoin Stratigraphy" },
@@ -62,7 +64,7 @@ export const CANONICAL_MCP_TOOLS: Readonly<
 export const MCP_NAMESPACE_COLUMNS: readonly (readonly McpNamespace[])[] = [
   ["stratigraphy"],
   ["proof"],
-  ["mesh", "payment"],
+  ["workflow", "mesh", "payment"],
 ];
 
 export const CANONICAL_MCP_TOOL_NAMES: readonly string[] = Object.values(

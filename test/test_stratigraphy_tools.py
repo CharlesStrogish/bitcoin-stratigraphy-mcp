@@ -48,6 +48,54 @@ class Pipeline:
 
 
 class BridgeTests(unittest.TestCase):
+    def test_composite_reuses_exact_diff_and_digest_with_minimal_boundary_receipts(self):
+        sequence = 0
+
+        def call(tool, arguments):
+            nonlocal sequence
+            sequence += 1
+            return self.query(tool, arguments, nonce=f"{sequence:032x}")
+
+        for day, height, price in [
+            ("2026-10-12", 970000, 70000),
+            ("2026-10-13", 971000, 75000),
+        ]:
+            record = calculate_stratigraphy_metrics(height, price, 9e20, "test-price").model_dump()
+            record["observed_at_utc"] = day + "T00:00:00+00:00"
+            body = json.dumps(record, indent=2).encode()
+            self.storage.put(day, body)
+            self.storage.put(day, receipt(body), proof=True)
+        args = {"fromTarget": "2026-10-12", "toTarget": "2026-10-13"}
+        with patch.object(self.storage, "load", wraps=self.storage.load) as load:
+            response = call("workflow.audit_trajectory", args)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(load.call_count, 2, "load each selected archive only once")
+        result = response.json()["result"]
+        self.assertEqual(set(result), {"trajectory_deltas", "cryptographic_proofs"})
+        diff = call("stratigraphy.get_diff", args).json()["result"]
+        self.assertEqual(result["trajectory_deltas"], {key: diff[key] for key in ("from", "to", "delta")})
+        for label, day in (("from", args["fromTarget"]), ("to", args["toTarget"])):
+            digest = call("stratigraphy.get_digest", {"target": day, "format": "kv"}).json()["result"]
+            boundary = result["cryptographic_proofs"][label]
+            self.assertEqual({key: boundary[key] for key in ("h", "ts", "tm", "hash")}, digest["result"])
+            self.assertEqual(boundary["receipt"]["snapshot_sha256"], boundary["hash"])
+            self.assertEqual(boundary["source"], "archived_snapshot")
+            self.assertIn("ots_download_url", boundary["receipt"])
+        self.assertEqual(response.json()["targetHeights"], [970000, 971000])
+        self.assertNotIn("snapshot_json", json.dumps(result))
+        self.assertNotIn("ots_proof_base64", json.dumps(result))
+        self.assertLess(len(json.dumps(result)), len(json.dumps(diff)))
+        live = call("workflow.audit_trajectory", {"fromTarget": "2026-10-12", "toTarget": "latest"}).json()
+        self.assertEqual(live["result"]["cryptographic_proofs"]["to"]["source"], "live_snapshot")
+        self.assertIsNone(live["result"]["cryptographic_proofs"]["to"]["receipt"])
+        self.assertEqual(live["targetHeights"], [970000, 971100])
+        reverse = call("workflow.audit_trajectory", {"fromTarget": "2026-10-13", "toTarget": "2026-10-12"}).json()["result"]
+        self.assertEqual(reverse["trajectory_deltas"]["delta"]["heightDelta"], -1000)
+        repeated = call("workflow.audit_trajectory", args).json()["result"]
+        self.assertEqual(repeated, result)
+        missing = call("workflow.audit_trajectory", {"fromTarget": "2020-01-01", "toTarget": "latest"})
+        self.assertEqual(missing.status_code, 404)
+
     def setUp(self):
         self.environment = patch.dict(os.environ, {"SESSION_SECRET": "local-test-only-secret"})
         self.environment.start()

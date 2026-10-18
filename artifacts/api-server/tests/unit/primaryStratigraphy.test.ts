@@ -5,9 +5,85 @@ import type { AddressInfo } from "node:net";
 import express from "express";
 import { registerMcpRoute } from "../../src/routes/mcp";
 import { createPrimaryStratigraphyBackend, PrimaryStratigraphyUnavailable } from "../../src/services/primaryStratigraphy";
+import { AUDIT_TRAJECTORY_DESCRIPTION, AUDIT_TRAJECTORY_EXAMPLE } from "../../src/lib/workflow-audit";
 import type { SettlementRouter } from "../../src/services/settlement";
 import { attenuateSubscriptionMacaroon, getMacaroonSignatureId } from "../../src/lib/subscription-pass";
 import { createMemoryMacaroonRevocationStore } from "../../src/lib/macaroon-revocation-store";
+
+test("composite audit validates both boundaries and executes once under a 250-sat tool-scoped payment", async () => {
+  const preimage = "ef".repeat(32);
+  const hash = createHash("sha256").update(Buffer.from(preimage, "hex")).digest("hex");
+  let issued: { amountMsats: number; description: string } | undefined;
+  let calls = 0;
+  const app = express();
+  app.use(express.json());
+  registerMcpRoute(app, {
+    sessionSecret: "workflow-test-session",
+    x402ResourceServer: null,
+    settlementRouter: {
+      isConfigured: () => true, activeProvider: () => "workflow-test", circuitState: () => "closed",
+      createInvoice: async (input) => {
+        issued = input;
+        return { invoice: "lnbc2500n1workflowtest", paymentHash: hash, provider: "workflow-test" };
+      },
+      verifyPayment: async (input) => input.preimage === preimage &&
+        input.expectedAmountMsats === issued?.amountMsats && input.expectedDescription === issued?.description
+        ? { settledAt: Date.now(), provider: "workflow-test" } : "invalid",
+    },
+    stratigraphyBackend: async (name, args) => {
+      calls++;
+      if (name === "stratigraphy.get") return { result: {}, targetHeights: [920000] };
+      assert.equal(name, "workflow.audit_trajectory");
+      assert.deepEqual(args, { fromTarget: "2026-10-12", toTarget: "latest" });
+      return { result: AUDIT_TRAJECTORY_EXAMPLE, targetHeights: [919900, 920000] };
+    },
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp`;
+  const request = async (method: string, params = {}, authorization?: string) => {
+    const response = await fetch(url, {
+      method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(authorization ? { Authorization: authorization } : {}) },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    });
+    return { response, body: await response.json() };
+  };
+  try {
+    const listing = await request("tools/list");
+    assert.equal(listing.body.result.tools.length, 16);
+    const tool = listing.body.result.tools.find((tool: { name: string }) => tool.name === "workflow.audit_trajectory");
+    assert.equal(tool.description, AUDIT_TRAJECTORY_DESCRIPTION);
+    assert.deepEqual(tool.inputSchema.required, ["fromTarget", "toTarget"]);
+    assert.equal(tool.annotations.l402.amountSats, 250);
+    for (const args of [{}, { fromTarget: "2026-10-12" }, { fromTarget: "latest", toTarget: "latest" },
+      { fromTarget: "2026-02-30", toTarget: "latest" }, { fromTarget: "9007199254740992", toTarget: "latest" },
+      { fromTarget: "2026-10-12", toTarget: "2026-02-30" }, { fromTarget: "1", toTarget: "2", extra: true }]) {
+      const invalid = await request("tools/call", { name: tool.name, arguments: args });
+      assert.equal(invalid.response.status, 200, "preserve MCP JSON-RPC invalid-params transport semantics");
+      assert.equal(invalid.body.error.code, -32602);
+    }
+    assert.equal(issued, undefined);
+    const params = { name: tool.name, arguments: { fromTarget: "2026-10-12", toTarget: "latest" } };
+    const challenge = await request("tools/call", params);
+    assert.equal(challenge.response.status, 402);
+    assert.equal(challenge.body.amount_sats, 250);
+    assert.equal(issued!.amountMsats, 250_000);
+    assert.equal(calls, 0, "no source execution before payment");
+    const macaroon = challenge.body.macaroon;
+    const paid = await request("tools/call", params, `L402 ${macaroon}:${preimage}`);
+    assert.equal(paid.response.status, 200);
+    assert.deepEqual(paid.body.result.structuredContent, AUDIT_TRAJECTORY_EXAMPLE);
+    assert.equal(calls, 1, "one paid call, one unified backend evaluation");
+    const bounded = attenuateSubscriptionMacaroon(macaroon, ["max_target=919999"]);
+    assert.ok(bounded);
+    const forbidden = await request("tools/call", params, `L402 ${bounded}:${preimage}`);
+    assert.equal(forbidden.response.status, 403, "both actual boundary heights are checked");
+    const wrongTool = await request("tools/call", { name: "stratigraphy.get", arguments: {} }, `L402 ${macaroon}:${preimage}`);
+    assert.equal(wrongTool.response.status, 402, "another tool requires its own payment challenge");
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
 
 const metrics = {
   block_height: 971100, observed_at_utc: "2026-10-12T12:00:00+00:00",
@@ -111,7 +187,7 @@ test("the canonical live route preserves L402, actual-height caveats and revocat
   }
   try {
     const list = await call("tools/list");
-    assert.equal(list.body.result.tools.length, 15);
+    assert.equal(list.body.result.tools.length, 16);
     const params = { name: "stratigraphy.get", arguments: {} };
     const challenge = await call("tools/call", params);
     assert.equal(challenge.response.status, 402);

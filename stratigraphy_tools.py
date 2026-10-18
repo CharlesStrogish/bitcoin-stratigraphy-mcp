@@ -107,6 +107,61 @@ class PrimaryStratigraphy:
         def position(record):
             return (record["block_height"], record["observed_at_utc"])
 
+        def difference_report(before, after):
+            difference = after["hal_finney_horizon_multiple"] - before["hal_finney_horizon_multiple"]
+
+            def summary(record):
+                return {
+                    "height": record["block_height"], "date": record["observed_at_utc"],
+                    "target_multiplier": record["hal_finney_horizon_multiple"],
+                    "network_energy_watts": record["network_energy_watts"],
+                }
+
+            return {
+                "from": summary(before), "to": summary(after),
+                "delta": {
+                    "heightDelta": after["block_height"] - before["block_height"],
+                    "multiplierDelta": difference,
+                    "percentageChange": f"{difference / before['hal_finney_horizon_multiple'] * 100:.2f}%",
+                    "energyWattsDelta": after["network_energy_watts"] - before["network_energy_watts"],
+                    "timeSpanDays": (
+                        datetime.fromisoformat(after["observed_at_utc"]) -
+                        datetime.fromisoformat(before["observed_at_utc"])
+                    ).total_seconds() / 86400,
+                },
+            }
+
+        if tool == "workflow.audit_trajectory":
+            # Both boundaries, arithmetic and digests share one captured live
+            # snapshot and archive cache. Never issue nested paid MCP calls.
+            before = target(arguments["fromTarget"])
+            after = target(arguments["toTarget"])
+
+            def boundary(record):
+                proof = next(
+                    (manifests[day] for day in manifests if loaded[day] is record),
+                    None,
+                )
+                return {
+                    **digest(record, "kv"),
+                    "source": "archived_snapshot" if proof else "live_snapshot",
+                    "receipt": {
+                        key: proof[key] for key in (
+                            "snapshot_sha256", "ots_sha256", "proof_status", "ots_download_url"
+                        )
+                    } if proof else None,
+                }
+
+            return {
+                "result": {
+                    "trajectory_deltas": difference_report(before, after),
+                    "cryptographic_proofs": {
+                        "from": boundary(before), "to": boundary(after),
+                    },
+                },
+                "targetHeights": sorted({before["block_height"], after["block_height"]}),
+            }
+
         selected = []
         limit = arguments.get("limit", 10)
         if tool == "stratigraphy.get":
@@ -165,28 +220,7 @@ class PrimaryStratigraphy:
         elif tool == "stratigraphy.get_diff":
             before, after = target(arguments["fromTarget"]), target(arguments.get("toTarget", "latest"))
             selected = [before, after]
-            difference = after["hal_finney_horizon_multiple"] - before["hal_finney_horizon_multiple"]
-
-            def summary(record):
-                return {
-                    "height": record["block_height"], "date": record["observed_at_utc"],
-                    "target_multiplier": record["hal_finney_horizon_multiple"],
-                    "network_energy_watts": record["network_energy_watts"],
-                }
-
-            result = {
-                "from": summary(before), "to": summary(after),
-                "delta": {
-                    "heightDelta": after["block_height"] - before["block_height"],
-                    "multiplierDelta": difference,
-                    "percentageChange": f"{difference / before['hal_finney_horizon_multiple'] * 100:.2f}%",
-                    "energyWattsDelta": after["network_energy_watts"] - before["network_energy_watts"],
-                    "timeSpanDays": (
-                        datetime.fromisoformat(after["observed_at_utc"]) -
-                        datetime.fromisoformat(before["observed_at_utc"])
-                    ).total_seconds() / 86400,
-                },
-            }
+            result = difference_report(before, after)
         elif tool == "stratigraphy.get_range":
             start = target(arguments["startTarget"])
             end = target(arguments.get("endTarget", "latest"))

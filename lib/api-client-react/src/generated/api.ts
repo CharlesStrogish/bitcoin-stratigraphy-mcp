@@ -1220,7 +1220,7 @@ export const getGetToolIntegrityManifestUrl = () => {
 
 /**
  * Generated at startup after registration from the exact UTF-8 descriptions served by tools/list. Verify each base64 Ed25519 signature against the raw 32-byte SHA-256 description digest using the SPKI PEM server_public_key. Pin the public key through a trusted channel before relying on it. These signatures attest descriptions, not schemas, tool execution, timestamp freshness, name-to-description binding, or prompt-injection safety. Also served at /api/.well-known/integrity.json.
- * @summary Public Ed25519 signatures of all 15 final MCP tool descriptions
+ * @summary Public Ed25519 signatures of all 16 final MCP tool descriptions
  */
 export const getToolIntegrityManifest = async ( options?: Parameters<typeof customFetch>[1]): Promise<ToolIntegrityManifest> => {
 
@@ -1267,7 +1267,7 @@ export type GetToolIntegrityManifestQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Public Ed25519 signatures of all 15 final MCP tool descriptions
+ * @summary Public Ed25519 signatures of all 16 final MCP tool descriptions
  */
 
 export function useGetToolIntegrityManifest<TData = Awaited<ReturnType<typeof getToolIntegrityManifest>>, TError = ErrorType<unknown>>(
@@ -1827,8 +1827,8 @@ export const getExecuteMcpRequestUrl = () => {
 }
 
 /**
- * Call initialize, ping, tools/list or tools/call. All fifteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
- * @summary JSON-RPC discovery and execution of the 15 canonical MCP tools
+ * Call initialize, ping, tools/list or tools/call. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * @summary JSON-RPC discovery and execution of the 16 canonical MCP tools
  */
 export const executeMcpRequest = async (mcpJsonRpcRequest: McpJsonRpcRequest, options?: Parameters<typeof customFetch>[1]): Promise<McpJsonRpcResponse> => {
 
@@ -1877,7 +1877,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ExecuteMcpRequestMutationError = ErrorType<McpJsonRpcResponse>
 
     /**
- * @summary JSON-RPC discovery and execution of the 15 canonical MCP tools
+ * @summary JSON-RPC discovery and execution of the 16 canonical MCP tools
  */
 export const useExecuteMcpRequest = <TError = ErrorType<McpJsonRpcResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeMcpRequest>>, TError,{data: BodyType<McpJsonRpcRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -117,7 +117,7 @@ The MCP client configurations above discover tools, but **do not automatically s
 
 ## Tool catalog and pricing
 
-The MCP `tools/list` response currently contains **15 canonical tools**; only `stratigraphy.list` and `proof.list` are free. The prices below describe the server code; confirm them at runtime with the free `POST /api/v1/cost` quote (for example `{"tools":["stratigraphy.get_digest"]}`) or the paid `payment.get_info` tool rather than treating this table as a price guarantee.
+The MCP `tools/list` response currently contains **16 canonical tools**; only `stratigraphy.list` and `proof.list` are free. The prices below describe the server code; confirm them at runtime with the free `POST /api/v1/cost` quote (for example `{"tools":["stratigraphy.get_digest"]}`) or the paid `payment.get_info` tool rather than treating this table as a price guarantee.
 
 | Tool | Advertised sats | Use |
 | --- | ---: | --- |

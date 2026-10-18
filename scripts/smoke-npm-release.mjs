@@ -87,7 +87,7 @@ try {
   });
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.equal(body.result.tools.length, 15);
+  assert.equal(body.result.tools.length, 16);
   const description = body.result.tools.find((tool) => tool.name === "stratigraphy.get").description;
   for (const phrase of ["Hal Finney Horizon tracker", "15 J/TH thermodynamic energy calculation", "Live L402 Satoshi settlement"]) {
     assert.ok(description.includes(phrase), phrase);
@@ -102,7 +102,7 @@ try {
   assert.equal(stats.status, 200);
   assert.deepEqual(await stats.json(), { verified_toll_sats: 24, settled_contracts: 1, genesis_escrow_id: genesisId });
   console.log(
-    "Isolated npm HTTP runtime, 15-tool discovery and genesis escrow recovery passed; " +
+    "Isolated npm HTTP runtime, 16-tool discovery and genesis escrow recovery passed; " +
       "outbound connections blocked except the disposable loopback database.",
   );
 } finally {

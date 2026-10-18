@@ -15,6 +15,7 @@ export const mcpToolPrices = Object.freeze({
   "mesh.get_status": 250,
   "mesh.broadcast": 250,
   "payment.get_info": 250,
+  "workflow.audit_trajectory": 250,
 });
 
 export const MCP_INVOICE_EXPIRY_SECONDS = 3600;

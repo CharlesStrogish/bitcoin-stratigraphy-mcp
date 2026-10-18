@@ -40,6 +40,10 @@ tags:
   - name: mesh
     description: Peer discovery, snapshot gossip, and Nostr Schnorr cross-validation
 x-mcp-tool-groups:
+  workflow:
+    description: "Deterministic composite thermodynamic trajectory audits with compact boundary proof receipts."
+    tools:
+      - workflow.audit_trajectory
   stratigraphy:
     description: "Indexed telemetry discovery, records, differences, digests, and bounded ranges."
     tools:
@@ -68,6 +72,41 @@ x-mcp-tool-groups:
     tools:
       - payment.get_info
 x-mcp-tools:
+  workflow.audit_trajectory:
+    description: "A deterministic composite workflow that executes a complete end-to-end thermodynamic audit between fromTarget and toTarget. It automatically calculates signed difficulty deltas, fetches compressed SHA-256 proof receipts, and returns a unified cryptographic report. Use this composite workflow to save LLM context tokens and eliminate multi-step agent orchestration when auditing historical divergence. Use individual stratigraphy or proof tools for single-purpose queries. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>."
+    annotations:
+      readOnlyHint: true
+      destructiveHint: false
+      idempotentHint: true
+      openWorldHint: false
+      l402:
+        amountSats: 250
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [fromTarget, toTarget]
+      properties:
+        fromTarget:
+          type: string
+          pattern: "^(?:0|[1-9]\\d*|\\d{4}-\\d{2}-\\d{2})$"
+          description: Baseline real Bitcoin height or valid UTC date.
+        toTarget:
+          type: string
+          pattern: "^(?:latest|0|[1-9]\\d*|\\d{4}-\\d{2}-\\d{2})$"
+          description: Required comparison real Bitcoin height, valid UTC date, or latest.
+    outputSchema:
+      type: object
+      additionalProperties: false
+      required: [trajectory_deltas, cryptographic_proofs]
+      properties:
+        trajectory_deltas:
+          type: object
+          description: Existing signed diff arithmetic and endpoint summaries; served OpenAPI expands the complete runtime schema.
+          additionalProperties: true
+        cryptographic_proofs:
+          type: object
+          description: Compact exact-byte boundary fingerprints and existing archived receipt references, or null receipts for live snapshots.
+          additionalProperties: true
   proof.notarize:
     description: "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats."
     annotations:
@@ -967,7 +1006,7 @@ paths:
     get:
       operationId: getToolIntegrityManifest
       tags: [discovery]
-      summary: Public Ed25519 signatures of all 15 final MCP tool descriptions
+      summary: Public Ed25519 signatures of all 16 final MCP tool descriptions
       description: >-
         Generated at startup after registration from the exact UTF-8 descriptions
         served by tools/list. Verify each base64 Ed25519 signature against the raw
@@ -1093,9 +1132,9 @@ paths:
     post:
       operationId: executeMcpRequest
       tags: [discovery]
-      summary: JSON-RPC discovery and execution of the 15 canonical MCP tools
+      summary: JSON-RPC discovery and execution of the 16 canonical MCP tools
       description: >-
-        Call initialize, ping, tools/list or tools/call. All fifteen input and output
+        Call initialize, ping, tools/list or tools/call. All sixteen input and output
         schemas, namespaces, side effects and prices are described in x-mcp-tools
         and x-mcp-tool-groups. tools/list is the live authoritative catalog.
         Tool calls use params.name and params.arguments. Paid calls require a
@@ -2037,8 +2076,8 @@ components:
           description: SHA-256 of the public key's SPKI DER bytes; suitable for an independently trusted pin.
         tools:
           type: array
-          minItems: 15
-          maxItems: 15
+          minItems: 16
+          maxItems: 16
           items:
             $ref: "#/components/schemas/ToolIntegrityEntry"
     EscrowInput:
@@ -2645,8 +2684,8 @@ components:
               type: string
         tools:
           type: array
-          minItems: 15
-          maxItems: 15
+          minItems: 16
+          maxItems: 16
           description: Descriptors mirroring the live tools/list catalog; tools/list remains authoritative.
           items:
             type: object
@@ -2656,7 +2695,7 @@ components:
                 type: string
               namespace:
                 type: string
-                enum: [stratigraphy, proof, mesh, payment]
+                enum: [stratigraphy, proof, mesh, payment, workflow]
               title:
                 type: string
               description:
@@ -4231,12 +4270,12 @@ components:
           properties:
             tool_count:
               type: integer
-              minimum: 15
-              maximum: 15
+              minimum: 16
+              maximum: 16
             tools:
               type: array
-              minItems: 15
-              maxItems: 15
+              minItems: 16
+              maxItems: 16
               items:
                 type: string
             free_tools:

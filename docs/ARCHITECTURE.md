@@ -4,7 +4,7 @@ Mermaid sequence and system diagrams for agent developers integrating with
 `https://bitcoinstratigraphy.com/mcp`.
 
 The public interface uses **Streamable HTTP**, supports MCP **2025-11-25**, and
-currently exposes **15 tools**. Discover the live catalog with `tools/list` and
+currently exposes **16 tools**. Discover the live catalog with `tools/list` and
 query `payment.get_info` for current prices rather than relying on static
 diagrams as a contract.
 
@@ -249,7 +249,7 @@ sequenceDiagram
 
 ## 4. Complete MCP namespace map
 
-The endpoint exposes **5 stratigraphy + 7 proof + 2 mesh + 1 payment = 15 tools**.
+The endpoint exposes **5 stratigraphy + 7 proof + 2 mesh + 1 payment + 1 workflow = 16 tools**.
 Tool nodes link to public reference pages in Mermaid renderers that allow links.
 Names are canonical, case-sensitive MCP names, not Python method names.
 

@@ -23,7 +23,7 @@ test("registry manifests agree on the live remote MCP endpoint and release", () 
   assert.equal(npmPackage.homepage, "https://bitcoinstratigraphy.com");
   assert.match(npmPackage.author, /^Charles R\. Strogish\b/);
   assert.equal(glama.version, smithery.version);
-  assert.equal(glama.toolCount, 15);
+  assert.equal(glama.toolCount, 16);
   assert.equal(smithery.transport.type, "streamable-http");
   assert.equal(
     smithery.transport.url,
@@ -33,7 +33,7 @@ test("registry manifests agree on the live remote MCP endpoint and release", () 
   assert.equal(glama.url, smithery.transport.url);
   assert.equal(glama.description, smithery.description);
   for (const phrase of [
-    "15 L402-gated tools",
+    "16 L402-gated tools",
     "OpenTimestamps AI Notary Hub",
     "LangChain/LlamaIndex Native",
     "100-call Macro-Macaroons",
@@ -67,7 +67,7 @@ test("registry sandbox and notarization pricing claims match the release", () =>
 test("README prominently links native frameworks and all three readiness badges", () => {
   assert.match(
     readme.slice(0, 2200),
-    new RegExp(`v${pkg.version.replaceAll(".", "\\.")} — 15 Canonical Tools`),
+    new RegExp(`v${pkg.version.replaceAll(".", "\\.")} — 16 Canonical Tools`),
   );
   assert.match(readme, /\]\(cookbooks\/frameworks\/\)/);
   for (const badge of [

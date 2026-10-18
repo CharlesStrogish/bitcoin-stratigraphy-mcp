@@ -196,9 +196,9 @@ export function McpToolsMatrix() {
       <div className="cc-module-head">
         <div className="cc-module-intro">
           <div className="section-kicker">01 · MCP tools matrix</div>
-          <h3 id="cc-tools-title">The 15 Canonical MCP Tools</h3>
+          <h3 id="cc-tools-title">The 16 Canonical MCP Tools</h3>
           <p>
-            Dot-notation tools in four namespaces over Streamable HTTP. Fees are
+            Dot-notation tools in five namespaces over Streamable HTTP. Fees are
             quoted live by <code>POST /api/v1/cost</code>, which never creates
             an invoice.
           </p>

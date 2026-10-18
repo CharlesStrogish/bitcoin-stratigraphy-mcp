@@ -143,11 +143,11 @@ export function createToolIntegrityManifest(
 ) {
   validateKey(privateKey);
   if (
-    tools.length !== 15 ||
-    new Set(tools.map((tool) => tool.name)).size !== 15
+    tools.length !== 16 ||
+    new Set(tools.map((tool) => tool.name)).size !== 16
   ) {
     throw new Error(
-      "Tool integrity requires exactly 15 uniquely named MCP tools.",
+      "Tool integrity requires exactly 16 uniquely named MCP tools.",
     );
   }
   const entries = tools.map((tool) => {

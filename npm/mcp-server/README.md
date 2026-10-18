@@ -1,6 +1,6 @@
 # @bitcoin-stratigraphy/mcp-server — 2.1.3
 
-Exactly 15 canonical MCP tools over **Streamable HTTP**, with two free sandbox
+Exactly 16 canonical MCP tools over **Streamable HTTP**, with two free sandbox
 discovery tools and unchanged paid-tool prices.
 
 - Canonical site: https://bitcoinstratigraphy.com

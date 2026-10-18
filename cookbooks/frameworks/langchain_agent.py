@@ -92,9 +92,9 @@ async def main() -> None:
     async with MCPAdapter(client) as adapter:
         tools = await adapter.list_tools()
         names = {tool.name for tool in tools}
-        if len(tools) != 15 or not DEMO_TOOLS.issubset(names):
+        if len(tools) != 16 or not DEMO_TOOLS.issubset(names):
             raise RuntimeError(
-                "Expected the published 15-tool catalog; publish Phase 1 or check --url"
+                "Expected the published 16-tool catalog; publish the latest build or check --url"
             )
         print(
             f"Discovered {len(tools)} canonical MCP tools: {', '.join(sorted(names))}"
@@ -154,7 +154,7 @@ if __name__ == "__main__":
         # Do not dump them or enable HTTP debug logging in this quickstart.
         print(
             f"Quickstart failed ({type(error).__name__}). Check framework dependencies, "
-            "the published 15-tool endpoint, and your L402 pass/proxy. "
+            "the published 16-tool endpoint, and your L402 pass/proxy. "
             "A 402 requires an explicitly funded or renewed tool-scoped pass.",
             file=sys.stderr,
         )

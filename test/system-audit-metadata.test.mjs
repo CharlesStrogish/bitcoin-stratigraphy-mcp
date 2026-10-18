@@ -49,11 +49,11 @@ test("each dedicated page is served its own head, not the homepage's", () => {
   }
 });
 
-test("registry publisher attribution preserves existing release and 15-tool metadata", () => {
+test("registry publisher attribution preserves existing release and 16-tool metadata", () => {
   const registry = JSON.parse(load("glama.json"));
   assert.equal(registry.publisher, "Charles R. Strogish");
   assert.equal(registry.website, origin + "/");
-  assert.equal(registry.toolCount, 15);
+  assert.equal(registry.toolCount, 16);
   assert.equal(registry.version, JSON.parse(load("package.json")).version);
   assert.equal(JSON.parse(load("mcp.json")).mcpServers["bitcoin-stratigraphy"].url, origin + "/mcp");
 });

@@ -113,7 +113,7 @@ return 503 without exposing exception details or secrets.
 Receipt retrieval validates the stored inclusion path and returns JSON-LD with
 trace/result hashes for independent membership verification; no preimage is
 included. OpenAPI's `Autonomous Escrow` tag documents these three routes. The
-15-tool MCP catalog and its definitions are untouched.
+canonical MCP catalog and its definitions are untouched by these services.
 
 The SQLite file stays outside `dist/` under the API process's private `.data`
 directory. Durable production custody/backup remains an operator deployment

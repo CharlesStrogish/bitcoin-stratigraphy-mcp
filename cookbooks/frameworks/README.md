@@ -1,6 +1,6 @@
 # Native framework agent quickstarts
 
-All **15 canonical tools** are discovered through Streamable HTTP MCP at:
+All **16 canonical tools** are discovered through Streamable HTTP MCP at:
 
 `https://bitcoinstratigraphy.com/mcp`
 
@@ -63,7 +63,7 @@ The batch header requests a batch; it does not prove payment or replenish quota.
 
 Macro-Macaroons remain **tool-scoped**. A notarization credential cannot
 authorize other paid tools, bypass expiry/revocation, or erase inherited limits.
-Therefore both demos discover all 15 tools but give the agent only
+Therefore both demos discover all 16 tools but give the agent only
 `proof.notarize` and **free** `stratigraphy.list`. Expand that allowlist only
 after configuring valid per-tool credentials or a budget-controlled wallet proxy.
 

@@ -6,10 +6,11 @@ import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 import { RELEASE_VERSION, canonicalUrl } from "../lib/public-site";
 import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
+import { AUDIT_TRAJECTORY_DESCRIPTION } from "../lib/workflow-audit";
 
 export const MCP_RELEASE_VERSION = RELEASE_VERSION;
 export const MCP_RELEASE_DESCRIPTION =
-  "OpenTimestamps AI Notary Hub: 15 L402-gated tools (13 paid, 2 free sandbox tools), " +
+  "OpenTimestamps AI Notary Hub: 16 L402-gated tools (14 paid, 2 free sandbox tools), " +
   "LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and " +
   "Free Sandbox available through stratigraphy.list and proof.list.";
 
@@ -187,6 +188,16 @@ const baseServerCard = {
           l402: { amountSats: 250 },
         },
       },
+      {
+        name: "workflow.audit_trajectory",
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+          l402: { amountSats: 250 },
+        },
+      },
     ],
   },
 } as const;
@@ -197,6 +208,7 @@ export const mcpServerCard = {
     ...baseServerCard.capabilities,
     tools: baseServerCard.capabilities.tools.map((tool) => ({
       ...tool,
+      ...(tool.name === "workflow.audit_trajectory" ? { description: AUDIT_TRAJECTORY_DESCRIPTION } : {}),
       ...(STRATIGRAPHY_TOOL_DESCRIPTIONS[tool.name]
         ? { description: STRATIGRAPHY_TOOL_DESCRIPTIONS[tool.name] }
         : {}),

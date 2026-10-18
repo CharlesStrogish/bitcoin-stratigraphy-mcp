@@ -69,8 +69,8 @@ export interface ToolIntegrityManifest {
      */
   key_id: string;
   /**
-     * @minItems 15
-     * @maxItems 15
+     * @minItems 16
+     * @maxItems 16
      */
   tools: ToolIntegrityEntry[];
 }
@@ -560,6 +560,7 @@ export const McpDiscoveryManifestToolsItemNamespace = {
   proof: 'proof',
   mesh: 'mesh',
   payment: 'payment',
+  workflow: 'workflow',
 } as const;
 
 export type McpDiscoveryManifestToolsItemBatch = {
@@ -754,8 +755,8 @@ export interface McpDiscoveryManifest {
   npm: McpDiscoveryManifestNpm;
   /**
      * Descriptors mirroring the live tools/list catalog; tools/list remains authoritative.
-     * @minItems 15
-     * @maxItems 15
+     * @minItems 16
+     * @maxItems 16
      */
   tools: McpDiscoveryManifestToolsItem[];
   l402: McpDiscoveryManifestL402;
@@ -1972,13 +1973,13 @@ export const EnterpriseDueDiligenceBriefMcpCatalogSettlementPathsItem = {
 
 export type EnterpriseDueDiligenceBriefMcpCatalog = {
   /**
-     * @minimum 15
-     * @maximum 15
+     * @minimum 16
+     * @maximum 16
      */
   tool_count: number;
   /**
-     * @minItems 15
-     * @maxItems 15
+     * @minItems 16
+     * @maxItems 16
      */
   tools: string[];
   free_tools: string[];

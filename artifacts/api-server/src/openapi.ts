@@ -21,7 +21,7 @@ for (const [name, amountSats] of Object.entries(mcpToolPrices)) {
     },
   };
 }
-// The canonical 15-tool registry owns these live data contracts. Keep the
+// The canonical 16-tool registry owns these live data contracts. Keep the
 // public OpenAPI extension in sync without adding any additional MCP tools.
 for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
   Object.assign(tools[name], contract);
@@ -32,4 +32,7 @@ for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
 }
 for (const tool of mcpToolDefinitions) {
   Object.assign(tools[tool.name], { description: tool.description });
+  if (tool.name === "workflow.audit_trajectory") {
+    Object.assign(tools[tool.name], { inputSchema: tool.inputSchema, outputSchema: tool.outputSchema });
+  }
 }

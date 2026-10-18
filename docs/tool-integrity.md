@@ -2,7 +2,7 @@
 
 `GET /.well-known/integrity.json` is public JSON, also available under
 `/api/.well-known/integrity.json`. It is generated once per process startup,
-after the canonical 15-tool registry's description overrides have finished.
+after the canonical 16-tool registry's description overrides have finished.
 No MCP tool, schema, price, payment gate or execution path is changed.
 
 ## Verify independently
@@ -11,7 +11,7 @@ No MCP tool, schema, price, payment gate or execution path is changed.
    The manifest's `key_id` is SHA-256 of the SPKI DER public key bytes.
 2. Fetch the manifest and `POST /mcp` with
    `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`.
-3. Require exactly the same 15 unique tool names in both responses.
+3. Require exactly the same 16 unique tool names in both responses.
 4. SHA-256 each tool's exact UTF-8 `description`: do not trim, normalize Unicode,
    reserialize it as JSON, or add a newline. Compare its lowercase hex digest
    with `description_hash`.
@@ -37,10 +37,10 @@ if (
   throw new Error("Unexpected format");
 const entries = new Map(manifest.tools.map((entry) => [entry.name, entry]));
 if (
-  manifest.tools.length !== 15 ||
-  entries.size !== 15 ||
-  listedTools.length !== 15 ||
-  new Set(listedTools.map((t) => t.name)).size !== 15
+  manifest.tools.length !== 16 ||
+  entries.size !== 16 ||
+  listedTools.length !== 16 ||
+  new Set(listedTools.map((t) => t.name)).size !== 16
 ) {
   throw new Error("Unexpected catalog");
 }

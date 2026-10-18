@@ -2,7 +2,7 @@
 
 **[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)**
 
-## v2.1.3 — 15 Canonical Tools
+## v2.1.3 — 16 Canonical Tools
 
 **OpenTimestamps AI Notary Hub · LangChain/LlamaIndex Native · 100-call Macro-Macaroons · Free Sandbox available**
 
@@ -16,7 +16,13 @@ Explore the **[native framework quickstarts in `/cookbooks/frameworks`](cookbook
 [![LlamaIndex Ready](https://img.shields.io/badge/LlamaIndex-Ready-6366F1)](cookbooks/frameworks/llamaindex_agent.py)
 [![OpenTimestamps Integrated](https://img.shields.io/badge/OpenTimestamps-Integrated-F7931A)](https://opentimestamps.org/)
 
-The catalog contains **13 paid tools and 2 free sandbox tools**:
+The catalog contains **14 paid tools and 2 free sandbox tools**:
+The new `workflow.audit_trajectory` combines existing diff arithmetic and
+minimal boundary SHA-256/OTS receipt references in one **250-sat** call:
+`{"fromTarget":"2026-10-12","toTarget":"latest"}`. Both targets are required.
+It shares one captured live snapshot across the report, omits intermediate
+record/proof-byte envelopes, and does not fabricate OTS coverage for live data.
+The two free sandbox tools remain
 `stratigraphy.list` and `proof.list`. A notarization Macro-Macaroon authorizes
 100 tool-scoped calls for 25,000 sats at the current 250-sat base price.
 Calendar acceptance is not Bitcoin confirmation; upgrade and independently
@@ -28,7 +34,7 @@ a trusted, budget-controlled wallet proxy; they do not pay automatically.
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2025--11--25-orange)](https://modelcontextprotocol.io/specification/2025-11-25)
 [![L402 Enabled](https://img.shields.io/badge/Monetization-L402%20Lightning-yellow)](https://l402.org)
 
-Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **15 Canonical Tools**.
+Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **16 Canonical Tools**.
 
 ## Licensing, IP & Enterprise Terms
 
@@ -152,7 +158,7 @@ L402 gateway + scoped macaroons
 Pricing -> invoice -> payment proof
              |
              v
-14-tool router / 4 namespaces
+16-tool router / 5 namespaces
 stratigraphy (5) | proof (6)
 mesh (2)        | payment (1)
              |
@@ -245,7 +251,7 @@ proof-of-work validity proofs.
 ## Tool Directory
 
 The directory uses bulleted definitions rather than multi-column tables so each
-tool description can wrap independently on mobile. These are the **15 canonical
+tool description can wrap independently on mobile. These are the **16 canonical
 MCP names** returned by `tools/list`.
 
 ### `stratigraphy.*` — 5 tools

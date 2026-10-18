@@ -66,4 +66,8 @@ export const MCP_TOOL_GROUPS = {
       "MCP price discovery and authenticated Lightning or configured Base USDC settlement checks.",
     tools: ["payment.get_info"],
   },
+  workflow: {
+    description: "Deterministic composite thermodynamic trajectory audits with compact boundary proof receipts.",
+    tools: ["workflow.audit_trajectory"],
+  },
 } as const;

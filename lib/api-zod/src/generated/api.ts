@@ -30,11 +30,11 @@ import * as zod from 'zod';
  */
 
 export const getEnterpriseDueDiligenceBriefResponseGenesisProofMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
-export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolCountMin = 15;
-export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolCountMax = 15;
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolCountMin = 16;
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolCountMax = 16;
 
-export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolsMin = 15;
-export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolsMax = 15;
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolsMin = 16;
+export const getEnterpriseDueDiligenceBriefResponseMcpCatalogToolsMax = 16;
 
 export const getEnterpriseDueDiligenceBriefResponseMcpCatalogPricesSatsMinOne = 0;
 
@@ -452,12 +452,12 @@ export const GetNostrDiscoveryInfoResponse = zod.record(zod.string(), zod.unknow
 
 /**
  * Generated at startup after registration from the exact UTF-8 descriptions served by tools/list. Verify each base64 Ed25519 signature against the raw 32-byte SHA-256 description digest using the SPKI PEM server_public_key. Pin the public key through a trusted channel before relying on it. These signatures attest descriptions, not schemas, tool execution, timestamp freshness, name-to-description binding, or prompt-injection safety. Also served at /api/.well-known/integrity.json.
- * @summary Public Ed25519 signatures of all 15 final MCP tool descriptions
+ * @summary Public Ed25519 signatures of all 16 final MCP tool descriptions
  */
 export const getToolIntegrityManifestResponseKeyIdRegExp = new RegExp('^[0-9a-f]{64}$');
 export const getToolIntegrityManifestResponseToolsItemDescriptionHashRegExp = new RegExp('^[0-9a-f]{64}$');
-export const getToolIntegrityManifestResponseToolsMin = 15;
-export const getToolIntegrityManifestResponseToolsMax = 15;
+export const getToolIntegrityManifestResponseToolsMin = 16;
+export const getToolIntegrityManifestResponseToolsMax = 16;
 
 
 
@@ -546,8 +546,8 @@ export const PreflightMcpResponse = zod.unknown()
 
 
 /**
- * Call initialize, ping, tools/list or tools/call. All fifteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
- * @summary JSON-RPC discovery and execution of the 15 canonical MCP tools
+ * Call initialize, ping, tools/list or tools/call. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * @summary JSON-RPC discovery and execution of the 16 canonical MCP tools
  */
 export const ExecuteMcpRequestHeader = zod.object({
   "MCP-Protocol-Version": zod.string().optional().describe('Negotiated MCP protocol version, for example 2025-11-25'),
@@ -580,8 +580,8 @@ export const ExecuteMcpRequestResponse = zod.union([zod.unknown(),zod.unknown()]
  */
 export const getMcpDiscoveryManifestResponseToolsItemPriceSatsMin = 0;
 
-export const getMcpDiscoveryManifestResponseToolsMin = 15;
-export const getMcpDiscoveryManifestResponseToolsMax = 15;
+export const getMcpDiscoveryManifestResponseToolsMin = 16;
+export const getMcpDiscoveryManifestResponseToolsMax = 16;
 
 export const getMcpDiscoveryManifestResponseL402PreflightGenesisReceiptMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
 
@@ -624,7 +624,7 @@ export const GetMcpDiscoveryManifestResponse = zod.object({
 }),
   "tools": zod.array(zod.object({
   "name": zod.string(),
-  "namespace": zod.enum(['stratigraphy', 'proof', 'mesh', 'payment']),
+  "namespace": zod.enum(['stratigraphy', 'proof', 'mesh', 'payment', 'workflow']),
   "title": zod.string(),
   "description": zod.string(),
   "price_sats": zod.number().int().min(getMcpDiscoveryManifestResponseToolsItemPriceSatsMin),

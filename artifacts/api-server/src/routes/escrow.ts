@@ -44,9 +44,9 @@ type EscrowOptions = {
 export function assertEscrowMcpRegistryIntegrity(): void {
   const schemas = openApiDocument["x-mcp-tools"] as Record<string, unknown>;
   const names = Object.keys(mcpToolPrices).sort();
-  if (names.length !== 15 || mcpDiscoveryManifest.mcp.capabilities.tools.count !== 15
+  if (names.length !== 16 || mcpDiscoveryManifest.mcp.capabilities.tools.count !== 16
       || JSON.stringify(names) !== JSON.stringify(Object.keys(schemas).sort())) {
-    throw new Error("Escrow mount requires the unchanged 15-tool MCP catalog");
+    throw new Error("Escrow mount requires the canonical 16-tool MCP catalog");
   }
 }
 

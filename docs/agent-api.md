@@ -31,7 +31,7 @@ It is registered as a second service of the existing API artifact.
   proof, including exact contents and download URLs.
 - `/agent-api/health`: process health; not an MCP tool.
 
-The existing `/mcp` server and its 15 canonical tools are unchanged.
+The existing `/mcp` server retains its original tools alongside the composite audit tool.
 
 ## Supply semantics
 
@@ -169,7 +169,7 @@ verify with their own Bitcoin mainnet node. Routine retries are debug-only logs.
 
 ### Agent retrieval
 
-The primary 15-tool `/mcp` catalog now obtains its stratigraphy responses
+The primary 16-tool `/mcp` catalog now obtains its stratigraphy responses
 through an authenticated internal bridge to this licensed Python pipeline and
 the authoritative Object Storage archive. The free `stratigraphy.list` tool
 exposes only real archive bounds and live tip metadata. The four paid

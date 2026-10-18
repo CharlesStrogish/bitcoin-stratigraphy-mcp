@@ -41,7 +41,7 @@ your client supports URL-based MCP configuration; some hosts require an explicit
 transport type in their own configuration format. [smithery.yaml](smithery.yaml)
 is canonical **remote registration metadata**, not a local-server launch recipe.
 
-The server advertises 15 canonical capabilities. `initialize` and `tools/list`
+The server advertises 16 canonical capabilities. `initialize` and `tools/list`
 are free protocol discovery operations. Exactly two tool executions are free:
 
 | Tool | Arguments | Purpose |

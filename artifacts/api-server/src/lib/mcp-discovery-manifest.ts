@@ -49,7 +49,7 @@ export const mcpDiscoveryManifest = {
   title: PRODUCT_NAME,
   version: RELEASE_VERSION,
   description:
-    "Bitcoin Stratigraphy: 15 canonical MCP tools for the Hal Finney Horizon tracker ($10M / BTC USD price), 15 J/TH thermodynamic energy calculation (hashrate H/s / 1e12 * 15 watts), Sovereign Node Bitcoin Core RPC telemetry, Live L402 Satoshi settlement through configured NWC, and OpenTimestamps provenance. Two sandbox discovery tools are free; paid execution requires verified settlement.",
+    "Bitcoin Stratigraphy: 16 canonical MCP tools for the Hal Finney Horizon tracker ($10M / BTC USD price), 15 J/TH thermodynamic energy calculation (hashrate H/s / 1e12 * 15 watts), Sovereign Node Bitcoin Core RPC telemetry, Live L402 Satoshi settlement through configured NWC, and OpenTimestamps provenance. Two sandbox discovery tools are free; paid execution requires verified settlement.",
   canonical_url: CANONICAL_ORIGIN,
   author: {
     name: CREATOR.name,
@@ -91,8 +91,8 @@ export const mcpDiscoveryManifest = {
     ],
     capabilities: {
       tools: {
-        count: 15,
-        namespaces: ["stratigraphy", "proof", "mesh", "payment"],
+        count: 16,
+        namespaces: ["stratigraphy", "proof", "mesh", "payment", "workflow"],
       },
       prompts: true,
       resources: true,

@@ -75,17 +75,29 @@ test("licensing renders both tiers with every requested entitlement and price", 
     "Air-Gapped / VPC Deployment",
     "EU AI Act Article 12 & 26(6) Tamper-Evident Flight Recorders",
     "L402 Runaway Swarm Circuit Breakers",
+    "Cryptographically Signed Tool Integrity",
     '"AS IS" No-SLA delivery',
   ]) {
     assert.ok(text.includes(label), `renders ${label}`);
   }
   assert.match(text, /Starting at\s*\$250k\s*\/Annual/);
   assert.equal((html.match(/<article\b/g) ?? []).length, 2);
-  assert.equal((html.match(/<li\b/g) ?? []).length, 8);
+  assert.equal((html.match(/<li\b/g) ?? []).length, 9);
   assert.doesNotMatch(
     text,
     /Unavailable|MAINNET SATS ACCRUED|RECENT VERIFIED SETTLEMENTS|Live Cryptographic/,
   );
+});
+
+test("licensing links the public integrity manifest below the tier matrix", () => {
+  const html = renderMatrix();
+  const enterprise = html.match(/<article\b[^>]*data-testid="card-tier-enterprise"[\s\S]*?<\/article>/)?.[0];
+  assert.match(enterprise ?? "", /<li>Cryptographically Signed Tool Integrity<\/li>/);
+  assert.match(
+    html,
+    /<\/article><\/div><a class="elm-integrity-link" href="\/\.well-known\/integrity\.json" data-testid="link-tool-integrity-manifest">View Tool Integrity Manifest<\/a>/,
+  );
+  assert.doesNotMatch(source, /useEffect|useQuery|fetch\(/);
 });
 
 test("licensing uses the shared module kicker and offers a copyable email fallback", () => {

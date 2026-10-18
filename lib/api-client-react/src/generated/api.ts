@@ -92,6 +92,7 @@ import type {
   StratigraphyCost,
   StratigraphyEntry,
   TokenRevocationServiceUnavailableError,
+  ToolIntegrityManifest,
   VerifyZkProof400,
   VerifyZkProof503,
   WalletGatewayError,
@@ -1197,6 +1198,84 @@ export function useGetNostrDiscoveryInfo<TData = Awaited<ReturnType<typeof getNo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetNostrDiscoveryInfoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetToolIntegrityManifestUrl = () => {
+
+
+
+
+  return `/api/.well-known/integrity.json`
+}
+
+/**
+ * Generated at startup after registration from the exact UTF-8 descriptions served by tools/list. Verify each base64 Ed25519 signature against the raw 32-byte SHA-256 description digest using the SPKI PEM server_public_key. Pin the public key through a trusted channel before relying on it. These signatures attest descriptions, not schemas, tool execution, timestamp freshness, name-to-description binding, or prompt-injection safety. Also served at /api/.well-known/integrity.json.
+ * @summary Public Ed25519 signatures of all 15 final MCP tool descriptions
+ */
+export const getToolIntegrityManifest = async ( options?: Parameters<typeof customFetch>[1]): Promise<ToolIntegrityManifest> => {
+
+  return customFetch<ToolIntegrityManifest>(getGetToolIntegrityManifestUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetToolIntegrityManifestQueryKey = () => {
+    return [
+    `/api/.well-known/integrity.json`
+    ] as const;
+    }
+
+
+export const getGetToolIntegrityManifestQueryOptions = <TData = Awaited<ReturnType<typeof getToolIntegrityManifest>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getToolIntegrityManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetToolIntegrityManifestQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getToolIntegrityManifest>>> = ({ signal }) => getToolIntegrityManifest({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getToolIntegrityManifest>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetToolIntegrityManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getToolIntegrityManifest>>>
+export type GetToolIntegrityManifestQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public Ed25519 signatures of all 15 final MCP tool descriptions
+ */
+
+export function useGetToolIntegrityManifest<TData = Awaited<ReturnType<typeof getToolIntegrityManifest>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getToolIntegrityManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetToolIntegrityManifestQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

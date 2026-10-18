@@ -81,3 +81,4 @@
 - [Dead CSS pruning](dead-css-pruning.md) — token scans miss common-word and template-family classes; diff HEAD vs now with a strict string pass, review by hand.
 - [Layout overflow checks](layout-overflow-checks.md) — drive the workspace Chromium over DevTools protocol to measure containment; leave the screenshot tool's browsers alone.
 - [Homepage licensing policy](homepage-licensing-policy.md) — keep Module 02 a static enterprise licensing matrix; no database-backed telemetry for visiting CISOs.
+- [Tool integrity trust](tool-integrity-trust.md) — signed descriptions need independently pinned client trust; preserve signing identity across publish cycles and coordinate secret rotation.

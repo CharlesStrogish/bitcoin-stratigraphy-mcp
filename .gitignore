@@ -61,3 +61,6 @@ __pycache__/
 
 # Runtime provenance archives and generated verification artifacts.
 /generated-artifacts/
+
+# Private tool-integrity signing keys (standalone deployments only).
+**/.keys/

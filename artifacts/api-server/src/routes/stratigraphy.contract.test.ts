@@ -95,7 +95,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "proof.get_by_hash":
     "Retrieve one retained proof payload, signed receipt, or lifecycle-only status using exactly one known `hash` (proof or receipt hash, CID, snapshot digest, or submission UUID) or `jobId` (submission UUID). Looks up bounded process-local records without re-running Groth16 proof verification; receipt provenance may be checked against the current dataset, and missing payloads cannot be reconstructed. Use `proof.list` to discover indexed proof hashes and `proof.verify` to cryptographically verify supplied proof inputs.",
   "proof.list":
-    "Freely discover, filter, and paginate recent zk-proof attestation lifecycle summaries. Use limit (1-100), offset (0-1000), and optional status (verified, cached, pending, invalid). Returns bounded summaries, not full proofs or receipts. Alias: proof.status. No invoice is created.",
+    "List available cryptographic proof attestations, including OpenTimestamps receipts and Groth16 zero-knowledge state proofs. Returns paginated index summaries of archived proofs without downloading the full byte payloads. Use this tool to discover existing proofs for specific block heights or dataset digests before verifying them. Use proof.get_by_hash to retrieve a specific full proof, proof.verify to validate one, or proof.submit to attest a new record. Read-only and idempotent.",
   "payment.get_info":
     "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted.",
   "stratigraphy.list":
@@ -109,17 +109,17 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "stratigraphy.get_digest":
     "Fetch compact source-record fingerprints and metadata for an indexed stratum height, date, or bounded date range. Returns no full record telemetry or Bitcoin block-header hash; the fingerprint is not a verification receipt. Use this tool instead of `stratigraphy.get` when a compact fingerprint is enough; use `stratigraphy.get_range` for contiguous multi-record summaries and `stratigraphy.list` for catalog discovery.",
   "proof.ground":
-    "PURPOSE & BOUNDARIES: Issue a signed Bitcoin-tip receipt for either agent context (contextHash plus agentId) or a dataset CID; this is an anchor, not a ZK or Bitcoin-confirmed OTS proof. USAGE GUIDELINES: Use `proof.verify` for proof verification without anchoring or `proof.get_by_hash` for existing receipts. BEHAVIOR & CONSEQUENCES: Creates a receipt and costs 250 sats via HTTP L402 without valid credentials; the two input modes are exclusive, invalid inputs fail, and tip/provider availability is required.",
+    "Ground an AI agent context window directly in immutable Bitcoin consensus state to eliminate temporal and factual hallucinations. Binds input claims to real-time proof-of-work difficulty, block height, and thermodynamic entropy. Use this tool during critical reasoning steps or pre-execution checks when agent outputs require deterministic verification against physical reality. Use proof.notarize to timestamp arbitrary digests or stratigraphy.get for raw metrics.",
   "proof.verify":
     "Execute cryptographic verification for supplied Groth16 telemetry or drift zk-SNARK proofs, or OpenTimestamps receipts. Returns proof validity; verification can update a bounded in-memory lifecycle index, and drift checks require a Bitcoin block provider. Use this tool to verify supplied proofs; use `proof.submit` to register new Groth16 proofs and `proof.get_by_hash` to retrieve retained proofs or signed receipts by a known identifier.",
   "proof.submit":
-    "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately.",
+    "Submit a generated Groth16 zero-knowledge proof or transaction attestation to the Bitcoin Stratigraphy validation pipeline. Ingests verification keys, public inputs, and proof bytes for engine attestation. Use this tool when external agent systems need their cryptographic state verified and anchored into the stratigraphy index. Requires L402 settlement: on HTTP 402, pay the Lightning invoice and retry with Authorization: L402 <macaroon>:<preimage>.",
   "mesh.broadcast":
-    "PURPOSE & BOUNDARIES: Sign a stored daily telemetry snapshot selected by date and distribute it to pinned mesh peers for cross-validation; arbitrary payloads or inbound peer sync publication are not supported. USAGE GUIDELINES: Use this instead of `mesh.get_status` only when sending a snapshot for peer acknowledgment. BEHAVIOR & CONSEQUENCES: Side-effecting and costs 250 sats via HTTP L402 without valid credentials; missing records, invalid agent events, unavailable peers, or failed quorum return errors.",
+    "Broadcast local telemetry snapshots and stratigraphy receipts to peer nodes across the Stratigraphy mesh network. Use this tool to propagate sovereign node state, sync multi-agent clusters, or announce new block validation events. Use mesh.get_status to inspect local peer connectivity before broadcasting. Requires network authorization or L402 settlement token.",
   "stratigraphy.get":
     "Retrieve indexed telemetry record bodies by indexed height or UTC ISO date, or query recent days and bounded date/height ranges. Returns full record fields by default; optional metrics project selected telemetry fields, and limit caps results at 1-100 (default 10). Read-only and L402-paid, without HTTP IP rate limiting. Use `date` or `blockHeight` for single-entry deep inspection; use `stratigraphy.get_range` for compact contiguous multi-record spans, `stratigraphy.get_digest` for lightweight source-record fingerprints, `stratigraphy.get_diff` for point-in-time deltas, and `stratigraphy.list` to discover indexed bounds.",
   "mesh.get_status":
-    "Inspect P2P peer counts, topology health, cross-validation rate, propagation latency, and quorum. Requires L402 authorization; use mesh.broadcast to distribute a snapshot. This tool does not administer peers or edit topology.",
+    "Inspect local mesh network topology, active peer connections, and relay synchronization state. Returns connected peer counts, latency figures, and gossip protocol health. Use this tool to check node network connectivity prior to broadcasting or querying distributed telemetry. Read-only and idempotent.",
 };
 for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
   expectedMcpToolDescriptions[name] = contract.description;
@@ -2224,21 +2224,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     }
   };
   for (const candidate of listed.result?.tools ?? []) {
-    if (
-      [
-        "payment.get_info",
-        "stratigraphy.get",
-        "stratigraphy.list",
-        "stratigraphy.get_range",
-        "stratigraphy.get_digest",
-        "stratigraphy.get_diff",
-        "proof.verify",
-        "proof.get_by_hash",
-        "proof.list",
-        "proof.attenuate",
-        "mesh.get_status",
-      ].includes(candidate.name)
-    ) {
+    if (Object.hasOwn(expectedMcpToolDescriptions, candidate.name)) {
       assert.ok(candidate.description.startsWith(expectedMcpToolDescriptions[candidate.name]));
     } else {
       assert.match(
@@ -2521,9 +2507,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       `${name} must not append the generic immutability note to its exact description`,
     );
   }
-  assert.match(
+  assert.equal(
     documentedTool("stratigraphy.list").description,
-    /^Free, metadata-only discovery of real UTC archive bounds/,
+    STRATIGRAPHY_TOOL_DESCRIPTIONS["stratigraphy.list"],
   );
   assert.match(documentedTool("proof.list").description, /free|no invoice/i);
   assert.match(

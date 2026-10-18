@@ -958,6 +958,32 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PublicMetadata"
+  /.well-known/integrity.json:
+    servers:
+      - url: https://bitcoinstratigraphy.com
+        description: Canonical production origin
+      - url: /
+        description: Same origin
+    get:
+      operationId: getToolIntegrityManifest
+      tags: [discovery]
+      summary: Public Ed25519 signatures of all 15 final MCP tool descriptions
+      description: >-
+        Generated at startup after registration from the exact UTF-8 descriptions
+        served by tools/list. Verify each base64 Ed25519 signature against the raw
+        32-byte SHA-256 description digest using the SPKI PEM server_public_key.
+        Pin the public key through a trusted channel before relying on it.
+        These signatures attest descriptions, not schemas, tool execution,
+        timestamp freshness, name-to-description binding, or prompt-injection safety.
+        Also served at /api/.well-known/integrity.json.
+      security: []
+      responses:
+        "200":
+          description: Startup-generated description integrity manifest; no credentials required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolIntegrityManifest"
   /.well-known/nostr.json:
     servers:
       - url: https://bitcoinstratigraphy.com
@@ -1974,6 +2000,47 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    ToolIntegrityEntry:
+      type: object
+      additionalProperties: false
+      required: [name, description_hash, signature]
+      properties:
+        name: { type: string }
+        description_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Lowercase SHA-256 hex digest of the exact UTF-8 description, without normalization.
+        signature:
+          type: string
+          description: Base64 Ed25519 signature over the raw 32-byte digest, not its hex text.
+    ToolIntegrityManifest:
+      type: object
+      additionalProperties: false
+      required: [server_public_key, algorithm, timestamp, hash_algorithm, signature_encoding, signed_message, key_id, tools]
+      properties:
+        server_public_key:
+          type: string
+          description: Ed25519 public key in SPKI PEM format; never includes private key material.
+        algorithm: { type: string, enum: [Ed25519] }
+        timestamp:
+          type: string
+          format: date-time
+          description: Manifest generation time at process startup, not the time of each HTTP request.
+        hash_algorithm: { type: string, enum: [SHA-256] }
+        signature_encoding: { type: string, enum: [base64] }
+        signed_message:
+          type: string
+          description: Exact byte-level signing convention for independent verifiers.
+        key_id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: SHA-256 of the public key's SPKI DER bytes; suitable for an independently trusted pin.
+        tools:
+          type: array
+          minItems: 15
+          maxItems: 15
+          items:
+            $ref: "#/components/schemas/ToolIntegrityEntry"
     EscrowInput:
       type: object
       additionalProperties: false

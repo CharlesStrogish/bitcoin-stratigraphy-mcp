@@ -6,3 +6,6 @@
 
 # Runtime archives are created locally, not bundled into deployments.
 generated-artifacts/
+
+# Never bundle standalone private signing keys into a published app.
+**/.keys/

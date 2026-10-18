@@ -35,6 +35,7 @@ const outputs = [
   "./dist/public-rate-limit.test.js",
   "./dist/postgres-ssl-mode.test.js",
   "./dist/api-root-aliases.test.js",
+  "./dist/tool-integrity.test.js",
   "./dist/provenanceChain.test.js",
   "./dist/provenanceRoutes.test.js",
 ];
@@ -163,6 +164,7 @@ await build({
     "public-rate-limit.test": "./tests/unit/public-rate-limit.test.ts",
     "postgres-ssl-mode.test": "./tests/unit/postgres-ssl-mode.test.ts",
     "api-root-aliases.test": "./tests/unit/api-root-aliases.test.ts",
+    "tool-integrity.test": "./tests/unit/tool-integrity.test.ts",
   },
   outdir: "./dist",
   bundle: true,

@@ -18,6 +18,7 @@ const ENTERPRISE = [
   "Air-Gapped / VPC Deployment",
   "EU AI Act Article 12 & 26(6) Tamper-Evident Flight Recorders",
   "L402 Runaway Swarm Circuit Breakers",
+  "Cryptographically Signed Tool Integrity",
   '"AS IS" No-SLA delivery',
 ];
 
@@ -96,6 +97,13 @@ export function EnterpriseLicensingMatrix() {
           </div>
         </article>
       </div>
+      <a
+        className="elm-integrity-link"
+        href="/.well-known/integrity.json"
+        data-testid="link-tool-integrity-manifest"
+      >
+        View Tool Integrity Manifest
+      </a>
     </section>
   );
 }

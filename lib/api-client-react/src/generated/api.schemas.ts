@@ -21,6 +21,60 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export interface ToolIntegrityEntry {
+  name: string;
+  /**
+     * Lowercase SHA-256 hex digest of the exact UTF-8 description, without normalization.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  description_hash: string;
+  /** Base64 Ed25519 signature over the raw 32-byte digest, not its hex text. */
+  signature: string;
+}
+
+export type ToolIntegrityManifestAlgorithm = typeof ToolIntegrityManifestAlgorithm[keyof typeof ToolIntegrityManifestAlgorithm];
+
+
+export const ToolIntegrityManifestAlgorithm = {
+  Ed25519: 'Ed25519',
+} as const;
+
+export type ToolIntegrityManifestHashAlgorithm = typeof ToolIntegrityManifestHashAlgorithm[keyof typeof ToolIntegrityManifestHashAlgorithm];
+
+
+export const ToolIntegrityManifestHashAlgorithm = {
+  'SHA-256': 'SHA-256',
+} as const;
+
+export type ToolIntegrityManifestSignatureEncoding = typeof ToolIntegrityManifestSignatureEncoding[keyof typeof ToolIntegrityManifestSignatureEncoding];
+
+
+export const ToolIntegrityManifestSignatureEncoding = {
+  base64: 'base64',
+} as const;
+
+export interface ToolIntegrityManifest {
+  /** Ed25519 public key in SPKI PEM format; never includes private key material. */
+  server_public_key: string;
+  algorithm: ToolIntegrityManifestAlgorithm;
+  /** Manifest generation time at process startup, not the time of each HTTP request. */
+  timestamp: string;
+  hash_algorithm: ToolIntegrityManifestHashAlgorithm;
+  signature_encoding: ToolIntegrityManifestSignatureEncoding;
+  /** Exact byte-level signing convention for independent verifiers. */
+  signed_message: string;
+  /**
+     * SHA-256 of the public key's SPKI DER bytes; suitable for an independently trusted pin.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  key_id: string;
+  /**
+     * @minItems 15
+     * @maxItems 15
+     */
+  tools: ToolIntegrityEntry[];
+}
+
 export interface EscrowInput {
   /** @pattern ^[0-9a-fA-F]{64}$ */
   buyer_pubkey: string;

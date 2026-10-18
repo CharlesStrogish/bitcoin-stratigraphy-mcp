@@ -451,6 +451,33 @@ export const GetNostrDiscoveryInfoResponse = zod.record(zod.string(), zod.unknow
 
 
 /**
+ * Generated at startup after registration from the exact UTF-8 descriptions served by tools/list. Verify each base64 Ed25519 signature against the raw 32-byte SHA-256 description digest using the SPKI PEM server_public_key. Pin the public key through a trusted channel before relying on it. These signatures attest descriptions, not schemas, tool execution, timestamp freshness, name-to-description binding, or prompt-injection safety. Also served at /api/.well-known/integrity.json.
+ * @summary Public Ed25519 signatures of all 15 final MCP tool descriptions
+ */
+export const getToolIntegrityManifestResponseKeyIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getToolIntegrityManifestResponseToolsItemDescriptionHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getToolIntegrityManifestResponseToolsMin = 15;
+export const getToolIntegrityManifestResponseToolsMax = 15;
+
+
+
+export const GetToolIntegrityManifestResponse = zod.object({
+  "server_public_key": zod.string().describe('Ed25519 public key in SPKI PEM format; never includes private key material.'),
+  "algorithm": zod.enum(['Ed25519']),
+  "timestamp": zod.coerce.date().describe('Manifest generation time at process startup, not the time of each HTTP request.'),
+  "hash_algorithm": zod.enum(['SHA-256']),
+  "signature_encoding": zod.enum(['base64']),
+  "signed_message": zod.string().describe('Exact byte-level signing convention for independent verifiers.'),
+  "key_id": zod.string().regex(getToolIntegrityManifestResponseKeyIdRegExp).describe('SHA-256 of the public key\'s SPKI DER bytes; suitable for an independently trusted pin.'),
+  "tools": zod.array(zod.object({
+  "name": zod.string(),
+  "description_hash": zod.string().regex(getToolIntegrityManifestResponseToolsItemDescriptionHashRegExp).describe('Lowercase SHA-256 hex digest of the exact UTF-8 description, without normalization.'),
+  "signature": zod.string().describe('Base64 Ed25519 signature over the raw 32-byte digest, not its hex text.')
+})).min(getToolIntegrityManifestResponseToolsMin).max(getToolIntegrityManifestResponseToolsMax)
+})
+
+
+/**
  * Always HTTP 200 JSON with wildcard CORS. Maps the announcing Nostr key to the configured NIP-05 name on its own domain, or to the root identity "_" when no name is configured. A name that is not served returns an empty names object. Also served at /api/.well-known/nostr.json.
  * @summary Public NIP-05 name-to-pubkey mapping
  */

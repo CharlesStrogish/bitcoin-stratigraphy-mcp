@@ -6,7 +6,12 @@ import router from "./routes";
 import { registerStratigraphyRoutes } from "./routes/stratigraphy";
 import { registerOpenApiRoute } from "./routes/openapi";
 import { registerDocsRoutes } from "./routes/docs";
-import { registerMcpRequestGuard, registerMcpRoute } from "./routes/mcp";
+import {
+  mcpToolDefinitions,
+  registerMcpRequestGuard,
+  registerMcpRoute,
+} from "./routes/mcp";
+import { registerToolIntegrityRoute } from "./routes/tool-integrity";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
 import { logger } from "./lib/logger";
 import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
@@ -108,6 +113,7 @@ registerMcpRoute(app, {
   meshService,
   publicRateLimiter,
 });
+registerToolIntegrityRoute(app, mcpToolDefinitions);
 registerNostrStatusRoute(app);
 registerRevenueAnalyticsRoutes(app, revenueLedger);
 registerSystemHealthRoute(app, pricingEngine);

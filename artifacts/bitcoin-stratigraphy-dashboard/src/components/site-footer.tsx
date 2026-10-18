@@ -1,4 +1,4 @@
-import { Play } from "lucide-react";
+import { Play, ShieldCheck } from "lucide-react";
 import WhitepaperLink from "./whitepaper-link";
 import "./site-footer.css";
 
@@ -14,6 +14,7 @@ export default function SiteFooter() {
               href={`${import.meta.env.BASE_URL}compliance`}
               data-testid="link-footer-compliance"
             >
+              <ShieldCheck size={14} aria-hidden="true" />
               Enterprise Compliance
             </a>
           </nav>
@@ -22,8 +23,9 @@ export default function SiteFooter() {
             LINKS OPEN IN A NEW TAB
           </span>
           <span>
-            ARCHITECTED BY CHARLES R. STROGISH | POWERED BY L402 MICROPAYMENTS,
-            RFC 6962 MERKLE PROOFS &amp; OPENTIMESTAMPS STATE ANCHORING.
+            BITCOIN STRATIGRAPHY DATA ENGINE © 2026 | ARCHITECTED BY CHARLES R.
+            STROGISH | ENTERPRISE MCP SERVER POWERED BY L402 MICROPAYMENTS, RFC
+            6962 MERKLE PROOFS &amp; OPENTIMESTAMPS STATE ANCHORING.
           </span>
         </div>
       </div>

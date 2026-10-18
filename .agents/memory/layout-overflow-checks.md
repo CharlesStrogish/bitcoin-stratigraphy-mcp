@@ -15,6 +15,10 @@ Measuring at 360, 390, 768, 1024 and 1440 px gives a definite containment
 answer.
 
 **How to apply:**
+- Select a `/json/list` target with `type === "page"`, not the first entry.
+  Chromium also exposes an extension background target; navigating it returns
+  `net::ERR_ABORTED` and an empty body instead of the application.
+  **Why:** Target ordering is not stable, and the extension can appear first.
 - Every page load polls the API, so keep runs few (see homepage-polling-budget.md).
 - The wrapper's child processes can outlive it; give each run its own
   `--user-data-dir` so leftovers can be found.

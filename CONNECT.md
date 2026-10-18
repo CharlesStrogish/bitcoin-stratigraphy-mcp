@@ -287,6 +287,52 @@ export async function invokeWithL402(
 
 For concurrent agents, deduplicate payment for the *same* in-flight challenge and do not let an older 402 response overwrite newer credentials. Never submit a preimage until it has been checked against the selected challenge's payment hash. A CoinOS internal-payment reference has separate server-side verification and is **not** a 32-byte preimage; the sample above intentionally handles ordinary Lightning preimages only. See `sdk/typescript/client.ts` for the project's existing MCP payment client.
 
+## Zero-polling execution with `webhook_url`
+
+`stratigraphy.get_range` and `proof.submit` accept an optional `webhook_url`
+argument. Add it to the paid call; the rest of the L402 flow is unchanged.
+
+1. **Unpaid call.** The callback is checked before anything else: it must be an
+   absolute `https://` URL without credentials, and its host must resolve only
+   to public addresses. Loopback, private, link-local, cloud-metadata and other
+   reserved targets fail with JSON-RPC `-32602` before an invoice is issued.
+   When the server's task queue is full, the call fails with HTTP 503 and
+   `Retry-After`; retry later or omit `webhook_url`. Otherwise you receive the
+   usual 402 challenge.
+2. **Paid retry.** The server verifies payment and answers **HTTP 202
+   Accepted** without waiting for the tool:
+
+   ```json
+   {"jsonrpc":"2.0","id":7,"result":{"task_id":"5d0c6f1e-6a43-4c8e-9f0b-2f1d4c7b9a10","status":"pending","tool":"stratigraphy.get_range","created_at":"2026-10-18T14:03:11.204Z"}}
+   ```
+
+3. **Callback.** When the tool finishes, the server sends one `POST` to the
+   callback with `Content-Type: application/json` and an `X-MCP-Task-Id` header:
+
+   ```json
+   {"task_id":"5d0c6f1e-6a43-4c8e-9f0b-2f1d4c7b9a10","status":"completed","tool":"stratigraphy.get_range","request_id":7,"created_at":"2026-10-18T14:03:11.204Z","completed_at":"2026-10-18T14:03:12.877Z","result":{"content":[{"type":"text","text":"…"}],"structuredContent":{"…":"…"}}}
+   ```
+
+   `result` is exactly the MCP result a synchronous call returns; for
+   `2026-07-28` requests it also carries `resultType: "complete"` and the
+   server `_meta`. Results with `isError: true` still have status `completed`.
+   A JSON-RPC failure after payment, such as a range with no captured records,
+   arrives with `"status":"failed"` and an `error` object instead of `result`.
+   A task that runs longer than 120 seconds is delivered as failed.
+
+Delivery is best effort. The server makes up to three attempts, retries only
+network errors and HTTP 408, 425, 429 and 5xx, never follows redirects, and
+expects any 2xx answer. Callbacks are not signed, so use an unguessable path or
+query token and accept only a `task_id` you received in a 202. Tasks are kept in
+server memory: a restart loses pending work, and there is no endpoint to poll.
+This is not the MCP Tasks extension (`tasks/get`). Omit `webhook_url` to keep
+the standard synchronous result.
+
+Credentials with a `max_target` caveat still fetch the range before the 202, so
+the caveat is enforced before the payment is used. The official MCP SDK clients
+ignore 202 response bodies, so send webhook calls with a direct HTTP client such
+as the `send` helper above.
+
 ## Configuration references
 
 - [Cursor MCP integrations](https://cursor.com/help/customization/mcp)

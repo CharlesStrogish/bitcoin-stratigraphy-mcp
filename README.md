@@ -272,7 +272,7 @@ MCP names** returned by `tools/list`.
 - **`stratigraphy.get_range`** — Retrieve fingerprints for a contiguous span of
   captured UTC snapshots across inclusive height or date bounds.
   - Access: paid, read-only. `startTarget` is required; the batch limit is 1–100,
-    default 50.
+    default 50. Optional `webhook_url` gives zero-polling execution (see below).
 
 ### `proof.*` — 7 tools
 
@@ -301,6 +301,7 @@ MCP names** returned by `tools/list`.
   then attempt a NIP-78 attestation.
   - Access: paid; changes proof registry state. Nostr publication can fail
     separately, and registration does not append the proof to a Merkle tree.
+    Optional `webhook_url` gives zero-polling execution (see below).
 - **`proof.notarize`** — Create a detached OpenTimestamps `.ots` receipt for a
   SHA-256 digest using public calendars.
   - Access: paid; `X-L402-Batch-Size: 100` buys 100 tool-scoped calls for
@@ -310,6 +311,18 @@ MCP names** returned by `tools/list`.
   (`contextHash` plus `agentId`) or for a dataset CID.
   - Access: paid; the input modes are exclusive. This is an off-chain signed
     anchor, not a Groth16 proof, on-chain transaction, or Bitcoin-confirmed OTS receipt.
+
+### Zero-polling execution (`webhook_url`)
+
+`stratigraphy.get_range` and `proof.submit` accept an optional public HTTPS
+`webhook_url`. After the L402 payment is verified, the server answers
+**HTTP 202 Accepted** with a `task_id` and status `pending`, runs the tool in the
+background, then POSTs the final MCP result (or JSON-RPC error) with the same
+`task_id` to the callback. Without `webhook_url` the call stays synchronous.
+Unsafe callback targets are refused before an invoice is issued, and tasks live
+in server memory, so a restart loses pending work. See
+[CONNECT.md](CONNECT.md#zero-polling-execution-with-webhook_url) for the request
+and callback shapes.
 
 ### `mesh.*` — 2 tools
 

@@ -291,7 +291,7 @@ x-mcp-tools:
         - required: [verified, settlementToken]
   stratigraphy.get_range:
     legacyNames: [stratigraphy.range]
-    description: "Fetch a contiguous sequence of Bitcoin stratigraphy records between startTarget and endTarget (block heights or YYYY-MM-DD UTC dates, in ascending order, capped by the limit parameter). Use this tool when analyzing multi-block trends or time-series intervals. Use stratigraphy.list to browse available catalog bounds, stratigraphy.get for a single snapshot, stratigraphy.get_diff to compare two endpoints without intermediate records, or stratigraphy.get_digest for compact hashes. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>."
+    description: "Fetch a contiguous sequence of Bitcoin stratigraphy records between startTarget and endTarget (block heights or YYYY-MM-DD UTC dates, in ascending order, capped by the limit parameter). Use this tool when analyzing multi-block trends or time-series intervals. Use stratigraphy.list to browse available catalog bounds, stratigraphy.get for a single snapshot, stratigraphy.get_diff to compare two endpoints without intermediate records, or stratigraphy.get_digest for compact hashes. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>. Supports zero-polling asynchronous execution: provide a webhook_url parameter to receive a 202 Accepted response immediately, followed by a server-initiated POST callback containing the final results when processing completes."
     annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
@@ -308,6 +308,12 @@ x-mcp-tools:
           description: Optional inclusive ending indexed height, UTC ISO date, or 'latest' (default latest indexed entry, not live tip); must resolve no earlier than startTarget.
         limit: { type: number, minimum: 1, maximum: 100, default: 50, description: "Maximum compressed records returned from startTarget toward endTarget, 1-100 (default 50); smaller limits truncate the batch." }
         format: { type: string, enum: [compact, minimal, kv], default: compact, description: "Compression of every returned record; does not change selected bounds." }
+        webhook_url:
+          type: string
+          format: uri
+          maxLength: 2048
+          pattern: "^https://"
+          description: Optional public HTTPS callback URL for zero-polling execution. On a paid call the server answers HTTP 202 Accepted with a JSON-RPC result containing task_id and status pending, runs the tool in the background, then POSTs one JSON body with task_id, status (completed or failed), tool, request_id and the final MCP result or JSON-RPC error. Omit it to receive the result synchronously. Loopback, private, link-local and other reserved addresses are rejected before any invoice is issued.
       required: [startTarget]
     outputSchema:
       type: object
@@ -647,7 +653,7 @@ x-mcp-tools:
         - required: [verifiedAt, computationTimeMs]
         - required: [status, blockHeight, bitcoinHeaderHash]
   proof.submit:
-    description: "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately."
+    description: "PURPOSE & BOUNDARIES: Submit and register a new Groth16 zk-SNARK proof with its five public signals, then attempt a Nostr NIP-78 attestation; this changes proof registry state, but does not append a proof to a Merkle tree. USAGE GUIDELINES: Use `proof.submit` strictly for registering new attestations, and use `proof.verify` instead when validating an existing proof without state mutation. Use `proof.get_by_hash` for retained submissions or `proof.ground` for a Bitcoin-tip receipt. BEHAVIOR & CONSEQUENCES: Costs 250 sats via HTTP L402 without valid credentials; malformed inputs fail validation, invalid proofs are reported, and Nostr publication status may fail separately. Supports zero-polling asynchronous execution: provide a webhook_url parameter to receive a 202 Accepted response immediately, followed by a server-initiated POST callback containing the final results when processing completes."
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
@@ -685,6 +691,12 @@ x-mcp-tools:
         snapshotDigest:
           type: string
           pattern: "^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$"
+        webhook_url:
+          type: string
+          format: uri
+          maxLength: 2048
+          pattern: "^https://"
+          description: Optional public HTTPS callback URL for zero-polling execution. On a paid call the server answers HTTP 202 Accepted with a JSON-RPC result containing task_id and status pending, runs the tool in the background, then POSTs one JSON body with task_id, status (completed or failed), tool, request_id and the final MCP result or JSON-RPC error. Omit it to receive the result synchronously. Loopback, private, link-local and other reserved addresses are rejected before any invoice is issued.
       required: [proof, publicSignals]
     outputSchema:
       type: object

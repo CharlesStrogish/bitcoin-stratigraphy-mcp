@@ -24,6 +24,7 @@ import {
   loadToolIntegrityKey,
 } from "../../src/lib/tool-integrity";
 import { registerToolIntegrityRoute } from "../../src/routes/tool-integrity";
+import { ASYNC_WEBHOOK_DESCRIPTION_SUFFIX } from "../../src/lib/stratigraphy-tool-descriptions";
 import {
   mcpToolDefinitions,
   registerMcpRequestGuard,
@@ -235,6 +236,14 @@ test("public integrity route matches live tools/list after final overlays, witho
       manifest.tools.map((t) => t.name),
       body.result.tools.map((t) => t.name),
     );
+    // The zero-polling suffix is part of the signed text, not appended later.
+    const asyncTools = body.result.tools.filter((tool) =>
+      tool.description.endsWith(ASYNC_WEBHOOK_DESCRIPTION_SUFFIX),
+    );
+    assert.deepEqual(asyncTools.map((tool) => tool.name).sort(), [
+      "proof.submit",
+      "stratigraphy.get_range",
+    ]);
     for (const tool of body.result.tools) {
       const entry = manifest.tools.find((item) => item.name === tool.name)!;
       const digest = createHash("sha256")

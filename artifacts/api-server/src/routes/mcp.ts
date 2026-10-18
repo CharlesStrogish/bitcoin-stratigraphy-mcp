@@ -7,8 +7,23 @@ import {
   answerStatelessMcpRequest,
   mcpServerCapabilities,
   negotiateMcpProtocol,
+  statelessErrorCode,
+  statelessMcpResult,
   type McpProtocolContext,
 } from "../lib/mcp-stateless";
+import {
+  WEBHOOK_URL_DESCRIPTION,
+  WEBHOOK_URL_EXAMPLE,
+  WEBHOOK_URL_MAX_LENGTH,
+  WEBHOOK_URL_PATTERN,
+  createMcpAsyncTaskRunner,
+  requestedWebhookUrl,
+  runMcpToolCallInMemory,
+  webhookUrlSchema,
+  withoutWebhookUrl,
+  type McpAsyncTaskRunner,
+  type McpTaskOutcome,
+} from "../lib/mcp-async-tasks";
 import {
   canonicalToolName,
   legacyToolNames,
@@ -103,7 +118,10 @@ import {
   type PrimaryStratigraphyResult,
 } from "../services/primaryStratigraphy";
 import { primaryStratigraphyContracts } from "../services/primaryStratigraphySchemas";
-import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
+import {
+  ASYNC_WEBHOOK_DESCRIPTION_SUFFIX,
+  STRATIGRAPHY_TOOL_DESCRIPTIONS,
+} from "../lib/stratigraphy-tool-descriptions";
 import { AUDIT_TRAJECTORY_DESCRIPTION, AUDIT_TRAJECTORY_OUTPUT_SCHEMA } from "../lib/workflow-audit";
 import { buildProvenanceChain } from "../services/provenanceChain";
 import {
@@ -435,6 +453,7 @@ const stratigraphyRangeInputSchema = z
       .default("latest"),
     limit: z.number().int().min(1).max(100).default(50),
     format: z.enum(["compact", "minimal", "kv"]).default("compact"),
+    webhook_url: webhookUrlSchema.optional(),
   })
   .strict();
 
@@ -864,6 +883,7 @@ const submitProofInputSchema = z
       .describe(
         "Decimal field digest or IPFS CID that must equal publicSignals[4] when supplied.",
       ),
+    webhook_url: webhookUrlSchema.optional(),
   })
   .strict()
   .superRefine((input, context) => {
@@ -1019,6 +1039,18 @@ const field = (
     ...extra,
   };
 };
+
+/** Shared by every tool that supports zero-polling webhook execution. */
+const webhookUrlField = field(
+  "string",
+  WEBHOOK_URL_DESCRIPTION,
+  [WEBHOOK_URL_EXAMPLE],
+  {
+    format: "uri",
+    maxLength: WEBHOOK_URL_MAX_LENGTH,
+    pattern: WEBHOOK_URL_PATTERN,
+  },
+);
 
 const quantitativeAlphaJsonSchema = {
   type: "object",
@@ -2021,6 +2053,7 @@ const baseMcpToolDefinitions = [
           ["compact", "minimal", "kv"],
           { enum: ["compact", "minimal", "kv"], default: "compact" },
         ),
+        webhook_url: webhookUrlField,
       },
       required: ["startTarget"],
     },
@@ -3170,6 +3203,7 @@ const baseMcpToolDefinitions = [
             pattern: "^(?:\\d+|Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$",
           },
         ),
+        webhook_url: webhookUrlField,
       },
       required: ["proof", "publicSignals"],
     },
@@ -4495,7 +4529,7 @@ export const mcpToolDefinitions = [
         mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0
           ? "Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution."
           : "Free metadata discovery: no Live L402 Satoshi settlement is required for this sandbox tool; no paid payload is released."
-      }`,
+      }${tool.name === "proof.submit" ? ASYNC_WEBHOOK_DESCRIPTION_SUFFIX : ""}`,
       _meta: { attestation_directive: ATTESTATION_DIRECTIVE },
       annotations: {
         ...tool.annotations,
@@ -4706,7 +4740,10 @@ function createBitcoinStratigraphyMcpServer(
       const parsed = schema?.safeParse(args);
       if (!parsed?.success) throw new McpError(ErrorCode.InvalidParams, "Invalid stratigraphy query");
       try {
-        const data = primaryResult ?? await primaryBackend(name, parsed.data);
+        // The callback URL is transport metadata, never a data-source argument.
+        const data =
+          primaryResult ??
+          (await primaryBackend(name, withoutWebhookUrl(parsed.data)));
         return {
           content: [{ type: "text" as const, text: JSON.stringify(data.result) }],
           structuredContent: data.result,
@@ -5016,7 +5053,8 @@ function createBitcoinStratigraphyMcpServer(
           "Invalid zk proof submission",
         );
       }
-      const { proof, ...rest } = parsed.data;
+      // Never archive or broadcast the caller's callback URL with the proof.
+      const { proof, ...rest } = withoutWebhookUrl(parsed.data);
       const canonicalProof =
         "piA" in proof
           ? { pi_a: proof.piA, pi_b: proof.piB, pi_c: proof.piC }
@@ -5154,30 +5192,55 @@ function createBitcoinStratigraphyMcpServer(
   return server;
 }
 
+/** Builds per-request SDK servers from the state the paid-call gates stored. */
+function mcpServerFactory(
+  locals: Record<string, unknown>,
+  mesh: Pick<MeshGossipService, "status" | "createConsensus">,
+  primaryBackend: PrimaryStratigraphyBackend,
+): () => McpServer {
+  return () => createBitcoinStratigraphyMcpServer(
+    locals.epistemicAnchorReceipt as
+      Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
+    mesh,
+    locals.epistemicDatasetReceipt as
+      Awaited<ReturnType<typeof createEpistemicDatasetReceipt>> | undefined,
+    locals.attenuation as Parameters<
+      typeof createBitcoinStratigraphyMcpServer
+    >[3],
+    locals.archivedProof as ArchivedProofLookup | undefined,
+    locals.driftVerification as
+      { valid: boolean; startedAt: number } | undefined,
+    Boolean(locals.x402Configured),
+    locals.paymentSettlement as SettlementCheck | undefined,
+    locals.notarizeHash as typeof notarizeHash | undefined,
+    primaryBackend,
+    locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined,
+  );
+}
+
+/** A webhook carries the same era framing as the synchronous reply would. */
+function eraTaskOutcome(
+  outcome: McpTaskOutcome,
+  protocol: McpProtocolContext | undefined,
+): McpTaskOutcome {
+  if (protocol?.era !== "stateless") return outcome;
+  return "error" in outcome
+    ? {
+        error: {
+          ...outcome.error,
+          code: statelessErrorCode(outcome.error.code, 200),
+        },
+      }
+    : { result: statelessMcpResult("tools/call", outcome.result) };
+}
+
 async function handleMcpRequest(
   req: Request,
   res: Response,
   mesh: Pick<MeshGossipService, "status" | "createConsensus">,
   primaryBackend: PrimaryStratigraphyBackend,
 ): Promise<void> {
-  const createServer = () => createBitcoinStratigraphyMcpServer(
-    res.locals.epistemicAnchorReceipt as
-      Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
-    mesh,
-    res.locals.epistemicDatasetReceipt as
-      Awaited<ReturnType<typeof createEpistemicDatasetReceipt>> | undefined,
-    res.locals.attenuation as Parameters<
-      typeof createBitcoinStratigraphyMcpServer
-    >[3],
-    res.locals.archivedProof as ArchivedProofLookup | undefined,
-    res.locals.driftVerification as
-      { valid: boolean; startedAt: number } | undefined,
-    Boolean(res.locals.x402Configured),
-    res.locals.paymentSettlement as SettlementCheck | undefined,
-    res.locals.notarizeHash as typeof notarizeHash | undefined,
-    primaryBackend,
-    res.locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined,
-  );
+  const createServer = mcpServerFactory(res.locals, mesh, primaryBackend);
   const protocol = res.locals.mcpProtocol as McpProtocolContext | undefined;
   if (protocol?.era === "stateless") {
     // MCP 2026-07-28: answered without the SDK HTTP transport or a session.
@@ -5266,10 +5329,13 @@ export function registerMcpRoute(
     notarizeHash?: typeof notarizeHash;
     stratigraphyBackend?: PrimaryStratigraphyBackend;
     publicRateLimiter?: SlidingWindowRateLimiter;
+    /** Background runner for webhook_url calls; one per process by default. */
+    asyncTaskRunner?: McpAsyncTaskRunner;
   } = {},
 ): void {
   const primaryBackend = options.stratigraphyBackend ??
     createPrimaryStratigraphyBackend({ secret: options.sessionSecret });
+  const asyncTasks = options.asyncTaskRunner ?? createMcpAsyncTaskRunner();
   app.use("/mcp", frameMcpErrors);
   app.use("/mcp", (_req, res, next) => {
     res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;
@@ -5314,6 +5380,80 @@ export function registerMcpRoute(
   const mesh = options.meshService ?? createMeshGossipService();
   const revocationStore =
     options.revocationStore ?? createPostgresMacaroonRevocationStore();
+  /** Refuses a callback before any invoice is issued or payment consumed. */
+  const webhookRefusal = async (
+    webhookUrl: string,
+  ): Promise<
+    { status: 400 | 503; error: { code: number; message: string } } | undefined
+  > => {
+    if (!asyncTasks.hasCapacity()) {
+      return {
+        status: 503,
+        error: {
+          code: -32603,
+          message:
+            "Asynchronous task capacity is exhausted; retry later or omit webhook_url for a synchronous result",
+        },
+      };
+    }
+    try {
+      await asyncTasks.checkWebhookTarget(webhookUrl);
+      return undefined;
+    } catch {
+      // One message for every DNS outcome, so callers cannot map internal names.
+      return {
+        status: 400,
+        error: {
+          code: -32602,
+          message: "webhook_url must be a publicly reachable HTTPS endpoint",
+        },
+      };
+    }
+  };
+  /** After verified payment: answer 202 and run the call in the background. */
+  const acceptAsyncToolCall = (
+    req: Request,
+    res: Response,
+    call: {
+      name: string;
+      canonicalName: string;
+      webhookUrl: string;
+      requestId: string | number | null;
+    },
+  ): void => {
+    if (res.headersSent) return;
+    const protocol = res.locals.mcpProtocol as McpProtocolContext | undefined;
+    // The background run outlives this response, so snapshot its paid state.
+    const createServer = mcpServerFactory(
+      { ...res.locals },
+      mesh,
+      primaryBackend,
+    );
+    const arguments_ = withoutWebhookUrl(
+      ((req.body as { params?: { arguments?: unknown } }).params?.arguments ??
+        {}) as Record<string, unknown>,
+    );
+    const acknowledgement = asyncTasks.accept({
+      tool: call.canonicalName,
+      webhookUrl: call.webhookUrl,
+      requestId: call.requestId,
+      execute: async (signal) =>
+        eraTaskOutcome(
+          await runMcpToolCallInMemory(
+            createServer,
+            { name: call.name, arguments: arguments_ },
+            signal,
+          ),
+          protocol,
+        ),
+    });
+    res.setHeader("Cache-Control", "no-store");
+    res.status(202).json({
+      jsonrpc: "2.0",
+      id: call.requestId,
+      result: acknowledgement,
+    });
+  };
   const gates = Object.fromEntries(
     Object.entries(paidTools).map(([name, { amountSats }]) => [
       name,
@@ -5836,6 +5976,53 @@ export function registerMcpRoute(
         next();
         return;
       }
+      const requestId =
+        typeof body?.id === "string" || typeof body?.id === "number"
+          ? body.id
+          : null;
+      // Zero-polling execution: the callback is checked and capacity reserved
+      // before any invoice is issued or any payment is consumed.
+      const webhookUrl = requestedWebhookUrl(
+        canonicalName,
+        body?.params?.arguments,
+      );
+      if (webhookUrl !== undefined) {
+        const refusal = await webhookRefusal(webhookUrl);
+        if (refusal) {
+          if (refusal.status === 503) res.setHeader("Retry-After", "30");
+          res.status(refusal.status).json({
+            jsonrpc: "2.0",
+            id: requestId,
+            error: refusal.error,
+          });
+          return;
+        }
+      }
+      // The live data source never receives the callback URL.
+      const sourceArguments = () =>
+        withoutWebhookUrl(
+          tool.schema.parse(body?.params?.arguments ?? {}) as Record<
+            string,
+            unknown
+          >,
+        );
+      // Payment gates continue here; a webhook call is acknowledged with 202
+      // and executed in the background instead of answering synchronously.
+      const afterPayment: NextFunction =
+        webhookUrl === undefined
+          ? next
+          : (error?: unknown) => {
+              if (error) {
+                next(error);
+                return;
+              }
+              acceptAsyncToolCall(req, res, {
+                name,
+                canonicalName,
+                webhookUrl,
+                requestId,
+              });
+            };
       if (name === "proof.get_by_hash") {
         const lookup = proofByHashInputSchema.parse(
           body?.params?.arguments ?? {},
@@ -5880,9 +6067,7 @@ export function registerMcpRoute(
           "stratigraphy.get_range",
         ].includes(canonicalName)) {
           try {
-            await primaryBackend(canonicalName, tool.schema.parse(
-              body?.params?.arguments ?? {},
-            ) as Record<string, unknown>);
+            await primaryBackend(canonicalName, sourceArguments());
           } catch (error) {
             if (error instanceof RangeError) {
               res.status(400).json({
@@ -5898,14 +6083,19 @@ export function registerMcpRoute(
             return;
           }
         }
-        await gates[name](req, res, next);
+        await gates[name](req, res, afterPayment);
         return;
       }
-      if (isPrimaryDataTool(canonicalName)) {
+      // A webhook call fetches in the background, unless a max_target caveat
+      // must be checked against the fetched heights before payment is used.
+      if (
+        isPrimaryDataTool(canonicalName) &&
+        (webhookUrl === undefined || pass?.maxTarget !== undefined)
+      ) {
         try {
           res.locals.primaryStratigraphy = await primaryBackend(
             canonicalName,
-            tool.schema.parse(body?.params?.arguments ?? {}) as Record<string, unknown>,
+            sourceArguments(),
           );
         } catch (error) {
           res.status(error instanceof RangeError ? 400
@@ -5984,8 +6174,8 @@ export function registerMcpRoute(
           }
         }
       }
-      if (res.locals.earlyL402Authorized) return next();
-      await gates[name](req, res, next);
+      if (res.locals.earlyL402Authorized) return afterPayment();
+      await gates[name](req, res, afterPayment);
     },
     async (req, res, next) => {
       const body = req.body as {

@@ -85,3 +85,4 @@
 - [Agent ID attribution](agent-id-attribution.md) — self-declared vs NIP-98 authenticated agent_id: caveats, is_authenticated rows, leaf digests, rollback hazards.
 - [Dual-era MCP transport](mcp-stateless-transport.md) — stateless 2026-07-28 beside handshake clients; strict JSON-RPC errors, header checks, per-instance limits.
 - [API server shared dist](api-server-shared-dist.md) — workflow builds and pnpm test both rewrite api-server dist; never overlap them, restart the server after tests.
+- [MCP async webhooks](mcp-async-webhooks.md) — user-defined 202 + POST callback, not the Tasks extension; check callbacks before invoicing, dispatch after payment.

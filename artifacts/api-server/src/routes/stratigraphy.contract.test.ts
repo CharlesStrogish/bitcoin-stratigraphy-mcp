@@ -2178,9 +2178,17 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       for (const [name, property] of Object.entries(schema.properties)) {
         const groth16Coordinate =
           path.endsWith(".proof") && ["pi_a", "pi_b", "pi_c"].includes(name);
+        // The user specified this snake_case name for the two async tools.
+        const asyncWebhookUrl =
+          name === "webhook_url" &&
+          [
+            "stratigraphy.get_range.inputSchema",
+            "proof.submit.inputSchema",
+          ].includes(path);
         if (
           !(path.endsWith(".agentEvent") && name === "created_at") &&
-          !groth16Coordinate
+          !groth16Coordinate &&
+          !asyncWebhookUrl
         ) {
           assert.match(
             name,

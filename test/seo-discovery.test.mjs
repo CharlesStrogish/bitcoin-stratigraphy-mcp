@@ -35,10 +35,10 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   assert.equal((html.match(/<title>/g) ?? []).length, 1);
   assert.match(
     html,
-    /<title>Bitcoin Stratigraphy Enterprise \| State-Anchored AI<\/title>/,
+    /<title>Bitcoin Stratigraphy \| Enterprise MCP Server & L402 Oracle<\/title>/,
   );
   for (const key of ["og:title", "twitter:title"]) {
-    assert.equal(meta(html, key), "Bitcoin Stratigraphy Enterprise | State-Anchored AI");
+    assert.equal(meta(html, key), "Bitcoin Stratigraphy | Enterprise MCP Server & L402 Oracle");
   }
   assert.equal(meta(html, "robots"), "index, follow");
   const verificationTags = [
@@ -50,15 +50,11 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
     "5-KfH4O096Z1k7nLsVu8839zUzv8mz0ItthQIGYjC28",
   ]);
   for (const key of ["description", "og:description", "twitter:description"]) {
-    const content = meta(html, key);
-    for (const feature of [
-      /Enterprise-grade L402 data engine/,
-      /cryptographic notary hub/,
-      /State-Anchored AI data layers/,
-      /Swarm Flight Recorders/,
-      /EU AI Act Article 12 compliance/,
-    ])
-      assert.match(content, feature, key);
+    assert.equal(
+      meta(html, key),
+      "Enterprise MCP server and L402 oracle providing state-anchored AI telemetry, cryptographic flight recorders, and EU AI Act Article 12 compliance logging.",
+      key,
+    );
   }
   assert.equal(meta(html, "og:url"), origin + "/");
   assert.equal(meta(html, "twitter:url"), origin + "/");

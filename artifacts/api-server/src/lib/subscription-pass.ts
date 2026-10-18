@@ -10,6 +10,8 @@ import {
   presentingAgentMatchesCaveats,
 } from "../services/l402Caveats";
 import type { SettlementAsset } from "../services/settlement/types";
+import { parseDelegationCaveat } from "./delegation-caveats";
+import { equivalentToolNames } from "./mcp-pricing";
 
 export type SubscriptionTier = "1-day" | "30-day";
 
@@ -37,9 +39,14 @@ export type VerifiedSubscriptionMacaroon = {
   tier: SubscriptionTier;
   validUntil: number;
   allowedPaths: string[];
-  /** Effective authorization deadline including descendant time_before caveats. */
+  /** Effective authorization deadline including descendant time caveats. */
   expiresAt?: number;
+  /** Earliest delegated `time <` or `time_before` deadline in epoch milliseconds. */
+  timeCaveatDeadline?: number;
+  /** Legacy alias-equivalent `allowed_tools` sets; each must authorize the tool. */
   allowedToolSets: string[][];
+  /** Exact `rpc` tool sets; each must name the executing tool verbatim. */
+  rpcToolSets: string[][];
   maxTarget?: number;
   maxRequests?: number;
   requestLimits: Array<{ tokenId: string; maxRequests: number }>;
@@ -93,19 +100,8 @@ export function attenuateSubscriptionMacaroon(
   if (!token || newCaveats.length === 0) return null;
   let signature: Buffer<ArrayBufferLike> = Buffer.from(token.signature, "hex");
   for (const caveat of newCaveats) {
-    if (
-      !/^allowed_path=\/[^\s]*$/.test(caveat) &&
-      !/^max_requests=[1-9]\d*$/.test(caveat) &&
-      !/^time_before=(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/.test(
-        caveat,
-      ) &&
-      !/^max_target=(?:0|[1-9]\d*)$/.test(caveat) &&
-      !/^allowed_tools=[a-z][a-z0-9]*\.[a-z][a-z0-9_]*(?:,[a-z][a-z0-9]*\.[a-z][a-z0-9_]*)*$/.test(
-        caveat,
-      )
-    ) {
-      return null;
-    }
+    // Holders may append only exactly formatted delegation caveats.
+    if (!parseDelegationCaveat(caveat)) return null;
     signature = hmac(signature, caveat);
   }
   return Buffer.from(
@@ -150,10 +146,26 @@ export function createSubscriptionMacaroon(input: {
   return Buffer.from(JSON.stringify(token)).toString("base64url");
 }
 
-export function verifySubscriptionMacaroon(
+const ROOT_CAVEAT_KEYS = new Set([
+  "payment_hash",
+  "tier",
+  "valid_until",
+  "amount_msats",
+  "agent_pubkey",
+  "agent_tier",
+  "payment_asset",
+  "payment_provider",
+]);
+
+/**
+ * Authenticates the HMAC chain and parses every caveat strictly, without
+ * applying any clock. Callers must enforce `validUntil` and
+ * `timeCaveatDeadline`; prefer verifySubscriptionMacaroon unless the expiry
+ * response needs to distinguish delegated deadlines from root expiry.
+ */
+export function inspectSubscriptionMacaroon(
   encoded: string,
   secret: string,
-  nowSeconds: number,
   presentingAgent?: Pick<AgentIdentity, "pubkey" | "tier"> | null,
 ): VerifiedSubscriptionMacaroon | null {
   try {
@@ -167,77 +179,46 @@ export function verifySubscriptionMacaroon(
     const rootValues = new Map<string, string>();
     const allowedPaths: string[] = [];
     const allowedToolSets: string[][] = [];
+    const rpcToolSets: string[][] = [];
     let maxTarget: number | undefined;
-    let timeBefore: number | undefined;
+    let timeCaveatDeadline: number | undefined;
     const requestLimits: number[] = [];
     const meteredScopes: Array<{ tokenId: string; maxRequests: number }> = [];
     for (const caveat of token.caveats) {
       runningSignature = hmac(runningSignature, caveat);
-      const separator = caveat.indexOf("=");
-      if (separator <= 0) return null;
-      const key = caveat.slice(0, separator);
-      const value = caveat.slice(separator + 1);
-      if (key === "allowed_path") {
-        if (!/^\/[^\s]*$/.test(value)) return null;
-        allowedPaths.push(value);
-      } else if (key === "max_requests") {
-        const limit = Number(value);
-        if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(limit))
-          return null;
-        requestLimits.push(limit);
+      const delegation = parseDelegationCaveat(caveat);
+      if (delegation?.type === "allowed_path") {
+        allowedPaths.push(delegation.path);
+      } else if (delegation?.type === "max_requests") {
+        requestLimits.push(delegation.limit);
         meteredScopes.push({
           tokenId: runningSignature.toString("hex"),
-          maxRequests: limit,
+          maxRequests: delegation.limit,
         });
-      } else if (key === "time_before") {
-        if (
-          !/^(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/.test(
-            value,
-          )
-        )
-          return null;
-        const parsed = Date.parse(
-          value.length === 10 ? `${value}T00:00:00.000Z` : value,
+      } else if (delegation?.type === "time") {
+        timeCaveatDeadline = Math.min(
+          timeCaveatDeadline ?? delegation.deadline,
+          delegation.deadline,
         );
-        if (
-          !Number.isFinite(parsed) ||
-          new Date(parsed).toISOString() !==
-            (value.length === 10 ? `${value}T00:00:00.000Z` : value)
-        )
-          return null;
-        // A date-only caveat includes that calendar date; timestamps use exclusive bounds.
-        const expiry = parsed + (value.length === 10 ? 86_400_000 : 0);
-        timeBefore = Math.min(timeBefore ?? expiry, expiry);
-      } else if (key === "max_target") {
-        const bound = Number(value);
-        if (!/^(?:0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(bound))
-          return null;
-        maxTarget = Math.min(maxTarget ?? bound, bound);
-      } else if (key === "allowed_tools") {
-        if (
-          !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*(?:,[a-z][a-z0-9]*\.[a-z][a-z0-9_]*)*$/.test(
-            value,
-          )
-        )
-          return null;
-        allowedToolSets.push(value.split(","));
+      } else if (delegation?.type === "max_target") {
+        maxTarget = Math.min(maxTarget ?? delegation.height, delegation.height);
+      } else if (delegation?.type === "allowed_tools") {
+        allowedToolSets.push(delegation.tools);
+      } else if (delegation?.type === "rpc") {
+        rpcToolSets.push(delegation.tools);
       } else {
+        // Anything else must be a single issuer caveat; malformed or unknown
+        // delegation caveats invalidate the whole credential.
+        const separator = caveat.indexOf("=");
+        const key = caveat.slice(0, Math.max(separator, 0));
         if (
-          ![
-            "payment_hash",
-            "tier",
-            "valid_until",
-            "amount_msats",
-            "agent_pubkey",
-            "agent_tier",
-            "payment_asset",
-            "payment_provider",
-          ].includes(key) ||
+          separator <= 0 ||
+          !ROOT_CAVEAT_KEYS.has(key) ||
           rootValues.has(key)
         ) {
           return null;
         }
-        rootValues.set(key, value);
+        rootValues.set(key, caveat.slice(separator + 1));
       }
     }
     if (!timingSafeEqual(supplied, runningSignature)) return null;
@@ -261,8 +242,6 @@ export function verifySubscriptionMacaroon(
       !/^[0-9a-f]{64}$/.test(paymentHash) ||
       !(tier in SUBSCRIPTION_TIERS) ||
       !Number.isSafeInteger(validUntil) ||
-      validUntil <= nowSeconds ||
-      (timeBefore !== undefined && nowSeconds * 1_000 >= timeBefore) ||
       (amountMsatsValue !== undefined &&
         (!/^[1-9]\d*$/.test(amountMsatsValue) ||
           !Number.isSafeInteger(amountMsats))) ||
@@ -287,9 +266,11 @@ export function verifySubscriptionMacaroon(
       paymentHash,
       tier,
       validUntil,
-      expiresAt: Math.min(validUntil * 1_000, timeBefore ?? Infinity),
+      expiresAt: Math.min(validUntil * 1_000, timeCaveatDeadline ?? Infinity),
+      timeCaveatDeadline,
       allowedPaths,
       allowedToolSets,
+      rpcToolSets,
       maxTarget,
       maxRequests:
         requestLimits.length > 0 ? Math.min(...requestLimits) : undefined,
@@ -304,4 +285,89 @@ export function verifySubscriptionMacaroon(
   } catch {
     return null;
   }
+}
+
+/** Authentic and unexpired under both the root validity and every time caveat. */
+export function verifySubscriptionMacaroon(
+  encoded: string,
+  secret: string,
+  nowSeconds: number,
+  presentingAgent?: Pick<AgentIdentity, "pubkey" | "tier"> | null,
+): VerifiedSubscriptionMacaroon | null {
+  const pass = inspectSubscriptionMacaroon(encoded, secret, presentingAgent);
+  return pass &&
+    pass.validUntil > nowSeconds &&
+    !(
+      pass.timeCaveatDeadline !== undefined &&
+      nowSeconds * 1_000 >= pass.timeCaveatDeadline
+    )
+    ? pass
+    : null;
+}
+
+/** Restrictions that only an MCP tool route can evaluate. */
+export function hasMcpScopedCaveats(
+  pass: VerifiedSubscriptionMacaroon,
+): boolean {
+  return (
+    pass.rpcToolSets.length > 0 ||
+    pass.allowedToolSets.length > 0 ||
+    pass.maxTarget !== undefined
+  );
+}
+
+/**
+ * Every `rpc` caveat must name the tool exactly; every legacy `allowed_tools`
+ * caveat must name it or one of its legacy aliases.
+ */
+export function macaroonAuthorizesTool(
+  pass: VerifiedSubscriptionMacaroon,
+  tool: string,
+): boolean {
+  const equivalent = equivalentToolNames(tool);
+  return (
+    pass.rpcToolSets.every((tools) => tools.includes(tool)) &&
+    pass.allowedToolSets.every((tools) =>
+      equivalent.some((name) => tools.includes(name)),
+    )
+  );
+}
+
+export type DelegationCaveatRejection = {
+  status: 401 | 403;
+  error: string;
+};
+
+/**
+ * Enforces the first-party caveats that need no request arguments: the
+ * earliest delegated deadline (millisecond precision, exclusive) and tool
+ * scope. Pass the exact MCP tool being executed; routes that execute no MCP
+ * tool omit it and reject tool or target scoped credentials outright.
+ * `max_target` needs the request arguments, so MCP routes enforce it before
+ * invoking a payment gate.
+ */
+export function delegationCaveatRejection(
+  pass: VerifiedSubscriptionMacaroon,
+  request: { nowMs: number; tool?: string },
+): DelegationCaveatRejection | null {
+  if (
+    pass.timeCaveatDeadline !== undefined &&
+    request.nowMs >= pass.timeCaveatDeadline
+  ) {
+    return { status: 401, error: "Macaroon time caveat has expired" };
+  }
+  if (request.tool === undefined) {
+    return hasMcpScopedCaveats(pass)
+      ? {
+          status: 403,
+          error: "Macaroon tool or target caveat forbids this route",
+        }
+      : null;
+  }
+  return macaroonAuthorizesTool(pass, request.tool)
+    ? null
+    : {
+        status: 403,
+        error: `Macaroon tool caveat does not authorize ${request.tool}`,
+      };
 }

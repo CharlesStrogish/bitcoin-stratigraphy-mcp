@@ -36,7 +36,7 @@ The package starts a Streamable HTTP server at `http://127.0.0.1:8008/mcp` (set 
 - `stratigraphy.get_digest` (250 sats): fetch SHA-256 fingerprints of archived or live pipeline JSON (not Bitcoin block hashes or ZK proofs) with associated receipts.
 - `stratigraphy.get_diff` (250 sats): compute signed deltas between two live or archived snapshots, including the 15 J/TH power change.
 - `stratigraphy.get_range` (250 sats): retrieve fingerprints for a contiguous span of captured UTC snapshots bounded by heights or dates.
-- `proof.attenuate` (250 sats): narrow an authentic, unexpired L402 parent macaroon with restrictive caveats and an optional TTL.
+- `proof.attenuate` (250 sats): narrow an authentic, unexpired L402 parent macaroon with an expiration boundary (`time <`), exact tool targets (`rpc =`), and other restrictive caveats.
 - `proof.verify` (250 sats): verify supplied Groth16 telemetry or drift proofs, or OpenTimestamps receipts.
 - `proof.get_by_hash` (250 sats): retrieve a retained proof payload, signed receipt or lifecycle status by hash or job ID.
 - `proof.list` (free): discover and paginate recent proof-attestation lifecycle summaries.
@@ -158,10 +158,10 @@ Paid contiguous captured UTC snapshot fingerprints bounded by actual Bitcoin hei
 
 **Attenuate a Macaroon** (read-only, idempotent, closed-world).
 
-Attenuate an authentic, unexpired L402 parent `macaroon` by appending restrictive `caveats` and optionally `ttlSeconds`. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
+Attenuate an authentic, unexpired L402 parent `macaroon` by appending strictly formatted first-party caveats. `expiresAt` (UTC instant) or `ttlSeconds` adds `time < YYYY-MM-DDTHH:MM:SS.sssZ`: redemption at or after that instant is rejected with HTTP 401. `tools` adds `rpc = tool[,tool...]`: any tool not listed exactly is rejected with HTTP 403, and every listed tool must already be authorized by the parent. `caveats` accepts those forms plus max_target, max_requests, allowed_path, and legacy time_before or allowed_tools restrictions. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota. Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution.
 
 ```json
-{"type":"object","additionalProperties":false,"properties":{"macaroon":{"type":"string","minLength":1,"maxLength":8192},"caveats":{"type":"array","maxItems":16,"items":{"type":"string","minLength":1,"maxLength":256}},"ttlSeconds":{"type":"number","minimum":1,"maximum":2592000}},"required":["macaroon","caveats"]}
+{"type":"object","additionalProperties":false,"properties":{"macaroon":{"type":"string","minLength":1,"maxLength":8192},"expiresAt":{"type":"string","format":"date-time","pattern":"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"},"tools":{"type":"array","minItems":1,"maxItems":16,"uniqueItems":true,"items":{"type":"string","pattern":"^[a-z][a-z0-9]*\\.[a-z][a-z0-9_]*$"}},"caveats":{"type":"array","maxItems":16,"default":[],"items":{"type":"string","minLength":1,"maxLength":256}},"ttlSeconds":{"type":"number","minimum":1,"maximum":2592000}},"required":["macaroon"]}
 ```
 
 ### 7. proof.verify — 250 sats

@@ -365,9 +365,9 @@ do not authorize spending or grant access to other tools.
 
 | Requested policy name | Implemented name or mechanism | Enforcement status and enterprise requirement |
 | --- | --- | --- |
-| `time_valid` | Issuance `valid_until`; attenuation `time_before`. | Expiry is enforced, but `time_valid` is not a supported attenuation key. An ISO timestamp bound is exclusive; a date-only `time_before` includes that UTC date. Prefer explicit UTC timestamps. |
+| `time_valid` | Issuance `valid_until`; attenuation `time < YYYY-MM-DDTHH:MM:SS.sssZ` (from `expiresAt` or `ttlSeconds`). Legacy `time_before` caveats remain verified. | Expiry is enforced on every redemption with millisecond precision: at or after a delegated deadline the request is refused with HTTP 401 before payment verification. `time_valid` is not a supported attenuation key. Timestamp bounds are exclusive; a legacy date-only `time_before` includes that UTC date. |
 | `max_calls` | `max_requests`. | Request limits are enforced; descendants consume inherited metered scopes atomically. `max_calls` is not a supported key. Paid MCP issuance normally permits one call. |
-| `allowed_tools` | `allowed_tools`, together with exact `allowed_path` scope. | Tool restrictions are enforced at redemption. Multiple inherited allowlists must all authorize the operation; attenuation cannot broaden the parent. |
+| `allowed_tools` | `rpc = <tool>[,<tool>]` (from `tools`), together with exact `allowed_path` scope. Legacy `allowed_tools` caveats remain verified. | Tool restrictions are enforced at redemption: an `rpc` caveat must name the executing tool exactly, otherwise the request is refused with HTTP 403. Every inherited `rpc` or `allowed_tools` caveat must authorize the operation, routes that execute no MCP tool refuse tool-scoped credentials, and attenuation cannot broaden the parent. |
 | `max_sats_per_invocation` | No equivalent server attenuation caveat. Invoice/payment amount binding is separate. | **Not server-enforced under this name.** The enterprise wallet must enforce the fee-inclusive per-call cap, atomic total reservations, deduplication, and reconciliation. Do not claim that `amount_msats` implements a spend ceiling. |
 
 Other supported attenuation restrictions include `allowed_path` and `max_target`.

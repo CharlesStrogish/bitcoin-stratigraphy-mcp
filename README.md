@@ -276,11 +276,15 @@ MCP names** returned by `tools/list`.
 
 ### `proof.*` — 7 tools
 
-- **`proof.attenuate`** — Append restrictive caveats to an authentic, unexpired
-  parent macaroon, including tool, target, path, expiration, and request budgets.
-  - Access: paid. Supply `macaroon` and `caveats`; `ttlSeconds` is optional.
-    At least one restriction is required. A child cannot widen inherited authority,
-    and later redemption still requires the parent's payment proof.
+- **`proof.attenuate`** — Append strictly formatted first-party caveats to an
+  authentic, unexpired parent macaroon: an expiration boundary
+  (`time < 2026-12-31T23:59:59.000Z`), exact tool targets
+  (`rpc = stratigraphy.get_diff`), and target, path, or request budgets.
+  - Access: paid. Supply `macaroon` and at least one restriction: `expiresAt` or
+    `ttlSeconds`, `tools`, or `caveats`. Redemption is refused at or after the
+    deadline (HTTP 401) and for any tool the `rpc` caveat does not name exactly
+    (HTTP 403). A child cannot widen inherited authority, and later redemption
+    still requires the parent's payment proof.
 - **`proof.verify`** — Verify supplied Groth16 telemetry proofs, drift zk-SNARKs,
   or OpenTimestamps receipts.
   - Access: paid. Verification can update a bounded lifecycle index; drift checks

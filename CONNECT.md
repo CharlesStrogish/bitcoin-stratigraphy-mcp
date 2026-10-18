@@ -6,7 +6,8 @@ The public MCP endpoint is **`https://bitcoinstratigraphy.com/mcp`** (Streamable
 
 Bitcoin Stratigraphy provides indexed stratigraphy analytics and compressed
 digests/diffs for efficient agent context; `proof.attenuate` can narrow an
-existing valid macaroon with caveats including TTL and request-count limits.
+existing valid macaroon with caveats including expiration boundaries, exact
+tool targets, and request-count limits.
 The MCP proof workflow includes Groth16/Poseidon BN254 telemetry and drift
 verification, plus a separate OpenTimestamps (OTS) receipt-verification mode.
 `proof.ground` issues off-chain Schnorr-signed Bitcoin-tip receipts for context

@@ -36,6 +36,20 @@ export function canonicalToolName(name: string): string {
     : name;
 }
 
+/** The name itself, its canonical name, and every legacy alias of that operation. */
+export function equivalentToolNames(name: string): string[] {
+  const canonical = canonicalToolName(name);
+  return [
+    ...new Set([
+      name,
+      canonical,
+      ...Object.entries(legacyToolNames)
+        .filter(([, target]) => target === canonical)
+        .map(([legacy]) => legacy),
+    ]),
+  ];
+}
+
 // These selectors describe existing operations; they are NOT callable MCP aliases.
 const pricingSelectors = {
   "stratigraphy.get_latest": "stratigraphy.get",

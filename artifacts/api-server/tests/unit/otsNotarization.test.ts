@@ -163,6 +163,7 @@ test("proof.notarize is the paid 15th tool and issues a tool-scoped 100-call L40
     const pass = verifySubscriptionMacaroon(
       offer.macaroon,
       "notary-test-secret",
+      Math.floor(Date.now() / 1_000),
     );
     assert.ok(pass);
     assert.deepEqual(pass.allowedPaths, ["/mcp/tools/proof.notarize"]);

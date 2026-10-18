@@ -31,6 +31,7 @@ import {
   attenuateSubscriptionMacaroon,
   createSubscriptionMacaroon,
   getMacaroonSignatureId,
+  hasMcpScopedCaveats,
   SUBSCRIPTION_TIERS,
   type SubscriptionTier,
   verifySubscriptionMacaroon,
@@ -1865,8 +1866,7 @@ export function registerStratigraphyRoutes(
               selectedRange.amountMsats, selectedRange.description);
           if (
             (!rangePayment && pass.allowedPaths.some((allowedPath) => allowedPath !== req.path)) ||
-            pass.allowedToolSets.length > 0 ||
-            pass.maxTarget !== undefined
+            hasMcpScopedCaveats(pass)
           ) {
             res.status(403).json({ error: "Macaroon path is not allowed" });
             return;
@@ -2159,8 +2159,7 @@ export function registerStratigraphyRoutes(
               (!rangePayment && pass.allowedPaths.some(
                 (allowedPath) => allowedPath !== req.path,
               )) ||
-              pass.allowedToolSets.length > 0 ||
-              pass.maxTarget !== undefined
+              hasMcpScopedCaveats(pass)
             ) {
               res.status(403).json({ error: "Macaroon path is not allowed" });
               return;

@@ -36,9 +36,20 @@ import {
 } from "./stratigraphy-index";
 import {
   attenuateSubscriptionMacaroon,
+  delegationCaveatRejection,
   getMacaroonSignatureId,
+  inspectSubscriptionMacaroon,
+  macaroonAuthorizesTool,
   verifySubscriptionMacaroon,
+  type VerifiedSubscriptionMacaroon,
 } from "../lib/subscription-pass";
+import {
+  formatRpcCaveat,
+  formatTimeCaveat,
+  MAX_RPC_TOOLS,
+  MCP_TOOL_NAME_PATTERN,
+  parseDelegationCaveat,
+} from "../lib/delegation-caveats";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { createPostgresMacaroonRevocationStore } from "../lib/postgres-macaroon-revocation-store";
 import { parseL402Header, paymentVerificationProof } from "../middleware/l402";
@@ -421,17 +432,38 @@ const stratigraphyRangeInputSchema = z
   })
   .strict();
 
+// UTC instant accepted from callers; normalized to `time < YYYY-MM-DDTHH:MM:SS.sssZ`.
+const UTC_INSTANT_INPUT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+
 const attenuateInputSchema = z
   .object({
     macaroon: z.string().min(1).max(8192),
-    caveats: z.array(z.string().min(1).max(256)).max(16),
+    caveats: z.array(z.string().min(1).max(256)).max(16).default([]),
     ttlSeconds: z.number().int().positive().max(2_592_000).optional(),
+    expiresAt: z.string().regex(UTC_INSTANT_INPUT).optional(),
+    tools: z
+      .array(z.string().regex(MCP_TOOL_NAME_PATTERN))
+      .min(1)
+      .max(MAX_RPC_TOOLS)
+      .refine((tools) => new Set(tools).size === tools.length, {
+        message: "tools must not repeat a name",
+      })
+      .optional(),
   })
   .strict()
   .refine(
-    ({ caveats, ttlSeconds }) => caveats.length > 0 || ttlSeconds !== undefined,
+    ({ ttlSeconds, expiresAt }) =>
+      ttlSeconds === undefined || expiresAt === undefined,
+    { message: "Use either ttlSeconds or expiresAt, not both" },
+  )
+  .refine(
+    ({ caveats, ttlSeconds, expiresAt, tools }) =>
+      caveats.length > 0 ||
+      ttlSeconds !== undefined ||
+      expiresAt !== undefined ||
+      tools !== undefined,
     {
-      message: "At least one caveat or ttlSeconds is required",
+      message: "At least one of caveats, ttlSeconds, expiresAt, or tools is required",
     },
   );
 
@@ -1434,11 +1466,85 @@ async function queryStratigraphyDiff({
   };
 }
 
+function isRegisteredMcpToolName(name: string): boolean {
+  return (
+    baseMcpToolDefinitions.some((tool) => tool.name === name) ||
+    Object.hasOwn(legacyToolNames, name)
+  );
+}
+
+/** Strict UTC instant that must still lie in the future. */
+function futureUtcInstant(value: string, now: number, label: string): number {
+  const canonical = value.length === 20 ? `${value.slice(0, 19)}.000Z` : value;
+  const time = UTC_INSTANT_INPUT.test(value) ? Date.parse(canonical) : Number.NaN;
+  if (!Number.isFinite(time) || new Date(time).toISOString() !== canonical) {
+    throw new RangeError(
+      `${label} must be a UTC instant such as 2026-12-31T23:59:59Z`,
+    );
+  }
+  if (time <= now) throw new RangeError(`${label} must be in the future`);
+  return time;
+}
+
+/**
+ * MCP gates redeem a credential only when every allowed_path is
+ * /mcp/tools/<name>, so a parent authorizes at most that one tool, further
+ * narrowed by its own tool caveats.
+ */
+function parentToolAuthority(
+  parent: VerifiedSubscriptionMacaroon,
+): string | undefined {
+  const [path, ...otherPaths] = new Set(parent.allowedPaths);
+  const tool = path?.startsWith("/mcp/tools/")
+    ? path.slice("/mcp/tools/".length)
+    : undefined;
+  return tool &&
+    otherPaths.length === 0 &&
+    Object.hasOwn(paidTools, tool) &&
+    macaroonAuthorizesTool(parent, tool)
+    ? tool
+    : undefined;
+}
+
+/** Canonical `rpc` caveat whose exact tools the parent already authorizes. */
+function parentScopedRpcCaveat(
+  tools: string[],
+  parent: VerifiedSubscriptionMacaroon,
+): string {
+  if (tools.length === 0 || !tools.every(isRegisteredMcpToolName)) {
+    throw new RangeError(
+      "rpc tools must be registered MCP tools or supported legacy aliases",
+    );
+  }
+  const authority = parentToolAuthority(parent);
+  const outside = tools.filter((tool) => tool !== authority);
+  if (outside.length > 0) {
+    throw new RangeError(
+      `rpc tools must already be authorized by the parent macaroon (${
+        authority ?? "no MCP tool"
+      }); outside its authority: ${outside.join(", ")}`,
+    );
+  }
+  return formatRpcCaveat(tools);
+}
+
 function normalizedAttenuationCaveats(
   input: z.infer<typeof attenuateInputSchema>,
   now: number,
+  parent: VerifiedSubscriptionMacaroon,
 ): string[] {
   const normalized = input.caveats.map((raw) => {
+    const time = /^\s*time\s*<\s*(\S+)\s*$/.exec(raw);
+    if (time) {
+      return formatTimeCaveat(futureUtcInstant(time[1]!, now, "time caveat"));
+    }
+    const rpc = /^\s*rpc\s*=\s*(\S.*?)\s*$/.exec(raw);
+    if (rpc) {
+      return parentScopedRpcCaveat(
+        rpc[1]!.split(",").map((name) => name.trim()),
+        parent,
+      );
+    }
     const match = /^\s*([a-z_]+)\s*=\s*(.*?)\s*$/.exec(raw);
     if (!match) throw new RangeError("Unsupported attenuation caveat");
     const [, key, value] = match;
@@ -1449,9 +1555,7 @@ function normalizedAttenuationCaveats(
         names.length > 16 ||
         names.some(
           (name) =>
-            !/^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/.test(name) ||
-            (!baseMcpToolDefinitions.some((tool) => tool.name === name) &&
-              !Object.hasOwn(legacyToolNames, name)),
+            !MCP_TOOL_NAME_PATTERN.test(name) || !isRegisteredMcpToolName(name),
         )
       )
         throw new RangeError(
@@ -1468,18 +1572,21 @@ function normalizedAttenuationCaveats(
         throw new RangeError("Invalid time_before UTC date");
       }
     }
-    if (
-      !/^(?:allowed_path=\/[^\s]*|max_requests=[1-9]\d*|max_target=(?:0|[1-9]\d*)|time_before=(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z))$/.test(
-        caveat,
-      )
-    )
+    if (!parseDelegationCaveat(caveat)) {
       throw new RangeError("Unsupported attenuation caveat");
+    }
     return caveat;
   });
   if (input.ttlSeconds !== undefined) {
+    normalized.push(formatTimeCaveat(now + input.ttlSeconds * 1_000));
+  }
+  if (input.expiresAt !== undefined) {
     normalized.push(
-      `time_before=${new Date(now + input.ttlSeconds * 1_000).toISOString()}`,
+      formatTimeCaveat(futureUtcInstant(input.expiresAt, now, "expiresAt")),
     );
+  }
+  if (input.tools !== undefined) {
+    normalized.push(parentScopedRpcCaveat(input.tools, parent));
   }
   return normalized;
 }
@@ -2071,7 +2178,7 @@ const baseMcpToolDefinitions = [
     name: "proof.attenuate",
     title: "Attenuate a Macaroon",
     description:
-      "Attenuate an authentic, unexpired L402 parent `macaroon` by appending restrictive `caveats` and optionally `ttlSeconds`. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota.",
+      "Attenuate an authentic, unexpired L402 parent `macaroon` by appending strictly formatted first-party caveats. `expiresAt` (UTC instant) or `ttlSeconds` adds `time < YYYY-MM-DDTHH:MM:SS.sssZ`: redemption at or after that instant is rejected with HTTP 401. `tools` adds `rpc = tool[,tool...]`: any tool not listed exactly is rejected with HTTP 403, and every listed tool must already be authorized by the parent. `caveats` accepts those forms plus max_target, max_requests, allowed_path, and legacy time_before or allowed_tools restrictions. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -2081,48 +2188,63 @@ const baseMcpToolDefinitions = [
     inputSchema: {
       type: "object",
       description:
-        "Provide an authentic parent macaroon, an array of restrictions, and optional TTL; child caveats intersect with inherited constraints and no payment invoice is issued.",
+        "Provide an authentic parent macaroon and at least one restriction: expiresAt or ttlSeconds, exact tools, or caveats. New caveats intersect with inherited constraints and no payment invoice is issued.",
       examples: [
         {
           macaroon: "base64url-parent-macaroon",
-          caveats: [
-            "allowed_tools = stratigraphy.get,stratigraphy.get_digest",
-            "max_target = 870000",
-          ],
-          ttlSeconds: 3600,
+          expiresAt: "2026-12-31T23:59:59Z",
+          tools: ["stratigraphy.get_diff"],
+          caveats: ["max_target = 870000"],
         },
       ],
       additionalProperties: false,
       properties: {
         macaroon: field(
           "string",
-          "Required authentic, unexpired parent L402 macaroon (1-8192 characters); caveats and ttlSeconds can only narrow its scope.",
+          "Required authentic, unexpired parent L402 macaroon (1-8192 characters); added restrictions can only narrow its scope.",
           ["base64url-parent-macaroon"],
           { minLength: 1, maxLength: 8192 },
         ),
+        expiresAt: field(
+          "string",
+          "Optional absolute expiration boundary as a future UTC instant (YYYY-MM-DDTHH:MM:SSZ, optionally with .sss milliseconds). Appends `time < YYYY-MM-DDTHH:MM:SS.sssZ`; it cannot extend the parent's expiry. Mutually exclusive with ttlSeconds.",
+          ["2026-12-31T23:59:59Z"],
+          { format: "date-time", pattern: UTC_INSTANT_INPUT.source },
+        ),
+        tools: field(
+          "array",
+          "Optional exact MCP tool targets (1-16 unique names). Appends one `rpc = tool[,tool...]` caveat; the child is refused for every other tool. Matching is exact, so a legacy alias is a different name. Each tool must already be authorized by the parent: an MCP L402 credential authorizes the single tool named in its allowed_path.",
+          [["stratigraphy.get_diff"]],
+          {
+            minItems: 1,
+            maxItems: MAX_RPC_TOOLS,
+            uniqueItems: true,
+            items: field(
+              "string",
+              "Registered MCP tool name or supported legacy alias.",
+              ["stratigraphy.get_diff"],
+              { pattern: MCP_TOOL_NAME_PATTERN.source },
+            ),
+          },
+        ),
         caveats: field(
           "array",
-          "List of restriction caveats to append (e.g. ['time_before = 2026-12-31', 'max_target = 870000', 'allowed_tools = stratigraphy.get,stratigraphy.get_digest']). Existing allowed_path and max_requests restrictions are also supported.",
-          [
-            [
-              "time_before = 2026-12-31",
-              "max_target = 870000",
-              "allowed_tools = stratigraphy.get,stratigraphy.get_digest",
-            ],
-          ],
+          "Optional restriction caveats to append, normalized to canonical form: 'time < 2026-12-31T23:59:59Z', 'rpc = stratigraphy.get_diff', 'max_target = 870000', 'max_requests = 1', 'allowed_path = /mcp/tools/stratigraphy.get_diff', and legacy 'time_before = 2026-12-31' or 'allowed_tools = stratigraphy.get,stratigraphy.get_digest'.",
+          [["max_target = 870000"]],
           {
             maxItems: 16,
+            default: [],
             items: field(
               "string",
               "One supported restriction caveat.",
-              ["max_target = 870000"],
+              ["time < 2026-12-31T23:59:59Z"],
               { minLength: 1, maxLength: 256 },
             ),
           },
         ),
         ttlSeconds: field(
           "number",
-          "Optional positive integer TTL of 1-2592000 seconds (e.g. 3600); appends an expiration caveat without extending the parent's expiry.",
+          "Optional positive integer TTL of 1-2592000 seconds (e.g. 3600). Appends `time <` at the current time plus ttlSeconds; it cannot extend the parent's expiry. Mutually exclusive with expiresAt.",
           [3600],
           {
             minimum: 1,
@@ -2130,7 +2252,7 @@ const baseMcpToolDefinitions = [
           },
         ),
       },
-      required: ["macaroon", "caveats"],
+      required: ["macaroon"],
     },
     outputSchema: {
       type: "object",
@@ -2140,7 +2262,11 @@ const baseMcpToolDefinitions = [
         {
           status: "attenuated",
           attenuatedMacaroon: "base64url-child-macaroon",
-          appliedCaveats: ["max_target=870000"],
+          appliedCaveats: [
+            "max_target=870000",
+            "time < 2026-12-31T23:59:59.000Z",
+            "rpc = stratigraphy.get_diff",
+          ],
           issuedAt: "2026-09-27T21:00:00.000Z",
         },
       ],
@@ -2160,10 +2286,16 @@ const baseMcpToolDefinitions = [
         appliedCaveats: field(
           "array",
           "New canonical caveats appended to the parent; inherited caveats are preserved inside the token.",
-          [["max_target=870000"]],
+          [
+            [
+              "max_target=870000",
+              "time < 2026-12-31T23:59:59.000Z",
+              "rpc = stratigraphy.get_diff",
+            ],
+          ],
           {
             items: field("string", "One appended canonical caveat.", [
-              "max_target=870000",
+              "rpc = stratigraphy.get_diff",
             ]),
           },
         ),
@@ -4474,15 +4606,47 @@ const paidTools = {
   },
 } as const;
 
-function toolNamesForAuthorization(name: string): string[] {
-  const canonicalName = canonicalToolName(name);
-  return [
-    name,
-    ...(canonicalName === name ? [] : [canonicalName]),
-    ...Object.entries(legacyToolNames)
-      .filter(([, canonical]) => canonical === canonicalName)
-      .map(([legacy]) => legacy),
-  ];
+/**
+ * The authentic L402 credential on an MCP request while its root validity is
+ * open. Delegated time caveats are not applied here, so callers refuse them
+ * explicitly instead of answering with a fresh payment challenge.
+ */
+function presentedMcpCredential(
+  authorizationHeader: string | undefined,
+  secret: string | undefined,
+  nowMs: number,
+): VerifiedSubscriptionMacaroon | null {
+  const authorization = parseL402Header(authorizationHeader);
+  const pass =
+    authorization && secret
+      ? inspectSubscriptionMacaroon(authorization.macaroon, secret)
+      : null;
+  return pass && pass.validUntil * 1_000 > nowMs ? pass : null;
+}
+
+function caveatRefusalResponse(
+  res: Response,
+  id: unknown,
+  refusal: { status: 401 | 403; error: string },
+) {
+  res.status(refusal.status).json({
+    jsonrpc: "2.0",
+    id: typeof id === "string" || typeof id === "number" ? id : null,
+    error: { code: -32602, message: refusal.error },
+  });
+}
+
+/** Refusal for a `max_target` caveat the requested selection would exceed. */
+async function targetCaveatRefusal(
+  pass: VerifiedSubscriptionMacaroon,
+  name: string,
+  args: unknown,
+  actualHeights?: number[],
+): Promise<{ status: 403; error: string } | null> {
+  return pass.maxTarget !== undefined &&
+    !(await withinMcpTargetBound(name, args, pass.maxTarget, actualHeights))
+    ? { status: 403, error: "Macaroon target caveat forbids this request" }
+    : null;
 }
 
 function createBitcoinStratigraphyMcpServer(
@@ -5151,6 +5315,7 @@ export function registerMcpRoute(
           revocationStore,
           ledger: options.ledger,
           scopePath: `/mcp/tools/${name}`,
+          tool: name,
           requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
         });
         return async (req: Request, res: Response, next: NextFunction) => {
@@ -5243,16 +5408,18 @@ export function registerMcpRoute(
         );
         if (parsed.success) {
           const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-          semanticInputValid = Boolean(
-            secret &&
-            verifySubscriptionMacaroon(
-              parsed.data.macaroon,
-              secret,
-              Math.floor(Date.now() / 1_000),
-            ),
-          );
+          const now = Date.now();
+          const parent = secret
+            ? verifySubscriptionMacaroon(
+                parsed.data.macaroon,
+                secret,
+                Math.floor(now / 1_000),
+              )
+            : null;
           try {
-            normalizedAttenuationCaveats(parsed.data, Date.now());
+            semanticInputValid = Boolean(
+              parent && normalizedAttenuationCaveats(parsed.data, now, parent),
+            );
           } catch {
             semanticInputValid = false;
           }
@@ -5304,39 +5471,22 @@ export function registerMcpRoute(
           req.body.params.arguments ?? {},
         ).success
       ) {
-        const authorization = parseL402Header(req.header("Authorization"));
-        const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-        const pass =
-          authorization && secret
-            ? verifySubscriptionMacaroon(
-                authorization.macaroon,
-                secret,
-                Math.floor(Date.now() / 1_000),
-              )
-            : null;
-        if (
+        const nowMs = Date.now();
+        const pass = presentedMcpCredential(
+          req.header("Authorization"),
+          options.sessionSecret ?? process.env.SESSION_SECRET,
+          nowMs,
+        );
+        const refusal =
           pass &&
-          (pass.allowedToolSets.some(
-            (set) =>
-              !toolNamesForAuthorization(name).some((allowedName) =>
-                set.includes(allowedName),
-              ),
-          ) ||
-            (pass.maxTarget !== undefined &&
-              !(await withinMcpTargetBound(
-                canonicalToolName(name),
-                req.body.params.arguments ?? {},
-                pass.maxTarget,
-              ))))
-        ) {
-          res.status(403).json({
-            jsonrpc: "2.0",
-            id: req.body.id ?? null,
-            error: {
-              code: -32602,
-              message: "Macaroon tool or target caveat forbids this request",
-            },
-          });
+          (delegationCaveatRejection(pass, { nowMs, tool: name }) ??
+            (await targetCaveatRefusal(
+              pass,
+              name,
+              req.body.params.arguments ?? {},
+            )));
+        if (refusal) {
+          caveatRefusalResponse(res, req.body.id, refusal);
           return;
         }
         await gates[name](req, res, (error?: unknown) => {
@@ -5606,7 +5756,7 @@ export function registerMcpRoute(
         }
         let caveats: string[];
         try {
-          caveats = normalizedAttenuationCaveats(parsed.data, now);
+          caveats = normalizedAttenuationCaveats(parsed.data, now, parent);
         } catch (error) {
           res.status(400).json({
             jsonrpc: "2.0",
@@ -5680,16 +5830,19 @@ export function registerMcpRoute(
         }
         res.locals.archivedProof = found;
       }
-      const authorization = parseL402Header(req.header("Authorization"));
-      const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-      const pass =
-        authorization && secret
-          ? verifySubscriptionMacaroon(
-              authorization.macaroon,
-              secret,
-              Math.floor(Date.now() / 1_000),
-            )
-          : null;
+      const nowMs = Date.now();
+      const pass = presentedMcpCredential(
+        req.header("Authorization"),
+        options.sessionSecret ?? process.env.SESSION_SECRET,
+        nowMs,
+      );
+      // Delegated deadlines and tool scope are refused before any live data work.
+      const scopeRefusal =
+        pass && delegationCaveatRejection(pass, { nowMs, tool: name });
+      if (scopeRefusal) {
+        caveatRefusalResponse(res, body?.id, scopeRefusal);
+        return;
+      }
       // Anonymous calls get the existing 402 without invoking the cloud-backed
       // source for ordinary paid reads. Comparison/summary selectors retain
       // their existing no-invoice-on-invalid-target rule.
@@ -5740,30 +5893,16 @@ export function registerMcpRoute(
           return;
         }
       }
-      if (
+      const targetRefusal =
         pass &&
-        (pass.allowedToolSets.some(
-          (set) =>
-            !toolNamesForAuthorization(name).some((allowedName) =>
-              set.includes(allowedName),
-            ),
-        ) ||
-          (pass.maxTarget !== undefined &&
-            !(await withinMcpTargetBound(
-              canonicalName,
-              body?.params?.arguments ?? {},
-              pass.maxTarget,
-              (res.locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined)?.targetHeights,
-            ))))
-      ) {
-        res.status(403).json({
-          jsonrpc: "2.0",
-          id: body?.id ?? null,
-          error: {
-            code: -32602,
-            message: "Macaroon tool or target caveat forbids this request",
-          },
-        });
+        (await targetCaveatRefusal(
+          pass,
+          canonicalName,
+          body?.params?.arguments ?? {},
+          (res.locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined)?.targetHeights,
+        ));
+      if (targetRefusal) {
+        caveatRefusalResponse(res, body?.id, targetRefusal);
         return;
       }
       if (

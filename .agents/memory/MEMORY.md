@@ -5,7 +5,7 @@
 - [ElizaOS type-only dependency](elizaos-type-only-dependency.md) — keep the peer contract while pruning vulnerable browser crypto from this workspace's type-only development install.
 - [API artifact root routes](api-artifact-root-routes.md) — root API endpoints need artifact service paths or the proxy 404s; root discovery docs are also aliased under /api.
 - [Macaroon attenuation budgets](macaroon-attenuation-budgets.md) — descendants must consume every inherited request-cap scope atomically, not only their final token cap.
-- [Macaroon delegation caveats](macaroon-delegation-caveats.md) — enforce tool and target restrictions at redemption, and deny routes that cannot honor them.
+- [Macaroon delegation caveats](macaroon-delegation-caveats.md) — strict `time <`/`rpc =` grammar, 401 expired, 403 wrong tool; deny routes that cannot honor tool or target scope.
 - [Macaroon revocation scope](macaroon-revocation-scope.md) — revoke exact final signatures, keep relatives valid, and fail closed when the shared index is unavailable.
 - [Dynamic pass price binding](dynamic-pass-price-binding.md) — bind each issued scarcity price into the macaroon and cache scope; verify against issuance, not the latest quote.
 - [Escrow affordability](escrow-affordability.md) — USD-normalized settlement tolls protect autonomous agents during Bitcoin appreciation; keep REST access fees separate.

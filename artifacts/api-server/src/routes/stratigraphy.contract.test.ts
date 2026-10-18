@@ -53,6 +53,7 @@ import {
   verifySubscriptionMacaroon,
   getMacaroonSignatureId,
 } from "../lib/subscription-pass";
+import { formatTimeCaveat } from "../lib/delegation-caveats";
 import { pool } from "@workspace/db";
 import { buildHeartbeatEvent } from "../lib/nostr-heartbeat";
 import { registerNostrStatusRoute } from "./nostr-status";
@@ -105,7 +106,7 @@ const expectedMcpToolDescriptions: Record<string, string> = {
   "stratigraphy.get_range":
     "Retrieve a contiguous span of compressed indexed stratum summaries across inclusive height or UTC date bounds. Read-only and L402-paid, without HTTP IP rate limiting; startTarget is required, endTarget defaults to the latest indexed entry, and limit caps the returned batch at 1-100 records (default 50) without changing the requested bounds. Primary tool for compact multi-record spans; use `stratigraphy.get` for full telemetry record bodies, `stratigraphy.get_digest` for source-record fingerprints, and `stratigraphy.get_diff` for parameter deltas between two entries.",
   "proof.attenuate":
-    "Attenuate an authentic, unexpired L402 parent `macaroon` by appending restrictive `caveats` and optionally `ttlSeconds`. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota.",
+    "Attenuate an authentic, unexpired L402 parent `macaroon` by appending strictly formatted first-party caveats. `expiresAt` (UTC instant) or `ttlSeconds` adds `time < YYYY-MM-DDTHH:MM:SS.sssZ`: redemption at or after that instant is rejected with HTTP 401. `tools` adds `rpc = tool[,tool...]`: any tool not listed exactly is rejected with HTTP 403, and every listed tool must already be authorized by the parent. `caveats` accepts those forms plus max_target, max_requests, allowed_path, and legacy time_before or allowed_tools restrictions. At least one restriction is required. Requires its own L402 authorization; the parent's payment proof remains required for child redemption. Delegation cannot widen authority or reset an inherited quota.",
   "stratigraphy.get_diff":
     "Compute signed numerical deltas (indexed height, target multiplier, percentage change, and elapsed days calculated from toTarget minus fromTarget) between two indexed stratum heights or dates. Read-only, stateless operation subject to L402 payment, without HTTP IP rate limiting; missing stratum entries yield JSON-RPC invalid-params errors. Requires valid `fromTarget` baseline; `toTarget` defaults to `latest`. Use this tool specifically to compare two point-in-time entries. Use `stratigraphy.get` for full stratum record lookups, `stratigraphy.get_range` for continuous compact multi-record spans, and `stratigraphy.get_digest` for indexed source-record fingerprints; stratigraphy data ingest is outside this comparison tool.",
   "stratigraphy.get_digest":
@@ -3924,7 +3925,14 @@ test("derives authentic caveated MCP sub-tokens and enforces inherited restricti
       (candidate: { name: string }) => candidate.name === "proof.attenuate",
     );
     assert.ok(tool);
-    assert.deepEqual(tool.inputSchema.required, ["macaroon", "caveats"]);
+    assert.deepEqual(tool.inputSchema.required, ["macaroon"]);
+    assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), [
+      "caveats",
+      "expiresAt",
+      "macaroon",
+      "tools",
+      "ttlSeconds",
+    ]);
     assert.equal(tool.annotations.readOnlyHint, true);
     assert.equal(tool.annotations.idempotentHint, true);
 
@@ -3972,7 +3980,7 @@ test("derives authentic caveated MCP sub-tokens and enforces inherited restricti
     ]);
     assert.match(
       result.appliedCaveats[3],
-      /^time_before=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+      /^time < \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
     );
     const verified = verifySubscriptionMacaroon(
       result.attenuatedMacaroon,
@@ -4062,6 +4070,105 @@ test("derives authentic caveated MCP sub-tokens and enforces inherited restricti
       `L402 ${secondOffer.macaroon}:${secondPayment.preimage}`,
     );
     assert.equal(revokedUse.response.status, 401);
+
+    // Exact tool targets and absolute expiration boundaries become strictly
+    // formatted first-party caveats that every MCP redemption enforces.
+    const scopedChallenge = await mcpRequestAt(
+      attenuationBase,
+      "tools/call",
+      digestArgs,
+    );
+    const scopedOffer = scopedChallenge.body as unknown as {
+      macaroon: string;
+      payment_hash: string;
+    };
+    const scopedPayment = mcpInvoices.get(scopedOffer.payment_hash);
+    assert.ok(scopedPayment);
+    // Inside the parent's one-hour validity so the boundary itself is decisive.
+    const boundary = `${new Date(Date.now() + 1_800_000).toISOString().slice(0, 19)}Z`;
+    const scoped = await call({
+      macaroon: scopedOffer.macaroon,
+      expiresAt: boundary,
+      tools: ["stratigraphy.digest"],
+    });
+    assert.equal(scoped.response.status, 200);
+    const scopedResult = scoped.body.result?.structuredContent;
+    assert.deepEqual(scopedResult.appliedCaveats, [
+      `time < ${boundary.slice(0, 19)}.000Z`,
+      "rpc = stratigraphy.digest",
+    ]);
+    const deadlineSeconds = Date.parse(boundary) / 1_000;
+    const scopedPass = verifySubscriptionMacaroon(
+      scopedResult.attenuatedMacaroon,
+      "contract-mcp-secret",
+      deadlineSeconds - 1,
+    );
+    assert.ok(scopedPass);
+    assert.deepEqual(scopedPass.rpcToolSets, [["stratigraphy.digest"]]);
+    assert.equal(
+      verifySubscriptionMacaroon(
+        scopedResult.attenuatedMacaroon,
+        "contract-mcp-secret",
+        deadlineSeconds,
+      ),
+      null,
+    );
+    for (const [args, reason] of [
+      [{ tools: ["stratigraphy.get_digest"] }, "aliases must match exactly"],
+      [{ tools: ["stratigraphy.diff"] }, "tools beyond the parent are refused"],
+      [{ tools: ["stratigraphy.unknown"] }, "unregistered tools are refused"],
+      [{ tools: ["stratigraphy.digest", "stratigraphy.digest"] }, "duplicates"],
+      [{ expiresAt: new Date(Date.now() - 1_000).toISOString() }, "past boundary"],
+      [{ expiresAt: "2099-02-30T00:00:00Z" }, "impossible calendar date"],
+      [{ expiresAt: "2099-01-01T00:00:00+00:00" }, "non-UTC notation"],
+      [{ expiresAt: boundary, ttlSeconds: 60 }, "two expiration boundaries"],
+      [{ caveats: ["time < tomorrow"] }, "malformed time caveat"],
+      [{}, "no restriction"],
+    ] as const) {
+      const refused = await call({ macaroon: scopedOffer.macaroon, ...args });
+      assert.equal(refused.response.status, 400, reason);
+    }
+    const scopedAuthorization = `L402 ${scopedResult.attenuatedMacaroon}:${scopedPayment.preimage}`;
+    for (const [params, tool] of [
+      [{ name: "stratigraphy.diff", arguments: { fromTarget: "919856" } }, "stratigraphy.diff"],
+      [{ name: "stratigraphy.get_digest", arguments: { target: "2026-09-09" } }, "stratigraphy.get_digest"],
+    ] as const) {
+      const outOfScope = await mcpRequestAt(
+        attenuationBase,
+        "tools/call",
+        params,
+        undefined,
+        scopedAuthorization,
+      );
+      assert.equal(outOfScope.response.status, 403);
+      assert.equal(
+        outOfScope.body.error?.message,
+        `Macaroon tool caveat does not authorize ${tool}`,
+      );
+    }
+    const lapsed = attenuateSubscriptionMacaroon(scopedOffer.macaroon, [
+      formatTimeCaveat(Date.now() - 1),
+      "rpc = stratigraphy.digest",
+    ]);
+    assert.ok(lapsed);
+    const lapsedUse = await mcpRequestAt(
+      attenuationBase,
+      "tools/call",
+      digestArgs,
+      undefined,
+      `L402 ${lapsed}:${scopedPayment.preimage}`,
+    );
+    assert.equal(lapsedUse.response.status, 401);
+    assert.equal(lapsedUse.body.error?.message, "Macaroon time caveat has expired");
+    const scopedUse = await mcpRequestAt(
+      attenuationBase,
+      "tools/call",
+      digestArgs,
+      undefined,
+      scopedAuthorization,
+    );
+    assert.equal(scopedUse.response.status, 200);
+    assert.match(scopedUse.body.result?.content[0].text, /HEIGHT:920000/);
 
     const restParent = createSubscriptionMacaroon({
       secret: process.env.SESSION_SECRET!,

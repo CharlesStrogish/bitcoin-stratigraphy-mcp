@@ -5,8 +5,10 @@ import type { Request, RequestHandler } from "express";
 import {
   attenuateSubscriptionMacaroon,
   createSubscriptionMacaroon,
-  verifySubscriptionMacaroon,
+  delegationCaveatRejection,
+  inspectSubscriptionMacaroon,
 } from "../lib/subscription-pass";
+import { MCP_TOOL_NAME_PATTERN } from "../lib/delegation-caveats";
 import {
   createMemoryMacaroonUsageStore,
   type MacaroonUsageStore,
@@ -38,6 +40,12 @@ export type L402MiddlewareOptions = {
   requestKind?: RevenueRequestKind;
   allowBatch?: boolean;
   expectedOutputSchema?: Record<string, unknown> | ((req: Request) => Record<string, unknown>);
+  /**
+   * Exact MCP tool this route executes, checked against `rpc` and
+   * `allowed_tools` caveats. Without it, tool or target scoped credentials are
+   * refused. MCP callers must enforce `max_target` before invoking the gate.
+   */
+  tool?: string;
 };
 
 export function parseL402Header(
@@ -62,6 +70,9 @@ export function createL402Middleware(
 ): RequestHandler {
   if (typeof options.scopePath === "string" && !/^\/[^\s]*$/.test(options.scopePath)) {
     throw new RangeError("L402 scopePath must be an absolute path");
+  }
+  if (options.tool !== undefined && !MCP_TOOL_NAME_PATTERN.test(options.tool)) {
+    throw new RangeError("L402 tool must be an MCP tool name");
   }
   if (
     !Number.isSafeInteger(options.invoiceExpirySeconds ?? 3_600) ||
@@ -99,7 +110,7 @@ export function createL402Middleware(
   const invoiceExpirySeconds = options.invoiceExpirySeconds ?? 3_600;
   const now = options.now ?? Date.now;
   const credentialCache = new L402EdgeCache<
-    NonNullable<ReturnType<typeof verifySubscriptionMacaroon>>
+    NonNullable<ReturnType<typeof inspectSubscriptionMacaroon>>
   >(now);
   const settlementCache = new L402EdgeCache<
     Awaited<ReturnType<SettlementRouter["verifyPayment"]>>
@@ -236,26 +247,29 @@ export function createL402Middleware(
     const authorization = parseL402Header(req.header("Authorization"));
     if (secret && authorization) {
       const credentialKey = L402EdgeCache.key(secret, authorization.macaroon);
-      const pass =
+      const requestTime = now();
+      const authentic =
         credentialCache.get(credentialKey) ??
-        verifySubscriptionMacaroon(
-          authorization.macaroon,
-          secret,
-          Math.floor(now() / 1_000),
-        );
+        inspectSubscriptionMacaroon(authorization.macaroon, secret);
+      // An expired root credential renews through a fresh 402 challenge.
+      const pass =
+        authentic && authentic.validUntil * 1_000 > requestTime
+          ? authentic
+          : null;
       if (pass) {
         credentialCache.set(
           credentialKey,
           pass,
           pass.expiresAt ?? pass.validUntil * 1_000,
         );
-        if (
-          !resolveScope(req).startsWith("/mcp/tools/") &&
-          (pass.allowedToolSets.length > 0 || pass.maxTarget !== undefined)
-        ) {
-          res.status(403).json({
-            error: "Macaroon tool or target caveat forbids this route",
-          });
+        // Delegated deadlines and tool scope are refused explicitly, before
+        // any revocation, wallet, or usage-quota work.
+        const rejection = delegationCaveatRejection(pass, {
+          nowMs: requestTime,
+          tool: options.tool,
+        });
+        if (rejection) {
+          res.status(rejection.status).json({ error: rejection.error });
           return;
         }
         if (options.revocationStore) {

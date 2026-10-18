@@ -11,6 +11,7 @@ import {
 } from "../services/l402Caveats";
 import type { SettlementAsset } from "../services/settlement/types";
 import { parseDelegationCaveat } from "./delegation-caveats";
+import { formatAgentIdCaveat, parseAgentIdCaveat } from "./agent-id-caveat";
 import { equivalentToolNames } from "./mcp-pricing";
 
 export type SubscriptionTier = "1-day" | "30-day";
@@ -54,6 +55,8 @@ export type VerifiedSubscriptionMacaroon = {
   amountMsats?: number;
   agentPubkey?: string;
   agentTier?: AgentTier;
+  /** Caller-declared sub-agent from the single `agent_id = <id>` caveat. */
+  agentId?: string;
   paymentAsset: SettlementAsset;
   paymentProvider?: string;
 };
@@ -120,6 +123,8 @@ export function createSubscriptionMacaroon(input: {
   validUntil: number;
   amountMsats?: number;
   agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
+  /** Sub-agent attribution; every use must declare the same ID. */
+  agentId?: string;
   paymentAsset?: SettlementAsset;
   paymentProvider?: string;
 }): string {
@@ -137,6 +142,9 @@ export function createSubscriptionMacaroon(input: {
     ...constructPaymentAssetCaveat(input.paymentAsset),
     ...constructPaymentProviderCaveat(input.paymentProvider),
     ...constructAgentIdentityCaveats(input.agentIdentity),
+    ...(input.agentId === undefined
+      ? []
+      : [formatAgentIdCaveat(input.agentId)]),
   ];
   const token: SerializedMacaroon = {
     identifier,
@@ -182,10 +190,18 @@ export function inspectSubscriptionMacaroon(
     const rpcToolSets: string[][] = [];
     let maxTarget: number | undefined;
     let timeCaveatDeadline: number | undefined;
+    let agentId: string | undefined;
     const requestLimits: number[] = [];
     const meteredScopes: Array<{ tokenId: string; maxRequests: number }> = [];
     for (const caveat of token.caveats) {
       runningSignature = hmac(runningSignature, caveat);
+      const boundAgent = parseAgentIdCaveat(caveat);
+      if (boundAgent !== null) {
+        // One sub-agent per credential: a second binding is never resolved.
+        if (agentId !== undefined) return null;
+        agentId = boundAgent;
+        continue;
+      }
       const delegation = parseDelegationCaveat(caveat);
       if (delegation?.type === "allowed_path") {
         allowedPaths.push(delegation.path);
@@ -279,6 +295,7 @@ export function inspectSubscriptionMacaroon(
       amountMsats,
       agentPubkey: agentCaveats?.agentPubkey,
       agentTier: agentCaveats?.agentTier,
+      ...(agentId === undefined ? {} : { agentId }),
       paymentAsset: paymentAssetCaveat ?? "btc-lightning",
       paymentProvider: paymentProviderCaveat,
     };

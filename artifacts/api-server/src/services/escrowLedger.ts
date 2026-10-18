@@ -25,6 +25,25 @@ export type EscrowState = {
 };
 type LedgerPool = Pick<typeof pool, "connect">;
 
+/**
+ * One committed settlement, appended to escrow_ledger_settlements in the same
+ * transaction as the snapshot. agentId is the verified agent_id caveat (null
+ * when the paid credential carried none); payment fields are null for
+ * settlements without a verified Lightning toll.
+ */
+export type EscrowSettlementRecord = {
+  escrowId: string;
+  agentId: string | null;
+  leafIndex: number;
+  executionLeafHash: string;
+  merkleRoot: string;
+  settledAtStrataBlock: number;
+  settledAt: string;
+  paymentHash: string | null;
+  tollSats: number | null;
+  settlementProvider: string | null;
+};
+
 export async function readGenesisReceipt(database: Pick<typeof pool, "query"> = pool, id = "live-rest-escrow") {
   const { rows } = await database.query(
     "SELECT genesis FROM escrow_ledger WHERE id=$1", [id],
@@ -43,7 +62,9 @@ export async function readGenesisReceipt(database: Pick<typeof pool, "query"> = 
  * Success (and private preimages) must not reach HTTP until COMMIT succeeds.
  */
 export async function withEscrowLedger<T>(
-  operation: (state: EscrowState | null) => Promise<{ state: EscrowState; result: T }>,
+  operation: (state: EscrowState | null) => Promise<{
+    state: EscrowState; result: T; settlement?: EscrowSettlementRecord;
+  }>,
   database: LedgerPool = pool,
   id = "live-rest-escrow",
 ): Promise<T> {
@@ -76,6 +97,19 @@ export async function withEscrowLedger<T>(
       throw new Error("Escrow genesis ledger integrity failure");
     }
     const out = await operation(rows[0].state);
+    if (out.settlement) {
+      // Append-only attribution record; a failed insert rolls back the settlement.
+      const record = out.settlement;
+      await client.query(
+        `INSERT INTO escrow_ledger_settlements (ledger_id, escrow_id, agent_id, leaf_index,
+           execution_leaf_hash, merkle_root, settled_at_strata_block, settled_at,
+           payment_hash, toll_sats, settlement_provider)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9, $10, $11)`,
+        [id, record.escrowId, record.agentId, record.leafIndex, record.executionLeafHash,
+          record.merkleRoot, record.settledAtStrataBlock, record.settledAt,
+          record.paymentHash, record.tollSats, record.settlementProvider],
+      );
+    }
     await client.query(
       "UPDATE escrow_ledger SET state=$2::jsonb, updated_at=now() WHERE id=$1",
       [id, JSON.stringify(out.state)],

@@ -33,6 +33,11 @@ export interface EscrowReceipt {
   /** Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage. */
   lightning_settlement?: EscrowReceiptLightningSettlement;
   escrow_id: string;
+  /**
+     * Sub-agent named by the paid credential's agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical JSON {"agent_id":"<agent_id>"}, so execution_leaf_hash and merkle_root commit to it.
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
+     */
+  agent_id?: string;
   /** @minimum 0 */
   leaf_index: number;
   /** @items.pattern ^[0-9a-f]{64}$ */

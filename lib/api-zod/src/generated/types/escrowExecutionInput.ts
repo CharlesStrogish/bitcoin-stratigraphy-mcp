@@ -28,6 +28,12 @@ export interface EscrowExecutionInput {
      * @pattern ^[0-9a-f]{64}$
      */
   settlement_capability?: string;
+  /**
+     * Optional sub-agent attribution, equivalent to the X-Agent-Id header. Bound into the 402 challenge's agent_id caveat; the paid retry must declare the same value. Recorded with the settlement and committed into the receipt leaf. Caller-declared, not an authenticated identity.
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
+     */
+  agent_id?: string;
   escrow_id: string;
   /** @maxLength 262144 */
   execution_trace: string;

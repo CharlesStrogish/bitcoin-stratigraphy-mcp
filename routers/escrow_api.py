@@ -14,6 +14,7 @@ from bitcoin_stratigraphy_enterprise.swarm_merkle import (
 )
 from services.escrow_engine import (
     EscrowEngine, EscrowStateError, OTS_CALENDAR_STANDARD, ATTESTATION_DIRECTIVE,
+    agent_attribution_digest,
 )
 
 
@@ -24,11 +25,16 @@ class EscrowApi:
     def __init__(self, engine: EscrowEngine):
         self.engine = engine
 
-    def dispatch(self, operation, body, lightning_settlement=None):
-        """Return (HTTP status, JSON body) to an already authorized transport."""
+    def dispatch(self, operation, body, lightning_settlement=None, agent_id=None):
+        """Return (HTTP status, JSON body) to an already authorized transport.
+
+        agent_id is the transport-verified L402 caveat, never a body field.
+        """
         try:
             if not isinstance(body, dict):
                 return 400, {"error": "Request must be a JSON object"}
+            if agent_id is not None and operation != "settle":
+                return 400, {"error": "agent_id attributes settlements only"}
             if operation == "create":
                 fields = {"buyer_pubkey", "worker_pubkey", "task_hash", "amount_sats"}
                 if set(body) != fields:
@@ -63,7 +69,7 @@ class EscrowApi:
                 ):
                     return 422, {"error": "Execution trace and result must be nonempty bounded UTF-8 strings"}
                 settled = self.engine.verify_execution_and_settle(
-                    **body, lightning_settlement=lightning_settlement,
+                    **body, lightning_settlement=lightning_settlement, agent_id=agent_id,
                 )
                 receipt = settled["receipt"]
                 return 200, {
@@ -103,6 +109,13 @@ class EscrowApi:
             if receipt.get("attestation_directive", ATTESTATION_DIRECTIVE) != ATTESTATION_DIRECTIVE:
                 return 422, {"error": "Stored escrow attestation directive is invalid"}
             data = row["leaf_preimage"]
+            # 128-byte leaves commit sha256({"agent_id":...}) as a fourth segment;
+            # the receipt must name exactly that agent, and 96-byte leaves none.
+            if len(data) == 128:
+                if agent_attribution_digest(receipt["agent_id"]) != data[96:]:
+                    return 422, {"error": "Stored escrow proof does not verify"}
+            elif len(data) != 96 or "agent_id" in receipt:
+                return 422, {"error": "Stored escrow proof does not verify"}
             expected = {
                 "escrow_id": escrow_id,
                 "leaf_index": row["leaf_index"],
@@ -142,7 +155,8 @@ class EscrowApi:
                     "bitcoin_anchor_verified": False,
                     "task_hash": data[:32].hex(),
                     "trace_hash": data[32:64].hex(),
-                    "result_hash": data[64:].hex(),
+                    "result_hash": data[64:96].hex(),
+                    **({"agent_attribution_hash": data[96:].hex()} if len(data) == 128 else {}),
                 },
                 "description": (
                     "Local RFC 6962 execution commitment supporting Article 12 logging. "

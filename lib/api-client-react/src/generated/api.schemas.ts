@@ -95,6 +95,12 @@ export interface EscrowExecutionInput {
      * @pattern ^[0-9a-f]{64}$
      */
   settlement_capability?: string;
+  /**
+     * Optional sub-agent attribution, equivalent to the X-Agent-Id header. Bound into the 402 challenge's agent_id caveat; the paid retry must declare the same value. Recorded with the settlement and committed into the receipt leaf. Caller-declared, not an authenticated identity.
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
+     */
+  agent_id?: string;
   escrow_id: string;
   /** @maxLength 262144 */
   execution_trace: string;
@@ -217,6 +223,11 @@ export interface EscrowReceipt {
   /** Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage. */
   lightning_settlement?: EscrowReceiptLightningSettlement;
   escrow_id: string;
+  /**
+     * Sub-agent named by the paid credential's agent_id caveat; present only for attributed settlements. Their 128-byte leaf is task_hash || trace_hash || result_hash || SHA-256 of the canonical JSON {"agent_id":"<agent_id>"}, so execution_leaf_hash and merkle_root commit to it.
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
+     */
+  agent_id?: string;
   /** @minimum 0 */
   leaf_index: number;
   /** @items.pattern ^[0-9a-f]{64}$ */
@@ -295,6 +306,11 @@ export type EscrowReceiptDocumentVerification = {
   task_hash: string;
   trace_hash: string;
   result_hash: string;
+  /**
+     * Fourth leaf segment of an attributed settlement: SHA-256 of {"agent_id":"<agent_id>"}, verified against proof.agent_id.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  agent_attribution_hash?: string;
 };
 
 export interface EscrowReceiptDocument {
@@ -1890,6 +1906,11 @@ export interface L402PaymentRequired {
   amount_sats: number;
   /** @minimum 1 */
   max_requests?: number;
+  /**
+     * Present when the challenge request declared X-Agent-Id or a body agent_id. The macaroon carries the matching "agent_id = <agent_id>" caveat, and every redemption must declare the same value.
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
+     */
+  agent_id?: string;
   /** Retry guidance naming both settlement paths and the free preflight checks. */
   agent_instruction: string;
   /**

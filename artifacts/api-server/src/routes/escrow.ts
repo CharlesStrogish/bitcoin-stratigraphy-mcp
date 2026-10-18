@@ -188,7 +188,10 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
       res.status(400).json({ error: "Missing or invalid escrow fields" });
       return;
     }
-    const { settlement_capability: _capability, ...input } = parsed.data as Record<string, unknown>;
+    // The capability authorizes transport only; a body agent_id is read by the
+    // toll gate and reaches the engine only through the paid macaroon caveat.
+    const { settlement_capability: _capability, agent_id: _agent, ...input } =
+      parsed.data as Record<string, unknown>;
     res.locals.escrowInput = input;
     next();
   };
@@ -223,7 +226,9 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
           amount_sats: res.locals.escrowTollSats,
           provider: res.locals.l402.provider,
           confirmed_at: new Date().toISOString(),
-        } : undefined);
+        } : undefined,
+        // Only the verified agent_id caveat attributes a settlement.
+        operation === "settle" ? res.locals.l402.agentId : undefined);
       if (res.destroyed) return;
       if (result.status !== 200 && result.status !== 201) {
         res.status(result.status).json(result.body);

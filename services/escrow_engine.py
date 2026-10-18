@@ -19,10 +19,28 @@ ATTESTATION_DIRECTIVE = (
     "Nostr Kind 38102 peer-trust attestation referencing the receipt root hash."
 )
 
+# Mirrors the L402 `agent_id = <id>` caveat grammar enforced by the transport.
+AGENT_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}")
+
+
 def _hex32(value, name):
     if not isinstance(value, str) or re.fullmatch(r"[0-9a-fA-F]{64}", value) is None:
         raise ValueError(f"{name} must be 64 hexadecimal characters")
     return value.lower()
+
+
+def agent_attribution_digest(agent_id):
+    """SHA-256 of the canonical attribution payload ``{"agent_id":"<id>"}``.
+
+    An attributed leaf appends this digest to the original 96 bytes:
+    task_hash || sha256(trace) || sha256(result) || sha256(payload). The ID is
+    the caller-declared value bound by the paid credential's caveat; it is not
+    an authenticated identity.
+    """
+    if not isinstance(agent_id, str) or AGENT_ID_PATTERN.fullmatch(agent_id) is None:
+        raise ValueError("agent_id does not match the caveat grammar")
+    payload = json.dumps({"agent_id": agent_id}, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(payload.encode("ascii")).digest()
 
 
 class EscrowStateError(ValueError):
@@ -77,14 +95,17 @@ class EscrowEngine:
 
     def verify_execution_and_settle(
         self, escrow_id, execution_trace, result_payload, lightning_settlement=None,
+        agent_id=None,
     ):
         """Commit caller-authorized execution evidence; release only after commit.
 
         Hashing proves a commitment, not whether the trace completed the task.
         Authentication/task validation and real Lightning custody remain upstream.
+        A supplied agent_id is committed into the leaf and named in the receipt.
         """
         if not isinstance(execution_trace, str) or not isinstance(result_payload, str):
             raise ValueError("execution_trace and result_payload must be UTF-8 strings")
+        attribution = b"" if agent_id is None else agent_attribution_digest(agent_id)
         with self.store.transaction() as connection:
             contract = connection.execute(
                 "SELECT * FROM agent_escrow_contracts WHERE escrow_id = ?",
@@ -106,6 +127,7 @@ class EscrowEngine:
                 bytes.fromhex(task_hash)
                 + hashlib.sha256(execution_trace.encode("utf-8")).digest()
                 + hashlib.sha256(result_payload.encode("utf-8")).digest()
+                + attribution
             )
             tree = MerkleAccumulator(self.max_leaves)
             for row in connection.execute(
@@ -129,6 +151,8 @@ class EscrowEngine:
                 "ots_calendar_standard": OTS_CALENDAR_STANDARD,
                 "attestation_directive": ATTESTATION_DIRECTIVE,
             }
+            if agent_id is not None:
+                receipt["agent_id"] = agent_id
             # Authenticated transport supplies this only after NWC confirms the
             # exact toll and SHA-256 payment proof. Never persist its preimage.
             if lightning_settlement is not None:
@@ -187,7 +211,7 @@ def create_l402_escrow(buyer_pubkey, worker_pubkey, task_hash, amount_sats):
     )
 
 
-def verify_execution_and_settle(escrow_id, execution_trace, result_payload):
+def verify_execution_and_settle(escrow_id, execution_trace, result_payload, agent_id=None):
     return _configured_engine().verify_execution_and_settle(
-        escrow_id, execution_trace, result_payload
+        escrow_id, execution_trace, result_payload, agent_id=agent_id,
     )

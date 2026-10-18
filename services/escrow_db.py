@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS agent_escrow_contracts (
 CREATE TABLE IF NOT EXISTS escrow_execution_leaves (
     leaf_index INTEGER PRIMARY KEY,
     escrow_id TEXT NOT NULL UNIQUE REFERENCES agent_escrow_contracts(escrow_id),
-    leaf_preimage BLOB NOT NULL CHECK(length(leaf_preimage) = 96),
+    leaf_preimage BLOB NOT NULL CHECK(length(leaf_preimage) IN (96, 128)),
     receipt_json TEXT NOT NULL
 );
 """

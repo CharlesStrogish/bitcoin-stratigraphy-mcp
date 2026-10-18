@@ -14,7 +14,7 @@ import uuid
 
 from bitcoin_stratigraphy_enterprise.swarm_merkle import verify_merkle_inclusion
 from services.escrow_db import EscrowStore
-from services.escrow_engine import EscrowEngine, EscrowStateError
+from services.escrow_engine import EscrowEngine, EscrowStateError, agent_attribution_digest
 
 
 def settle_in_process(path, escrow_id):
@@ -90,6 +90,56 @@ class EscrowTests(unittest.TestCase):
         self.assertIn("Nostr Kind 38102", settled["receipt"]["attestation_directive"])
         with self.assertRaises(EscrowStateError):
             self.engine.verify_execution_and_settle(created["escrow_id"], trace, result)
+
+    def test_agent_attribution_is_committed_into_the_leaf(self):
+        attributed, plain = self.create(), self.create()
+        settled = self.engine.verify_execution_and_settle(
+            attributed["escrow_id"], "trace", "result", agent_id="planner-7",
+        )["receipt"]
+        self.assertEqual(settled["agent_id"], "planner-7")
+        digest = hashlib.sha256(b'{"agent_id":"planner-7"}').digest()
+        self.assertEqual(agent_attribution_digest("planner-7"), digest)
+        data = (
+            bytes.fromhex(self.task)
+            + hashlib.sha256(b"trace").digest()
+            + hashlib.sha256(b"result").digest()
+            + digest
+        )
+        self.assertEqual(len(data), 128)
+        self.assertEqual(
+            hashlib.sha256(b"\x00" + data).hexdigest(), settled["execution_leaf_hash"],
+        )
+        self.assertTrue(verify_merkle_inclusion(
+            data, settled["leaf_index"], settled["tree_size"],
+            [bytes.fromhex(item) for item in settled["audit_path"]],
+            bytes.fromhex(settled["merkle_root"]),
+        ))
+        with self.store.connection() as connection:
+            stored = connection.execute(
+                "SELECT leaf_preimage FROM escrow_execution_leaves WHERE escrow_id=?",
+                (attributed["escrow_id"],),
+            ).fetchone()[0]
+        self.assertEqual(stored, data)
+        # Unattributed settlements keep the original 96-byte leaf and no agent field.
+        unattributed = self.engine.verify_execution_and_settle(
+            plain["escrow_id"], "trace", "result",
+        )["receipt"]
+        self.assertNotIn("agent_id", unattributed)
+        self.verify_receipt(unattributed)
+        self.assertNotEqual(unattributed["execution_leaf_hash"], settled["execution_leaf_hash"])
+
+    def test_invalid_agent_attribution_never_settles(self):
+        created = self.create()
+        for invalid in ("", " planner", "planner 7", "-lead", "a" * 129, 7, b"planner"):
+            with self.assertRaises(ValueError):
+                self.engine.verify_execution_and_settle(
+                    created["escrow_id"], "trace", "result", agent_id=invalid,
+                )
+        self.assertEqual(self.store.get_contract(created["escrow_id"])["status"], "LOCKED")
+        with self.store.connection() as connection:
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM escrow_execution_leaves").fetchone()[0], 0,
+            )
 
     def test_restart_and_uneven_tree_paths(self):
         receipts = []

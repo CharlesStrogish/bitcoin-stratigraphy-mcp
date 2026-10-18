@@ -29,4 +29,9 @@ export type EscrowReceiptDocumentVerification = {
   task_hash: string;
   trace_hash: string;
   result_hash: string;
+  /**
+     * Fourth leaf segment of an attributed settlement: SHA-256 of {"agent_id":"<agent_id>"}, verified against proof.agent_id.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  agent_attribution_hash?: string;
 };

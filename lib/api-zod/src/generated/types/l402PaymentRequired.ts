@@ -40,6 +40,11 @@ export interface L402PaymentRequired {
   amount_sats: number;
   /** @minimum 1 */
   max_requests?: number;
+  /**
+     * Present when the challenge request declared X-Agent-Id or a body agent_id. The macaroon carries the matching "agent_id = <agent_id>" caveat, and every redemption must declare the same value.
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}$
+     */
+  agent_id?: string;
   /** Retry guidance naming both settlement paths and the free preflight checks. */
   agent_instruction: string;
   /**

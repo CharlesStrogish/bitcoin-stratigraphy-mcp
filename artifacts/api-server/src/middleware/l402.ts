@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { clientKey } from "../lib/client-address";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
-import type { Request, RequestHandler } from "express";
+import type { Request, RequestHandler, Response } from "express";
 import {
   attenuateSubscriptionMacaroon,
   createSubscriptionMacaroon,
@@ -9,6 +9,7 @@ import {
   inspectSubscriptionMacaroon,
 } from "../lib/subscription-pass";
 import { MCP_TOOL_NAME_PATTERN } from "../lib/delegation-caveats";
+import { agentIdCaveatRejection, declaredAgentId } from "../lib/agent-id-caveat";
 import {
   createMemoryMacaroonUsageStore,
   type MacaroonUsageStore,
@@ -124,7 +125,7 @@ export function createL402Middleware(
   const maxChallengeCallers = 10_000;
   let challengeWindowsCleanedAt = 0;
 
-  const sendChallenge: RequestHandler = async (req, res) => {
+  const sendChallenge = async (req: Request, res: Response, agentId?: string) => {
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
     if (!secret) {
       res.status(500).json({ error: "SESSION_SECRET is not configured" });
@@ -213,6 +214,7 @@ export function createL402Middleware(
         amountMsats,
         paymentAsset: "btc-lightning",
         paymentProvider: invoice.provider,
+        ...(agentId === undefined ? {} : { agentId }),
       });
       const macaroon = attenuateSubscriptionMacaroon(rootMacaroon, [
         `allowed_path=${resolveScope(req)}`,
@@ -231,6 +233,7 @@ export function createL402Middleware(
         payment_hash: invoice.paymentHash,
         amount_sats: amountSats,
         max_requests: batchSize,
+        ...(agentId === undefined ? {} : { agent_id: agentId }),
         ...l402ChallengeGuidance(),
         staged_preview: awaitingPaymentPreview(amountSats,
           typeof options.expectedOutputSchema === "function" ? options.expectedOutputSchema(req)
@@ -243,6 +246,13 @@ export function createL402Middleware(
   };
 
   return async (req, res, next) => {
+    // Optional sub-agent attribution (X-Agent-Id or body agent_id). Malformed
+    // or conflicting declarations never reach a challenge or the wallet.
+    const declaration = declaredAgentId(req);
+    if (!declaration.ok) {
+      res.status(400).json({ error: declaration.error });
+      return;
+    }
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
     const authorization = parseL402Header(req.header("Authorization"));
     if (secret && authorization) {
@@ -262,12 +272,13 @@ export function createL402Middleware(
           pass,
           pass.expiresAt ?? pass.validUntil * 1_000,
         );
-        // Delegated deadlines and tool scope are refused explicitly, before
-        // any revocation, wallet, or usage-quota work.
-        const rejection = delegationCaveatRejection(pass, {
-          nowMs: requestTime,
-          tool: options.tool,
-        });
+        // Delegated deadlines, tool scope and agent binding are refused
+        // explicitly, before any revocation, wallet, or usage-quota work.
+        const rejection =
+          delegationCaveatRejection(pass, {
+            nowMs: requestTime,
+            tool: options.tool,
+          }) ?? agentIdCaveatRejection(pass.agentId, declaration.agentId);
         if (rejection) {
           res.status(rejection.status).json({ error: rejection.error });
           return;
@@ -398,6 +409,7 @@ export function createL402Middleware(
             paymentHash: pass.paymentHash,
             settledAt: verification.settledAt,
             provider: verification.provider,
+            ...(pass.agentId === undefined ? {} : { agentId: pass.agentId }),
           };
           next();
           return;
@@ -414,6 +426,6 @@ export function createL402Middleware(
         }
       }
     }
-    await sendChallenge(req, res, next);
+    await sendChallenge(req, res, declaration.agentId);
   };
 }

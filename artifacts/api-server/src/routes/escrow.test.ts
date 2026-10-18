@@ -480,3 +480,88 @@ test(`public create/settle uses ${proof.length === 64 ? "preimage" : proof || "e
   assert.equal((await fetch(`${base}/settle`, publicPost(authorized, `L402 ${quote.macaroon}:${proof}`))).status, 429);
   assert.equal(executions, 1);
 });
+
+test("settle binds a declared agent_id into the toll macaroon and forwards only the verified caveat", async () => {
+  const executions: Array<{ body: Record<string, unknown>; agentId?: string }> = [];
+  const base = await serve({
+    readHeight: async () => 900000,
+    execute: async (operation, body, _height, _signal, payment, agentId) => {
+      if (operation === "lookup") {
+        assert.equal(agentId, undefined);
+        return { status: 200, body: { status: "LOCKED", toll_fee_sats: 24 } };
+      }
+      assert.equal(operation, "settle");
+      executions.push({ body, agentId });
+      return { status: 200, body: {
+        status: "SETTLED", preimage: "a".repeat(64), merkle_root: receipt.merkle_root,
+        audit_path: [], ots_calendar_standard: OTS_CALENDAR_STANDARD,
+        attestation_directive: ATTESTATION_DIRECTIVE,
+        article_12_receipt: {
+          ...receipt, lightning_settlement: payment, ...(agentId ? { agent_id: agentId } : {}),
+        },
+      } };
+    },
+  });
+  const challengeFor = async (body: Record<string, unknown>, headers = {}) => {
+    const response = await fetch(`${base}/settle`, post(body, { authorization: "", ...headers }));
+    assert.equal(response.status, 402);
+    return await response.json() as { macaroon: string; agent_id?: string };
+  };
+  const caveatsOf = (macaroon: string) =>
+    (JSON.parse(Buffer.from(macaroon, "base64url").toString("utf8")) as { caveats: string[] }).caveats;
+  const submission = { escrow_id: id, execution_trace: "agent trace", result_payload: "agent result" };
+
+  // X-Agent-Id declaration: bound into the macaroon and required on redemption.
+  const quote = await challengeFor(submission, { "X-Agent-Id": "planner-7" });
+  assert.equal(quote.agent_id, "planner-7");
+  assert.equal(caveatsOf(quote.macaroon).filter((caveat) => caveat === "agent_id = planner-7").length, 1);
+  const paid = { authorization: `L402 ${quote.macaroon}:${tollPreimage}` };
+  for (const [attempt, headers] of [
+    [submission, paid],
+    [submission, { ...paid, "X-Agent-Id": "planner-8" }],
+    [{ ...submission, agent_id: "planner-8" }, paid],
+  ] as const) {
+    const refused = await fetch(`${base}/settle`, post(attempt, headers));
+    assert.equal(refused.status, 403);
+  }
+  assert.equal(executions.length, 0);
+  const settled = await fetch(`${base}/settle`, post(submission, { ...paid, "X-Agent-Id": "planner-7" }));
+  assert.equal(settled.status, 200);
+  const output = await settled.json() as { article_12_receipt: { agent_id?: string } };
+  assert.equal(output.article_12_receipt.agent_id, "planner-7");
+  assert.equal(executions.length, 1);
+  assert.equal(executions[0]!.agentId, "planner-7");
+  assert.deepEqual(Object.keys(executions[0]!.body).sort(), ["escrow_id", "execution_trace", "result_payload"]);
+
+  // Body declaration: the field is stripped; only the caveat reaches the engine.
+  const bodySubmission = { ...submission, execution_trace: "second trace", agent_id: "auditor.eu-12" };
+  const bodyQuote = await challengeFor(bodySubmission);
+  assert.ok(caveatsOf(bodyQuote.macaroon).includes("agent_id = auditor.eu-12"));
+  const bodySettled = await fetch(`${base}/settle`, post(bodySubmission, {
+    authorization: `L402 ${bodyQuote.macaroon}:${tollPreimage}`,
+  }));
+  assert.equal(bodySettled.status, 200);
+  assert.equal(executions[1]!.agentId, "auditor.eu-12");
+  assert.equal(Object.hasOwn(executions[1]!.body, "agent_id"), false);
+
+  // Undeclared settlements stay unattributed, and late declarations are refused.
+  const plain = { ...submission, execution_trace: "third trace" };
+  const plainQuote = await challengeFor(plain);
+  assert.equal(Object.hasOwn(plainQuote, "agent_id"), false);
+  const plainPaid = { authorization: `L402 ${plainQuote.macaroon}:${tollPreimage}` };
+  assert.equal((await fetch(`${base}/settle`, post(plain, { ...plainPaid, "X-Agent-Id": "planner-7" }))).status, 403);
+  assert.equal((await fetch(`${base}/settle`, post(plain, plainPaid))).status, 200);
+  assert.equal(executions[2]!.agentId, undefined);
+
+  // Malformed or conflicting declarations never reach a challenge or the engine.
+  for (const [attempt, headers] of [
+    [submission, { "X-Agent-Id": "planner 7" }],
+    [{ ...submission, agent_id: "planner 7" }, {}],
+    [{ ...submission, agent_id: "planner-7" }, { "X-Agent-Id": "planner-8" }],
+  ] as const) {
+    const rejected = await fetch(`${base}/settle`, post(attempt, { authorization: "", ...headers }));
+    assert.equal(rejected.status, 400);
+    assert.equal(rejected.headers.has("www-authenticate"), false);
+  }
+  assert.equal(executions.length, 3);
+});

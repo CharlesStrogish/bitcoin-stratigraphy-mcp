@@ -1164,21 +1164,43 @@ paths:
       tags: [discovery]
       summary: JSON-RPC discovery and execution of the 16 canonical MCP tools
       description: >-
-        Call initialize, ping, tools/list or tools/call. All sixteen input and output
-        schemas, namespaces, side effects and prices are described in x-mcp-tools
-        and x-mcp-tool-groups. tools/list is the live authoritative catalog.
-        Tool calls use params.name and params.arguments. Paid calls require a
-        scoped L402 Authorization credential obtained from the HTTP 402
-        WWW-Authenticate challenge. A cost quote grants no tool entitlement.
-        SDK clients may advertise application/json and text/event-stream, but
-        POST returns finite JSON. Cookies are not used for cross-origin auth.
+        Stateless MCP 2026-07-28 (no initialize handshake and no Mcp-Session-Id):
+        call server/discover, tools/list or tools/call, sending
+        params._meta["io.modelcontextprotocol/protocolVersion"] and
+        params._meta["io.modelcontextprotocol/clientCapabilities"] on every request
+        with matching MCP-Protocol-Version and Mcp-Method headers, plus Mcp-Name
+        for tools/call. Stateless failures are strict JSON-RPC; payment challenge
+        fields appear in error.data. Handshake-era clients (2025-11-25 and earlier)
+        may still call initialize, ping, tools/list or tools/call without _meta.
+        All sixteen input and output schemas, namespaces, side effects and prices
+        are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live
+        authoritative catalog. Tool calls use params.name and params.arguments.
+        Paid calls require a scoped L402 Authorization credential obtained from
+        the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool
+        entitlement. SDK clients may advertise application/json and
+        text/event-stream, but POST returns finite JSON. Cookies are not used for
+        cross-origin auth.
       security: []
       parameters:
         - name: MCP-Protocol-Version
           in: header
           schema:
             type: string
-          description: Negotiated MCP protocol version, for example 2025-11-25
+          description: >-
+            MCP protocol version: 2026-07-28 (must equal the _meta protocol
+            version) or a handshake-era version such as 2025-11-25
+        - name: Mcp-Method
+          in: header
+          schema:
+            type: string
+          description: JSON-RPC method mirrored for routing; required for 2026-07-28 requests
+        - name: Mcp-Name
+          in: header
+          schema:
+            type: string
+          description: >-
+            params.name for tools/call, mirrored for routing; required for
+            2026-07-28 tools/call. Non-ASCII values use =?base64?...?=
         - name: Authorization
           in: header
           schema:
@@ -1203,7 +1225,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/McpJsonRpcResponse"
         "400":
-          description: Invalid request, parameters or JSON
+          description: >-
+            Invalid request, parameters or JSON; 2026-07-28 header mismatch
+            (-32020) or unsupported protocol version (-32022)
           content:
             application/json:
               schema:
@@ -1219,6 +1243,14 @@ paths:
               schema:
                 type: string
               description: Base64 x402 quote only when the configured settlement rail supports it
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "404":
+          description: >-
+            Method not available under 2026-07-28, including initialize and
+            ping (-32601), or proof not found
           content:
             application/json:
               schema:
@@ -2822,6 +2854,12 @@ components:
           properties:
             version:
               type: string
+              description: Newest supported MCP protocol version
+            supported_versions:
+              type: array
+              description: Every MCP protocol version this endpoint accepts, newest first
+              items:
+                type: string
             transports:
               type: array
               items:

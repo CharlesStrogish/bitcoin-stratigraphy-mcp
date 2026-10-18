@@ -7,7 +7,7 @@ installing or changing the server.
 | --- | --- |
 | Public MCP URL | `https://bitcoinstratigraphy.com/mcp` |
 | Remote transport | Streamable HTTP |
-| Supported protocol | MCP `2025-11-25` |
+| Supported protocol | MCP `2026-07-28` (stateless); handshake-era `2025-11-25` clients also supported |
 | Tool catalog | 16 tools; retrieve the current catalog from the server |
 | Connection-time wallet requirement | None |
 | Paid execution | Lightning L402; conditional Base USDC x402 only when configured, with a separate payment integration |
@@ -251,6 +251,6 @@ revoke that connection in your wallet if it is no longer needed.
 
 - [Official MCP guide: connect local servers with Claude Desktop](https://modelcontextprotocol.io/docs/develop/connect-local-servers)
 - [mcp-remote bridge documentation](https://github.com/geelen/mcp-remote)
-- [MCP Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+- [MCP Streamable HTTP transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)
 - [Project connection reference](../CONNECT.md)
 - [Live MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)

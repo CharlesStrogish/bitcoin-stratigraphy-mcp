@@ -738,7 +738,10 @@ export type McpDiscoveryManifestMcpCapabilities = {
 };
 
 export type McpDiscoveryManifestMcp = {
+  /** Newest supported MCP protocol version */
   version: string;
+  /** Every MCP protocol version this endpoint accepts, newest first */
+  supported_versions?: string[];
   transports: McpDiscoveryManifestMcpTransportsItem[];
   capabilities: McpDiscoveryManifestMcpCapabilities;
 };

@@ -1,4 +1,9 @@
 import type { RequestHandler } from "express";
+import {
+  isStatelessMcpExchange,
+  statelessErrorCode,
+  statelessFailureCode,
+} from "../lib/mcp-stateless";
 
 function responseId(body: unknown): string | number | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
@@ -9,7 +14,11 @@ function responseId(body: unknown): string | number | null {
     : null;
 }
 
-/** Preserve L402/x402 challenge fields while framing every HTTP failure as JSON-RPC. */
+/**
+ * Frame every HTTP failure as JSON-RPC. Handshake-era clients keep L402/x402
+ * challenge fields at the top level; 2026-07-28 clients receive strict
+ * JSON-RPC with those fields in error.data and permitted error codes.
+ */
 export const frameMcpErrors: RequestHandler = (req, res, next) => {
   const json = res.json.bind(res);
   res.json = (body: unknown) => {
@@ -19,18 +28,12 @@ export const frameMcpErrors: RequestHandler = (req, res, next) => {
         ? (body as Record<string, unknown>)
         : {};
     const existing = payload.error;
-    if (
+    const framed =
       payload.jsonrpc === "2.0" &&
-      existing &&
+      existing !== null &&
       typeof existing === "object" &&
       typeof (existing as { code?: unknown }).code === "number" &&
-      typeof (existing as { message?: unknown }).message === "string"
-    ) {
-      return json({
-        ...payload,
-        id: responseId(payload) ?? responseId(req.body),
-      });
-    }
+      typeof (existing as { message?: unknown }).message === "string";
     const message =
       typeof existing === "string"
         ? existing
@@ -39,6 +42,40 @@ export const frameMcpErrors: RequestHandler = (req, res, next) => {
           : res.statusCode === 402
             ? "Payment required"
             : "MCP request failed";
+    if (isStatelessMcpExchange(req, res)) {
+      const id = responseId(payload) ?? responseId(req.body);
+      if (framed) {
+        const error = existing as { code: number; message: string };
+        return json({
+          jsonrpc: "2.0",
+          ...(id === null ? {} : { id }),
+          error: {
+            ...error,
+            code: statelessErrorCode(error.code, res.statusCode),
+          },
+        });
+      }
+      const details = Object.fromEntries(
+        Object.entries(payload).filter(
+          ([key]) => !["jsonrpc", "id", "error", "message"].includes(key),
+        ),
+      );
+      return json({
+        jsonrpc: "2.0",
+        ...(id === null ? {} : { id }),
+        error: {
+          code: statelessFailureCode(res.statusCode),
+          message,
+          ...(Object.keys(details).length > 0 ? { data: details } : {}),
+        },
+      });
+    }
+    if (framed) {
+      return json({
+        ...payload,
+        id: responseId(payload) ?? responseId(req.body),
+      });
+    }
     const code =
       res.statusCode >= 500
         ? -32603

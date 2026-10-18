@@ -2,6 +2,10 @@
 import { mcpToolDefinitions } from "../routes/mcp";
 import { mcpToolPrices } from "./mcp-pricing";
 import {
+  MCP_SUPPORTED_PROTOCOL_VERSIONS,
+  STATELESS_MCP_PROTOCOL_VERSION,
+} from "./mcp-stateless";
+import {
   ATTESTATION_DIRECTIVE,
   L402_PREFLIGHT,
   L402_SETTLEMENT_PATHS,
@@ -82,7 +86,10 @@ export const mcpDiscoveryManifest = {
       "Self-hosted Streamable HTTP server at /mcp, not a stdio connector. Requires PostgreSQL, the licensed Python companion and operator-provisioned secrets; see the package README.",
   },
   mcp: {
-    version: "2025-11-25",
+    // Newest revision; handshake-era clients may still initialize with an
+    // earlier entry from supported_versions.
+    version: STATELESS_MCP_PROTOCOL_VERSION,
+    supported_versions: [...MCP_SUPPORTED_PROTOCOL_VERSIONS],
     transports: [
       {
         type: "streamable-http",

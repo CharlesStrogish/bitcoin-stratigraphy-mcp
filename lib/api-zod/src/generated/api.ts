@@ -573,11 +573,13 @@ export const PreflightMcpResponse = zod.unknown()
 
 
 /**
- * Call initialize, ping, tools/list or tools/call. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * Stateless MCP 2026-07-28 (no initialize handshake and no Mcp-Session-Id): call server/discover, tools/list or tools/call, sending params._meta["io.modelcontextprotocol/protocolVersion"] and params._meta["io.modelcontextprotocol/clientCapabilities"] on every request with matching MCP-Protocol-Version and Mcp-Method headers, plus Mcp-Name for tools/call. Stateless failures are strict JSON-RPC; payment challenge fields appear in error.data. Handshake-era clients (2025-11-25 and earlier) may still call initialize, ping, tools/list or tools/call without _meta. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
  * @summary JSON-RPC discovery and execution of the 16 canonical MCP tools
  */
 export const ExecuteMcpRequestHeader = zod.object({
-  "MCP-Protocol-Version": zod.string().optional().describe('Negotiated MCP protocol version, for example 2025-11-25'),
+  "MCP-Protocol-Version": zod.string().optional().describe('MCP protocol version: 2026-07-28 (must equal the _meta protocol version) or a handshake-era version such as 2025-11-25'),
+  "Mcp-Method": zod.string().optional().describe('JSON-RPC method mirrored for routing; required for 2026-07-28 requests'),
+  "Mcp-Name": zod.string().optional().describe('params.name for tools\/call, mirrored for routing; required for 2026-07-28 tools\/call. Non-ASCII values use =?base64?...?='),
   "Authorization": zod.string().optional().describe('For paid calls: L402 <macaroon>:<preimage>. Discovery needs no credential.'),
   "PAYMENT-SIGNATURE": zod.string().optional().describe('Optional x402 proof, accepted only when live settlement is configured')
 })
@@ -707,7 +709,8 @@ export const GetMcpDiscoveryManifestResponse = zod.object({
   "due_diligence_brief": zod.string().url().optional()
 }),
   "mcp": zod.object({
-  "version": zod.string(),
+  "version": zod.string().describe('Newest supported MCP protocol version'),
+  "supported_versions": zod.array(zod.string()).optional().describe('Every MCP protocol version this endpoint accepts, newest first'),
   "transports": zod.array(zod.object({
   "type": zod.enum(['streamable-http']),
   "endpoint": zod.string().url()

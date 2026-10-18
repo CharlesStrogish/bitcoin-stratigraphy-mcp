@@ -31,7 +31,7 @@ a trusted, budget-controlled wallet proxy; they do not pay automatically.
 
 [![Glama TDQS](https://img.shields.io/badge/Glama-Grade%20A%20%284.4%2F5.0%29-10b981)](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
 [![Smithery Rating](https://img.shields.io/badge/Smithery-100%2F100-brightgreen)](https://smithery.ai/servers/crstrogish/bitcoin-stratigraphy-mcp)
-[![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2025--11--25-orange)](https://modelcontextprotocol.io/specification/2025-11-25)
+[![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2026--07--28-orange)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![L402 Enabled](https://img.shields.io/badge/Monetization-L402%20Lightning-yellow)](https://l402.org)
 
 Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **16 Canonical Tools**.
@@ -350,17 +350,26 @@ it from the deployment:
 curl -i https://bitcoinstratigraphy.com/.well-known/mcp.json
 ```
 
-The manifest declares release version `2.1.3` and
-`mcp.version: "2024-11-25"`. Those are metadata values, not protocol configuration.
-The installed MCP SDK negotiates supported protocol versions, including
-`2025-11-25`, which is the protocol shown in the badge and connection guidance.
-Let clients negotiate rather than forcing the manifest's declared version.
+The manifest declares release version `2.1.3`, `mcp.version: "2026-07-28"` and
+`mcp.supported_versions`. Those are metadata values, not protocol configuration.
+The endpoint serves the stateless MCP `2026-07-28` transport and still accepts
+handshake-era clients on `2025-11-25` and earlier. Let clients negotiate rather
+than forcing the manifest's declared version.
 
 ## Quick Connect
 
 **Live MCP endpoint:** `https://bitcoinstratigraphy.com/mcp`
 
-**Transport:** Streamable HTTP · **Protocol:** MCP `2025-11-25`
+**Transport:** Streamable HTTP, stateless · **Protocol:** MCP `2026-07-28`
+(handshake-era `2025-11-25` clients remain supported)
+
+The endpoint keeps no sessions: there is no `initialize` handshake and no
+`Mcp-Session-Id`, so any server instance can answer any request. A `2026-07-28`
+client calls `server/discover` for supported versions and capabilities, then
+sends its protocol version and client capabilities in `params._meta` on every
+request, with matching `MCP-Protocol-Version`, `Mcp-Method` and (for
+`tools/call`) `Mcp-Name` headers. See [CONNECT.md](CONNECT.md) for the request
+shape.
 
 Discovery with `stratigraphy.list` and `proof.list` is free. These connection
 examples do **not** provide a wallet or pay L402 invoices automatically. Check
@@ -448,8 +457,10 @@ try {
 ```
 
 For other languages or frameworks, use an MCP client supporting Streamable HTTP
-and initialize it against the same URL. Let the client negotiate the protocol
-version and manage MCP headers; this is not a legacy `/sse` endpoint.
+and point it at the same URL. Clients implementing `2026-07-28` use
+`server/discover` and per-request `_meta`; older clients initialize as before.
+Let the client negotiate the protocol version and manage MCP headers; this is
+not a legacy `/sse` endpoint.
 
 Paid tool execution requires a separate, wallet-enabled L402 integration:
 handle the HTTP `402` challenge, obtain explicit payment authorization, pay the

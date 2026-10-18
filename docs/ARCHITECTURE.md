@@ -3,7 +3,9 @@
 Mermaid sequence and system diagrams for agent developers integrating with
 `https://bitcoinstratigraphy.com/mcp`.
 
-The public interface uses **Streamable HTTP**, supports MCP **2025-11-25**, and
+The public interface uses stateless **Streamable HTTP**, supports MCP
+**2026-07-28** (no initialize handshake or session; capabilities travel in each
+request's `_meta`) alongside handshake-era **2025-11-25** clients, and
 currently exposes **16 tools**. Discover the live catalog with `tools/list` and
 query `payment.get_info` for current prices rather than relying on static
 diagrams as a contract.

@@ -28,6 +28,7 @@ const outputs = [
   "./dist/l402-caveats.test.js",
   "./dist/agent-id-binding.test.js",
   "./dist/nip98-agent-auth.test.js",
+  "./dist/mcp-stateless-transport.test.js",
   "./dist/announcer.test.js",
   "./dist/ledger.test.js",
   "./dist/orchestrator.test.js",
@@ -160,6 +161,8 @@ await build({
     "l402-caveats.test": "./tests/unit/l402-caveats.test.ts",
     "agent-id-binding.test": "./tests/unit/agent-id-binding.test.ts",
     "nip98-agent-auth.test": "./tests/unit/nip98-agent-auth.test.ts",
+    "mcp-stateless-transport.test":
+      "./tests/unit/mcp-stateless-transport.test.ts",
     "announcer.test": "../../tests/announcer.test.ts",
     "ledger.test": "../../tests/ledger.test.ts",
     "orchestrator.test": "../../tests/orchestrator.test.ts",

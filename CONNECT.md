@@ -146,16 +146,30 @@ For direct HTTP clients, a preflight request looks like:
 POST /mcp HTTP/1.1
 Content-Type: application/json
 Accept: application/json, text/event-stream
-MCP-Protocol-Version: 2025-11-25
+MCP-Protocol-Version: 2026-07-28
+Mcp-Method: tools/call
+Mcp-Name: payment.get_info
 
-{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"payment.get_info","arguments":{"toolName":"stratigraphy.get_digest"}}}
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"payment.get_info","arguments":{"toolName":"stratigraphy.get_digest"},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}
 ```
+
+The endpoint implements the stateless MCP `2026-07-28` transport. There is no
+`initialize` handshake and no `Mcp-Session-Id`, so any server instance can
+answer any request. Call `server/discover` (with the same `_meta`,
+`MCP-Protocol-Version` and `Mcp-Method: server/discover`) to read supported
+versions and capabilities. Every request repeats its protocol version and client
+capabilities in `params._meta`. The `MCP-Protocol-Version`, `Mcp-Method` and,
+for `tools/call`, `Mcp-Name` headers must equal the body values; otherwise the
+request fails with JSON-RPC error `-32020`. An unsupported version returns
+`-32022` with the supported list. Handshake-era clients that send
+`MCP-Protocol-Version: 2025-11-25` without `_meta` can still `initialize` and
+call tools as before.
 
 Read the price from `result.structuredContent.perToolSats["stratigraphy.get_digest"]`. Some clients also expose the same JSON in the MCP text content.
 
 ## TypeScript: handle an L402 challenge
 
-The server responds to an unauthenticated paid call with HTTP 402, `WWW-Authenticate: L402 macaroon="...", invoice="..."`, and JSON containing `macaroon`, `invoice`, `payment_hash`, and `amount_sats`. Pay **that exact invoice**, verify that the wallet's 32-byte preimage hashes to `payment_hash`, then retry the **same** JSON-RPC call once with `Authorization: L402 <macaroon>:<preimage>`. MCP paid-call credentials are tool/request-scoped; do not reuse one to authorize another tool or REST scope. This differs from any REST subscription credential, whose reuse is governed by its own path, request, and expiry caveats. The wallet callback below must be connected to a real wallet with its own authorization and spending policy; it is deliberately not a hard-coded credential.
+The server responds to an unauthenticated paid call with HTTP 402, `WWW-Authenticate: L402 macaroon="...", invoice="..."`, and a JSON-RPC error (code `402`) whose `error.data` contains `macaroon`, `invoice`, `payment_hash`, and `amount_sats`. Handshake-era `2025-11-25` clients receive the same fields at the top level of the response body. Pay **that exact invoice**, verify that the wallet's 32-byte preimage hashes to `payment_hash`, then retry the **same** JSON-RPC call once with `Authorization: L402 <macaroon>:<preimage>`. MCP paid-call credentials are tool/request-scoped; do not reuse one to authorize another tool or REST scope. This differs from any REST subscription credential, whose reuse is governed by its own path, request, and expiry caveats. The wallet callback below must be connected to a real wallet with its own authorization and spending policy; it is deliberately not a hard-coded credential.
 
 ```ts
 const endpoint = "https://bitcoinstratigraphy.com/mcp";
@@ -175,6 +189,8 @@ type Challenge = {
   amount_sats: number;
 };
 
+const PROTOCOL = "2026-07-28";
+
 async function send(id: number, name: string, args: object, authorization?: string) {
   return fetch(endpoint, {
     method: "POST",
@@ -182,14 +198,23 @@ async function send(id: number, name: string, args: object, authorization?: stri
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
-      "MCP-Protocol-Version": "2025-11-25",
+      "MCP-Protocol-Version": PROTOCOL,
+      "Mcp-Method": "tools/call",
+      "Mcp-Name": name,
       ...(authorization ? { Authorization: authorization } : {}),
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id,
       method: "tools/call",
-      params: { name, arguments: args },
+      params: {
+        name,
+        arguments: args,
+        _meta: {
+          "io.modelcontextprotocol/protocolVersion": PROTOCOL,
+          "io.modelcontextprotocol/clientCapabilities": {},
+        },
+      },
     }),
   });
 }
@@ -224,7 +249,8 @@ export async function invokeWithL402(
     if (advertised === 0) throw new Error("Unexpected payment demand for a free tool");
     const header = response.headers.get("WWW-Authenticate") ?? "";
     const match = /^L402\s+macaroon="([^"\r\n]+)",\s*invoice="([^"\r\n]+)"$/i.exec(header);
-    const challenge = (await response.json()) as Partial<Challenge>;
+    const rpc = (await response.json()) as { error?: { data?: Partial<Challenge> } };
+    const challenge = rpc.error?.data ?? {};
     const paymentHash = challenge.payment_hash;
     if (!match || challenge.macaroon !== match[1] ||
         challenge.invoice !== match[2] || !challenge.invoice.startsWith("ln") ||

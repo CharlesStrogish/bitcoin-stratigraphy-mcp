@@ -3,6 +3,13 @@
 import { createHash } from "node:crypto";
 import { frameMcpErrors, validateMcpEnvelope } from "../middleware/mcpJsonRpc";
 import {
+  MCP_SERVER_INFO,
+  answerStatelessMcpRequest,
+  mcpServerCapabilities,
+  negotiateMcpProtocol,
+  type McpProtocolContext,
+} from "../lib/mcp-stateless";
+import {
   canonicalToolName,
   legacyToolNames,
   mcpToolPrices,
@@ -27,7 +34,6 @@ import type {
 } from "express";
 import { z } from "zod";
 import { ENGINE_DESCRIPTION } from "../lib/engine-metadata";
-import { RELEASE_VERSION } from "../lib/public-site";
 import { ATTESTATION_DIRECTIVE } from "../lib/agent-conversion";
 import {
   digestRecord,
@@ -4671,18 +4677,10 @@ function createBitcoinStratigraphyMcpServer(
   primaryResult?: PrimaryStratigraphyResult,
 ) {
   const server = new McpServer(
-    {
-      name: "bitcoin-stratigraphy",
-      version: RELEASE_VERSION,
-      description: ENGINE_DESCRIPTION,
-    },
+    { ...MCP_SERVER_INFO, description: ENGINE_DESCRIPTION },
     {
       instructions: ENGINE_DESCRIPTION,
-      capabilities: {
-        prompts: {},
-        resources: {},
-        tools: {},
-      },
+      capabilities: mcpServerCapabilities(),
     },
   );
 
@@ -5162,7 +5160,7 @@ async function handleMcpRequest(
   mesh: Pick<MeshGossipService, "status" | "createConsensus">,
   primaryBackend: PrimaryStratigraphyBackend,
 ): Promise<void> {
-  const server = createBitcoinStratigraphyMcpServer(
+  const createServer = () => createBitcoinStratigraphyMcpServer(
     res.locals.epistemicAnchorReceipt as
       Awaited<ReturnType<typeof groundEpistemicContext>> | undefined,
     mesh,
@@ -5180,6 +5178,24 @@ async function handleMcpRequest(
     primaryBackend,
     res.locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined,
   );
+  const protocol = res.locals.mcpProtocol as McpProtocolContext | undefined;
+  if (protocol?.era === "stateless") {
+    // MCP 2026-07-28: answered without the SDK HTTP transport or a session.
+    try {
+      await answerStatelessMcpRequest(req, res, protocol, createServer);
+    } catch (error) {
+      req.log?.error({ err: error }, "MCP request failed");
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          id: protocol.id,
+          error: { code: -32603, message: "Internal server error" },
+        });
+      }
+    }
+    return;
+  }
+  const server = createServer();
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -5393,9 +5409,20 @@ export function registerMcpRoute(
         res.status(200).json({ status: "ok", service: "MCP Server" });
         return;
       }
+      if (req.method !== "POST") {
+        // No session is ever minted, so DELETE has nothing to terminate.
+        res.setHeader("Allow", "GET, HEAD, POST, OPTIONS");
+        res.status(405).json({
+          error: "Method not allowed: send MCP JSON-RPC requests with POST",
+        });
+        return;
+      }
       next();
     },
     validateMcpEnvelope,
+    // Selects the protocol era and validates 2026-07-28 metadata and routing
+    // headers before any payment, delegation or tool work.
+    negotiateMcpProtocol,
     async (req, res, next) => {
       // Previously-free operations must authorize before settlement/delegation
       // side effects. Invalid schemas still go to normal JSON-RPC validation.

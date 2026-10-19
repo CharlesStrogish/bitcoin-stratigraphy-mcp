@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import type { StratigraphyEntry } from "@workspace/api-client-react";
 import stratigraphyDataset from "../../api-server/data/stratigraphy.json";
-import { Check, Download, FileText, Play, RefreshCw, Zap } from "lucide-react";
+import { Check, Download, FileText, LayoutGrid, Play, Zap } from "lucide-react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -145,14 +145,10 @@ function downloadCsv(rows: StratigraphyEntry[]) {
 }
 
 function Header({
-  onRefresh,
   onExport,
-  refreshing,
   rowCount,
 }: {
-  onRefresh: () => void;
   onExport: () => void;
-  refreshing: boolean;
   rowCount: number;
 }) {
   return (
@@ -204,13 +200,13 @@ function Header({
           >
             <Play size={14} /> Enterprise preview
           </a>
-          <button
+          <a
             className="control-button"
-            onClick={onRefresh}
-            disabled={refreshing}
+            href="#mcp-tools"
+            data-testid="link-tool-catalog"
           >
-            <RefreshCw size={14} className={refreshing ? "spin" : ""} /> Refresh
-          </button>
+            <LayoutGrid size={14} aria-hidden="true" /> 16-Tool Catalog
+          </a>
           <div
             className="header-exports"
             role="group"
@@ -271,9 +267,7 @@ function Home() {
       <div className="grain" />
       <div className="shell-inner">
         <Header
-          onRefresh={() => query.refetch()}
           onExport={() => downloadCsv(allRows)}
-          refreshing={query.isFetching}
           rowCount={allRows.length}
         />
         <section

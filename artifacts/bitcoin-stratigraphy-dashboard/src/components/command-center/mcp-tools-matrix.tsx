@@ -189,6 +189,7 @@ export function McpToolsMatrix() {
       : "ready";
   return (
     <section
+      id="mcp-tools"
       className="cc-module cc-tools"
       aria-labelledby="cc-tools-title"
       data-testid="module-mcp-tools"

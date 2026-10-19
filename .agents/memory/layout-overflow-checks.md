@@ -24,3 +24,6 @@ answer.
   `--user-data-dir` so leftovers can be found.
 - Chromium processes with a `playwright_chromiumdev_profile` profile belong to
   the screenshot tool. Do not kill them.
+- Verify smooth scrolling with animation-frame samples, not a single delayed
+  measurement. **Why:** Headless Chromium can defer animation start past an
+  arbitrary timeout even when the scroll animates correctly.

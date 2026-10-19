@@ -137,6 +137,7 @@ The MCP `tools/list` response currently contains **16 canonical tools**; only `s
 | `payment.get_info` | 250 | Query prices (default) or set `action: "settle"` to verify a server-issued L402 credential or settle an authenticated x402 signature. Bare preimages and hashes are not enough; settlement claims are not bearer tokens. |
 | `mesh.get_status` | 250 | Read peer and quorum health. |
 | `mesh.broadcast` | 250 | Sign and distribute a stored snapshot to mesh peers; has side effects. |
+| `workflow.audit_trajectory` | 250 | Deterministic composite workflow executing end-to-end thermodynamic audits. Returns signed deltas and compressed proof receipts in a single payload to save LLM context tokens. |
 
 Call `payment.get_info` with `{}` (equivalent to `{"action":"query"}`) for the complete `perToolSats` map, or `{"toolName":"stratigraphy.get_digest"}` to narrow it to one **case-sensitive, canonical** tool name. Unknown names fail validation. The query result includes accepted methods, invoice expiry, and challenge metadata. It does not issue an invoice; the actual invoice is issued only when a paid `tools/call` receives HTTP **402**. Use `{"action":"settle","paymentHash":"…","preimage":"…"}` with matching L402 Authorization, or, only when MCP Base USDC x402 is currently enabled, `{"action":"settle","paymentHash":"0x…","txHash":"0x…"}` with PAYMENT-SIGNATURE. Settlement does not authorize access to another tool.
 

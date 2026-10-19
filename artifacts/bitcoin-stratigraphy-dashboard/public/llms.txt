@@ -9,7 +9,7 @@
 > data or native per-record Bitcoin block provenance.
 
 ## Agent entry points
-- [Interactive Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs): live schemas and a manual playground for 15 MCP tools across 4 namespaces, including OpenTimestamps notarization.
+- [Interactive Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs): live schemas and a manual playground for 16 canonical MCP tools across 5 namespaces, including OpenTimestamps notarization and composite trajectory audits.
 - [Python SDK and integration cookbooks](https://bitcoinstratigraphy.com/cookbooks): CrewAI, LangChain and AutoGen examples; [HTTPX Python SDK/client source](https://bitcoinstratigraphy.com/cookbooks/l402_client.py). Payments require explicit callbacks.
 - [MCP auto-discovery manifest](https://bitcoinstratigraphy.com/.well-known/mcp.json): transport, tool descriptors, settlement paths, documentation links and pricing methods.
 - [Complete tool schemas, settlement guide and TypeScript SDK usage](https://bitcoinstratigraphy.com/llms-full.txt)

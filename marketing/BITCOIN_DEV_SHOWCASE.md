@@ -14,7 +14,8 @@ The public endpoint is:
 
 **https://bitcoinstratigraphy.com/mcp**
 
-It exposes 14 tools over Streamable HTTP, supports MCP `2025-11-25`, and uses
+It exposes 16 canonical MCP tools over stateless Streamable HTTP, supports MCP
+`2026-07-28` alongside handshake-era clients, and uses
 Lightning L402 plus conditional Base USDC x402 when that settlement path is
 configured. The catalog has a Glama
 tool-definition quality rating of **A, 4.4/5.0**, checked September 30, 2026.
@@ -57,14 +58,15 @@ every source value true or every model interpretation correct.
 
 ### 1. The MCP execution surface
 
-The 14 canonical tools are grouped into four namespaces:
+The 16 canonical MCP tools are grouped into five namespaces:
 
 | Namespace | Tools | Purpose |
 | --- | --- | --- |
 | `stratigraphy.*` | `stratigraphy.list`, `stratigraphy.get`, `stratigraphy.get_digest`, `stratigraphy.get_diff`, `stratigraphy.get_range` | Discover coverage and retrieve indexed records, compact summaries, comparisons, or bounded ranges. |
-| `proof.*` | `proof.attenuate`, `proof.verify`, `proof.get_by_hash`, `proof.list`, `proof.submit`, `proof.ground` | Restrict credentials, verify/register proofs, retrieve retained evidence, and issue signed state receipts. |
+| `proof.*` | `proof.attenuate`, `proof.verify`, `proof.get_by_hash`, `proof.list`, `proof.submit`, `proof.ground`, `proof.notarize` | Restrict credentials, verify/register proofs, retrieve retained evidence, issue signed state receipts, and create OpenTimestamps receipts. |
 | `mesh.*` | `mesh.get_status`, `mesh.broadcast` | Inspect peer/quorum health or sign and distribute a stored telemetry snapshot to configured pinned peers. Quorum is not source truth. |
 | `payment.*` | `payment.get_info` | Discover current prices or use an authenticated payment-verification/settlement mode. |
+| `workflow.*` | `workflow.audit_trajectory` | Deterministic composite workflow executing end-to-end thermodynamic audits. Returns signed deltas and compressed proof receipts in a single payload to save LLM context tokens. |
 
 The server does not advertise a `proof.generate` MCP tool. Generation is an
 internal capability behind supported proof-producing paths. It also does not

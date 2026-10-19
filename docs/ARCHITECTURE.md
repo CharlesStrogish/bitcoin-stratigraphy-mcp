@@ -52,7 +52,7 @@ flowchart LR
     Payer["Agent-owned Lightning wallet<br/>NWC / LND / Core Lightning"]
     Gateway["Public MCP endpoint<br/>Streamable HTTP / JSON-RPC"]
     Gate["L402 enforcement<br/>Credential validation and scoped redemption"]
-    Tools["15 MCP tools<br/>Four namespaces"]
+    Tools["16 canonical MCP tools<br/>Five namespaces"]
     Data[("Indexed historical strata<br/>Dataset provenance")]
     ZK["Groth16 prover and verifier<br/>Poseidon / BN254"]
     Notary["Signed receipt notary<br/>Bitcoin-tip context binding"]
@@ -292,16 +292,22 @@ flowchart TB
         pay_info["payment.get_info<br/>Query prices / verify or settle payment"]
     end
 
+    subgraph Workflow["workflow.* · 1 tool"]
+        direction TB
+        audit["workflow.audit_trajectory<br/>Composite thermodynamic audit"]
+    end
+
     MCP --> Stratigraphy
     MCP --> Proof
     MCP --> Mesh
     MCP --> Payment
+    MCP --> Workflow
 
     classDef discovery fill:#f0fdf4,stroke:#15803d,color:#111827;
     classDef paid fill:#fff7ed,stroke:#c2410c,color:#111827;
     classDef credential fill:#eef2ff,stroke:#4338ca,color:#111827;
     class s_list,p_list discovery;
-    class s_get,s_digest,s_diff,s_range,p_verify,p_get,p_submit,p_notarize,p_ground,m_status,m_broadcast,pay_info paid;
+    class s_get,s_digest,s_diff,s_range,p_verify,p_get,p_submit,p_notarize,p_ground,m_status,m_broadcast,pay_info,audit paid;
     class p_attenuate credential;
 
     click s_list href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/stratigraphy.list" "Dataset discovery reference" _blank
@@ -347,7 +353,7 @@ not from these diagrams or a cached registry page.
 - [Claude Desktop setup](CLAUDE_DESKTOP_SETUP.md)
 - [LangChain and CrewAI Python integration](LANGCHAIN_CREWAI_GUIDE.md)
 - [Agent-owned L402 payments](L402_AGENT_PAYMENTS.md)
-- [Connection guide and 14-tool catalog](../CONNECT.md)
+- [Connection guide and 16-tool catalog](../CONNECT.md)
 - [MCP routing and tool implementation](../artifacts/api-server/src/routes/mcp.ts)
 - [Groth16 telemetry proof service](../artifacts/api-server/src/services/zkProofService.ts)
 - [Mermaid sequence diagram syntax](https://mermaid.js.org/syntax/sequenceDiagram.html)

@@ -36,6 +36,32 @@ a trusted, budget-controlled wallet proxy; they do not pay automatically.
 
 Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **16 Canonical Tools**.
 
+## Enterprise Architecture
+
+- **Stateless MCP Transport:** MCP `2026-07-28` removes session-affinity
+  bottlenecks so requests can be routed across horizontally scaled instances.
+  Handshake-era clients remain supported. Transport is stateless; callback
+  queues and some rate-limit state remain process-local.
+- **Cryptographic Tool Integrity:** All 16 canonical tool descriptions are
+  SHA-256 hashed and their digests signed at boot with an Ed25519 keypair.
+  The public key, hashes, and signatures are published at
+  `/.well-known/integrity.json`. Clients that verify a trusted public-key pin
+  can detect description tampering before exposing tools to an LLM.
+  Signatures establish provenance, not blanket prevention of tool poisoning;
+  see [verification instructions](docs/tool-integrity.md).
+- **NIP-98 Agent Identity Binding:** Schnorr-signed NIP-98 HTTP events
+  authenticate an agent's pubkey against the request URL, method, and payload
+  hash. Authenticated identity is bound into L402 macaroons and the Postgres
+  settlement ledger's RFC 6962 Merkle receipts. Authenticated credentials
+  require a fresh event from the same pubkey on every use; self-declared
+  attribution remains explicitly distinguishable from verified identity.
+- **Zero-Polling Asymmetric Webhooks:** Heavy `stratigraphy.get_range` and
+  `proof.submit` calls support asynchronous execution: after payment, HTTP 202
+  acknowledges the task and the server POSTs its result to `webhook_url`.
+  Callbacks use Standard Webhooks `v1a` Ed25519 signatures with the same
+  published integrity key. No per-receiver shared secret is required.
+  See [callback delivery and verification](#zero-polling-execution-webhook_url).
+
 ## Licensing, IP & Enterprise Terms
 
 ### Npm server release
@@ -159,8 +185,9 @@ Pricing -> invoice -> payment proof
              |
              v
 16-tool router / 5 namespaces
-stratigraphy (5) | proof (6)
+stratigraphy (5) | proof (7)
 mesh (2)        | payment (1)
+workflow (1)
              |
              v
 Telemetry / Groth16 / Nostr mesh
@@ -180,7 +207,7 @@ Lightning settlement / OTS receipts
   `payment.get_info` advertises MCP terms. Paid calls receive HTTP 402
   challenges, then redeem verified payment proofs and scoped macaroons.
 - **Tool routing:** The canonical catalog contains 5 `stratigraphy.*`,
-  6 `proof.*`, 2 `mesh.*`, and 1 `payment.*` tools.
+  7 `proof.*`, 2 `mesh.*`, 1 `payment.*`, and 1 `workflow.*` tools.
 - **Telemetry subsystem:** The 422-record historical dataset supports indexed
   lookups, numerical differences, source-record digests, and compact ranges.
   Historical height mappings are deterministic indices, not native block
@@ -344,6 +371,16 @@ and callback shapes.
   - Access: paid L402 call; `action: "query"` is the default and `action: "settle"`
     requires authenticated payment evidence. Neither mode mints a macaroon or
     creates an invoice. Free price quotes are available from `/api/v1/cost`.
+
+### `workflow.*` — 1 tool
+
+- **`workflow.audit_trajectory`** — Deterministic composite workflow executing end-to-end thermodynamic audits. Returns signed deltas and compressed proof receipts in a single payload to save LLM context tokens.
+  - Access: paid; currently 250 sats per call.
+  - Inputs: required `fromTarget` and `toTarget`, for example
+    `{"fromTarget":"2026-10-12","toTarget":"latest"}`.
+  - Combines existing diff arithmetic, exact-byte SHA-256 boundary
+    fingerprints, and available OTS receipt references. Live boundaries have
+    no archived OTS receipt; this does not create a new Bitcoin-confirmed proof.
 
 Most paid MCP calls currently cost **250 sats** without valid credentials.
 Check `payment.get_info` and the actual challenge for current terms; do not

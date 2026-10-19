@@ -4,6 +4,11 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Run & Operate
 
+- Canonical MCP catalog: **16 tools across 5 namespaces** — 5 stratigraphy,
+  7 proof, 2 mesh, 1 payment, and 1 workflow. The 16th tool is
+  `workflow.audit_trajectory`: Deterministic composite workflow executing
+  end-to-end thermodynamic audits. Returns signed deltas and compressed proof
+  receipts in a single payload to save LLM context tokens.
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages

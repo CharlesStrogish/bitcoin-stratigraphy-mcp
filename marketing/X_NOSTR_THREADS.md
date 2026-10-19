@@ -5,7 +5,7 @@
 Publish one paragraph per post, in order.
 
 ```text
-Bitcoin Stratigraphy Data Engine: 14 MCP tools; Glama A (4.4/5) is a dated tool-definition rating, not an audit. Indexed telemetry, L402, Groth16/Poseidon BN254. Free: stratigraphy.list + payment.get_info: https://bitcoinstratigraphy.com/mcp
+Bitcoin Stratigraphy: 16 canonical MCP tools; Glama A (4.4/5) rates tool definitions, not security. Indexed telemetry, L402, Groth16/Poseidon BN254. Free: stratigraphy.list + proof.list. https://bitcoinstratigraphy.com/mcp
 
 Bitcoin Stratigraphy MCP exposes stratigraphy.{list,get,get_digest,get_diff,get_range}: discover bounds; read indexed records, compact digests, differences, and bounded ranges. Start free with stratigraphy.list: https://bitcoinstratigraphy.com/mcp
 
@@ -29,7 +29,7 @@ Bitcoin Stratigraphy Data Engine is an MCP notary hub for AI agents that combine
 ### Post 2
 
 ```text
-The Bitcoin Stratigraphy MCP catalog has 14 tools across four namespaces. Historical indexed data is in stratigraphy.list (bounds/metrics), stratigraphy.get (records), stratigraphy.get_digest (compact summary), stratigraphy.get_diff (differences), and stratigraphy.get_range (bounded compressed records). Mesh operations are mesh.get_status (peer/quorum health) and mesh.broadcast (sign and distribute a stored snapshot). The latter has side effects; inspect policy before allowing it.
+The Bitcoin Stratigraphy MCP catalog has 16 canonical tools across five namespaces. Historical indexed data is in stratigraphy.list (bounds/metrics), stratigraphy.get (records), stratigraphy.get_digest (compact summary), stratigraphy.get_diff (differences), and stratigraphy.get_range (bounded compressed records). workflow.audit_trajectory combines signed deltas and compact proof receipts in one audit payload. Mesh operations are mesh.get_status (peer/quorum health) and mesh.broadcast (sign and distribute a stored snapshot). The latter has side effects; inspect policy before allowing it.
 ```
 
 ### Post 3

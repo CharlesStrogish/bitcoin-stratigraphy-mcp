@@ -34,12 +34,15 @@ import {
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerNativeMcpDiscovery, validateNativeMcpRequest } from "../lib/mcp-native-discovery";
 import { createToolIntegrityManifest, loadToolIntegrityKey } from "../lib/tool-integrity";
+import { signToolResponse } from "../lib/mcp-response-signature";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  type CallToolResult,
+  type CallToolRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import type {
   Express,
@@ -4711,6 +4714,7 @@ function createBitcoinStratigraphyMcpServer(
   primaryBackend: PrimaryStratigraphyBackend = createPrimaryStratigraphyBackend(),
   primaryResult?: PrimaryStratigraphyResult,
   readIntegrity?: () => ReturnType<typeof createToolIntegrityManifest>,
+  signResponse?: (name: string, result: CallToolResult) => CallToolResult,
 ) {
   const server = new McpServer(
     { ...MCP_SERVER_INFO, description: ENGINE_DESCRIPTION },
@@ -4732,7 +4736,7 @@ function createBitcoinStratigraphyMcpServer(
   server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: mcpToolDefinitions,
   }));
-  server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const executeTool = async (request: CallToolRequest): Promise<CallToolResult> => {
     const args = request.params.arguments ?? {};
     const name = canonicalToolName(request.params.name);
     if (!mcpToolDefinitions.some((tool) => tool.name === name)) {
@@ -5191,6 +5195,10 @@ function createBitcoinStratigraphyMcpServer(
       ErrorCode.MethodNotFound,
       `Unknown tool: ${request.params.name}`,
     );
+  };
+  server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const result = await executeTool(request);
+    return signResponse ? signResponse(request.params.name, result) : result;
   });
 
   return server;
@@ -5220,6 +5228,7 @@ function mcpServerFactory(
     primaryBackend,
     locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined,
     locals.readToolIntegrity as (() => ReturnType<typeof createToolIntegrityManifest>) | undefined,
+    locals.signToolResponse as ((name: string, result: CallToolResult) => CallToolResult) | undefined,
   );
 }
 
@@ -5345,10 +5354,24 @@ export function registerMcpRoute(
   const readToolIntegrity = () =>
     app.locals.toolIntegrityManifest ??
     (fallbackIntegrity ??= createToolIntegrityManifest(mcpToolDefinitions, loadToolIntegrityKey()));
+  let fallbackSigningKey: ReturnType<typeof loadToolIntegrityKey> | undefined;
+  const signResponse = (name: string, result: CallToolResult) =>
+    signToolResponse(name, result, fallbackSigningKey ??= loadToolIntegrityKey());
   app.use("/mcp", frameMcpErrors);
-  app.use("/mcp", (_req, res, next) => {
+  app.use("/mcp", (req, res, next) => {
     res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;
     res.locals.readToolIntegrity = readToolIntegrity;
+    const messages = Array.isArray(req.body) ? req.body : [req.body];
+    if (messages.some((message) => message?.method === "tools/call")) {
+      try {
+        if (!app.locals.signMcpToolResponse) fallbackSigningKey ??= loadToolIntegrityKey();
+        res.locals.signToolResponse = app.locals.signMcpToolResponse ?? signResponse;
+      } catch (error) {
+        req.log?.error({ err: error }, "MCP response signing unavailable");
+        res.status(503).json({ error: "MCP response signing unavailable" });
+        return;
+      }
+    }
     next();
   });
   const limitPublic = createPublicRateLimitMiddleware(
@@ -5446,7 +5469,7 @@ export function registerMcpRoute(
     const protocol = res.locals.mcpProtocol as McpProtocolContext | undefined;
     // The background run outlives this response, so snapshot its paid state.
     const createServer = mcpServerFactory(
-      { ...res.locals },
+      { ...res.locals, signToolResponse: undefined },
       mesh,
       primaryBackend,
     );

@@ -500,6 +500,26 @@ export interface McpToolCostItem {
   invoice_generation: McpInvoiceGeneration | null;
 }
 
+/**
+ * Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.
+ */
+export interface BatchSettlementDiscovery {
+  protocol: 'L402';
+  settlementAsset: 'btc-lightning';
+  requestHeader: 'X-L402-Batch-Size';
+  /**
+     * @minItems 1
+     * @maxItems 1
+     */
+  supportedBatchSizes: 100[];
+  exampleHeaderValue: '100';
+  maxCalls: 100;
+  priceMultiplier: 100;
+  credentialScope: 'exact MCP tool path';
+  invoiceGeneratedByDiscovery: false;
+  instructions: string;
+}
+
 export type McpBatchCostQuotePerToolSats = {[key: string]: number};
 
 export type McpBatchCostQuoteL402Batch = {
@@ -528,6 +548,7 @@ export type McpBatchCostQuoteL402 = {
 };
 
 export interface McpBatchCostQuote {
+  batchSettlement: BatchSettlementDiscovery;
   protocol: 'L402';
   currency: 'sats';
   perToolSats: McpBatchCostQuotePerToolSats;
@@ -1727,6 +1748,7 @@ export interface JsonSchema {
 }
 
 export interface StratigraphyCost {
+  batchSettlement?: BatchSettlementDiscovery;
   protocol: 'L402';
   settlement_asset: SettlementAsset;
   /** @minItems 1 */

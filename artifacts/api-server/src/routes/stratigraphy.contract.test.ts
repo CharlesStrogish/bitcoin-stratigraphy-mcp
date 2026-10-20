@@ -5348,6 +5348,10 @@ test("quotes batch MCP costs with itemized invoice details and wildcard CORS wit
     assert.equal(item.invoice_generation.expiry_seconds, 3600);
   }
   assert.equal(quote.l402.invoice_generated, false);
+  assert.equal(quote.batchSettlement.requestHeader, "X-L402-Batch-Size");
+  assert.deepEqual(quote.batchSettlement.supportedBatchSizes, [100]);
+  assert.equal(quote.batchSettlement.maxCalls, 100);
+  assert.equal(quote.batchSettlement.invoiceGeneratedByDiscovery, false);
   assert.equal(quote.l402.aggregate_invoice_supported, false);
   assert.equal(quote.l402.challenge_status, 402);
   assert.equal(quote.l402.max_requests, 1);
@@ -5463,6 +5467,7 @@ test("serves public pre-flight cost and schema metadata", async () => {
   assert.equal(response.headers.get("www-authenticate"), null);
   const body = (await response.json()) as {
     access_tiers: Array<{ id: string; price_sats: number }>;
+    batchSettlement: { requestHeader: string; supportedBatchSizes: number[]; maxCalls: number; invoiceGeneratedByDiscovery: boolean };
     dataset: { days: number; grows_over_time: boolean };
     mcp_tool: { name: string; parameters: Record<string, unknown> };
     catalog_tool: { name: string; description: string };
@@ -5475,6 +5480,10 @@ test("serves public pre-flight cost and schema metadata", async () => {
     submit_proof_tool: { name: string; requiredInputs: string[] };
     response_schema: { type: string };
   };
+  assert.equal(body.batchSettlement.requestHeader, "X-L402-Batch-Size");
+  assert.deepEqual(body.batchSettlement.supportedBatchSizes, [100]);
+  assert.equal(body.batchSettlement.maxCalls, 100);
+  assert.equal(body.batchSettlement.invoiceGeneratedByDiscovery, false);
   assert.deepEqual(
     body.access_tiers.map(({ id, price_sats }) => ({ id, price_sats })),
     [

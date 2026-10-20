@@ -11,6 +11,7 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { COMMERCIAL_LICENSE_PRICE, LICENSING_EMAIL } from "./public-site";
+import { batchSettlement } from "./batch-settlement";
 
 export const MCP_NATIVE_RESOURCES = [
   {
@@ -233,6 +234,7 @@ export function registerNativeMcpDiscovery(
         payload = {
           dataset: await dependencies.readCatalog(),
           toolCount: dependencies.tools.length,
+          batchSettlement,
           namespaces,
           l402: {
             instructions:

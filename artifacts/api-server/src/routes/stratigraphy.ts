@@ -10,6 +10,7 @@ import {
 import { type Express, type Request, type Response } from "express";
 import { createL402Middleware } from "../middleware/l402";
 import { quoteMcpTools } from "../lib/mcp-pricing";
+import { batchSettlement } from "../lib/batch-settlement";
 import {
   createHash,
   createHmac,
@@ -1307,6 +1308,7 @@ export function registerStratigraphyRoutes(
     res.status(200).json({
       protocol: "L402",
       ...selectedToolQuote,
+      batchSettlement,
       settlement_asset: assetSelection.asset,
       supported_assets: supportedSettlementAssets(settlementRouter),
       available_assets: availableSettlementAssets(settlementRouter),

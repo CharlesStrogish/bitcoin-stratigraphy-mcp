@@ -1,0 +1,24 @@
+Let's implement Ed25519 Signed Synchronous Response Envelopes on `tools/call` and surface Prepaid Batch Pass (`X-L402-Batch-Size`) discovery metadata.
+
+1. Ed25519 Signed Synchronous Response Envelopes (`tools/call`):
+   - Using the existing persistent Ed25519 keypair from `/.well-known/integrity.json`, cryptographically sign every successful synchronous `tools/call` result before returning it to the client.
+   - Construct the canonical signed payload string deterministically: `tool_name.timestamp.sha256_hex(canonical_result_content)` (where `timestamp` is integer Unix seconds and `canonical_result_content` is the deterministic JSON serialization of the `content` / `structuredContent` payload).
+   - Attach the signature metadata inside the tool result's `_meta.responseSignature` object (preserving all existing `content` and `structuredContent` fields so strict schema validators and MCP clients never break):
+     ```json
+     {
+       "algorithm": "Ed25519",
+       "keyId": "<server_public_key_fingerprint_or_url>",
+       "timestamp": 1792454400,
+       "contentSha256": "<64-char-hex>",
+       "signature": "v1a,<base64_ed25519_signature>"
+     }
+     ```
+   - Expose a helper function to verify this envelope and test both valid verification and tamper rejection.
+
+2. Surface Prepaid Batch Pass (`X-L402-Batch-Size`) Discovery:
+   - In `/api/v1/cost` and in the `stratigraphy://catalog/overview` MCP resource, explicitly include a `batchSettlement` discovery block documenting how high-frequency agent swarms can pass `X-L402-Batch-Size` (e.g., 10 to 1000 calls) during the initial 402 challenge to settle a single upfront Lightning invoice for a multi-call macro-macaroon, eliminating per-call Lightning latency.
+
+3. Documentation & Tests:
+   - Document synchronous response signature verification in `docs/tool-integrity.md`, `README.md`, and `llms-full.txt`.
+   - Add unit/integration tests confirming `_meta.responseSignature` is present on synchronous `tools/call` responses, validates against the public key in `/.well-known/integrity.json`, fails if a single byte of tool output is modified, and that `/api/v1/cost` and `stratigraphy://catalog/overview` include the `batchSettlement` metadata.
+   - Run typecheck, production build, and the full test suite, and commit cleanly so I can republish.

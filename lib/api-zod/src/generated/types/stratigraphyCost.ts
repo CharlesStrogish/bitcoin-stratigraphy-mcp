@@ -22,6 +22,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AgentReputationMetadata } from './agentReputationMetadata';
+import type { BatchSettlementDiscovery } from './batchSettlementDiscovery';
 import type { JsonSchema } from './jsonSchema';
 import type { ListProofAttestationsMcpTool } from './listProofAttestationsMcpTool';
 import type { ProofByHashMcpTool } from './proofByHashMcpTool';
@@ -35,6 +36,7 @@ import type { StratigraphyCostMcpTool } from './stratigraphyCostMcpTool';
 import type { SubmitZkProofMcpTool } from './submitZkProofMcpTool';
 
 export interface StratigraphyCost {
+  batchSettlement?: BatchSettlementDiscovery;
   protocol: 'L402';
   settlement_asset: SettlementAsset;
   /** @minItems 1 */

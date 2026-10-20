@@ -29,6 +29,7 @@ const outputs = [
   "./dist/agent-id-binding.test.js",
   "./dist/nip98-agent-auth.test.js",
   "./dist/mcp-stateless-transport.test.js",
+  "./dist/mcp-response-signature.test.js",
   "./dist/mcp-async-webhooks.test.js",
   "./dist/announcer.test.js",
   "./dist/ledger.test.js",
@@ -164,6 +165,7 @@ await build({
     "nip98-agent-auth.test": "./tests/unit/nip98-agent-auth.test.ts",
     "mcp-stateless-transport.test":
       "./tests/unit/mcp-stateless-transport.test.ts",
+    "mcp-response-signature.test": "./tests/unit/mcp-response-signature.test.ts",
     "mcp-async-webhooks.test": "./tests/unit/mcp-async-webhooks.test.ts",
     "announcer.test": "../../tests/announcer.test.ts",
     "ledger.test": "../../tests/ledger.test.ts",

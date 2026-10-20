@@ -132,6 +132,99 @@ cannot verify for the other. A valid webhook signature shows that this server's
 key signed that body for that task and time. It does not guarantee delivery,
 and it shows who sent the result, not that the result is correct.
 
+## Signed synchronous tool responses
+
+Every successful synchronous `tools/call` result, free or paid and on either
+protocol version, includes `_meta.responseSignature`:
+
+```json
+{
+  "algorithm": "Ed25519",
+  "keyId": "<SHA-256 of the trusted SPKI DER public key>",
+  "timestamp": 1792454400,
+  "contentSha256": "<64 lowercase hex characters>",
+  "signature": "v1a,<base64 Ed25519 signature>"
+}
+```
+
+This is additional metadata, not a replacement for `content` or
+`structuredContent`. Other metadata, including stateless server information, is
+preserved. JSON-RPC/payment errors, tool results marked `isError`, discovery
+responses, and HTTP 202 async acknowledgements are not signed this way. Async
+callbacks keep the separate webhook format above.
+
+### Canonical bytes
+
+1. Select an object with the `content` member and, **only if present**, the
+   `structuredContent` member from the tool result.
+2. Normalize to JSON wire values: omit undefined object members, use JSON `null`
+   for undefined array values and non-finite numbers, and serialize any `toJSON`
+   values before sorting. Parsed HTTP JSON is already normalized.
+3. Recursively sort object keys in JavaScript string order (UTF-16 code units).
+   Serialize keys and primitive values with `JSON.stringify`; preserve array
+   order and exact string contents. Join object/array members with commas and
+   colons, without whitespace or a trailing newline. This is this server's
+   deterministic JSON scheme, not a claim of full RFC 8785 compatibility.
+4. SHA-256 hash the UTF-8 bytes of that serialization, producing lowercase hex.
+5. Verify Ed25519 over the UTF-8 string
+   `tool_name.timestamp.contentSha256`. The tool name is the exact name sent in
+   the request, including a supported legacy alias. The signature has the `v1a,`
+   prefix; the prefix itself is not part of the signed string.
+
+Example canonical bytes:
+
+```text
+{"content":[{"text":"ok","type":"text"}],"structuredContent":{"a":1,"b":2}}
+```
+
+Hash **both** representations when both exist. Replacing a displayed text byte
+or changing a structured value invalidates verification. `_meta`, `resultType`,
+cache hints and other transport fields are outside the signed payload.
+
+The exported TypeScript helper
+`artifacts/api-server/src/lib/mcp-response-signature.ts` exposes
+`canonicalResultContent`, `signToolResponse`, and `verifyToolResponse`.
+For code running in this repository:
+
+```ts
+import { createPublicKey } from "node:crypto";
+import { verifyToolResponse } from "./artifacts/api-server/src/lib/mcp-response-signature";
+
+// Persist server_public_key after independently authenticating its fingerprint.
+const pinnedKey = createPublicKey(trustedPublicKeyPem);
+const valid = verifyToolResponse(requestedToolName, rpcResponse.result, pinnedKey);
+if (!valid) throw new Error("Tool result signature or freshness check failed");
+```
+
+The verifier requires the SHA-256 SPKI DER fingerprint to match `keyId`, verifies
+the digest and signature, and rejects timestamps more than 300 seconds in the
+past or future by default. Its optional `nowSeconds` and `toleranceSeconds`
+arguments let callers apply an explicit verification-time policy. Archive
+verification needs a separate trusted time/retention policy, not a casually
+disabled freshness check. Never choose a trusted key based only on `keyId` or
+fetch a replacement key from the same untrusted response.
+
+These signatures establish server origin and content integrity. They do not
+prove factual correctness, Bitcoin confirmation, payment settlement, a legal
+identity, or that this payload was produced for a particular request. The
+envelope has no request nonce or arguments hash; a fresh same-tool result can
+be replayed within the clock window. Consumers must match expected inputs and
+their own request-level replay policy separately.
+
+## Prepaid batch discovery
+
+Both cost-quote methods at `/api/v1/cost` and
+`stratigraphy://catalog/overview` return `batchSettlement` with the request
+header, supported sizes, price multiplier, scope and upfront-settlement
+instructions. The existing gate accepts **only `X-L402-Batch-Size: 100`**:
+100 times the tool's per-call price buys a single tool-scoped 100-call pass.
+Send that header on the initial paid tool challenge, pay the exact returned
+Lightning invoice once, then reuse its macaroon/preimage credential for
+authorized calls. No cross-tool aggregate invoice, x402 batch, or arbitrary
+10–1000-call range is advertised. Discovery never creates an invoice.
+Payment-proof caching avoids repeated Lightning settlement checks while
+expiry, revocation and every inherited attenuation budget remain enforced.
+
 ## Key persistence and operations
 
 Key source priority:
@@ -159,12 +252,12 @@ Key source priority:
 For independent key rotation, configure the dedicated private-key secret and
 distribute the new public-key pin through a trusted channel **before** rollout.
 Changing `SESSION_SECRET` also changes the integrity key when derived mode is
-in use. Rotation changes the webhook signing key too: callbacks carry a single
+in use. Rotation changes the synchronous-response and webhook signing key too: callbacks carry a single
 signature from the current key, so receivers must update their pin first.
 Do not delete local key files or rotate the relevant secret casually.
 Never commit private keys. Only public keys, hashes and signatures are served.
 
-## Security boundary
+## Description-signature security boundary
 
 This is **signed description integrity**, not a guarantee of safe descriptions or
 safe LLM behavior. Clients must actually verify a trusted pin; trusting a key

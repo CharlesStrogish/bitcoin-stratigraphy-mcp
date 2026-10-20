@@ -33,6 +33,7 @@ export * from './auditSubmissionReceipt';
 export * from './auditSubmissionTrace';
 export * from './auditTraceResult';
 export * from './auditTraceResultStatus';
+export * from './batchSettlementDiscovery';
 export * from './datasetHealthStatus';
 export * from './enterpriseDueDiligenceBrief';
 export * from './enterpriseDueDiligenceBriefArchitecture';

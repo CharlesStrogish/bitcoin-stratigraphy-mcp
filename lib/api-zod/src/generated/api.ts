@@ -925,6 +925,8 @@ export const QuoteMcpToolCostsBody = zod.object({
   "tools": zod.array(zod.string().min(1).max(quoteMcpToolCostsBodyToolsItemMax)).min(1).max(quoteMcpToolCostsBodyToolsMax)
 })
 
+export const quoteMcpToolCostsResponseBatchSettlementSupportedBatchSizesMax = 1;
+
 export const quoteMcpToolCostsResponsePerToolSatsMinOne = 0;
 
 export const quoteMcpToolCostsResponseItemsItemPriceSatsMin = 0;
@@ -939,6 +941,18 @@ export const quoteMcpToolCostsResponseTotalSatsMin = 0;
 
 
 export const QuoteMcpToolCostsResponse = zod.object({
+  "batchSettlement": zod.object({
+  "protocol": zod.literal("L402"),
+  "settlementAsset": zod.literal("btc-lightning"),
+  "requestHeader": zod.literal("X-L402-Batch-Size"),
+  "supportedBatchSizes": zod.array(zod.literal(100)).min(1).max(quoteMcpToolCostsResponseBatchSettlementSupportedBatchSizesMax),
+  "exampleHeaderValue": zod.literal("100"),
+  "maxCalls": zod.literal(100),
+  "priceMultiplier": zod.literal(100),
+  "credentialScope": zod.literal("exact MCP tool path"),
+  "invoiceGeneratedByDiscovery": zod.literal(false),
+  "instructions": zod.string()
+}).describe('Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.'),
   "protocol": zod.literal("L402"),
   "currency": zod.literal("sats"),
   "perToolSats": zod.record(zod.string(), zod.number().int().min(quoteMcpToolCostsResponsePerToolSatsMinOne)),
@@ -1000,6 +1014,8 @@ export const GetStratigraphyCostHeader = zod.object({
   "Accept-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Alias for X-Settlement-Asset.')
 })
 
+export const getStratigraphyCostResponseBatchSettlementSupportedBatchSizesMax = 1;
+
 
 export const getStratigraphyCostResponseAccessTiersMin = 2;
 export const getStratigraphyCostResponseAccessTiersMax = 2;
@@ -1028,6 +1044,18 @@ export const getStratigraphyCostResponseProofAttestationsToolExampleResultTotalM
 
 
 export const GetStratigraphyCostResponse = zod.object({
+  "batchSettlement": zod.object({
+  "protocol": zod.literal("L402"),
+  "settlementAsset": zod.literal("btc-lightning"),
+  "requestHeader": zod.literal("X-L402-Batch-Size"),
+  "supportedBatchSizes": zod.array(zod.literal(100)).min(1).max(getStratigraphyCostResponseBatchSettlementSupportedBatchSizesMax),
+  "exampleHeaderValue": zod.literal("100"),
+  "maxCalls": zod.literal(100),
+  "priceMultiplier": zod.literal(100),
+  "credentialScope": zod.literal("exact MCP tool path"),
+  "invoiceGeneratedByDiscovery": zod.literal(false),
+  "instructions": zod.string()
+}).optional().describe('Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.'),
   "protocol": zod.literal("L402"),
   "settlement_asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']),
   "supported_assets": zod.array(zod.enum(['btc-lightning', 'l-btc', 'taproot-assets'])).min(1),

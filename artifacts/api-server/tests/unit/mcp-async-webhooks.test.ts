@@ -570,7 +570,13 @@ test(
     assert.equal(sync.response.status, 200, JSON.stringify(sync.body));
     assert.equal(sync.body?.id, 42);
     assert.ok(sync.body?.result?.structuredContent);
-    assert.deepEqual(payload.result, sync.body?.result);
+    assert.ok(sync.body?.result?._meta?.responseSignature);
+    assert.equal(payload.result?._meta?.responseSignature, undefined);
+    // Only synchronous replies get the new envelope; compare all other bytes.
+    const syncPayload = structuredClone(sync.body!.result!);
+    delete syncPayload._meta.responseSignature;
+    if (Object.keys(syncPayload._meta).length === 0) delete syncPayload._meta;
+    assert.deepEqual(payload.result, syncPayload);
     await runner.drain();
     assert.equal(deliveries.length, 1);
 

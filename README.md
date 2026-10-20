@@ -386,6 +386,40 @@ Most paid MCP calls currently cost **250 sats** without valid credentials.
 Check `payment.get_info` and the actual challenge for current terms; do not
 assume a static per-call price applies to every payment policy or asset.
 
+## Signed synchronous MCP responses and prepaid batch discovery
+
+Successful synchronous `tools/call` results include `_meta.responseSignature`
+using the same persistent Ed25519 identity published at
+`/.well-known/integrity.json`. Existing `content`, `structuredContent`, and other
+metadata remain intact, including stateless server-info metadata. Payment errors,
+JSON-RPC errors, discovery results, and asynchronous HTTP 202 acknowledgements do
+not receive this envelope; callbacks retain their separate signed-webhook format.
+
+The server signs UTF-8 `tool_name.timestamp.contentSha256`, where `tool_name` is
+the exact requested tool name (including any supported alias), `timestamp` is
+integer Unix seconds, and `contentSha256` hashes the deterministic JSON object
+containing `content` and, when present, `structuredContent`. Object keys are
+recursively sorted; arrays and text bytes keep their order. Verify both payload
+representations, not just whichever one your client displays.
+
+The exported `verifyToolResponse` helper in
+`artifacts/api-server/src/lib/mcp-response-signature.ts` checks the signature,
+trusted-key fingerprint, exact tool name, digest and a default five-minute clock
+tolerance. Independently pin `server_public_key` before verification. Signatures
+establish origin and content integrity, not factual correctness or request-level
+replay protection. See [canonicalization and verification](docs/tool-integrity.md#signed-synchronous-tool-responses).
+
+`GET /api/v1/cost`, `POST /api/v1/cost` quotes and the native
+`stratigraphy://catalog/overview` resource expose a `batchSettlement` block.
+The currently supported pass size is **100 calls**, not an arbitrary 10–1000
+range. Include `X-L402-Batch-Size: 100` on the initial paid `tools/call` challenge,
+settle its single upfront Lightning invoice, then reuse its invoice-bound
+macro-macaroon/preimage for up to 100 calls to that same tool. The price is 100
+times the per-call price. Payment-proof caching avoids repeated Lightning
+settlement latency; expiry, revocation, attenuation and inherited request quotas
+are still enforced on every call. This is not a cross-tool aggregate invoice,
+does not enable x402 batching, and discovery itself never creates an invoice.
+
 ## Native MCP Resources & Prompts
 
 The endpoint exposes **3 public Resources and 3 public Prompts alongside the

@@ -1,3 +1,5 @@
+import { batchSettlement } from "./batch-settlement";
+
 /** Shared by actual MCP payment gates, payment discovery, and HTTP cost quotes. */
 export const mcpToolPrices = Object.freeze({
   "stratigraphy.get": 250,
@@ -91,6 +93,7 @@ export function quoteMcpTools(tools: string[]) {
   });
   return {
     protocol: "L402" as const,
+    batchSettlement,
     currency: "sats" as const,
     perToolSats: Object.fromEntries(
       items.map((item) => [item.tool, item.price_sats]),

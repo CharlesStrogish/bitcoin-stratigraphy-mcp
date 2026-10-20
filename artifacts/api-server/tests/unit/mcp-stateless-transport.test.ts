@@ -19,6 +19,7 @@ import {
   registerMcpRoute,
 } from "../../src/routes/mcp";
 import { registerToolIntegrityRoute } from "../../src/routes/tool-integrity";
+import { verifyToolResponse } from "../../src/lib/mcp-response-signature";
 import { generateKeyPairSync, createPublicKey, verify } from "node:crypto";
 import type { SettlementRouter } from "../../src/services/settlement";
 
@@ -602,6 +603,49 @@ test("Mcp-Name header values decode the base64 sentinel strictly", () => {
 });
 
 for (const version of [MODERN, LEGACY]) {
+  test(`${version}: free and paid synchronous results verify against the published integrity key`, async () => {
+    const request = async (name: string, authorization?: string) => {
+      const message = version === MODERN
+        ? stateless("tools/call", { name, arguments: name === "stratigraphy.get" ? { days: 1 } : {} })
+        : { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: name === "stratigraphy.get" ? { days: 1 } : {} } };
+      return post(message, {
+        ...(version === MODERN ? statelessHeaders(message) : legacyHeaders),
+        ...(authorization ? { Authorization: authorization } : {}),
+      });
+    };
+    const manifest = await (await fetch(`${baseUrl}/.well-known/integrity.json`)).json();
+    const key = createPublicKey(manifest.server_public_key);
+    const assertSigned = (name: string, body: RpcBody | undefined) => {
+      assert.ok(body?.result);
+      const result = body.result as any;
+      assert.equal(result._meta.responseSignature.keyId, manifest.key_id);
+      assert.equal(result._meta.responseSignature.algorithm, "Ed25519");
+      assert.ok(verifyToolResponse(name, result, key));
+      const tampered = structuredClone(result);
+      tampered.content[0].text += "!";
+      assert.equal(verifyToolResponse(name, tampered, key), false);
+      if (version === MODERN) {
+        assert.equal(result.resultType, "complete");
+        assert.equal(result._meta["io.modelcontextprotocol/serverInfo"].name, "bitcoin-stratigraphy");
+      }
+    };
+    for (const name of ["stratigraphy.list", "proof.list", "stratigraphy.latest"]) {
+      const response = await request(name);
+      assert.equal(response.response.status, 200);
+      assertSigned(name, response.body);
+    }
+    const challenge = await request("stratigraphy.get");
+    assert.equal(challenge.response.status, 402);
+    assert.equal(challenge.body?.result, undefined, "payment errors are not signed tool results");
+    const data = version === MODERN ? challenge.body!.error!.data! : challenge.body!;
+    const payment = invoices.get(data.payment_hash as string)!;
+    const paid = await request("stratigraphy.get", `L402 ${data.macaroon}:${payment.preimage}`);
+    assert.equal(paid.response.status, 200);
+    assertSigned("stratigraphy.get", paid.body);
+    const unknown = await request("unknown.tool");
+    assert.equal(unknown.body?.result, undefined);
+    assert.ok(unknown.body?.error);
+  });
   test(`${version}: native resources and prompts are public, complete and validated`, async () => {
     const invoiceCount = invoices.size;
     const request = async (
@@ -643,6 +687,9 @@ for (const version of [MODERN, LEGACY]) {
       const payload = JSON.parse(content.text);
       if (resource.uri.endsWith("/overview")) {
         assert.equal(payload.toolCount, 16);
+        assert.equal(payload.batchSettlement.requestHeader, "X-L402-Batch-Size");
+        assert.deepEqual(payload.batchSettlement.supportedBatchSizes, [100]);
+        assert.equal(payload.batchSettlement.invoiceGeneratedByDiscovery, false);
         assert.equal(Object.keys(payload.namespaces).length, 5);
         assert.equal(Object.values(payload.namespaces).flat().length, 16);
         assert.ok(payload.dataset);

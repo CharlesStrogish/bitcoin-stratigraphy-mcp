@@ -2604,11 +2604,33 @@ components:
           anyOf:
             - $ref: "#/components/schemas/McpInvoiceGeneration"
             - type: "null"
+    BatchSettlementDiscovery:
+      type: object
+      additionalProperties: false
+      description: Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.
+      required: [protocol, settlementAsset, requestHeader, supportedBatchSizes, exampleHeaderValue, maxCalls, priceMultiplier, credentialScope, invoiceGeneratedByDiscovery, instructions]
+      properties:
+        protocol: { type: string, const: L402 }
+        settlementAsset: { type: string, const: btc-lightning }
+        requestHeader: { type: string, const: X-L402-Batch-Size }
+        supportedBatchSizes:
+          type: array
+          items: { type: integer, const: 100 }
+          minItems: 1
+          maxItems: 1
+        exampleHeaderValue: { type: string, const: "100" }
+        maxCalls: { type: integer, const: 100 }
+        priceMultiplier: { type: integer, const: 100 }
+        credentialScope: { type: string, const: exact MCP tool path }
+        invoiceGeneratedByDiscovery: { type: boolean, const: false }
+        instructions: { type: string }
     McpBatchCostQuote:
       type: object
       additionalProperties: false
-      required: [protocol, currency, perToolSats, items, total_sats, l402]
+      required: [protocol, currency, perToolSats, items, total_sats, l402, batchSettlement]
       properties:
+        batchSettlement:
+          $ref: "#/components/schemas/BatchSettlementDiscovery"
         protocol:
           type: string
           const: L402
@@ -3517,6 +3539,8 @@ components:
     StratigraphyCost:
       type: object
       properties:
+        batchSettlement:
+          $ref: "#/components/schemas/BatchSettlementDiscovery"
         protocol:
           type: string
           const: L402

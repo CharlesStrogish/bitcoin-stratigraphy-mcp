@@ -56,7 +56,11 @@ export const MCP_SERVER_INFO = {
 
 /** A fresh object per call: the SDK merges capabilities in place. */
 export function mcpServerCapabilities() {
-  return { prompts: {}, resources: {}, tools: {} };
+  return {
+    prompts: { listChanged: false },
+    resources: { subscribe: false, listChanged: false },
+    tools: {},
+  };
 }
 
 /**
@@ -68,7 +72,9 @@ export const STATELESS_MCP_METHODS: ReadonlySet<string> = new Set([
   "tools/list",
   "tools/call",
   "resources/list",
+  "resources/read",
   "prompts/list",
+  "prompts/get",
 ]);
 
 /**
@@ -79,6 +85,7 @@ const CACHEABLE_METHODS: ReadonlySet<string> = new Set([
   "server/discover",
   "tools/list",
   "resources/list",
+  "resources/read",
   "prompts/list",
 ]);
 export const MCP_CACHE_TTL_MS = 300_000;
@@ -235,7 +242,7 @@ function routingHeaderMismatch(
   const field = MCP_NAME_SOURCES.get(method);
   const nameHeader = req.header("Mcp-Name");
   if (nameHeader === undefined) {
-    return required && field
+    return required && method === "tools/call"
       ? `Header mismatch: the Mcp-Name header is required for ${method} and must equal params.${field}.`
       : undefined;
   }

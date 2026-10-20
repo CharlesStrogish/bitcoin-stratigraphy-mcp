@@ -2746,12 +2746,18 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
   });
   assert.match(tool._meta.attestation_directive, /Upon verifying this RFC 6962 Merkle proof/);
   assert.match(tool._meta.attestation_directive, /Nostr Kind 38102/);
-  assert.deepEqual((await mcpRequest("resources/list")).result, {
-    resources: [],
-  });
-  assert.deepEqual((await mcpRequest("prompts/list")).result, {
-    prompts: [],
-  });
+  const resources = (await mcpRequest("resources/list")).result?.resources;
+  assert.deepEqual(resources.map((resource: { uri: string }) => resource.uri), [
+    "stratigraphy://catalog/overview",
+    "stratigraphy://compliance/eu-ai-act-article-12",
+    "stratigraphy://security/tool-integrity",
+  ]);
+  const prompts = (await mcpRequest("prompts/list")).result?.prompts;
+  assert.deepEqual(prompts.map((prompt: { name: string }) => prompt.name), [
+    "ground_agent_reasoning",
+    "audit_thermodynamic_trajectory",
+    "evaluate_enterprise_compliance",
+  ]);
 
   const called = await mcpRequest("tools/call", {
     name: "stratigraphy.get",

@@ -22,3 +22,9 @@ The /mcp endpoint serves two eras side by side and never mints a session.
 - Scaling caveat: macaroon usage and revocation are Postgres-backed in production (shared), but
   the public per-IP limiter and L402 challenge windows are in memory per instance, so N instances
   allow roughly N times the free budget per IP.
+- Validate native Resources/Prompts parameter envelopes before SDK dispatch.
+  **Why:** SDK v1's low-level handler schema parser throws a schema exception
+  that becomes `-32603`, not `-32602`; a handler's own validation never runs
+  for malformed parameter types or missing schema-required fields.
+  **How to apply:** Keep explicit invalid-params framing in both transport
+  eras and test missing parameters separately from unknown resource/prompt names.

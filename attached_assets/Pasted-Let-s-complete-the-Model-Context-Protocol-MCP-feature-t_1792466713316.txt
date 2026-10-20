@@ -1,0 +1,32 @@
+Let's complete the Model Context Protocol (MCP) feature triad by implementing native MCP `Resources` (`resources/list`, `resources/read`) and `Prompts` (`prompts/list`, `prompts/get`) across both our stateless 2026-07-28 transport bridge and legacy 2025-11-25 handler.
+
+1. Advertise Capabilities & Header Routing:
+   - In `server/discover` (2026-07-28) and `initialize` (2025-11-25), advertise `resources: { subscribe: false, listChanged: false }` and `prompts: { listChanged: false }` alongside our existing `tools` capability.
+   - Ensure our stateless `2026-07-28` header validation (`Mcp-Method` and `Mcp-Name`) properly allows `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` as free, public discovery calls (no L402 payment required). For `prompts/get`, validate `Mcp-Name` if provided by the client.
+   - Include `ttlMs: 300000` and `cacheScope: "public"` where appropriate on 2026-07-28 list/read responses.
+
+2. Implement 3 Native MCP Resources (`resources/list` and `resources/read`):
+   - `stratigraphy://catalog/overview` (name: "Bitcoin Stratigraphy Catalog & L402 Overview", mimeType: "application/json"): Returns a JSON summary of the indexed dataset boundaries, the 16 canonical MCP tools grouped by namespace, and instructions for L402 Lightning settlement and NIP-98 authentication.
+   - `stratigraphy://compliance/eu-ai-act-article-12` (name: "EU AI Act Article 12 & Enterprise Licensing Matrix", mimeType: "application/json"): Returns a structured JSON compliance specification detailing how RFC 6962 Merkle receipts, NIP-98 cryptographic agent identity binding, and L402 macaroon attenuation satisfy EU AI Act Article 12 & 26(6) logging requirements, plus details on the $250k/yr Commercial Enterprise Exemption (`licensing@bitcoinstratigraphy.com`).
+   - `stratigraphy://security/tool-integrity` (name: "Ed25519 Signed Tool Integrity Manifest", mimeType: "application/json"): Returns the live payload from our `/.well-known/integrity.json` generator so MCP clients can verify all 16 tool description hashes natively via `resources/read`.
+   - Return standard JSON-RPC `-32602` error if an unknown resource URI is requested.
+
+3. Implement 3 Native MCP Prompts (`prompts/list` and `prompts/get`):
+   - `ground_agent_reasoning`:
+     * description: "Anchor an AI agent claim in immutable Bitcoin consensus state and thermodynamic proof-of-work to eliminate hallucinations."
+     * arguments: `claim` (required: true, description: "The factual or temporal claim to ground"), `targetHeightOrDate` (required: false, description: "Optional block height or YYYY-MM-DD UTC date; defaults to latest").
+     * messages: Returns a structured user prompt instructing the LLM to invoke `proof.ground` and `stratigraphy.get` (handling the HTTP 402 L402 challenge if needed) to deterministically verify the claim against Bitcoin state.
+   - `audit_thermodynamic_trajectory`:
+     * description: "Execute a token-efficient, end-to-end thermodynamic divergence audit between two block heights or UTC dates."
+     * arguments: `fromTarget` (required: true, description: "Baseline block height or UTC date"), `toTarget` (required: true, description: "Comparison block height, UTC date, or 'latest'").
+     * messages: Returns a structured user prompt instructing the LLM to call the composite tool `workflow.audit_trajectory` with `fromTarget` and `toTarget`, and then verify the returned receipt with `proof.verify`.
+   - `evaluate_enterprise_compliance`:
+     * description: "Generate an EU AI Act Article 12 compliance and least-privilege deployment plan for enterprise AI swarms."
+     * arguments: `organizationName` (required: false, description: "Enterprise organization name"), `swarmSize` (required: false, description: "Estimated number of autonomous agents").
+     * messages: Returns a prompt containing an embedded resource reference to `stratigraphy://compliance/eu-ai-act-article-12` and instructs the assistant to outline an air-gapped VPC rollout using NIP-98 identity binding, `proof.attenuate` circuit breakers, and commercial licensing via `licensing@bitcoinstratigraphy.com`.
+   - Return standard JSON-RPC `-32602` error for unknown prompt names or missing required arguments.
+
+4. Tests & Documentation:
+   - Add unit/integration tests verifying `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` across both 2026-07-28 and 2025-11-25 formats, plus `-32602` validation on invalid URIs/arguments.
+   - Update `README.md`, `llms-full.txt`, and discovery manifests to mention the 3 MCP Resources and 3 MCP Prompts alongside our 16 canonical tools.
+   - Run typecheck, build, and the full test suite, and commit cleanly so I can republish.

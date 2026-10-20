@@ -386,6 +386,81 @@ Most paid MCP calls currently cost **250 sats** without valid credentials.
 Check `payment.get_info` and the actual challenge for current terms; do not
 assume a static per-call price applies to every payment policy or asset.
 
+## Native MCP Resources & Prompts
+
+The endpoint exposes **3 public Resources and 3 public Prompts alongside the
+16 canonical tools**, on both stateless `2026-07-28` and legacy `2025-11-25`
+transports. Discovery and prompt retrieval require no L402 payment; executing
+paid tools recommended by a prompt still requires settlement.
+
+### Resources
+
+Call `resources/list` for the catalog, then `resources/read` with a `uri`:
+
+- **`stratigraphy://catalog/overview`** — Bitcoin Stratigraphy Catalog & L402
+  Overview: indexed dataset boundaries, all 16 tools grouped by namespace,
+  and L402 Lightning settlement and NIP-98 authentication instructions.
+- **`stratigraphy://compliance/eu-ai-act-article-12`** — EU AI Act Article 12 &
+  Enterprise Licensing Matrix: structured logging-control mappings for RFC 6962
+  receipts, authenticated agent identity, macaroon attenuation, and Article
+  26(6) retention, plus the **$250k/year Commercial Enterprise Exemption** at
+  **licensing@bitcoinstratigraphy.com**.
+- **`stratigraphy://security/tool-integrity`** — Ed25519 Signed Tool Integrity
+  Manifest: the identical startup payload served at
+  `/.well-known/integrity.json`, including all 16 description hashes and
+  signatures. Verify with an independently trusted public-key pin.
+
+All three use `application/json`; parse `contents[0].text` as JSON. Unknown
+URIs return JSON-RPC `-32602`. Resource contents provide context and evidence,
+not automatic legal certification or proof of arbitrary factual claims.
+
+### Prompts
+
+Call `prompts/list`, then `prompts/get` with a `name` and optional `arguments`
+object. All argument values are strings.
+
+- **`ground_agent_reasoning`** — required `claim`; optional
+  `targetHeightOrDate` (defaults to `latest`). Guides `stratigraphy.get` and
+  `proof.ground`, including budget-approved L402 settlement and explicit
+  limits on what context anchoring can establish.
+- **`audit_thermodynamic_trajectory`** — required `fromTarget` and `toTarget`.
+  Guides a composite `workflow.audit_trajectory` call and `proof.verify`
+  verification of available referenced OTS receipts; never invents proof
+  coverage for live boundaries.
+- **`evaluate_enterprise_compliance`** — optional `organizationName` and
+  `swarmSize`. Embeds the compliance resource and guides a private VPC/air-gap
+  assessment, NIP-98 identity binding, `proof.attenuate` circuit breakers,
+  retention controls, and commercial licensing.
+
+Unknown names, missing required arguments, and invalid argument types or
+values return JSON-RPC `-32602`.
+
+For stateless requests, include the usual protocol `_meta`,
+`MCP-Protocol-Version: 2026-07-28`, and the matching `Mcp-Method`.
+`Mcp-Name` is optional for `prompts/get` and `resources/read`; when provided,
+it must match `params.name` or `params.uri`, respectively. Example body:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "resources/read",
+  "params": {
+    "uri": "stratigraphy://security/tool-integrity",
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {}
+    }
+  }
+}
+```
+
+Stateless `resources/list`, `resources/read`, and `prompts/list` results include
+`ttlMs: 300000` and `cacheScope: "public"`. Argument-specific `prompts/get`
+results are not advertised as publicly cacheable. Legacy clients use their
+normal initialize handshake and omit the stateless `_meta` fields. Neither
+subscriptions nor list-change notifications are advertised.
+
 ## Public Auto-Discovery
 
 - **Manifest:** `GET /.well-known/mcp.json`

@@ -14,6 +14,8 @@ export function registerToolIntegrityRoute(
   privateKey = loadToolIntegrityKey(),
 ) {
   const manifest = createToolIntegrityManifest(tools, privateKey);
+  // Native resources/read and HTTP expose the identical startup snapshot.
+  app.locals.toolIntegrityManifest = manifest;
   app.get("/.well-known/integrity.json", (_req, res) => {
     res.set("Cache-Control", "no-store");
     res.status(200).json(manifest);

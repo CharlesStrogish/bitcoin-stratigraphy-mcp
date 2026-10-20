@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import { mcpToolDefinitions } from "../routes/mcp";
 import { mcpToolPrices } from "./mcp-pricing";
+import { MCP_NATIVE_PROMPTS, MCP_NATIVE_RESOURCES } from "./mcp-native-discovery";
 import {
   MCP_SUPPORTED_PROTOCOL_VERSIONS,
   STATELESS_MCP_PROTOCOL_VERSION,
@@ -97,15 +98,18 @@ export const mcpDiscoveryManifest = {
       },
     ],
     capabilities: {
+      // Keep the published HTTP schema's boolean flags; descriptors live below.
+      resources: true,
+      prompts: true,
       tools: {
         count: 16,
         namespaces: ["stratigraphy", "proof", "mesh", "payment", "workflow"],
       },
-      prompts: true,
-      resources: true,
     },
   },
   tools: toolDescriptors,
+  resources: MCP_NATIVE_RESOURCES,
+  prompts: MCP_NATIVE_PROMPTS,
   l402: {
     settlement_capabilities: L402_SETTLEMENT_PATHS.map((path) => path.id),
     settlement_paths: L402_SETTLEMENT_PATHS,

@@ -15,8 +15,11 @@ import {
 } from "../../src/lib/mcp-stateless";
 import {
   indexedContractTestFixture,
+  mcpToolDefinitions,
   registerMcpRoute,
 } from "../../src/routes/mcp";
+import { registerToolIntegrityRoute } from "../../src/routes/tool-integrity";
+import { generateKeyPairSync, createPublicKey, verify } from "node:crypto";
 import type { SettlementRouter } from "../../src/services/settlement";
 
 const MODERN = "2026-07-28";
@@ -100,6 +103,7 @@ before(async () => {
       source: "stateless-test",
     }),
   });
+  registerToolIntegrityRoute(app, mcpToolDefinitions, generateKeyPairSync("ed25519").privateKey);
   server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", resolve));
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -222,8 +226,8 @@ test("server/discover answers without a handshake or session", async () => {
   assert.equal(result.supportedVersions[0], MODERN);
   assert.ok(result.supportedVersions.includes(LEGACY));
   assert.deepEqual(result.capabilities, {
-    prompts: {},
-    resources: {},
+    prompts: { listChanged: false },
+    resources: { subscribe: false, listChanged: false },
     tools: {},
   });
   assert.equal(typeof result.instructions, "string");
@@ -384,14 +388,14 @@ test("handshake methods are gone under 2026-07-28 with upgrade guidance", async 
   assert.match(error.message, /server\/discover/);
   assert.match(error.message, /2025-11-25/);
 
-  for (const method of ["ping", "resources/read", "no/such/method"]) {
+  for (const method of ["ping", "no/such/method"]) {
     const message = stateless(
       method,
-      method === "resources/read" ? { uri: "stratigraphy://none" } : {},
+      {},
     );
     const headers = statelessHeaders(
       message,
-      method === "resources/read" ? { "Mcp-Name": "stratigraphy://none" } : {},
+      {},
     );
     const { response, body } = await post(message, headers);
     assert.equal(response.status, 404, method);
@@ -526,6 +530,10 @@ test("handshake-era clients keep initialize and legacy payment framing", async (
   assert.equal(init.response.status, 200);
   assert.equal(init.response.headers.get("mcp-session-id"), null);
   assert.equal(init.body?.result?.protocolVersion, LEGACY);
+  assert.deepEqual(init.body?.result?.capabilities?.resources, {
+    subscribe: false, listChanged: false,
+  });
+  assert.deepEqual(init.body?.result?.capabilities?.prompts, { listChanged: false });
   assert.equal(init.body?.result?.serverInfo?.name, "bitcoin-stratigraphy");
 
   const list = await post(
@@ -592,3 +600,131 @@ test("Mcp-Name header values decode the base64 sentinel strictly", () => {
   assert.equal(decodeMcpHeaderValue("tools\u0000call", false), null);
   assert.equal(decodeMcpHeaderValue("plain.name", true), "plain.name");
 });
+
+for (const version of [MODERN, LEGACY]) {
+  test(`${version}: native resources and prompts are public, complete and validated`, async () => {
+    const invoiceCount = invoices.size;
+    const request = async (
+      method: string,
+      params: Record<string, unknown> = {},
+      overrides: Record<string, string | undefined> = {},
+    ) => {
+      const message = version === MODERN
+        ? stateless(method, params)
+        : { jsonrpc: "2.0", id: 1, method, params };
+      const headers: Record<string, string> = version === MODERN
+        ? statelessHeaders(message, overrides)
+        : { ...legacyHeaders, ...overrides } as Record<string, string>;
+      return post(message, headers);
+    };
+    const list = await request("resources/list");
+    assert.equal(list.response.status, 200);
+    assert.equal(list.body?.error, undefined);
+    const resources = list.body!.result!.resources;
+    assert.equal(resources.length, 3);
+    assert.deepEqual(resources.map((r: { uri: string }) => r.uri), [
+      "stratigraphy://catalog/overview",
+      "stratigraphy://compliance/eu-ai-act-article-12",
+      "stratigraphy://security/tool-integrity",
+    ]);
+    if (version === MODERN) {
+      assert.equal(list.body!.result!.ttlMs, 300000);
+      assert.equal(list.body!.result!.cacheScope, "public");
+    } else {
+      assert.equal(list.body!.result!.ttlMs, undefined);
+    }
+    for (const resource of resources) {
+      const { response, body } = await request("resources/read", { uri: resource.uri });
+      assert.equal(response.status, 200);
+      assert.equal(body?.error, undefined, JSON.stringify(body));
+      const content = body!.result!.contents[0];
+      assert.equal(content.uri, resource.uri);
+      assert.equal(content.mimeType, "application/json");
+      const payload = JSON.parse(content.text);
+      if (resource.uri.endsWith("/overview")) {
+        assert.equal(payload.toolCount, 16);
+        assert.equal(Object.keys(payload.namespaces).length, 5);
+        assert.equal(Object.values(payload.namespaces).flat().length, 16);
+        assert.ok(payload.dataset);
+        assert.match(payload.l402.instructions, /402/);
+        assert.match(payload.nip98.instructions, /27235/);
+      } else if (resource.uri.includes("/compliance/")) {
+        assert.equal(payload.controlMapping.length, 3);
+        assert.equal(payload.licensing.annualPriceUsd, 250000);
+        assert.equal(payload.licensing.contact, "licensing@bitcoinstratigraphy.com");
+        assert.ok(payload.regulations.includes("EU AI Act Article 26(6)"));
+      } else {
+        const manifest = await (await fetch(`${baseUrl}/.well-known/integrity.json`)).json();
+        assert.deepEqual(payload, manifest);
+        assert.equal(payload.tools.length, 16);
+        for (const tool of mcpToolDefinitions) {
+          const signed = payload.tools.find((entry: { name: string }) => entry.name === tool.name);
+          const digest = createHash("sha256").update(tool.description, "utf8").digest();
+          assert.equal(signed.description_hash, digest.toString("hex"));
+          assert.ok(verify(null, digest, createPublicKey(payload.server_public_key), Buffer.from(signed.signature, "base64")));
+        }
+      }
+      assert.equal(body!.result!.ttlMs, version === MODERN ? 300000 : undefined);
+      assert.equal(body!.result!.cacheScope, version === MODERN ? "public" : undefined);
+    }
+    const promptList = await request("prompts/list");
+    assert.equal(promptList.response.status, 200);
+    const prompts = promptList.body!.result!.prompts;
+    assert.deepEqual(prompts.map((p: { name: string }) => p.name), [
+      "ground_agent_reasoning", "audit_thermodynamic_trajectory", "evaluate_enterprise_compliance",
+    ]);
+    assert.deepEqual(prompts[0].arguments.map((a: { required: boolean }) => a.required), [true, false]);
+    assert.deepEqual(prompts[1].arguments.map((a: { required: boolean }) => a.required), [true, true]);
+    assert.equal(promptList.body!.result!.ttlMs, version === MODERN ? 300000 : undefined);
+    const examples = [
+      ["ground_agent_reasoning", { claim: "A telemetry claim", targetHeightOrDate: "920000" }, /proof\.ground.*stratigraphy\.get|stratigraphy\.get.*proof\.ground/],
+      ["audit_thermodynamic_trajectory", { fromTarget: "2026-10-12", toTarget: "latest" }, /workflow\.audit_trajectory.*proof\.verify/s],
+      ["evaluate_enterprise_compliance", { organizationName: "Example Corp", swarmSize: "12" }, /NIP-98.*proof\.attenuate/s],
+    ] as const;
+    for (const [name, args, pattern] of examples) {
+      const { response, body } = await request("prompts/get", { name, arguments: args }, { "Mcp-Name": name });
+      assert.equal(response.status, 200);
+      assert.equal(body?.error, undefined, JSON.stringify(body));
+      const messages = body!.result!.messages;
+      assert.match(JSON.stringify(messages), pattern);
+      assert.equal(body!.result!.cacheScope, undefined, "argument-specific prompts are not publicly cached");
+      if (name === "evaluate_enterprise_compliance") {
+        assert.equal(messages[0].content.type, "resource");
+        assert.equal(messages[0].content.resource.uri, resources[1].uri);
+        assert.ok(JSON.parse(messages[0].content.resource.text).licensing);
+      }
+    }
+    const defaultGround = await request("prompts/get", { name: "ground_agent_reasoning", arguments: { claim: "Test claim" } });
+    assert.equal(defaultGround.body?.error, undefined);
+    assert.match(JSON.stringify(defaultGround.body?.result), /latest/);
+    const defaultPlan = await request("prompts/get", { name: "evaluate_enterprise_compliance" });
+    assert.equal(defaultPlan.body?.error, undefined);
+    const invalidCases: [string, Record<string, unknown>][] = [
+      ["resources/read", { uri: "stratigraphy://unknown" }],
+      ["resources/read", {}],
+      ["prompts/get", { name: "unknown" }],
+      ["prompts/get", { name: "ground_agent_reasoning" }],
+      ["prompts/get", { name: "ground_agent_reasoning", arguments: { claim: "  " } }],
+      ["prompts/get", { name: "ground_agent_reasoning", arguments: { claim: 12 } }],
+      ["prompts/get", { name: "audit_thermodynamic_trajectory", arguments: { fromTarget: "920000" } }],
+      ["prompts/get", { name: "audit_thermodynamic_trajectory", arguments: { fromTarget: "2026-02-30", toTarget: "latest" } }],
+      ["prompts/get", { name: "evaluate_enterprise_compliance", arguments: { swarmSize: "-1" } }],
+      ["prompts/get", { name: "evaluate_enterprise_compliance", arguments: { unexpected: "argument" } }],
+    ];
+    for (const [method, params] of invalidCases) {
+      const { body } = await request(method, params);
+      assert.equal(body?.error?.code, -32602, JSON.stringify({ method, params, body }));
+      assertStrictError(body, -32602);
+    }
+    for (const [method, params] of [
+      ["prompts/get", { name: "evaluate_enterprise_compliance" }],
+      ["resources/read", { uri: resources[0].uri }],
+    ] as const) {
+      const mismatch = await request(method, params, { "Mcp-Name": "wrong-name", "Mcp-Method": method });
+      assertStrictError(mismatch.body, MCP_HEADER_MISMATCH);
+    }
+    assert.equal(invoices.size, invoiceCount, "discovery must never issue invoices");
+    const tools = await request("tools/list");
+    assert.equal(tools.body?.result?.tools.length, 16, "native discovery does not add tools");
+  });
+}

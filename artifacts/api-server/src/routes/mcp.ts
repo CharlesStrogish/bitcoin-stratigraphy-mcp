@@ -32,12 +32,12 @@ import {
   MCP_INVOICE_EXPIRY_SECONDS,
 } from "../lib/mcp-pricing";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerNativeMcpDiscovery, validateNativeMcpRequest } from "../lib/mcp-native-discovery";
+import { createToolIntegrityManifest, loadToolIntegrityKey } from "../lib/tool-integrity";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
-  ListPromptsRequestSchema,
-  ListResourcesRequestSchema,
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -4710,6 +4710,7 @@ function createBitcoinStratigraphyMcpServer(
   notary: typeof notarizeHash = notarizeHash,
   primaryBackend: PrimaryStratigraphyBackend = createPrimaryStratigraphyBackend(),
   primaryResult?: PrimaryStratigraphyResult,
+  readIntegrity?: () => ReturnType<typeof createToolIntegrityManifest>,
 ) {
   const server = new McpServer(
     { ...MCP_SERVER_INFO, description: ENGINE_DESCRIPTION },
@@ -4719,12 +4720,14 @@ function createBitcoinStratigraphyMcpServer(
     },
   );
 
-  server.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-    resources: [],
-  }));
-  server.server.setRequestHandler(ListPromptsRequestSchema, async () => ({
-    prompts: [],
-  }));
+  registerNativeMcpDiscovery(server, {
+    tools: mcpToolDefinitions,
+    readCatalog: async () => (await primaryBackend("stratigraphy.list", {})).result,
+    readIntegrity: () => {
+      if (!readIntegrity) throw new McpError(ErrorCode.InternalError, "Tool integrity manifest unavailable");
+      return readIntegrity();
+    },
+  });
 
   server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: mcpToolDefinitions,
@@ -5216,6 +5219,7 @@ function mcpServerFactory(
     locals.notarizeHash as typeof notarizeHash | undefined,
     primaryBackend,
     locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined,
+    locals.readToolIntegrity as (() => ReturnType<typeof createToolIntegrityManifest>) | undefined,
   );
 }
 
@@ -5337,9 +5341,14 @@ export function registerMcpRoute(
   const primaryBackend = options.stratigraphyBackend ??
     createPrimaryStratigraphyBackend({ secret: options.sessionSecret });
   const asyncTasks = options.asyncTaskRunner ?? createMcpAsyncTaskRunner();
+  let fallbackIntegrity: ReturnType<typeof createToolIntegrityManifest> | undefined;
+  const readToolIntegrity = () =>
+    app.locals.toolIntegrityManifest ??
+    (fallbackIntegrity ??= createToolIntegrityManifest(mcpToolDefinitions, loadToolIntegrityKey()));
   app.use("/mcp", frameMcpErrors);
   app.use("/mcp", (_req, res, next) => {
     res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;
+    res.locals.readToolIntegrity = readToolIntegrity;
     next();
   });
   const limitPublic = createPublicRateLimitMiddleware(
@@ -5575,6 +5584,7 @@ export function registerMcpRoute(
     // Selects the protocol era and validates 2026-07-28 metadata and routing
     // headers before any payment, delegation or tool work.
     negotiateMcpProtocol,
+    validateNativeMcpRequest,
     async (req, res, next) => {
       // Previously-free operations must authorize before settlement/delegation
       // side effects. Invalid schemas still go to normal JSON-RPC validation.

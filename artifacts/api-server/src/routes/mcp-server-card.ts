@@ -7,6 +7,7 @@ import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
 import { RELEASE_VERSION, canonicalUrl } from "../lib/public-site";
 import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
 import { AUDIT_TRAJECTORY_DESCRIPTION } from "../lib/workflow-audit";
+import { MCP_NATIVE_PROMPTS, MCP_NATIVE_RESOURCES } from "../lib/mcp-native-discovery";
 
 export const MCP_RELEASE_VERSION = RELEASE_VERSION;
 export const MCP_RELEASE_DESCRIPTION =
@@ -22,6 +23,8 @@ const baseServerCard = {
     url: canonicalUrl("/mcp"),
   },
   capabilities: {
+    resources: MCP_NATIVE_RESOURCES,
+    prompts: MCP_NATIVE_PROMPTS,
     toolGroups: MCP_TOOL_GROUPS,
     tags: [
       "zero-knowledge-data-integrity",

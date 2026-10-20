@@ -38,6 +38,12 @@ licensed Python companion described in the package README.
 
 ## The 16 canonical MCP tools
 
+The same MCP endpoint also exposes 3 free Resources (catalog overview,
+Article 12 compliance/licensing, and tool integrity) and 3 free Prompts
+(claim grounding, trajectory audits, and enterprise deployment planning).
+Use resources/list, resources/read, prompts/list and prompts/get on either
+2026-07-28 or 2025-11-25. Paid tool execution remains L402-gated.
+
 - `workflow.audit_trajectory` (250 sats): one deterministic diff and compact
   SHA-256/OTS receipt-reference report for required `fromTarget` and `toTarget`.
   Accepts the same real-height/UTC-date selectors as get_diff. Live boundaries

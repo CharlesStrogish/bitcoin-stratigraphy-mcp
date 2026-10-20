@@ -30,7 +30,7 @@
 .cmp-cta:focus-visible, .cmp-mail:focus-visible { outline: 2px solid #e8b04a; outline-offset: 3px; }
 .cmp-mail { color: #e8b04a; text-underline-offset: 4px; }
 .cmp-page .cmp-nav .control-button { white-space: normal; }
-.cmp-page .cmp-mail { overflow-wrap: anywhere; }
+.cmp-page .cmp-mail { color: #e8b04a; text-decoration: underline; overflow-wrap: anywhere; }
 .cmp-page .ciso-actions { margin: 0 0 18px; }
 @media (prefers-reduced-motion: reduce) {
   .cmp-page .cmp-cta { transition: none; }

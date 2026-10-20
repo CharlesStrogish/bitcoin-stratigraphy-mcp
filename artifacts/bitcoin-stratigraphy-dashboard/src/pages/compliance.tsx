@@ -134,6 +134,9 @@ export default function CompliancePage() {
               <li>
                 <strong>RFC 6962 Merkle Evidence:</strong> Every agent thought, context window, and tool execution is hashed into an append-only Merkle tree. If a single comma in a historical agent log is altered, the cryptographic root hash fractures, immediately alerting auditors to tampering.
               </li>
+              <li>
+                <strong>NIP-98 Agent Identity Binding:</strong> Satisfies Article 12 chain-of-custody requirements by using Schnorr signatures to mathematically authenticate exactly which autonomous sub-agent executed a decision, anchoring their identity permanently into the Merkle receipt.
+              </li>
             </ul>
           </section>
 
@@ -168,11 +171,15 @@ export default function CompliancePage() {
               <li>Complete IP Protection: A full exemption from all AGPLv3 open-source requirements.</li>
               <li>Air-Gapped Deployment: The legal right to deploy the Notary Hub and Escrow Oracle entirely on-premises or within isolated internal networks.</li>
               <li>Zero-Telemetry Sovereign Guarantee: 100% offline, self-contained execution with zero vendor backdoors, network phone-home pings, or third-party dependencies.</li>
+              <li><strong>Cryptographic Tool Integrity:</strong> Defeats LLM tool-poisoning attacks by hashing and signing all MCP tool descriptions via an immutable Ed25519 public manifest.</li>
+              <li><strong>Stateless Horizontal Scaling:</strong> Upgraded to the stateless MCP 2026-07-28 transport, completely removing session bottlenecks for high-concurrency agent swarms.</li>
             </ul>
             <p>
+              Contact{" "}
               <a href={MAIL} className="cmp-mail" data-testid="link-contact-licensing">
-                [Contact licensing@bitcoinstratigraphy.com for Enterprise Licensing]
+                licensing@bitcoinstratigraphy.com
               </a>
+              {" "}for Enterprise Licensing
             </p>
             <CisoIntakeActions testIdPrefix="compliance" />
             <div className="cmp-actions">

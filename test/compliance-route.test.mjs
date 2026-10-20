@@ -76,10 +76,10 @@ test("compliance marketing copy preserves approved text with live escrow pricing
       blocks.push(text(node).replace(/\s+/gu, " ").trim());
     }
   });
-  assert.equal(blocks.length, 20);
+  assert.equal(blocks.length, 23);
   assert.equal(
     createHash("sha256").update(blocks.join("\n")).digest("hex"),
-    "614a1f548a808aa799c686e811d80fa9865f9cb8facbc172b0f0da03d177f382",
+    "3b0906dcaf6d28771ba3735c0938b2410a03c5b3d644b419b7ccb03fcc1d1474",
   );
 });
 
@@ -99,6 +99,11 @@ test("compliance CTA opens the homepage live escrow terminal and licensing conta
     (node) => node.props["data-testid"] === "link-contact-licensing",
   )?.props.href;
   assert.equal(href, cisoIntake.CISO_MAILTO_HREF);
+  const contact = links.find((node) => node.props["data-testid"] === "link-contact-licensing");
+  assert.equal(text(contact).trim(), "licensing@bitcoinstratigraphy.com");
+  assert.equal(contact.props.className, "cmp-mail");
+  assert.doesNotMatch(text(renderPage()), /\[Contact licensing@bitcoinstratigraphy\.com for Enterprise Licensing\]/);
+  assert.match(read("src/pages/compliance.css"), /\.cmp-page \.cmp-mail \{ color: #e8b04a;/);
   const mailto = new URL(href);
   assert.equal(mailto.pathname, "licensing@bitcoinstratigraphy.com");
   assert.equal(mailto.searchParams.get("subject"), cisoIntake.CISO_INTAKE_SUBJECT);
@@ -110,6 +115,16 @@ test("compliance CTA opens the homepage live escrow terminal and licensing conta
     intakeActions.map((node) => node.props.testIdPrefix),
     ["compliance"],
   );
+});
+
+test("compliance solution and enterprise exemption include the exact approved cryptographic upgrades", () => {
+  const sections = {};
+  walk(renderPage(), (node) => {
+    if (node.type === "section") sections[node.props.id] = text(node).replace(/\s+/gu, " ").trim();
+  });
+  assert.ok(sections.solution.includes("NIP-98 Agent Identity Binding: Satisfies Article 12 chain-of-custody requirements by using Schnorr signatures to mathematically authenticate exactly which autonomous sub-agent executed a decision, anchoring their identity permanently into the Merkle receipt."));
+  assert.ok(sections.licensing.includes("Cryptographic Tool Integrity: Defeats LLM tool-poisoning attacks by hashing and signing all MCP tool descriptions via an immutable Ed25519 public manifest."));
+  assert.ok(sections.licensing.includes("Stateless Horizontal Scaling: Upgraded to the stateless MCP 2026-07-28 transport, completely removing session bottlenecks for high-concurrency agent swarms."));
 });
 
 test("direct compliance HTML includes exact crawler metadata and author JSON-LD", () => {

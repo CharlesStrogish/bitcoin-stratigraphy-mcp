@@ -58,7 +58,7 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "gitFull", "libiconv", "libxcrypt", "openssl", "opentimestamps-client", "pkg-config", "rustc"]
+packages = ["cacert", "cargo", "freetype", "gitFull", "lcms2", "libiconv", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "openssl", "opentimestamps-client", "pkg-config", "rustc", "tcl", "tk", "zlib"]
 
 [[ports]]
 localPort = 5000

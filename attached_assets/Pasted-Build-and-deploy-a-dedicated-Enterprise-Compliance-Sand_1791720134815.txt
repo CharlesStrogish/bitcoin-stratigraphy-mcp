@@ -47,5 +47,5 @@ The Enterprise Exemption grants:
 - Ensure the new page has the following meta tags:
   - `<title>`: EU AI Act Article 12 Compliance Sandbox | Bitcoin Stratigraphy
   - `<meta name="description" content="Simulate autonomous L402 proof-of-execution and ensure your multi-agent swarms meet EU AI Act Article 12 compliance with RFC 6962 Merkle flight recorders.">`
-  - `<link rel="canonical" href="https://bitcoin-stratigraphy-dashboard.replit.app/compliance" />`
+  - `<link rel="canonical" href="https://bitcoinstratigraphy.com/compliance" />`
 - Add `@type: "TechArticle"` or `@type: "WebPage"` structured data (JSON-LD) to this route, clearly noting the author as Charles R. Strogish.

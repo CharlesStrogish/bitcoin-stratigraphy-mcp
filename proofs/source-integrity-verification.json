@@ -73,22 +73,22 @@
   "routes": {
     "/": {
       "http_status": 200,
-      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/",
+      "canonical": "https://bitcoinstratigraphy.com/",
       "structured_data_blocks": 2
     },
     "/compliance": {
       "http_status": 200,
-      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/compliance",
+      "canonical": "https://bitcoinstratigraphy.com/compliance",
       "structured_data_blocks": 3
     },
     "/simulator": {
       "http_status": 200,
-      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/simulator",
+      "canonical": "https://bitcoinstratigraphy.com/simulator",
       "structured_data_blocks": 2
     },
     "/docs": {
       "http_status": 200,
-      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/docs",
+      "canonical": "https://bitcoinstratigraphy.com/docs",
       "structured_data_blocks": 1
     },
     "/api/docs": {
@@ -96,17 +96,17 @@
     },
     "/standard": {
       "http_status": 200,
-      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/standard",
+      "canonical": "https://bitcoinstratigraphy.com/standard",
       "structured_data_blocks": 2
     },
     "/enterprise": {
       "http_status": 200,
-      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/enterprise",
+      "canonical": "https://bitcoinstratigraphy.com/enterprise",
       "structured_data_blocks": 2
     },
     "/whitepaper": {
       "http_status": 200,
-      "canonical": "https://bitcoin-stratigraphy-dashboard.replit.app/whitepaper",
+      "canonical": "https://bitcoinstratigraphy.com/whitepaper",
       "structured_data_blocks": 2
     },
     "/robots.txt": {

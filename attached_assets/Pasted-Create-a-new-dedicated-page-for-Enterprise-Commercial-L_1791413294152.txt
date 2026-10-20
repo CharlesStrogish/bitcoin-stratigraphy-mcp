@@ -16,5 +16,5 @@ Requirements for the page:
    - Settlement Model: Clearly state that enterprise pricing is customized based on swarm size and deployment needs, settled securely via a single Bitcoin transaction paid in full at the time of execution.
 5. Call to Action (CTA): 
    - A highly visible button stating "Contact Sales for Enterprise Sizing" that links to exactly: `mailto:licensing@bitcoinstratigraphy.com`.
-6. SEO/Sitemap: Update the `public/sitemap.xml` to include the new `https://bitcoin-stratigraphy-dashboard.replit.app/enterprise` route with a Priority of 0.9.
+6. SEO/Sitemap: Update the `public/sitemap.xml` to include the new `https://bitcoinstratigraphy.com/enterprise` route with a Priority of 0.9.
 7. Run a frontend build check to verify routing and responsiveness.

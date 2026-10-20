@@ -10,7 +10,7 @@ Please implement a comprehensive Agentic SEO (AIO) and web search optimization s
 2. Add JSON-LD Structured Data to index.html:
 - Inject server-rendered JSON-LD scripts into <head>:
   a) Type: "Dataset" (name: "Bitcoin Stratigraphy Dataset", author: "Charles R. Strogish", license: "Open/L402").
-  b) Type: "WebAPI" (name: "Thermodynamic Notary MCP Server", documentation: "https://bitcoin-stratigraphy-dashboard.replit.app").
+  b) Type: "WebAPI" (name: "Thermodynamic Notary MCP Server", documentation: "https://bitcoinstratigraphy.com").
   c) Type: "potentialAction" detailing the L402 payment action endpoint.
 
 3. Update HTML Meta Tags & Open Graph:

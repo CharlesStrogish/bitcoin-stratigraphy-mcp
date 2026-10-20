@@ -5,9 +5,9 @@ CRITICAL INVARIANT: Do NOT break or reset our PostgreSQL `escrow_ledger` table, 
 Please execute the following 6 architectural upgrades end-to-end, fix any code/type/lint issues found along the way, verify with full test suites, and commit cleanly:
 
 1. FULL DOMAIN CANONICALIZATION & SEO MIGRATION TO https://bitcoinstratigraphy.com
-- Audit the entire codebase (`index.html`, frontend SEO/head components, backend metadata routes, `robots.txt`, `sitemap.xml`, OpenAPI specs, READMEs, and `@bitcoin-stratigraphy/mcp-server` package defaults) for any hardcoded references to `bitcoin-stratigraphy-dashboard.replit.app`.
+- Audit the entire codebase (`index.html`, frontend SEO/head components, backend metadata routes, `robots.txt`, `sitemap.xml`, OpenAPI specs, READMEs, and `@bitcoin-stratigraphy/mcp-server` package defaults) for any hardcoded references to the former testing host.
 - Update all primary URLs, `<link rel="canonical">`, `og:url`, `og:image` (if absolute), `twitter:url`, OpenAPI `servers` entries, `sitemap.xml`, and `robots.txt` to use `https://bitcoinstratigraphy.com` as the authoritative canonical domain.
-- In `@bitcoin-stratigraphy/mcp-server`, update the default fallback API base URL to `https://bitcoinstratigraphy.com` (while still allowing env overrides and keeping `.replit.app` requests working smoothly on the backend so existing clients never break).
+- In `@bitcoin-stratigraphy/mcp-server`, update the default fallback API base URL to `https://bitcoinstratigraphy.com` (while still allowing env overrides and keeping legacy-host requests working smoothly on the backend so existing clients never break).
 - Inject comprehensive Schema.org JSON-LD (`SoftwareApplication` + `WebAPI`) in the document head identifying "Bitcoin Stratigraphy Data Engine", Creator & Principal Architect "Charles R. Strogish", canonical URL `https://bitcoinstratigraphy.com`, licensing contact `licensing@bitcoinstratigraphy.com`, the 15 MCP tools, L402 24-satoshi micropayment access, and the Commercial Enterprise License (Starting at $250k/Annual).
 
 2. AI-NATIVE SWARM & LLM DISCOVERY ENDPOINTS (`/llms.txt`, `/llms-full.txt`, `/.well-known/mcp.json`)

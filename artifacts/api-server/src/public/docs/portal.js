@@ -1,10 +1,7 @@
 (function () {
   "use strict";
-  // The canonical domain and the legacy .replit.app address serve one deployment.
-  var PROD = [
-    "https://bitcoinstratigraphy.com",
-    "https://bitcoin-stratigraphy-dashboard.replit.app",
-  ];
+  // Only the canonical domain is advertised as production.
+  var PROD = ["https://bitcoinstratigraphy.com"];
   var FREE = ["stratigraphy.list", "proof.list"];
   var NS_COLOR = {
     stratigraphy: "hsl(42 96% 57%)",

@@ -38,7 +38,7 @@
 - [Python test suites](python-test-suites.md) — pnpm test runs no Python; each suite needs its own import root, plus the coverage gate.
 - [Public llms.txt ownership](public-llms-ownership.md) — serve the frontend agent-discovery document publicly instead of the API's older guide.
 - [Static response headers](static-response-headers.md) — static deployments honor production responseHeaders; validator acceptance alone proves nothing.
-- [Published domain changes](published-domain-changes.md) — canonical host is bitcoinstratigraphy.com; keep serving legacy .replit.app unadvertised; verify the primary URL first.
+- [Published domain changes](published-domain-changes.md) — advertise only bitcoinstratigraphy.com; remove old testing-domain references repository-wide.
 - [Git subdirectory SDK installs](git-subdirectory-sdk-installs.md) — pnpm Git preparation needs an explicit workspace boundary and consumer build-script trust.
 - [Vendored archive integrity](vendored-archive-integrity.md) — a repacked local SDK archive can make unrelated frozen installs fail after lockfile regeneration.
 - [Nested Replit config validation](nested-replit-config-validation.md) — the validator replaces the workspace root .replit even when its temp file lives in a subdirectory.

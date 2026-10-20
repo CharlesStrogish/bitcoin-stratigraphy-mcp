@@ -1,8 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 /**
  * Canonical public identity for discovery documents and outbound defaults.
- * Request handling stays host-agnostic: legacy hostnames such as the former
- * .replit.app address keep serving existing clients unchanged.
+ * Request handling stays host-agnostic so existing clients remain compatible.
  */
 export const CANONICAL_ORIGIN = "https://bitcoinstratigraphy.com";
 export const RELEASE_VERSION = "2.1.3";

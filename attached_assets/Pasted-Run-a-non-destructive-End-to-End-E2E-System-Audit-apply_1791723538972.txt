@@ -17,15 +17,15 @@ Run a non-destructive End-to-End (E2E) System Audit, apply IP license protection
 
 ### 3. COMPREHENSIVE SEO & CANONICAL AUDIT
 - CANONICAL ANCHORING: Audit every public route (`/`, `/compliance`, `/simulator`, `/api/docs`), HTML template, and JSON-LD script. Ensure all canonical links, Open Graph tags, and structured data point exclusively to:
-  https://bitcoin-stratigraphy-dashboard.replit.app/
-- PURGE DEFUNCT REFERENCES: Perform a codebase search for any hardcoded occurrences of the legacy vanity slug (`dashboard--charlesstrogish`). If found in internal links, schemas, or docs, replace them with the production domain (`bitcoin-stratigraphy-dashboard.replit.app`).
+  https://bitcoinstratigraphy.com/
+- PURGE DEFUNCT REFERENCES: Perform a codebase search for any hardcoded occurrences of the legacy vanity slug (`dashboard--charlesstrogish`). If found in internal links, schemas, or docs, replace them with the production domain (`https://bitcoinstratigraphy.com`).
 - STRUCTURED DATA VALIDATION: Verify that every page exports valid Schema.org JSON-LD:
   - Homepage / Dashboard: `@type: "Dataset"` with `"name": "Bitcoin Stratigraphy Dataset"`, valid `"creator"` containing `@type: "Person"` with `"name": "Charles R. Strogish"`, and appropriate license URLs.
   - Escrow Terminal & Compliance Route: Ensure structured markup accurately reflects the Autonomous Proof-of-Execution Escrow Oracle (L402 + RFC 6962) authored by Charles R. Strogish.
 - Create a `glama.json` file in the root directory setting the publisher/author name explicitly to "Charles R. Strogish" to override the default namespace with this exact content:
   {
     "publisher": "Charles R. Strogish",
-    "website": "https://bitcoin-stratigraphy-dashboard.replit.app/"
+    "website": "https://bitcoinstratigraphy.com/"
   }
 - CRAWLER DIRECTIVES:
   - Check `robots.txt` to confirm all public routes are open for crawling, while internal temp files remain disallowed.

@@ -37,7 +37,8 @@
       "proxy-addr": "2.0.8",
       "qs": "6.16.0",
       "source-map-js": "1.2.2",
-      "underscore": "1.13.8"
+      "underscore": "1.13.8",
+      "follow-redirects@>=1.16.0 <1.16.1": "1.16.1"
     }
   },
   "dependencies": {

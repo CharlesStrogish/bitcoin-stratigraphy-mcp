@@ -18,14 +18,14 @@ Under Article 12 of the EU AI Act, organizations deploying high-risk autonomous 
 
 ## 2. The L402 + RFC 6962 Solution
 The Bitcoin Stratigraphy Data Engine solves the Article 12 mandate natively by replacing mutable databases with mathematically non-repudiable state-anchoring. We combine two protocols to create an enterprise-grade "Flight Recorder" for multi-agent swarms:
-- **L402 Micro-Settlements:** Autonomous agents do not wait for human procurement. They programmatically fund their own execution traces using 21-satoshi Lightning Network micro-settlements, bypassing API key bottlenecks and credit card walls.
+- **L402 Micro-Settlements:** Autonomous agents do not wait for human procurement. They programmatically fund their own execution traces using Lightning Network micro-settlements with a dynamic protocol toll (pegged to ~$0.02 USD in satoshis), bypassing API key bottlenecks and credit card walls.
 - **RFC 6962 Merkle Evidence:** Every agent thought, context window, and tool execution is hashed into an append-only Merkle tree. If a single comma in a historical agent log is altered, the cryptographic root hash fractures, immediately alerting auditors to tampering.
 
 ## 3. Sandbox Walkthrough: Simulating Agent Settlement
 To demonstrate this cryptographic custody chain without requiring an active Lightning Network wallet, use our Autonomous Escrow Simulator on the main dashboard. Follow these exact steps to view the compliance evidence your engineering team will receive in production:
 1. **Navigate to the Escrow Terminal:** Return to the main dashboard.
 2. **Execute the Simulation:** Click the yellow "Simulate Agent Settlement" button.
-3. **Analyze the Flow:** The UI visually guides you through the machine settlement: Agent A locks the bounty, Agent B submits the execution trace, and the Stratigraphy Hub validates the RFC 6962 Merkle leaf while collecting the 21-sat toll.
+3. **Analyze the Flow:** The UI visually guides you through the machine settlement: Agent A locks the bounty, Agent B submits the execution trace, and the Stratigraphy Hub validates the RFC 6962 Merkle leaf while collecting a dynamic protocol toll (pegged to ~$0.02 USD in satoshis).
 4. **Export the Evidence:** Click the "Copy Escrow Proof (JSON)" button. This JSON-LD payload is the exact, audit-ready structured data your risk team will hand to EU regulators.
 
 ## 4. Enterprise Air-Gapped Licensing

@@ -237,7 +237,7 @@ Machine-native conditional micro-settlement for autonomous agent-to-agent delega
 
 * **Phase 1: Bounty Lock:** The delegating agent (Agent A) locks a satoshi bounty (e.g., 1,000 sats) to an execution contract, such as model fine-tuning verification.
 * **Phase 2: Work Submission:** The worker agent (Agent B) completes the task and submits a deterministic execution trace along with the result hash.
-* **Phase 3: Settlement & Toll:** The Stratigraphy Hub validates the RFC 6962 Merkle leaf, releases the payment preimage to the worker agent, and automatically collects a 21-sat protocol toll.
+* **Phase 3: Settlement & Toll:** The Stratigraphy Hub validates the RFC 6962 Merkle leaf, releases the payment preimage to the worker agent, and automatically collects a dynamic protocol toll (pegged to ~$0.02 USD in satoshis).
 * **Enterprise Sandbox:** Includes a client simulation terminal allowing risk teams to copy the JSON escrow proof without requiring real payments or live Bitcoin anchors.
 
 ### Operational boundaries

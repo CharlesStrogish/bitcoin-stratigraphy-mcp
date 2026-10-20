@@ -10,7 +10,7 @@ Connect the Escrow Oracle settlement fee to the repository's existing dynamic pr
   - Enforce a strict minimum floor of 1 satoshi (`max(1, sats)`) so settlements never drop to zero.
   - Fail-safe Fallback: If the price feed or exchange rate oracle is unreachable or errors out, fall back gracefully to the deterministic default: 21 satoshis.
 - Update `create_l402_escrow(...)`:
-  - Replace the hardcoded 21-sat toll with `toll_fee_sats = get_dynamic_escrow_toll()`.
+  - Use a dynamic protocol toll (pegged to ~$0.02 USD in satoshis), calculated with `toll_fee_sats = get_dynamic_escrow_toll()`.
   - Persist this value into the existing `agent_escrow_contracts` table (schema already supports integer values; no table migrations needed).
 
 2. REST Endpoint & Response Sync (`routers/escrow_api.py` or equivalent file):

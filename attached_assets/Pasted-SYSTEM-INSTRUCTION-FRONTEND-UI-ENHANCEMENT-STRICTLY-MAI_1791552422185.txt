@@ -11,13 +11,13 @@ Implement an "Autonomous Agent Escrow Terminal" card directly below the existing
 - Build a responsive 3-step visual sequence:
   - Step 1 (Bounty Lock): "Agent A Locks 1,000 Sats (Contract: Model Fine-Tuning Verification)" -> Display simulated task hash and contract ID badge.
   - Step 2 (Work Submission): "Agent B Submits Deterministic Execution Trace + Result Hash" -> Display simulated SHA-256 trace digest.
-  - Step 3 (Settlement & Toll): "Stratigraphy Hub Validates RFC 6962 Leaf -> Releases Payment Preimage -> Collects 21 Sats Toll" -> Display green "SETTLED & NOTARIZED" badge.
+  - Step 3 (Settlement & Toll): "Stratigraphy Hub Validates RFC 6962 Leaf -> Releases Payment Preimage -> Collects a dynamic protocol toll (pegged to ~$0.02 USD in satoshis)" -> Display green "SETTLED & NOTARIZED" badge.
 - Action Trigger: "Simulate Agent Settlement" button (styled in copper/orange).
   - Clicking this triggers a smooth visual transition: animates the Merkle leaf generation, reveals the 64-char hex preimage, and renders an Article 12 compliance receipt preview.
 
 3. Telemetry Counter & Clipboard Utility:
 - Display a dedicated metric badge: "Automated Protocol Tolls Accrued: X sats".
-  - Initialize at current baseline and increment by +21 sats upon each successful client simulation click.
+  - Initialize at current baseline and increment by the evaluated dynamic protocol toll (pegged to ~$0.02 USD in satoshis) upon each successful client simulation click.
 - Add a "Copy Escrow Proof (JSON)" button:
   - Wire this to the existing zero-dependency clipboard helper to copy the sample JSON-LD Article 12 proof payload with a brief "Copied to Clipboard!" visual indicator.
 

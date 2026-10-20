@@ -55,7 +55,7 @@ hash without a funding-verification step. Committing submitted trace/result hash
 does not independently verify their truth. Article 12 logging requirements do not
 define a universal JSON receipt standard.
 
-**How to apply:** Describe the 21-sat toll as a ledger reservation until collection
+**How to apply:** Describe the dynamic protocol toll (pegged to ~$0.02 USD in satoshis) as a ledger reservation until collection
 is verified. Require trusted execution acceptance and funding checks before any
 public redemption integration. Never invent a strata height or call a local
 receipt Bitcoin inclusion. Permission-restricted SQLite is not air-gapped or

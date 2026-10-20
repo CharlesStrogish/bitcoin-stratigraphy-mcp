@@ -3,7 +3,7 @@ name: Escrow affordability
 description: Business reason for USD-normalized autonomous escrow tolls.
 ---
 
-Autonomous escrow settlement tolls should target a small USD-equivalent cost, rather than remain fixed in satoshis as Bitcoin appreciates.
+Autonomous escrow settlement tolls should target approximately $0.02 USD, rather than remain fixed in satoshis as Bitcoin appreciates. Documentation should describe a "dynamic protocol toll (pegged to ~$0.02 USD in satoshis)" rather than a fixed toll.
 
 **Why:** The user requires that agents not be priced out during rapid Bitcoin market appreciation.
 

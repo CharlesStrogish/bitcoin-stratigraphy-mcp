@@ -26,7 +26,7 @@ Implement the persistent database layer and cryptographic settlement engine for 
 - `create_l402_escrow(buyer_pubkey, worker_pubkey, task_hash, amount_sats)`:
   - Generates a cryptographically secure 32-byte random preimage: `secrets.token_hex(32)`.
   - Computes `payment_hash = hashlib.sha256(bytes.fromhex(preimage)).hexdigest()`.
-  - Persists contract state with status 'LOCKED' and reserves a 21-sat protocol toll. Returns `escrow_id` and `payment_hash`.
+  - Persists contract state with status 'LOCKED' and reserves a dynamic protocol toll (pegged to ~$0.02 USD in satoshis). Returns `escrow_id` and `payment_hash`.
 - `verify_execution_and_settle(escrow_id, execution_trace, result_payload)`:
   - Fetches the contract; strictly asserts `status == 'LOCKED'`.
   - Calculates trace hash: `H_trace = hashlib.sha256(execution_trace.encode('utf-8')).digest()`.

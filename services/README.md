@@ -44,8 +44,8 @@ properly backed-up custody volume and understand that durability tradeoff.
   **plaintext secrets**. Permissions are not encryption or an air gap. Deploy on
   an isolated encrypted custody volume; do not expose these modules to untrusted
   workers or add the database to source control.
-- Creation reserves a USD-normalized toll in the contract ledger, targeting
-  $0.02 using the existing mempool.space Bitcoin/USD price rail. The toll is
+- Creation reserves a dynamic protocol toll (pegged to ~$0.02 USD in satoshis)
+  in the contract ledger using the existing mempool.space Bitcoin/USD price rail. The toll is
   rounded to an integer with a 1-satoshi floor; failed or invalid rates select
   exactly 21 sats. `amount_sats` is worker consideration; total accounting
   reservation is `amount_sats + toll_fee_sats`. The issued toll is persisted

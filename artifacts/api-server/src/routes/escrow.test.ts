@@ -94,23 +94,37 @@ test("public toll preview needs no payment or operator token and exposes no escr
 });
 
 test("public cumulative ledger counter returns durable totals and never a zero fallback", async () => {
-  const base = await serve({ execute: async (operation) => {
-    assert.equal(operation, "stats");
-    return { status: 200, body: { verified_toll_sats: 48, settled_contracts: 2,
-      genesis_escrow_id: "ba4f25dd-7f16-420c-9264-a16f102fd5a6" } };
-  } });
+  const base = await serve({ readStats: async () => ({
+    ...recoveredLedger, total_settled_sats: 48, total_contracts: 2,
+    verified_toll_sats: 48, settled_contracts: 2,
+  }) });
   const response = await fetch(`${base}/stats`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.equal((await response.json() as Record<string, unknown>).verified_toll_sats, 48);
-  const offline = await serve({ execute: async () => { throw new Error("database unavailable"); } });
+  const stats = await response.json() as Record<string, unknown>;
+  assert.equal(stats.verified_toll_sats, 48);
+  assert.equal(stats.total_settled_sats, 48);
+  assert.equal(stats.total_contracts, 2);
+  assert.match(String(stats.latest_merkle_root), /^[a-f0-9]{64}$/);
+  const offline = await serve({ readStats: async () => { throw new Error("database unavailable"); } });
   const unavailable = await fetch(`${offline}/stats`);
   assert.equal(unavailable.status, 503);
   assert.equal(Object.hasOwn(await unavailable.json() as Record<string, unknown>, "verified_toll_sats"), false);
 });
 
 const recoveredLedger = { verified_toll_sats: 24, settled_contracts: 1,
+  total_settled_sats: 24, total_contracts: 1,
+  latest_merkle_root: "d8cd6fe5a388e9422ccc6006969fb01c716291c14b1e85dc4e8a75c2ad134da6",
   genesis_escrow_id: "ba4f25dd-7f16-420c-9264-a16f102fd5a6" };
+
+test("public stats accepts a truly empty ledger without authentication", async () => {
+  const empty = { total_settled_sats: 0, total_contracts: 0, latest_merkle_root: null,
+    verified_toll_sats: 0, settled_contracts: 0, genesis_escrow_id: "" };
+  const base = await serve({ readStats: async () => empty });
+  const response = await fetch(`${base}/stats`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), empty);
+});
 
 async function untilTrue(condition: () => boolean, label: string) {
   const deadline = Date.now() + 5_000;
@@ -130,7 +144,8 @@ test("escrow routes wait for startup ledger recovery and never serve an unrecove
     return { status: 200, body: recoveredLedger };
   };
   const recovery = createEscrowRecovery({ execute, retryDelaysMs: [60_000] });
-  const base = await serve({ execute, readPrice: async () => 1_000_000,
+  const base = await serve({ execute, readStats: async () => { calls += 1; return recoveredLedger; },
+    readPrice: async () => 1_000_000,
     ready: () => recovery.whenReady() });
 
   // Accepting traffic before recovery has started must fail closed.
@@ -178,7 +193,8 @@ test("failed startup recovery keeps escrow routes at 503 until a background retr
     routeCalls += 1;
     return { status: 200, body: recoveredLedger };
   };
-  const base = await serve({ execute, ready: () => recovery.whenReady() });
+  const base = await serve({ execute, readStats: async () => { routeCalls += 1; return recoveredLedger; },
+    ready: () => recovery.whenReady() });
   assert.equal(await recovery.start(), false);
   assert.equal(recovery.status, "retrying");
   const unavailable = await fetch(`${base}/stats`);

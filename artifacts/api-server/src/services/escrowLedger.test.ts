@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { pool } from "@workspace/db";
+import { readEscrowStats } from "./escrowStats";
 import {
   ESCROW_GENESIS, LEGACY_ESCROW_GENESIS, readGenesisReceipt, withEscrowLedger,
   type EscrowSettlementRecord, type EscrowState,
@@ -17,6 +18,53 @@ async function deleteLedgerFixture(id: string) {
   await pool.query("DELETE FROM escrow_ledger_settlements WHERE ledger_id=$1", [id]);
   await pool.query("DELETE FROM escrow_ledger WHERE id=$1", [id]);
 }
+
+test("public stats aggregate confirmed tolls, preserve genesis once, and select latest execution leaf", async () => {
+  const id = `escrow-stats-${randomUUID()}`;
+  try {
+    const empty = await readEscrowStats(pool, id);
+    assert.equal(empty.total_settled_sats, 0);
+    assert.equal(empty.total_contracts, 0);
+    assert.equal(empty.latest_merkle_root, null);
+    await pool.query("INSERT INTO escrow_ledger (id, genesis) VALUES ($1, $2::jsonb)",
+      [id, JSON.stringify(ESCROW_GENESIS)]);
+    const baseline = await readEscrowStats(pool, id);
+    assert.equal(baseline.total_settled_sats, 24);
+    assert.equal(baseline.total_contracts, 1);
+    assert.equal(baseline.latest_merkle_root,
+      ESCROW_GENESIS.settle_response.article_12_receipt.execution_leaf_hash);
+    const append = (escrowId: string, index: number, toll: number | null) => pool.query(
+      `INSERT INTO escrow_ledger_settlements
+        (ledger_id, escrow_id, leaf_index, execution_leaf_hash, merkle_root,
+         settled_at_strata_block, settled_at, payment_hash, toll_sats, settlement_provider)
+       VALUES ($1,$2,$3,$4,$5,971342,$6,$7,$8,$9)`,
+      [id, escrowId, index, index.toString().repeat(64), "f".repeat(64),
+        `2026-10-20T12:0${index}:00Z`, toll === null ? null : "a".repeat(64),
+        toll, toll === null ? null : "test-confirmed"],
+    );
+    await append("first", 1, 24);
+    let stats = await readEscrowStats(pool, id);
+    assert.equal(stats.total_settled_sats, 48);
+    assert.equal(stats.total_contracts, 2);
+    assert.equal(stats.latest_merkle_root, "1".repeat(64));
+    assert.equal(stats.verified_toll_sats, stats.total_settled_sats);
+    assert.equal(stats.settled_contracts, stats.total_contracts);
+    // A duplicate historical index row and an unpaid execution commitment
+    // must never inflate the total or replace the latest confirmed leaf.
+    await append(ESCROW_GENESIS.create_response.escrow_id, 2, 24);
+    await append("unpaid", 3, null);
+    assert.deepEqual(await readEscrowStats(pool, id), stats);
+    await append("second", 4, 17);
+    stats = await readEscrowStats(pool, id);
+    assert.equal(stats.total_settled_sats, 65);
+    assert.equal(stats.total_contracts, 3);
+    assert.equal(stats.latest_merkle_root, "4".repeat(64), "leaf hash, not aggregate tree root");
+    await pool.query("UPDATE escrow_ledger SET genesis='{}'::jsonb WHERE id=$1", [id]);
+    await assert.rejects(readEscrowStats(pool, id), /genesis ledger integrity/);
+  } finally {
+    await deleteLedgerFixture(id);
+  }
+});
 
 // Real development PostgreSQL plus a fresh, secret-free Python process and a
 // freshly deleted scratch directory on EVERY operation. No wallet/network calls.

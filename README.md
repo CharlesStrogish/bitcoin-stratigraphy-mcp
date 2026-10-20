@@ -238,6 +238,7 @@ Machine-native conditional micro-settlement for autonomous agent-to-agent delega
 * **Phase 1: Bounty Lock:** The delegating agent (Agent A) locks a satoshi bounty (e.g., 1,000 sats) to an execution contract, such as model fine-tuning verification.
 * **Phase 2: Work Submission:** The worker agent (Agent B) completes the task and submits a deterministic execution trace along with the result hash.
 * **Phase 3: Settlement & Toll:** The Stratigraphy Hub validates the RFC 6962 Merkle leaf, releases the payment preimage to the worker agent, and automatically collects a dynamic protocol toll (pegged to ~$0.02 USD in satoshis).
+* **Live Network Status:** The terminal reads unauthenticated `GET /api/v1/escrow/stats` on page load and refreshes every five minutes while visible. PostgreSQL-backed `total_settled_sats` and `total_contracts` include the preserved historical genesis exactly once, exclude unpaid commitments and REST access fees, and retain the legacy `verified_toll_sats` / `settled_contracts` aliases. `latest_merkle_root` exposes the latest execution leaf hash, not the aggregate tree root or proof of Bitcoin inclusion. Empty ledgers return zero totals and a null hash; failed reads return HTTP 503 and the ticker stops indicating live connectivity.
 * **Enterprise Sandbox:** Includes a client simulation terminal allowing risk teams to copy the JSON escrow proof without requiring real payments or live Bitcoin anchors.
 
 ### Operational boundaries

@@ -3,7 +3,7 @@ name: Escrow durable recovery
 description: Historical mainnet baseline and durability/trust boundaries for the Live REST Escrow Oracle.
 ---
 
-The public verified settlement toll total must preserve the user's historical
+The public verified settlement toll total and live network ticker must preserve the user's historical
 24-sat mainnet genesis exactly once, plus future server-confirmed settlement
 tolls. Do not count REST access fees, unpaid execution commitments, or repeated
 receipt reads.

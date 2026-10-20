@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Lock, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { CopyJsonButton } from "./CopyJsonButton";
-import type { EscrowTollQuote } from "@workspace/api-client-react";
+import { EscrowNetworkTicker } from "./EscrowNetworkTicker";
+import type { EscrowTollQuote, EscrowLedgerStats } from "@workspace/api-client-react";
 import { getEscrowLedgerStats } from "@workspace/api-client-react";
 import { evaluateEscrowToll } from "../engine/escrowToll";
 import {
@@ -33,7 +34,7 @@ export function EscrowTerminal() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [preimage, setPreimage] = useState("");
   const [settled, setSettled] = useState<SettleResult | null>(null);
-  const [ledgerToll, setLedgerToll] = useState<number | null>(null);
+  const [ledgerStats, setLedgerStats] = useState<EscrowLedgerStats | null>(null);
   const [ledgerUnavailable, setLedgerUnavailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,16 +54,22 @@ export function EscrowTerminal() {
   useEffect(() => {
     const c = new AbortController();
     let reading = false;
+    let lastAttempt = 0;
     const refresh = async () => {
-      if (reading) return;
+      if (reading || document.hidden) return;
       reading = true;
+      lastAttempt = Date.now();
       try {
-        const stats = await getEscrowLedgerStats({ signal: c.signal, cache: "no-store" });
-        if (!Number.isSafeInteger(stats.verified_toll_sats) || stats.verified_toll_sats < 24) {
+        const stats = await getEscrowLedgerStats({
+          signal: AbortSignal.any([c.signal, AbortSignal.timeout(10_000)]), cache: "no-store",
+        });
+        if (!Number.isSafeInteger(stats.total_settled_sats) || stats.total_settled_sats < 0
+          || !Number.isSafeInteger(stats.total_contracts) || stats.total_contracts < 0
+          || (stats.latest_merkle_root !== null && !HEX64.test(stats.latest_merkle_root))) {
           throw new Error("Invalid durable escrow total");
         }
         if (!c.signal.aborted) {
-          setLedgerToll(stats.verified_toll_sats);
+          setLedgerStats(stats);
           setLedgerUnavailable(false);
         }
       } catch {
@@ -72,8 +79,11 @@ export function EscrowTerminal() {
       }
     };
     void refresh();
-    const timer = setInterval(() => void refresh(), 30_000);
-    const onFocus = () => void refresh();
+    // Public reads share a 100-request / 15-minute budget with the homepage.
+    const timer = setInterval(() => void refresh(), 300_000);
+    const onFocus = () => {
+      if (Date.now() - lastAttempt >= 300_000) void refresh();
+    };
     window.addEventListener("focus", onFocus);
     return () => {
       c.abort();
@@ -166,7 +176,7 @@ export function EscrowTerminal() {
     ? JSON.stringify({ create_response: contract && { ...contract, settlement_capability: undefined }, settle_response: settled }, null, 2)
     : null;
   const verifiedToll = ledgerUnavailable ? "temporarily unavailable"
-    : ledgerToll === null ? "loading…" : `${ledgerToll} sats`;
+    : ledgerStats === null ? "loading…" : `${ledgerStats.total_settled_sats.toLocaleString("en-US")} sats`;
   const stage = settled ? 3 : contract || existingId.trim() ? 2 : pending?.op === "create" ? 1 : 0;
   const st = (n: number) => (stage > n ? "done" : stage === n ? "active" : "idle");
   const inp = (id: string, label: string, v: string, set: (s: string) => void, extra: Record<string, unknown> = {}) => (
@@ -183,9 +193,8 @@ export function EscrowTerminal() {
       <h2 id="escrow-h">Live REST Escrow · Proof-of-Execution Oracle (L402 + RFC 6962)</h2>
       <p className="et-sub">Real Lightning Network micropayments via L402 and Nostr Wallet Connect (NWC). Create an escrow, pay the server-issued L402 invoice with your own wallet, and settle against the live server.</p>
       <div className="et-tags" aria-live="polite">
-        {settled
-          ? <span className="et-tag et-ok" data-testid="badge-settled">SERVER CONFIRMED: {settled.status}</span>
-          : <span className="et-tag" data-testid="badge-awaiting">AWAITING LIVE CONFIRMATION</span>}
+        <EscrowNetworkTicker stats={ledgerStats} unavailable={ledgerUnavailable} />
+        {settled && <span className="et-tag et-ok" data-testid="badge-settled">SERVER CONFIRMED: {settled.status}</span>}
         <span className="et-tag">LOCKED = RFC 6962 MERKLE COMMITMENT · OPENTIMESTAMPS READY · TECHNICAL AUDIT RECEIPT</span>
       </div>
 

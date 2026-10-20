@@ -10,6 +10,36 @@ const root = "../artifacts/bitcoin-stratigraphy-dashboard/src/simulator/";
 const read = (file) => readFileSync(new URL(root + file, import.meta.url), "utf8");
 const jsx = (type, props) => ({ type, props });
 
+test("network ticker displays real totals, empty state and failures without false live status", () => {
+  const { EscrowNetworkTicker } = compile(read("components/EscrowNetworkTicker.tsx"),
+    (id) => {
+      assert.equal(id, "react/jsx-runtime");
+      return { jsx, jsxs: jsx };
+    });
+  const text = (node) => {
+    if (Array.isArray(node)) return node.map(text).join("");
+    return node && typeof node === "object" ? text(node.props?.children) : String(node ?? "");
+  };
+  const stats = { total_settled_sats: 48, total_contracts: 2,
+    latest_merkle_root: "c3a78bb1" + "a".repeat(56) };
+  const live = EscrowNetworkTicker({ stats, unavailable: false });
+  assert.equal(live.props["data-live"], true);
+  assert.match(text(live), /LIVE NETWORK • 48 SATS SETTLED • 2 CONTRACTS • LATEST ROOT: c3a78bb1…/);
+  const stale = EscrowNetworkTicker({ stats, unavailable: true });
+  assert.equal(stale.props["data-live"], false);
+  assert.match(text(stale), /NETWORK STATUS UNAVAILABLE.*LAST KNOWN: 48.*STALE/);
+  const loading = EscrowNetworkTicker({ stats: null, unavailable: false });
+  assert.equal(loading.props["data-live"], false);
+  assert.match(text(loading), /CONNECTING TO LIVE NETWORK/);
+  assert.match(text(EscrowNetworkTicker({ stats: null, unavailable: true })), /RETRYING AUTOMATICALLY/);
+  assert.match(text(EscrowNetworkTicker({ stats: {
+    total_settled_sats: 0, total_contracts: 0, latest_merkle_root: null,
+  }, unavailable: false })), /0 SATS SETTLED • 0 CONTRACTS • LATEST ROOT: NONE YET/);
+  const terminal = read("components/EscrowTerminal.tsx");
+  assert.match(terminal, /<EscrowNetworkTicker stats=\{ledgerStats\}/);
+  assert.doesNotMatch(terminal, /AWAITING LIVE CONFIRMATION/);
+});
+
 function compile(source, require, extra = {}) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(source, {

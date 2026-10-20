@@ -123,18 +123,30 @@ export const GetEnterpriseDueDiligenceBriefResponse = zod.object({
 
 
 /**
- * Counts the operator-supplied 24-sat mainnet genesis exactly once plus future server-confirmed settlement tolls, excluding REST access fees and unpaid commitments. Storage failures return 503, never a zero counter.
- * @summary Read the durable verified settlement toll total
+ * Read-only PostgreSQL aggregates of confirmed toll settlements, including the preserved historical genesis exactly once. Excludes REST access fees and unpaid commitments. latest_merkle_root is the latest execution leaf hash, not the aggregate tree root or proof of Bitcoin inclusion. An empty ledger returns zero totals and a null hash; storage failures return 503, never fabricated zero totals.
+ * @summary Read public live network settlement statistics
  */
-export const getEscrowLedgerStatsResponseVerifiedTollSatsMin = 24;
+export const getEscrowLedgerStatsResponseTotalSettledSatsMin = 0;
+export const getEscrowLedgerStatsResponseTotalSettledSatsMax = 9007199254740991;
+
+export const getEscrowLedgerStatsResponseTotalContractsMin = 0;
+export const getEscrowLedgerStatsResponseTotalContractsMax = 9007199254740991;
+
+export const getEscrowLedgerStatsResponseLatestMerkleRootRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getEscrowLedgerStatsResponseVerifiedTollSatsMin = 0;
 export const getEscrowLedgerStatsResponseVerifiedTollSatsMax = 9007199254740991;
 
+export const getEscrowLedgerStatsResponseSettledContractsMin = 0;
+export const getEscrowLedgerStatsResponseSettledContractsMax = 9007199254740991;
 
 
 
 export const GetEscrowLedgerStatsResponse = zod.object({
-  "verified_toll_sats": zod.number().int().min(getEscrowLedgerStatsResponseVerifiedTollSatsMin).max(getEscrowLedgerStatsResponseVerifiedTollSatsMax),
-  "settled_contracts": zod.number().int().min(1),
+  "total_settled_sats": zod.number().int().min(getEscrowLedgerStatsResponseTotalSettledSatsMin).max(getEscrowLedgerStatsResponseTotalSettledSatsMax).describe('Sum of confirmed settlement tolls plus preserved genesis exactly once; excludes REST access fees.'),
+  "total_contracts": zod.number().int().min(getEscrowLedgerStatsResponseTotalContractsMin).max(getEscrowLedgerStatsResponseTotalContractsMax),
+  "latest_merkle_root": zod.string().regex(getEscrowLedgerStatsResponseLatestMerkleRootRegExp).nullable().describe('Most recent confirmed execution leaf hash (legacy field name), or null when there are no settlements. Not the aggregate tree root.'),
+  "verified_toll_sats": zod.number().int().min(getEscrowLedgerStatsResponseVerifiedTollSatsMin).max(getEscrowLedgerStatsResponseVerifiedTollSatsMax).describe('Backward-compatible alias for total_settled_sats.'),
+  "settled_contracts": zod.number().int().min(getEscrowLedgerStatsResponseSettledContractsMin).max(getEscrowLedgerStatsResponseSettledContractsMax).describe('Backward-compatible alias for total_contracts.'),
   "genesis_escrow_id": zod.string()
 })
 

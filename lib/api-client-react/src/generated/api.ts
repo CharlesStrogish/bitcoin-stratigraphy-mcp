@@ -217,8 +217,8 @@ export const getGetEscrowLedgerStatsUrl = () => {
 }
 
 /**
- * Counts the operator-supplied 24-sat mainnet genesis exactly once plus future server-confirmed settlement tolls, excluding REST access fees and unpaid commitments. Storage failures return 503, never a zero counter.
- * @summary Read the durable verified settlement toll total
+ * Read-only PostgreSQL aggregates of confirmed toll settlements, including the preserved historical genesis exactly once. Excludes REST access fees and unpaid commitments. latest_merkle_root is the latest execution leaf hash, not the aggregate tree root or proof of Bitcoin inclusion. An empty ledger returns zero totals and a null hash; storage failures return 503, never fabricated zero totals.
+ * @summary Read public live network settlement statistics
  */
 export const getEscrowLedgerStats = async ( options?: Parameters<typeof customFetch>[1]): Promise<EscrowLedgerStats> => {
 
@@ -265,7 +265,7 @@ export type GetEscrowLedgerStatsQueryError = ErrorType<void>
 
 
 /**
- * @summary Read the durable verified settlement toll total
+ * @summary Read public live network settlement statistics
  */
 
 export function useGetEscrowLedgerStats<TData = Awaited<ReturnType<typeof getEscrowLedgerStats>>, TError = ErrorType<void>>(

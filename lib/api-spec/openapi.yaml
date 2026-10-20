@@ -743,8 +743,8 @@ paths:
     get:
       operationId: getEscrowLedgerStats
       tags: [Autonomous Escrow]
-      summary: Read the durable verified settlement toll total
-      description: Counts the operator-supplied 24-sat mainnet genesis exactly once plus future server-confirmed settlement tolls, excluding REST access fees and unpaid commitments. Storage failures return 503, never a zero counter.
+      summary: Read public live network settlement statistics
+      description: Read-only PostgreSQL aggregates of confirmed toll settlements, including the preserved historical genesis exactly once. Excludes REST access fees and unpaid commitments. latest_merkle_root is the latest execution leaf hash, not the aggregate tree root or proof of Bitcoin inclusion. An empty ledger returns zero totals and a null hash; storage failures return 503, never fabricated zero totals.
       security: []
       responses:
         "200":
@@ -2220,10 +2220,28 @@ components:
           maximum: 9007199254740991
     EscrowLedgerStats:
       type: object
-      required: [verified_toll_sats, settled_contracts, genesis_escrow_id]
+      required: [total_settled_sats, total_contracts, latest_merkle_root, verified_toll_sats, settled_contracts, genesis_escrow_id]
       properties:
-        verified_toll_sats: { type: integer, minimum: 24, maximum: 9007199254740991 }
-        settled_contracts: { type: integer, minimum: 1 }
+        total_settled_sats:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Sum of confirmed settlement tolls plus preserved genesis exactly once; excludes REST access fees.
+        total_contracts: { type: integer, minimum: 0, maximum: 9007199254740991 }
+        latest_merkle_root:
+          type: [string, "null"]
+          pattern: "^[a-f0-9]{64}$"
+          description: Most recent confirmed execution leaf hash (legacy field name), or null when there are no settlements. Not the aggregate tree root.
+        verified_toll_sats:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Backward-compatible alias for total_settled_sats.
+        settled_contracts:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Backward-compatible alias for total_contracts.
         genesis_escrow_id: { type: string }
     EscrowGenesisReceipt:
       type: object

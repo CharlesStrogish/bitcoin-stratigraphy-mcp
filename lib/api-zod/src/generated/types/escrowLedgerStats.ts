@@ -24,11 +24,33 @@
 
 export interface EscrowLedgerStats {
   /**
-     * @minimum 24
+     * Sum of confirmed settlement tolls plus preserved genesis exactly once; excludes REST access fees.
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  total_settled_sats: number;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  total_contracts: number;
+  /**
+     * Most recent confirmed execution leaf hash (legacy field name), or null when there are no settlements. Not the aggregate tree root.
+     * @nullable
+     * @pattern ^[a-f0-9]{64}$
+     */
+  latest_merkle_root: string | null;
+  /**
+     * Backward-compatible alias for total_settled_sats.
+     * @minimum 0
      * @maximum 9007199254740991
      */
   verified_toll_sats: number;
-  /** @minimum 1 */
+  /**
+     * Backward-compatible alias for total_contracts.
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
   settled_contracts: number;
   genesis_escrow_id: string;
 }

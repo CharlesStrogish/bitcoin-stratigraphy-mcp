@@ -10,6 +10,7 @@ import {
   GetEscrowLedgerStatsResponse, GetEscrowGenesisReceiptResponse,
 } from "@workspace/api-zod";
 import { readGenesisReceipt } from "../services/escrowLedger";
+import { readEscrowStats } from "../services/escrowStats";
 import { createL402Middleware } from "../middleware/l402";
 import { createDefaultMultiSettlementRouter } from "../services/multiSettlement";
 import { executeEscrow, type EscrowExecutor, type EscrowOperation } from "../services/escrowBridge";
@@ -32,6 +33,7 @@ type EscrowOptions = {
   ready?: () => Promise<void>;
   readHeight?: () => Promise<number>;
   readPrice?: () => Promise<number | null>;
+  readStats?: typeof readEscrowStats;
   paymentGate?: RequestHandler;
   operatorSecret?: string;
   usageStore?: MacaroonUsageStore;
@@ -257,7 +259,7 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
       res.removeListener("close", abort);
     }
   };
-  // Public, read-only price preview. Never creates an escrow or collects a fee.
+  // Public read-only telemetry; never locks custody state or spawns Python.
   router.get("/stats", async (_req, res) => {
     if (active >= 8) {
       res.set("Retry-After", "5").status(503).json({ error: "Escrow service is busy" });
@@ -265,9 +267,8 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
     }
     active++;
     try {
-      const result = await execute("stats", {});
-      if (result.status !== 200) throw new Error("Escrow ledger unavailable");
-      res.json(GetEscrowLedgerStatsResponse.parse(result.body));
+      const stats = await (options.readStats ?? readEscrowStats)();
+      res.json(GetEscrowLedgerStatsResponse.parse(stats));
     } catch {
       res.status(503).json({ error: "Durable escrow ledger unavailable" });
     } finally {

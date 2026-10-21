@@ -602,6 +602,13 @@ export default function StandardPage() {
               copied={copied}
               onCopy={copy}
             />
+            <a
+              className="sa-license-cta"
+              href="mailto:licensing@bitcoinstratigraphy.com"
+              data-testid="link-msa-commercial-license"
+            >
+              Request Enterprise Commercial License
+            </a>
           </section>
           <section id="badge" className="panel sa-sec">
             <h2>4. Trust badge</h2>
@@ -679,7 +686,14 @@ export default function StandardPage() {
                   multi-tenant hosting without the source disclosure required by
                   AGPL, a Commercial License from Charles R. Strogish is
                   required. Deployment rights, pricing and support
-                  require a separate written agreement with the maintainer.
+                  require a separate written agreement. Contact{" "}
+                  <a
+                    href="mailto:licensing@bitcoinstratigraphy.com"
+                    data-testid="link-enterprise-licensing-email"
+                  >
+                    licensing@bitcoinstratigraphy.com
+                  </a>{" "}
+                  to arrange commercial terms before such deployment.
                 </dd>
               </div>
             </dl>

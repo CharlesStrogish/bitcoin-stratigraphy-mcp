@@ -918,6 +918,7 @@ code {
   padding: 22px;
   max-width: 100%;
   min-width: 0;
+  scroll-margin-top: 24px;
 }
 .sa-sec h2 {
   margin: 0 0 10px;
@@ -932,6 +933,31 @@ code {
 .sa-sec a {
   color: hsl(var(--accent));
   text-underline-offset: 3px;
+}
+.sa-sec .sa-license-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  max-width: 100%;
+  margin-top: 16px;
+  padding: 12px 18px;
+  border: 1px solid hsl(var(--accent));
+  border-radius: 4px;
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+}
+.sa-sec .sa-license-cta:hover {
+  filter: brightness(1.1);
+}
+.sa-sec .sa-license-cta:focus-visible {
+  outline: 2px solid hsl(var(--accent));
+  outline-offset: 4px;
 }
 .sa-hint {
   color: hsl(var(--muted-foreground));

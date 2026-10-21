@@ -52,3 +52,12 @@ immediately and to land on it directly from other pages.
 
 **How to apply:** Keep this placement and anchor when reorganizing the
 homepage, and point any new link to the terminal at `/#live-escrow-terminal`.
+
+On the Enterprise Preview page, prioritize the Live REST Escrow terminal above
+the synthetic agent simulation. Keep the Article 12 compliance-guide link as
+a bridge into the simulation, with breathing room below the live terminal.
+
+**Why:** The user requested this ordering to optimize enterprise conversion.
+
+**How to apply:** Preserve this live-first hierarchy when reorganizing the
+preview; it is separate from the homepage placement rule above.

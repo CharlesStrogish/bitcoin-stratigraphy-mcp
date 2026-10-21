@@ -10,6 +10,16 @@ const root = "../artifacts/bitcoin-stratigraphy-dashboard/src/simulator/";
 const read = (file) => readFileSync(new URL(root + file, import.meta.url), "utf8");
 const jsx = (type, props) => ({ type, props });
 
+test("enterprise preview places live escrow before the compliance bridge and simulator", () => {
+  const page = read("../pages/simulator.tsx");
+  assert.equal((page.match(/<EscrowTerminal \/>/g) ?? []).length, 1);
+  assert.match(
+    page,
+    /<\/header>\s*<div className="sim-live-escrow">\s*<EscrowTerminal \/>\s*<\/div>\s*<ComplianceGuideLink \/>\s*<SyntheticBanner \/>\s*<div className="sim-controls">/,
+  );
+  assert.match(read("../index.css"), /\.sim-live-escrow\s*\{\s*margin-bottom: 32px;\s*\}/);
+});
+
 test("network ticker displays real totals, empty state and failures without false live status", () => {
   const { EscrowNetworkTicker } = compile(read("components/EscrowNetworkTicker.tsx"),
     (id) => {

@@ -240,6 +240,10 @@ export default function SimulatorPage() {
             </div>
           </div>
         </header>
+        <div className="sim-live-escrow">
+          <EscrowTerminal />
+        </div>
+        <ComplianceGuideLink />
         <SyntheticBanner />
 
         <div className="sim-controls">
@@ -446,8 +450,6 @@ export default function SimulatorPage() {
             </div>
           )}
         </section>
-        <ComplianceGuideLink />
-        <EscrowTerminal />
       </div>
     </div>
   );

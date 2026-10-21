@@ -1226,6 +1226,9 @@ code {
 }
 
 /* Enterprise Swarm Control Room */
+.sim-live-escrow {
+  margin-bottom: 32px;
+}
 .sim-banner {
   display: flex;
   gap: 12px;

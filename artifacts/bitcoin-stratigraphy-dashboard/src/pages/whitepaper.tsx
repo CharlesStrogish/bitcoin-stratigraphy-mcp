@@ -86,7 +86,7 @@ export default function WhitepaperPage() {
               Contact Sales for Enterprise Sizing
             </a>
             <a
-              href={`${BASE}enterprise`}
+              href="#deployment"
               className="wp-cta wp-cta-alt"
               data-testid="link-enterprise-licensing"
             >

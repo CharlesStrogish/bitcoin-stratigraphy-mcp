@@ -58,7 +58,8 @@ export default function WhitepaperContent() {
         <h3>Continuous Automation</h3>
         <p>
           Record events at the execution boundary, not only when an operator
-          starts an audit. Capture the agent identity claim, run and sequence
+          starts an audit. Capture the agent identity claim (cryptographically
+          authenticated via NIP-98 Schnorr signatures), run and sequence
           identifiers, relevant input/output context or digests, tool
           invocation, policy version, result, and producer-declared UTC time.
           Logging failures must be observable, with an explicit deployment
@@ -260,7 +261,10 @@ new_quote <= per_invoice_ceiling`}</code>
       <section className="wp-section" id="deployment">
         <h2>5. Enterprise Licensing &amp; Air-Gapped Deployment</h2>
         <p>
-          Covered first-party engine software has an AGPLv3 open-source option.
+          Covered first-party engine software is deployed as a Stateless
+          Enterprise MCP Server (2026-07-28 specification) secured by Ed25519
+          Cryptographically Signed Tool Integrity. It has an AGPLv3 open-source
+          option.
           A separately executed Enterprise Commercial License grants an
           exemption from the AGPL obligations for the software and deployment
           covered by that agreement. Enterprises can run the licensed engine

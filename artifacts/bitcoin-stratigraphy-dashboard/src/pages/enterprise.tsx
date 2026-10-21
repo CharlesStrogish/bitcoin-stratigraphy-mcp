@@ -40,6 +40,7 @@ const SECTIONS: {
     title: "A Merkle flight recorder for post-hoc reconstruction",
     body: [
       "The engine supports EU AI Act Article 12 automatic logging by committing agent events into a Merkle chain of custody, a cryptographic flight recorder that lets auditors reconstruct what happened after an incident.",
+      "Powered by NIP-98 Cryptographic Agent Identity Binding, the engine cryptographically authenticates the signing sub-agent behind each identity-bound request, linking that identity to the Merkle chain of custody for EU AI Act Article 12 logging and post-hoc reconstruction.",
       "Merkle evidence is tamper-evident: any later change to a recorded entry becomes detectable. It does not physically prevent changes, and it is not proof of fault or of regulatory compliance. Compliance remains your determination with counsel.",
       "A Bitcoin anchor is verified only after confirmed inclusion that you or a third party has independently checked. A pending anchor is provisional.",
     ],
@@ -119,7 +120,10 @@ export default function EnterprisePage() {
             </h1>
             <p className="subtitle">
               For CISOs protecting private AI swarm IP and needing auditable
-              reconstruction of agent activity.
+              reconstruction of agent activity. Deploy the complete 16-Tool
+              Stateless MCP Server (2026-07-28), secured by Ed25519
+              Cryptographically Signed Tool Integrity, behind your firewall
+              without relying on a third-party MCP proxy.
             </p>
             <div className="ent-cta-row">
               <a href={MAIL} className="ent-cta" data-testid="link-contact-sales">

@@ -1235,21 +1235,20 @@ code {
   align-items: flex-start;
   margin-top: 18px;
   padding: 14px 16px;
-  border: 1px solid hsl(var(--accent));
-  border-left-width: 4px;
-  background: hsl(var(--accent) / 0.1);
-  color: hsl(var(--foreground));
+  border: 1px solid #334155;
+  background: rgb(30 41 59 / 50%);
+  color: #cbd5e1;
 }
 .sim-banner svg {
   flex: none;
-  color: hsl(var(--accent));
+  color: hsl(var(--primary));
   margin-top: 2px;
 }
 .sim-banner p {
   margin: 4px 0 0;
   font-size: 12px;
   line-height: 1.5;
-  color: hsl(var(--muted-foreground));
+  color: inherit;
 }
 .sim-banner strong {
   font: 11px var(--app-font-mono);

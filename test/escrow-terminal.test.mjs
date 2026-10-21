@@ -98,8 +98,15 @@ test("escrow UI distinguishes live micropayments from the client preview and inc
   assert.match(terminal, /<summary>Optional Admin Override<\/summary>/);
   assert.doesNotMatch(terminal, /Operator token required/);
   assert.match(terminal, /LOCKED = RFC 6962 MERKLE COMMITMENT · OPENTIMESTAMPS READY · TECHNICAL AUDIT RECEIPT/);
-  assert.match(banner, /Enterprise Interactive Preview is a client-only/);
-  assert.match(banner, /real payments via L402/);
+  const bannerText = banner.replace(/\s+/g, " ");
+  assert.match(bannerText, /Enterprise Sandbox Mode/);
+  assert.match(bannerText, /The interactive visualizer below uses synthetic agent traces for risk-team evaluation\. Unlike the Live REST Escrow above, this simulation does not require real Lightning Network micropayments or submit live Bitcoin timestamp commitments\./);
+  assert.match(banner, /<Info size=\{18\}/);
+  assert.doesNotMatch(banner, /ShieldAlert|terminal below/);
+  const bannerStyles = read("../index.css").match(/\.sim-banner \{[^}]+\}/)?.[0];
+  assert.match(bannerStyles ?? "", /border: 1px solid #334155/);
+  assert.match(bannerStyles ?? "", /background: rgb\(30 41 59 \/ 50%\)/);
+  assert.doesNotMatch(bannerStyles ?? "", /--accent|border-left-width/);
   assert.doesNotMatch(terminal + banner, /21 sats|server price wins|SYNTHETIC SIMULATION|Runs entirely in this browser tab|Sample \/ Client Simulation/);
 });
 

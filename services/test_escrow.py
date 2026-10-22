@@ -14,7 +14,9 @@ import uuid
 
 from bitcoin_stratigraphy_enterprise.swarm_merkle import verify_merkle_inclusion
 from services.escrow_db import EscrowStore
-from services.escrow_engine import EscrowEngine, EscrowStateError, agent_attribution_digest
+from services.escrow_engine import (
+    EscrowEngine, EscrowStateError, agent_attribution_digest, trace_context_digest,
+)
 
 
 def settle_in_process(path, escrow_id):
@@ -39,6 +41,76 @@ class EscrowTests(unittest.TestCase):
         return (engine or self.engine).create_l402_escrow(
             "a" * 64, "b" * 64, self.task, 1000
         )
+
+    def test_traceparent_is_committed_before_receipt_release(self):
+        from routers.escrow_api import EscrowApi
+
+        context = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        for agent in (None, "planner-7"):
+            created = self.create()
+            settled = self.engine.verify_execution_and_settle(
+                created["escrow_id"], "trace", "result", agent_id=agent, traceparent=context,
+            )
+            receipt = settled["receipt"]
+            self.assertEqual(receipt["traceparent"], context)
+            with self.store.connection() as connection:
+                row = connection.execute(
+                    "SELECT leaf_preimage FROM escrow_execution_leaves WHERE escrow_id=?",
+                    (created["escrow_id"],),
+                ).fetchone()
+            data = row["leaf_preimage"]
+            self.assertEqual(len(data), 160)
+            self.assertEqual(data[128:], trace_context_digest(context))
+            self.assertTrue(verify_merkle_inclusion(
+                data, receipt["leaf_index"], receipt["tree_size"],
+                [bytes.fromhex(item) for item in receipt["audit_path"]],
+                bytes.fromhex(receipt["merkle_root"]),
+            ))
+            api = EscrowApi(self.engine)
+            self.assertEqual(api.dispatch("receipt", {"escrow_id": created["escrow_id"]})[0], 200)
+            receipt["traceparent"] = context[:-2] + "00"
+            with self.store.transaction() as connection:
+                connection.execute(
+                    "UPDATE escrow_execution_leaves SET receipt_json=? WHERE escrow_id=?",
+                    (json.dumps(receipt), created["escrow_id"]),
+                )
+            self.assertEqual(api.dispatch("receipt", {"escrow_id": created["escrow_id"]})[0], 422)
+
+    def test_invalid_traceparent_cannot_create_a_settlement(self):
+        created = self.create()
+        for value in ("invalid", "00-" + "0" * 32 + "-00f067aa0ba902b7-01"):
+            with self.assertRaises(ValueError):
+                self.engine.verify_execution_and_settle(
+                    created["escrow_id"], "trace", "result", traceparent=value,
+                )
+        self.assertEqual(self.store.get_contract(created["escrow_id"])["status"], "LOCKED")
+
+    def test_legacy_leaf_constraint_upgrade_preserves_committed_bytes(self):
+        from services.escrow_db import SCHEMA
+        import sqlite3
+
+        path = Path(self.directory.name) / "private" / "legacy.sqlite3"
+        connection = sqlite3.connect(path)
+        connection.executescript(SCHEMA.replace("(96, 128, 160)", "(96, 128)"))
+        connection.close()
+        os.chmod(path, 0o600)
+        with patch.object(EscrowStore, "_upgrade_trace_leaf_constraint"):
+            store = EscrowStore(path)
+        engine = EscrowEngine(store, strata_block_provider=lambda: 900000)
+        created = self.create(engine)
+        legacy = engine.verify_execution_and_settle(created["escrow_id"], "trace", "result")
+        with store.connection() as connection:
+            before = connection.execute(
+                "SELECT leaf_preimage, receipt_json FROM escrow_execution_leaves",
+            ).fetchone()
+        # Reopening is idempotent, including custody data and exact leaf bytes.
+        EscrowStore(path)
+        with store.connection() as connection:
+            after = connection.execute(
+                "SELECT leaf_preimage, receipt_json FROM escrow_execution_leaves",
+            ).fetchone()
+            self.assertEqual(tuple(before), tuple(after))
+        self.verify_receipt(legacy["receipt"])
 
     def verify_receipt(self, receipt, trace="trace", result="result"):
         data = (

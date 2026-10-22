@@ -249,7 +249,7 @@ function routingHeaderMismatch(
   const field = MCP_NAME_SOURCES.get(method);
   const nameHeader = req.header("Mcp-Name");
   if (nameHeader === undefined) {
-    return required && method === "tools/call"
+    return required && (method === "tools/call" || method.startsWith("tasks/"))
       ? `Header mismatch: the Mcp-Name header is required for ${method} and must equal params.${field}.`
       : undefined;
   }

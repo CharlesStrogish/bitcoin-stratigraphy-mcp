@@ -28,6 +28,11 @@ import type { EscrowReceiptOtsCalendarStandard } from './escrowReceiptOtsCalenda
 import type { EscrowReceiptReceiptType } from './escrowReceiptReceiptType';
 
 export interface EscrowReceipt {
+  /**
+     * Optional validated W3C Trace Context from the settlement request. Trace-aware 160-byte leaves append SHA-256 of the canonical traceparent JSON after the attribution digest (SHA-256 of {} when unattributed). Legacy 96-byte and 128-byte leaves remain valid and cannot claim trace context.
+     * @maxLength 512
+     */
+  traceparent?: string;
   /** Identifies the verifiable SHA-256 Merkle commitment format for future OpenTimestamps anchoring; does not assert calendar submission or Bitcoin confirmation. */
   ots_calendar_standard: EscrowReceiptOtsCalendarStandard;
   attestation_directive: EscrowReceiptAttestationDirective;

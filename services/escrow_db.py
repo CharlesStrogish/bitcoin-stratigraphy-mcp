@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS agent_escrow_contracts (
 CREATE TABLE IF NOT EXISTS escrow_execution_leaves (
     leaf_index INTEGER PRIMARY KEY,
     escrow_id TEXT NOT NULL UNIQUE REFERENCES agent_escrow_contracts(escrow_id),
-    leaf_preimage BLOB NOT NULL CHECK(length(leaf_preimage) IN (96, 128)),
+    leaf_preimage BLOB NOT NULL CHECK(length(leaf_preimage) IN (96, 128, 160)),
     receipt_json TEXT NOT NULL
 );
 """
@@ -85,6 +85,44 @@ class EscrowStore:
         with self.connection() as connection:
             connection.executescript(SCHEMA)
             self._upgrade_fixed_toll_constraint(connection)
+            self._upgrade_trace_leaf_constraint(connection)
+
+    @staticmethod
+    def _upgrade_trace_leaf_constraint(connection):
+        """Widen the leaf check transactionally without rewriting any leaf bytes."""
+        name = "escrow_execution_leaves"
+        pattern = re.compile(r"CHECK\s*\(\s*length\s*\(\s*leaf_preimage\s*\)\s+IN\s*\(\s*96\s*,\s*128\s*\)\s*\)", re.I)
+
+        def sql():
+            return connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (name,),
+            ).fetchone()[0]
+
+        if not pattern.search(sql()):
+            return
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            original = sql()
+            if pattern.search(original):
+                objects = connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE tbl_name=? "
+                    "AND type IN ('index','trigger') AND sql IS NOT NULL", (name,),
+                ).fetchall()
+                revised = pattern.sub(
+                    "CHECK(length(leaf_preimage) IN (96, 128, 160))", original,
+                ).replace(name, name + "_trace", 1)
+                connection.execute(revised)
+                connection.execute(f"INSERT INTO {name}_trace SELECT * FROM {name}")
+                connection.execute(f"DROP TABLE {name}")
+                connection.execute(f"ALTER TABLE {name}_trace RENAME TO {name}")
+                for row in objects:
+                    connection.execute(row[0])
+                if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                    raise RuntimeError("Trace leaf migration failed integrity check")
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
 
     @staticmethod
     def _upgrade_fixed_toll_constraint(connection):

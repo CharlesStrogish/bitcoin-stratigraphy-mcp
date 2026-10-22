@@ -6,8 +6,10 @@ description: Rules for the webhook_url zero-polling flow on paid MCP tools (202 
 The user asked (2026-10-18) for a specific contract: `webhook_url` on `proof.submit` and
 `stratigraphy.get_range`; paid call → HTTP 202 with JSON-RPC `result {task_id, status:"pending"}`;
 one POST of the final result or error to the callback; synchronous behaviour when omitted.
-The user cited SEP-1686, but this is deliberately NOT the MCP Tasks extension: no `tasks/get`, no
-`resultType:"task"`, no `execution.taskSupport` advertisement.
+The user cited SEP-1686, but this webhook path is deliberately distinct from the
+MCP Tasks extension: its acknowledgement is not `resultType:"task"`. The user
+subsequently requested SEP-2663 polling alongside it; an explicit callback URL
+must continue to select this existing push contract even for Tasks-capable clients.
 
 **Why:** the official Tasks flow returns a task handle in a 200 result and expects polling; the user
 explicitly wanted 202 plus push delivery. Official SDK clients ignore 202 bodies, so webhook calls

@@ -34,4 +34,9 @@ export type EscrowReceiptDocumentVerification = {
      * @pattern ^[0-9a-f]{64}$
      */
   agent_attribution_hash?: string;
+  /**
+     * Fifth segment of a trace-aware execution leaf, SHA-256 of canonical compact JSON containing traceparent. Correlation metadata, not authenticated identity.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  trace_context_hash?: string;
 };

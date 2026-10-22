@@ -13,6 +13,19 @@ import type { AddressInfo } from "node:net";
 import { after, before, test } from "node:test";
 import express from "express";
 import { pool } from "@workspace/db";
+import {
+  McpTasksExtension,
+  TASKS_EXTENSION,
+} from "../../src/lib/mcp-tasks-extension";
+import {
+  memoryMcpTaskStore,
+  postgresMcpTaskStore,
+} from "../../src/lib/mcp-task-store";
+import { verifyToolResponse } from "../../src/lib/mcp-response-signature";
+import {
+  requestTraceparent,
+  validTraceparent,
+} from "../../src/lib/trace-context";
 import { createMemoryMacaroonRevocationStore } from "../../src/lib/macaroon-revocation-store";
 import {
   MCP_ASYNC_TOOL_NAMES,
@@ -193,6 +206,8 @@ function hold(): () => void {
 const bounded = { timeout: 30_000 };
 
 const servers: Server[] = [];
+const pollingStore = memoryMcpTaskStore();
+const pollingExtension = new McpTasksExtension(pollingStore);
 async function startApp(runner: McpAsyncTaskRunner): Promise<{ url: string }> {
   const app = express();
   app.use(
@@ -210,6 +225,7 @@ async function startApp(runner: McpAsyncTaskRunner): Promise<{ url: string }> {
     x402ResourceServer: null,
     revocationStore: createMemoryMacaroonRevocationStore(),
     asyncTaskRunner: runner,
+    tasksExtension: pollingExtension,
   });
   // Default key, as for a runner without signingKey: receivers pin this one.
   registerToolIntegrityRoute(app, mcpToolDefinitions);
@@ -339,6 +355,286 @@ async function paidCredential(
     preimage: payment.preimage,
   };
 }
+
+function pollingCall(id: number, name: string, args: Record<string, unknown>) {
+  const message = call(id, name, args, "stateless");
+  message.body.params._meta!["io.modelcontextprotocol/clientCapabilities"] = {
+    extensions: { [TASKS_EXTENSION]: {} },
+  };
+  return message;
+}
+
+function taskMessage(id: number, method: string, taskId: string, extra = {}) {
+  return {
+    body: {
+      jsonrpc: "2.0",
+      id,
+      method,
+      params: {
+        taskId,
+        ...extra,
+        _meta: {
+          "io.modelcontextprotocol/protocolVersion": MODERN,
+          "io.modelcontextprotocol/clientCapabilities": {
+            extensions: { [TASKS_EXTENSION]: {} },
+          },
+        },
+      },
+    },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "MCP-Protocol-Version": MODERN,
+      "Mcp-Method": method,
+      "Mcp-Name": taskId,
+    },
+  } as unknown as ReturnType<typeof call>;
+}
+
+async function completedTask(taskId: string) {
+  for (let i = 0; i < 100; i++) {
+    const response = await post(taskMessage(1001, "tasks/get", taskId));
+    assert.equal(response.response.status, 200, JSON.stringify(response.body));
+    if (response.body?.result?.status !== "working")
+      return response.body!.result!;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.fail("Task did not finish");
+}
+
+test("traceparent extraction accepts HTTP and MCP metadata without mutating signed bytes", () => {
+  const context = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+  const body = { params: { _meta: { traceparent: context } } };
+  const req = { body, header: () => undefined } as unknown as express.Request;
+  const before = JSON.stringify(body);
+  assert.equal(requestTraceparent(req), context);
+  assert.equal(JSON.stringify(body), before);
+  assert.equal(
+    requestTraceparent({
+      ...req,
+      header: () => context,
+    } as unknown as express.Request),
+    context,
+  );
+  for (const value of [
+    context.replace("00-", "ff-"),
+    context.toUpperCase(),
+    "garbage",
+    "00-" + "0".repeat(32) + "-00f067aa0ba902b7-01",
+    context + "-extra",
+  ]) {
+    assert.equal(validTraceparent(value), false, value);
+  }
+});
+
+test(
+  "Tasks polling returns a durable handle and an Ed25519 signed completed result",
+  bounded,
+  async () => {
+    const message = pollingCall(1002, "stratigraphy.get_range", {
+      startTarget: "919712",
+    });
+    const credential = await paidCredential(message);
+    const release = hold();
+    const created = await post(message, credential.authorization);
+    assert.equal(created.response.status, 200, JSON.stringify(created.body));
+    const task = created.body?.result!;
+    assert.equal(task.resultType, "task");
+    assert.equal(task.status, "working");
+    assert.ok(task.pollIntervalMs > 0);
+    assert.ok(
+      await pollingStore.get(task.taskId),
+      "persisted before acknowledgement",
+    );
+    const working = await post(taskMessage(1013, "tasks/get", task.taskId));
+    assert.equal(
+      working.body?.result?.status,
+      "working",
+      "fetch is still held after acknowledgement",
+    );
+    release();
+    const completed = await completedTask(task.taskId);
+    assert.equal(completed.resultType, "complete");
+    assert.equal(completed.status, "completed", JSON.stringify(completed));
+    assert.ok(
+      verifyToolResponse(
+        "stratigraphy.get_range",
+        completed.result,
+        await manifestPublicKey(),
+      ),
+      "final tool result must verify against the pinned server key",
+    );
+    assert.doesNotMatch(JSON.stringify(completed), /preimage|macaroon/);
+  },
+);
+
+test(
+  "input_required correction uses tasks/update without bypassing payment",
+  bounded,
+  async () => {
+    const invoiceStart = invoiceCount;
+    const invalid = await post(
+      pollingCall(1003, "stratigraphy.get_range", { startTarget: 42 }),
+    );
+    assert.equal(
+      invalid.body?.result?.status,
+      "input_required",
+      JSON.stringify(invalid.body),
+    );
+    assert.equal(invoiceCount, invoiceStart);
+    const task = invalid.body!.result!;
+    const current = await post(taskMessage(1004, "tasks/get", task.taskId));
+    const key = Object.keys(current.body!.result!.inputRequests)[0]!;
+    const update = taskMessage(1005, "tasks/update", task.taskId, {
+      inputResponses: {
+        [key]: {
+          action: "accept",
+          content: { arguments: JSON.stringify({ startTarget: "919712" }) },
+        },
+      },
+    });
+    const credential = await paidCredential(update);
+    const accepted = await post(update, credential.authorization);
+    assert.equal(accepted.response.status, 200, JSON.stringify(accepted.body));
+    assert.equal(accepted.body?.result?.resultType, "complete");
+    assert.equal((await completedTask(task.taskId)).status, "completed");
+    const callsBefore = backendCalls.length;
+    const repeated = await post(update, credential.authorization);
+    assert.equal(repeated.response.status, 200);
+    assert.equal(
+      backendCalls.length,
+      callsBefore,
+      "replayed input must not execute twice",
+    );
+  },
+);
+
+test(
+  "Tasks cancellation, missing capabilities, unknown handles, and no enumeration",
+  bounded,
+  async () => {
+    const task = await pollingExtension.create(
+      "proof.submit",
+      {},
+      "Correct input",
+    );
+    const cancelled = await post(
+      taskMessage(1006, "tasks/cancel", task.taskId),
+    );
+    assert.equal(cancelled.body?.result?.resultType, "complete");
+    assert.equal(
+      (await post(taskMessage(1007, "tasks/get", task.taskId))).body?.result
+        ?.status,
+      "cancelled",
+    );
+    const unknown = await post(taskMessage(1008, "tasks/get", "x".repeat(43)));
+    assert.equal(unknown.body?.error?.code, -32602);
+    const missing = taskMessage(1009, "tasks/get", task.taskId);
+    missing.body.params._meta!["io.modelcontextprotocol/clientCapabilities"] =
+      {};
+    assert.equal((await post(missing)).body?.error?.code, -32021);
+    const listed = await post(taskMessage(1010, "tasks/list", task.taskId));
+    assert.ok([-32601, -32020].includes(listed.body?.error?.code ?? 0));
+    const mismatched = taskMessage(1011, "tasks/get", task.taskId);
+    mismatched.headers["Mcp-Name"] = "wrong";
+    assert.equal((await post(mismatched)).body?.error?.code, -32020);
+  },
+);
+
+test(
+  "cancelling an in-flight task persists cancellation and never releases its later result",
+  bounded,
+  async () => {
+    const message = pollingCall(1014, "stratigraphy.get_range", {
+      startTarget: "919712",
+    });
+    const credential = await paidCredential(message);
+    const release = hold();
+    try {
+      const created = await post(message, credential.authorization);
+      assert.equal(created.response.status, 200, JSON.stringify(created.body));
+      const taskId = created.body!.result!.taskId;
+      await post(taskMessage(1015, "tasks/cancel", taskId));
+      release();
+      const state = await completedTask(taskId);
+      assert.equal(state.status, "cancelled");
+      assert.equal(state.result, undefined);
+    } finally {
+      release();
+    }
+  },
+);
+
+test(
+  "durable task stores survive new instances and reject competing revisions",
+  bounded,
+  async () => {
+    const store = postgresMcpTaskStore();
+    const extension = new McpTasksExtension(store);
+    const task = await extension.create("proof.submit", {}, "Correct input");
+    try {
+      const other = new McpTasksExtension(postgresMcpTaskStore());
+      assert.equal((await other.get(task.taskId))?.status, "input_required");
+      const updated = { ...task, revision: 1, status: "cancelled" as const };
+      const outcomes = await Promise.all([
+        store.replace(updated, 0),
+        other.store.replace(updated, 0),
+      ]);
+      assert.deepEqual(outcomes.sort(), [false, true]);
+      assert.equal((await other.get(task.taskId))?.status, "cancelled");
+    } finally {
+      await store.remove(task.taskId);
+    }
+  },
+);
+
+test("expired handles disappear and interrupted charged tasks are never replayed", async () => {
+  const store = memoryMcpTaskStore();
+  const extension = new McpTasksExtension(store);
+  const task = await extension.create("proof.submit", {});
+  await store.replace(
+    {
+      ...task,
+      revision: 1,
+      lastUpdatedAt: new Date(Date.now() - 220_000).toISOString(),
+    },
+    0,
+  );
+  assert.equal((await extension.get(task.taskId))?.status, "failed");
+  const stale = await extension.get(task.taskId);
+  await store.replace(
+    {
+      ...stale!,
+      revision: stale!.revision + 1,
+      createdAt: new Date(Date.now() - 3_700_000).toISOString(),
+    },
+    stale!.revision,
+  );
+  assert.equal(await extension.get(task.taskId), undefined);
+});
+
+test(
+  "explicit webhook_url retains v1a push delivery for Tasks-capable clients",
+  bounded,
+  async () => {
+    const before = deliveries.length;
+    const message = pollingCall(1012, "stratigraphy.get_range", {
+      startTarget: "919712",
+      webhook_url: hookUrl("/tasks-capable-callback"),
+    });
+    const credential = await paidCredential(message);
+    const accepted = await post(message, credential.authorization);
+    assert.equal(accepted.response.status, 202);
+    await runner.drain();
+    assert.equal(deliveries.length, before + 1);
+    assert.match(
+      String(deliveries.at(-1)!.headers["webhook-signature"]),
+      /^v1a,/,
+    );
+    // This test's receiver state must not change the legacy webhook fixtures.
+    deliveries.splice(before);
+  },
+);
 
 function assertAcknowledgement(
   body: RpcBody | undefined,

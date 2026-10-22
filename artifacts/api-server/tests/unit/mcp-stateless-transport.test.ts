@@ -227,6 +227,7 @@ test("server/discover answers without a handshake or session", async () => {
   assert.equal(result.supportedVersions[0], MODERN);
   assert.ok(result.supportedVersions.includes(LEGACY));
   assert.deepEqual(result.capabilities, {
+    extensions: { "io.modelcontextprotocol/tasks": {} },
     prompts: { listChanged: false },
     resources: { subscribe: false, listChanged: false },
     tools: {},

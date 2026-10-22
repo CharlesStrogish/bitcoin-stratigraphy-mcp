@@ -5524,6 +5524,27 @@ export function registerMcpRoute(
           requestKind: name.startsWith("proof.") ? "zk-proof" : "stratigraphy",
         });
         return async (req: Request, res: Response, next: NextFunction) => {
+          if (TASK_TOOLS.has(canonicalToolName(name)) && taskCapabilities(res) &&
+              req.body?.method === "tools/call" &&
+              requestedWebhookUrl(canonicalToolName(name), req.body.params?.arguments) === undefined &&
+              !res.locals.pollingTask) {
+            try {
+              const task = await pollingTasks.create(canonicalToolName(name),
+                withoutWebhookUrl(paidTools[name as keyof typeof paidTools].schema.parse(
+                  req.body.params?.arguments ?? {}) as Record<string, unknown>),
+                undefined, requestTraceparent(req));
+              res.locals.pollingTask = task;
+              res.once("finish", () => {
+                if (!res.locals.pollingTaskStarted)
+                  void pollingTasks.store.remove(task.taskId).catch((error: unknown) =>
+                    req.log?.error({ err: error }, "Task reservation cleanup unavailable"));
+              });
+            } catch {
+              res.status(503).json({ jsonrpc: "2.0", id: req.body.id,
+                error: { code: -32603, message: "Durable task admission unavailable; payment was not consumed" } });
+              return;
+            }
+          }
           if (name === "proof.notarize") {
             if (req.header("PAYMENT-SIGNATURE")) {
               res.status(400).json({
@@ -5625,7 +5646,9 @@ export function registerMcpRoute(
       options.sessionSecret ?? process.env.SESSION_SECRET, Date.now());
     const scopeRefusal = pass && delegationCaveatRejection(pass, { nowMs: Date.now(), tool: name });
     if (scopeRefusal) { caveatRefusalResponse(res, req.body.id, scopeRefusal); return; }
-    if (isPrimaryDataTool(name)) {
+    if (isPrimaryDataTool(name) &&
+        ((!parseL402Header(req.header("Authorization")) && !req.header("PAYMENT-SIGNATURE")) ||
+          pass?.maxTarget !== undefined)) {
       try { res.locals.primaryStratigraphy = await primaryBackend(name, sourceArgs); }
       catch (error) {
         taskError(req, res, error instanceof RangeError ? -32602 : -32603,
@@ -5713,6 +5736,9 @@ export function registerMcpRoute(
             const response = task.inputKey ? responses[task.inputKey] : undefined;
             if (task.status !== "input_required" || response === undefined) {
               taskReply(req, res, { resultType: "complete" }); return;
+            }
+            if (!response || typeof response !== "object" || Array.isArray(response)) {
+              taskError(req, res, -32602, "Each input response must be an object"); return;
             }
             if (response.action === "decline" || response.action === "cancel") {
               await pollingTasks.cancel(task);
@@ -6171,6 +6197,8 @@ export function registerMcpRoute(
         canonicalName,
         body?.params?.arguments,
       );
+      const polling = webhookUrl === undefined &&
+        TASK_TOOLS.has(canonicalName) && taskCapabilities(res);
       if (webhookUrl !== undefined) {
         const refusal = await webhookRefusal(webhookUrl);
         if (refusal) {
@@ -6198,10 +6226,11 @@ export function registerMcpRoute(
           ? TASK_TOOLS.has(canonicalName) && taskCapabilities(res)
             ? (error?: unknown) => {
                 if (error) { next(error); return; }
-                void pollingTasks.create(canonicalName, sourceArguments(), undefined,
-                  res.locals.traceparent).then(async (task) => {
+                void Promise.resolve(res.locals.pollingTask as TaskRecord).then(async (task) => {
+                  if (!task) throw new Error("Task reservation unavailable");
                   if (!await runPollingTask(task, sourceArguments(), res))
                     throw new Error("Task admission failed");
+                  res.locals.pollingTaskStarted = true;
                   taskReply(req, res, pollingTasks.publicView(task, "task"));
                 }).catch(next);
               }
@@ -6260,11 +6289,18 @@ export function registerMcpRoute(
           "stratigraphy.get_digest",
           "stratigraphy.get_diff",
           "stratigraphy.get_range",
-        ].includes(canonicalName)) {
+        ].includes(canonicalName) &&
+          !(polling && (parseL402Header(req.header("Authorization")) || req.header("PAYMENT-SIGNATURE")))) {
           try {
             await primaryBackend(canonicalName, sourceArguments());
           } catch (error) {
             if (error instanceof RangeError) {
+              if (polling) {
+                const task = await pollingTasks.create(canonicalName, {}, error.message,
+                  res.locals.traceparent);
+                taskReply(req, res, pollingTasks.publicView(task, "task"));
+                return;
+              }
               res.status(400).json({
                 jsonrpc: "2.0", id: body?.id ?? null,
                 error: { code: -32602, message: error.message },
@@ -6285,7 +6321,7 @@ export function registerMcpRoute(
       // must be checked against the fetched heights before payment is used.
       if (
         isPrimaryDataTool(canonicalName) &&
-        (webhookUrl === undefined || pass?.maxTarget !== undefined)
+        ((webhookUrl === undefined && !polling) || pass?.maxTarget !== undefined)
       ) {
         try {
           res.locals.primaryStratigraphy = await primaryBackend(

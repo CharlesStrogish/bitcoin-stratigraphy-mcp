@@ -249,6 +249,11 @@ export type EscrowReceiptLightningSettlement = {
 };
 
 export interface EscrowReceipt {
+  /**
+     * Optional validated W3C Trace Context from the settlement request. Trace-aware 160-byte leaves append SHA-256 of the canonical traceparent JSON after the attribution digest (SHA-256 of {} when unattributed). Legacy 96-byte and 128-byte leaves remain valid and cannot claim trace context.
+     * @maxLength 512
+     */
+  traceparent?: string;
   /** Identifies the verifiable SHA-256 Merkle commitment format for future OpenTimestamps anchoring; does not assert calendar submission or Bitcoin confirmation. */
   ots_calendar_standard: EscrowReceiptOtsCalendarStandard;
   attestation_directive: EscrowReceiptAttestationDirective;
@@ -345,6 +350,11 @@ export type EscrowReceiptDocumentVerification = {
      * @pattern ^[0-9a-f]{64}$
      */
   agent_attribution_hash?: string;
+  /**
+     * Fifth segment of a trace-aware execution leaf, SHA-256 of canonical compact JSON containing traceparent. Correlation metadata, not authenticated identity.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  trace_context_hash?: string;
 };
 
 export interface EscrowReceiptDocument {

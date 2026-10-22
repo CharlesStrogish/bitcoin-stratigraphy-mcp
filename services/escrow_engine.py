@@ -263,8 +263,10 @@ def create_l402_escrow(buyer_pubkey, worker_pubkey, task_hash, amount_sats):
 
 def verify_execution_and_settle(
     escrow_id, execution_trace, result_payload, agent_id=None, agent_authentication=None,
+    traceparent=None,
 ):
     return _configured_engine().verify_execution_and_settle(
         escrow_id, execution_trace, result_payload, agent_id=agent_id,
         agent_authentication=agent_authentication,
+        traceparent=traceparent,
     )

@@ -2284,6 +2284,10 @@ components:
       type: object
       required: [escrow_id, leaf_index, audit_path, merkle_root, timestamp, tree_size, execution_leaf_hash, settled_at_strata_block, receipt_type, ots_calendar_standard, attestation_directive]
       properties:
+        traceparent:
+          type: string
+          maxLength: 512
+          description: Optional validated W3C Trace Context from the settlement request. Trace-aware 160-byte leaves append SHA-256 of the canonical traceparent JSON after the attribution digest (SHA-256 of {} when unattributed). Legacy 96-byte and 128-byte leaves remain valid and cannot claim trace context.
         ots_calendar_standard:
           type: string
           enum: ["OpenTimestamps / RFC 6962 SHA-256"]
@@ -2400,6 +2404,10 @@ components:
               type: string
               pattern: "^[0-9a-f]{64}$"
               description: 'Fourth leaf segment of an attributed settlement: SHA-256 of {"agent_id":"<agent_id>"}, or of {"agent_authentication":"nip98","agent_id":"<pubkey>"} when NIP-98 authenticated, verified against proof.agent_id and proof.agent_authentication.'
+            trace_context_hash:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+              description: Fifth segment of a trace-aware execution leaf, SHA-256 of canonical compact JSON containing traceparent. Correlation metadata, not authenticated identity.
         description:
           type: string
     AuditSubmission:

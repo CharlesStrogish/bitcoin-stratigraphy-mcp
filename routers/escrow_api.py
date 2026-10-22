@@ -4,6 +4,7 @@
 This module does not start another HTTP server or register any MCP tools.
 """
 
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -119,7 +120,6 @@ class EscrowApi:
             # segment; the receipt must name exactly that agent and authentication
             # mode, and 96-byte leaves neither.
             if len(data) == 160:
-                import hashlib
                 attribution = (
                     agent_attribution_digest(receipt["agent_id"], receipt.get("agent_authentication"))
                     if "agent_id" in receipt else hashlib.sha256(b"{}").digest()

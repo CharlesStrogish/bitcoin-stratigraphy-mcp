@@ -198,7 +198,7 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
     res.locals.escrowInput = input;
     next();
   };
-  const run = (operation: EscrowOperation): RequestHandler => async (_req, res) => {
+  const run = (operation: EscrowOperation): RequestHandler => async (req, res) => {
     if (active >= 8) {
       res.set("Retry-After", "5").status(503).json({ error: "Escrow service is busy" });
       return;

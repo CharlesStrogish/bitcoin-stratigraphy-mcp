@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { z } from "zod";
+import { validTraceparent } from "../lib/trace-context";
 import { readEscrowBitcoinPrice } from "./escrowPricing";
 import {
   withEscrowLedger, ESCROW_GENESIS, type EscrowSettlementRecord, type EscrowState,
@@ -38,6 +39,7 @@ export type EscrowExecutor = (
   signal?: AbortSignal,
   lightningSettlement?: EscrowLightningSettlement,
   attribution?: EscrowAgentAttribution,
+  traceparent?: string,
 ) => Promise<EscrowWorkerResult>;
 
 const hex64 = z.string().regex(/^[0-9a-f]{64}$/);
@@ -60,9 +62,10 @@ const settledReceipt = z.object({
 
 /** Derives the attribution row and fails unless the receipt names exactly the requested agent. */
 function settlementRecord(
-  body: Record<string, unknown>, attribution?: EscrowAgentAttribution,
+  body: Record<string, unknown>, attribution?: EscrowAgentAttribution, traceparent?: string,
 ): EscrowSettlementRecord {
   const receipt = settledReceipt.parse(body.article_12_receipt);
+  if (receipt.traceparent !== traceparent) throw new Error("Escrow receipt trace context mismatch");
   if (receipt.agent_id !== attribution?.agentId
       || receipt.agent_authentication !== attribution?.authentication) {
     throw new Error("Escrow receipt agent attribution mismatch");
@@ -84,12 +87,12 @@ function settlementRecord(
 
 /** Only staged source code is bundled. The custody DB never enters dist/. */
 export const executeEscrow: EscrowExecutor = async (
-  operation, body, height, signal, lightningSettlement, attribution,
+  operation, body, height, signal, lightningSettlement, attribution, traceparent,
 ) => {
   if (signal?.aborted) throw new Error("Escrow request cancelled");
   const price = operation === "create" ? await readEscrowBitcoinPrice() : undefined;
   return withEscrowLedger((state) => runEscrowWorker(
-    operation, body, state, height, signal, lightningSettlement, price, undefined, attribution,
+    operation, body, state, height, signal, lightningSettlement, price, undefined, attribution, traceparent,
   ));
 };
 
@@ -98,9 +101,13 @@ export function runEscrowWorker(
   height?: number, signal?: AbortSignal, lightningSettlement?: EscrowLightningSettlement,
   price?: number | null, legacyPath = path.resolve(process.cwd(), ".data/escrow/escrow.sqlite3"),
   attribution?: EscrowAgentAttribution,
+  traceparent?: string,
 ): Promise<{ state: EscrowState; result: EscrowWorkerResult; settlement?: EscrowSettlementRecord }> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error("Escrow request cancelled"));
+    if (traceparent !== undefined && (operation !== "settle" || !validTraceparent(traceparent))) {
+      return reject(new Error("Invalid escrow trace context"));
+    }
     if (attribution !== undefined && (operation !== "settle"
         || !isAgentAttribution(attribution.agentId, attribution.authentication))) {
       return reject(new Error("Invalid escrow agent attribution"));
@@ -155,7 +162,7 @@ export function runEscrowWorker(
           throw new Error("Missing durable escrow state");
         }
         const settlement = operation === "settle" && result.status === 200
-          ? settlementRecord(result.body, attribution) : undefined;
+          ? settlementRecord(result.body, attribution, traceparent) : undefined;
         finish(undefined, { result, state: output.state, ...(settlement ? { settlement } : {}) });
       } catch {
         finish(new Error("Invalid escrow worker response"));
@@ -164,6 +171,7 @@ export function runEscrowWorker(
     child.stdin.end(JSON.stringify({
       operation, body, strata_height: height, btc_usd_price: price,
       lightning_settlement: lightningSettlement,
+      ...(traceparent === undefined ? {} : { traceparent }),
       ...(attribution === undefined ? {} : {
         agent_id: attribution.agentId,
         ...(attribution.authentication === undefined ? {}

@@ -24,6 +24,23 @@ AGENT_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@/+=%~#-]{0,127}")
 # `agent_authentication = nip98` qualifies only a Nostr pubkey agent_id.
 NOSTR_PUBKEY_PATTERN = re.compile(r"[0-9a-f]{64}")
 AGENT_AUTHENTICATION_METHODS = frozenset({"nip98"})
+TRACEPARENT_PATTERN = re.compile(
+    r"([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})(.*)"
+)
+
+
+def trace_context_digest(traceparent):
+    """Bind the exact W3C context, without claiming it authenticates identity."""
+    match = TRACEPARENT_PATTERN.fullmatch(traceparent) if isinstance(traceparent, str) else None
+    if (
+        match is None or len(traceparent) > 512 or match[1] == "ff"
+        or match[2] == "0" * 32 or match[3] == "0" * 16
+        or (match[1] == "00" and match[5])
+        or (match[1] != "00" and match[5] and re.fullmatch(r"-[\x21-\x7e]+", match[5]) is None)
+    ):
+        raise ValueError("Invalid W3C traceparent")
+    payload = json.dumps({"traceparent": traceparent}, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(payload.encode("ascii")).digest()
 
 
 def _hex32(value, name):
@@ -109,7 +126,7 @@ class EscrowEngine:
 
     def verify_execution_and_settle(
         self, escrow_id, execution_trace, result_payload, lightning_settlement=None,
-        agent_id=None, agent_authentication=None,
+        agent_id=None, agent_authentication=None, traceparent=None,
     ):
         """Commit caller-authorized execution evidence; release only after commit.
 
@@ -126,6 +143,15 @@ class EscrowEngine:
             b"" if agent_id is None
             else agent_attribution_digest(agent_id, agent_authentication)
         )
+        # Trace-aware leaves use 160 bytes: base execution, attribution (or the
+        # canonical empty attribution), then context. Legacy widths stay valid.
+        context = b""
+        receipt_context = {}
+        if traceparent is not None:
+            receipt_context["traceparent"] = traceparent
+            context = trace_context_digest(receipt_context["traceparent"])
+            if not attribution:
+                attribution = hashlib.sha256(b"{}").digest()
         with self.store.transaction() as connection:
             contract = connection.execute(
                 "SELECT * FROM agent_escrow_contracts WHERE escrow_id = ?",
@@ -148,6 +174,7 @@ class EscrowEngine:
                 + hashlib.sha256(execution_trace.encode("utf-8")).digest()
                 + hashlib.sha256(result_payload.encode("utf-8")).digest()
                 + attribution
+                + context
             )
             tree = MerkleAccumulator(self.max_leaves)
             for row in connection.execute(
@@ -159,6 +186,7 @@ class EscrowEngine:
             index = tree.append(data)
             digest = leaf_hash(data).hex()
             receipt = {
+                **receipt_context,
                 "escrow_id": escrow_id,
                 "leaf_index": index,
                 "audit_path": [sibling.hex() for sibling in tree.inclusion_path(index)],

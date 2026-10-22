@@ -35,6 +35,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerNativeMcpDiscovery, validateNativeMcpRequest } from "../lib/mcp-native-discovery";
 import { createToolIntegrityManifest, loadToolIntegrityKey } from "../lib/tool-integrity";
 import { signToolResponse } from "../lib/mcp-response-signature";
+import { requestTraceparent } from "../lib/trace-context";
+import { McpTasksExtension, TASK_TOOLS, TASKS_EXTENSION, supportsTasks } from "../lib/mcp-tasks-extension";
+import type { TaskRecord } from "../lib/mcp-task-store";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
@@ -5345,11 +5348,13 @@ export function registerMcpRoute(
     publicRateLimiter?: SlidingWindowRateLimiter;
     /** Background runner for webhook_url calls; one per process by default. */
     asyncTaskRunner?: McpAsyncTaskRunner;
+    tasksExtension?: McpTasksExtension;
   } = {},
 ): void {
   const primaryBackend = options.stratigraphyBackend ??
     createPrimaryStratigraphyBackend({ secret: options.sessionSecret });
   const asyncTasks = options.asyncTaskRunner ?? createMcpAsyncTaskRunner();
+  const pollingTasks = options.tasksExtension ?? new McpTasksExtension();
   let fallbackIntegrity: ReturnType<typeof createToolIntegrityManifest> | undefined;
   const readToolIntegrity = () =>
     app.locals.toolIntegrityManifest ??
@@ -5582,6 +5587,80 @@ export function registerMcpRoute(
     string,
     (req: Request, res: Response, next: NextFunction) => void | Promise<void>
   >;
+  const taskCapabilities = (res: Response) => {
+    const protocol = res.locals.mcpProtocol as McpProtocolContext | undefined;
+    return protocol?.era === "stateless" && supportsTasks(protocol.clientCapabilities);
+  };
+  const taskReply = (req: Request, res: Response, result: Record<string, unknown>) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json({ jsonrpc: "2.0", id: req.body.id,
+      result: statelessMcpResult(req.body.method, result) });
+  };
+  const taskError = (req: Request, res: Response, code: number, message: string) => {
+    res.status(400).json({ jsonrpc: "2.0", id: req.body.id, error: { code, message } });
+  };
+  const runPollingTask = async (
+    task: TaskRecord, args: Record<string, unknown>, res: Response,
+  ) => {
+    const createServer = mcpServerFactory({ ...res.locals,
+      signToolResponse: app.locals.signMcpToolResponse ?? signResponse,
+    }, mesh, primaryBackend);
+    return pollingTasks.start(task, args, (signal) =>
+      runMcpToolCallInMemory(createServer, { name: task.tool, arguments: args }, signal));
+  };
+  /** Corrected input is a new signed request and must authorize before execution. */
+  const resumePollingTask = async (
+    req: Request, res: Response, next: NextFunction, task: TaskRecord,
+    args: Record<string, unknown>,
+  ) => {
+    const name = task.tool;
+    const tool = paidTools[name as keyof typeof paidTools];
+    const parsed = tool.schema.safeParse(args);
+    if (!parsed.success || requestedWebhookUrl(name, args) !== undefined) {
+      taskError(req, res, -32602, "Provide corrected tool arguments matching its tools/list inputSchema; webhook_url cannot change task delivery");
+      return;
+    }
+    const sourceArgs = withoutWebhookUrl(parsed.data as Record<string, unknown>);
+    const pass = presentedMcpCredential(req.header("Authorization"),
+      options.sessionSecret ?? process.env.SESSION_SECRET, Date.now());
+    const scopeRefusal = pass && delegationCaveatRejection(pass, { nowMs: Date.now(), tool: name });
+    if (scopeRefusal) { caveatRefusalResponse(res, req.body.id, scopeRefusal); return; }
+    if (isPrimaryDataTool(name)) {
+      try { res.locals.primaryStratigraphy = await primaryBackend(name, sourceArgs); }
+      catch (error) {
+        taskError(req, res, error instanceof RangeError ? -32602 : -32603,
+          error instanceof RangeError ? error.message : "Live stratigraphy validation unavailable");
+        return;
+      }
+    }
+    const targetRefusal = pass && await targetCaveatRefusal(pass, name, sourceArgs,
+      (res.locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined)?.targetHeights);
+    if (targetRefusal) { caveatRefusalResponse(res, req.body.id, targetRefusal); return; }
+    // Reserve the correction before touching a usage budget. Racing updates
+    // cannot both consume a payment or start the same work.
+    const reserved: TaskRecord = { ...task, revision: task.revision + 1,
+      status: "working", lastUpdatedAt: new Date().toISOString() };
+    if (!await pollingTasks.store.replace(reserved, task.revision)) {
+      taskError(req, res, -32602, "Task was already updated; poll its current state");
+      return;
+    }
+    let started = false;
+    res.once("finish", () => {
+      if (!started) void pollingTasks.store.replace({ ...task, revision: reserved.revision + 1 },
+        reserved.revision).catch((error: unknown) =>
+        req.log?.error({ err: error }, "Task input recovery unavailable"));
+    });
+    // The actual request/raw body is retained: NIP-98 verifies tasks/update,
+    // not a fabricated tools/call request.
+    await gates[name]!(req, res, (error?: unknown) => {
+      if (error) { next(error); return; }
+      void runPollingTask(reserved, sourceArgs, res).then((accepted) => {
+        started = accepted;
+        if (accepted) taskReply(req, res, { resultType: "complete" });
+        else taskError(req, res, -32602, "Task was cancelled or updated");
+      }).catch(next);
+    });
+  };
   app.all(
     "/mcp",
     rateLimit,
@@ -5608,6 +5687,67 @@ export function registerMcpRoute(
     // headers before any payment, delegation or tool work.
     negotiateMcpProtocol,
     validateNativeMcpRequest,
+    async (req, res, next) => {
+      try {
+        res.locals.traceparent = requestTraceparent(req);
+        const method = req.body?.method;
+        if (["tasks/get", "tasks/update", "tasks/cancel"].includes(method)) {
+          if (!taskCapabilities(res)) {
+            res.status(400).json({ jsonrpc: "2.0", id: req.body.id,
+              error: { code: -32021, message: "Missing required client capability",
+                data: { requiredCapabilities: { extensions: { [TASKS_EXTENSION]: {} } } } } });
+            return;
+          }
+          const task = await pollingTasks.get(req.body.params?.taskId);
+          if (!task) { taskError(req, res, -32602, "Task not found or expired"); return; }
+          if (method === "tasks/get") {
+            taskReply(req, res, pollingTasks.publicView(task));
+          } else if (method === "tasks/cancel") {
+            await pollingTasks.cancel(task);
+            taskReply(req, res, { resultType: "complete" });
+          } else {
+            const responses = req.body.params?.inputResponses;
+            if (!responses || typeof responses !== "object" || Array.isArray(responses)) {
+              taskError(req, res, -32602, "inputResponses must be an object"); return;
+            }
+            const response = task.inputKey ? responses[task.inputKey] : undefined;
+            if (task.status !== "input_required" || response === undefined) {
+              taskReply(req, res, { resultType: "complete" }); return;
+            }
+            if (response.action === "decline" || response.action === "cancel") {
+              await pollingTasks.cancel(task);
+              taskReply(req, res, { resultType: "complete" }); return;
+            }
+            let args: unknown;
+            try { args = JSON.parse(response.content?.arguments); } catch { /* Invalid input is not executable. */ }
+            if (response.action !== "accept" || !args || typeof args !== "object" || Array.isArray(args)) {
+              taskError(req, res, -32602, "Accept with content.arguments containing a JSON object string");
+              return;
+            }
+            // Key loading fails before a payment is consumed.
+            fallbackSigningKey ??= loadToolIntegrityKey();
+            await resumePollingTask(req, res, next, task, args as Record<string, unknown>);
+          }
+          return;
+        }
+        const name = req.body?.params?.name;
+        if (method === "tools/call" && TASK_TOOLS.has(name) && taskCapabilities(res) &&
+            !requestedWebhookUrl(name, req.body.params.arguments) &&
+            !paidTools[name as keyof typeof paidTools].schema.safeParse(req.body.params.arguments ?? {}).success) {
+          // Invalid calls never create invoices or consume paid execution.
+          limitPublic(req, res, (error?: unknown) => {
+            if (error) { next(error); return; }
+            const definition = mcpToolDefinitions.find((tool) => tool.name === name);
+            void pollingTasks.create(name, {},
+              `Correct the arguments for ${name}. Required format: ${JSON.stringify(definition?.inputSchema)}`,
+              res.locals.traceparent).then((task) =>
+              taskReply(req, res, pollingTasks.publicView(task, "task"))).catch(next);
+          });
+          return;
+        }
+        next();
+      } catch (error) { next(error); }
+    },
     async (req, res, next) => {
       // Previously-free operations must authorize before settlement/delegation
       // side effects. Invalid schemas still go to normal JSON-RPC validation.
@@ -6055,7 +6195,17 @@ export function registerMcpRoute(
       // and executed in the background instead of answering synchronously.
       const afterPayment: NextFunction =
         webhookUrl === undefined
-          ? next
+          ? TASK_TOOLS.has(canonicalName) && taskCapabilities(res)
+            ? (error?: unknown) => {
+                if (error) { next(error); return; }
+                void pollingTasks.create(canonicalName, sourceArguments(), undefined,
+                  res.locals.traceparent).then(async (task) => {
+                  if (!await runPollingTask(task, sourceArguments(), res))
+                    throw new Error("Task admission failed");
+                  taskReply(req, res, pollingTasks.publicView(task, "task"));
+                }).catch(next);
+              }
+            : next
           : (error?: unknown) => {
               if (error) {
                 next(error);

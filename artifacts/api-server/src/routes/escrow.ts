@@ -23,6 +23,7 @@ import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import type { SettlementRouter } from "../services/settlement";
 import { escrowTollQuote, readEscrowBitcoinPrice } from "../services/escrowPricing";
 import { escrowCapability, verifyEscrowCapability } from "../lib/escrow-capability";
+import { requestTraceparent } from "../lib/trace-context";
 
 type EscrowOptions = {
   execute?: EscrowExecutor;
@@ -234,7 +235,8 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
           agentId: res.locals.l402.agentId,
           ...(res.locals.l402.agentAuthentication === undefined ? {}
             : { authentication: res.locals.l402.agentAuthentication }),
-        } : undefined);
+        } : undefined,
+        operation === "settle" ? requestTraceparent(req) : undefined);
       if (res.destroyed) return;
       if (result.status !== 200 && result.status !== 201) {
         res.status(result.status).json(result.body);

@@ -60,6 +60,7 @@ export function mcpServerCapabilities() {
     prompts: { listChanged: false },
     resources: { subscribe: false, listChanged: false },
     tools: {},
+    extensions: { "io.modelcontextprotocol/tasks": {} },
   };
 }
 
@@ -75,6 +76,9 @@ export const STATELESS_MCP_METHODS: ReadonlySet<string> = new Set([
   "resources/read",
   "prompts/list",
   "prompts/get",
+  "tasks/get",
+  "tasks/update",
+  "tasks/cancel",
 ]);
 
 /**
@@ -91,10 +95,13 @@ const CACHEABLE_METHODS: ReadonlySet<string> = new Set([
 export const MCP_CACHE_TTL_MS = 300_000;
 
 /** Body field mirrored by the Mcp-Name header (SEP-2243). */
-const MCP_NAME_SOURCES: ReadonlyMap<string, "name" | "uri"> = new Map([
+const MCP_NAME_SOURCES: ReadonlyMap<string, "name" | "uri" | "taskId"> = new Map([
   ["tools/call", "name"],
   ["prompts/get", "name"],
   ["resources/read", "uri"],
+  ["tasks/get", "taskId"],
+  ["tasks/update", "taskId"],
+  ["tasks/cancel", "taskId"],
 ]);
 
 const LOG_LEVELS: ReadonlySet<string> = new Set([

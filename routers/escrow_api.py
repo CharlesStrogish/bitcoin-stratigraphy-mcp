@@ -14,7 +14,7 @@ from bitcoin_stratigraphy_enterprise.swarm_merkle import (
 )
 from services.escrow_engine import (
     EscrowEngine, EscrowStateError, OTS_CALENDAR_STANDARD, ATTESTATION_DIRECTIVE,
-    agent_attribution_digest,
+    agent_attribution_digest, trace_context_digest,
 )
 
 
@@ -27,7 +27,7 @@ class EscrowApi:
 
     def dispatch(
         self, operation, body, lightning_settlement=None, agent_id=None,
-        agent_authentication=None,
+        agent_authentication=None, traceparent=None,
     ):
         """Return (HTTP status, JSON body) to an already authorized transport.
 
@@ -75,6 +75,7 @@ class EscrowApi:
                 settled = self.engine.verify_execution_and_settle(
                     **body, lightning_settlement=lightning_settlement, agent_id=agent_id,
                     agent_authentication=agent_authentication,
+                    traceparent=traceparent,
                 )
                 receipt = settled["receipt"]
                 return 200, {
@@ -117,7 +118,21 @@ class EscrowApi:
             # 128-byte leaves commit the canonical attribution digest as a fourth
             # segment; the receipt must name exactly that agent and authentication
             # mode, and 96-byte leaves neither.
-            if len(data) == 128:
+            if len(data) == 160:
+                import hashlib
+                attribution = (
+                    agent_attribution_digest(receipt["agent_id"], receipt.get("agent_authentication"))
+                    if "agent_id" in receipt else hashlib.sha256(b"{}").digest()
+                )
+                if (
+                    attribution != data[96:128]
+                    or trace_context_digest(receipt["traceparent"]) != data[128:]
+                    or ("agent_authentication" in receipt and "agent_id" not in receipt)
+                ):
+                    return 422, {"error": "Stored escrow proof does not verify"}
+            elif "traceparent" in receipt:
+                return 422, {"error": "Stored escrow proof does not verify"}
+            elif len(data) == 128:
                 if agent_attribution_digest(
                     receipt["agent_id"], receipt.get("agent_authentication"),
                 ) != data[96:]:
@@ -167,7 +182,8 @@ class EscrowApi:
                     "task_hash": data[:32].hex(),
                     "trace_hash": data[32:64].hex(),
                     "result_hash": data[64:96].hex(),
-                    **({"agent_attribution_hash": data[96:].hex()} if len(data) == 128 else {}),
+                    **({"agent_attribution_hash": data[96:128].hex()} if len(data) >= 128 else {}),
+                    **({"trace_context_hash": data[128:].hex()} if len(data) == 160 else {}),
                 },
                 "description": (
                     "Local RFC 6962 execution commitment supporting Article 12 logging. "

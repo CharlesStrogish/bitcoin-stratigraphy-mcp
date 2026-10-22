@@ -8,5 +8,14 @@ Disallow: /.data/
 Disallow: /.local/
 Disallow: /attached_assets/
 
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
 # Agent discovery: https://bitcoinstratigraphy.com/llms.txt
 Sitemap: https://bitcoinstratigraphy.com/sitemap.xml

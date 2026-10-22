@@ -134,16 +134,19 @@ test("crawler rules and sitemap include developer pages and MCP discovery", asyn
     "artifacts/bitcoin-stratigraphy-dashboard/public/robots.txt",
   );
   assert.match(robots, /^User-agent: \*$/m);
-  // Public pages remain crawlable; only API data and internal files are excluded.
+  // Keep default exclusions and explicitly allow the requested AI crawlers.
   assert.deepEqual(
     robots.split("\n").map((line) => line.trim()).filter(
       (line) => /^(User-agent|Allow|Disallow):/i.test(line),
     ),
     ["User-agent: *", "Allow: /", "Disallow: /api/", "Allow: /api/docs",
       "Disallow: /tmp/", "Disallow: /generated-artifacts/", "Disallow: /.data/",
-      "Disallow: /.local/", "Disallow: /attached_assets/"],
+      "Disallow: /.local/", "Disallow: /attached_assets/",
+      "User-agent: OAI-SearchBot", "Allow: /",
+      "User-agent: ClaudeBot", "Allow: /",
+      "User-agent: PerplexityBot", "Allow: /"],
   );
-  assert.ok(robots.includes(`Sitemap: ${origin}/sitemap.xml`));
+  assert.ok(robots.trimEnd().endsWith(`Sitemap: ${origin}/sitemap.xml`));
   const xml = await load(
     "artifacts/bitcoin-stratigraphy-dashboard/public/sitemap.xml",
   );
@@ -191,7 +194,6 @@ test("developer pages, README and AI guides expose canonical documentation links
   assert.ok(header.includes(origin + "/docs"));
   assert.ok(header.includes(origin + "/cookbooks"));
   for (const file of [
-    "artifacts/bitcoin-stratigraphy-dashboard/public/llms.txt",
     "artifacts/bitcoin-stratigraphy-dashboard/public/llms-full.txt",
   ]) {
     const guide = await load(file);
@@ -238,4 +240,41 @@ test("developer pages, README and AI guides expose canonical documentation links
     const escaped = name.replace(".", "\\.");
     assert.match(full, new RegExp(`^#{2,4} (?:\\d+\\. )?${escaped} — `, "m"), name);
   }
+});
+
+test("concise agent guide maps exactly 16 tools and enterprise licensing", async () => {
+  const guide = await load(
+    "artifacts/bitcoin-stratigraphy-dashboard/public/llms.txt",
+  );
+  assert.equal(
+    guide.split("\n")[0],
+    "# Bitcoin Stratigraphy Data Engine (Enterprise MCP Server)",
+  );
+  assert.ok(guide.includes(
+    "> An enterprise-grade, L402-gated AI Notary Hub providing thermodynamic Bitcoin telemetry. Features 16 canonical tools, NIP-98 Cryptographic Agent Identity Binding, and RFC 6962 Merkle flight recorders for EU AI Act Article 12 compliance.",
+  ));
+  const tools = [...guide.matchAll(/^- `([a-z_]+\.[a-z_]+)`:/gm)]
+    .map((match) => match[1]);
+  assert.deepEqual(tools.sort(), [
+    "stratigraphy.list", "stratigraphy.get", "stratigraphy.get_digest",
+    "stratigraphy.get_diff", "stratigraphy.get_range",
+    "proof.list", "proof.attenuate", "proof.verify", "proof.get_by_hash",
+    "proof.submit", "proof.notarize", "proof.ground",
+    "mesh.get_status", "mesh.broadcast", "payment.get_info",
+    "workflow.audit_trajectory",
+  ].sort());
+  for (const namespace of ["stratigraphy", "proof", "mesh", "payment", "workflow"]) {
+    assert.ok(guide.includes(`### ${namespace}\n`));
+  }
+  for (const term of [
+    "## Enterprise Licensing",
+    "$250k/Annual Commercial License Exemption",
+    "licensing@bitcoinstratigraphy.com",
+    `${origin}/mcp`, `${origin}/llms-full.txt`, `${origin}/docs`,
+    `${origin}/cookbooks`,
+  ]) {
+    assert.ok(guide.includes(term), term);
+  }
+  assert.ok(Buffer.byteLength(guide) < 5000, "Keep agent discovery concise");
+  assert.doesNotMatch(guide, /replit\.app/);
 });

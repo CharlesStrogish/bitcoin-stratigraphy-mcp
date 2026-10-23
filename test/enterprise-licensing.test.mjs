@@ -76,7 +76,7 @@ test("licensing renders both tiers with every requested entitlement and price", 
     "EU AI Act Article 12 & 26(6) Tamper-Evident Flight Recorders",
     "L402 Runaway Swarm Circuit Breakers",
     "Cryptographically Signed Tool Integrity",
-    '"AS IS" No-SLA delivery',
+    "Automated Compliance SLAs Available",
   ]) {
     assert.ok(text.includes(label), `renders ${label}`);
   }

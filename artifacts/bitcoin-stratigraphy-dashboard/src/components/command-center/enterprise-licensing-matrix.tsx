@@ -19,7 +19,7 @@ const ENTERPRISE = [
   "EU AI Act Article 12 & 26(6) Tamper-Evident Flight Recorders",
   "L402 Runaway Swarm Circuit Breakers",
   "Cryptographically Signed Tool Integrity",
-  '"AS IS" No-SLA delivery',
+  "Automated Compliance SLAs Available",
 ];
 
 export function EnterpriseLicensingMatrix() {

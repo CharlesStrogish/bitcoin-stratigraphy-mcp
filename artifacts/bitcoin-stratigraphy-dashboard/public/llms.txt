@@ -1,6 +1,6 @@
 # Bitcoin Stratigraphy Data Engine (Enterprise MCP Server)
 
-> An enterprise-grade, L402-gated AI Notary Hub providing thermodynamic Bitcoin telemetry. Features 16 canonical tools, NIP-98 Cryptographic Agent Identity Binding, and RFC 6962 Merkle flight recorders for EU AI Act Article 12 compliance.
+> An enterprise-grade, L402-gated AI Notary Hub providing thermodynamic Bitcoin telemetry to mathematically eliminate AI hallucinations. Offers a Commercial Enterprise Exemption with Automated Compliance SLAs. Features 16 canonical tools, NIP-98 Cryptographic Agent Identity Binding, and RFC 6962 Merkle flight recorders for EU AI Act Article 12 compliance.
 
 ## Agent entry points
 - [MCP endpoint](https://bitcoinstratigraphy.com/mcp): POST JSON-RPC; use `tools/list` for current schemas.

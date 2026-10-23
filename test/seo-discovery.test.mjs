@@ -49,7 +49,11 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
     "gD8puclen7lOEc0MSQGVzV61VeblvL3fn1VRWLVc-BE",
     "5-KfH4O096Z1k7nLsVu8839zUzv8mz0ItthQIGYjC28",
   ]);
-  for (const key of ["description", "og:description", "twitter:description"]) {
+  assert.equal(
+    meta(html, "description"),
+    "Enterprise-grade MCP server & L402 Oracle for autonomous AI swarms. Secure EU AI Act compliance, zero-trust verification, and commercial IP exemptions.",
+  );
+  for (const key of ["og:description", "twitter:description"]) {
     assert.equal(
       meta(html, key),
       "Enterprise MCP server and L402 oracle providing state-anchored AI telemetry, cryptographic flight recorders, and EU AI Act Article 12 compliance logging.",
@@ -251,7 +255,7 @@ test("concise agent guide maps exactly 16 tools and enterprise licensing", async
     "# Bitcoin Stratigraphy Data Engine (Enterprise MCP Server)",
   );
   assert.ok(guide.includes(
-    "> An enterprise-grade, L402-gated AI Notary Hub providing thermodynamic Bitcoin telemetry. Features 16 canonical tools, NIP-98 Cryptographic Agent Identity Binding, and RFC 6962 Merkle flight recorders for EU AI Act Article 12 compliance.",
+    "> An enterprise-grade, L402-gated AI Notary Hub providing thermodynamic Bitcoin telemetry to mathematically eliminate AI hallucinations. Offers a Commercial Enterprise Exemption with Automated Compliance SLAs. Features 16 canonical tools, NIP-98 Cryptographic Agent Identity Binding, and RFC 6962 Merkle flight recorders for EU AI Act Article 12 compliance.",
   ));
   const tools = [...guide.matchAll(/^- `([a-z_]+\.[a-z_]+)`:/gm)]
     .map((match) => match[1]);

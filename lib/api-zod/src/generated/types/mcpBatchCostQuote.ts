@@ -22,11 +22,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BatchSettlementDiscovery } from './batchSettlementDiscovery';
+import type { LicensingCompliance } from './licensingCompliance';
 import type { McpBatchCostQuoteL402 } from './mcpBatchCostQuoteL402';
 import type { McpBatchCostQuotePerToolSats } from './mcpBatchCostQuotePerToolSats';
 import type { McpToolCostItem } from './mcpToolCostItem';
 
 export interface McpBatchCostQuote {
+  licensing_compliance?: LicensingCompliance;
   batchSettlement: BatchSettlementDiscovery;
   protocol: 'L402';
   currency: 'sats';

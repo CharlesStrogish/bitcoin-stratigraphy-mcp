@@ -186,6 +186,12 @@ export type EscrowGenesisReceiptCreateResponse = {
   toll_fee_sats: number;
 };
 
+export interface LicensingCompliance {
+  open_source_license: string;
+  commercial_exemption: string;
+  procurement_url: string;
+}
+
 export type EscrowSettlementOtsCalendarStandard = typeof EscrowSettlementOtsCalendarStandard[keyof typeof EscrowSettlementOtsCalendarStandard];
 
 
@@ -277,6 +283,9 @@ export type EscrowReceiptLightningSettlement = {
 };
 
 export interface EscrowReceipt {
+  /** Signed SHA-256 SPKI fingerprint for selection from independently pinned current and historical receipt issuer keys. */
+  issuer_key_id?: string;
+  issued_at?: string;
   /**
      * Exact 96, 128 or 160 byte RFC 6962 leaf preimage containing only task, trace, result and optional attribution/context hashes; never a payment preimage.
      * @pattern ^(?:[0-9a-f]{192}|[0-9a-f]{256}|[0-9a-f]{320})$
@@ -317,6 +326,7 @@ export interface EscrowReceipt {
 }
 
 export interface EscrowSettlement {
+  licensing_compliance?: LicensingCompliance;
   ots_calendar_standard: EscrowSettlementOtsCalendarStandard;
   attestation_directive: EscrowSettlementAttestationDirective;
   status: EscrowSettlementStatus;
@@ -586,6 +596,28 @@ export interface BatchSettlementDiscovery {
   instructions: string;
 }
 
+export interface RevocationSnapshotEntry {
+  /** @pattern ^[0-9a-f]{64}$ */
+  pubkey: string;
+  revoked_at: string;
+}
+
+export type SignedRevocationSnapshotIssuerAttestation = {
+  version: string;
+  algorithm: string;
+  key_id: string;
+  signature: string;
+};
+
+export interface SignedRevocationSnapshot {
+  snapshot_type: 'nip98-revocation-snapshot-v1';
+  as_of: string;
+  next_update: string;
+  issuer_key_id: string;
+  revoked_keys: RevocationSnapshotEntry[];
+  issuer_attestation: SignedRevocationSnapshotIssuerAttestation;
+}
+
 export type McpBatchCostQuotePerToolSats = {[key: string]: number};
 
 export type McpBatchCostQuoteL402Batch = {
@@ -614,6 +646,7 @@ export type McpBatchCostQuoteL402 = {
 };
 
 export interface McpBatchCostQuote {
+  licensing_compliance?: LicensingCompliance;
   batchSettlement: BatchSettlementDiscovery;
   protocol: 'L402';
   currency: 'sats';
@@ -1814,6 +1847,7 @@ export interface JsonSchema {
 }
 
 export interface StratigraphyCost {
+  licensing_compliance?: LicensingCompliance;
   batchSettlement?: BatchSettlementDiscovery;
   protocol: 'L402';
   settlement_asset: SettlementAsset;

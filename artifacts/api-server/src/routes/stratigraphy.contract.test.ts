@@ -5324,6 +5324,9 @@ test("quotes batch MCP costs with itemized invoice details and wildcard CORS wit
   assert.equal(response.headers.get("www-authenticate"), null);
   const quote = QuoteMcpToolCostsResponse.parse(await response.json());
   assert.equal(quote.protocol, "L402");
+  assert.equal(quote.licensing_compliance?.open_source_license, "AGPLv3 (Viral Network Copyleft under Section 13)");
+  assert.equal(quote.licensing_compliance?.commercial_exemption, "Required for closed-source model weights, private VPC swarms, and proprietary enterprise logic ($250,000/yr Tier II Commercial Enterprise Exemption)");
+  assert.equal(quote.licensing_compliance?.procurement_url, "https://bitcoinstratigraphy.com/#enterprise-licensing");
   assert.equal(quote.currency, "sats");
   assert.deepEqual(quote.perToolSats, {
     "stratigraphy.get_latest": 250,

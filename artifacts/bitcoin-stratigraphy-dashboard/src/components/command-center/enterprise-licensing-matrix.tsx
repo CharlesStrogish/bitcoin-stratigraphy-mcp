@@ -25,6 +25,7 @@ const ENTERPRISE = [
 export function EnterpriseLicensingMatrix() {
   return (
     <section
+      id="enterprise-licensing"
       className="elm"
       aria-labelledby="cc-licensing-title"
       data-testid="module-enterprise-licensing"
@@ -96,6 +97,42 @@ export function EnterpriseLicensingMatrix() {
             />
           </div>
         </article>
+        <details
+          className="elm-risk-brief"
+          data-testid="ciso-vendor-risk-brief"
+        >
+          <summary>CISO Vendor Risk &amp; AGPLv3 Copyleft Brief</summary>
+          <div className="elm-risk-content">
+            <h5>Protect proprietary swarm IP with Tier II</h5>
+            <p>
+              The $250,000/year Commercial Enterprise Exemption licenses the
+              engine under commercial terms for private VPC and air-gapped
+              deployments. Keep proprietary multi-agent weights and enterprise
+              logic under your commercial agreement, rather than relying on the
+              engine&apos;s AGPLv3 license.
+            </p>
+            <p>
+              AGPLv3 Section 13 requires corresponding source access for covered
+              modified software used over a network. It does not automatically
+              make independent model weights or unrelated applications subject
+              to disclosure. Tier II defines the commercial rights for your
+              deployment.
+            </p>
+            <h5>Automated Compliance SLAs</h5>
+            <p>
+              Export signed NIP-98 registry snapshots automatically from{" "}
+              <code>/api/v1/compliance/revocation-snapshot</code>. Verify issuer
+              signatures, snapshot freshness and agent non-revocation at the
+              signed timestamp without a network connection.
+            </p>
+            <p>
+              Receipt issuer-key rotation supports independently pinned current
+              and historical public keys. The Zero-Trust Article 12 Verifier
+              keeps execution evidence inspectable after rotation. Service
+              commitments are defined by the signed commercial agreement.
+            </p>
+          </div>
+        </details>
       </div>
       <a
         className="elm-integrity-link"

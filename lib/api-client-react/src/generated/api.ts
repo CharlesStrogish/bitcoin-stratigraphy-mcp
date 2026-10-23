@@ -90,6 +90,7 @@ import type {
   ReadinessStatus,
   RevokeNip98Key200,
   SettlementAssetSelectionError,
+  SignedRevocationSnapshot,
   SmitheryServerCard,
   StratigraphyCost,
   StratigraphyEntry,
@@ -2575,6 +2576,84 @@ export function useGetStratigraphy<TData = Awaited<ReturnType<typeof getStratigr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStratigraphyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRevocationSnapshotUrl = () => {
+
+
+
+
+  return `/api/v1/compliance/revocation-snapshot`
+}
+
+/**
+ * Public Ed25519-signed complete registry snapshot, valid for freshness checking for 15 minutes. Pin issuer keys independently. Absence proves only the issuer's registry state at as_of, not future authorization or independent verification of the original NIP-98 event. Failures return 503, never an empty synthetic registry.
+ * @summary Export a signed, point-in-time NIP-98 revocation registry
+ */
+export const getRevocationSnapshot = async ( options?: Parameters<typeof customFetch>[1]): Promise<SignedRevocationSnapshot> => {
+
+  return customFetch<SignedRevocationSnapshot>(getGetRevocationSnapshotUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRevocationSnapshotQueryKey = () => {
+    return [
+    `/api/v1/compliance/revocation-snapshot`
+    ] as const;
+    }
+
+
+export const getGetRevocationSnapshotQueryOptions = <TData = Awaited<ReturnType<typeof getRevocationSnapshot>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRevocationSnapshot>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRevocationSnapshotQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRevocationSnapshot>>> = ({ signal }) => getRevocationSnapshot({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRevocationSnapshot>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRevocationSnapshotQueryResult = NonNullable<Awaited<ReturnType<typeof getRevocationSnapshot>>>
+export type GetRevocationSnapshotQueryError = ErrorType<void>
+
+
+/**
+ * @summary Export a signed, point-in-time NIP-98 revocation registry
+ */
+
+export function useGetRevocationSnapshot<TData = Awaited<ReturnType<typeof getRevocationSnapshot>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRevocationSnapshot>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRevocationSnapshotQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

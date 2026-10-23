@@ -41,6 +41,7 @@ import { registerEscrowRoutes } from "./routes/escrow";
 import { registerEnterpriseRoutes } from "./routes/enterprise";
 import { createEscrowRecovery } from "./services/escrowRecovery";
 import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store";
+import { registerComplianceRoutes } from "./routes/compliance";
 import {
   createNip98RevocationGuard, registerNip98RevocationAdmin,
 } from "./middleware/nip98-revocation";
@@ -112,6 +113,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(nip98RevocationGuard);
 registerNip98RevocationAdmin(app, nip98Revocations);
+registerComplianceRoutes(app, nip98Revocations);
 
 const macaroonUsageStore = createPostgresMacaroonUsageStore();
 

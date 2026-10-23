@@ -101,7 +101,7 @@ footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:
 
 <main class="grid">
  <section class="panel" aria-labelledby="in-h">
-  <div class="ph"><h2 id="in-h">Evidence inputs</h2><span class="kicker">3 required</span></div>
+   <div class="ph"><h2 id="in-h">Evidence inputs</h2><span class="kicker">3 required · CRL optional</span></div>
   <form class="pb" id="form" novalidate>
    <div class="field">
     <label for="receipt">Receipt JSON <small>raw receipt, settlement response or JSON-LD</small></label>
@@ -109,16 +109,21 @@ footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:
     <p class="hint" id="receipt-h">Paste the object exactly as received. Accepts <code>article_12_receipt</code> or <code>proof</code> wrappers.</p>
    </div>
    <div class="field">
-    <label for="pem">Trusted issuer public key <small>Ed25519 SPKI PEM</small></label>
+     <label for="pem">Pinned issuer public keys <small>current &amp; historical · Ed25519 SPKI PEM</small></label>
     <textarea id="pem" rows="4" spellcheck="false" autocomplete="off" aria-describedby="pem-h" placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----" required></textarea>
-    <p class="hint" id="pem-h">Obtain and pin this key through an independent channel (procurement record, signed config, out-of-band confirmation). Never copy it from the receipt or from the same response that delivered the receipt.</p>
+     <p class="hint" id="pem-h">Paste one or more PEM blocks (or a JSON array of PEM strings) from your independently pinned current and historical key list. Rotation selects the matching SHA-256 fingerprint; it never trusts a key from the receipt or snapshot. Retire compromised pins through your enterprise trust process.</p>
    </div>
    <div class="field">
     <label for="agent">Expected agent pubkey <small>NIP-98 · 64 hex</small></label>
     <input id="agent" type="text" inputmode="text" spellcheck="false" autocomplete="off" maxlength="80" aria-describedby="agent-h" required>
     <p class="hint" id="agent-h">The agent identity you expect, from your own records — not from the receipt.</p>
    </div>
-   <div class="actions">
+    <div class="field">
+     <label for="snapshot">Signed Revocation Snapshot JSON <small>optional · offline audit</small></label>
+     <textarea id="snapshot" rows="5" spellcheck="false" autocomplete="off" aria-describedby="snapshot-h"></textarea>
+     <p class="hint" id="snapshot-h">Export <code>/api/v1/compliance/revocation-snapshot</code> before going offline. Signature, registry format, issuer pin and 15-minute freshness are checked against this browser's clock. A pass establishes absence from the issuer's registry at the signed <code>as_of</code> time, not after it.</p>
+    </div>
+    <div class="actions">
     <button type="submit" class="primary" id="verify">Verify receipt</button>
     <button type="button" class="ghost" id="clear">Clear</button>
     <span class="spacer"></span>
@@ -135,6 +140,7 @@ footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:
     <li data-k="signature" data-s="idle"><span class="dot" aria-hidden="true"></span><span>Issuer Ed25519 signature &amp; key fingerprint</span><span class="chk-k">Pending</span></li>
     <li data-k="merkle" data-s="idle"><span class="dot" aria-hidden="true"></span><span>Leaf binding &amp; RFC 6962 inclusion</span><span class="chk-k">Pending</span></li>
     <li data-k="identity" data-s="idle"><span class="dot" aria-hidden="true"></span><span>Bound to expected NIP-98 agent</span><span class="chk-k">Pending</span></li>
+     <li data-k="revocation" data-s="idle"><span class="dot" aria-hidden="true"></span><span>Optional signed registry &amp; snapshot-time non-revocation</span><span class="chk-k">Not supplied</span></li>
    </ul>
   </section>
   <section class="panel" aria-labelledby="out-h">
@@ -144,6 +150,7 @@ footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:
     <div><dt>Agent pubkey</dt><dd id="o-agent" class="empty">—</dd></div>
     <div><dt>Merkle root</dt><dd id="o-root" class="empty">—</dd></div>
     <div><dt>Escrow ID</dt><dd id="o-escrow" class="empty">—</dd></div>
+     <div><dt>Signed registry as of</dt><dd id="o-revocation" class="empty">—</dd></div>
    </dl>
    <p class="notice" id="o-notice" hidden></p>
   </section>
@@ -153,8 +160,8 @@ footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:
 <section class="panel limits warn" aria-labelledby="lim-h">
  <div class="ph"><h2 id="lim-h">What a pass does not prove</h2><span class="kicker">Read before relying</span></div>
  <ul>
-  <li><b>Key trust is yours.</b> The result is only as strong as the provenance of the issuer key you pasted. A key taken from the receipt proves nothing.</li>
-  <li><b>Identity is server-recorded.</b> The receipt records that the issuer verified a NIP-98 identity. This page does not independently re-verify the original Schnorr-signed event, nor current key revocation status.</li>
+   <li><b>Key trust is yours.</b> Independently pin current and historical issuer keys. Fingerprint selection supports rotation but does not certify a key's provenance or continued safety.</li>
+   <li><b>Identity is server-recorded.</b> This page does not independently re-verify the original Schnorr-signed NIP-98 event. A valid optional CRL establishes signed registry state at its timestamp; it cannot reveal later revocations or authorize a live request. Without a CRL, revocation is not checked. Freshness depends on your browser clock.</li>
   <li><b>Merkle validity is local.</b> A valid inclusion proof does not prove the thermodynamic truth of source data, Bitcoin anchoring of the root, or legal / regulatory compliance.</li>
  </ul>
 </section>
@@ -198,7 +205,73 @@ globalThis.Article12Verifier = (() => {
     }
     return Uint8Array.from(atob(value), c => c.charCodeAt(0));
   }
-  async function verify(input, trustedPublicKeyPem, expectedAgentPubkey) {
+  async function verifyEnvelope(receipt, trustedPublicKeyPem, version, signingDomain) {
+    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw new Error("Invalid signed evidence object");
+    const { issuer_attestation: attestation, ...payload } = receipt;
+    if (attestation?.version !== version || attestation.algorithm !== "Ed25519") {
+      throw new Error("Missing supported Ed25519 receipt attestation; unsigned legacy receipts cannot pass.");
+    }
+    let pins = trustedPublicKeyPem;
+    if (typeof pins === "string" && pins.trim().startsWith("[")) pins = JSON.parse(pins);
+    const text = Array.isArray(pins) ? pins.join("\n") : String(pins);
+    const keys = text.match(/-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----/g) || [];
+    if (!keys.length || text.replace(/-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----/g, "").trim()) {
+      throw new Error("Provide independently trusted Ed25519 SPKI public key PEMs");
+    }
+    let der;
+    for (const pem of keys) {
+      const candidate = base64(pem.replace(/-----[A-Z ]+-----/g, "").replace(/\s/g, ""));
+      if (hex(await hash(candidate)) === attestation.key_id) { der = candidate; break; }
+    }
+    if (!der) throw new Error("Trusted issuer key fingerprint does not match any pinned key");
+    const key = await crypto.subtle.importKey("spki", der, { name: "Ed25519" }, false, ["verify"]);
+    const signature = base64(attestation.signature);
+    if (signature.length !== 64 || !await crypto.subtle.verify(
+      { name: "Ed25519" }, key, signature, encoder.encode(signingDomain + canonical(payload)),
+    )) throw new Error("Ed25519 signature is invalid");
+    if (payload.issuer_key_id !== undefined && payload.issuer_key_id !== attestation.key_id) {
+      throw new Error("Signed issuer key fingerprint does not match envelope");
+    }
+    return { payload, attestation };
+  }
+  function isoTime(value) {
+    const time = typeof value === "string" ? Date.parse(value) : NaN;
+    if (!Number.isFinite(time) || new Date(time).toISOString() !== value) throw new Error("Revocation snapshot requires canonical ISO timestamps");
+    return time;
+  }
+  async function verifyRevocationSnapshot(input, pins, expectedAgent, auditTime = Date.now()) {
+    try {
+      const snapshot = typeof input === "string" ? JSON.parse(input) : input;
+      const { payload, attestation } = await verifyEnvelope(
+        snapshot, pins, "nip98-crl-ed25519-v1", "bitcoin-stratigraphy/nip98-crl/v1\n",
+      );
+      const asOf = isoTime(payload.as_of), nextUpdate = isoTime(payload.next_update);
+      if (payload.snapshot_type !== "nip98-revocation-snapshot-v1" ||
+          payload.issuer_key_id !== attestation.key_id ||
+          !Array.isArray(payload.revoked_keys) || nextUpdate - asOf !== 900000) {
+        throw new Error("Invalid complete registry snapshot");
+      }
+      if (!Number.isFinite(auditTime) || auditTime < asOf || auditTime >= nextUpdate) {
+        throw new Error("Snapshot is future-dated or stale at the audit time; obtain a fresh signed export");
+      }
+      const agent = String(expectedAgent).trim().toLowerCase();
+      if (!/^[0-9a-f]{64}$/.test(agent)) throw new Error("Expected NIP-98 public key required");
+      let previous = "";
+      for (const entry of payload.revoked_keys) {
+        if (!entry || !/^[0-9a-f]{64}$/.test(entry.pubkey) ||
+            entry.pubkey <= previous || isoTime(entry.revoked_at) > asOf) {
+          throw new Error("Invalid or duplicate revocation registry entry");
+        }
+        previous = entry.pubkey;
+        if (entry.pubkey === agent) throw new Error("Agent is revoked in the signed registry snapshot");
+      }
+      return { verified: true, status: "not_revoked_in_snapshot", asOf: payload.as_of,
+        nextUpdate: payload.next_update, issuerKeyId: attestation.key_id };
+    } catch (error) {
+      throw new Error("Revocation snapshot: " + String(error?.message || error));
+    }
+  }
+  async function verify(input, trustedPublicKeyPem, expectedAgentPubkey, snapshotInput, auditTime = Date.now()) {
     if (!globalThis.crypto?.subtle) {
       throw new Error("Web Crypto is unavailable. Use a browser supporting Ed25519 in a secure context or a local file.");
     }
@@ -208,21 +281,7 @@ globalThis.Article12Verifier = (() => {
     if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
       throw new Error("Paste an Article 12 receipt JSON object");
     }
-    const { issuer_attestation: attestation, ...payload } = receipt;
-    if (attestation?.version !== "article12-ed25519-v1" || attestation.algorithm !== "Ed25519") {
-      throw new Error("Missing supported Ed25519 receipt attestation; unsigned legacy receipts cannot pass.");
-    }
-    const pem = String(trustedPublicKeyPem).trim();
-    if (!/^-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----$/.test(pem)) {
-      throw new Error("Provide an independently trusted Ed25519 SPKI public key PEM");
-    }
-    const der = base64(pem.replace(/-----[A-Z ]+-----/g, "").replace(/\s/g, ""));
-    if (hex(await hash(der)) !== attestation.key_id) throw new Error("Trusted issuer key fingerprint does not match");
-    const key = await crypto.subtle.importKey("spki", der, { name: "Ed25519" }, false, ["verify"]);
-    const signature = base64(attestation.signature);
-    if (signature.length !== 64 || !await crypto.subtle.verify(
-      { name: "Ed25519" }, key, signature, encoder.encode(domain + canonical(payload)),
-    )) throw new Error("Ed25519 signature is invalid");
+    const { payload, attestation } = await verifyEnvelope(receipt, trustedPublicKeyPem, "article12-ed25519-v1", domain);
     if (payload.receipt_type !== "article_12_execution_commitment") throw new Error("Unexpected receipt type");
     const leaf = unhex(payload.leaf_preimage, [96, 128, 160]);
     let current = await hash(concat(new Uint8Array([0]), leaf));
@@ -276,31 +335,39 @@ globalThis.Article12Verifier = (() => {
     if (payload.agent_authentication !== "nip98" || payload.agent_id !== expected) {
       throw new Error("Receipt is not bound to the expected NIP-98-authenticated agent");
     }
+    const revocation = snapshotInput == null || snapshotInput === "" ? null :
+      await verifyRevocationSnapshot(snapshotInput, trustedPublicKeyPem, expected, auditTime);
     return {
       verified: true, signature: true, merkle: true, identity: true,
       issuerKeyId: attestation.key_id, agentPubkey: expected,
       root: payload.merkle_root, escrowId: payload.escrow_id,
-      notice: "Verified issuer signature, committed agent attribution and local Merkle inclusion. This does not independently verify the original NIP-98 event, present key-revocation status, thermodynamic source truth, Bitcoin anchoring or legal compliance.",
+      revocation,
+      notice: "Verified issuer signature, committed agent attribution and local Merkle inclusion. " +
+        (revocation ? "Agent absent from the issuer's signed registry as of " + revocation.asOf + ". " : "Revocation snapshot not supplied; revocation not checked. ") +
+        "This does not independently verify the original NIP-98 event, changes after the snapshot, thermodynamic source truth, Bitcoin anchoring or legal compliance.",
     };
   }
-  return Object.freeze({ verify, canonical });
+  return Object.freeze({ verify, verifyRevocationSnapshot, canonical });
 })();
 </script>
 <script>
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
-  const form = $("form"), rc = $("receipt"), pem = $("pem"), ag = $("agent");
+  const form = $("form"), rc = $("receipt"), pem = $("pem"), ag = $("agent"), crl = $("snapshot");
   const vBtn = $("verify"), status = $("status");
-  const out = { key: $("o-key"), agent: $("o-agent"), root: $("o-root"), escrow: $("o-escrow") };
+  const out = { key: $("o-key"), agent: $("o-agent"), root: $("o-root"), escrow: $("o-escrow"), revocation: $("o-revocation") };
   let gen = 0;
   function setChecks(state, failKey) {
     document.querySelectorAll("#checks li").forEach(li => {
+      if (li.dataset.k === "revocation" && !crl.value.trim()) {
+        li.dataset.s = "idle"; li.lastElementChild.textContent = "Not supplied"; return;
+      }
       const s = state === "fail" ? (li.dataset.k === failKey ? "fail" : "idle") : state;
       li.dataset.s = s;
       li.lastElementChild.textContent = { idle: state === "fail" ? "Not passed" : "Pending", run: "Checking", pass: "Pass", fail: "Fail" }[s];
     });
-    $("ck-sum").textContent = { idle: "Not run", run: "Running", pass: "3 / 3 pass", fail: "Failed" }[state];
+    $("ck-sum").textContent = { idle: "Not run", run: "Running", pass: crl.value.trim() ? "4 / 4 pass" : "3 / 3 · CRL not checked", fail: "Failed" }[state];
   }
   function resetOutput() {
     for (const k in out) { out[k].textContent = "—"; out[k].classList.add("empty"); }
@@ -317,15 +384,16 @@ globalThis.Article12Verifier = (() => {
   function reset() {
     gen++; vBtn.disabled = false; vBtn.textContent = "Verify receipt";
     setChecks("idle"); resetOutput(); setStatus(null);
-    [rc, pem, ag].forEach(e => fieldErr(e, false));
+    [rc, pem, ag, crl].forEach(e => fieldErr(e, false));
   }
   function classify(msg) {
+    if (/revocation|snapshot|registry/i.test(msg)) return "revocation";
     if (/agent|NIP-98/i.test(msg) && !/attribution|Leaf layout/i.test(msg)) return "identity";
     if (/Merkle|leaf|Leaf|Trace|hex|receipt type/i.test(msg)) return "merkle";
     return "signature";
   }
-  [rc, pem, ag].forEach(el => el.addEventListener("input", reset));
-  $("clear").addEventListener("click", () => { rc.value = ""; pem.value = ""; ag.value = ""; reset(); rc.focus(); });
+  [rc, pem, ag, crl].forEach(el => el.addEventListener("input", reset));
+  $("clear").addEventListener("click", () => { rc.value = ""; pem.value = ""; ag.value = ""; crl.value = ""; reset(); rc.focus(); });
   form.addEventListener("submit", async ev => {
     ev.preventDefault();
     reset();
@@ -339,22 +407,24 @@ globalThis.Article12Verifier = (() => {
     vBtn.disabled = true; vBtn.textContent = "Verifying…";
     setChecks("run"); setStatus("busy", "Verifying", "Running checks locally in this tab.");
     try {
-      const r = await Article12Verifier.verify(rc.value, pem.value, ag.value);
+      const r = await Article12Verifier.verify(rc.value, pem.value, ag.value, crl.value.trim() || undefined);
       if (my !== gen) return;
       if (!r || r.verified !== true || !r.signature || !r.merkle || !r.identity) throw new Error("Verifier did not report a complete pass");
       setChecks("pass");
       out.key.textContent = String(r.issuerKeyId); out.agent.textContent = String(r.agentPubkey);
       out.root.textContent = String(r.root); out.escrow.textContent = r.escrowId == null ? "(none)" : String(r.escrowId);
+      out.revocation.textContent = r.revocation ? String(r.revocation.asOf) : "Not checked — no snapshot supplied";
       for (const k in out) out[k].classList.remove("empty");
       $("o-notice").textContent = String(r.notice); $("o-notice").hidden = false;
-      setStatus("ok", "Verified", "Signature, attribution binding, Merkle inclusion and expected agent all pass. Review the limits below.");
+      setStatus("ok", "Verified", r.revocation ? "Receipt checks pass; agent not revoked in the signed snapshot at " + r.revocation.asOf + ". Review the limits below." : "Receipt checks pass. Revocation not checked — no snapshot supplied.");
     } catch (e) {
       if (my !== gen) return;
       resetOutput();
       const msg = e instanceof SyntaxError ? "Receipt is not valid JSON: " + e.message : String(e && e.message || e);
       const k = e instanceof SyntaxError ? "signature" : classify(msg);
       setChecks("fail", k);
-      if (e instanceof SyntaxError) fieldErr(rc, true);
+      if (k === "revocation") fieldErr(crl, true);
+      else if (e instanceof SyntaxError) fieldErr(rc, true);
       else if (/PEM|public key|fingerprint|base64/i.test(msg)) fieldErr(pem, true);
       else if (/64-character|expected NIP-98/i.test(msg)) fieldErr(ag, true);
       setStatus("bad", "Not verified", msg);

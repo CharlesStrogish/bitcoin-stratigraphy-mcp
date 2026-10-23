@@ -68,7 +68,10 @@ test("CISO mailto pre-populates the subject and five-question template", () => {
     body,
     /Commercial Enterprise License \(Starting at \$250k\/Annual\)/,
   );
-  assert.match(body, /"AS IS" terms with no SLAs\? \(Yes\/No\)/);
+  assert.match(
+    body,
+    /Which Automated Compliance SLAs do you require for signed revocation snapshot exports, issuer-key rotation, and in-house deployment stewardship\?/,
+  );
   assert.ok(
     body.endsWith(
       "Due-diligence brief: https://bitcoinstratigraphy.com/api/v1/enterprise/due-diligence-brief",

@@ -56,7 +56,7 @@ export const CISO_INTAKE_QUESTIONNAIRE = [
     number: 5,
     topic: "In-House Technical Stewardship",
     question:
-      'Do you confirm that your team will install, operate, patch and secure the engine in-house under strict "AS IS" terms with no SLAs? (Yes/No)',
+      "Which Automated Compliance SLAs do you require for signed revocation snapshot exports, issuer-key rotation, and in-house deployment stewardship?",
   },
 ] as const;
 

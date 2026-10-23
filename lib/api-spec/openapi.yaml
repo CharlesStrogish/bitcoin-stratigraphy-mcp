@@ -1488,6 +1488,22 @@ paths:
                 maxItems: 5
                 items:
                   $ref: "#/components/schemas/StratigraphyEntry"
+  /v1/compliance/revocation-snapshot:
+    get:
+      operationId: getRevocationSnapshot
+      tags: [Compliance]
+      summary: Export a signed, point-in-time NIP-98 revocation registry
+      description: Public Ed25519-signed complete registry snapshot, valid for freshness checking for 15 minutes. Pin issuer keys independently. Absence proves only the issuer's registry state at as_of, not future authorization or independent verification of the original NIP-98 event. Failures return 503, never an empty synthetic registry.
+      security: []
+      responses:
+        "200":
+          description: Signed point-in-time registry snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedRevocationSnapshot"
+        "503":
+          description: Registry or receipt issuer unavailable
   /v1/cost:
     post:
       operationId: quoteMcpToolCosts
@@ -2326,6 +2342,12 @@ components:
       type: object
       required: [escrow_id, leaf_index, audit_path, merkle_root, timestamp, tree_size, execution_leaf_hash, settled_at_strata_block, receipt_type, ots_calendar_standard, attestation_directive]
       properties:
+        issuer_key_id:
+          type: string
+          description: Signed SHA-256 SPKI fingerprint for selection from independently pinned current and historical receipt issuer keys.
+        issued_at:
+          type: string
+          format: date-time
         leaf_preimage:
           type: string
           pattern: "^(?:[0-9a-f]{192}|[0-9a-f]{256}|[0-9a-f]{320})$"
@@ -2410,6 +2432,8 @@ components:
       type: object
       required: [status, preimage, merkle_root, audit_path, article_12_receipt, ots_calendar_standard, attestation_directive]
       properties:
+        licensing_compliance:
+          $ref: "#/components/schemas/LicensingCompliance"
         ots_calendar_standard:
           type: string
           enum: ["OpenTimestamps / RFC 6962 SHA-256"]
@@ -2712,11 +2736,64 @@ components:
         credentialScope: { type: string, const: exact MCP tool path }
         invoiceGeneratedByDiscovery: { type: boolean, const: false }
         instructions: { type: string }
+    LicensingCompliance:
+      type: object
+      required: [open_source_license, commercial_exemption, procurement_url]
+      properties:
+        open_source_license:
+          type: string
+        commercial_exemption:
+          type: string
+        procurement_url:
+          type: string
+    RevocationSnapshotEntry:
+      type: object
+      required: [pubkey, revoked_at]
+      properties:
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        revoked_at:
+          type: string
+          format: date-time
+    SignedRevocationSnapshot:
+      type: object
+      required: [snapshot_type, as_of, next_update, issuer_key_id, revoked_keys, issuer_attestation]
+      properties:
+        snapshot_type:
+          type: string
+          const: nip98-revocation-snapshot-v1
+        as_of:
+          type: string
+          format: date-time
+        next_update:
+          type: string
+          format: date-time
+        issuer_key_id:
+          type: string
+        revoked_keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/RevocationSnapshotEntry"
+        issuer_attestation:
+          type: object
+          required: [version, algorithm, key_id, signature]
+          properties:
+            version:
+              type: string
+            algorithm:
+              type: string
+            key_id:
+              type: string
+            signature:
+              type: string
     McpBatchCostQuote:
       type: object
       additionalProperties: false
       required: [protocol, currency, perToolSats, items, total_sats, l402, batchSettlement]
       properties:
+        licensing_compliance:
+          $ref: "#/components/schemas/LicensingCompliance"
         batchSettlement:
           $ref: "#/components/schemas/BatchSettlementDiscovery"
         protocol:
@@ -3627,6 +3704,8 @@ components:
     StratigraphyCost:
       type: object
       properties:
+        licensing_compliance:
+          $ref: "#/components/schemas/LicensingCompliance"
         batchSettlement:
           $ref: "#/components/schemas/BatchSettlementDiscovery"
         protocol:

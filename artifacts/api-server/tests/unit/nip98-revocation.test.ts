@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, verify } from "node:crypto";
 import { once } from "node:events";
 import test from "node:test";
 import express from "express";
@@ -11,10 +11,13 @@ import {
   createPostgresNip98RevocationStore, type Nip98RevocationStore,
 } from "../../src/lib/nip98-revocation-store";
 import { registerAuditRoutes } from "../../src/routes/audit";
+import { registerComplianceRoutes } from "../../src/routes/compliance";
+import { canonical, issuerKeyId } from "../../src/lib/article12-signature";
 
 test("revocation rejects fresh valid NIP-98 before execution and is idempotent and operator-only", async () => {
   const revoked = new Map<string, string>();
   const store: Nip98RevocationStore = {
+    async snapshot() { return { as_of: new Date().toISOString(), revoked_keys: [...revoked].map(([pubkey, revoked_at]) => ({ pubkey, revoked_at })) }; },
     async isRevoked(key) { return revoked.has(key); },
     async revoke(key) {
       if (!revoked.has(key)) revoked.set(key, new Date().toISOString());
@@ -87,6 +90,7 @@ test("revocation rejects fresh valid NIP-98 before execution and is idempotent a
 test("raw audit route also rejects revoked keys before invoking its worker", async () => {
   const secret = generateSecretKey();
   const store: Nip98RevocationStore = {
+    async snapshot() { throw new Error("not used"); },
     async isRevoked() { return true; },
     async revoke(pubkey) { return { pubkey, revoked_at: new Date().toISOString() }; },
   };
@@ -139,4 +143,56 @@ test("persistent CRL normalizes keys, reads every time, and propagates DB errors
     query: async () => { throw new Error("DB unavailable"); },
   } as never);
   await assert.rejects(failing.isRevoked(key), /DB unavailable/);
+});
+
+test("public CRL export signs the full registry, changes after revocation and fails closed", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const registry = { as_of: new Date().toISOString(), revoked_keys: [] as { pubkey: string; revoked_at: string }[] };
+  const store: Nip98RevocationStore = {
+    async snapshot() { return registry; },
+    async isRevoked() { return false; },
+    async revoke(pubkey) { const entry = { pubkey, revoked_at: registry.as_of }; registry.revoked_keys.push(entry); return entry; },
+  };
+  const app = express();
+  registerComplianceRoutes(app, store, () => privateKey);
+  const server = app.listen(0); await once(server, "listening");
+  const address = server.address(); assert.ok(address && typeof address === "object");
+  const url = `http://127.0.0.1:${address.port}/api/v1/compliance/revocation-snapshot`;
+  try {
+    for (const size of [0, 1]) {
+      if (size) await store.revoke("ab".repeat(32));
+      const response = await fetch(url);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      const { issuer_attestation, ...payload } = await response.json();
+      assert.equal(payload.revoked_keys.length, size);
+      assert.equal(payload.issuer_key_id, issuerKeyId(privateKey));
+      assert.equal(Date.parse(payload.next_update) - Date.parse(payload.as_of), 900000);
+      assert.ok(verify(null, Buffer.from("bitcoin-stratigraphy/nip98-crl/v1\n" + canonical(payload)),
+        publicKey, Buffer.from(issuer_attestation.signature, "base64")));
+    }
+    store.snapshot = async () => { throw new Error("database unavailable"); };
+    const failed = await fetch(url);
+    assert.equal(failed.status, 503);
+    assert.equal((await failed.json()).revoked_keys, undefined);
+  } finally {
+    server.closeAllConnections(); server.close(); await once(server, "close");
+  }
+});
+
+test("Postgres CRL capture uses one ordered MVCC query without cached registry entries", async () => {
+  let captures = 0;
+  const store = createPostgresNip98RevocationStore({ async query(sql: string) {
+    if (sql.includes("CREATE TABLE")) return { rows: [] };
+    captures++;
+    assert.match(sql, /statement_timestamp\(\)/);
+    assert.match(sql, /ORDER BY pubkey/);
+    return { rows: [{ as_of: new Date("2026-10-23T00:00:00Z"),
+      revoked_keys: [{ pubkey: "ab".repeat(32), revoked_at: "2026-10-22T00:00:00Z" }] }] };
+  } } as never);
+  for (let i = 0; i < 2; i++) assert.deepEqual(await store.snapshot(), {
+    as_of: "2026-10-23T00:00:00.000Z",
+    revoked_keys: [{ pubkey: "ab".repeat(32), revoked_at: "2026-10-22T00:00:00.000Z" }],
+  });
+  assert.equal(captures, 2);
 });

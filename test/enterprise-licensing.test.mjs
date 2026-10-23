@@ -95,9 +95,19 @@ test("licensing links the public integrity manifest below the tier matrix", () =
   assert.match(enterprise ?? "", /<li>Cryptographically Signed Tool Integrity<\/li>/);
   assert.match(
     html,
-    /<\/article><\/div><a class="elm-integrity-link" href="\/\.well-known\/integrity\.json" data-testid="link-tool-integrity-manifest">View Tool Integrity Manifest<\/a>/,
+    /<\/details><\/div><a class="elm-integrity-link" href="\/\.well-known\/integrity\.json" data-testid="link-tool-integrity-manifest">View Tool Integrity Manifest<\/a>/,
   );
   assert.doesNotMatch(source, /useEffect|useQuery|fetch\(/);
+});
+
+test("CISO risk brief is expandable below Tier II with a working procurement anchor", () => {
+  const html = renderMatrix();
+  assert.match(html, /<section[^>]*id="enterprise-licensing"/);
+  assert.match(html, /<\/article><details class="elm-risk-brief" data-testid="ciso-vendor-risk-brief"><summary>CISO Vendor Risk &amp; AGPLv3 Copyleft Brief<\/summary>/);
+  assert.ok(html.includes("/api/v1/compliance/revocation-snapshot"));
+  assert.ok(html.includes("current and historical public keys"));
+  assert.ok(html.includes("AGPLv3 Section 13"));
+  assert.doesNotMatch(html, /<details[^>]*\bopen\b/);
 });
 
 test("licensing uses the shared module kicker and offers a copyable email fallback", () => {

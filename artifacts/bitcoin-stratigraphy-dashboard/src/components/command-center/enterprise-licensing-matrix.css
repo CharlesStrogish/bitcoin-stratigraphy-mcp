@@ -1,3 +1,42 @@
+.elm-risk-brief {
+  grid-column: 2;
+  min-width: 0;
+  border: 1px solid hsl(var(--primary) / 0.4);
+  background: hsl(var(--primary) / 0.05);
+}
+.elm-risk-brief summary {
+  cursor: pointer;
+  padding: 16px;
+  color: hsl(var(--primary));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.elm-risk-brief summary:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+.elm-risk-content {
+  padding: 0 16px 16px;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.elm-risk-content h5 {
+  margin: 12px 0 6px;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+}
+.elm-risk-content p {
+  margin: 0 0 12px;
+  color: hsl(var(--muted-foreground));
+}
+@media (max-width: 760px) {
+  .elm-risk-brief {
+    grid-column: 1;
+    order: -1;
+  }
+}
 /* Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available). */
 .elm-integrity-link {
   display: inline-block;

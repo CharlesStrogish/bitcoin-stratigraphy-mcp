@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
-import { createHash, generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync, verify } from "node:crypto";
 import { after, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express, { type RequestHandler } from "express";
@@ -18,7 +18,7 @@ import type { SettlementRouter } from "../services/settlement";
 import { createSettlementRouter } from "../services/settlement";
 import { createNwcSettlementProvider } from "../services/settlement/nwc-provider";
 import { ATTESTATION_DIRECTIVE, OTS_CALENDAR_STANDARD } from "../lib/agent-conversion";
-import { signArticle12Receipt } from "../lib/article12-signature";
+import { canonical, issuerKeyId } from "../lib/article12-signature";
 
 const servers: Array<ReturnType<ReturnType<typeof express>["listen"]>> = [];
 const id = "11111111-1111-4111-8111-111111111111";
@@ -316,7 +316,7 @@ test("returns exact create and settle envelopes and never exposes a secret in re
 });
 
 test("settlement and receipt responses preserve leaf evidence and add a pinned-issuer signature", async () => {
-  const { privateKey } = generateKeyPairSync("ed25519");
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const leaf = Buffer.from("01".repeat(96), "hex");
   const digest = createHash("sha256").update(Buffer.concat([Buffer.from([0]), leaf])).digest("hex");
   const material = { ...receipt, leaf_preimage: leaf.toString("hex"),
@@ -345,11 +345,21 @@ test("settlement and receipt responses preserve leaf evidence and add a pinned-i
     { authorization: `L402 ${offer.macaroon}:${tollPreimage}` }));
   assert.equal(settled.status, 200);
   const output = await settled.json() as { article_12_receipt: Record<string, unknown> };
-  assert.deepEqual(output.article_12_receipt, signArticle12Receipt(material, privateKey));
+  const validateSignature = (signed: Record<string, unknown>) => {
+    const { issuer_attestation, ...payload } = signed;
+    const { issuer_key_id, issued_at, ...evidence } = payload;
+    assert.deepEqual(evidence, material);
+    assert.equal(issuer_key_id, issuerKeyId(privateKey));
+    assert.equal(new Date(String(issued_at)).toISOString(), issued_at);
+    const attestation = issuer_attestation as { signature: string };
+    assert.ok(verify(null, Buffer.from("bitcoin-stratigraphy/article12/v1\n" + canonical(payload)),
+      publicKey, Buffer.from(attestation.signature, "base64")));
+  };
+  validateSignature(output.article_12_receipt);
   const read = await fetch(`${base}/receipt/${id}`, { headers: post(null).headers });
   assert.equal(read.status, 200);
   const document = await read.json() as { proof: Record<string, unknown> };
-  assert.deepEqual(document.proof, output.article_12_receipt);
+  validateSignature(document.proof);
 });
 
 test("returns 404 for absent contracts, 422 for invalid states, and 503 for provider failure", async () => {

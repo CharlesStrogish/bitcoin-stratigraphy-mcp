@@ -4,12 +4,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
-import { signArticle12Receipt } from "../../src/lib/article12-signature";
+import { issuerKeyId, signArticle12Receipt, signIssuerPayload } from "../../src/lib/article12-signature";
+import { signRevocationSnapshot } from "../../src/routes/compliance";
 
 const corePath = resolve(process.cwd(), "../bitcoin-stratigraphy-dashboard/public/static/receipt-verifier.js");
 const source = readFileSync(corePath, "utf8");
 type Verifier = {
-  verify(input: unknown, pem: string, expected: string): Promise<Record<string, unknown>>;
+  verify(input: unknown, pem: string | string[], expected: string, snapshot?: unknown, now?: number): Promise<Record<string, unknown>>;
+  verifyRevocationSnapshot(input: unknown, pem: string | string[], expected: string, now?: number): Promise<Record<string, unknown>>;
   canonical(value: unknown): string;
 };
 const context = { crypto: webcrypto, TextEncoder, Uint8Array, atob,
@@ -124,4 +126,68 @@ test("downloadable verifier embeds the tested core without network dependencies"
   assert.match(html, /connect-src 'none'/);
   assert.doesNotMatch(html, /<script[^>]+src=|<link[^>]+href=["']https?:/i);
   assert.doesNotMatch(html, /\bfetch\s*\(|\bXMLHttpRequest\b|\blocalStorage\b|\bsessionStorage\b/);
+});
+
+test("rotation verifies current and historical receipts against only independent pins", async () => {
+  const rotated = generateKeyPairSync("ed25519");
+  const newPem = rotated.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const oldReceipt = signArticle12Receipt(fixture(), privateKey);
+  const newReceipt = signArticle12Receipt(fixture(), rotated.privateKey);
+  for (const pins of [[pem, newPem], pem + "\n" + newPem, JSON.stringify([pem, newPem])]) {
+    assert.equal((await verifier.verify(oldReceipt, pins, agent)).issuerKeyId, issuerKeyId(privateKey));
+    assert.equal((await verifier.verify(newReceipt, pins, agent)).issuerKeyId, issuerKeyId(rotated.privateKey));
+  }
+  await assert.rejects(verifier.verify(newReceipt, pem, agent), /fingerprint/);
+  await assert.rejects(verifier.verify(oldReceipt, newPem, agent), /fingerprint/);
+  // Legacy signed v1 receipts without signed rotation metadata remain readable.
+  const legacy = signIssuerPayload(fixture(), privateKey, "article12-ed25519-v1", "bitcoin-stratigraphy/article12/v1\n");
+  assert.equal((await verifier.verify(legacy, pem, agent)).verified, true);
+  const mismatch = signIssuerPayload({ ...fixture(), issuer_key_id: "00".repeat(32) },
+    privateKey, "article12-ed25519-v1", "bitcoin-stratigraphy/article12/v1\n");
+  await assert.rejects(verifier.verify(mismatch, pem, agent), /fingerprint/);
+});
+
+test("signed CRL verifies as-of non-revocation, current rotation and optional historical receipts", async () => {
+  const now = Date.parse("2026-10-23T12:00:00.000Z");
+  const rotated = generateKeyPairSync("ed25519");
+  const newPem = rotated.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const snapshot = signRevocationSnapshot({ as_of: new Date(now).toISOString(), revoked_keys: [
+    { pubkey: "01".repeat(32), revoked_at: "2026-10-22T00:00:00.000Z" },
+  ] }, rotated.privateKey);
+  const receipt = signArticle12Receipt(fixture(), privateKey);
+  const result = await verifier.verify(receipt, [pem, newPem], agent, JSON.stringify(snapshot), now + 1);
+  assert.equal(result.verified, true);
+  assert.equal((result.revocation as Record<string, unknown>).status, "not_revoked_in_snapshot");
+  assert.equal((result.revocation as Record<string, unknown>).asOf, "2026-10-23T12:00:00.000Z");
+  await assert.rejects(verifier.verify(receipt, pem, agent, snapshot, now), /Revocation.*fingerprint/);
+  await assert.rejects(verifier.verify(receipt, [pem, newPem], agent, snapshot, now - 1), /future-dated/);
+  await assert.rejects(verifier.verify(receipt, [pem, newPem], agent, snapshot, now + 900000), /stale/);
+  const revoked = signRevocationSnapshot({ as_of: new Date(now).toISOString(), revoked_keys: [
+    { pubkey: agent, revoked_at: new Date(now).toISOString() },
+  ] }, rotated.privateKey);
+  await assert.rejects(verifier.verify(receipt, [pem, newPem], agent, revoked, now), /Agent is revoked/);
+  // Revocation at audit time is distinct from valid historical execution evidence.
+  assert.equal((await verifier.verify(receipt, pem, agent)).verified, true);
+  assert.equal((await verifier.verify(receipt, pem, agent)).revocation, null);
+  await assert.rejects(verifier.verifyRevocationSnapshot({ ...snapshot, revoked_keys: [] }, newPem, agent, now), /signature/);
+  await assert.rejects(verifier.verifyRevocationSnapshot("not-json", newPem, agent, now), /Revocation/);
+  await assert.rejects(verifier.verifyRevocationSnapshot(receipt, pem, agent, now), /Missing supported/);
+});
+
+test("even valid signatures cannot bless malformed, incomplete or unbounded CRL evidence", async () => {
+  const now = Date.parse("2026-10-23T12:00:00.000Z");
+  const base = { snapshot_type: "nip98-revocation-snapshot-v1",
+    as_of: new Date(now).toISOString(), next_update: new Date(now + 900000).toISOString(),
+    issuer_key_id: issuerKeyId(privateKey), revoked_keys: [] };
+  for (const change of [
+    { revoked_keys: undefined }, { revoked_keys: {} }, { issuer_key_id: "00".repeat(32) },
+    { next_update: new Date(now + 86400000).toISOString() }, { as_of: "invalid" },
+    { revoked_keys: [{ pubkey: "bad", revoked_at: new Date(now).toISOString() }] },
+    { revoked_keys: [{ pubkey: "01".repeat(32), revoked_at: new Date(now + 1).toISOString() }] },
+    { revoked_keys: Array(2).fill({ pubkey: "01".repeat(32), revoked_at: new Date(now).toISOString() }) },
+  ]) {
+    const snapshot = signIssuerPayload({ ...base, ...change }, privateKey,
+      "nip98-crl-ed25519-v1", "bitcoin-stratigraphy/nip98-crl/v1\n");
+    await assert.rejects(verifier.verifyRevocationSnapshot(snapshot, pem, agent, now), /Revocation/);
+  }
 });

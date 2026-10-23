@@ -34,7 +34,73 @@ globalThis.Article12Verifier = (() => {
     }
     return Uint8Array.from(atob(value), c => c.charCodeAt(0));
   }
-  async function verify(input, trustedPublicKeyPem, expectedAgentPubkey) {
+  async function verifyEnvelope(receipt, trustedPublicKeyPem, version, signingDomain) {
+    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) throw new Error("Invalid signed evidence object");
+    const { issuer_attestation: attestation, ...payload } = receipt;
+    if (attestation?.version !== version || attestation.algorithm !== "Ed25519") {
+      throw new Error("Missing supported Ed25519 receipt attestation; unsigned legacy receipts cannot pass.");
+    }
+    let pins = trustedPublicKeyPem;
+    if (typeof pins === "string" && pins.trim().startsWith("[")) pins = JSON.parse(pins);
+    const text = Array.isArray(pins) ? pins.join("\n") : String(pins);
+    const keys = text.match(/-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----/g) || [];
+    if (!keys.length || text.replace(/-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----/g, "").trim()) {
+      throw new Error("Provide independently trusted Ed25519 SPKI public key PEMs");
+    }
+    let der;
+    for (const pem of keys) {
+      const candidate = base64(pem.replace(/-----[A-Z ]+-----/g, "").replace(/\s/g, ""));
+      if (hex(await hash(candidate)) === attestation.key_id) { der = candidate; break; }
+    }
+    if (!der) throw new Error("Trusted issuer key fingerprint does not match any pinned key");
+    const key = await crypto.subtle.importKey("spki", der, { name: "Ed25519" }, false, ["verify"]);
+    const signature = base64(attestation.signature);
+    if (signature.length !== 64 || !await crypto.subtle.verify(
+      { name: "Ed25519" }, key, signature, encoder.encode(signingDomain + canonical(payload)),
+    )) throw new Error("Ed25519 signature is invalid");
+    if (payload.issuer_key_id !== undefined && payload.issuer_key_id !== attestation.key_id) {
+      throw new Error("Signed issuer key fingerprint does not match envelope");
+    }
+    return { payload, attestation };
+  }
+  function isoTime(value) {
+    const time = typeof value === "string" ? Date.parse(value) : NaN;
+    if (!Number.isFinite(time) || new Date(time).toISOString() !== value) throw new Error("Revocation snapshot requires canonical ISO timestamps");
+    return time;
+  }
+  async function verifyRevocationSnapshot(input, pins, expectedAgent, auditTime = Date.now()) {
+    try {
+      const snapshot = typeof input === "string" ? JSON.parse(input) : input;
+      const { payload, attestation } = await verifyEnvelope(
+        snapshot, pins, "nip98-crl-ed25519-v1", "bitcoin-stratigraphy/nip98-crl/v1\n",
+      );
+      const asOf = isoTime(payload.as_of), nextUpdate = isoTime(payload.next_update);
+      if (payload.snapshot_type !== "nip98-revocation-snapshot-v1" ||
+          payload.issuer_key_id !== attestation.key_id ||
+          !Array.isArray(payload.revoked_keys) || nextUpdate - asOf !== 900000) {
+        throw new Error("Invalid complete registry snapshot");
+      }
+      if (!Number.isFinite(auditTime) || auditTime < asOf || auditTime >= nextUpdate) {
+        throw new Error("Snapshot is future-dated or stale at the audit time; obtain a fresh signed export");
+      }
+      const agent = String(expectedAgent).trim().toLowerCase();
+      if (!/^[0-9a-f]{64}$/.test(agent)) throw new Error("Expected NIP-98 public key required");
+      let previous = "";
+      for (const entry of payload.revoked_keys) {
+        if (!entry || !/^[0-9a-f]{64}$/.test(entry.pubkey) ||
+            entry.pubkey <= previous || isoTime(entry.revoked_at) > asOf) {
+          throw new Error("Invalid or duplicate revocation registry entry");
+        }
+        previous = entry.pubkey;
+        if (entry.pubkey === agent) throw new Error("Agent is revoked in the signed registry snapshot");
+      }
+      return { verified: true, status: "not_revoked_in_snapshot", asOf: payload.as_of,
+        nextUpdate: payload.next_update, issuerKeyId: attestation.key_id };
+    } catch (error) {
+      throw new Error("Revocation snapshot: " + String(error?.message || error));
+    }
+  }
+  async function verify(input, trustedPublicKeyPem, expectedAgentPubkey, snapshotInput, auditTime = Date.now()) {
     if (!globalThis.crypto?.subtle) {
       throw new Error("Web Crypto is unavailable. Use a browser supporting Ed25519 in a secure context or a local file.");
     }
@@ -44,21 +110,7 @@ globalThis.Article12Verifier = (() => {
     if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
       throw new Error("Paste an Article 12 receipt JSON object");
     }
-    const { issuer_attestation: attestation, ...payload } = receipt;
-    if (attestation?.version !== "article12-ed25519-v1" || attestation.algorithm !== "Ed25519") {
-      throw new Error("Missing supported Ed25519 receipt attestation; unsigned legacy receipts cannot pass.");
-    }
-    const pem = String(trustedPublicKeyPem).trim();
-    if (!/^-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----$/.test(pem)) {
-      throw new Error("Provide an independently trusted Ed25519 SPKI public key PEM");
-    }
-    const der = base64(pem.replace(/-----[A-Z ]+-----/g, "").replace(/\s/g, ""));
-    if (hex(await hash(der)) !== attestation.key_id) throw new Error("Trusted issuer key fingerprint does not match");
-    const key = await crypto.subtle.importKey("spki", der, { name: "Ed25519" }, false, ["verify"]);
-    const signature = base64(attestation.signature);
-    if (signature.length !== 64 || !await crypto.subtle.verify(
-      { name: "Ed25519" }, key, signature, encoder.encode(domain + canonical(payload)),
-    )) throw new Error("Ed25519 signature is invalid");
+    const { payload, attestation } = await verifyEnvelope(receipt, trustedPublicKeyPem, "article12-ed25519-v1", domain);
     if (payload.receipt_type !== "article_12_execution_commitment") throw new Error("Unexpected receipt type");
     const leaf = unhex(payload.leaf_preimage, [96, 128, 160]);
     let current = await hash(concat(new Uint8Array([0]), leaf));
@@ -112,12 +164,17 @@ globalThis.Article12Verifier = (() => {
     if (payload.agent_authentication !== "nip98" || payload.agent_id !== expected) {
       throw new Error("Receipt is not bound to the expected NIP-98-authenticated agent");
     }
+    const revocation = snapshotInput == null || snapshotInput === "" ? null :
+      await verifyRevocationSnapshot(snapshotInput, trustedPublicKeyPem, expected, auditTime);
     return {
       verified: true, signature: true, merkle: true, identity: true,
       issuerKeyId: attestation.key_id, agentPubkey: expected,
       root: payload.merkle_root, escrowId: payload.escrow_id,
-      notice: "Verified issuer signature, committed agent attribution and local Merkle inclusion. This does not independently verify the original NIP-98 event, present key-revocation status, thermodynamic source truth, Bitcoin anchoring or legal compliance.",
+      revocation,
+      notice: "Verified issuer signature, committed agent attribution and local Merkle inclusion. " +
+        (revocation ? "Agent absent from the issuer's signed registry as of " + revocation.asOf + ". " : "Revocation snapshot not supplied; revocation not checked. ") +
+        "This does not independently verify the original NIP-98 event, changes after the snapshot, thermodynamic source truth, Bitcoin anchoring or legal compliance.",
     };
   }
-  return Object.freeze({ verify, canonical });
+  return Object.freeze({ verify, verifyRevocationSnapshot, canonical });
 })();

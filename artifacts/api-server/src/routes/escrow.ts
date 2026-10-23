@@ -24,8 +24,8 @@ import type { SettlementRouter } from "../services/settlement";
 import { escrowTollQuote, readEscrowBitcoinPrice } from "../services/escrowPricing";
 import { escrowCapability, verifyEscrowCapability } from "../lib/escrow-capability";
 import { requestTraceparent } from "../lib/trace-context";
-import { signArticle12Receipt } from "../lib/article12-signature";
-import { loadToolIntegrityKey } from "../lib/tool-integrity";
+import { loadArticle12IssuerKey, signArticle12Receipt } from "../lib/article12-signature";
+import { licensingCompliance } from "../lib/licensing-compliance";
 import type { KeyObject } from "node:crypto";
 
 type EscrowOptions = {
@@ -257,12 +257,13 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
       const receiptKey = operation === "settle" ? "article_12_receipt"
         : operation === "receipt" ? "proof" : undefined;
       const wireOutput = output as Record<string, unknown>;
+      if (operation === "settle") wireOutput.licensing_compliance = licensingCompliance;
       if (receiptKey) {
         const receipt = wireOutput[receiptKey] as Record<string, unknown>;
         // Legacy engine versions remain readable, but cannot claim offline verification.
         if (receipt.leaf_preimage !== undefined) {
           wireOutput[receiptKey] = signArticle12Receipt(
-            receipt, options.signingKey ?? loadToolIntegrityKey(),
+            receipt, options.signingKey ?? loadArticle12IssuerKey(),
           );
         }
       }

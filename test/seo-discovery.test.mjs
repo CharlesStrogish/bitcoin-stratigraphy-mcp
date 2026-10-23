@@ -113,6 +113,9 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
     (entry) => entry["@type"] === "SoftwareApplication",
   );
   assert.equal(software["@id"], origin + "/#software");
+  assert.equal(software.name, "Bitcoin Stratigraphy MCP Server & L402 Oracle");
+  assert.match(software.description, /EU AI Act Article 12/);
+  assert.match(software.description, /Automated Compliance SLAs/);
   assert.equal(software.url, origin + "/");
   assert.equal(software.author["@id"], person["@id"]);
   assert.match(software.description, /npx -y @bitcoin-stratigraphy\/mcp-server/);

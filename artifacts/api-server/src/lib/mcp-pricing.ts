@@ -1,4 +1,5 @@
 import { batchSettlement } from "./batch-settlement";
+import { licensingCompliance } from "./licensing-compliance";
 
 /** Shared by actual MCP payment gates, payment discovery, and HTTP cost quotes. */
 export const mcpToolPrices = Object.freeze({
@@ -93,6 +94,7 @@ export function quoteMcpTools(tools: string[]) {
   });
   return {
     protocol: "L402" as const,
+    licensing_compliance: licensingCompliance,
     batchSettlement,
     currency: "sats" as const,
     perToolSats: Object.fromEntries(

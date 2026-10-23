@@ -29,6 +29,9 @@ import type { EscrowReceiptOtsCalendarStandard } from './escrowReceiptOtsCalenda
 import type { EscrowReceiptReceiptType } from './escrowReceiptReceiptType';
 
 export interface EscrowReceipt {
+  /** Signed SHA-256 SPKI fingerprint for selection from independently pinned current and historical receipt issuer keys. */
+  issuer_key_id?: string;
+  issued_at?: Date;
   /**
      * Exact 96, 128 or 160 byte RFC 6962 leaf preimage containing only task, trace, result and optional attribution/context hashes; never a payment preimage.
      * @pattern ^(?:[0-9a-f]{192}|[0-9a-f]{256}|[0-9a-f]{320})$

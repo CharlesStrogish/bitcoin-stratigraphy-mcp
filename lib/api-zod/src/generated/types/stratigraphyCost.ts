@@ -24,6 +24,7 @@
 import type { AgentReputationMetadata } from './agentReputationMetadata';
 import type { BatchSettlementDiscovery } from './batchSettlementDiscovery';
 import type { JsonSchema } from './jsonSchema';
+import type { LicensingCompliance } from './licensingCompliance';
 import type { ListProofAttestationsMcpTool } from './listProofAttestationsMcpTool';
 import type { ProofByHashMcpTool } from './proofByHashMcpTool';
 import type { SettlementAsset } from './settlementAsset';
@@ -36,6 +37,7 @@ import type { StratigraphyCostMcpTool } from './stratigraphyCostMcpTool';
 import type { SubmitZkProofMcpTool } from './submitZkProofMcpTool';
 
 export interface StratigraphyCost {
+  licensing_compliance?: LicensingCompliance;
   batchSettlement?: BatchSettlementDiscovery;
   protocol: 'L402';
   settlement_asset: SettlementAsset;

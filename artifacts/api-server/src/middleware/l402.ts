@@ -1,3 +1,4 @@
+import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement } from "../lib/licensing-compliance";
 import { createHash, randomUUID } from "node:crypto";
 import { clientKey } from "../lib/client-address";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
@@ -245,6 +246,7 @@ export function createL402Middleware(
       res.setHeader("Cache-Control", "no-store");
       res.status(402).json({
         error: "Payment required",
+        licensing_compliance: licensingCompliance,
         macaroon,
         invoice: invoice.invoice,
         payment_hash: invoice.paymentHash,
@@ -458,6 +460,8 @@ export function createL402Middleware(
               ? {}
               : { agentAuthentication: pass.agentAuthentication }),
           };
+          attachLicensingCompliance(res);
+          logLicensingSettlement(req);
           next();
           return;
         }

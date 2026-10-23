@@ -70,15 +70,11 @@ ceiling. This is scheduled issuance, not measured circulating or spendable suppl
 genesis, unclaimed rewards, lost coins and burned/unspendable coins are not
 subtracted. The exact satoshi field avoids relying on floating-point BTC precision.
 
-## Thermodynamics and Hal Finney Horizon
+## Institutional thermodynamic telemetry
 
 The unified REST/MCP response adds:
 
 - `btc_price_usd`: the live provider spot quote.
-- `hal_finney_horizon_multiple`: exactly `10000000.0 / btc_price_usd`, without
-  arbitrary rounding or clamping.
-- `attribution`, immediately after the multiple in JSON, exactly:
-  `"Projected by Hal Finney on January 10, 2009 ($10M per coin valuation under total global wealth absorption)."`
 - `network_hashrate_h_s`: provider-estimated current network hashrate in H/s.
 - `network_hashrate_th_s`: H/s divided by `1e12`.
 - `network_energy_watts`: TH/s multiplied by `15`, in **joules per second**.
@@ -86,9 +82,8 @@ The unified REST/MCP response adds:
 - `price_source`, `hashrate_source` and `energy_method`: provenance and units.
 
 The 15 J/TH baseline is an assumed modern-miner efficiency model, not measured
-network electricity consumption. Hashrate is also a provider estimate. The
-horizon is a price multiple toward $10M per coin, **not days remaining or a
-prediction of when that valuation will occur**.
+network electricity consumption. Hashrate is also a provider estimate.
+These estimates provide institutional Bitcoin state context, not a price forecast.
 
 The license gate authorizes this deployment to start; it is not per-agent request
 authentication. No existing L402 gates or public API access rules were changed.
@@ -174,8 +169,7 @@ through an authenticated internal bridge to this licensed Python pipeline and
 the authoritative Object Storage archive. The free `stratigraphy.list` tool
 exposes only real archive bounds and live tip metadata. The four paid
 stratigraphy tools return the latest complete live pipeline snapshot (including
-the assumed 15 J/TH network power estimate and the $10M/current-price
-Finney multiple with attribution), plus exact archived JSON and the **current**
+the assumed 15 J/TH network power estimate), plus exact archived JSON and the **current**
 bucket `.ots` bytes for selected UTC captures. A receipt covers its archived
 JSON only, **not** a later changing live value. No legacy video/index record
 is substituted when the pipeline or storage fails. Existing L402 tool scopes,

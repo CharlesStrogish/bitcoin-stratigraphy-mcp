@@ -4,6 +4,71 @@
 
 ## v2.1.3 — 16 Canonical Tools
 
+**Institutional Bitcoin thermodynamic state-anchoring · L402 micropayments · EU AI Act Article 12 execution evidence**
+
+**[Bitcoin Stratigraphy](https://bitcoinstratigraphy.com)** serves enterprise
+autonomous swarms through 16 canonical MCP tools. The commercial deployment
+path is the **$250,000/year Tier II Commercial Enterprise Exemption**, with
+Automated Compliance SLAs for signed revocation exports and receipt-key rotation.
+
+## High-velocity enterprise deployment
+
+- **L402 Bulk Macaroons:** include `X-L402-Batch-Size: 100` on an initial paid
+  `tools/call`. Pay the exact upfront invoice once, then reuse the invoice-bound
+  credential for up to 100 calls to that exact tool. Expiry, attenuation,
+  inherited quotas, NIP-98 identity and revocation still apply on every call.
+  Query `POST /api/v1/cost` for free quotes; it does not create invoices.
+- **NIP-98 Kill Switch + Signed CRL Snapshots:** operator-authenticated
+  `POST /api/admin/revoke_key` persists revocations before future authenticated
+  requests can invoice or execute. Public
+  [`GET /api/v1/compliance/revocation-snapshot`](https://bitcoinstratigraphy.com/api/v1/compliance/revocation-snapshot)
+  exports the complete registry, its ISO `as_of` timestamp, a 15-minute
+  `next_update` boundary and the issuer's SHA-256 SPKI fingerprint, all signed
+  with Ed25519. Export failures return 503, never a fabricated empty CRL.
+- **Zero-Trust Article 12 Verifier:** download
+  [`/static/verify.html`](https://bitcoinstratigraphy.com/static/verify.html)
+  for self-contained browser verification of signed receipts, committed NIP-98
+  attribution and RFC 6962 inclusion. Supply independently pinned current and
+  historical issuer PEM keys. An optional signed CRL checks non-revocation at
+  its recorded timestamp and freshness against the audit browser's clock.
+- **Commercial Enterprise Exemption:** Tier II offers a commercial alternative
+  to AGPLv3 for private VPC and air-gapped deployments. The commercial agreement
+  governs proprietary swarm IP and Automated Compliance SLAs. AGPLv3 Section 13
+  covers corresponding source for covered modified network software; it does
+  not automatically require disclosure of independent weights or applications.
+  [Enterprise procurement brief](https://bitcoinstratigraphy.com/#enterprise-licensing)
+  · [licensing@bitcoinstratigraphy.com](mailto:licensing@bitcoinstratigraphy.com).
+- **In-band compliance telemetry:** GET/POST `/api/v1/cost` and L402 challenge
+  bodies include `licensing_compliance`. Successful L402 responses expose the
+  same JSON in `X-L402-Licensing-Compliance`; settlement logs expose the structured
+  object for Splunk/Datadog ingestion without altering any MCP tool contract.
+
+### Automated exports and receipt issuer rotation
+
+Poll the public snapshot endpoint from your audit scheduler before an air-gapped
+review. Retain the exact signed JSON and capture clock evidence. A snapshot
+proves only the issuer's registry state at `as_of`; `next_update` is a freshness
+limit, not a promise that no revocation can occur in that interval. A later
+revocation does not erase valid historical execution evidence, and an offline
+pass never authorizes a new request.
+
+By default receipts and CRL exports use the persistent tool-integrity issuer.
+To rotate **only** receipt/CRL signing, configure a dedicated Ed25519 PKCS#8 PEM
+as `ARTICLE12_ISSUER_PRIVATE_KEY` through your secret manager and restart the API.
+Never commit private keys. Publish the corresponding SPKI public key through
+your independently authenticated procurement/configuration channel **before**
+cutover, and retain historical public pins for historical receipts. Receipts
+include signed `issuer_key_id` and `issued_at` fields; CRL signatures use a
+separate domain from receipt signatures. Paste multiple PEM blocks or a JSON
+array of PEM strings into the offline verifier. Each artifact selects only an
+independently pinned matching fingerprint. Remove compromised issuer pins
+through your enterprise trust process; do not accept self-announced keys.
+This does not rotate or modify the 16 MCP tool signatures or descriptions.
+
+Receipt signatures, agent attribution, CRL state, Bitcoin anchoring and legal
+compliance are distinct checks. The verifier does not independently re-verify
+the original Schnorr-signed NIP-98 request or establish regulatory compliance.
+
 **OpenTimestamps AI Notary Hub · LangChain/LlamaIndex Native · 100-call Macro-Macaroons · Free Sandbox available**
 
 Use [`proof.notarize`](cookbooks/frameworks/README.md#what-the-agent-reports)
@@ -103,7 +168,7 @@ never triggers a public-API fallback. RPC redirects are refused, and the enterpr
 telemetry HTTP client ignores ambient HTTP proxy settings.
 
 Bitcoin Core does not provide BTC/USD prices. Local-mode snapshots report
-`btc_price_usd` and `hal_finney_horizon_multiple` as `null`, with an explicit
+fiat-dependent valuation fields as `null`, with an explicit
 unavailable price source; supply, header, hashrate, and power metrics remain usable.
 When **all three variables are absent**, the existing mempool.space/Coinbase
 route (including the public price fallback) remains unchanged.

@@ -19,6 +19,7 @@ export function registerPublicCors(
         "*",
         "WWW-Authenticate",
         "X-L402-Receipt",
+        "X-L402-Licensing-Compliance",
         "X-Stratigraphy-Records",
         "X-Stratigraphy-First-Day",
         "X-Stratigraphy-Last-Day",

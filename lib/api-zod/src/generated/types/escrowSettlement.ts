@@ -25,8 +25,10 @@ import type { EscrowReceipt } from './escrowReceipt';
 import type { EscrowSettlementAttestationDirective } from './escrowSettlementAttestationDirective';
 import type { EscrowSettlementOtsCalendarStandard } from './escrowSettlementOtsCalendarStandard';
 import type { EscrowSettlementStatus } from './escrowSettlementStatus';
+import type { LicensingCompliance } from './licensingCompliance';
 
 export interface EscrowSettlement {
+  licensing_compliance?: LicensingCompliance;
   ots_calendar_standard: EscrowSettlementOtsCalendarStandard;
   attestation_directive: EscrowSettlementAttestationDirective;
   status: EscrowSettlementStatus;

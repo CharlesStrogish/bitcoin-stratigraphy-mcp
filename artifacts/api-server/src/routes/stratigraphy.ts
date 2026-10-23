@@ -11,6 +11,7 @@ import { type Express, type Request, type Response } from "express";
 import { createL402Middleware } from "../middleware/l402";
 import { quoteMcpTools } from "../lib/mcp-pricing";
 import { batchSettlement } from "../lib/batch-settlement";
+import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement } from "../lib/licensing-compliance";
 import {
   createHash,
   createHmac,
@@ -731,6 +732,7 @@ async function sendPaymentChallenge(
     ]);
     res.setHeader("Cache-Control", "no-store");
     res.status(402).json({
+      licensing_compliance: licensingCompliance,
       invoice: legacyResult.challenge.invoice,
       macaroon: rangeMacaroon,
       payment_hash: legacyResult.challenge.paymentHash,
@@ -820,6 +822,8 @@ export function registerStratigraphyRoutes(
     settledAt: number;
     clientIdentifier: string;
   }) => {
+    if (input.req.res) attachLicensingCompliance(input.req.res);
+    logLicensingSettlement(input.req);
     try {
       await recordRevenueWithRetry(revenueLedger, {
         id: randomUUID(),
@@ -1232,6 +1236,7 @@ export function registerStratigraphyRoutes(
   });
 
   app.use("/api/v1/cost", (_req, res, next) => {
+    attachLicensingCompliance(res);
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.removeHeader("Access-Control-Allow-Credentials");
     res.setHeader("Cache-Control", "no-store");
@@ -1307,6 +1312,7 @@ export function registerStratigraphyRoutes(
     );
     res.status(200).json({
       protocol: "L402",
+      licensing_compliance: licensingCompliance,
       ...selectedToolQuote,
       batchSettlement,
       settlement_asset: assetSelection.asset,

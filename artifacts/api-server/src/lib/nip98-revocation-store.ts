@@ -3,6 +3,12 @@ import { pool } from "@workspace/db";
 export interface Nip98RevocationStore {
   isRevoked(pubkey: string): Promise<boolean>;
   revoke(pubkey: string): Promise<{ pubkey: string; revoked_at: string }>;
+  snapshot(): Promise<Nip98RegistrySnapshot>;
+}
+
+export interface Nip98RegistrySnapshot {
+  as_of: string;
+  revoked_keys: { pubkey: string; revoked_at: string }[];
 }
 
 export function normalizeNip98Pubkey(value: unknown): string {
@@ -32,6 +38,31 @@ export function createPostgresNip98RevocationStore(
     return initialized;
   };
   return {
+    async snapshot() {
+      await initialize();
+      // One MVCC statement binds the complete registry and its capture time.
+      const result = await database.query<{
+        as_of: Date;
+        revoked_keys: { pubkey: string; revoked_at: string }[];
+      }>(
+        `SELECT statement_timestamp() AS as_of,
+         COALESCE(json_agg(json_build_object('pubkey', pubkey,
+           'revoked_at', revoked_at) ORDER BY pubkey)
+           FILTER (WHERE pubkey IS NOT NULL), '[]'::json) AS revoked_keys
+         FROM revoked_nip98_keys`,
+      );
+      const row = result.rows[0];
+      if (!row || !Array.isArray(row.revoked_keys)) {
+        throw new Error("Revocation registry returned no snapshot");
+      }
+      return {
+        as_of: row.as_of.toISOString(),
+        revoked_keys: row.revoked_keys.map(entry => ({
+          pubkey: normalizeNip98Pubkey(entry.pubkey),
+          revoked_at: new Date(entry.revoked_at).toISOString(),
+        })),
+      };
+    },
     async isRevoked(value) {
       const pubkey = normalizeNip98Pubkey(value);
       await initialize();

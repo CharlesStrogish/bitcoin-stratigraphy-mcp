@@ -88,3 +88,4 @@
 - [MCP async webhooks](mcp-async-webhooks.md) — user-defined 202 + POST callback, not Tasks; check before invoicing, dispatch after payment; v1a Ed25519 signatures.
 - [Publishing security validation](publishing-security-validation.md) — successful builds and patched runtime versions do not by themselves confirm security-gate clearance.
 - [MCP Tasks and trace trust](mcp-tasks-trace-trust.md) — polling coexists with push; corrections stay paid, handles stay private, and trace-aware leaves preserve historical proofs.
+- [Offline evidence trust](offline-evidence-trust.md) — historical receipt verification is not live authorization; later key revocation does not erase valid execution evidence.

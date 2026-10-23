@@ -36,6 +36,7 @@ export function requestNip98Authorization(req: Request): string | undefined {
 export function requestNip98Payload(req: Request): Uint8Array | undefined {
   const raw = (req as Request & { rawBody?: Buffer }).rawBody;
   if (raw) return raw.length > 0 ? raw : undefined;
+  if (Buffer.isBuffer(req.body)) return req.body.length ? req.body : undefined;
   const serialized =
     req.body === undefined ? undefined : JSON.stringify(req.body);
   return serialized === undefined ? undefined : Buffer.from(serialized);

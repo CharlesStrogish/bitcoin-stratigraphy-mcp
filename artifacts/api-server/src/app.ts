@@ -40,6 +40,10 @@ import { registerAuditRoutes } from "./routes/audit";
 import { registerEscrowRoutes } from "./routes/escrow";
 import { registerEnterpriseRoutes } from "./routes/enterprise";
 import { createEscrowRecovery } from "./services/escrowRecovery";
+import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store";
+import {
+  createNip98RevocationGuard, registerNip98RevocationAdmin,
+} from "./middleware/nip98-revocation";
 
 const app: Express = express();
 // Started by the server entry once the HTTP port is bound; escrow routes wait on it.
@@ -93,7 +97,9 @@ app.use(
 );
 registerPublicCors(app, createPublicWebRateLimitMiddleware(publicRateLimiter));
 registerMcpRequestGuard(app);
-registerAuditRoutes(app);
+const nip98Revocations = createPostgresNip98RevocationStore();
+const nip98RevocationGuard = createNip98RevocationGuard(nip98Revocations);
+registerAuditRoutes(app, undefined, nip98RevocationGuard);
 app.use(
   express.json({
     limit: "1mb",
@@ -103,6 +109,9 @@ app.use(
   }),
 );
 app.use(express.urlencoded({ extended: true }));
+
+app.use(nip98RevocationGuard);
+registerNip98RevocationAdmin(app, nip98Revocations);
 
 const macaroonUsageStore = createPostgresMacaroonUsageStore();
 
@@ -130,6 +139,7 @@ registerEnterpriseRoutes(app);
 export const provenanceAnchoring = registerProvenanceRoutes(app);
 registerZkDriftRoute(app);
 registerEscrowRoutes(app, {
+  signingKey: toolIntegrityKey,
   ready: () => escrowRecovery.whenReady(),
   usageStore: macaroonUsageStore,
   revocationStore: createPostgresMacaroonRevocationStore(),

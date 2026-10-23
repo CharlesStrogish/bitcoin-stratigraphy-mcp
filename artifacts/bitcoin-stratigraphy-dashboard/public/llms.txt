@@ -9,6 +9,7 @@
 - [Developer documentation](https://bitcoinstratigraphy.com/docs)
 - [Python SDK and cookbooks](https://bitcoinstratigraphy.com/cookbooks)
 - [OpenAPI](https://bitcoinstratigraphy.com/openapi.json)
+- [Offline Article 12 verifier](https://bitcoinstratigraphy.com/static/verify.html): browser-only Ed25519, agent attribution and RFC 6962 checks with independently pinned keys.
 
 ## 16 canonical tools by namespace
 ### stratigraphy

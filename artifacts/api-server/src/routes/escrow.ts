@@ -24,6 +24,9 @@ import type { SettlementRouter } from "../services/settlement";
 import { escrowTollQuote, readEscrowBitcoinPrice } from "../services/escrowPricing";
 import { escrowCapability, verifyEscrowCapability } from "../lib/escrow-capability";
 import { requestTraceparent } from "../lib/trace-context";
+import { signArticle12Receipt } from "../lib/article12-signature";
+import { loadToolIntegrityKey } from "../lib/tool-integrity";
+import type { KeyObject } from "node:crypto";
 
 type EscrowOptions = {
   execute?: EscrowExecutor;
@@ -41,6 +44,7 @@ type EscrowOptions = {
   revocationStore?: MacaroonRevocationStore;
   settlementRouter?: SettlementRouter;
   sessionSecret?: string;
+  signingKey?: KeyObject;
 };
 
 /** Guard existing catalogs without registering, wrapping or changing MCP tools. */
@@ -250,6 +254,18 @@ export function registerEscrowRoutes(app: Express, options: EscrowOptions = {}):
       const output = operation === "create" ? CreateEscrowResponse.parse(result.body)
         : operation === "settle" ? SettleEscrowResponse.parse(result.body)
         : GetEscrowReceiptResponse.parse(result.body);
+      const receiptKey = operation === "settle" ? "article_12_receipt"
+        : operation === "receipt" ? "proof" : undefined;
+      const wireOutput = output as Record<string, unknown>;
+      if (receiptKey) {
+        const receipt = wireOutput[receiptKey] as Record<string, unknown>;
+        // Legacy engine versions remain readable, but cannot claim offline verification.
+        if (receipt.leaf_preimage !== undefined) {
+          wireOutput[receiptKey] = signArticle12Receipt(
+            receipt, options.signingKey ?? loadToolIntegrityKey(),
+          );
+        }
+      }
       if (operation === "receipt") res.type("application/ld+json");
       res.status(result.status).send(output);
     } catch {

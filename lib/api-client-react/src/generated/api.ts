@@ -74,6 +74,7 @@ import type {
   MeshAttestRequest,
   MeshAttestResponse,
   MeshStatus,
+  Nip98KeyRevocationInput,
   NostrAgentIdentity,
   NostrHeartbeatStatus,
   NostrIdentityInput,
@@ -87,6 +88,7 @@ import type {
   PublicPreflightResponse,
   QuoteMcpToolCosts400,
   ReadinessStatus,
+  RevokeNip98Key200,
   SettlementAssetSelectionError,
   SmitheryServerCard,
   StratigraphyCost,
@@ -129,6 +131,78 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getRevokeNip98KeyUrl = () => {
+
+
+
+
+  return `/api/admin/revoke_key`
+}
+
+/**
+ * Requires the configured MACAROON_OPERATOR_SECRET as a Bearer token. Writes the shared persistent registry; future authenticated requests from this key fail with 403 before invoicing or execution. Registry failures return 503. This does not cancel already-running jobs or prove current revocation status to an offline verifier.
+ * @summary Permanently revoke a compromised NIP-98 agent public key
+ */
+export const revokeNip98Key = async (nip98KeyRevocationInput: Nip98KeyRevocationInput, options?: Parameters<typeof customFetch>[1]): Promise<RevokeNip98Key200> => {
+
+  return customFetch<RevokeNip98Key200>(getRevokeNip98KeyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(nip98KeyRevocationInput)
+  }
+);}
+
+
+
+
+
+export const getRevokeNip98KeyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeNip98Key>>, TError,{data: BodyType<Nip98KeyRevocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeNip98Key>>, TError,{data: BodyType<Nip98KeyRevocationInput>}, TContext> => {
+
+const mutationKey = ['revokeNip98Key'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeNip98Key>>, {data: BodyType<Nip98KeyRevocationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  revokeNip98Key(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeNip98KeyMutationResult = NonNullable<Awaited<ReturnType<typeof revokeNip98Key>>>
+    export type RevokeNip98KeyMutationBody = BodyType<Nip98KeyRevocationInput>
+    export type RevokeNip98KeyMutationError = ErrorType<void>
+
+    /**
+ * @summary Permanently revoke a compromised NIP-98 agent public key
+ */
+export const useRevokeNip98Key = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeNip98Key>>, TError,{data: BodyType<Nip98KeyRevocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeNip98Key>>,
+        TError,
+        {data: BodyType<Nip98KeyRevocationInput>},
+        TContext
+      > => {
+      return useMutation(getRevokeNip98KeyMutationOptions(options));
+    }
 
 export const getGetEnterpriseDueDiligenceBriefUrl = () => {
 

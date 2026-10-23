@@ -152,7 +152,8 @@ class EscrowTests(unittest.TestCase):
             created["payment_hash"],
         )
         self.verify_receipt(settled["receipt"], trace, result)
-        self.assertNotIn("preimage", json.dumps(settled["receipt"]))
+        self.assertNotIn('"preimage":', json.dumps(settled["receipt"]))
+        self.assertNotIn(settled["preimage"], json.dumps(settled["receipt"]))
         self.assertEqual(self.store.get_contract(created["escrow_id"])["status"], "SETTLED")
         self.assertEqual(settled["receipt"]["settled_at_strata_block"], 900000)
         self.assertEqual(

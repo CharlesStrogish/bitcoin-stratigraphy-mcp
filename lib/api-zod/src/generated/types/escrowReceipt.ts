@@ -23,11 +23,18 @@
  */
 import type { EscrowReceiptAgentAuthentication } from './escrowReceiptAgentAuthentication';
 import type { EscrowReceiptAttestationDirective } from './escrowReceiptAttestationDirective';
+import type { EscrowReceiptIssuerAttestation } from './escrowReceiptIssuerAttestation';
 import type { EscrowReceiptLightningSettlement } from './escrowReceiptLightningSettlement';
 import type { EscrowReceiptOtsCalendarStandard } from './escrowReceiptOtsCalendarStandard';
 import type { EscrowReceiptReceiptType } from './escrowReceiptReceiptType';
 
 export interface EscrowReceipt {
+  /**
+     * Exact 96, 128 or 160 byte RFC 6962 leaf preimage containing only task, trace, result and optional attribution/context hashes; never a payment preimage.
+     * @pattern ^(?:[0-9a-f]{192}|[0-9a-f]{256}|[0-9a-f]{320})$
+     */
+  leaf_preimage?: string;
+  issuer_attestation?: EscrowReceiptIssuerAttestation;
   /**
      * Optional validated W3C Trace Context from the settlement request. Trace-aware 160-byte leaves append SHA-256 of the canonical traceparent JSON after the attribution digest (SHA-256 of {} when unattributed). Legacy 96-byte and 128-byte leaves remain valid and cannot claim trace context.
      * @maxLength 512

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { after, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import express, { type RequestHandler } from "express";
@@ -18,6 +18,7 @@ import type { SettlementRouter } from "../services/settlement";
 import { createSettlementRouter } from "../services/settlement";
 import { createNwcSettlementProvider } from "../services/settlement/nwc-provider";
 import { ATTESTATION_DIRECTIVE, OTS_CALENDAR_STANDARD } from "../lib/agent-conversion";
+import { signArticle12Receipt } from "../lib/article12-signature";
 
 const servers: Array<ReturnType<ReturnType<typeof express>["listen"]>> = [];
 const id = "11111111-1111-4111-8111-111111111111";
@@ -312,6 +313,43 @@ test("returns exact create and settle envelopes and never exposes a secret in re
   assert.match(read.headers.get("content-type")!, /application\/ld\+json/);
   assert.equal(read.headers.get("cache-control"), "no-store");
   assert.equal(Object.hasOwn(await read.json() as object, "preimage"), false);
+});
+
+test("settlement and receipt responses preserve leaf evidence and add a pinned-issuer signature", async () => {
+  const { privateKey } = generateKeyPairSync("ed25519");
+  const leaf = Buffer.from("01".repeat(96), "hex");
+  const digest = createHash("sha256").update(Buffer.concat([Buffer.from([0]), leaf])).digest("hex");
+  const material = { ...receipt, leaf_preimage: leaf.toString("hex"),
+    merkle_root: digest, execution_leaf_hash: digest };
+  const base = await serve({ signingKey: privateKey, readHeight: async () => 900000,
+    execute: async (operation) => {
+      if (operation === "lookup") return { status: 200, body: { status: "LOCKED", toll_fee_sats: 21 } };
+      if (operation === "settle") return { status: 200, body: {
+        status: "SETTLED", preimage: "a".repeat(64), merkle_root: digest,
+        audit_path: [], article_12_receipt: material,
+        ots_calendar_standard: OTS_CALENDAR_STANDARD, attestation_directive: ATTESTATION_DIRECTIVE,
+      } };
+      return { status: 200, body: {
+        "@context": { "@vocab": "https://schema.org/" }, "@type": "DigitalDocument",
+        identifier: id, dateCreated: material.timestamp, proof: material,
+        verification: { merkle_inclusion: true, bitcoin_anchor_verified: false,
+          strata_block_height: 900000, task_hash: input.task_hash,
+          trace_hash: "b".repeat(64), result_hash: "c".repeat(64) }, description: "Local commitment",
+      } };
+    } });
+  const submission = { escrow_id: id, execution_trace: "trace", result_payload: "result" };
+  const challenge = await fetch(`${base}/settle`, post(submission));
+  assert.equal(challenge.status, 402);
+  const offer = await challenge.json() as { macaroon: string };
+  const settled = await fetch(`${base}/settle`, post(submission,
+    { authorization: `L402 ${offer.macaroon}:${tollPreimage}` }));
+  assert.equal(settled.status, 200);
+  const output = await settled.json() as { article_12_receipt: Record<string, unknown> };
+  assert.deepEqual(output.article_12_receipt, signArticle12Receipt(material, privateKey));
+  const read = await fetch(`${base}/receipt/${id}`, { headers: post(null).headers });
+  assert.equal(read.status, 200);
+  const document = await read.json() as { proof: Record<string, unknown> };
+  assert.deepEqual(document.proof, output.article_12_receipt);
 });
 
 test("returns 404 for absent contracts, 422 for invalid states, and 503 for provider failure", async () => {

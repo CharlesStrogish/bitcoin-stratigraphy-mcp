@@ -154,7 +154,7 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
   }
 });
 
-test("a paid 100-call macro uses one invoice and one single-flight wallet verification", async () => {
+test("a 25000-sat 100-call macro depletes atomically using one invoice and one wallet verification", async () => {
   let invoiceCount = 0;
   let verificationCount = 0;
   const revocationStore = createMemoryMacaroonRevocationStore();
@@ -164,7 +164,7 @@ test("a paid 100-call macro uses one invoice and one single-flight wallet verifi
     ...fakeSettlementRouter(),
     async createInvoice(input) {
       invoiceCount++;
-      assert.equal(input.amountMsats, 500_000);
+      assert.equal(input.amountMsats, 25_000_000);
       assert.equal(input.description, "test paid route (100-call batch)");
       return {
         invoice: "lnbc5n1batch",
@@ -175,7 +175,7 @@ test("a paid 100-call macro uses one invoice and one single-flight wallet verifi
     async verifyPayment(input) {
       verificationCount++;
       await new Promise((resolve) => setTimeout(resolve, 10));
-      assert.equal(input.expectedAmountMsats, 500_000);
+      assert.equal(input.expectedAmountMsats, 25_000_000);
       assert.equal(
         input.expectedDescription,
         "test paid route (100-call batch)",
@@ -188,7 +188,7 @@ test("a paid 100-call macro uses one invoice and one single-flight wallet verifi
   app.get(
     "/batch",
     createL402Middleware({
-      amountSats: 5,
+      amountSats: 250,
       description: "test paid route",
       settlementRouter: provider,
       sessionSecret: "test-macro-secret",
@@ -219,7 +219,7 @@ test("a paid 100-call macro uses one invoice and one single-flight wallet verifi
       amount_sats: number;
     };
     assert.equal(offer.max_requests, 100);
-    assert.equal(offer.amount_sats, 500);
+    assert.equal(offer.amount_sats, 25_000);
     const pass = verifySubscriptionMacaroon(
       offer.macaroon,
       "test-macro-secret",

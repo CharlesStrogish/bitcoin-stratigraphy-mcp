@@ -28,6 +28,8 @@ const outputs = [
   "./dist/l402-caveats.test.js",
   "./dist/agent-id-binding.test.js",
   "./dist/nip98-agent-auth.test.js",
+  "./dist/nip98-revocation.test.js",
+  "./dist/article12-verifier.test.js",
   "./dist/mcp-stateless-transport.test.js",
   "./dist/mcp-response-signature.test.js",
   "./dist/mcp-async-webhooks.test.js",
@@ -163,6 +165,8 @@ await build({
     "l402-caveats.test": "./tests/unit/l402-caveats.test.ts",
     "agent-id-binding.test": "./tests/unit/agent-id-binding.test.ts",
     "nip98-agent-auth.test": "./tests/unit/nip98-agent-auth.test.ts",
+    "nip98-revocation.test": "./tests/unit/nip98-revocation.test.ts",
+    "article12-verifier.test": "./tests/unit/article12-verifier.test.ts",
     "mcp-stateless-transport.test":
       "./tests/unit/mcp-stateless-transport.test.ts",
     "mcp-response-signature.test": "./tests/unit/mcp-response-signature.test.ts",

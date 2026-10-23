@@ -720,6 +720,40 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /admin/revoke_key:
+    post:
+      operationId: revokeNip98Key
+      tags: [health]
+      summary: Permanently revoke a compromised NIP-98 agent public key
+      description: Requires the configured MACAROON_OPERATOR_SECRET as a Bearer token. Writes the shared persistent registry; future authenticated requests from this key fail with 403 before invoicing or execution. Registry failures return 503. This does not cancel already-running jobs or prove current revocation status to an offline verifier.
+      security:
+        - MacaroonOperator: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Nip98KeyRevocationInput"
+      responses:
+        "200":
+          description: Revocation durably recorded (idempotent)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pubkey, revoked_at]
+                properties:
+                  pubkey:
+                    type: string
+                  revoked_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Invalid public key or unexpected fields
+        "403":
+          description: Operator authorization required
+        "503":
+          description: Registry or operator configuration unavailable
   /v1/enterprise/due-diligence-brief:
     get:
       operationId: getEnterpriseDueDiligenceBrief
@@ -2113,6 +2147,14 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    Nip98KeyRevocationInput:
+      type: object
+      additionalProperties: false
+      required: [pubkey]
+      properties:
+        pubkey:
+          type: string
+          pattern: "^[0-9a-fA-F]{64}$"
     ToolIntegrityEntry:
       type: object
       additionalProperties: false
@@ -2284,6 +2326,26 @@ components:
       type: object
       required: [escrow_id, leaf_index, audit_path, merkle_root, timestamp, tree_size, execution_leaf_hash, settled_at_strata_block, receipt_type, ots_calendar_standard, attestation_directive]
       properties:
+        leaf_preimage:
+          type: string
+          pattern: "^(?:[0-9a-f]{192}|[0-9a-f]{256}|[0-9a-f]{320})$"
+          description: Exact 96, 128 or 160 byte RFC 6962 leaf preimage containing only task, trace, result and optional attribution/context hashes; never a payment preimage.
+        issuer_attestation:
+          type: object
+          required: [version, algorithm, key_id, signature]
+          properties:
+            version:
+              type: string
+              enum: [article12-ed25519-v1]
+            algorithm:
+              type: string
+              enum: [Ed25519]
+            key_id:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+            signature:
+              type: string
+              description: Base64 Ed25519 signature over UTF-8 bitcoin-stratigraphy/article12/v1 followed by a newline and recursive key-sorted compact JSON of all receipt fields except issuer_attestation. Use an independently pinned SPKI public key from the issuer, not a key supplied by the receipt.
         traceparent:
           type: string
           maxLength: 512

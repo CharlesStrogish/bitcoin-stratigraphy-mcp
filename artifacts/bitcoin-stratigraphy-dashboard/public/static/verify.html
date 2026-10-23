@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; base-uri 'none'; form-action 'none'">
+<link rel="icon" href="data:,">
+<title>Article 12 Receipt Verifier · Bitcoin Stratigraphy</title>
+<style>
+:root{--bg:222 34% 12%;--fg:38 34% 92%;--card:220 29% 15%;--border:220 24% 24%;--muted:220 24% 20%;--mfg:220 12% 68%;--primary:42 96% 57%;--pfg:222 34% 12%;--accent:13 58% 56%;--ok:164 40% 50%;--bad:3 70% 62%;--input:220 24% 29%;
+--mono:"DM Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:"Space Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;font-family:var(--sans);color:hsl(var(--fg));background:radial-gradient(circle at 12% 0%,rgba(217,154,22,.13),transparent 30rem),hsl(var(--bg));-webkit-font-smoothing:antialiased}
+.wrap{width:min(100% - 32px,1180px);margin-inline:auto;padding:28px 0 40px}
+.skip{position:absolute;left:-999px}.skip:focus{left:12px;top:12px;background:hsl(var(--primary));color:hsl(var(--pfg));padding:8px 12px;z-index:9}
+.mono,.eyebrow,.kicker,label,.chk-k,dt{font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.eyebrow{color:hsl(var(--primary));font-size:10px;display:flex;align-items:center;gap:9px}
+.eyebrow::before{content:"";width:28px;height:1px;background:currentColor}
+header{border-bottom:1px solid hsl(var(--border));padding-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+h1{margin:12px 0 0;font-size:clamp(1.9rem,4.4vw,3.3rem);line-height:.95;letter-spacing:-.06em;font-weight:600}
+h1 span{color:hsl(var(--primary))}
+.sub{margin:12px 0 0;color:hsl(var(--mfg));font-size:14px;max-width:70ch;line-height:1.5}
+.badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{font:500 9px var(--mono);letter-spacing:.08em;text-transform:uppercase;border:1px solid hsl(var(--border));padding:5px 8px;color:hsl(var(--mfg))}
+.badge.hl{background:hsl(var(--primary));color:hsl(var(--pfg));border-color:transparent}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;margin-top:18px}
+.panel{background:hsl(var(--card));border:1px solid hsl(var(--border))}
+.ph{padding:13px 16px;border-bottom:1px solid hsl(var(--border));display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ph h2{margin:0;font-size:16px;letter-spacing:-.03em;font-weight:600}
+.kicker{font-size:9px;color:hsl(var(--mfg))}
+.pb{padding:16px}
+.field{margin-bottom:14px}
+label{display:flex;justify-content:space-between;font-size:10px;color:hsl(var(--fg));margin-bottom:6px;gap:8px}
+label small{color:hsl(var(--mfg));text-transform:none;letter-spacing:.02em}
+textarea,input{width:100%;font:12px/1.5 var(--mono);color:hsl(var(--fg));background:hsl(var(--bg));border:1px solid hsl(var(--input));padding:10px 11px;border-radius:2px;resize:vertical;transition:border-color .16s ease,box-shadow .16s ease}
+textarea:focus,input:focus{outline:none;border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/.25)}
+textarea[aria-invalid=true],input[aria-invalid=true]{border-color:hsl(var(--bad))}
+.hint{margin:6px 0 0;font-size:11.5px;color:hsl(var(--mfg));line-height:1.45}
+.hint.err{color:hsl(var(--bad))}
+.actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:4px}
+button{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;height:38px;padding:0 16px;border-radius:2px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--fg));transition:transform .16s ease,border-color .16s ease,background .16s ease,opacity .16s ease}
+button:hover:not(:disabled){transform:translateY(-1px);border-color:hsl(var(--primary))}
+button:focus-visible{outline:2px solid hsl(var(--primary));outline-offset:2px}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.primary{background:hsl(var(--primary));color:hsl(var(--pfg));border-color:transparent;font-weight:600;min-width:150px}
+button.ghost{background:transparent}
+.spacer{flex:1}
+.status{margin-top:16px;padding:12px 14px;border:1px solid hsl(var(--border));border-left-width:3px;font-size:13px;line-height:1.5;display:none}
+.status.show{display:block;animation:rise .22s ease}
+.status.ok{border-color:hsl(var(--ok));background:hsl(var(--ok)/.09)}
+.status.bad{border-color:hsl(var(--bad));background:hsl(var(--bad)/.09)}
+.status.busy{border-color:hsl(var(--primary));background:hsl(var(--primary)/.07)}
+.status strong{display:block;font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.status.ok strong{color:hsl(var(--ok))}.status.bad strong{color:hsl(var(--bad))}.status.busy strong{color:hsl(var(--primary))}
+@keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.checks{list-style:none;margin:0;padding:0}
+.checks li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid hsl(var(--border));font-size:13px}
+.checks li:last-child{border-bottom:0}
+.dot{width:12px;height:12px;border:1px solid hsl(var(--mfg));border-radius:50%;transition:background .2s ease,border-color .2s ease}
+.chk-k{font-size:10px;color:hsl(var(--mfg))}
+li[data-s=pass] .dot{background:hsl(var(--ok));border-color:hsl(var(--ok))}
+li[data-s=pass] .chk-k{color:hsl(var(--ok))}
+li[data-s=fail] .dot{background:hsl(var(--bad));border-color:hsl(var(--bad))}
+li[data-s=fail] .chk-k{color:hsl(var(--bad))}
+li[data-s=run] .dot{border-color:hsl(var(--primary));animation:pulse 1s ease infinite}
+@keyframes pulse{50%{opacity:.35}}
+dl{margin:0;display:grid}
+dl>div{padding:9px 16px;border-bottom:1px solid hsl(var(--border))}
+dl>div:last-child{border-bottom:0}
+dt{font-size:9px;color:hsl(var(--mfg));margin-bottom:3px}
+dd{margin:0;font:12px/1.45 var(--mono);word-break:break-all;color:hsl(var(--fg))}
+dd.empty{color:hsl(var(--mfg))}
+.notice{padding:12px 16px;font-size:12.5px;line-height:1.5;color:hsl(var(--mfg));border-top:1px solid hsl(var(--border))}
+.limits{margin-top:14px}
+.limits ul{margin:0;padding:4px 16px 14px 32px;font-size:13px;line-height:1.55;color:hsl(var(--mfg))}
+.limits li{margin-top:8px}.limits b{color:hsl(var(--fg));font-weight:600}
+.warn{border-left:3px solid hsl(var(--accent))}
+.side{display:grid;gap:14px;align-content:start}
+footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:hsl(var(--mfg));display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:860px){.grid{grid-template-columns:1fr}.wrap{width:min(100% - 22px,100%);padding-top:18px}button{flex:1}.spacer{display:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media print{.actions,footer{display:none}body{background:#fff;color:#111}}
+</style>
+</head>
+<body>
+<a class="skip" href="#receipt">Skip to verifier</a>
+<div class="wrap">
+<header>
+ <div>
+  <div class="eyebrow">Bitcoin Stratigraphy · CISO Review</div>
+  <h1>Article 12 receipt <span>verifier</span></h1>
+  <p class="sub">Checks the issuer's Ed25519 signature, the agent attribution bound into the Merkle leaf, and the RFC&nbsp;6962 inclusion proof. Everything runs in this browser tab. Nothing is sent, stored or logged.</p>
+ </div>
+ <div class="badges" aria-label="Page properties">
+  <span class="badge hl">Offline</span><span class="badge">No network · CSP</span><span class="badge">No storage</span>
+ </div>
+</header>
+
+<main class="grid">
+ <section class="panel" aria-labelledby="in-h">
+  <div class="ph"><h2 id="in-h">Evidence inputs</h2><span class="kicker">3 required</span></div>
+  <form class="pb" id="form" novalidate>
+   <div class="field">
+    <label for="receipt">Receipt JSON <small>raw receipt, settlement response or JSON-LD</small></label>
+    <textarea id="receipt" rows="11" spellcheck="false" autocomplete="off" aria-describedby="receipt-h" required></textarea>
+    <p class="hint" id="receipt-h">Paste the object exactly as received. Accepts <code>article_12_receipt</code> or <code>proof</code> wrappers.</p>
+   </div>
+   <div class="field">
+    <label for="pem">Trusted issuer public key <small>Ed25519 SPKI PEM</small></label>
+    <textarea id="pem" rows="4" spellcheck="false" autocomplete="off" aria-describedby="pem-h" placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----" required></textarea>
+    <p class="hint" id="pem-h">Obtain and pin this key through an independent channel (procurement record, signed config, out-of-band confirmation). Never copy it from the receipt or from the same response that delivered the receipt.</p>
+   </div>
+   <div class="field">
+    <label for="agent">Expected agent pubkey <small>NIP-98 · 64 hex</small></label>
+    <input id="agent" type="text" inputmode="text" spellcheck="false" autocomplete="off" maxlength="80" aria-describedby="agent-h" required>
+    <p class="hint" id="agent-h">The agent identity you expect, from your own records — not from the receipt.</p>
+   </div>
+   <div class="actions">
+    <button type="submit" class="primary" id="verify">Verify receipt</button>
+    <button type="button" class="ghost" id="clear">Clear</button>
+    <span class="spacer"></span>
+    <button type="button" class="ghost" id="save" title="Save this page as a single offline HTML file">Download page</button>
+   </div>
+   <div id="status" class="status" role="status" aria-live="polite"><strong id="status-t"></strong><span id="status-m"></span></div>
+  </form>
+ </section>
+
+ <div class="side">
+  <section class="panel" aria-labelledby="ck-h">
+   <div class="ph"><h2 id="ck-h">Checks</h2><span class="kicker" id="ck-sum">Not run</span></div>
+   <ul class="checks" id="checks">
+    <li data-k="signature" data-s="idle"><span class="dot" aria-hidden="true"></span><span>Issuer Ed25519 signature &amp; key fingerprint</span><span class="chk-k">Pending</span></li>
+    <li data-k="merkle" data-s="idle"><span class="dot" aria-hidden="true"></span><span>Leaf binding &amp; RFC 6962 inclusion</span><span class="chk-k">Pending</span></li>
+    <li data-k="identity" data-s="idle"><span class="dot" aria-hidden="true"></span><span>Bound to expected NIP-98 agent</span><span class="chk-k">Pending</span></li>
+   </ul>
+  </section>
+  <section class="panel" aria-labelledby="out-h">
+   <div class="ph"><h2 id="out-h">Verified output</h2><span class="kicker">Only shown on pass</span></div>
+   <dl>
+    <div><dt>Issuer key ID (SHA-256 of SPKI)</dt><dd id="o-key" class="empty">—</dd></div>
+    <div><dt>Agent pubkey</dt><dd id="o-agent" class="empty">—</dd></div>
+    <div><dt>Merkle root</dt><dd id="o-root" class="empty">—</dd></div>
+    <div><dt>Escrow ID</dt><dd id="o-escrow" class="empty">—</dd></div>
+   </dl>
+   <p class="notice" id="o-notice" hidden></p>
+  </section>
+ </div>
+</main>
+
+<section class="panel limits warn" aria-labelledby="lim-h">
+ <div class="ph"><h2 id="lim-h">What a pass does not prove</h2><span class="kicker">Read before relying</span></div>
+ <ul>
+  <li><b>Key trust is yours.</b> The result is only as strong as the provenance of the issuer key you pasted. A key taken from the receipt proves nothing.</li>
+  <li><b>Identity is server-recorded.</b> The receipt records that the issuer verified a NIP-98 identity. This page does not independently re-verify the original Schnorr-signed event, nor current key revocation status.</li>
+  <li><b>Merkle validity is local.</b> A valid inclusion proof does not prove the thermodynamic truth of source data, Bitcoin anchoring of the root, or legal / regulatory compliance.</li>
+ </ul>
+</section>
+
+<footer><span>Bitcoin Stratigraphy · Article 12 verifier · article12-ed25519-v1</span><span>Self-contained · works from file://</span></footer>
+</div>
+<script>
+/* Offline Article 12 verifier. No network, storage, dependencies or backend trust. */
+globalThis.Article12Verifier = (() => {
+  "use strict";
+  const encoder = new TextEncoder();
+  const domain = "bitcoin-stratigraphy/article12/v1\n";
+  function canonical(value) {
+    if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+    if (value !== null && typeof value === "object") {
+      return `{${Object.keys(value).sort().map(key =>
+        `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+    }
+    return JSON.stringify(value);
+  }
+  function hex(bytes) {
+    return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+  }
+  function unhex(value, lengths = [32]) {
+    if (typeof value !== "string" || !/^[0-9a-f]+$/.test(value)
+        || !lengths.includes(value.length / 2)) throw new Error("Invalid hex evidence");
+    return Uint8Array.from(value.match(/../g), byte => parseInt(byte, 16));
+  }
+  function concat(...parts) {
+    const result = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+    let offset = 0;
+    for (const part of parts) { result.set(part, offset); offset += part.length; }
+    return result;
+  }
+  async function hash(value) {
+    return new Uint8Array(await crypto.subtle.digest("SHA-256", value));
+  }
+  function base64(value) {
+    if (typeof value !== "string" || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+      throw new Error("Invalid base64");
+    }
+    return Uint8Array.from(atob(value), c => c.charCodeAt(0));
+  }
+  async function verify(input, trustedPublicKeyPem, expectedAgentPubkey) {
+    if (!globalThis.crypto?.subtle) {
+      throw new Error("Web Crypto is unavailable. Use a browser supporting Ed25519 in a secure context or a local file.");
+    }
+    // Accept the raw receipt, settlement response or JSON-LD receipt document.
+    const parsed = typeof input === "string" ? JSON.parse(input) : input;
+    const receipt = parsed?.article_12_receipt ?? parsed?.proof ?? parsed;
+    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
+      throw new Error("Paste an Article 12 receipt JSON object");
+    }
+    const { issuer_attestation: attestation, ...payload } = receipt;
+    if (attestation?.version !== "article12-ed25519-v1" || attestation.algorithm !== "Ed25519") {
+      throw new Error("Missing supported Ed25519 receipt attestation; unsigned legacy receipts cannot pass.");
+    }
+    const pem = String(trustedPublicKeyPem).trim();
+    if (!/^-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----$/.test(pem)) {
+      throw new Error("Provide an independently trusted Ed25519 SPKI public key PEM");
+    }
+    const der = base64(pem.replace(/-----[A-Z ]+-----/g, "").replace(/\s/g, ""));
+    if (hex(await hash(der)) !== attestation.key_id) throw new Error("Trusted issuer key fingerprint does not match");
+    const key = await crypto.subtle.importKey("spki", der, { name: "Ed25519" }, false, ["verify"]);
+    const signature = base64(attestation.signature);
+    if (signature.length !== 64 || !await crypto.subtle.verify(
+      { name: "Ed25519" }, key, signature, encoder.encode(domain + canonical(payload)),
+    )) throw new Error("Ed25519 signature is invalid");
+    if (payload.receipt_type !== "article_12_execution_commitment") throw new Error("Unexpected receipt type");
+    const leaf = unhex(payload.leaf_preimage, [96, 128, 160]);
+    let current = await hash(concat(new Uint8Array([0]), leaf));
+    if (hex(current) !== payload.execution_leaf_hash) throw new Error("Execution leaf hash does not match");
+    const hasAgent = Object.hasOwn(payload, "agent_id");
+    const hasAuth = Object.hasOwn(payload, "agent_authentication");
+    const hasTrace = Object.hasOwn(payload, "traceparent");
+    if ((hasAuth && !hasAgent) || (hasAuth && payload.agent_authentication !== "nip98")
+        || (leaf.length === 96 && (hasAgent || hasAuth || hasTrace))
+        || (leaf.length === 128 && (!hasAgent || hasTrace))
+        || (leaf.length === 160 && !hasTrace)) throw new Error("Leaf layout and attribution do not agree");
+    if (leaf.length >= 128) {
+      const attribution = hasAgent ? {
+        agent_id: payload.agent_id,
+        ...(hasAuth ? { agent_authentication: payload.agent_authentication } : {}),
+      } : {};
+      if (hex(await hash(encoder.encode(canonical(attribution)))) !== hex(leaf.slice(96, 128))) {
+        throw new Error("Agent attribution is not bound to the Merkle leaf");
+      }
+    }
+    if (hasTrace) {
+      if (typeof payload.traceparent !== "string" ||
+          !/^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}(?:-[\x21-\x7e]+)?$/.test(payload.traceparent) ||
+          hex(await hash(encoder.encode(canonical({ traceparent: payload.traceparent })))) !== hex(leaf.slice(128))) {
+        throw new Error("Trace context is not bound to the Merkle leaf");
+      }
+    }
+    if (!Number.isSafeInteger(payload.tree_size) || payload.tree_size < 1 ||
+        !Number.isSafeInteger(payload.leaf_index) || payload.leaf_index < 0 ||
+        payload.leaf_index >= payload.tree_size || !Array.isArray(payload.audit_path) ||
+        payload.audit_path.length > 53) throw new Error("Invalid Merkle proof bounds");
+    let index = payload.leaf_index;
+    let last = payload.tree_size - 1;
+    for (const entry of payload.audit_path) {
+      if (last === 0) throw new Error("Merkle proof contains extra siblings");
+      const sibling = unhex(entry);
+      if (index % 2 === 1 || index === last) {
+        current = await hash(concat(new Uint8Array([1]), sibling, current));
+        while (index !== 0 && index % 2 === 0) {
+          index = Math.floor(index / 2); last = Math.floor(last / 2);
+        }
+      } else {
+        current = await hash(concat(new Uint8Array([1]), current, sibling));
+      }
+      index = Math.floor(index / 2); last = Math.floor(last / 2);
+    }
+    unhex(payload.merkle_root);
+    if (last !== 0 || hex(current) !== payload.merkle_root) throw new Error("RFC 6962 Merkle inclusion proof is invalid");
+    const expected = String(expectedAgentPubkey).trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(expected)) throw new Error("Provide the expected 64-character NIP-98 agent public key");
+    if (payload.agent_authentication !== "nip98" || payload.agent_id !== expected) {
+      throw new Error("Receipt is not bound to the expected NIP-98-authenticated agent");
+    }
+    return {
+      verified: true, signature: true, merkle: true, identity: true,
+      issuerKeyId: attestation.key_id, agentPubkey: expected,
+      root: payload.merkle_root, escrowId: payload.escrow_id,
+      notice: "Verified issuer signature, committed agent attribution and local Merkle inclusion. This does not independently verify the original NIP-98 event, present key-revocation status, thermodynamic source truth, Bitcoin anchoring or legal compliance.",
+    };
+  }
+  return Object.freeze({ verify, canonical });
+})();
+</script>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const form = $("form"), rc = $("receipt"), pem = $("pem"), ag = $("agent");
+  const vBtn = $("verify"), status = $("status");
+  const out = { key: $("o-key"), agent: $("o-agent"), root: $("o-root"), escrow: $("o-escrow") };
+  let gen = 0;
+  function setChecks(state, failKey) {
+    document.querySelectorAll("#checks li").forEach(li => {
+      const s = state === "fail" ? (li.dataset.k === failKey ? "fail" : "idle") : state;
+      li.dataset.s = s;
+      li.lastElementChild.textContent = { idle: state === "fail" ? "Not passed" : "Pending", run: "Checking", pass: "Pass", fail: "Fail" }[s];
+    });
+    $("ck-sum").textContent = { idle: "Not run", run: "Running", pass: "3 / 3 pass", fail: "Failed" }[state];
+  }
+  function resetOutput() {
+    for (const k in out) { out[k].textContent = "—"; out[k].classList.add("empty"); }
+    $("o-notice").hidden = true; $("o-notice").textContent = "";
+  }
+  function setStatus(kind, title, msg) {
+    status.className = "status";
+    if (!kind) { $("status-t").textContent = ""; $("status-m").textContent = ""; return; }
+    void status.offsetWidth;
+    status.classList.add("show", kind);
+    $("status-t").textContent = title; $("status-m").textContent = msg;
+  }
+  function fieldErr(el, bad) { el.setAttribute("aria-invalid", bad ? "true" : "false"); }
+  function reset() {
+    gen++; vBtn.disabled = false; vBtn.textContent = "Verify receipt";
+    setChecks("idle"); resetOutput(); setStatus(null);
+    [rc, pem, ag].forEach(e => fieldErr(e, false));
+  }
+  function classify(msg) {
+    if (/agent|NIP-98/i.test(msg) && !/attribution|Leaf layout/i.test(msg)) return "identity";
+    if (/Merkle|leaf|Leaf|Trace|hex|receipt type/i.test(msg)) return "merkle";
+    return "signature";
+  }
+  [rc, pem, ag].forEach(el => el.addEventListener("input", reset));
+  $("clear").addEventListener("click", () => { rc.value = ""; pem.value = ""; ag.value = ""; reset(); rc.focus(); });
+  form.addEventListener("submit", async ev => {
+    ev.preventDefault();
+    reset();
+    const missing = [[rc, rc.value.trim()], [pem, pem.value.trim()], [ag, ag.value.trim()]].filter(([, v]) => !v).map(([e]) => e);
+    if (missing.length) {
+      missing.forEach(e => fieldErr(e, true));
+      setStatus("bad", "Input required", "Provide the receipt, an independently trusted issuer key and the expected agent pubkey.");
+      missing[0].focus(); return;
+    }
+    const my = ++gen;
+    vBtn.disabled = true; vBtn.textContent = "Verifying…";
+    setChecks("run"); setStatus("busy", "Verifying", "Running checks locally in this tab.");
+    try {
+      const r = await Article12Verifier.verify(rc.value, pem.value, ag.value);
+      if (my !== gen) return;
+      if (!r || r.verified !== true || !r.signature || !r.merkle || !r.identity) throw new Error("Verifier did not report a complete pass");
+      setChecks("pass");
+      out.key.textContent = String(r.issuerKeyId); out.agent.textContent = String(r.agentPubkey);
+      out.root.textContent = String(r.root); out.escrow.textContent = r.escrowId == null ? "(none)" : String(r.escrowId);
+      for (const k in out) out[k].classList.remove("empty");
+      $("o-notice").textContent = String(r.notice); $("o-notice").hidden = false;
+      setStatus("ok", "Verified", "Signature, attribution binding, Merkle inclusion and expected agent all pass. Review the limits below.");
+    } catch (e) {
+      if (my !== gen) return;
+      resetOutput();
+      const msg = e instanceof SyntaxError ? "Receipt is not valid JSON: " + e.message : String(e && e.message || e);
+      const k = e instanceof SyntaxError ? "signature" : classify(msg);
+      setChecks("fail", k);
+      if (e instanceof SyntaxError) fieldErr(rc, true);
+      else if (/PEM|public key|fingerprint|base64/i.test(msg)) fieldErr(pem, true);
+      else if (/64-character|expected NIP-98/i.test(msg)) fieldErr(ag, true);
+      setStatus("bad", "Not verified", msg);
+    } finally {
+      if (my === gen) { vBtn.disabled = false; vBtn.textContent = "Verify receipt"; }
+    }
+  });
+  // Capture a clean initial page, never the current receipt, result or status.
+  reset();
+  const offlineDocument = "<!doctype html>\n" + document.documentElement.outerHTML;
+  $("save").addEventListener("click", () => {
+    const html = offlineDocument;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    a.download = "article12-verifier.html";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+})();
+</script>
+</body>
+</html>

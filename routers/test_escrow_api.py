@@ -51,6 +51,11 @@ class EscrowApiTests(unittest.TestCase):
         status, settlement = self.api.dispatch("settle", execution)
         self.assertEqual(status, 200)
         self.assertEqual(settlement["status"], "SETTLED")
+        leaf = bytes.fromhex(settlement["article_12_receipt"]["leaf_preimage"])
+        self.assertEqual(len(leaf), 96)
+        self.assertEqual(leaf[:32].hex(), self.input["task_hash"])
+        self.assertEqual(leaf[32:64], hashlib.sha256(b"trace").digest())
+        self.assertEqual(leaf[64:], hashlib.sha256(b"result").digest())
         self.assertEqual(
             hashlib.sha256(bytes.fromhex(settlement["preimage"])).hexdigest(),
             contract["payment_hash"],
@@ -63,7 +68,8 @@ class EscrowApiTests(unittest.TestCase):
         self.assertTrue(document["verification"]["merkle_inclusion"])
         self.assertFalse(document["verification"]["bitcoin_anchor_verified"])
         self.assertEqual(document["verification"]["strata_block_height"], 900001)
-        self.assertNotIn("preimage", json.dumps(document))
+        self.assertNotIn('"preimage":', json.dumps(document))
+        self.assertNotIn(settlement["preimage"], json.dumps(document))
 
     def test_corrupt_receipt_rejected(self):
         contract = self.create()
@@ -97,7 +103,8 @@ class EscrowApiTests(unittest.TestCase):
         status, document = self.api.dispatch("receipt", lookup)
         self.assertEqual(status, 200)
         self.assertEqual(document["proof"]["lightning_settlement"], confirmation)
-        self.assertNotIn("preimage", json.dumps(document))
+        self.assertNotIn('"preimage":', json.dumps(document))
+        self.assertNotIn(settled["preimage"], json.dumps(document))
 
     def test_agent_attribution_receipt_verifies_and_rejects_forgery(self):
         contract = self.create()

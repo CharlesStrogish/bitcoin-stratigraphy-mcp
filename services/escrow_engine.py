@@ -194,6 +194,7 @@ class EscrowEngine:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "tree_size": tree.size,
                 "execution_leaf_hash": digest,
+                "leaf_preimage": data.hex(),
                 "settled_at_strata_block": height,
                 "receipt_type": "article_12_execution_commitment",
                 "ots_calendar_standard": OTS_CALENDAR_STANDARD,

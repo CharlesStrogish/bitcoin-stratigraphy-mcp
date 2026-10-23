@@ -162,6 +162,7 @@ class EscrowApi:
             receipt = {
                 **receipt, "ots_calendar_standard": OTS_CALENDAR_STANDARD,
                 "attestation_directive": ATTESTATION_DIRECTIVE,
+                "leaf_preimage": data.hex(),
             }
             return 200, {
                 "@context": {

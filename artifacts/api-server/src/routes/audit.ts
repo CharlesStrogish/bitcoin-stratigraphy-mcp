@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
-import express, { type Express, type ErrorRequestHandler } from "express";
+import express, { type Express, type ErrorRequestHandler, type RequestHandler } from "express";
 import { clientKey } from "../lib/client-address";
 import { createSlidingWindowRateLimiter } from "../middleware/rateLimiter";
 import {
@@ -11,6 +11,7 @@ import {
 export function registerAuditRoutes(
   app: Express,
   verify = verifyAuditEvidence,
+  identityGuard: RequestHandler = (_req, _res, next) => next(),
 ) {
   const router = express.Router();
   const limiter = createSlidingWindowRateLimiter({
@@ -63,6 +64,7 @@ export function registerAuditRoutes(
       next();
     },
     express.raw({ type: () => true, limit: "1mb", inflate: false }),
+    identityGuard,
     async (req, res) => {
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
         res

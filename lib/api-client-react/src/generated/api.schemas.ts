@@ -21,6 +21,11 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export interface Nip98KeyRevocationInput {
+  /** @pattern ^[0-9a-fA-F]{64}$ */
+  pubkey: string;
+}
+
 export interface ToolIntegrityEntry {
   name: string;
   /**
@@ -202,6 +207,20 @@ export const EscrowSettlementStatus = {
   SETTLED: 'SETTLED',
 } as const;
 
+export type EscrowReceiptIssuerAttestationVersion = typeof EscrowReceiptIssuerAttestationVersion[keyof typeof EscrowReceiptIssuerAttestationVersion];
+
+
+export const EscrowReceiptIssuerAttestationVersion = {
+  'article12-ed25519-v1': 'article12-ed25519-v1',
+} as const;
+
+export type EscrowReceiptIssuerAttestationAlgorithm = typeof EscrowReceiptIssuerAttestationAlgorithm[keyof typeof EscrowReceiptIssuerAttestationAlgorithm];
+
+
+export const EscrowReceiptIssuerAttestationAlgorithm = {
+  Ed25519: 'Ed25519',
+} as const;
+
 /**
  * Identifies the verifiable SHA-256 Merkle commitment format for future OpenTimestamps anchoring; does not assert calendar submission or Bitcoin confirmation.
  */
@@ -236,6 +255,15 @@ export const EscrowReceiptReceiptType = {
   article_12_execution_commitment: 'article_12_execution_commitment',
 } as const;
 
+export type EscrowReceiptIssuerAttestation = {
+  version: EscrowReceiptIssuerAttestationVersion;
+  algorithm: EscrowReceiptIssuerAttestationAlgorithm;
+  /** @pattern ^[0-9a-f]{64}$ */
+  key_id: string;
+  /** Base64 Ed25519 signature over UTF-8 bitcoin-stratigraphy/article12/v1 followed by a newline and recursive key-sorted compact JSON of all receipt fields except issuer_attestation. Use an independently pinned SPKI public key from the issuer, not a key supplied by the receipt. */
+  signature: string;
+};
+
 /**
  * Trusted NWC toll settlement confirmation, not bounty funding or a Bitcoin anchor. Contains no payment preimage.
  */
@@ -249,6 +277,12 @@ export type EscrowReceiptLightningSettlement = {
 };
 
 export interface EscrowReceipt {
+  /**
+     * Exact 96, 128 or 160 byte RFC 6962 leaf preimage containing only task, trace, result and optional attribution/context hashes; never a payment preimage.
+     * @pattern ^(?:[0-9a-f]{192}|[0-9a-f]{256}|[0-9a-f]{320})$
+     */
+  leaf_preimage?: string;
+  issuer_attestation?: EscrowReceiptIssuerAttestation;
   /**
      * Optional validated W3C Trace Context from the settlement request. Trace-aware 160-byte leaves append SHA-256 of the canonical traceparent JSON after the attribution digest (SHA-256 of {} when unattributed). Legacy 96-byte and 128-byte leaves remain valid and cannot claim trace context.
      * @maxLength 512
@@ -2197,6 +2231,11 @@ export type PublicMetadataResponse = PublicMetadata;
  * Empty, finite successful preflight
  */
 export type PublicPreflightResponse = void;
+
+export type RevokeNip98Key200 = {
+  pubkey: string;
+  revoked_at: string;
+};
 
 export type GetRevenueAuditParams = {
 /**

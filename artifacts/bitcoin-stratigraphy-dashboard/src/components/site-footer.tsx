@@ -1,5 +1,6 @@
 import { Play, ShieldCheck } from "lucide-react";
 import WhitepaperLink from "./whitepaper-link";
+import Article12VerifierLink from "./article12-verifier-link";
 import "./site-footer.css";
 
 export default function SiteFooter() {
@@ -8,6 +9,7 @@ export default function SiteFooter() {
       <div className="shell-inner">
         <div className="footer-note">
           <nav aria-label="Footer navigation">
+            <Article12VerifierLink placement="footer" />
             <WhitepaperLink />
             <a
               className="control-button"

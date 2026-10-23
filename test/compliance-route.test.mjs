@@ -48,6 +48,9 @@ function renderPage() {
       if (path === "@/lib/compliance-seo") return metadata;
       if (path === "@/lib/ciso-intake") return cisoIntake;
       if (path === "@/components/ciso-intake-actions") return { CisoIntakeActions };
+      // Shared navigation is covered by article12-verifier-navigation.test.mjs,
+      // not by the approved compliance marketing-copy fingerprint.
+      if (path === "@/components/article12-verifier-link") return { default: () => null };
       if (path.endsWith(".css")) return {};
       throw new Error(`Unexpected dependency: ${path}`);
     },

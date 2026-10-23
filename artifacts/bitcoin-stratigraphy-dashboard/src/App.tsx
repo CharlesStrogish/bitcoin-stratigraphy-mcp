@@ -17,6 +17,7 @@ import EnterpriseLicenseLink from "@/components/enterprise-license-link";
 import WhitepaperPage from "@/pages/whitepaper";
 import WhitepaperLink from "@/components/whitepaper-link";
 import SiteFooter from "@/components/site-footer";
+import Article12VerifierLink from "@/components/article12-verifier-link";
 import StandardPage from "@/pages/standard";
 import SimulatorPage from "@/pages/simulator";
 import CompliancePage from "@/pages/compliance";
@@ -179,6 +180,7 @@ function Header({
             <Zap size={14} /> Live REST Escrow
           </a>
           <EnterpriseLicenseLink />
+          <Article12VerifierLink />
           <WhitepaperLink />
           <a
             className="control-button"

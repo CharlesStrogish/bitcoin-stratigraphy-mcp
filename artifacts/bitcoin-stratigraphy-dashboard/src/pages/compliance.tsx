@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import { useEffect } from "react";
+import Article12VerifierLink from "@/components/article12-verifier-link";
 import {
   COMPLIANCE_TITLE,
   COMPLIANCE_DESCRIPTION,
@@ -95,6 +96,7 @@ export default function CompliancePage() {
       <div className="shell-inner">
         <header className="topbar">
           <nav className="cmp-nav" aria-label="Primary">
+            <Article12VerifierLink />
             {NAV.map(([k, label, path]) => (
               <a key={k} href={`${BASE}${path}`} className="control-button" data-testid={`link-${k}`}>
                 {label}

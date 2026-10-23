@@ -1,0 +1,31 @@
+.control-button.article12-verifier-link {
+  min-width: 0;
+  height: auto;
+  min-height: 36px;
+  white-space: normal;
+  line-height: 1.4;
+  border-color: hsl(var(--primary) / 0.65);
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+  text-decoration: none;
+}
+
+.control-button.article12-verifier-link:hover {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.2);
+}
+
+.control-button.article12-verifier-link:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 3px;
+}
+
+.article12-verifier-link svg {
+  flex-shrink: 0;
+}
+
+.site-footer .control-button.article12-verifier-link {
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+}

@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowLeft, Play, RotateCcw, Square } from "lucide-react";
 import { TrustBadges } from "@/components/trust-badges";
 import EnterpriseLicenseLink from "@/components/enterprise-license-link";
+import Article12VerifierLink from "@/components/article12-verifier-link";
 import WhitepaperLink from "@/components/whitepaper-link";
 import { SyntheticBanner } from "@/simulator/components/SyntheticBanner";
 import { SIMULATOR_TITLE, SIMULATOR_DESCRIPTION } from "@/lib/escrow-seo";
@@ -233,6 +234,7 @@ export default function SimulatorPage() {
             </div>
             <div className="header-actions">
               <EnterpriseLicenseLink />
+              <Article12VerifierLink />
               <WhitepaperLink />
               <Link href="/" className="control-button" data-testid="link-home">
                 <ArrowLeft size={14} /> Dashboard

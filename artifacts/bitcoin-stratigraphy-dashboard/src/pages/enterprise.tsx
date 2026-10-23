@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import Article12VerifierLink from "@/components/article12-verifier-link";
 import {
   ENTERPRISE_TITLE as TITLE,
   ENTERPRISE_DESCRIPTION as DESC,
@@ -90,6 +91,7 @@ export default function EnterprisePage() {
       <div className="shell-inner">
         <header className="topbar">
           <nav className="ent-nav" aria-label="Primary">
+            <Article12VerifierLink />
             {NAV.map(([k, label, path]) => (
               <a
                 key={k}

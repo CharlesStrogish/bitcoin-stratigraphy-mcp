@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import Article12VerifierLink from "@/components/article12-verifier-link";
 import {
   WHITEPAPER_TITLE as TITLE,
   WHITEPAPER_DESCRIPTION as DESC,
@@ -42,6 +43,7 @@ export default function WhitepaperPage() {
       <div className="shell-inner">
         <header className="topbar">
           <nav className="wp-nav" aria-label="Primary">
+            <Article12VerifierLink />
             {NAV.map(([k, label, path]) => (
               <a
                 key={k}

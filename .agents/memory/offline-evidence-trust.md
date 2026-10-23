@@ -18,5 +18,20 @@ remain independently inspectable after access is withdrawn.
 Distinguish issuer-attested agent attribution from independent verification of
 an original NIP-98 event. Keep local Merkle inclusion, source-data truth,
 Bitcoin anchoring and legal compliance as separate findings. Signed revocation
-snapshots, if introduced later, need explicit issuance/expiry semantics rather
-than pretending to be live status.
+snapshots establish registry state only at the signed capture time. Their
+15-minute freshness window does not promise there will be no intervening
+revocation. An omitted snapshot must remain explicitly "not checked"; a stale,
+untrusted, malformed or revoked-agent snapshot must not silently downgrade into
+a receipt-only pass.
+
+Retain independently distributed current and historical issuer pins for
+receipt-key rotation. Never auto-enroll keys supplied with the evidence.
+Receipt/CRL rotation must not implicitly rotate the MCP integrity and webhook
+identity.
+
+**Why:** Enterprise offline audits require both retained historical evidence
+and a bounded, explicit registry-time finding. These are not live authorization
+or automatic trust in a new issuer.
+
+**How to apply:** Preserve domain-separated signatures and a distinct CRL check
+in the UI. Keep historical receipts inspectable without requiring a fresh CRL.

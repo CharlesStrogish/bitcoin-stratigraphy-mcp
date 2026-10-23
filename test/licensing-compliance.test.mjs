@@ -43,4 +43,5 @@ test("pre-flight and settlement telemetry share exact machine-readable licensing
     { event: "l402_settlement", licensing_compliance: expected },
   ]);
   logLicensingSettlement({});
+  logLicensingSettlement({ log: { error() {} } });
 });

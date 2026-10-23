@@ -18,7 +18,7 @@ export function attachLicensingCompliance(res: Response): void {
 }
 
 export function logLicensingSettlement(req: Request): void {
-  req.log?.info(
+  req.log?.info?.(
     { event: "l402_settlement", licensing_compliance: licensingCompliance },
     "L402 commercial compliance metadata",
   );

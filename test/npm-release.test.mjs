@@ -28,9 +28,12 @@ test("npm metadata defines real formulas and honest settlement boundaries", () =
     "Live L402 Satoshi settlement",
   ]) {
     assert.ok(distribution.description.includes(phrase), phrase);
-    assert.ok(readme.includes(phrase), phrase);
+    if (phrase !== "Hal Finney Horizon tracker") {
+      assert.ok(readme.includes(phrase), phrase);
+    }
   }
-  assert.match(readme, /\$10,000,000 \/ btc_price_usd/);
+  assert.match(readme, /Institutional Bitcoin state-anchoring/);
+  assert.doesNotMatch(readme, /422[ -]day|\$10M|Hal Finney Horizon|\$10,000,000/i);
   assert.match(readme, /network_hashrate_h_s \/ 10\^12/);
   assert.match(readme, /does not spend a client's wallet automatically/);
   assert.match(readme, /not update a running HTTP deployment/);

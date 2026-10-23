@@ -18,3 +18,15 @@ resolve the earlier ambiguous horizon and energy requirements.
 **How to apply:** Keep these definitions and the attribution requirement when
 extending enterprise telemetry. Do not silently substitute a different horizon,
 efficiency assumption, physical measurement claim, or time-to-price prediction.
+
+Public positioning must stay focused on institutional Bitcoin thermodynamic
+state-anchoring, L402 micropayments and EU AI Act Article 12 compliance. Do not
+introduce references to the "422-day dataset" or "$10M Hal Finney horizon" in
+the UI, product docs or READMEs. Preserve all 16 canonical MCP tool schemas and
+descriptions, including the existing Glama/Smithery configurations.
+
+**Why:** The user explicitly imposed these enterprise-upgrade guardrails.
+
+**How to apply:** Keep the underlying telemetry model and frozen MCP contracts
+separate from public marketing summaries; do not use the earlier metric policy
+as a reason to restore excluded promotional copy.

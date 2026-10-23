@@ -17,8 +17,8 @@ npx -y @bitcoin-stratigraphy/mcp-server
 
 ## Semantic capabilities
 
-- **Hal Finney Horizon tracker:** `$10,000,000 / btc_price_usd`, a price multiple,
-  not a deadline or price prediction. Historical attribution remains adjacent.
+- **Institutional Bitcoin state-anchoring:** live or archived thermodynamic
+  telemetry with independently inspectable execution evidence.
 - **15 J/TH thermodynamic energy calculation:**
   `network_energy_watts = (network_hashrate_h_s / 10^12) × 15`.
   This is estimated network power using an assumed efficiency, not measured

@@ -1,4 +1,5 @@
 import type { Express, RequestHandler } from "express";
+import { LIMITATION_OF_LIABILITY } from "./liability-notice";
 
 /**
  * Public API CORS is token-based, not cross-origin cookie authentication.
@@ -10,6 +11,7 @@ export function registerPublicCors(
 ): void {
   app.use((_req, res, next) => {
     res.set({
+      "X-Limitation-Of-Liability": LIMITATION_OF_LIABILITY,
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Access-Control-Allow-Origin": "*",
@@ -18,6 +20,7 @@ export function registerPublicCors(
       "Access-Control-Expose-Headers": [
         "*",
         "WWW-Authenticate",
+        "X-Limitation-Of-Liability",
         "X-L402-Receipt",
         "X-L402-Licensing-Compliance",
         "X-Commercial-Exemption-Status",

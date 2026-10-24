@@ -21,6 +21,7 @@ import {
 } from "./agent-id-caveat";
 import { equivalentToolNames } from "./mcp-pricing";
 import { enterpriseContext, enterpriseMacaroonFields } from "./enterprise-economics";
+import { LIABILITY_CAVEAT } from "../middleware/liability-notice";
 
 const ENTERPRISE_KEYS = ["enterprise_buyer", "routing_kickback", "commercial_exemption", "commercial_exemption_exp"];
 function economicsProof(secret: string, paymentHash: string, fields: Map<string, string>): string {
@@ -173,6 +174,7 @@ export function createSubscriptionMacaroon(input: {
     `payment_hash=${input.paymentHash}`,
     `tier=${input.tier}`,
     `valid_until=${input.validUntil}`,
+    LIABILITY_CAVEAT,
     ...(input.amountMsats === undefined
       ? []
       : [`amount_msats=${input.amountMsats}`]),
@@ -244,6 +246,11 @@ export function inspectSubscriptionMacaroon(
     const meteredScopes: Array<{ tokenId: string; maxRequests: number }> = [];
     for (const caveat of token.caveats) {
       runningSignature = hmac(runningSignature, caveat);
+      if (caveat === LIABILITY_CAVEAT) {
+        if (rootValues.has("liability")) return null;
+        rootValues.set("liability", LIABILITY_CAVEAT);
+        continue;
+      }
       if (caveat === "Commercial-Exemption: Active") {
         if (rootValues.has("commercial_exemption")) return null;
         rootValues.set("commercial_exemption", "Active");
@@ -347,6 +354,7 @@ export function inspectSubscriptionMacaroon(
         )) ||
       rootValues.size !==
         3 +
+          (rootValues.has("liability") ? 1 : 0) +
           (amountMsatsValue === undefined ? 0 : 1) +
           (paymentAssetCaveat === undefined ? 0 : 1) +
           (paymentProviderCaveat === undefined ? 0 : 1) +

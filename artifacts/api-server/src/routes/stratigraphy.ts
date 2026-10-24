@@ -11,6 +11,7 @@ import { type Express, type Request, type Response } from "express";
 import { createL402Middleware } from "../middleware/l402";
 import { quoteMcpTools } from "../lib/mcp-pricing";
 import { bindEnterpriseInvoiceToContext, enterpriseChallengeScope } from "../lib/enterprise-economics";
+import { liabilityChallengeScope } from "../middleware/liability-notice";
 import { batchSettlement } from "../lib/batch-settlement";
 import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement } from "../lib/licensing-compliance";
 import {
@@ -597,6 +598,7 @@ async function sendPaymentChallenge(
       challengeAmountMsats: number,
       challengeDescription: string,
     ) => {
+      scope = liabilityChallengeScope(scope);
       const economicsScope = enterpriseChallengeScope();
       const providerScope = `${scope}${agentScope}:asset:${paymentAsset}:settlement:${settlementRouter.activeProvider(paymentAsset)}${economicsScope}`;
       const result = await challengeStore.getOrCreate(

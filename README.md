@@ -210,6 +210,22 @@ text and dual-licensing rider are in [LICENSE.md](LICENSE.md).
 These notices do not guarantee legal protection or regulatory compliance.
 Obtain qualified legal review of ownership and any enterprise agreement.
 
+## Limitation of Liability & Hold Harmless
+
+All data is provided **"AS IS" and "AS AVAILABLE", without warranty**, express or
+implied. To the fullest extent permitted by applicable law, the Bitcoin
+Stratigraphy Data Engine and its founder/architect, **Charles R. Strogish, shall
+not be held liable for enterprise losses**, downstream financial execution,
+hallucinations, or client-system logic failures.
+
+New L402 macaroons carry `liability = "charles_r_strogish_held_harmless"` in their
+authenticated HMAC chain. API responses communicate the proposed terms through
+`X-Limitation-Of-Liability`; clients are requested to review and record them
+before execution. These are technical notices, not proof of legally valid
+assent, an indemnity agreement, or guaranteed immunity from lawsuits. Mandatory
+law and applicable signed agreements govern enforceability; obtain qualified
+legal review. Previously issued paid tokens are not retroactively invalidated.
+
 ## Enterprise SDK and Swarm Flight Simulator
 
 Install the self-contained enterprise suite from the checkout or a built wheel:

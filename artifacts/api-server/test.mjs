@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/liability-notice.test.js",
   "./dist/enterpriseEconomics.test.js",
   "./dist/primaryStratigraphy.test.js",
   "./dist/escrow.test.js",
@@ -141,6 +142,7 @@ await build({
 
 await build({
   entryPoints: {
+    "liability-notice.test": "./tests/unit/liability-notice.test.ts",
     "enterpriseEconomics.test": "./tests/unit/enterpriseEconomics.test.ts",
     "primaryStratigraphy.test": "./tests/unit/primaryStratigraphy.test.ts",
     "escrow.test": "./src/routes/escrow.test.ts",

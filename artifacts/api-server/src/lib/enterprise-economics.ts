@@ -20,6 +20,7 @@ type PriceReader = () => Promise<number | null>;
 export type EnterpriseContext = {
   buyer?: string;
   payout?: string;
+  parentPayout?: string;
   account?: EnterpriseAccount;
   invoices: Map<string, RoutingInvoice>;
   onSettlement?: () => void;
@@ -137,7 +138,14 @@ export class EnterpriseEconomics {
     const token = this.token(context.account);
     return {
       routing_kickback_percent: context.payout ? 5 : 0,
+      direct_kickback_percent: context.payout
+        ? context.parentPayout
+          ? 4
+          : 5
+        : 0,
+      parent_kickback_percent: context.parentPayout ? 1 : 0,
       payout_address: context.payout ?? null,
+      parent_payout_address: context.parentPayout ?? null,
       payout_mode: "ledger_only_no_automatic_disbursement",
       buyer_pubkey: context.buyer ?? null,
       cumulative_spend_msats: context.account?.total_msats ?? "0",
@@ -165,6 +173,11 @@ export class EnterpriseEconomics {
     context: EnterpriseContext,
   ): Promise<RoutingInvoice> {
     if (
+      context.parentPayout &&
+      (!context.payout || context.parentPayout === context.payout)
+    )
+      throw new Error("Parent payout requires a distinct direct payout");
+    if (
       !Number.isSafeInteger(amount) ||
       amount <= 0 ||
       !/^[0-9a-f]{64}$/.test(invoice.paymentHash)
@@ -174,6 +187,17 @@ export class EnterpriseEconomics {
     const kickback = context.payout
       ? ((BigInt(amount) * 5n) / 100n).toString()
       : "0";
+    // Floor each independently to the millisatoshi. Never assign rounding dust
+    // to an agent, and never exceed the existing 5% total allocation.
+    const directKickback = context.parentPayout
+      ? ((BigInt(amount) * 4n) / 100n).toString()
+      : kickback;
+    const parentKickback = context.parentPayout
+      ? (BigInt(amount) / 100n).toString()
+      : "0";
+    const totalKickback = (
+      BigInt(directKickback) + BigInt(parentKickback)
+    ).toString();
     const allocation = signIssuerPayload(
       {
         receipt_type: "autonomous_routing_kickback",
@@ -182,7 +206,18 @@ export class EnterpriseEconomics {
         payment_provider: invoice.provider,
         payment_asset: "btc-lightning",
         invoice_amount_msats: String(amount),
-        kickback_msats: kickback,
+        kickback_msats: totalKickback,
+        ...(context.parentPayout
+          ? {
+              allocation_version: 2,
+              direct_kickback_percent: 4,
+              parent_kickback_percent: 1,
+              direct_kickback_msats: directKickback,
+              parent_kickback_msats: parentKickback,
+              parent_payout_address: context.parentPayout,
+              payout_mode: "ledger_only_no_automatic_disbursement",
+            }
+          : {}),
         payout_address: context.payout ?? null,
         buyer_pubkey: context.buyer ?? null,
         issued_at: new Date(this.now()).toISOString(),
@@ -198,7 +233,14 @@ export class EnterpriseEconomics {
       amount_msats: String(amount),
       buyer: context.buyer,
       payout: context.payout,
-      kickback_msats: kickback,
+      kickback_msats: totalKickback,
+      ...(context.parentPayout
+        ? {
+            parent_payout: context.parentPayout,
+            direct_kickback_msats: directKickback,
+            parent_kickback_msats: parentKickback,
+          }
+        : {}),
       allocation,
     };
     const bound = await this.store.transaction(
@@ -212,6 +254,9 @@ export class EnterpriseEconomics {
           value.buyer ?? null,
           value.payout ?? null,
           value.kickback_msats,
+          value.parent_payout ?? null,
+          value.direct_kickback_msats ?? value.kickback_msats,
+          value.parent_kickback_msats ?? "0",
         ];
         if (old && canonical(binding(old)) !== canonical(binding(record))) {
           throw new Error("Invoice economics already bound");
@@ -349,7 +394,18 @@ export function enterpriseChallengeScope(): string {
   return context && (context.buyer || context.payout)
     ? ":economics:" +
         createHash("sha256")
-          .update(JSON.stringify([context.buyer, context.payout, activeGrant]))
+          .update(
+            JSON.stringify(
+              context.parentPayout
+                ? [
+                    context.buyer,
+                    context.payout,
+                    activeGrant,
+                    context.parentPayout,
+                  ]
+                : [context.buyer, context.payout, activeGrant],
+            ),
+          )
           .digest("hex")
     : "";
 }
@@ -365,7 +421,11 @@ export async function bindEnterpriseInvoiceToContext(
     (tx) => tx.invoice(hash),
   );
   if (!invoice) return;
-  if (invoice.buyer !== context.buyer || invoice.payout !== context.payout)
+  if (
+    invoice.buyer !== context.buyer ||
+    invoice.payout !== context.payout ||
+    invoice.parent_payout !== context.parentPayout
+  )
     throw new Error("Invoice attribution mismatch");
   context.invoices.set(hash, invoice);
 }

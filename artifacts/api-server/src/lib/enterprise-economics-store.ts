@@ -13,11 +13,15 @@ export type RoutingInvoice = {
   amount_msats: string;
   buyer?: string;
   payout?: string;
+  parent_payout?: string;
   kickback_msats: string;
+  direct_kickback_msats?: string;
+  parent_kickback_msats?: string;
   allocation: Record<string, unknown>;
   settled_at?: string;
 };
 export interface EconomicsTransaction {
+  routingVolume(payout: string): Promise<string>;
   invoice(hash: string): Promise<RoutingInvoice | undefined>;
   putInvoice(invoice: RoutingInvoice): Promise<void>;
   account(buyer: string): Promise<EnterpriseAccount>;
@@ -47,6 +51,16 @@ export function createMemoryEnterpriseEconomicsStore(): EnterpriseEconomicsStore
       const nextAccounts = structuredClone(accounts);
       try {
         const result = await run({
+          routingVolume: async (payout) =>
+            [...nextInvoices.values()]
+              .filter(
+                (invoice) => invoice.payout === payout && invoice.settled_at,
+              )
+              .reduce(
+                (total, invoice) => total + BigInt(invoice.amount_msats),
+                0n,
+              )
+              .toString(),
           invoice: async (hash) => structuredClone(nextInvoices.get(hash)),
           putInvoice: async (invoice) => {
             nextInvoices.set(invoice.hash, structuredClone(invoice));
@@ -87,7 +101,10 @@ export function createPostgresEnterpriseEconomicsStore(
     );
     CREATE TABLE IF NOT EXISTS enterprise_buyer_accounts (
       buyer_pubkey text PRIMARY KEY, payload jsonb NOT NULL
-    )`,
+    );
+    CREATE INDEX IF NOT EXISTS enterprise_settled_routing_payout
+      ON enterprise_routing_invoices ((payload->>'payout'))
+      WHERE payload->>'settled_at' IS NOT NULL`,
       )
       .catch((error) => {
         initialized = undefined;
@@ -104,6 +121,16 @@ export function createPostgresEnterpriseEconomicsStore(
           ["enterprise:" + key],
         );
         const result = await run({
+          async routingVolume(payout) {
+            const result = await client.query<{ total: string }>(
+              `SELECT COALESCE(SUM((payload->>'amount_msats')::numeric),0)::text AS total
+               FROM enterprise_routing_invoices
+               WHERE payload->>'payout'=$1 AND payload->>'settled_at' IS NOT NULL`,
+              [payout],
+            );
+            if (!result.rows[0]) throw new Error("Routing volume unavailable");
+            return result.rows[0].total;
+          },
           async invoice(hash) {
             const result = await client.query<{ payload: RoutingInvoice }>(
               "SELECT payload FROM enterprise_routing_invoices WHERE payment_hash=$1 FOR UPDATE",

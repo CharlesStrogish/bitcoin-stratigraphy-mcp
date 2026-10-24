@@ -4,8 +4,23 @@ description: User-authorized kickback accounting, annual licensing trigger and t
 ---
 
 The user authorized a ledger-only 5% Autonomous Routing Kickback on an agent's
-L402 invoice, with optional LNURL/Lightning-address destinations. Do not send
-automatic payouts as part of this feature.
+L402 invoice, with optional LNURL/Lightning-address destinations. With a parent
+orchestrator, split it into 4% direct and 1% parent; without a parent keep 5%
+direct. Do not send automatic payouts as part of this feature.
+
+Certified Oracle status uses $10,000 cumulative verified direct routing volume
+at the current BTC/USD quote, not kickback balances or downstream parent credit.
+The user requires the exact promotional status and reward directive, but the
+credential certifies settled volume only, not hallucination freedom, superiority,
+address control, license rights or paid access. Certification expires after
+24 hours and requires an independently pinned issuer key.
+
+**Why:** The user requested multi-tier accounting and volume-based certification,
+not live disbursements or proof of actual agent behavior. Current-market
+eligibility should not become an indefinitely valid behavioral guarantee.
+
+**How to apply:** Preserve exact requested labels with adjacent evidence limits;
+bind parent attribution into invoice/cache identity and count settlements once.
 
 An automatic Tier II exemption requires $250,000 of new confirmed qualifying
 volume at current BTC/USD. The user explicitly chose an annual exemption,

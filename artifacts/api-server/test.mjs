@@ -7,6 +7,7 @@ process.env.NODE_ENV = "test";
 const outputs = [
   "./dist/liability-notice.test.js",
   "./dist/enterpriseEconomics.test.js",
+  "./dist/certified-oracle.test.js",
   "./dist/primaryStratigraphy.test.js",
   "./dist/escrow.test.js",
   "./dist/escrowLedger.test.js",
@@ -144,6 +145,7 @@ await build({
   entryPoints: {
     "liability-notice.test": "./tests/unit/liability-notice.test.ts",
     "enterpriseEconomics.test": "./tests/unit/enterpriseEconomics.test.ts",
+    "certified-oracle.test": "./tests/unit/certified-oracle.test.ts",
     "primaryStratigraphy.test": "./tests/unit/primaryStratigraphy.test.ts",
     "escrow.test": "./src/routes/escrow.test.ts",
     "escrowLedger.test": "./src/services/escrowLedger.test.ts",
@@ -173,7 +175,8 @@ await build({
     "article12-verifier.test": "./tests/unit/article12-verifier.test.ts",
     "mcp-stateless-transport.test":
       "./tests/unit/mcp-stateless-transport.test.ts",
-    "mcp-response-signature.test": "./tests/unit/mcp-response-signature.test.ts",
+    "mcp-response-signature.test":
+      "./tests/unit/mcp-response-signature.test.ts",
     "mcp-async-webhooks.test": "./tests/unit/mcp-async-webhooks.test.ts",
     "announcer.test": "../../tests/announcer.test.ts",
     "ledger.test": "../../tests/ledger.test.ts",

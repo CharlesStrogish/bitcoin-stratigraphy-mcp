@@ -27,6 +27,9 @@ export function parseAgentPayout(
     return local + "@" + domain!.toLowerCase();
   }
   if (lnurl === undefined) return undefined;
+  // Both public routing identifiers are accepted; addresses remain opaque and
+  // are never resolved or contacted by the accounting layer.
+  if (lnurl.includes("@")) return parseAgentPayout(lnurl);
   if (
     lnurl.length > 2_048 ||
     (lnurl !== lnurl.toLowerCase() && lnurl !== lnurl.toUpperCase())
@@ -67,6 +70,16 @@ export function createEnterpriseEconomicsMiddleware(
         req.get("X-Agent-Lightning-Address"),
         req.get("X-Agent-LNURL"),
       );
+      const parentPayout = parseAgentPayout(
+        undefined,
+        req.get("X-Parent-Agent-LNURL"),
+      );
+      if (parentPayout && (!payout || parentPayout === payout)) {
+        res.status(400).json({
+          error: "X-Parent-Agent-LNURL requires a distinct direct agent payout",
+        });
+        return;
+      }
       const declared = req.get("Buyer-Pubkey");
       const signer = verifyRequestNip98Signer(req, service.now());
       if (signer.provided && !signer.pubkey) {
@@ -87,6 +100,7 @@ export function createEnterpriseEconomicsMiddleware(
       const context: EnterpriseContext = {
         buyer,
         payout,
+        parentPayout,
         account: buyer ? await service.status(buyer) : undefined,
         invoices: new Map(),
         now: service.now,

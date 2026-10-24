@@ -46,6 +46,7 @@ import { EnterpriseEconomics, configureEnterpriseEconomics } from "./lib/enterpr
 import { createPostgresEnterpriseEconomicsStore } from "./lib/enterprise-economics-store";
 import { createEnterpriseEconomicsMiddleware } from "./middleware/enterprise-economics";
 import { registerCryptographicAuditRoutes } from "./routes/cryptographic-audit";
+import { registerCertifiedOracleRoutes } from "./routes/certified-oracle";
 import {
   createNip98RevocationGuard, registerNip98RevocationAdmin,
 } from "./middleware/nip98-revocation";
@@ -120,6 +121,7 @@ const enterpriseEconomics = new EnterpriseEconomics(createPostgresEnterpriseEcon
 configureEnterpriseEconomics(enterpriseEconomics);
 app.use(createEnterpriseEconomicsMiddleware(enterpriseEconomics));
 registerCryptographicAuditRoutes(app, enterpriseEconomics, { ledger: revenueLedger });
+registerCertifiedOracleRoutes(app, enterpriseEconomics);
 registerNip98RevocationAdmin(app, nip98Revocations);
 registerComplianceRoutes(app, nip98Revocations);
 

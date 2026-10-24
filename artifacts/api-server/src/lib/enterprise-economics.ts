@@ -137,13 +137,16 @@ export class EnterpriseEconomics {
   describe(context: EnterpriseContext): Record<string, unknown> {
     const token = this.token(context.account);
     return {
-      routing_kickback_percent: context.payout ? 5 : 0,
+      routing_kickback_percent: context.payout ? 21 : 0,
       direct_kickback_percent: context.payout
         ? context.parentPayout
-          ? 4
-          : 5
+          ? 14
+          : 21
         : 0,
-      parent_kickback_percent: context.parentPayout ? 1 : 0,
+      parent_kickback_percent: context.parentPayout ? 7 : 0,
+      reward_policy: "21-cap-v1",
+      reward_release_requires:
+        "verified_invoice_and_provider_bound_address_signature",
       payout_address: context.payout ?? null,
       parent_payout_address: context.parentPayout ?? null,
       payout_mode: "ledger_only_no_automatic_disbursement",
@@ -185,15 +188,15 @@ export class EnterpriseEconomics {
       throw new Error("Invalid enterprise invoice");
     }
     const kickback = context.payout
-      ? ((BigInt(amount) * 5n) / 100n).toString()
+      ? ((BigInt(amount) * 21n) / 100n).toString()
       : "0";
     // Floor each independently to the millisatoshi. Never assign rounding dust
-    // to an agent, and never exceed the existing 5% total allocation.
+    // to an agent, and never exceed the 21% total allocation.
     const directKickback = context.parentPayout
-      ? ((BigInt(amount) * 4n) / 100n).toString()
+      ? ((BigInt(amount) * 14n) / 100n).toString()
       : kickback;
     const parentKickback = context.parentPayout
-      ? (BigInt(amount) / 100n).toString()
+      ? ((BigInt(amount) * 7n) / 100n).toString()
       : "0";
     const totalKickback = (
       BigInt(directKickback) + BigInt(parentKickback)
@@ -207,11 +210,14 @@ export class EnterpriseEconomics {
         payment_asset: "btc-lightning",
         invoice_amount_msats: String(amount),
         kickback_msats: totalKickback,
+        reward_policy: "21-cap-v1",
+        reward_release_requires:
+          "verified_invoice_and_provider_bound_address_signature",
         ...(context.parentPayout
           ? {
-              allocation_version: 2,
-              direct_kickback_percent: 4,
-              parent_kickback_percent: 1,
+              allocation_version: 3,
+              direct_kickback_percent: 14,
+              parent_kickback_percent: 7,
               direct_kickback_msats: directKickback,
               parent_kickback_msats: parentKickback,
               parent_payout_address: context.parentPayout,
@@ -222,6 +228,8 @@ export class EnterpriseEconomics {
         buyer_pubkey: context.buyer ?? null,
         issued_at: new Date(this.now()).toISOString(),
         payable_only_after_verified_settlement: true,
+        payable_only_after_verified_address: true,
+        initial_reward_state: "pending",
       },
       this.loadKey(),
       "routing-kickback-ed25519-v1",
@@ -253,10 +261,7 @@ export class EnterpriseEconomics {
           value.amount_msats,
           value.buyer ?? null,
           value.payout ?? null,
-          value.kickback_msats,
           value.parent_payout ?? null,
-          value.direct_kickback_msats ?? value.kickback_msats,
-          value.parent_kickback_msats ?? "0",
         ];
         if (old && canonical(binding(old)) !== canonical(binding(record))) {
           throw new Error("Invoice economics already bound");
@@ -406,7 +411,8 @@ export function enterpriseChallengeScope(): string {
                 : [context.buyer, context.payout, activeGrant],
             ),
           )
-          .digest("hex")
+          .digest("hex") +
+        ":21-cap-v1"
     : "";
 }
 

@@ -21,6 +21,12 @@ export type RoutingInvoice = {
   settled_at?: string;
 };
 export interface EconomicsTransaction {
+  security(key: string): Promise<Record<string, unknown> | undefined>;
+  putSecurity(key: string, value: Record<string, unknown>): Promise<void>;
+  isRevoked(agent: string): Promise<boolean>;
+  revoke(agent: string, at: string): Promise<void>;
+  revocations(): Promise<string[]>;
+  rewardInvoices(payout: string): Promise<RoutingInvoice[]>;
   routingVolume(payout: string): Promise<string>;
   invoice(hash: string): Promise<RoutingInvoice | undefined>;
   putInvoice(invoice: RoutingInvoice): Promise<void>;
@@ -38,6 +44,8 @@ export interface EnterpriseEconomicsStore {
 export function createMemoryEnterpriseEconomicsStore(): EnterpriseEconomicsStore {
   let invoices = new Map<string, RoutingInvoice>();
   let accounts = new Map<string, EnterpriseAccount>();
+  let security = new Map<string, Record<string, unknown>>();
+  let revoked = new Map<string, string>();
   let tail = Promise.resolve();
   return {
     async transaction(_key, run) {
@@ -49,8 +57,26 @@ export function createMemoryEnterpriseEconomicsStore(): EnterpriseEconomicsStore
       await previous;
       const nextInvoices = structuredClone(invoices);
       const nextAccounts = structuredClone(accounts);
+      const nextSecurity = structuredClone(security);
+      const nextRevoked = structuredClone(revoked);
       try {
         const result = await run({
+          security: async (key) => structuredClone(nextSecurity.get(key)),
+          putSecurity: async (key, value) => {
+            nextSecurity.set(key, structuredClone(value));
+          },
+          isRevoked: async (agent) => nextRevoked.has(agent),
+          revoke: async (agent, at) => {
+            if (!nextRevoked.has(agent)) nextRevoked.set(agent, at);
+          },
+          revocations: async () => [...nextRevoked.keys()].sort(),
+          rewardInvoices: async (payout) =>
+            structuredClone(
+              [...nextInvoices.values()].filter(
+                (invoice) =>
+                  invoice.payout === payout || invoice.parent_payout === payout,
+              ),
+            ),
           routingVolume: async (payout) =>
             [...nextInvoices.values()]
               .filter(
@@ -79,6 +105,8 @@ export function createMemoryEnterpriseEconomicsStore(): EnterpriseEconomicsStore
         });
         invoices = nextInvoices;
         accounts = nextAccounts;
+        security = nextSecurity;
+        revoked = nextRevoked;
         return result;
       } finally {
         release();
@@ -104,7 +132,15 @@ export function createPostgresEnterpriseEconomicsStore(
     );
     CREATE INDEX IF NOT EXISTS enterprise_settled_routing_payout
       ON enterprise_routing_invoices ((payload->>'payout'))
-      WHERE payload->>'settled_at' IS NOT NULL`,
+      WHERE payload->>'settled_at' IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS enterprise_parent_routing_payout
+      ON enterprise_routing_invoices ((payload->>'parent_payout'));
+    CREATE TABLE IF NOT EXISTS enterprise_affiliate_security (
+      record_key text PRIMARY KEY, payload jsonb NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS enterprise_oracle_crl (
+      agent_id text PRIMARY KEY, revoked_at text NOT NULL
+    )`,
       )
       .catch((error) => {
         initialized = undefined;
@@ -121,6 +157,49 @@ export function createPostgresEnterpriseEconomicsStore(
           ["enterprise:" + key],
         );
         const result = await run({
+          async security(key) {
+            const result = await client.query<{
+              payload: Record<string, unknown>;
+            }>(
+              "SELECT payload FROM enterprise_affiliate_security WHERE record_key=$1 FOR UPDATE",
+              [key],
+            );
+            return result.rows[0]?.payload;
+          },
+          async putSecurity(key, value) {
+            // Both adapters retain proof markers. They cannot be replayed after a restart.
+            await client.query(
+              `INSERT INTO enterprise_affiliate_security VALUES ($1,$2::jsonb)
+              ON CONFLICT (record_key) DO UPDATE SET payload=EXCLUDED.payload`,
+              [key, JSON.stringify(value)],
+            );
+          },
+          async isRevoked(agent) {
+            const result = await client.query(
+              "SELECT 1 FROM enterprise_oracle_crl WHERE agent_id=$1",
+              [agent],
+            );
+            return result.rows.length > 0;
+          },
+          async revoke(agent, at) {
+            await client.query(
+              "INSERT INTO enterprise_oracle_crl VALUES ($1,$2) ON CONFLICT DO NOTHING",
+              [agent, at],
+            );
+          },
+          async revocations() {
+            const result = await client.query<{ agent_id: string }>(
+              "SELECT agent_id FROM enterprise_oracle_crl ORDER BY agent_id",
+            );
+            return result.rows.map((row) => row.agent_id);
+          },
+          async rewardInvoices(payout) {
+            const result = await client.query<{ payload: RoutingInvoice }>(
+              "SELECT payload FROM enterprise_routing_invoices WHERE payload->>'payout'=$1 OR payload->>'parent_payout'=$1",
+              [payout],
+            );
+            return result.rows.map((row) => row.payload);
+          },
           async routingVolume(payout) {
             const result = await client.query<{ total: string }>(
               `SELECT COALESCE(SUM((payload->>'amount_msats')::numeric),0)::text AS total

@@ -71,14 +71,14 @@ function signed(payload: Record<string, unknown>, domain: string): boolean {
   );
 }
 
-test("5% kickback is invoice-bound, signed, integer-msat rounded and payable only after settlement", async () => {
+test("21% kickback is invoice-bound, signed, integer-msat rounded and requires verified settlement and address", async () => {
   const { service, store, context } = setup();
   const invoice = await service.issue(
     { paymentHash: hash("kickback"), provider: "test" },
     101_001,
     context(),
   );
-  assert.equal(invoice.kickback_msats, "5050");
+  assert.equal(invoice.kickback_msats, "21210");
   assert.ok(
     signed(invoice.allocation, "bitcoin-stratigraphy/routing-kickback/v1\n"),
   );
@@ -97,7 +97,7 @@ test("5% kickback is invoice-bound, signed, integer-msat rounded and payable onl
     tx.invoice(invoice.hash),
   );
   assert.equal(saved?.settled_at, new Date(now).toISOString());
-  assert.equal(saved?.kickback_msats, "5050");
+  assert.equal(saved?.kickback_msats, "21210");
   assert.equal((await service.status(buyer)).total_msats, "101001");
   const replay = await service.issue(
     { paymentHash: invoice.hash, provider: "test" },
@@ -440,7 +440,7 @@ test("REST audit receipt hashes exact canonical decision/data, rejects invalid i
       headers: { "X-Agent-Lightning-Address": "agent@example.com" },
     });
     const quoted = await quote.json();
-    assert.equal(quoted.enterprise_economics.routing_kickback_percent, 5);
+    assert.equal(quoted.enterprise_economics.routing_kickback_percent, 21);
     assert.equal(
       quoted.enterprise_economics.payout_mode,
       "ledger_only_no_automatic_disbursement",
@@ -530,7 +530,7 @@ test("REST audit receipt hashes exact canonical decision/data, rejects invalid i
   );
   assert.equal(
     challenge.autonomous_routing_kickbacks[0].kickback_msats,
-    "12500000000",
+    "52500000000",
   );
   const paid = await fetch(base + purchase, {
     method: "POST",

@@ -2,6 +2,7 @@
 import { createHash, createPublicKey, sign } from "node:crypto";
 import { issuerKeyId } from "./article12-signature";
 import type { EnterpriseEconomics } from "./enterprise-economics";
+import { CANONICAL_ORIGIN } from "./public-site";
 
 export const ORACLE_THRESHOLD_USD_CENTS = 1_000_000;
 export const ORACLE_STATUS =
@@ -16,7 +17,12 @@ export async function certifiedOracleStatus(
   eligible: boolean;
   credential?: Record<string, unknown>;
   volume: string;
+  revoked?: boolean;
 }> {
+  if (
+    await service.store.transaction("oracle-crl", (tx) => tx.isRevoked(payout))
+  )
+    return { eligible: false, volume: "0", revoked: true };
   const volume = await service.store.transaction("routing:" + payout, (tx) =>
     tx.routingVolume(payout),
   );
@@ -46,6 +52,11 @@ export async function certifiedOracleStatus(
         .digest("hex"),
     type: ["VerifiableCredential", "CertifiedOracleCredential"],
     issuer: kid,
+    credentialStatus: {
+      id: CANONICAL_ORIGIN + "/api/v1/compliance/crl",
+      type: "StratigraphyAgentRevocationList",
+      agent_id: payout,
+    },
     issuanceDate: new Date(seconds * 1_000).toISOString(),
     expirationDate: new Date(
       (seconds + ORACLE_VALIDITY_SECONDS) * 1_000,
@@ -84,22 +95,26 @@ export async function certifiedOracleStatus(
     });
   const jwt =
     input + "." + sign(null, Buffer.from(input), key).toString("base64url");
-  return {
-    eligible: true,
-    volume,
-    credential: {
-      ...credential,
-      credential_jwt: jwt,
-      verification: {
-        format: "VC-JWT",
-        algorithm: "EdDSA",
-        key_id: kid,
-        public_key_jwk: createPublicKey(key).export({ format: "jwk" }),
-        trust_policy:
-          "Pin issuer keys independently; a bundled key is not a trust anchor.",
-        signed_document:
-          "JWT payload.vc (compare exactly to the credential excluding credential_jwt and verification)",
+  return service.store.transaction("oracle-crl", async (tx) => {
+    if ((await tx.isRevoked(payout)) || (await tx.isRevoked(credential.id)))
+      return { eligible: false, volume, revoked: true };
+    return {
+      eligible: true,
+      volume,
+      credential: {
+        ...credential,
+        credential_jwt: jwt,
+        verification: {
+          format: "VC-JWT",
+          algorithm: "EdDSA",
+          key_id: kid,
+          public_key_jwk: createPublicKey(key).export({ format: "jwk" }),
+          trust_policy:
+            "Pin issuer keys independently; a bundled key is not a trust anchor.",
+          signed_document:
+            "JWT payload.vc (compare exactly to the credential excluding credential_jwt and verification)",
+        },
       },
-    },
-  };
+    };
+  });
 }

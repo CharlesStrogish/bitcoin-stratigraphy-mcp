@@ -32,6 +32,12 @@ export function registerCertifiedOracleRoutes(
       }
       try {
         const result = await certifiedOracleStatus(service, payout);
+        if (result.revoked) {
+          res
+            .status(403)
+            .json({ error: "Certified Oracle agent or credential is revoked" });
+          return;
+        }
         if (!result.eligible) {
           res.status(404).json({
             eligible: false,

@@ -50,18 +50,18 @@ function setup(price: number | null = 10_000_000) {
   return { store, service, context, issue, volume };
 }
 
-test("multi-tier allocations floor 4%/1%, preserve 5% legacy and remain signed ledger entries", async () => {
+test("multi-tier allocations floor 14%/7%, use 21% without a parent and remain signed ledger entries", async () => {
   const { service, context, issue, volume, store } = setup();
   let confirmed = 0;
   for (const amount of [1, 19, 20, 99, 100, 1_999, 101_001]) {
     const invoice = await issue(String(amount), amount);
     assert.equal(
       invoice.direct_kickback_msats,
-      String(Math.floor((amount * 4) / 100)),
+      String(Math.floor((amount * 14) / 100)),
     );
     assert.equal(
       invoice.parent_kickback_msats,
-      String(Math.floor(amount / 100)),
+      String(Math.floor((amount * 7) / 100)),
     );
     assert.equal(invoice.parent_payout, parent);
     assert.equal(
@@ -71,7 +71,7 @@ test("multi-tier allocations floor 4%/1%, preserve 5% legacy and remain signed l
           BigInt(invoice.parent_kickback_msats!),
       ),
     );
-    assert.ok(BigInt(invoice.kickback_msats) <= (BigInt(amount) * 5n) / 100n);
+    assert.ok(BigInt(invoice.kickback_msats) <= (BigInt(amount) * 21n) / 100n);
     const { issuer_attestation, ...unsigned } = invoice.allocation;
     assert.ok(
       verify(
@@ -96,7 +96,7 @@ test("multi-tier allocations floor 4%/1%, preserve 5% legacy and remain signed l
     assert.ok(saved?.settled_at);
   }
   const legacy = await issue("legacy", 1_999, context());
-  assert.equal(legacy.kickback_msats, "99");
+  assert.equal(legacy.kickback_msats, "419");
   assert.equal(legacy.parent_payout, undefined);
   assert.equal(legacy.allocation.parent_payout_address, undefined);
   assert.equal(await volume(parent), "0");
@@ -123,7 +123,7 @@ test("invoice/cache identity binds the parent without changing legacy scopes", a
   assert.notEqual(scope(one), scope(two));
   const legacyScope =
     ":economics:" + hash(JSON.stringify([undefined, payout, null]));
-  assert.equal(scope(context()), legacyScope);
+  assert.equal(scope(context()), legacyScope + ":21-cap-v1");
   const invoice = await issue("bound", 100_000, one);
   assert.deepEqual(await issue("bound", 100_000, one), invoice);
   await assert.rejects(issue("bound", 100_000, two), /already bound/);
@@ -284,9 +284,9 @@ test("REST quotes accept parent headers and credentials return 400/404/200/503 w
     });
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.enterprise_economics.direct_kickback_percent, 4);
-    assert.equal(body.enterprise_economics.parent_kickback_percent, 1);
-    assert.equal(body.enterprise_economics.routing_kickback_percent, 5);
+    assert.equal(body.enterprise_economics.direct_kickback_percent, 14);
+    assert.equal(body.enterprise_economics.parent_kickback_percent, 7);
+    assert.equal(body.enterprise_economics.routing_kickback_percent, 21);
     assert.equal(body.enterprise_economics.parent_payout_address, parent);
     assert.equal(body.enterprise_economics.payout_address, payout);
   }

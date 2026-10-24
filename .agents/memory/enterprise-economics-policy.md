@@ -3,10 +3,25 @@ name: Enterprise economics and annual exemption policy
 description: User-authorized kickback accounting, annual licensing trigger and truthful audit-receipt positioning.
 ---
 
-The user authorized a ledger-only 5% Autonomous Routing Kickback on an agent's
+The user authorized a ledger-only 21% Autonomous Routing Kickback on an agent's
 L402 invoice, with optional LNURL/Lightning-address destinations. With a parent
-orchestrator, split it into 4% direct and 1% parent; without a parent keep 5%
+orchestrator, split it into 14% direct and 7% parent; without a parent keep 21%
 direct. Do not send automatic payouts as part of this feature.
+
+Address verification must be absolute zero-touch automation, using an explicit
+provider HTTPS address-to-key binding and a matching cryptographic proof.
+Never build a manual operator approval workflow or treat a bare NIP-98 signer
+or generic LNURL-auth key as proof of ownership of an arbitrary payout address.
+Unverified rewards stay pending indefinitely, even after the invoice is paid.
+Direct and parent proof requirements are independent.
+
+**Why:** The user explicitly required provider-published automated ownership
+proof, permanently pending rewards without proof, and no manual approval.
+
+**How to apply:** Fail closed when provider evidence is unavailable. Operator
+revocation is a kill-switch only, never a means of approving addresses. Preserve
+historic signed invoice amounts when reward rates change; separate new-rate
+challenge caches instead of reminting existing quota-bearing tokens.
 
 Certified Oracle status uses $10,000 cumulative verified direct routing volume
 at the current BTC/USD quote, not kickback balances or downstream parent credit.

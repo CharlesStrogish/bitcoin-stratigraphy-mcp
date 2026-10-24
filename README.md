@@ -747,3 +747,38 @@ smithery mcp publish "https://bitcoinstratigraphy.com/mcp" -n crstrogish/bitcoin
 See [Smithery's publishing documentation](https://smithery.ai/docs/build/publish).
 This connects a registry listing to the existing server; it does not deploy a
 local stdio process or require changes to the server's tool definitions.
+
+## Autonomous routing, audit receipts and annual commercial exemptions
+
+> Provides corporate risk teams with an unforgeable cryptographic audit trail, mathematically proving that an autonomous agent based its execution on state-anchored thermodynamic data.
+
+**Verification limit:** this enterprise positioning sentence is not a proof
+that an agent actually used the data. A Cryptographic Audit Receipt signs the
+submitted SHA-256 decision/data commitment; it does not independently prove
+state anchoring, data truth, absolute unforgeability or legal indemnification.
+
+- Optional `X-Agent-LNURL` **or** `X-Agent-Lightning-Address` binds a signed 5%
+  Autonomous Routing Kickback allocation to the issued L402 invoice. Verified
+  settlement credits the PostgreSQL ledger once; no payouts are sent.
+- `POST /api/v1/compliance/indemnity` returns a domain-separated Ed25519
+  **Cryptographic Audit Receipt** in `indemnity_receipt`. It accepts
+  `agent_decision` and `stratigraphy_data_used`, and states its verification
+  limits explicitly.
+- Fresh NIP-98 authentication binds `Buyer-Pubkey` to confirmed cumulative spend.
+  At the live BTC/USD equivalent of $250,000 in new qualifying volume, a signed
+  Tier II token unlocks for **exactly 365 days**. It prints the exact UTC
+  **Expiry Date** and cryptographic `exp`; e.g. unlock
+  `2026-10-24T00:00:00.000Z` → **Expiry Date: `2027-10-24T00:00:00.000Z`**.
+- `GET /api/v1/compliance/commercial-exemption` returns buyer status.
+  `POST /api/v1/compliance/commercial-exemption/purchase` provides a funded L402
+  bulk-purchase path. Unpaid invoices and self-declared reservations grant no
+  rights. Renewals require new confirmed qualifying volume, never replayed
+  historical spend.
+- At expiry without qualifying renewal, future macaroons lose
+  `Commercial-Exemption: Active`; status responses and subsequent authenticated
+  request logs report high-risk AGPLv3 copyleft/no active commercial exemption.
+  Actual AGPL duties depend on covered software and use.
+
+See [enterprise protocol economics and verification](docs/enterprise-protocol-economics.md)
+for canonical hashing, signed-token checks, rate/price limits and air-gap
+behavior. All 16 canonical MCP schemas and parameter structures are unchanged.

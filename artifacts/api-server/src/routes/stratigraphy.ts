@@ -10,6 +10,7 @@ import {
 import { type Express, type Request, type Response } from "express";
 import { createL402Middleware } from "../middleware/l402";
 import { quoteMcpTools } from "../lib/mcp-pricing";
+import { bindEnterpriseInvoiceToContext, enterpriseChallengeScope } from "../lib/enterprise-economics";
 import { batchSettlement } from "../lib/batch-settlement";
 import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement } from "../lib/licensing-compliance";
 import {
@@ -596,8 +597,9 @@ async function sendPaymentChallenge(
       challengeAmountMsats: number,
       challengeDescription: string,
     ) => {
-      const providerScope = `${scope}${agentScope}:asset:${paymentAsset}:settlement:${settlementRouter.activeProvider(paymentAsset)}`;
-      return challengeStore.getOrCreate(
+      const economicsScope = enterpriseChallengeScope();
+      const providerScope = `${scope}${agentScope}:asset:${paymentAsset}:settlement:${settlementRouter.activeProvider(paymentAsset)}${economicsScope}`;
+      const result = await challengeStore.getOrCreate(
         caller,
         providerScope,
         adjustedPolicy,
@@ -622,8 +624,10 @@ async function sendPaymentChallenge(
         (challenge) =>
           `${scope}${agentScope}:asset:${paymentAsset}:settlement:${
             challenge.provider ?? settlementRouter.activeProvider(paymentAsset)
-          }`,
+          }${economicsScope}`,
       );
+      if (result.kind === "challenge") await bindEnterpriseInvoiceToContext(result.challenge.paymentHash);
+      return result;
     };
     const legacyResult = await getChallenge(rangeKey, amountMsats, description);
     if (legacyResult.kind === "limited") {

@@ -1488,6 +1488,67 @@ paths:
                 maxItems: 5
                 items:
                   $ref: "#/components/schemas/StratigraphyEntry"
+  /v1/compliance/indemnity:
+    post:
+      operationId: createCryptographicAuditReceipt
+      tags: [Compliance]
+      summary: Sign a Cryptographic Audit Receipt for a submitted decision/data commitment
+      description: SHA-256 over canonical JSON of agent_decision and stratigraphy_data_used, wrapped in a domain-separated Ed25519 signature. This signs submitted bytes, not actual agent behavior, independent state anchoring, data truth or legal indemnification. The legacy REST URL and indemnity_receipt response key do not imply indemnity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CryptographicAuditInput"
+      responses:
+        "200":
+          description: Signed audit commitment; independently pin the issuer key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CryptographicAuditEnvelope"
+        "400":
+          description: Invalid decision/data object
+        "413":
+          description: Canonical input exceeds 128 KiB
+        "503":
+          description: Signing unavailable
+  /v1/compliance/commercial-exemption:
+    get:
+      operationId: getCommercialExemption
+      tags: [Compliance]
+      summary: Retrieve the authenticated buyer's annual exemption and exact expiry
+      description: Fresh NIP-98 authentication is required. Optional Buyer-Pubkey must match the signer. Only verified settled invoices count. The signed exp is exactly 365 days from unlock. Consumed historical volume cannot renew an exemption.
+      responses:
+        "200":
+          description: Buyer accounting status and optional signed annual exemption token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseEconomicsStatus"
+        "401":
+          description: Fresh buyer authentication required
+        "503":
+          description: Accounting unavailable
+  /v1/compliance/commercial-exemption/purchase:
+    post:
+      operationId: purchaseCommercialExemption
+      tags: [Compliance]
+      summary: Purchase funded annual qualifying volume using an L402 invoice
+      description: Authenticated NIP-98 buyer only. Returns an unpaid L402 challenge at the current market equivalent of 250000 USD; an unpaid invoice or self-declared reservation never activates a license. Verified settlement consumes qualifying volume once. Already-active buyers reserve new settled volume for renewal at or after expiry. No additional canonical MCP tool is introduced.
+      responses:
+        "200":
+          description: Confirmed funded purchase and exemption status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseEconomicsStatus"
+        "401":
+          description: Fresh buyer authentication required
+        "402":
+          description: L402 challenge; no exemption before settlement
+        "503":
+          description: Price or accounting unavailable
   /v1/compliance/revocation-snapshot:
     get:
       operationId: getRevocationSnapshot
@@ -2746,6 +2807,45 @@ components:
           type: string
         procurement_url:
           type: string
+    CryptographicAuditInput:
+      type: object
+      additionalProperties: false
+      required: [agent_decision, stratigraphy_data_used]
+      properties:
+        agent_decision:
+          type: string
+          minLength: 1
+          maxLength: 16000
+        stratigraphy_data_used:
+          type: object
+          additionalProperties: true
+    CryptographicAuditEnvelope:
+      type: object
+      required: [indemnity_receipt]
+      properties:
+        indemnity_receipt:
+          type: object
+          additionalProperties: true
+          description: Cryptographic Audit Receipt with SHA-256 commitment, issued_at, issuer_key_id and issuer_attestation. Explicit state_anchor_verified and agent_execution_proven findings remain false.
+    EnterpriseEconomicsStatus:
+      type: object
+      additionalProperties: true
+      properties:
+        buyer_pubkey:
+          type: [string, "null"]
+        cumulative_spend_msats:
+          type: string
+        cumulative_spend_sats:
+          type: string
+        qualifying_spend_msats:
+          type: string
+        commercial_exemption_status:
+          type: string
+          enum: [Active, Expired, Inactive]
+        commercial_exemption_token:
+          type: object
+          additionalProperties: true
+          description: Domain-separated Ed25519 envelope with sub, iat, exp, unlock_date and exact expiry_date. exp is iat plus 31536000 seconds. Pin the issuer independently and verify signature, subject and exp before use.
     RevocationSnapshotEntry:
       type: object
       required: [pubkey, revoked_at]

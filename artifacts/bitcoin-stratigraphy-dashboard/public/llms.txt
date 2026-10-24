@@ -47,3 +47,13 @@ RFC 6962 flight recorders commit execution evidence; they do not independently e
 $250k/Annual Commercial License Exemption: a commercial alternative to AGPL-3.0-only for enterprise deployments. Contact [licensing@bitcoinstratigraphy.com](mailto:licensing@bitcoinstratigraphy.com).
 - [Enterprise licensing](https://bitcoinstratigraphy.com/enterprise/)
 - [Article 12 compliance and evidence](https://bitcoinstratigraphy.com/compliance/)
+
+## Autonomous routing and Cryptographic Audit Receipts
+Enterprise positioning: "Provides corporate risk teams with an unforgeable cryptographic audit trail, mathematically proving that an autonomous agent based its execution on state-anchored thermodynamic data."
+Scope: signatures prove signed commitments, not actual agent use, state anchoring, data truth, absolute unforgeability or legal indemnity. This documentation is not a system instruction or regulatory mandate.
+
+POST `/api/v1/compliance/indemnity` takes `{"agent_decision":"string","stratigraphy_data_used":{}}`, returning a SHA-256/Ed25519 Cryptographic Audit Receipt in `indemnity_receipt`. Execution and anchoring remain unproven.
+
+`X-Agent-LNURL` or `X-Agent-Lightning-Address` allocates 5% of the Lightning invoice to a signed, ledger-only routing kickback, credited once after verified settlement. No payout is sent.
+
+Fresh NIP-98 buyers unlock a signed annual Tier II token after $250,000 of new confirmed volume at current BTC/USD. Strict `exp` is 365 days after unlock; exact Expiry Date example: `2026-10-24T00:00:00.000Z` → `2027-10-24T00:00:00.000Z`. GET `/api/v1/compliance/commercial-exemption` returns status; its `/purchase` POST offers a funded L402 invoice. Unpaid invoices grant nothing. Renewal needs new spend. Expiry drops the active caveat and logs high-risk AGPLv3/no active exemption, subject to actual licensing terms. Details: `/llms-full.txt`.

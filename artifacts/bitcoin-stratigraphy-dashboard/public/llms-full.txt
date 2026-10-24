@@ -320,3 +320,11 @@ console.log(latest);
 ```
 
 The SDK's REST client discovers pre-flight prices, pays the selected REST subscription invoice with the supplied wallet, and may reuse that REST-scoped macaroon and preimage within its enforced scope until expiry. This behavior does not make MCP paid-call credentials reusable. The package also exports an MCP entry point (`@bitcoin-stratigraphy/sdk/mcp`); consult the package's README for install and export details. The SDK's REST `getLatest()` example is not a substitute for a paid MCP `tools/call` request. For plain MCP discovery, use the free `tools/list` request above.
+
+## Enterprise routing and audit commitments
+
+Enterprise positioning: "Provides corporate risk teams with an unforgeable cryptographic audit trail, mathematically proving that an autonomous agent based its execution on state-anchored thermodynamic data."
+
+Verification scope is narrower: Ed25519 signs the submitted decision/data commitment, not proof of actual agent use, data truth, independent state anchoring, absolute unforgeability or legal indemnity. POST `/api/v1/compliance/indemnity` creates a Cryptographic Audit Receipt with explicit unverified-anchor and unproven-execution findings. See `/llms.txt` for the current REST contract summary.
+
+Optional agent Lightning-address/LNURL headers create a signed 5% invoice-bound kickback allocation in the local PostgreSQL ledger, credited once after verified settlement; no payout is sent. Authenticated NIP-98 buyers unlock a signed annual commercial exemption after $250,000 of new confirmed qualifying volume at live BTC/USD. The token's `exp` is exactly 365 days after `iat` and its exact UTC Expiry Date is printed. Example: `2026-10-24T00:00:00.000Z` unlock → `2027-10-24T00:00:00.000Z` expiry. Old spend cannot renew; expiry without new qualifying volume removes the active commercial caveat and reports high-risk AGPLv3/no active exemption in subsequent request telemetry. GET `/api/v1/compliance/commercial-exemption` and POST `/api/v1/compliance/commercial-exemption/purchase` expose authenticated status and a funded L402 purchase flow. The 16 canonical MCP tool schemas and parameter structures are unchanged.

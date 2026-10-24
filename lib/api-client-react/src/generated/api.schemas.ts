@@ -596,6 +596,53 @@ export interface BatchSettlementDiscovery {
   instructions: string;
 }
 
+export type CryptographicAuditInputStratigraphyDataUsed = { [key: string]: unknown };
+
+export interface CryptographicAuditInput {
+  /**
+     * @minLength 1
+     * @maxLength 16000
+     */
+  agent_decision: string;
+  stratigraphy_data_used: CryptographicAuditInputStratigraphyDataUsed;
+}
+
+/**
+ * Cryptographic Audit Receipt with SHA-256 commitment, issued_at, issuer_key_id and issuer_attestation. Explicit state_anchor_verified and agent_execution_proven findings remain false.
+ */
+export type CryptographicAuditEnvelopeIndemnityReceipt = { [key: string]: unknown };
+
+export interface CryptographicAuditEnvelope {
+  /** Cryptographic Audit Receipt with SHA-256 commitment, issued_at, issuer_key_id and issuer_attestation. Explicit state_anchor_verified and agent_execution_proven findings remain false. */
+  indemnity_receipt: CryptographicAuditEnvelopeIndemnityReceipt;
+}
+
+export type EnterpriseEconomicsStatusCommercialExemptionStatus = typeof EnterpriseEconomicsStatusCommercialExemptionStatus[keyof typeof EnterpriseEconomicsStatusCommercialExemptionStatus];
+
+
+export const EnterpriseEconomicsStatusCommercialExemptionStatus = {
+  Active: 'Active',
+  Expired: 'Expired',
+  Inactive: 'Inactive',
+} as const;
+
+/**
+ * Domain-separated Ed25519 envelope with sub, iat, exp, unlock_date and exact expiry_date. exp is iat plus 31536000 seconds. Pin the issuer independently and verify signature, subject and exp before use.
+ */
+export type EnterpriseEconomicsStatusCommercialExemptionToken = { [key: string]: unknown };
+
+export interface EnterpriseEconomicsStatus {
+  /** @nullable */
+  buyer_pubkey?: string | null;
+  cumulative_spend_msats?: string;
+  cumulative_spend_sats?: string;
+  qualifying_spend_msats?: string;
+  commercial_exemption_status?: EnterpriseEconomicsStatusCommercialExemptionStatus;
+  /** Domain-separated Ed25519 envelope with sub, iat, exp, unlock_date and exact expiry_date. exp is iat plus 31536000 seconds. Pin the issuer independently and verify signature, subject and exp before use. */
+  commercial_exemption_token?: EnterpriseEconomicsStatusCommercialExemptionToken;
+  [key: string]: unknown;
+ }
+
 export interface RevocationSnapshotEntry {
   /** @pattern ^[0-9a-f]{64}$ */
   pubkey: string;

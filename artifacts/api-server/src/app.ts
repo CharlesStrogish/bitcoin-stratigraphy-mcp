@@ -42,6 +42,10 @@ import { registerEnterpriseRoutes } from "./routes/enterprise";
 import { createEscrowRecovery } from "./services/escrowRecovery";
 import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store";
 import { registerComplianceRoutes } from "./routes/compliance";
+import { EnterpriseEconomics, configureEnterpriseEconomics } from "./lib/enterprise-economics";
+import { createPostgresEnterpriseEconomicsStore } from "./lib/enterprise-economics-store";
+import { createEnterpriseEconomicsMiddleware } from "./middleware/enterprise-economics";
+import { registerCryptographicAuditRoutes } from "./routes/cryptographic-audit";
 import {
   createNip98RevocationGuard, registerNip98RevocationAdmin,
 } from "./middleware/nip98-revocation";
@@ -112,6 +116,10 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 
 app.use(nip98RevocationGuard);
+const enterpriseEconomics = new EnterpriseEconomics(createPostgresEnterpriseEconomicsStore());
+configureEnterpriseEconomics(enterpriseEconomics);
+app.use(createEnterpriseEconomicsMiddleware(enterpriseEconomics));
+registerCryptographicAuditRoutes(app, enterpriseEconomics, { ledger: revenueLedger });
 registerNip98RevocationAdmin(app, nip98Revocations);
 registerComplianceRoutes(app, nip98Revocations);
 

@@ -38,8 +38,11 @@ import type {
 import type {
   AuditReport,
   AuditSubmission,
+  CryptographicAuditEnvelope,
+  CryptographicAuditInput,
   DatasetHealthStatus,
   EnterpriseDueDiligenceBrief,
+  EnterpriseEconomicsStatus,
   EpistemicGroundingRequest,
   EscrowContract,
   EscrowExecutionInput,
@@ -2587,6 +2590,228 @@ export function useGetStratigraphy<TData = Awaited<ReturnType<typeof getStratigr
 
 
 
+
+export const getCreateCryptographicAuditReceiptUrl = () => {
+
+
+
+
+  return `/api/v1/compliance/indemnity`
+}
+
+/**
+ * SHA-256 over canonical JSON of agent_decision and stratigraphy_data_used, wrapped in a domain-separated Ed25519 signature. This signs submitted bytes, not actual agent behavior, independent state anchoring, data truth or legal indemnification. The legacy REST URL and indemnity_receipt response key do not imply indemnity.
+ * @summary Sign a Cryptographic Audit Receipt for a submitted decision/data commitment
+ */
+export const createCryptographicAuditReceipt = async (cryptographicAuditInput: CryptographicAuditInput, options?: Parameters<typeof customFetch>[1]): Promise<CryptographicAuditEnvelope> => {
+
+  return customFetch<CryptographicAuditEnvelope>(getCreateCryptographicAuditReceiptUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(cryptographicAuditInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCryptographicAuditReceiptMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCryptographicAuditReceipt>>, TError,{data: BodyType<CryptographicAuditInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCryptographicAuditReceipt>>, TError,{data: BodyType<CryptographicAuditInput>}, TContext> => {
+
+const mutationKey = ['createCryptographicAuditReceipt'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCryptographicAuditReceipt>>, {data: BodyType<CryptographicAuditInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCryptographicAuditReceipt(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCryptographicAuditReceiptMutationResult = NonNullable<Awaited<ReturnType<typeof createCryptographicAuditReceipt>>>
+    export type CreateCryptographicAuditReceiptMutationBody = BodyType<CryptographicAuditInput>
+    export type CreateCryptographicAuditReceiptMutationError = ErrorType<void>
+
+    /**
+ * @summary Sign a Cryptographic Audit Receipt for a submitted decision/data commitment
+ */
+export const useCreateCryptographicAuditReceipt = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCryptographicAuditReceipt>>, TError,{data: BodyType<CryptographicAuditInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCryptographicAuditReceipt>>,
+        TError,
+        {data: BodyType<CryptographicAuditInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCryptographicAuditReceiptMutationOptions(options));
+    }
+
+export const getGetCommercialExemptionUrl = () => {
+
+
+
+
+  return `/api/v1/compliance/commercial-exemption`
+}
+
+/**
+ * Fresh NIP-98 authentication is required. Optional Buyer-Pubkey must match the signer. Only verified settled invoices count. The signed exp is exactly 365 days from unlock. Consumed historical volume cannot renew an exemption.
+ * @summary Retrieve the authenticated buyer's annual exemption and exact expiry
+ */
+export const getCommercialExemption = async ( options?: Parameters<typeof customFetch>[1]): Promise<EnterpriseEconomicsStatus> => {
+
+  return customFetch<EnterpriseEconomicsStatus>(getGetCommercialExemptionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCommercialExemptionQueryKey = () => {
+    return [
+    `/api/v1/compliance/commercial-exemption`
+    ] as const;
+    }
+
+
+export const getGetCommercialExemptionQueryOptions = <TData = Awaited<ReturnType<typeof getCommercialExemption>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCommercialExemption>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCommercialExemptionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCommercialExemption>>> = ({ signal }) => getCommercialExemption({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCommercialExemption>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCommercialExemptionQueryResult = NonNullable<Awaited<ReturnType<typeof getCommercialExemption>>>
+export type GetCommercialExemptionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Retrieve the authenticated buyer's annual exemption and exact expiry
+ */
+
+export function useGetCommercialExemption<TData = Awaited<ReturnType<typeof getCommercialExemption>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCommercialExemption>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCommercialExemptionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPurchaseCommercialExemptionUrl = () => {
+
+
+
+
+  return `/api/v1/compliance/commercial-exemption/purchase`
+}
+
+/**
+ * Authenticated NIP-98 buyer only. Returns an unpaid L402 challenge at the current market equivalent of 250000 USD; an unpaid invoice or self-declared reservation never activates a license. Verified settlement consumes qualifying volume once. Already-active buyers reserve new settled volume for renewal at or after expiry. No additional canonical MCP tool is introduced.
+ * @summary Purchase funded annual qualifying volume using an L402 invoice
+ */
+export const purchaseCommercialExemption = async ( options?: Parameters<typeof customFetch>[1]): Promise<EnterpriseEconomicsStatus> => {
+
+  return customFetch<EnterpriseEconomicsStatus>(getPurchaseCommercialExemptionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getPurchaseCommercialExemptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof purchaseCommercialExemption>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof purchaseCommercialExemption>>, TError,void, TContext> => {
+
+const mutationKey = ['purchaseCommercialExemption'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof purchaseCommercialExemption>>, void> = () => {
+
+
+          return  purchaseCommercialExemption(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PurchaseCommercialExemptionMutationResult = NonNullable<Awaited<ReturnType<typeof purchaseCommercialExemption>>>
+
+    export type PurchaseCommercialExemptionMutationError = ErrorType<void>
+
+    /**
+ * @summary Purchase funded annual qualifying volume using an L402 invoice
+ */
+export const usePurchaseCommercialExemption = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof purchaseCommercialExemption>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof purchaseCommercialExemption>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPurchaseCommercialExemptionMutationOptions(options));
+    }
 
 export const getGetRevocationSnapshotUrl = () => {
 

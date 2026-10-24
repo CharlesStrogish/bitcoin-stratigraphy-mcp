@@ -995,6 +995,52 @@ export const GetStratigraphyResponse = zod.array(GetStratigraphyResponseItem).mi
 
 
 /**
+ * SHA-256 over canonical JSON of agent_decision and stratigraphy_data_used, wrapped in a domain-separated Ed25519 signature. This signs submitted bytes, not actual agent behavior, independent state anchoring, data truth or legal indemnification. The legacy REST URL and indemnity_receipt response key do not imply indemnity.
+ * @summary Sign a Cryptographic Audit Receipt for a submitted decision/data commitment
+ */
+export const createCryptographicAuditReceiptBodyAgentDecisionMax = 16000;
+
+
+
+export const CreateCryptographicAuditReceiptBody = zod.object({
+  "agent_decision": zod.string().min(1).max(createCryptographicAuditReceiptBodyAgentDecisionMax),
+  "stratigraphy_data_used": zod.record(zod.string(), zod.unknown())
+})
+
+export const CreateCryptographicAuditReceiptResponse = zod.object({
+  "indemnity_receipt": zod.record(zod.string(), zod.unknown()).describe('Cryptographic Audit Receipt with SHA-256 commitment, issued_at, issuer_key_id and issuer_attestation. Explicit state_anchor_verified and agent_execution_proven findings remain false.')
+})
+
+
+/**
+ * Fresh NIP-98 authentication is required. Optional Buyer-Pubkey must match the signer. Only verified settled invoices count. The signed exp is exactly 365 days from unlock. Consumed historical volume cannot renew an exemption.
+ * @summary Retrieve the authenticated buyer's annual exemption and exact expiry
+ */
+export const GetCommercialExemptionResponse = zod.object({
+  "buyer_pubkey": zod.string().nullish(),
+  "cumulative_spend_msats": zod.string().optional(),
+  "cumulative_spend_sats": zod.string().optional(),
+  "qualifying_spend_msats": zod.string().optional(),
+  "commercial_exemption_status": zod.enum(['Active', 'Expired', 'Inactive']).optional(),
+  "commercial_exemption_token": zod.record(zod.string(), zod.unknown()).optional().describe('Domain-separated Ed25519 envelope with sub, iat, exp, unlock_date and exact expiry_date. exp is iat plus 31536000 seconds. Pin the issuer independently and verify signature, subject and exp before use.')
+})
+
+
+/**
+ * Authenticated NIP-98 buyer only. Returns an unpaid L402 challenge at the current market equivalent of 250000 USD; an unpaid invoice or self-declared reservation never activates a license. Verified settlement consumes qualifying volume once. Already-active buyers reserve new settled volume for renewal at or after expiry. No additional canonical MCP tool is introduced.
+ * @summary Purchase funded annual qualifying volume using an L402 invoice
+ */
+export const PurchaseCommercialExemptionResponse = zod.object({
+  "buyer_pubkey": zod.string().nullish(),
+  "cumulative_spend_msats": zod.string().optional(),
+  "cumulative_spend_sats": zod.string().optional(),
+  "qualifying_spend_msats": zod.string().optional(),
+  "commercial_exemption_status": zod.enum(['Active', 'Expired', 'Inactive']).optional(),
+  "commercial_exemption_token": zod.record(zod.string(), zod.unknown()).optional().describe('Domain-separated Ed25519 envelope with sub, iat, exp, unlock_date and exact expiry_date. exp is iat plus 31536000 seconds. Pin the issuer independently and verify signature, subject and exp before use.')
+})
+
+
+/**
  * Public Ed25519-signed complete registry snapshot, valid for freshness checking for 15 minutes. Pin issuer keys independently. Absence proves only the issuer's registry state at as_of, not future authorization or independent verification of the original NIP-98 event. Failures return 503, never an empty synthetic registry.
  * @summary Export a signed, point-in-time NIP-98 revocation registry
  */

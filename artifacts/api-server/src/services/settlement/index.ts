@@ -1,4 +1,5 @@
 import { createAlbySettlementProvider } from "./alby";
+import { decorateEnterpriseSettlementRouter } from "../../lib/enterprise-economics";
 import { createCoinosSettlementProvider } from "./coinos";
 import type { NwcClientFactory } from "./nwc-provider";
 import {
@@ -173,7 +174,7 @@ export function createSettlementRouter(input: {
     }
   };
 
-  return {
+  return decorateEnterpriseSettlementRouter({
     isConfigured: () =>
       input.primary.isConfigured() || input.fallback.isConfigured(),
     activeProvider: () =>
@@ -241,7 +242,7 @@ export function createSettlementRouter(input: {
       }
       return unavailable ? "unavailable" : "invalid";
     },
-  };
+  });
 
   function activeProviderName() {
     return (state === "closed" || shouldProbe()) && input.primary.isConfigured()

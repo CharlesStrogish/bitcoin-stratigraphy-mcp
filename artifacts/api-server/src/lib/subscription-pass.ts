@@ -20,6 +20,13 @@ import {
   type AgentAuthentication,
 } from "./agent-id-caveat";
 import { equivalentToolNames } from "./mcp-pricing";
+import { enterpriseContext, enterpriseMacaroonFields } from "./enterprise-economics";
+
+const ENTERPRISE_KEYS = ["enterprise_buyer", "routing_kickback", "commercial_exemption", "commercial_exemption_exp"];
+function economicsProof(secret: string, paymentHash: string, fields: Map<string, string>): string {
+  return createHmac("sha256", secret).update("bitcoin-stratigraphy/enterprise-macaroon/v1\n" +
+    JSON.stringify([paymentHash, ENTERPRISE_KEYS.map(key => [key, fields.get(key) ?? null])])).digest("hex");
+}
 
 export type SubscriptionTier = "1-day" | "30-day";
 
@@ -142,6 +149,13 @@ export function createSubscriptionMacaroon(input: {
   paymentAsset?: SettlementAsset;
   paymentProvider?: string;
 }): string {
+  const buyer = enterpriseContext.getStore()?.buyer;
+  if (buyer) {
+    if (input.agentId !== undefined && input.agentId !== buyer) throw new Error("Enterprise buyer attribution conflict");
+    input = { ...input, agentId: buyer, agentAuthentication: "nip98" };
+  }
+  const enterprise = enterpriseMacaroonFields(input.paymentHash);
+  if (enterprise.expires) input = { ...input, validUntil: Math.min(input.validUntil, enterprise.expires) };
   if (input.paymentAsset && !input.paymentProvider) {
     throw new Error("Asset-bound macaroons require a settlement provider");
   }
@@ -171,7 +185,13 @@ export function createSubscriptionMacaroon(input: {
     ...(input.agentAuthentication === undefined
       ? []
       : [AGENT_AUTHENTICATION_CAVEAT]),
+    ...enterprise.caveats,
   ];
+  if (enterprise.caveats.length) {
+    const fields = new Map(enterprise.caveats.map(caveat => caveat === "Commercial-Exemption: Active"
+      ? ["commercial_exemption", "Active"] : [caveat.slice(0, caveat.indexOf("=")), caveat.slice(caveat.indexOf("=") + 1)]));
+    caveats.push(`enterprise_metadata_proof=${economicsProof(input.secret, input.paymentHash, fields)}`);
+  }
   const token: SerializedMacaroon = {
     identifier,
     caveats,
@@ -189,6 +209,8 @@ const ROOT_CAVEAT_KEYS = new Set([
   "agent_tier",
   "payment_asset",
   "payment_provider",
+  ...ENTERPRISE_KEYS,
+  "enterprise_metadata_proof",
 ]);
 
 /**
@@ -222,6 +244,11 @@ export function inspectSubscriptionMacaroon(
     const meteredScopes: Array<{ tokenId: string; maxRequests: number }> = [];
     for (const caveat of token.caveats) {
       runningSignature = hmac(runningSignature, caveat);
+      if (caveat === "Commercial-Exemption: Active") {
+        if (rootValues.has("commercial_exemption")) return null;
+        rootValues.set("commercial_exemption", "Active");
+        continue;
+      }
       const boundAgent = parseAgentIdCaveat(caveat);
       if (boundAgent !== null) {
         // One sub-agent per credential: a second binding is never resolved.
@@ -281,6 +308,18 @@ export function inspectSubscriptionMacaroon(
     const paymentHash = rootValues.get("payment_hash")!;
     const tier = rootValues.get("tier") as SubscriptionTier;
     const validUntil = Number(rootValues.get("valid_until"));
+    if (ENTERPRISE_KEYS.some(key => rootValues.has(key)) || rootValues.has("enterprise_metadata_proof")) {
+      const proof = rootValues.get("enterprise_metadata_proof") ?? "";
+      if (!/^[0-9a-f]{64}$/.test(proof) || !timingSafeEqual(Buffer.from(proof, "hex"),
+        Buffer.from(economicsProof(secret, paymentHash, rootValues), "hex"))) return null;
+      const buyer = rootValues.get("enterprise_buyer");
+      if (buyer !== undefined && (!/^[0-9a-f]{64}$/.test(buyer) || buyer !== agentId || agentAuthentication !== "nip98")) return null;
+      if (rootValues.has("commercial_exemption") || rootValues.has("commercial_exemption_exp")) {
+        const expiry = Number(rootValues.get("commercial_exemption_exp"));
+        if (!buyer || rootValues.get("commercial_exemption") !== "Active" ||
+            !Number.isSafeInteger(expiry) || expiry <= 0 || validUntil > expiry) return null;
+      }
+    }
     const amountMsatsValue = rootValues.get("amount_msats");
     const amountMsats =
       amountMsatsValue === undefined ? undefined : Number(amountMsatsValue);
@@ -311,7 +350,8 @@ export function inspectSubscriptionMacaroon(
           (amountMsatsValue === undefined ? 0 : 1) +
           (paymentAssetCaveat === undefined ? 0 : 1) +
           (paymentProviderCaveat === undefined ? 0 : 1) +
-          (agentCaveats === undefined ? 0 : 2)
+          (agentCaveats === undefined ? 0 : 2) +
+          [...ENTERPRISE_KEYS, "enterprise_metadata_proof"].filter(key => rootValues.has(key)).length
     ) {
       return null;
     }

@@ -158,7 +158,7 @@ assert.ok(
 
 const discoveryFixturesDirectory = path.join(
   workspaceRoot,
-  "test",
+  "tests",
   "fixtures",
   "artifact-discovery",
 );
@@ -512,7 +512,7 @@ function findHtmlEntryPoints(directory, relativeDirectory = "") {
 
 const productionOutputFixturesDirectory = path.join(
   workspaceRoot,
-  "test",
+  "tests",
   "fixtures",
   "production-output",
 );

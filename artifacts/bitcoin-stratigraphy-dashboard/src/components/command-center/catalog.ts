@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 /**
  * Static MCP catalog for the homepage Command Center. Names and titles mirror
- * the API's tools/list registry; test/command-center.test.mjs keeps them in
+ * the API's tools/list registry; tests/command-center.test.mjs keeps them in
  * lockstep with the server. Prices are never stored here: they are quoted live.
  */
 

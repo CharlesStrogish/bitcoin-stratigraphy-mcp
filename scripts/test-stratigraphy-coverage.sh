@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 coverage_dir=$(mktemp -d)
 trap 'rm -rf "$coverage_dir"' EXIT
 export COVERAGE_FILE="$coverage_dir/.coverage"
-export PYTHONPATH="$PWD/test:$PWD:${PYTHONPATH:-}"
+export PYTHONPATH="$PWD/tests:$PWD:${PYTHONPATH:-}"
 uv run --no-sync python -m coverage run --branch --source=stratigraphy_pipeline \
   -m unittest test_stratigraphy_pipeline test_stratigraphy_rpc
 uv run --no-sync python -m coverage report --fail-under=100 --precision=2 -m

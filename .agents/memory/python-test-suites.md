@@ -5,7 +5,7 @@ description: Where the Python suites live and how to run them, since the root No
 
 `pnpm test` runs only Node tests. A full verification must run each Python
 suite separately with the project interpreter (`uv run --no-sync`):
-- `test/`: discover with `PYTHONPATH=test:.:sdk/python`, using plain module
+- Root suite: discover with `PYTHONPATH=tests:.:sdk/python`, using plain module
   names. A `test.`-prefixed name resolves to the standard library's `test`
   package.
 - `routers` and `services`: run as packages from the root, with
@@ -13,6 +13,8 @@ suite separately with the project interpreter (`uv run --no-sync`):
 - `cookbooks`: discover from inside that directory with
   `PYTHONPATH=../sdk/python:..`. Without it, the enterprise package tests fail
   with 17 import errors.
+- Framework quickstarts require a separate discovery from inside their directory;
+  ordinary cookbook discovery does not recurse into a namespace-only subdirectory.
 - `scripts`: `scripts.test_verify_agent_routes`, from the root.
 - SDK: `test_client`, from inside `sdk/python` with `PYTHONPATH=../..`. It
   imports `sdk.python.client`, so without it the import fails.

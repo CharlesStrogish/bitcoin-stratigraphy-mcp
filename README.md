@@ -777,10 +777,9 @@ that an agent actually used the data. A Cryptographic Audit Receipt signs the
 submitted SHA-256 decision/data commitment; it does not independently prove
 state anchoring, data truth, absolute unforgeability or legal indemnification.
 
-- Optional `X-Agent-LNURL` **or** `X-Agent-Lightning-Address` binds a signed
-  programmatic L402 revenue sharing allocation to the issued L402 invoice.
-  Verified settlement records payment once in PostgreSQL; address verification
-  is also required for payability. No payouts are sent.
+- Optional X-Agent-LNURL or X-Agent-Lightning-Address binds a signed programmatic L402 revenue sharing allocation to the issued L402 invoice. Verified settlement credits the PostgreSQL ledger once; no payouts are sent.
+  Invoice settlement alone does not make this allocation payable; current address
+  verification is also required.
 - `POST /api/v1/compliance/indemnity` returns a domain-separated Ed25519
   **Cryptographic Audit Receipt** in `indemnity_receipt`. It accepts
   `agent_decision` and `stratigraphy_data_used`, and states its verification

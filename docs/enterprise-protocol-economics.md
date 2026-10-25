@@ -19,7 +19,7 @@ indemnification. State-Anchored Provenance requires separate, independently
 verified source/anchor evidence. This endpoint explicitly reports
 `state_anchor_verified: false` and `agent_execution_proven: false`.
 
-## Autonomous Routing Kickback
+## programmatic L402 revenue sharing
 
 Send exactly one optional header on invoice creation:
 
@@ -31,21 +31,26 @@ X-Agent-Lightning-Address: routing-agent@example.com
 The same headers are accepted on `GET`/`POST /api/v1/cost`. Cost quotes do not
 create invoices or credit any account. An issued Lightning invoice binds its
 payment hash, provider, full invoice amount, payout address and buyer (if
-authenticated) into a domain-separated signed allocation. The kickback is
-`floor(invoice_amount_msats * 5 / 100)`, in integer millisatoshis. Fractional
+authenticated) into a domain-separated signed allocation. Optional
+`X-Parent-Agent-LNURL` splits programmatic L402 revenue sharing into 14% direct
+and 7% parent allocations; without a parent, the direct agent receives the full
+allocation. Each component floors independently to integer millisatoshis. Fractional
 millisatoshi dust stays with the merchant. The paid invoice's original gross
-amount remains due; the kickback is not an invoice discount.
+amount remains due; programmatic L402 revenue sharing is not an invoice discount.
 
-The invoice ledger records the allocation before returning the invoice. Only
-merchant-verified settlement marks it payable. Repeated proofs, descendants,
+The invoice ledger records the allocation before returning the invoice.
+Payability requires merchant-verified settlement, current provider-bound address
+verification through `POST /api/v1/affiliate/verify`, and no agent revocation.
+Unverified allocations remain pending indefinitely. Repeated proofs, descendants,
 cached retries and parallel requests cannot credit it twice. The address cannot
 be replaced after invoice issuance. Challenge caches partition buyer/payout
 attribution without expanding IP rate limits. Existing invoices minted before
 this accounting layer are not retroactively assigned an affiliate.
 
 **No payouts are sent automatically.** This is local PostgreSQL accounting for
-future payout processing. LNURLs are not resolved and no third-party payout
-requests are made. Address headers are a requested destination, not proof that
+future payout processing. Verification decodes LNURLs to locate the provider's
+HTTPS address-to-key record; it does not send third-party payout requests.
+Address headers are a requested destination, not proof that
 the signer controls that wallet. Inspect the signed allocation before paying.
 
 ## Authenticated annual commercial exemption
@@ -128,8 +133,8 @@ The attestation signs the following bytes with Ed25519:
 bitcoin-stratigraphy/cryptographic-audit/v1\n<canonical receipt excluding issuer_attestation>
 ```
 
-Kickback and exemption signatures use their own distinct domains:
-`bitcoin-stratigraphy/routing-kickback/v1\n` and
+Signatures for programmatic L402 revenue sharing and exemptions retain their
+existing distinct wire-level domains. The exemption domain remains
 `bitcoin-stratigraphy/commercial-exemption/v1\n`. They cannot substitute for
 Article 12 receipt, revocation snapshot or tool-integrity signatures.
 

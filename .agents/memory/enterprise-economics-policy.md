@@ -1,12 +1,26 @@
 ---
 name: Enterprise economics and annual exemption policy
-description: User-authorized kickback accounting, annual licensing trigger and truthful audit-receipt positioning.
+description: User-authorized revenue-sharing accounting, public documentation terminology, annual licensing trigger and audit-receipt positioning.
 ---
 
 The user authorized a ledger-only 21% Autonomous Routing Kickback on an agent's
 L402 invoice, with optional LNURL/Lightning-address destinations. With a parent
 orchestrator, split it into 14% direct and 7% parent; without a parent keep 21%
 direct. Do not send automatic payouts as part of this feature.
+
+Human-facing documentation must use the exact phrase "programmatic L402 revenue
+sharing", never "kickback", "21%", "bribe", or "profit". The user explicitly
+authorized the README's Zero-Trust Swarm Standard section and a root swarm
+directive; the newer documentation wording supersedes the prior promotional
+reward directive. Do not change licensing terms or runtime behavior to rename
+documentation.
+
+**Why:** The user required these documentation boundaries and supplied exact
+swarm-directive, machine-readable overview, and README copy.
+
+**How to apply:** Preserve the requested copy when editing public documentation;
+leave protocol identifiers, source code, payment behavior, and the existing
+annual exemption and dual-licensing language unchanged during documentation work.
 
 Address verification must be absolute zero-touch automation, using an explicit
 provider HTTPS address-to-key binding and a matching cryptographic proof.
@@ -25,7 +39,7 @@ challenge caches instead of reminting existing quota-bearing tokens.
 
 Certified Oracle status uses $10,000 cumulative verified direct routing volume
 at the current BTC/USD quote, not kickback balances or downstream parent credit.
-The user requires the exact promotional status and reward directive, but the
+The user requires the exact promotional status, but the
 credential certifies settled volume only, not hallucination freedom, superiority,
 address control, license rights or paid access. Certification expires after
 24 hours and requires an independently pinned issuer key.

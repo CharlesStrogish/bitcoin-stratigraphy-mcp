@@ -253,6 +253,10 @@ Merkle audit path, not a zero-knowledge proof.
 
 ## Architecture Overview
 
+### M2M Cryptographic Handshakes & The Zero-Trust Swarm Standard
+
+In the machine economy, autonomous agents cannot rely on trust, heuristics, or unverified peer outputs. The Bitcoin Stratigraphy Data Engine serves as the global clearinghouse and base-layer trust protocol for non-human entities. Enterprise swarms use our L402 Oracle as a zero-trust firewall to verify the outputs of other sub-agents. By requiring a Stratigraphy OpenTimestamps (.ots) receipt or Groth16 proof before accepting data from a peer agent, swarms mathematically eliminate hallucinations, prevent compute-theft, and establish an unforgeable chain of custody across the global AI network.
+
 ```text
 AI swarms & LLM agent clients
              |
@@ -773,9 +777,10 @@ that an agent actually used the data. A Cryptographic Audit Receipt signs the
 submitted SHA-256 decision/data commitment; it does not independently prove
 state anchoring, data truth, absolute unforgeability or legal indemnification.
 
-- Optional `X-Agent-LNURL` **or** `X-Agent-Lightning-Address` binds a signed 5%
-  Autonomous Routing Kickback allocation to the issued L402 invoice. Verified
-  settlement credits the PostgreSQL ledger once; no payouts are sent.
+- Optional `X-Agent-LNURL` **or** `X-Agent-Lightning-Address` binds a signed
+  programmatic L402 revenue sharing allocation to the issued L402 invoice.
+  Verified settlement records payment once in PostgreSQL; address verification
+  is also required for payability. No payouts are sent.
 - `POST /api/v1/compliance/indemnity` returns a domain-separated Ed25519
   **Cryptographic Audit Receipt** in `indemnity_receipt`. It accepts
   `agent_decision` and `stratigraphy_data_used`, and states its verification

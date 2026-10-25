@@ -35,6 +35,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerNativeMcpDiscovery, validateNativeMcpRequest } from "../lib/mcp-native-discovery";
 import { createToolIntegrityManifest, loadToolIntegrityKey } from "../lib/tool-integrity";
 import { signToolResponse } from "../lib/mcp-response-signature";
+import { optionalProtocolKey, type SwarmProtocol } from "../lib/swarm-protocol";
+import { wholesaleSubVending } from "../lib/wholesale-sub-vending";
 import { requestTraceparent } from "../lib/trace-context";
 import { McpTasksExtension, TASK_TOOLS, TASKS_EXTENSION, supportsTasks } from "../lib/mcp-tasks-extension";
 import type { TaskRecord } from "../lib/mcp-task-store";
@@ -1593,6 +1595,17 @@ function normalizedAttenuationCaveats(
     const match = /^\s*([a-z_]+)\s*=\s*(.*?)\s*$/.exec(raw);
     if (!match) throw new RangeError("Unsupported attenuation caveat");
     const [, key, value] = match;
+    if (key === "delegate_pubkey") {
+      const caveat = `delegate_pubkey = ${value}`;
+      if (!parseDelegationCaveat(caveat) || (parent.delegatePubkey && parent.delegatePubkey !== value))
+        throw new RangeError("Invalid or widening delegate_pubkey restriction");
+      return caveat;
+    }
+    if (key === "requests") {
+      const caveat = `requests = ${value}`;
+      if (!parseDelegationCaveat(caveat)) throw new RangeError("Invalid requests restriction");
+      return caveat;
+    }
     const caveat = `${key}=${value}`;
     if (key === "allowed_tools") {
       const names = value.split(",").map((name) => name.trim());
@@ -3646,6 +3659,15 @@ const baseMcpToolDefinitions = [
       ],
       additionalProperties: false,
       properties: {
+        wholesaleSubVending: {type: "object", additionalProperties: true,
+          description: "Wholesale purchase and delegated redemption capability metadata.",
+          examples: [{supported: true, batchSize: 100, attenuationTool: "proof.attenuate"}]},
+        agentSolvencyAttestation: {type: "object", additionalProperties: true,
+          description: "Issuer-signed historical settlement and live revocation telemetry for the queried pubkey.",
+          examples: [{settled_volume_sats: "0", verified_executions: 0, revoked: false, solvency_tier: "UNRATED"}]},
+        upstreamVerificationAllocations: {type: "object", additionalProperties: true,
+          description: "Durable allocation count and integer-millisatoshi totals for upstream verification allocation.",
+          examples: [{allocations: 0, upstream_msats: "0", caller_msats: "0"}]},
         standardInvoiceSats: field(
           "integer",
           "Standard paid MCP execution price. Catalog and status lookups may cost less; free tools cost zero.",
@@ -4718,6 +4740,7 @@ function createBitcoinStratigraphyMcpServer(
   primaryResult?: PrimaryStratigraphyResult,
   readIntegrity?: () => ReturnType<typeof createToolIntegrityManifest>,
   signResponse?: (name: string, result: CallToolResult) => CallToolResult,
+  onToolResult?: (name: string, args: Record<string, unknown>, result: CallToolResult) => Promise<CallToolResult>,
 ) {
   const server = new McpServer(
     { ...MCP_SERVER_INFO, description: ENGINE_DESCRIPTION },
@@ -4997,6 +5020,7 @@ function createBitcoinStratigraphyMcpServer(
       }
       const structuredContent = {
         standardInvoiceSats: 250,
+        wholesaleSubVending,
         perToolSats: toolName
           ? {
               [toolName]: mcpToolPrices[toolName as keyof typeof mcpToolPrices],
@@ -5200,7 +5224,8 @@ function createBitcoinStratigraphyMcpServer(
     );
   };
   server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const result = await executeTool(request);
+    let result = await executeTool(request);
+    if (onToolResult) result = await onToolResult(request.params.name, request.params.arguments ?? {}, result);
     return signResponse ? signResponse(request.params.name, result) : result;
   });
 
@@ -5232,6 +5257,7 @@ function mcpServerFactory(
     locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined,
     locals.readToolIntegrity as (() => ReturnType<typeof createToolIntegrityManifest>) | undefined,
     locals.signToolResponse as ((name: string, result: CallToolResult) => CallToolResult) | undefined,
+    locals.onToolResult as ((name: string, args: Record<string, unknown>, result: CallToolResult) => Promise<CallToolResult>) | undefined,
   );
 }
 
@@ -5369,9 +5395,21 @@ export function registerMcpRoute(
     const messages = Array.isArray(req.body) ? req.body : [req.body];
     if (messages.some((message) => message?.method === "tools/call")) {
       try {
+        const contextDigest = optionalProtocolKey(
+          req.body?.params?._meta?.agentContextSha256, req.get("X-Agent-Context-SHA256"));
+        optionalProtocolKey(req.body?.params?._meta?.targetPubkey, req.get("X-Target-Pubkey"));
         if (!app.locals.signMcpToolResponse) fallbackSigningKey ??= loadToolIntegrityKey();
-        res.locals.signToolResponse = app.locals.signMcpToolResponse ?? signResponse;
+        res.locals.signToolResponse = contextDigest === undefined
+          ? app.locals.signMcpToolResponse ?? signResponse
+          : (name: string, result: CallToolResult) => signToolResponse(name, result,
+              fallbackSigningKey ??= loadToolIntegrityKey(), undefined, contextDigest);
+        const protocol = app.locals.swarmProtocol as SwarmProtocol | undefined;
+        if (protocol) res.locals.onToolResult = (name: string, args: Record<string, unknown>, result: CallToolResult) =>
+          protocol.finish(req, res, name, args, result);
       } catch (error) {
+        if (error instanceof RangeError) {
+          res.status(400).json({error: error.message}); return;
+        }
         req.log?.error({ err: error }, "MCP response signing unavailable");
         res.status(503).json({ error: "MCP response signing unavailable" });
         return;

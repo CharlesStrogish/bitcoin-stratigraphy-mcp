@@ -13,6 +13,7 @@ import { quoteMcpTools } from "../lib/mcp-pricing";
 import { bindEnterpriseInvoiceToContext, enterpriseChallengeScope } from "../lib/enterprise-economics";
 import { liabilityChallengeScope } from "../middleware/liability-notice";
 import { batchSettlement } from "../lib/batch-settlement";
+import { wholesaleSubVending } from "../lib/wholesale-sub-vending";
 import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement } from "../lib/licensing-compliance";
 import {
   createHash,
@@ -1262,7 +1263,7 @@ export function registerStratigraphyRoutes(
       return;
     }
     try {
-      res.status(200).json(quoteMcpTools(parsed.data.tools));
+      res.status(200).json({...quoteMcpTools(parsed.data.tools), wholesaleSubVending});
     } catch (error) {
       if (!(error instanceof RangeError)) throw error;
       res.status(400).json({ error: error.message });
@@ -1318,6 +1319,7 @@ export function registerStratigraphyRoutes(
     );
     res.status(200).json({
       protocol: "L402",
+      wholesaleSubVending,
       licensing_compliance: licensingCompliance,
       ...selectedToolQuote,
       batchSettlement,

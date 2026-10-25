@@ -77,6 +77,8 @@ export type VerifiedSubscriptionMacaroon = {
    * and every use must carry a fresh NIP-98 event signed by it.
    */
   agentAuthentication?: AgentAuthentication;
+  delegatePubkey?: string;
+  ancestorTokenIds?: string[];
   paymentAsset: SettlementAsset;
   paymentProvider?: string;
 };
@@ -241,10 +243,13 @@ export function inspectSubscriptionMacaroon(
     let maxTarget: number | undefined;
     let timeCaveatDeadline: number | undefined;
     let agentId: string | undefined;
+    let delegatePubkey: string | undefined;
+    const ancestorTokenIds: string[] = [];
     let agentAuthentication: AgentAuthentication | undefined;
     const requestLimits: number[] = [];
     const meteredScopes: Array<{ tokenId: string; maxRequests: number }> = [];
     for (const caveat of token.caveats) {
+      ancestorTokenIds.push(runningSignature.toString("hex"));
       runningSignature = hmac(runningSignature, caveat);
       if (caveat === LIABILITY_CAVEAT) {
         if (rootValues.has("liability")) return null;
@@ -270,7 +275,10 @@ export function inspectSubscriptionMacaroon(
         continue;
       }
       const delegation = parseDelegationCaveat(caveat);
-      if (delegation?.type === "allowed_path") {
+      if (delegation?.type === "delegate_pubkey") {
+        if (delegatePubkey !== undefined && delegatePubkey !== delegation.pubkey) return null;
+        delegatePubkey = delegation.pubkey;
+      } else if (delegation?.type === "allowed_path") {
         allowedPaths.push(delegation.path);
       } else if (delegation?.type === "max_requests") {
         requestLimits.push(delegation.limit);
@@ -382,6 +390,8 @@ export function inspectSubscriptionMacaroon(
       agentTier: agentCaveats?.agentTier,
       ...(agentId === undefined ? {} : { agentId }),
       ...(agentAuthentication === undefined ? {} : { agentAuthentication }),
+      ancestorTokenIds,
+      ...(delegatePubkey === undefined ? {} : {delegatePubkey}),
       paymentAsset: paymentAssetCaveat ?? "btc-lightning",
       paymentProvider: paymentProviderCaveat,
     };

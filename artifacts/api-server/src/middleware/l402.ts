@@ -17,6 +17,7 @@ import {
   type AgentAuthentication,
 } from "../lib/agent-id-caveat";
 import { verifyRequestNip98Signer } from "../lib/nip98-request";
+import { assertEnterpriseVerificationTarget } from "../lib/enterprise-economics";
 import {
   createMemoryMacaroonUsageStore,
   type MacaroonUsageStore,
@@ -309,6 +310,11 @@ export function createL402Middleware(
           ? authentic
           : null;
       if (pass) {
+        try { await assertEnterpriseVerificationTarget(pass.paymentHash); }
+        catch (error) {
+          res.status(error instanceof RangeError ? 403 : 503).json({error: error instanceof RangeError ? error.message : "Invoice allocation validation unavailable"});
+          return;
+        }
         credentialCache.set(
           credentialKey,
           pass,
@@ -329,9 +335,24 @@ export function createL402Middleware(
           res.status(rejection.status).json({ error: rejection.error });
           return;
         }
+        if (pass.delegatePubkey && pass.agentAuthentication === "nip98" && pass.agentId) {
+          try {
+            if (await req.app.locals.swarmProtocol?.revoked(pass.agentId)) {
+              res.status(401).json({error: "Delegating agent is revoked"}); return;
+            }
+          } catch {
+            res.status(503).json({error: "Delegating agent revocation unavailable"}); return;
+          }
+        }
         if (options.revocationStore) {
           try {
-            if (await options.revocationStore.isRevoked(pass.tokenId)) {
+            const ids = pass.delegatePubkey || pass.requestLimits[0]?.maxRequests === 100
+              ? [...(pass.ancestorTokenIds ?? []), pass.tokenId] : [pass.tokenId];
+            let revoked = false;
+            for (const id of ids) {
+              if (await options.revocationStore.isRevoked(id)) { revoked = true; break; }
+            }
+            if (revoked) {
               res.status(401).json({ error: "Macaroon is revoked" });
               return;
             }
@@ -452,6 +473,7 @@ export function createL402Middleware(
             }
           }
           res.locals.l402 = {
+            ...(pass.delegatePubkey ? {delegatePubkey: pass.delegatePubkey} : {}),
             paymentHash: pass.paymentHash,
             settledAt: verification.settledAt,
             provider: verification.provider,

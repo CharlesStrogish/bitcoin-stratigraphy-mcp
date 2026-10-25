@@ -16,6 +16,25 @@ const output = (): CallToolResult => ({
   _meta: { existing: { retained: true } },
 });
 
+test("context-bound responses sign four parts and reject removal, replacement or malformed context", () => {
+  const context = "ab".repeat(32);
+  const result = signToolResponse("proof.verify", output(), privateKey, now, context);
+  const envelope = result._meta!.responseSignature as Record<string, unknown>;
+  assert.equal(envelope.agentContextSha256, context);
+  const expected = sign(null, Buffer.from(`proof.verify.${now}.${envelope.contentSha256}.${context}`), privateKey).toString("base64");
+  assert.equal(envelope.signature, "v1a," + expected);
+  assert.ok(verifyToolResponse("proof.verify", result, publicKey, now));
+  for (const value of [undefined, "cd".repeat(32), "AB".repeat(32), null, 5]) {
+    const altered = structuredClone(result);
+    (altered._meta!.responseSignature as Record<string, unknown>).agentContextSha256 = value;
+    assert.equal(verifyToolResponse("proof.verify", altered, publicKey, now), false);
+  }
+  assert.throws(() => signToolResponse("proof.verify", output(), privateKey, now, "bad"));
+  const legacy = signToolResponse("proof.verify", output(), privateKey, now);
+  (legacy._meta!.responseSignature as Record<string, unknown>).agentContextSha256 = context;
+  assert.equal(verifyToolResponse("proof.verify", legacy, publicKey, now), false);
+});
+
 test("canonical content is deterministic, key-sorted, JSON-normalized and metadata-independent", () => {
   assert.equal(
     canonicalResultContent(output()),

@@ -18,6 +18,7 @@ export const EXEMPTION_SECONDS = 365 * 24 * 60 * 60;
 export const EXEMPTION_USD_CENTS = 25_000_000;
 type PriceReader = () => Promise<number | null>;
 export type EnterpriseContext = {
+  verificationAllocation?: {origin_pubkey: string; proof_hash: string; caller_pubkey: string};
   buyer?: string;
   payout?: string;
   parentPayout?: string;
@@ -137,13 +138,15 @@ export class EnterpriseEconomics {
   describe(context: EnterpriseContext): Record<string, unknown> {
     const token = this.token(context.account);
     return {
-      routing_kickback_percent: context.payout ? 21 : 0,
-      direct_kickback_percent: context.payout
+      routing_kickback_percent: context.payout || context.verificationAllocation ? 21 : 0,
+      ...(context.verificationAllocation ? {upstream_allocation_percent: 15, allocation_policy: "upstream-verification-v1",
+        verification_allocation: context.verificationAllocation} : {}),
+      direct_kickback_percent: context.verificationAllocation ? 6 : context.payout
         ? context.parentPayout
           ? 14
           : 21
         : 0,
-      parent_kickback_percent: context.parentPayout ? 7 : 0,
+      parent_kickback_percent: context.verificationAllocation ? 0 : context.parentPayout ? 7 : 0,
       reward_policy: "21-cap-v1",
       reward_release_requires:
         "verified_invoice_and_provider_bound_address_signature",
@@ -187,33 +190,43 @@ export class EnterpriseEconomics {
     ) {
       throw new Error("Invalid enterprise invoice");
     }
-    const kickback = context.payout
+    const verificationAllocation = context.verificationAllocation ? {...context.verificationAllocation} : undefined;
+    const allocationPool = context.payout || verificationAllocation
       ? ((BigInt(amount) * 21n) / 100n).toString()
       : "0";
-    // Floor each independently to the millisatoshi. Never assign rounding dust
-    // to an agent, and never exceed the 21% total allocation.
-    const directKickback = context.parentPayout
+    // Legacy referrals floor each component independently. Verification invoices
+    // preserve the original pool and assign its remainder after the upstream floor.
+    const directKickback = verificationAllocation
+      ? (BigInt(allocationPool) - (BigInt(amount) * 15n) / 100n).toString() : context.parentPayout
       ? ((BigInt(amount) * 14n) / 100n).toString()
-      : kickback;
-    const parentKickback = context.parentPayout
+      : allocationPool;
+    const parentKickback = verificationAllocation ? "0" : context.parentPayout
       ? ((BigInt(amount) * 7n) / 100n).toString()
       : "0";
     const totalKickback = (
-      BigInt(directKickback) + BigInt(parentKickback)
+      BigInt(directKickback) + BigInt(parentKickback) +
+      (verificationAllocation ? (BigInt(amount) * 15n) / 100n : 0n)
     ).toString();
     const allocation = signIssuerPayload(
       {
         receipt_type: "autonomous_routing_kickback",
-        label: "Autonomous Routing Kickback",
+        label: "programmatic L402 revenue sharing",
         payment_hash: invoice.paymentHash,
         payment_provider: invoice.provider,
         payment_asset: "btc-lightning",
         invoice_amount_msats: String(amount),
         kickback_msats: totalKickback,
+        ...(verificationAllocation ? {
+          verification_allocation: verificationAllocation,
+          direct_kickback_msats: directKickback,
+          upstream_allocation_msats: ((BigInt(amount) * 15n) / 100n).toString(),
+          upstream_allocation_percent: 15, verifying_agent_percent: 6,
+          allocation_policy: "upstream-verification-v1",
+        } : {}),
         reward_policy: "21-cap-v1",
         reward_release_requires:
           "verified_invoice_and_provider_bound_address_signature",
-        ...(context.parentPayout
+        ...(context.parentPayout && !verificationAllocation
           ? {
               allocation_version: 3,
               direct_kickback_percent: 14,
@@ -242,7 +255,8 @@ export class EnterpriseEconomics {
       buyer: context.buyer,
       payout: context.payout,
       kickback_msats: totalKickback,
-      ...(context.parentPayout
+      ...(verificationAllocation ? {verification_allocation: verificationAllocation, direct_kickback_msats: directKickback} : {}),
+      ...(context.parentPayout && !verificationAllocation
         ? {
             parent_payout: context.parentPayout,
             direct_kickback_msats: directKickback,
@@ -262,6 +276,7 @@ export class EnterpriseEconomics {
           value.buyer ?? null,
           value.payout ?? null,
           value.parent_payout ?? null,
+          value.verification_allocation ?? null,
         ];
         if (old && canonical(binding(old)) !== canonical(binding(record))) {
           throw new Error("Invoice economics already bound");
@@ -373,7 +388,7 @@ export function enterpriseMacaroonFields(paymentHash: string): {
   return {
     caveats: [
       ...(context.buyer ? [`enterprise_buyer=${context.buyer}`] : []),
-      ...(invoice?.payout
+      ...(invoice && (invoice.payout || invoice.verification_allocation)
         ? [
             `routing_kickback=${Buffer.from(JSON.stringify(invoice.allocation)).toString("base64url")}`,
           ]
@@ -412,7 +427,8 @@ export function enterpriseChallengeScope(): string {
             ),
           )
           .digest("hex") +
-        ":21-cap-v1"
+        ":21-cap-v1" + (context.verificationAllocation ? ":verification:" +
+          createHash("sha256").update(canonical(context.verificationAllocation)).digest("hex") : "")
     : "";
 }
 
@@ -434,4 +450,15 @@ export async function bindEnterpriseInvoiceToContext(
   )
     throw new Error("Invoice attribution mismatch");
   context.invoices.set(hash, invoice);
+}
+
+/** A paid verification capability cannot redirect its signed upstream allocation. */
+export async function assertEnterpriseVerificationTarget(hash: string): Promise<void> {
+  const context = enterpriseContext.getStore();
+  if (!configuredService || !context) return;
+  const invoice = await configuredService.store.transaction("invoice:" + hash, tx => tx.invoice(hash));
+  if (invoice?.verification_allocation &&
+      (invoice.verification_allocation.proof_hash !== context.verificationAllocation?.proof_hash ||
+       invoice.verification_allocation.origin_pubkey !== context.verificationAllocation?.origin_pubkey))
+    throw new RangeError("Invoice is bound to a different upstream verification statement");
 }

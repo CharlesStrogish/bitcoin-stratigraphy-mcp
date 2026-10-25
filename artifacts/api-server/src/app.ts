@@ -49,6 +49,7 @@ import { registerCryptographicAuditRoutes } from "./routes/cryptographic-audit";
 import { registerCertifiedOracleRoutes } from "./routes/certified-oracle";
 import { registerAffiliateRoutes } from "./routes/affiliate";
 import { registerOracleCrlRoutes } from "./routes/oracle-crl";
+import { SwarmProtocol, registerSwarmProtocolRoutes } from "./lib/swarm-protocol";
 import {
   createNip98RevocationGuard, registerNip98RevocationAdmin,
 } from "./middleware/nip98-revocation";
@@ -120,8 +121,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(nip98RevocationGuard);
 const enterpriseEconomics = new EnterpriseEconomics(createPostgresEnterpriseEconomicsStore());
+const swarmProtocol = new SwarmProtocol(enterpriseEconomics, undefined, key => nip98Revocations.isRevoked(key));
 configureEnterpriseEconomics(enterpriseEconomics);
-app.use(createEnterpriseEconomicsMiddleware(enterpriseEconomics));
+app.use(createEnterpriseEconomicsMiddleware(enterpriseEconomics, swarmProtocol));
+registerSwarmProtocolRoutes(app, swarmProtocol);
 registerCryptographicAuditRoutes(app, enterpriseEconomics, { ledger: revenueLedger });
 registerCertifiedOracleRoutes(app, enterpriseEconomics);
 registerAffiliateRoutes(app, enterpriseEconomics);

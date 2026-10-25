@@ -6,6 +6,7 @@ import {
   type EnterpriseEconomics,
 } from "../lib/enterprise-economics";
 import { verifyRequestNip98Signer } from "../lib/nip98-request";
+import type { SwarmProtocol } from "../lib/swarm-protocol";
 
 /** Validate an opaque LNURL without resolving it or making a payout/network call. */
 export function parseAgentPayout(
@@ -63,6 +64,7 @@ export function parseAgentPayout(
 
 export function createEnterpriseEconomicsMiddleware(
   service: EnterpriseEconomics,
+  protocol?: SwarmProtocol,
 ): RequestHandler {
   return async (req, res, next) => {
     try {
@@ -106,6 +108,8 @@ export function createEnterpriseEconomicsMiddleware(
         now: service.now,
         onSettlement: () => update(),
       };
+      if (protocol) await protocol.prepare(req, context);
+      res.locals.swarmContext = context;
       const update = () => {
         if (!buyer && !payout) return;
         const status = service.describe(context);
@@ -176,8 +180,8 @@ export function createEnterpriseEconomicsMiddleware(
       enterpriseContext.run(context, next);
     } catch (error) {
       if (
-        error instanceof Error &&
-        /payout header|X-Agent-/.test(error.message)
+        error instanceof RangeError || (error instanceof Error &&
+        /payout header|X-Agent-/.test(error.message))
       ) {
         res.status(400).json({ error: error.message });
         return;

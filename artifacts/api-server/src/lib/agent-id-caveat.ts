@@ -129,9 +129,14 @@ export function agentIdCaveatRejection(
  * declaration rule, where a verified NIP-98 signer counts as the declaration.
  */
 export function agentBindingRejection(
-  bound: { agentId?: string; agentAuthentication?: AgentAuthentication },
+  bound: { agentId?: string; agentAuthentication?: AgentAuthentication; delegatePubkey?: string },
   presented: { declared?: string; nip98Pubkey?: string },
 ): { status: 401 | 403; error: string } | null {
+  if (bound.delegatePubkey !== undefined) {
+    if (!presented.nip98Pubkey) return {status: 401, error: "Delegated redemption requires fresh NIP-98 authentication"};
+    return presented.nip98Pubkey === bound.delegatePubkey ? null :
+      {status: 403, error: "NIP-98 signer does not match delegate_pubkey"};
+  }
   if (bound.agentAuthentication !== undefined) {
     if (presented.nip98Pubkey === undefined) {
       return {

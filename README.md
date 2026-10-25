@@ -257,6 +257,32 @@ Merkle audit path, not a zero-knowledge proof.
 
 In the machine economy, autonomous agents cannot rely on trust, heuristics, or unverified peer outputs. The Bitcoin Stratigraphy Data Engine serves as the global clearinghouse and base-layer trust protocol for non-human entities. Enterprise swarms use our L402 Oracle as a zero-trust firewall to verify the outputs of other sub-agents. By requiring a Stratigraphy OpenTimestamps (.ots) receipt or Groth16 proof before accepting data from a peer agent, swarms mathematically eliminate hallucinations, prevent compute-theft, and establish an unforgeable chain of custody across the global AI network.
 
+- **In-band Article 12 context binding:** synchronous calls accept
+  `params._meta.agentContextSha256` or `X-Agent-Context-SHA256`. A lowercase SHA-256
+  digest adds a fourth signed component to `_meta.responseSignature`; omitted
+  context preserves the legacy three-part format. This binds a submitted digest,
+  not proof that an agent actually used the data.
+- **Wholesale macro-macaroon sub-vending:** buy a tool-scoped 100-call capability
+  with `X-L402-Batch-Size: 100`, then use `proof.attenuate` with
+  `delegate_pubkey = <pubkey>`, `requests = 1`, `rpc` and `time` caveats.
+  Children require fresh delegate NIP-98 signatures and consume inherited quotas.
+  Wholesale ancestor revocation is enforced; invoice attribution cannot move.
+- **NIP-98 solvency attestations:** `payment.get_info` accepts `_meta.targetPubkey`
+  or `X-Target-Pubkey`, otherwise using the authenticated caller. REST:
+  `GET /api/v1/compliance/agent-solvency?pubkey=<pubkey>`. Signed telemetry reports
+  confirmed settlement volume, distinct settled invoice count, and current
+  revocation—not future creditworthiness or a payment guarantee.
+- **Upstream verification allocation:** authenticated creation records an
+  immutable first-recorded origin for supported proofs/receipts. A successful,
+  paid `proof.verify` on that same statement records a 15% upstream allocation
+  and the remaining 6% caller allocation from the existing programmatic L402
+  revenue sharing pool. No additional merchant funding is used. Integer-msat
+  rounding preserves the original pool exactly; the caller receives its
+  remainder after flooring the upstream amount. Historical signed invoices and
+  other tool allocations stay unchanged. Replay cannot create another credit.
+  Counters appear in `payment.get_info` and `/api/v1/escrow/stats`; accounting
+  remains ledger-only, with no automatic disbursement.
+
 ```text
 AI swarms & LLM agent clients
              |

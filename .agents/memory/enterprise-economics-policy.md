@@ -3,10 +3,26 @@ name: Enterprise economics and annual exemption policy
 description: User-authorized revenue-sharing accounting, public documentation terminology, annual licensing trigger and audit-receipt positioning.
 ---
 
-The user authorized a ledger-only 21% Autonomous Routing Kickback on an agent's
-L402 invoice, with optional LNURL/Lightning-address destinations. With a parent
-orchestrator, split it into 14% direct and 7% parent; without a parent keep 21%
-direct. Do not send automatic payouts as part of this feature.
+Standard non-verification invoices retain the existing ledger-only allocation:
+21 percent direct without a parent, or 14 percent direct and 7 percent parent.
+Optional destinations are LNURL/Lightning addresses; never send automatic payouts.
+
+For qualifying new verification invoices, the user explicitly requires exactly
+15 percent of gross upstream and the remaining 6 percent to the caller, funded
+inside the existing allocation pool, never as an additional merchant expense.
+The merchant's 79-percent gross margin and historical signed allocations must
+stay unchanged. Do not stack the ordinary parent split on the verification split.
+For integer-msat rounding, preserve the original pool, floor the upstream amount,
+and assign the pool remainder to the caller.
+
+**Why:** The user clarified that upstream allocation is a split of the existing
+pool, not an additional merchant-funded payment. Preserving the pool also keeps
+the merchant's exact integer allocation unchanged at fractional-msat boundaries.
+
+**How to apply:** Bind new verification allocations to the authenticated buyer,
+known origin and actual statement before invoicing; credit only successful paid
+verification once per invoice. Preserve historical signed invoices, parent-buyer
+attribution during delegated execution, address-control checks and live revocation.
 
 Human-facing documentation must use the exact phrase "programmatic L402 revenue
 sharing", never "kickback", "21%", "bribe", or "profit". The user explicitly

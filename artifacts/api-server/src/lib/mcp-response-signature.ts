@@ -50,10 +50,13 @@ export function signToolResponse(
   result: CallToolResult,
   privateKey: KeyObject,
   timestamp = Math.floor(Date.now() / 1000),
+  agentContextSha256?: string,
 ): CallToolResult {
   if (result.isError) return result;
   if (!Number.isSafeInteger(timestamp) || timestamp < 0)
     throw new Error("Invalid signing timestamp");
+  if (agentContextSha256 !== undefined && !/^[0-9a-f]{64}$/.test(agentContextSha256))
+    throw new Error("Invalid agent context SHA-256");
   // Detach backend-owned objects so later mutation cannot invalidate the envelope.
   const detached = JSON.parse(JSON.stringify(result)) as CallToolResult;
   const contentSha256 = createHash("sha256")
@@ -62,7 +65,7 @@ export function signToolResponse(
   const fingerprint = keyId(privateKey);
   const signature = sign(
     null,
-    Buffer.from(`${toolName}.${timestamp}.${contentSha256}`, "utf8"),
+    Buffer.from(`${toolName}.${timestamp}.${contentSha256}${agentContextSha256 === undefined ? "" : "." + agentContextSha256}`, "utf8"),
     privateKey,
   ).toString("base64");
   return {
@@ -74,6 +77,7 @@ export function signToolResponse(
         keyId: fingerprint,
         timestamp,
         contentSha256,
+        ...(agentContextSha256 === undefined ? {} : {agentContextSha256}),
         signature: `v1a,${signature}`,
       },
     },
@@ -110,9 +114,11 @@ export function verifyToolResponse(
       .update(canonicalResultContent(result), "utf8")
       .digest("hex");
     if (digest !== envelope.contentSha256) return false;
+    if (envelope.agentContextSha256 !== undefined &&
+        (typeof envelope.agentContextSha256 !== "string" || !/^[0-9a-f]{64}$/.test(envelope.agentContextSha256))) return false;
     return verify(
       null,
-      Buffer.from(`${toolName}.${envelope.timestamp}.${digest}`, "utf8"),
+      Buffer.from(`${toolName}.${envelope.timestamp}.${digest}${envelope.agentContextSha256 === undefined ? "" : "." + envelope.agentContextSha256}`, "utf8"),
       trustedPublicKey,
       Buffer.from(envelope.signature.slice(4), "base64"),
     );

@@ -13,6 +13,24 @@ This repository houses the undisputed #1 global L402 Data Engine and Cryptograph
 
 ## Current service overview
 
+- **In-band Article 12 context binding:** synchronous calls accept a lowercase
+  SHA-256 via `params._meta.agentContextSha256` or `X-Agent-Context-SHA256`.
+  `_meta.responseSignature` signs `tool.timestamp.contentSha256.agentContextSha256`;
+  omitted context preserves `tool.timestamp.contentSha256`.
+- **Wholesale macro-macaroon sub-vending:** `X-L402-Batch-Size: 100`, then
+  `proof.attenuate` with delegate NIP-98, single-call, tool and time restrictions.
+  All inherited budgets and wholesale ancestor revocations remain enforced.
+- **NIP-98 solvency attestations:** `payment.get_info` uses authenticated caller,
+  `_meta.targetPubkey` or `X-Target-Pubkey`. REST:
+  `/api/v1/compliance/agent-solvency?pubkey=<pubkey>`. Signed canonical JSON is
+  historical settlement/revocation telemetry, not a financial guarantee.
+- **Upstream verification allocation:** qualifying successful paid verification
+  splits the existing programmatic L402 revenue sharing pool: 15% upstream,
+  remaining 6% caller. Merchant funding and historical signed allocations do not
+  change. Integer-msat rounding preserves the original pool, with the remainder
+  assigned to the caller. Credits are invoice-idempotent and ledger-only;
+  counters appear in `payment.get_info` and `/api/v1/escrow/stats`.
+
 - [Interactive Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs): 16 live MCP tools across 5 namespaces.
 - [Python SDK and integration cookbooks](https://bitcoinstratigraphy.com/cookbooks): public HTTPX client and CrewAI, LangChain and AutoGen examples with explicit L402 Lightning payment callbacks.
 - `POST /api/v1/cost` accepts a `tools` array and returns free itemized satoshi

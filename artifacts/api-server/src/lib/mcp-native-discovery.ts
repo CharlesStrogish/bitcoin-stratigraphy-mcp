@@ -2,6 +2,7 @@
 // Dual-licensed under AGPLv3 and Commercial terms.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandler } from "express";
+import { wholesaleSubVending } from "./wholesale-sub-vending";
 import {
   ErrorCode,
   GetPromptRequestSchema,
@@ -234,6 +235,7 @@ export function registerNativeMcpDiscovery(
         payload = {
           dataset: await dependencies.readCatalog(),
           toolCount: dependencies.tools.length,
+          wholesaleSubVending,
           batchSettlement,
           namespaces,
           l402: {

@@ -2401,6 +2401,9 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     },
     "payment.get_info": {
       keys: [
+        "wholesaleSubVending",
+        "agentSolvencyAttestation",
+        "upstreamVerificationAllocations",
         "standardInvoiceSats",
         "perToolSats",
         "acceptedPaymentMethods",

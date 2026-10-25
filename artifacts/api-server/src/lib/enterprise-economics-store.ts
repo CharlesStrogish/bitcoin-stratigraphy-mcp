@@ -8,6 +8,7 @@ export type EnterpriseAccount = {
   grant?: { iat: number; exp: number; threshold_price_usd_cents: number };
 };
 export type RoutingInvoice = {
+  verification_allocation?: {origin_pubkey: string; proof_hash: string; caller_pubkey: string};
   hash: string;
   provider: string;
   amount_msats: string;
@@ -21,6 +22,8 @@ export type RoutingInvoice = {
   settled_at?: string;
 };
 export interface EconomicsTransaction {
+  agentMetrics(pubkey: string): Promise<{volume_msats: string; executions: number}>;
+  upstreamMetrics(): Promise<{allocations: number; upstream_msats: string; caller_msats: string}>;
   security(key: string): Promise<Record<string, unknown> | undefined>;
   putSecurity(key: string, value: Record<string, unknown>): Promise<void>;
   isRevoked(agent: string): Promise<boolean>;
@@ -61,6 +64,16 @@ export function createMemoryEnterpriseEconomicsStore(): EnterpriseEconomicsStore
       const nextRevoked = structuredClone(revoked);
       try {
         const result = await run({
+          agentMetrics: async pubkey => {
+            const rows = [...nextInvoices.values()].filter(i => i.buyer === pubkey && i.settled_at);
+            return {volume_msats: rows.reduce((s,i) => s+BigInt(i.amount_msats),0n).toString(), executions: rows.length};
+          },
+          upstreamMetrics: async () => {
+            const rows = [...nextSecurity.entries()].filter(([k]) => k.startsWith("verification-credit:")).map(([,v])=>v);
+            return {allocations: rows.length,
+              upstream_msats: rows.reduce((s,v)=>s+BigInt(String(v.upstream_msats)),0n).toString(),
+              caller_msats: rows.reduce((s,v)=>s+BigInt(String(v.caller_msats)),0n).toString()};
+          },
           security: async (key) => structuredClone(nextSecurity.get(key)),
           putSecurity: async (key, value) => {
             nextSecurity.set(key, structuredClone(value));
@@ -157,6 +170,23 @@ export function createPostgresEnterpriseEconomicsStore(
           ["enterprise:" + key],
         );
         const result = await run({
+          async agentMetrics(pubkey) {
+            const r = await client.query<{volume_msats: string; executions: string}>(
+              `SELECT COALESCE(SUM((payload->>'amount_msats')::numeric),0)::text AS volume_msats,
+               COUNT(*)::text AS executions FROM enterprise_routing_invoices
+               WHERE payload->>'buyer'=$1 AND payload->>'settled_at' IS NOT NULL`,[pubkey]);
+            if (!r.rows[0]) throw new Error("Agent telemetry unavailable");
+            return {volume_msats: r.rows[0].volume_msats, executions: Number(r.rows[0].executions)};
+          },
+          async upstreamMetrics() {
+            const r = await client.query<{allocations: string; upstream_msats: string; caller_msats: string}>(
+              `SELECT COUNT(*)::text AS allocations,
+               COALESCE(SUM((payload->>'upstream_msats')::numeric),0)::text AS upstream_msats,
+               COALESCE(SUM((payload->>'caller_msats')::numeric),0)::text AS caller_msats
+               FROM enterprise_affiliate_security WHERE record_key LIKE 'verification-credit:%'`);
+            if (!r.rows[0]) throw new Error("Allocation telemetry unavailable");
+            return {...r.rows[0], allocations: Number(r.rows[0].allocations)};
+          },
           async security(key) {
             const result = await client.query<{
               payload: Record<string, unknown>;

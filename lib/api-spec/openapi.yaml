@@ -235,6 +235,21 @@ x-mcp-tools:
       type: object
       additionalProperties: false
       properties:
+        wholesaleSubVending:
+          type: object
+          additionalProperties: true
+          description: Wholesale purchase and delegated redemption capability metadata.
+          examples: [{supported: true, batchSize: 100, attenuationTool: proof.attenuate}]
+        agentSolvencyAttestation:
+          type: object
+          additionalProperties: true
+          description: Issuer-signed historical settlement and live revocation telemetry for the queried pubkey.
+          examples: [{settled_volume_sats: "0", verified_executions: 0, revoked: false, solvency_tier: UNRATED}]
+        upstreamVerificationAllocations:
+          type: object
+          additionalProperties: true
+          description: Durable allocation count and integer-millisatoshi totals for upstream verification allocation.
+          examples: [{allocations: 0, upstream_msats: "0", caller_msats: "0"}]
         standardInvoiceSats: { type: integer, const: 250 }
         perToolSats:
           type: object

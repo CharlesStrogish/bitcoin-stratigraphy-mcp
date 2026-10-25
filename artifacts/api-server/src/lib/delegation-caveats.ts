@@ -31,6 +31,7 @@ export const MCP_TOOL_NAME_PATTERN = new RegExp(`^${TOOL_NAME}$`);
 export const MAX_RPC_TOOLS = 16;
 
 export type DelegationCaveat =
+  | { type: "delegate_pubkey"; pubkey: string }
   /** Exclusive deadline in epoch milliseconds, from `time <` or `time_before`. */
   | { type: "time"; deadline: number }
   /** Exact tool names from one `rpc =` caveat; every rpc caveat must name the tool. */
@@ -51,6 +52,10 @@ function canonicalInstant(value: string): number | null {
 
 /** Returns null for anything that is not an exactly formatted delegation caveat. */
 export function parseDelegationCaveat(caveat: string): DelegationCaveat | null {
+  const delegate = /^delegate_pubkey = ([0-9a-f]{64})$/.exec(caveat);
+  if (delegate) return {type: "delegate_pubkey", pubkey: delegate[1]!};
+  const requests = /^requests = ([1-9]\d*)$/.exec(caveat);
+  if (requests && Number.isSafeInteger(Number(requests[1]))) return {type: "max_requests", limit: Number(requests[1])};
   const time = TIME_CAVEAT.exec(caveat);
   if (time) {
     const deadline = canonicalInstant(time[1]!);

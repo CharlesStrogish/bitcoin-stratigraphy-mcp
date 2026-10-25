@@ -36,7 +36,7 @@ Automated Compliance SLAs for signed revocation exports and receipt-key rotation
   pinned Ed25519 public keys; a valid historical signature is not live
   authorization, current solvency, or a legal compliance determination.
 - **Online ledger indexes:** after the normal application schema is initialized,
-  run `pnpm db:indexes` against the intended database. The explicit migration
+  run `pnpm db:indexes` against the development database. This explicit command
   builds B-tree indexes with `CREATE INDEX CONCURRENTLY`, a two-second lock-wait
   limit and a ten-minute per-statement limit, outside application transactions.
   It covers settled buyer pubkeys, upstream origins, grounded context digests,
@@ -46,6 +46,9 @@ Automated Compliance SLAs for signed revocation exports and receipt-key rotation
   or backfilled. Missing lazy tables are reported as deferred with a nonzero exit
   status; initialize them normally and rerun. Interrupted or mismatched indexes
   fail validation and require operator inspection, never automatic table drops.
+  Replit-managed production schema changes are applied by Publish, not this
+  command. Publish can use ordinary `CREATE INDEX` statements rather than
+  concurrent builds; allow for possible write blocking during that rollout.
 - **Commercial Enterprise Exemption:** Tier II offers a commercial alternative
   to AGPLv3 for private VPC and air-gapped deployments. The commercial agreement
   governs proprietary swarm IP and Automated Compliance SLAs. AGPLv3 Section 13

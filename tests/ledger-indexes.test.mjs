@@ -28,6 +28,13 @@ test("online indexes cover authenticated buyers, origins, context digests and hi
   assert.ok(ledgerIndexes.some(i=>i.keys.includes("timestamp")));
   assert.ok(ledgerIndexes.some(i=>i.keys.includes("settled_at")));
 });
+test("origin lookup indexes allocation credit records without the redundant publish-truncated invoice expression",()=>{
+  const origin=ledgerIndexes.find(i=>i.name==="enterprise_proof_origin_idx");
+  assert.deepEqual(origin.keys,["(payload->>'origin_pubkey')"]);
+  assert.match(origin.where,/verification-credit:/);
+  assert.equal(ledgerIndexes.some(i=>i.name==="enterprise_verification_origin_idx"),false);
+  for(const index of ledgerIndexes) for(const key of index.keys) assert.doesNotMatch(key,/#>>|verification_allocation/);
+});
 test("migration uses concurrent idempotent B-trees without changing tables or application transactions",async()=>{
   const db=database();
   const first=await applyLedgerIndexes(db,"public");

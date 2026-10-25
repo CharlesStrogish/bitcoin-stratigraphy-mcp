@@ -1,13 +1,12 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
-/** Explicit online migration, never run inside an application transaction. */
+/** Development index initialization; managed production schema changes belong to Publish. */
 export const ledgerIndexes = [
   {name: "enterprise_settled_buyer_idx", table: "enterprise_routing_invoices", columns: ["payload"],
     keys: ["(payload->>'buyer')"], where: "payload->>'settled_at' IS NOT NULL"},
-  {name: "enterprise_verification_origin_idx", table: "enterprise_routing_invoices", columns: ["payload"],
-    keys: ["(payload#>>'{verification_allocation,origin_pubkey}')"],
-    where: ""},
   {name: "enterprise_settlement_time_idx", table: "enterprise_routing_invoices", columns: ["payload"],
     keys: ["(payload->>'settled_at')"], where: "payload->>'settled_at' IS NOT NULL"},
+  // Covers both proof origins and the authoritative verification-credit records.
+  // Avoid a redundant long nested invoice expression: Publish truncates its SQL.
   {name: "enterprise_proof_origin_idx", table: "enterprise_affiliate_security", columns: ["payload", "record_key"],
     keys: ["(payload->>'origin_pubkey')"],
     where: "record_key LIKE 'proof-origin:%' OR record_key LIKE 'verification-credit:%'"},

@@ -12,6 +12,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
+import {sql} from "drizzle-orm";
 
 // A transaction-locked snapshot preserves the Python engine's exact custody and
 // RFC 6962 leaf ordering without making a container-local SQLite file authoritative.
@@ -54,6 +55,9 @@ export const escrowLedgerSettlementsTable = pgTable(
     primaryKey({ columns: [table.ledgerId, table.escrowId] }),
     uniqueIndex("escrow_ledger_settlements_leaf_uidx").on(table.ledgerId, table.leafIndex),
     index("escrow_ledger_settlements_agent_id_idx").on(table.agentId),
+    index("escrow_authenticated_pubkey_time_idx").on(table.agentId, table.settledAt).where(sql`${table.isAuthenticated}`),
+    index("escrow_settlement_time_idx").on(table.settledAt),
+    index("escrow_recorded_at_idx").on(table.recordedAt),
   ],
 );
 export type EscrowLedgerSettlementRow = typeof escrowLedgerSettlementsTable.$inferSelect;

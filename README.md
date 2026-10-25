@@ -31,6 +31,21 @@ Automated Compliance SLAs for signed revocation exports and receipt-key rotation
   attribution and RFC 6962 inclusion. Supply independently pinned current and
   historical issuer PEM keys. An optional signed CRL checks non-revocation at
   its recorded timestamp and freshness against the audit browser's clock.
+  Enterprise CISOs can download this single HTML file to verify agent context
+  bindings and L402 solvency attestations entirely offline, using independently
+  pinned Ed25519 public keys; a valid historical signature is not live
+  authorization, current solvency, or a legal compliance determination.
+- **Online ledger indexes:** after the normal application schema is initialized,
+  run `pnpm db:indexes` against the intended database. The explicit migration
+  builds B-tree indexes with `CREATE INDEX CONCURRENTLY`, a two-second lock-wait
+  limit and a ten-minute per-statement limit, outside application transactions.
+  It covers settled buyer pubkeys, upstream origins, grounded context digests,
+  and settlement/recording timestamps; existing revenue timestamp indexes are
+  reused. Grounded `contextHash` values already use the proof-origin ledger's
+  `proof_hash` field; synchronous MCP context commitments are not newly persisted
+  or backfilled. Missing lazy tables are reported as deferred with a nonzero exit
+  status; initialize them normally and rerun. Interrupted or mismatched indexes
+  fail validation and require operator inspection, never automatic table drops.
 - **Commercial Enterprise Exemption:** Tier II offers a commercial alternative
   to AGPLv3 for private VPC and air-gapped deployments. The commercial agreement
   governs proprietary swarm IP and Automated Compliance SLAs. AGPLv3 Section 13

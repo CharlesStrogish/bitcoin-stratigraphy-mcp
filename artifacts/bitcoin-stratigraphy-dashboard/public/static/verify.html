@@ -80,6 +80,17 @@ dd.empty{color:hsl(var(--mfg))}
 .side{display:grid;gap:14px;align-content:start}
 footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:hsl(var(--mfg));display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.proto{margin-top:14px;border-left:3px solid hsl(var(--primary))}
+.proto .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.proto fieldset{border:1px solid hsl(var(--border));margin:0 0 14px;padding:10px 12px;display:flex;gap:18px;flex-wrap:wrap}
+.proto legend{font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:0 6px}
+.proto fieldset label{margin:0;display:inline-flex;align-items:center;gap:8px;font-size:11px;cursor:pointer}
+.proto input[type=radio]{width:auto;accent-color:hsl(var(--primary))}
+.status.warnst{border-color:hsl(var(--accent));background:hsl(var(--accent)/.1)}.status.warnst strong{color:hsl(var(--accent))}
+#proto-status{font-size:14px}#proto-status strong{font-size:15px}
+#proto-out[hidden]{display:none}
+.proto .ph,.proto label{flex-wrap:wrap;overflow-wrap:anywhere}
+@media (max-width:860px){.proto .row{grid-template-columns:1fr}}
 @media (max-width:860px){.grid{grid-template-columns:1fr}.wrap{width:min(100% - 22px,100%);padding-top:18px}button{flex:1}.spacer{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media print{.actions,footer{display:none}body{background:#fff;color:#111}}
@@ -156,6 +167,56 @@ footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:
   </section>
  </div>
 </main>
+
+<section class="panel proto" aria-labelledby="proto-h">
+ <div class="ph"><h2 id="proto-h">Protocol signature verifier</h2><span class="kicker">MCP responseSignature · agentSolvencyAttestation</span></div>
+ <form class="pb" id="proto-form" novalidate>
+  <fieldset>
+   <legend>Evidence type</legend>
+   <label><input type="radio" name="proto-mode" id="proto-mode-mcp" value="mcp" checked> MCP tool response</label>
+   <label><input type="radio" name="proto-mode" id="proto-mode-solvency" value="solvency"> Agent solvency attestation</label>
+  </fieldset>
+  <div class="field">
+   <label for="proto-payload">Signed JSON <small>CallToolResult, JSON-RPC wrapper, or attestation</small></label>
+   <textarea id="proto-payload" rows="9" spellcheck="false" autocomplete="off" aria-describedby="proto-payload-h" required></textarea>
+   <p class="hint" id="proto-payload-h">MCP: raw result or <code>{"jsonrpc","id","result"}</code>; signature read from <code>_meta.responseSignature</code>. Solvency: raw object or <code>{"agentSolvencyAttestation":…}</code>.</p>
+  </div>
+  <div class="row">
+   <div class="field">
+    <label for="proto-tool">Expected tool name <small>required for MCP</small></label>
+    <input id="proto-tool" type="text" spellcheck="false" autocomplete="off" aria-describedby="proto-tool-h">
+    <p class="hint" id="proto-tool-h">Not carried in the envelope; supply the tool you called, e.g. <code>payment.get_info</code>.</p>
+   </div>
+   <div class="field">
+    <label for="proto-context">Expected agentContextSha256 <small>optional · 64 lowercase hex</small></label>
+    <input id="proto-context" type="text" spellcheck="false" autocomplete="off" maxlength="64" aria-describedby="proto-context-h">
+    <p class="hint" id="proto-context-h">If set, the envelope must be context-bound to exactly this digest.</p>
+   </div>
+  </div>
+  <div class="field">
+   <label for="proto-signature">Signature <small>optional override · v1a,base64</small></label>
+   <input id="proto-signature" type="text" spellcheck="false" autocomplete="off" aria-describedby="proto-signature-h">
+   <p class="hint" id="proto-signature-h">If both are present, this must equal the envelope signature exactly.</p>
+  </div>
+  <div class="field">
+   <label for="proto-pem">Pinned published public key <small>one Ed25519 SPKI PEM</small></label>
+   <textarea id="proto-pem" rows="4" spellcheck="false" autocomplete="off" aria-describedby="proto-pem-h" placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----" required></textarea>
+   <p class="hint" id="proto-pem-h">From your own pinned records. Key ID is SHA-256 of the SPKI DER and must match the envelope.</p>
+  </div>
+  <div class="actions">
+   <button type="submit" class="primary" id="proto-verify">Verify signature</button>
+   <button type="button" class="ghost" id="proto-prefill">Prefill signature</button>
+   <button type="button" class="ghost" id="proto-clear">Clear</button>
+  </div>
+  <div id="proto-status" class="status" role="status" aria-live="assertive" aria-atomic="true"><strong id="proto-status-t"></strong><span id="proto-status-m"></span></div>
+ </form>
+ <dl id="proto-out" hidden>
+  <div><dt>Key ID</dt><dd id="proto-o-key">—</dd></div>
+  <div><dt>Signed statement</dt><dd id="proto-o-msg">—</dd></div>
+  <div><dt>Signed at / as of</dt><dd id="proto-o-time">—</dd></div>
+ </dl>
+ <p class="notice">Historical signature check only. A pass is not live authorization, current solvency, revocation status, or a legal compliance determination. The programmatic L402 revenue sharing figures are not re-derived here.</p>
+</section>
 
 <section class="panel limits warn" aria-labelledby="lim-h">
  <div class="ph"><h2 id="lim-h">What a pass does not prove</h2><span class="kicker">Read before relying</span></div>
@@ -348,6 +409,223 @@ globalThis.Article12Verifier = (() => {
     };
   }
   return Object.freeze({ verify, verifyRevocationSnapshot, canonical });
+})();
+</script>
+<script>
+/* Offline MCP responseSignature and agentSolvencyAttestation verifier. Pure; no network or storage. */
+globalThis.StratigraphyProtocolVerifier = (() => {
+  "use strict";
+  const enc = new TextEncoder();
+  const HEX = /^[0-9a-f]{64}$/;
+  const TIERS = ["REVOKED", "TIER_2_INSTITUTIONAL", "TIER_1_VERIFIED", "UNRATED"];
+  const SPKI_PREFIX = "302a300506032b6570032100";
+  const canonical = globalThis.Article12Verifier ? globalThis.Article12Verifier.canonical : function c(v) {
+    if (Array.isArray(v)) return "[" + v.map(c).join(",") + "]";
+    if (v !== null && typeof v === "object") return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + c(v[k])).join(",") + "}";
+    return JSON.stringify(v);
+  };
+  class VerificationError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+  const fail = (code, msg) => { throw new VerificationError(code, msg); };
+  const hex = b => Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+  const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
+  function b64(v, what) {
+    if (typeof v !== "string" || !v || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(v)) fail("MALFORMED", "Invalid base64 " + what);
+    return Uint8Array.from(atob(v), ch => ch.charCodeAt(0));
+  }
+  function isAvailable() {
+    return !!(globalThis.crypto && globalThis.crypto.subtle && typeof globalThis.crypto.subtle.verify === "function");
+  }
+  function requireCrypto() {
+    if (!isAvailable()) fail("UNAVAILABLE", "Verification unavailable: Web Crypto is not exposed in this context (insecure origin or unsupported browser). No result was produced.");
+  }
+  async function sha256Hex(bytes) { return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))); }
+  function parseJson(input) {
+    if (typeof input !== "string") return input;
+    try { return JSON.parse(input); } catch (e) { fail("MALFORMED", "Payload is not valid JSON: " + e.message); }
+  }
+  function parsePem(text) {
+    if (typeof text !== "string") fail("BAD_KEY", "Public key PEM required");
+    const blocks = text.match(/-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----/g) || [];
+    if (blocks.length !== 1 || text.replace(blocks[0], "").trim()) fail("BAD_KEY", "Provide exactly one Ed25519 SPKI PEM public key");
+    const der = b64(blocks[0].replace(/-----[A-Z ]+-----/g, "").replace(/\s/g, ""), "public key");
+    if (der.length !== 44 || hex(der.slice(0, 12)) !== SPKI_PREFIX) fail("BAD_KEY", "Public key is not an Ed25519 SPKI key");
+    return der;
+  }
+  async function importKey(pem) {
+    requireCrypto();
+    const der = parsePem(pem);
+    let key;
+    try { key = await crypto.subtle.importKey("spki", der, { name: "Ed25519" }, false, ["verify"]); }
+    catch (e) { fail("UNAVAILABLE", "Verification unavailable: this browser cannot import Ed25519 keys (" + (e && e.message || e) + ")"); }
+    return { key, keyId: await sha256Hex(der) };
+  }
+  async function edVerify(key, sig, msgBytes) {
+    try { return await crypto.subtle.verify({ name: "Ed25519" }, key, sig, msgBytes); }
+    catch (e) { fail("UNAVAILABLE", "Verification unavailable: Ed25519 verify failed to run (" + (e && e.message || e) + ")"); }
+  }
+  function extractToolResult(input) {
+    const parsed = parseJson(input);
+    if (!isObj(parsed)) fail("MALFORMED", "Payload must be a JSON object");
+    if (Object.hasOwn(parsed, "error")) fail("ERROR_PAYLOAD", "JSON-RPC error payloads are never signed");
+    const r = Object.hasOwn(parsed, "jsonrpc") || (Object.hasOwn(parsed, "result") && !Object.hasOwn(parsed, "content")) ? parsed.result : parsed;
+    if (!isObj(r)) fail("MALFORMED", "Missing CallToolResult object");
+    if (r.isError === true) fail("ERROR_PAYLOAD", "Error results (isError) are never signed");
+    if (!Array.isArray(r.content)) fail("MALFORMED", "CallToolResult.content array required");
+    return r;
+  }
+  function canonicalResultContent(result) {
+    const p = JSON.parse(JSON.stringify({ content: result.content, ...(result.structuredContent !== undefined ? { structuredContent: result.structuredContent } : {}) }));
+    return canonical(p);
+  }
+  function getEnvelope(input) {
+    const r = extractToolResult(input);
+    const env = r._meta && r._meta.responseSignature;
+    return isObj(env) ? env : null;
+  }
+  async function verifyResponseSignature(opts) {
+    const o = opts || {};
+    requireCrypto();
+    const result = extractToolResult(o.payload);
+    const tool = typeof o.toolName === "string" ? o.toolName.trim() : "";
+    if (!tool || /\s/.test(tool)) fail("MISSING_FIELD", "Expected tool name is required");
+    const env = result._meta && result._meta.responseSignature;
+    if (!isObj(env)) fail("MISSING_FIELD", "Missing _meta.responseSignature envelope");
+    if (env.algorithm !== "Ed25519") fail("MALFORMED", "Envelope algorithm must be Ed25519");
+    if (typeof env.keyId !== "string" || !HEX.test(env.keyId)) fail("MALFORMED", "Envelope keyId must be 64 lowercase hex");
+    if (!Number.isSafeInteger(env.timestamp) || env.timestamp < 0) fail("BAD_TIMESTAMP", "Envelope timestamp must be a non-negative integer");
+    if (typeof env.contentSha256 !== "string" || !HEX.test(env.contentSha256)) fail("MALFORMED", "Envelope contentSha256 must be 64 lowercase hex");
+    const hasCtx = Object.hasOwn(env, "agentContextSha256");
+    if (hasCtx && (typeof env.agentContextSha256 !== "string" || !HEX.test(env.agentContextSha256))) fail("BAD_CONTEXT", "Envelope agentContextSha256 must be 64 lowercase hex");
+    const expCtx = o.expectedAgentContextSha256 == null || o.expectedAgentContextSha256 === "" ? undefined : o.expectedAgentContextSha256;
+    if (expCtx !== undefined) {
+      if (typeof expCtx !== "string" || !HEX.test(expCtx)) fail("BAD_CONTEXT", "Expected agentContextSha256 must be 64 lowercase hex");
+      if (!hasCtx) fail("BAD_CONTEXT", "Expected context supplied but envelope is not context-bound");
+      if (env.agentContextSha256 !== expCtx) fail("BAD_CONTEXT", "agentContextSha256 does not match expected context");
+    }
+    const override = typeof o.signature === "string" && o.signature.trim() ? o.signature.trim() : undefined;
+    if (env.signature !== undefined && typeof env.signature !== "string") fail("BAD_SIGNATURE", "Envelope signature must be a string");
+    if (override !== undefined && env.signature !== undefined && override !== env.signature) fail("BAD_SIGNATURE", "Signature override does not match envelope signature");
+    const sigStr = env.signature !== undefined ? env.signature : override;
+    if (sigStr === undefined) fail("MISSING_FIELD", "Missing signature");
+    if (!/^v1a,[A-Za-z0-9+/]{86}==$/.test(sigStr)) fail("BAD_SIGNATURE", "Signature must be v1a,<base64 64-byte Ed25519>");
+    const sig = b64(sigStr.slice(4), "signature");
+    const { key, keyId } = await importKey(o.publicKeyPem);
+    if (keyId !== env.keyId) fail("KEY_MISMATCH", "Envelope keyId does not match the pinned key fingerprint");
+    const digest = await sha256Hex(enc.encode(canonicalResultContent(result)));
+    if (digest !== env.contentSha256) fail("DIGEST_MISMATCH", "contentSha256 does not match canonical {content, structuredContent}");
+    const message = tool + "." + env.timestamp + "." + digest + (hasCtx ? "." + env.agentContextSha256 : "");
+    if (!await edVerify(key, sig, enc.encode(message))) fail("INVALID_SIGNATURE", "Ed25519 signature is invalid");
+    return { verified: true, kind: "mcp-response", keyId, toolName: tool, timestamp: env.timestamp,
+      contentSha256: digest, agentContextSha256: hasCtx ? env.agentContextSha256 : null, contextBound: hasCtx, signedMessage: message,
+      notice: "Historical signature valid. Not live authorization, freshness, or legal compliance." };
+  }
+  const SOLV_KEYS = ["as_of", "issuer_key_id", "pubkey", "revoked", "settled_volume_sats", "signature", "solvency_tier", "verified_executions"];
+  async function verifySolvencyAttestation(opts) {
+    const o = opts || {};
+    requireCrypto();
+    const parsed = parseJson(o.payload);
+    if (!isObj(parsed)) fail("MALFORMED", "Payload must be a JSON object");
+    if (Object.hasOwn(parsed, "error")) fail("ERROR_PAYLOAD", "Error payloads are never signed");
+    const a = Object.hasOwn(parsed, "agentSolvencyAttestation") ? parsed.agentSolvencyAttestation : parsed;
+    if (!isObj(a)) fail("MALFORMED", "agentSolvencyAttestation object required");
+    for (const k of SOLV_KEYS) if (!Object.hasOwn(a, k)) fail("MISSING_FIELD", "Missing attestation field " + k);
+    for (const k of Object.keys(a)) if (!SOLV_KEYS.includes(k)) fail("MALFORMED", "Unexpected attestation field " + k);
+    if (typeof a.pubkey !== "string" || !HEX.test(a.pubkey)) fail("MALFORMED", "pubkey must be 64 lowercase hex");
+    if (typeof a.settled_volume_sats !== "string" || !/^(?:0|[1-9]\d*)$/.test(a.settled_volume_sats)) fail("MALFORMED", "settled_volume_sats must be a decimal string");
+    if (!Number.isSafeInteger(a.verified_executions) || a.verified_executions < 0) fail("MALFORMED", "verified_executions must be a non-negative integer");
+    if (typeof a.revoked !== "boolean") fail("MALFORMED", "revoked must be boolean");
+    if (!TIERS.includes(a.solvency_tier)) fail("MALFORMED", "Unknown solvency_tier");
+    if (a.revoked !== (a.solvency_tier === "REVOKED")) fail("MALFORMED", "revoked flag and solvency_tier disagree");
+    const t = typeof a.as_of === "string" ? Date.parse(a.as_of) : NaN;
+    if (!Number.isFinite(t) || new Date(t).toISOString() !== a.as_of) fail("BAD_TIMESTAMP", "as_of must be a canonical ISO timestamp");
+    if (typeof a.issuer_key_id !== "string" || !HEX.test(a.issuer_key_id)) fail("MALFORMED", "issuer_key_id must be 64 lowercase hex");
+    if (typeof a.signature !== "string") fail("BAD_SIGNATURE", "signature must be a string");
+    const sig = b64(a.signature, "signature");
+    if (sig.length !== 64) fail("BAD_SIGNATURE", "Signature must be 64 bytes");
+    const { key, keyId } = await importKey(o.publicKeyPem);
+    if (keyId !== a.issuer_key_id) fail("KEY_MISMATCH", "issuer_key_id does not match the pinned key fingerprint");
+    const { signature, ...payload } = a;
+    const message = canonical(payload);
+    if (!await edVerify(key, sig, enc.encode(message))) fail("INVALID_SIGNATURE", "Ed25519 signature is invalid");
+    return { verified: true, kind: "agent-solvency", keyId, pubkey: a.pubkey, solvencyTier: a.solvency_tier, asOf: a.as_of,
+      revoked: a.revoked, signedMessage: message,
+      notice: "Historical attestation valid as of " + a.as_of + ". Not current solvency, live authorization, or legal compliance." };
+  }
+  return Object.freeze({ isAvailable, canonical, canonicalResultContent, extractToolResult, getEnvelope, parsePem,
+    verifyResponseSignature, verifySolvencyAttestation, VerificationError, SOLVENCY_TIERS: Object.freeze(TIERS.slice()) });
+})();
+</script>
+<script>
+(() => {
+  "use strict";
+  if (typeof document === "undefined") return;
+  const $ = id => document.getElementById(id);
+  const P = globalThis.StratigraphyProtocolVerifier;
+  const f = $("proto-form"), pay = $("proto-payload"), tool = $("proto-tool"), ctx = $("proto-context"),
+    sig = $("proto-signature"), pem = $("proto-pem"), btn = $("proto-verify"), st = $("proto-status");
+  let gen = 0;
+  const mode = () => $("proto-mode-solvency").checked ? "solvency" : "mcp";
+  function status(kind, t, m) {
+    st.className = "status"; $("proto-status-t").textContent = t || ""; $("proto-status-m").textContent = m || "";
+    if (kind) { void st.offsetWidth; st.classList.add("show", kind); }
+  }
+  function reset() {
+    gen++; btn.disabled = false; status(null); $("proto-out").hidden = true;
+    [pay, tool, ctx, sig, pem].forEach(e => e.setAttribute("aria-invalid", "false"));
+  }
+  function syncMode() {
+    const m = mode() === "mcp";
+    [tool, ctx, sig, $("proto-prefill")].forEach(e => { e.disabled = !m; });
+    tool.required = m; reset();
+  }
+  [pay, tool, ctx, sig, pem].forEach(e => e.addEventListener("input", reset));
+  $("proto-mode-mcp").addEventListener("change", syncMode);
+  $("proto-mode-solvency").addEventListener("change", syncMode);
+  $("proto-clear").addEventListener("click", () => { [pay, tool, ctx, sig, pem].forEach(e => { e.value = ""; }); reset(); pay.focus(); });
+  $("proto-prefill").addEventListener("click", () => {
+    reset();
+    try {
+      const env = P.getEnvelope(pay.value);
+      if (!env || typeof env.signature !== "string") throw new Error("No envelope signature found");
+      sig.value = env.signature;
+      status("busy", "Prefilled", "Signature copied from payload. Not yet verified.");
+    } catch (e) { status("bad", "Cannot prefill", String(e && e.message || e)); }
+  });
+  f.addEventListener("submit", async ev => {
+    ev.preventDefault(); reset();
+    const m = mode();
+    const missing = [[pay, pay.value.trim()], [pem, pem.value.trim()], ...(m === "mcp" ? [[tool, tool.value.trim()]] : [])].filter(([, v]) => !v).map(([e]) => e);
+    if (missing.length) {
+      missing.forEach(e => e.setAttribute("aria-invalid", "true"));
+      status("bad", "Input required", m === "mcp" ? "Provide the payload, expected tool name and pinned public key." : "Provide the attestation and pinned public key.");
+      missing[0].focus(); return;
+    }
+    const my = gen; btn.disabled = true;
+    status("busy", "Verifying", "Running Ed25519 checks locally in this tab.");
+    try {
+      const r = m === "mcp"
+        ? await P.verifyResponseSignature({ payload: pay.value, toolName: tool.value, expectedAgentContextSha256: ctx.value.trim(), signature: sig.value, publicKeyPem: pem.value })
+        : await P.verifySolvencyAttestation({ payload: pay.value, publicKeyPem: pem.value });
+      if (my !== gen) return;
+      if (!r || r.verified !== true) throw new Error("Verifier did not report a pass");
+      $("proto-o-key").textContent = r.keyId; $("proto-o-msg").textContent = r.signedMessage;
+      $("proto-o-time").textContent = m === "mcp" ? String(r.timestamp) + " (unix s)" + (r.contextBound ? " · context-bound" : "") : r.asOf + " · " + r.solvencyTier;
+      $("proto-out").hidden = false;
+      status("ok", "VERIFIED", r.notice);
+    } catch (e) {
+      if (my !== gen) return;
+      const code = e && e.code, msg = String(e && e.message || e);
+      if (code === "UNAVAILABLE") { status("warnst", "VERIFICATION UNAVAILABLE", msg); return; }
+      if (code === "BAD_KEY" || code === "KEY_MISMATCH") pem.setAttribute("aria-invalid", "true");
+      else if (code === "BAD_CONTEXT") ctx.setAttribute("aria-invalid", "true");
+      else if (code === "MISSING_FIELD" && /tool/i.test(msg)) tool.setAttribute("aria-invalid", "true");
+      else if (/override/.test(msg)) sig.setAttribute("aria-invalid", "true");
+      else pay.setAttribute("aria-invalid", "true");
+      status("bad", "INVALID SIGNATURE", (code ? "[" + code + "] " : "") + msg);
+    } finally { if (my === gen) btn.disabled = false; }
+  });
+  syncMode();
+  if (!P.isAvailable()) status("warnst", "VERIFICATION UNAVAILABLE", "Web Crypto is not available in this context; nothing can be verified here.");
 })();
 </script>
 <script>

@@ -20,7 +20,8 @@
     "test:mcp": "pnpm exec tsx scripts/test-mcp-health.ts",
     "test:nostr": "pnpm exec tsx scripts/test-nostr.ts",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --filter \"./plugins/**\" --filter \"./templates/**\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --filter \"./plugins/**\" --filter \"./templates/**\" --if-present run typecheck",
+    "db:indexes": "tsx lib/db/scripts/apply-ledger-indexes.ts"
   },
   "private": true,
   "pnpm": {

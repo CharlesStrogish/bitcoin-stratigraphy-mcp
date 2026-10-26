@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import { createHash } from "node:crypto";
+import { createMcpPipelineHandler, type PipelineReceiptStore } from "../lib/mcp-pipeline";
+import { loadArticle12IssuerKey } from "../lib/article12-signature";
 import { frameMcpErrors, validateMcpEnvelope } from "../middleware/mcpJsonRpc";
 import {
   MCP_SERVER_INFO,
@@ -5375,6 +5377,7 @@ export function registerMcpRoute(
     /** Background runner for webhook_url calls; one per process by default. */
     asyncTaskRunner?: McpAsyncTaskRunner;
     tasksExtension?: McpTasksExtension;
+    pipelineReceiptStore?: PipelineReceiptStore;
   } = {},
 ): void {
   const primaryBackend = options.stratigraphyBackend ??
@@ -5392,8 +5395,10 @@ export function registerMcpRoute(
   app.use("/mcp", (req, res, next) => {
     res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;
     res.locals.readToolIntegrity = readToolIntegrity;
-    const messages = Array.isArray(req.body) ? req.body : [req.body];
-    if (messages.some((message) => message?.method === "tools/call")) {
+    const messages = Array.isArray(req.body) ? req.body
+      : ["tools/pipeline", "tools/batch"].includes(req.body?.method) &&
+        Array.isArray(req.body.params?.calls) ? req.body.params.calls : [req.body];
+    if (messages.some((message: {method?: unknown} | null) => message?.method === "tools/call")) {
       try {
         const contextDigest = optionalProtocolKey(
           req.body?.params?._meta?.agentContextSha256, req.get("X-Agent-Context-SHA256"));
@@ -5425,10 +5430,14 @@ export function registerMcpRoute(
       req.body?.method === "tools/call" ? req.body.params?.name : undefined;
     // Credential headers alone never exempt free calls. Paid aliases remain gated
     // by their existing L402/x402 middleware, without imposing an IP batch ceiling.
+    const pipelineCalls = Array.isArray(req.body) ? req.body
+      : ["tools/pipeline", "tools/batch"].includes(req.body?.method) ? req.body.params?.calls : undefined;
     if (
       req.method === "POST" &&
-      typeof name === "string" &&
-      Object.hasOwn(paidTools, name)
+      (typeof name === "string" && Object.hasOwn(paidTools, name) ||
+        Array.isArray(pipelineCalls) && pipelineCalls.some(call =>
+          call?.method === "tools/call" && typeof call.params?.name === "string" &&
+          Object.hasOwn(paidTools, call.params.name)))
     ) {
       next();
       return;
@@ -5747,6 +5756,107 @@ export function registerMcpRoute(
     // Selects the protocol era and validates 2026-07-28 metadata and routing
     // headers before any payment, delegation or tool work.
     negotiateMcpProtocol,
+    createMcpPipelineHandler({
+      settlementRouter, sessionSecret: options.sessionSecret,
+      usageStore: options.usageStore, revocationStore, ledger: options.ledger,
+      store: options.pipelineReceiptStore, key: loadArticle12IssuerKey,
+      schemaFor: name => name === "stratigraphy.list" ? stratigraphyCatalogInputSchema
+        : name === "proof.list" ? listProofAttestationsInputSchema
+        : paidTools[name as keyof typeof paidTools].schema,
+      execute: async (_req, res, name, args, signal) => {
+        // Fresh per-step preparation prevents a previous step's cached source,
+        // grounding receipt, or verifier result from leaking into the next call.
+        const locals: Record<string, unknown> = {
+          ...res.locals, primaryStratigraphy: undefined, attenuation: undefined,
+          epistemicAnchorReceipt: undefined, epistemicDatasetReceipt: undefined,
+          archivedProof: undefined, driftVerification: undefined, paymentSettlement: undefined,
+        };
+        if (name === "proof.attenuate") {
+          const input = attenuateInputSchema.parse(args);
+          const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+          const now = Date.now();
+          const parent = secret ? verifySubscriptionMacaroon(input.macaroon, secret, Math.floor(now / 1000)) : null;
+          if (!parent || await revocationStore.isRevoked(parent.tokenId))
+            throw new RangeError("Invalid, expired or revoked parent macaroon");
+          const caveats = normalizedAttenuationCaveats(input, now, parent);
+          const child = attenuateSubscriptionMacaroon(input.macaroon, caveats);
+          if (!child || !verifySubscriptionMacaroon(child, secret!, Math.floor(now / 1000)))
+            throw new RangeError("Invalid attenuation caveats");
+          locals.attenuation = {status: "attenuated", attenuatedMacaroon: child,
+            appliedCaveats: caveats, issuedAt: new Date(now).toISOString()};
+        }
+        if (name === "proof.get_by_hash") {
+          const input = proofByHashInputSchema.parse(args);
+          const archived = findArchivedProof(input.hash ?? input.jobId!, mesh.status().quorumThreshold);
+          if (!archived) throw new RangeError("Proof or receipt not found");
+          locals.archivedProof = archived;
+        }
+        if (name === "proof.verify" && args.circuit === "zk.drift.v1") {
+          const {circuit: _circuit, ...input} = driftProofInputSchema.parse(args);
+          const startedAt = performance.now();
+          locals.driftVerification = {valid: await verifyDriftProof(input), startedAt};
+        }
+        if (name === "mesh.broadcast" && mesh.status().configuredPeerCount === 0)
+          throw new RangeError("No mesh peers configured");
+        if (name === "proof.ground") {
+          const input = proofGroundInputSchema.parse(args);
+          if (Buffer.byteLength(JSON.stringify(input)) > 16_384)
+            throw new RangeError("Grounding metadata exceeds 16 KiB");
+          const current = buildProvenanceChain(await readDataset());
+          const datasetProvenance: BoundProvenance = {
+            headHash: current.headHash, merkleRoot: current.merkleRoot, totalDepth: current.totalDepth,
+          };
+          if ("cid" in input) {
+            locals.epistemicDatasetReceipt = await createEpistemicDatasetReceipt({
+              ...input, context: {...input.context, datasetProvenance},
+            }, {readBitcoinTip: options.readBitcoinTip});
+          } else {
+            locals.epistemicAnchorReceipt = await groundEpistemicContext({
+              ...input, metadata: {...input.metadata, datasetProvenance},
+            }, {readBitcoinTip: options.readBitcoinTip});
+          }
+        }
+        if (name === "payment.get_info" && args.action === "settle") {
+          const input = paymentInfoInputSchema.parse(args);
+          if (input.action === "settle") {
+            // This is an ordinary paid settlement lookup, not a second invoice:
+            // validate the separately supplied original single-tool credential.
+            locals.paymentSettlement = {verified: false, settlementToken: null};
+            const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+            const pass = input.paymentMacaroon && secret
+              ? verifySubscriptionMacaroon(input.paymentMacaroon, secret, Math.floor(Date.now() / 1000)) : null;
+            const path = pass?.allowedPaths[0];
+            const tool = path?.startsWith("/mcp/tools/") ? path.slice("/mcp/tools/".length) : "";
+            const paymentHash = input.paymentHash.replace(/^0x/i, "").toLowerCase();
+            const preimage = input.preimage?.toLowerCase() ?? "nwc_lookup";
+            if (pass && pass.paymentHash === paymentHash && !input.txHash &&
+                pass.paymentAsset === "btc-lightning" && pass.paymentProvider &&
+                pass.allowedPaths.length === 1 && Object.hasOwn(paidTools, tool) &&
+                pass.amountMsats === paidTools[tool as keyof typeof paidTools].amountSats * 1000 *
+                  (pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1) &&
+                (!/^[0-9a-fA-F]{64}$/.test(preimage) || createHash("sha256")
+                  .update(Buffer.from(preimage, "hex")).digest("hex") === paymentHash) &&
+                !await revocationStore.isRevoked(pass.tokenId)) {
+              const verified = await settlementRouter.verifyPayment({
+                paymentHash, ...paymentVerificationProof(preimage),
+                expectedAmountMsats: pass.amountMsats,
+                expectedDescription: `Bitcoin Stratigraphy MCP ${tool} execution${pass.requestLimits[0]?.maxRequests === 100 ? " (100-call batch)" : ""}`,
+                expectedProvider: pass.paymentProvider, asset: "btc-lightning",
+              });
+              if (verified === "unavailable") throw new Error("Payment verifier unavailable");
+              if (verified !== "invalid" && verified.provider === pass.paymentProvider &&
+                  (verified.asset === undefined || verified.asset === "btc-lightning"))
+                locals.paymentSettlement = {verified: true, settlementToken: {scheme: "L402", paymentHash,
+                  scope: path!, settledAt: new Date(verified.settledAt < 10_000_000_000
+                    ? verified.settledAt * 1000 : verified.settledAt).toISOString()}};
+            }
+          }
+        }
+        if (signal.aborted) throw new Error("Pipeline interrupted");
+        return runMcpToolCallInMemory(mcpServerFactory(locals, mesh, primaryBackend),
+          {name, arguments: args}, signal);
+      },
+    }),
     validateNativeMcpRequest,
     async (req, res, next) => {
       try {

@@ -38,6 +38,7 @@ const outputs = [
   "./dist/mcp-stateless-transport.test.js",
   "./dist/mcp-response-signature.test.js",
   "./dist/mcp-async-webhooks.test.js",
+  "./dist/mcp-pipeline.test.js",
   "./dist/announcer.test.js",
   "./dist/ledger.test.js",
   "./dist/orchestrator.test.js",
@@ -182,6 +183,7 @@ await build({
     "mcp-response-signature.test":
       "./tests/unit/mcp-response-signature.test.ts",
     "mcp-async-webhooks.test": "./tests/unit/mcp-async-webhooks.test.ts",
+    "mcp-pipeline.test": "./tests/unit/mcp-pipeline.test.ts",
     "announcer.test": "../../tests/announcer.test.ts",
     "ledger.test": "../../tests/ledger.test.ts",
     "orchestrator.test": "../../tests/orchestrator.test.ts",

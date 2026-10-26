@@ -105,10 +105,10 @@ export function quoteMcpTools(tools: string[]) {
     l402: {
       settlement_asset: "btc-lightning" as const,
       invoice_generated: false,
-      aggregate_invoice_supported: false,
+      aggregate_invoice_supported: true,
       invoice_expiry_seconds: MCP_INVOICE_EXPIRY_SECONDS,
       generation_trigger:
-        "An unauthenticated tools/call to a paid tool generates its own invoice; include that tool's required arguments.",
+        "An unauthenticated tools/call generates its own invoice. tools/pipeline (alias tools/batch) with params.calls generates one invoice for the sum of the ordered tool prices; legacy JSON-RPC tools/call arrays use the same pipeline extension.",
       challenge_status: 402,
       challenge_header: "WWW-Authenticate",
       challenge_format: 'L402 macaroon="<macaroon>", invoice="<BOLT11>"',

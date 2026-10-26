@@ -1322,7 +1322,7 @@ test("MCP proof.ground reads and signs Bitcoin receipts only after L402 settles"
   }
 });
 
-test("rejects canonical paid tool calls in JSON-RPC batches before execution", async () => {
+test("rejects invalid canonical paid pipeline steps before execution or invoices", async () => {
   const requests = [
     {
       jsonrpc: "2.0",
@@ -1330,7 +1330,7 @@ test("rejects canonical paid tool calls in JSON-RPC batches before execution", a
       method: "tools/call",
       params: {
         name: "proof.get_by_hash",
-        arguments: { hash: "1" },
+        arguments: { hash: 1 },
       },
     },
     {
@@ -1339,7 +1339,7 @@ test("rejects canonical paid tool calls in JSON-RPC batches before execution", a
       method: "tools/call",
       params: {
         name: "proof.ground",
-        arguments: { cid: "ef".repeat(32) },
+        arguments: { cid: 42 },
       },
     },
   ];
@@ -1382,8 +1382,8 @@ test("rejects canonical paid tool calls in JSON-RPC batches before execution", a
     assert.deepEqual(body, {
       jsonrpc: "2.0",
       error: {
-        code: -32600,
-        message: "Batch paid tool calls are not supported",
+        code: -32602,
+        message: `Invalid arguments for pipeline step ${batch.length - 1} (${batch[batch.length - 1].params.name})`,
       },
       id: null,
     });
@@ -1398,7 +1398,9 @@ test("rejects canonical paid tool calls in JSON-RPC batches before execution", a
   }
 
   for (const call of [requests[1]]) {
-    const challenge = await mcpRequestAt(baseUrl, "tools/call", call.params);
+    const challenge = await mcpRequestAt(baseUrl, "tools/call", {
+      ...call.params, arguments: {cid: "ef".repeat(32)},
+    });
     assert.equal(challenge.response.status, 402);
     const issued = challenge.body as unknown as {
       macaroon: string;
@@ -5358,7 +5360,7 @@ test("quotes batch MCP costs with itemized invoice details and wildcard CORS wit
   assert.deepEqual(quote.batchSettlement.supportedBatchSizes, [100]);
   assert.equal(quote.batchSettlement.maxCalls, 100);
   assert.equal(quote.batchSettlement.invoiceGeneratedByDiscovery, false);
-  assert.equal(quote.l402.aggregate_invoice_supported, false);
+  assert.equal(quote.l402.aggregate_invoice_supported, true);
   assert.equal(quote.l402.challenge_status, 402);
   assert.equal(quote.l402.max_requests, 1);
   assert.equal(invoiceRequestCount, before);

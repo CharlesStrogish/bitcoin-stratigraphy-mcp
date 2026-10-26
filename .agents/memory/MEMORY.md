@@ -92,3 +92,4 @@
 - [Enterprise economics policy](enterprise-economics-policy.md) — ledger-only kickbacks, authenticated spend, exact 365-day exemptions and qualified audit-receipt positioning.
 - [Liability notices](liability-notices.md) — notices are not legal assent; isolate changed root terms from old invoice caches without revoking paid tokens.
 - [Online ledger indexes](online-ledger-indexes.md) — Publish owns managed-production DDL; avoid long nested JSON index expressions and preserve literal JSON keys.
+- [Pipeline settlement trust](mcp-pipeline-settlement-trust.md) — one exact-request payment, sequential fail-fast work; receipts commit actual bytes but external effects cannot roll back.

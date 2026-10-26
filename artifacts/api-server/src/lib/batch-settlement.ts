@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
-/** Discovery describes the existing gate; it does not enable new batch sizes. */
+/** Same-tool macro-passes and ordered cross-tool pipelines are distinct transports. */
 export const batchSettlement = Object.freeze({
   protocol: "L402",
   settlementAsset: "btc-lightning",
@@ -10,6 +10,18 @@ export const batchSettlement = Object.freeze({
   priceMultiplier: 100,
   credentialScope: "exact MCP tool path",
   invoiceGeneratedByDiscovery: false,
+  pipeline: {
+    methods: ["tools/pipeline", "tools/batch"],
+    callsParameter: "params.calls",
+    legacyJsonRpcArrays: true,
+    maxSteps: 100,
+    pricing: "sum of all ordered per-tool prices, including duplicates",
+    referenceSyntax: '{"$ref":"0#/structuredContent/field"}',
+    credentialScope: "SHA-256 commitment to the exact pipeline request",
+    maxExecutionsPerInvoice: 1,
+    execution: "sequential, fail-fast; external side effects are not rolled back",
+    receipt: "one signed Article 12 record-keeping receipt, persisted in PostgreSQL",
+  },
   instructions:
-    "On the initial POST /mcp tools/call to a paid tool, include X-L402-Batch-Size: 100 and the tool's required arguments. Receive HTTP 402 with one upfront Lightning invoice priced at 100 times the per-call price and an invoice-bound multi-call macro-macaroon. Pay that exact invoice once, then reuse Authorization: L402 <macaroon>:<preimage> for up to 100 calls to the same tool. Positive payment-proof caching avoids per-call Lightning settlement latency; every call still enforces expiry, revocation, attenuation and inherited quotas. No cross-tool aggregate invoice or arbitrary 10–1000 size range is supported.",
+    "For a 100-call same-tool pass, POST tools/call with X-L402-Batch-Size: 100 and pay its 100-times-price invoice once. For an ordered cross-tool pipeline, POST tools/pipeline with params.calls (or a legacy JSON-RPC tools/call array), without X-L402-Batch-Size. Pay the exact summed-price invoice once and retry the identical body with Authorization: L402 <macaroon>:<preimage>. Earlier results may be referenced with $ref. Each pipeline invoice executes at most once; expiry, revocation, identity, exact request scope and inherited quotas remain enforced. Discovery never creates an invoice.",
 });

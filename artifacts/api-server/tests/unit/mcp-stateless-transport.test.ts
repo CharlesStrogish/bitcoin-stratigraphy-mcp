@@ -227,7 +227,14 @@ test("server/discover answers without a handshake or session", async () => {
   assert.equal(result.supportedVersions[0], MODERN);
   assert.ok(result.supportedVersions.includes(LEGACY));
   assert.deepEqual(result.capabilities, {
-    extensions: { "io.modelcontextprotocol/tasks": {} },
+    extensions: {
+      "io.modelcontextprotocol/tasks": {},
+      "com.bitcoinstratigraphy/pipelines": {
+        methods: ["tools/pipeline", "tools/batch"], maxCalls: 100,
+        references: "<zero-based-step>#/structuredContent/field",
+        settlement: "sum_of_tool_prices_single_l402_invoice",
+      },
+    },
     prompts: { listChanged: false },
     resources: { subscribe: false, listChanged: false },
     tools: {},

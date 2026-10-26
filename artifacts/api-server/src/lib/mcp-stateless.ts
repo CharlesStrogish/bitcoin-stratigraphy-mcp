@@ -60,7 +60,14 @@ export function mcpServerCapabilities() {
     prompts: { listChanged: false },
     resources: { subscribe: false, listChanged: false },
     tools: {},
-    extensions: { "io.modelcontextprotocol/tasks": {} },
+    extensions: {
+      "io.modelcontextprotocol/tasks": {},
+      "com.bitcoinstratigraphy/pipelines": {
+        methods: ["tools/pipeline", "tools/batch"], maxCalls: 100,
+        references: "<zero-based-step>#/structuredContent/field",
+        settlement: "sum_of_tool_prices_single_l402_invoice",
+      },
+    },
   };
 }
 
@@ -72,6 +79,9 @@ export const STATELESS_MCP_METHODS: ReadonlySet<string> = new Set([
   "server/discover",
   "tools/list",
   "tools/call",
+  // Negotiated transport extensions; neither entry is a canonical tool.
+  "tools/pipeline",
+  "tools/batch",
   "resources/list",
   "resources/read",
   "prompts/list",

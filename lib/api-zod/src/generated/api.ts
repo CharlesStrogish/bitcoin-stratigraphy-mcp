@@ -1135,7 +1135,7 @@ export const QuoteMcpToolCostsResponse = zod.object({
   "l402": zod.object({
   "settlement_asset": zod.literal("btc-lightning"),
   "invoice_generated": zod.literal(false),
-  "aggregate_invoice_supported": zod.literal(false),
+  "aggregate_invoice_supported": zod.literal(true),
   "invoice_expiry_seconds": zod.number().int().min(1),
   "generation_trigger": zod.string(),
   "challenge_status": zod.literal(402),

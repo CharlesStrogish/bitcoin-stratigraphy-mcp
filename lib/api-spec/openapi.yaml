@@ -2944,7 +2944,7 @@ components:
               const: false
             aggregate_invoice_supported:
               type: boolean
-              const: false
+              const: true
             invoice_expiry_seconds:
               type: integer
               minimum: 1

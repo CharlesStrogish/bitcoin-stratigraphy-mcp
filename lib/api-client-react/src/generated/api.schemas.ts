@@ -678,7 +678,7 @@ export type McpBatchCostQuoteL402Batch = {
 export type McpBatchCostQuoteL402 = {
   settlement_asset: 'btc-lightning';
   invoice_generated: false;
-  aggregate_invoice_supported: false;
+  aggregate_invoice_supported: true;
   /** @minimum 1 */
   invoice_expiry_seconds: number;
   generation_trigger: string;

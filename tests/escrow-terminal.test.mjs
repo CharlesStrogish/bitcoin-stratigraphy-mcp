@@ -20,7 +20,7 @@ test("enterprise preview places live escrow before the compliance bridge and sim
   assert.match(read("../index.css"), /\.sim-live-escrow\s*\{\s*margin-bottom: 32px;\s*\}/);
 });
 
-test("network ticker displays real totals, empty state and failures without false live status", () => {
+test("network ticker displays the live engine and root without cumulative counts or false live status", () => {
   const { EscrowNetworkTicker } = compile(read("components/EscrowNetworkTicker.tsx"),
     (id) => {
       assert.equal(id, "react/jsx-runtime");
@@ -34,20 +34,42 @@ test("network ticker displays real totals, empty state and failures without fals
     latest_merkle_root: "c3a78bb1" + "a".repeat(56) };
   const live = EscrowNetworkTicker({ stats, unavailable: false });
   assert.equal(live.props["data-live"], true);
-  assert.match(text(live), /LIVE NETWORK • 48 SATS SETTLED • 2 CONTRACTS • LATEST ROOT: c3a78bb1…/);
+  assert.equal(text(live), "LIVE NETWORK • L402 SETTLEMENT ENGINE ACTIVE • LATEST ROOT: c3a78bb1…");
   const stale = EscrowNetworkTicker({ stats, unavailable: true });
   assert.equal(stale.props["data-live"], false);
-  assert.match(text(stale), /NETWORK STATUS UNAVAILABLE.*LAST KNOWN: 48.*STALE/);
+  assert.equal(text(stale), "NETWORK STATUS UNAVAILABLE • RETRYING AUTOMATICALLY");
   const loading = EscrowNetworkTicker({ stats: null, unavailable: false });
   assert.equal(loading.props["data-live"], false);
   assert.match(text(loading), /CONNECTING TO LIVE NETWORK/);
-  assert.match(text(EscrowNetworkTicker({ stats: null, unavailable: true })), /RETRYING AUTOMATICALLY/);
-  assert.match(text(EscrowNetworkTicker({ stats: {
+  assert.equal(text(EscrowNetworkTicker({ stats: null, unavailable: true })),
+    "NETWORK STATUS UNAVAILABLE • RETRYING AUTOMATICALLY");
+  assert.equal(text(EscrowNetworkTicker({ stats: {
     total_settled_sats: 0, total_contracts: 0, latest_merkle_root: null,
-  }, unavailable: false })), /0 SATS SETTLED • 0 CONTRACTS • LATEST ROOT: NONE YET/);
+  }, unavailable: false })), "LIVE NETWORK • L402 SETTLEMENT ENGINE ACTIVE • LATEST ROOT: NONE YET");
+  for (const display of [text(live), text(stale)]) {
+    assert.doesNotMatch(display, /SATS SETTLED|CONTRACTS|LAST KNOWN/);
+  }
   const terminal = read("components/EscrowTerminal.tsx");
   assert.match(terminal, /<EscrowNetworkTicker stats=\{ledgerStats\}/);
   assert.doesNotMatch(terminal, /AWAITING LIVE CONFIRMATION/);
+});
+
+test("escrow summary shows the latest verified settlement or an honest pipeline state", () => {
+  const terminal = read("components/EscrowTerminal.tsx");
+  const expression = /const verifiedToll = ([\s\S]*?);\n\s*const stage/.exec(terminal)?.[1];
+  assert.ok(expression, "the terminal computes a settlement summary");
+  const summary = (settled, ledgerStats, ledgerUnavailable) =>
+    vm.runInNewContext(expression, { settled, ledgerStats, ledgerUnavailable });
+  const stats = { total_settled_sats: 48, total_contracts: 2, latest_merkle_root: null };
+  assert.equal(summary({ article_12_receipt: { lightning_settlement: { amount_sats: 7 } } }, stats, false),
+    "Latest verified settlement: 7 sats");
+  assert.equal(summary(null, stats, false), "L402 NWC Pipeline: Active & Synchronized");
+  assert.equal(summary(null, null, false), "L402 NWC Pipeline: Connecting…");
+  assert.equal(summary(null, stats, true), "L402 NWC Pipeline: Status temporarily unavailable");
+  assert.match(terminal, /data-testid="metric-tolls"[\s\S]*?\{verifiedToll\}/);
+  assert.doesNotMatch(terminal, /Verified settle toll accrued|ledgerStats\.total_settled_sats\.toLocaleString/);
+  assert.match(read("../App.tsx"), /<EscrowTerminal \/>/);
+  assert.match(read("../pages/simulator.tsx"), /<EscrowTerminal \/>/);
 });
 
 function compile(source, require, extra = {}) {

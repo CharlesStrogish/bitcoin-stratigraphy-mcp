@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { tsImport } from "tsx/esm/api";
 
-// The dashboard keeps its own copy of the intake so the browser bundle never
-// imports server code; these checks keep both copies identical.
+// The dashboard keeps its own customer-facing copy; the published API brief
+// retains the original five-question questionnaire and subject metadata.
 const frontend = await tsImport(
   "../artifacts/bitcoin-stratigraphy-dashboard/src/lib/ciso-intake.ts",
   import.meta.url,
@@ -17,7 +17,7 @@ const backend = await tsImport(
 const read = (path) =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("dashboard CISO intake mirrors the published due-diligence brief", () => {
+test("dashboard CISO intake retains the published brief's subject, link, and questionnaire metadata", () => {
   assert.deepEqual(
     frontend.CISO_INTAKE_QUESTIONNAIRE,
     backend.CISO_INTAKE_QUESTIONNAIRE,
@@ -27,15 +27,13 @@ test("dashboard CISO intake mirrors the published due-diligence brief", () => {
     `/${frontend.DUE_DILIGENCE_BRIEF_PATH}`,
     backend.DUE_DILIGENCE_BRIEF_PATH,
   );
-  assert.equal(frontend.cisoIntakeTemplate(), backend.cisoIntakeTemplate());
-  assert.equal(frontend.CISO_MAILTO_HREF, backend.cisoIntakeMailto());
   const { intake } = backend.enterpriseDueDiligenceBrief;
-  assert.equal(intake.mailto, frontend.CISO_MAILTO_HREF);
+  assert.equal(intake.mailto, backend.cisoIntakeMailto());
   assert.equal(intake.subject, frontend.CISO_INTAKE_SUBJECT);
   assert.deepEqual(intake.questionnaire, frontend.CISO_INTAKE_QUESTIONNAIRE);
 });
 
-test("CISO mailto pre-populates the subject and five-question template", () => {
+test("CISO mailto and clipboard contain the exact enterprise SLA intake template", () => {
   const mailto = new URL(frontend.CISO_MAILTO_HREF);
   assert.equal(mailto.protocol, "mailto:");
   assert.equal(mailto.pathname, "licensing@bitcoinstratigraphy.com");
@@ -44,7 +42,25 @@ test("CISO mailto pre-populates the subject and five-question template", () => {
     "Commercial Exemption License Inquiry — Bitcoin Stratigraphy Data Engine",
   );
   const body = mailto.searchParams.get("body");
-  assert.equal(body, frontend.cisoIntakeTemplate("\r\n"));
+  const expected = [
+    "=== BITCOIN STRATIGRAPHY: CISO INTAKE TEMPLATE ===",
+    "To request a custom Tier II Commercial Enterprise Exemption quote, please complete the following and email to: licensing@bitcoinstratigraphy.com",
+    "",
+    "Enterprise / Organization Name:",
+    "",
+    "Primary AI Use Case & Estimated Swarm Size (Number of Active Agents):",
+    "",
+    "Target Deployment Environment (e.g., On-Prem, Private VPC, Air-Gapped):",
+    "",
+    "What specific regulatory frameworks (e.g., EU AI Act Article 12, SOC 2 Type II, FINRA) govern your internal AI swarm's telemetry and data retention requirements?",
+    "",
+    "Do you require standard self-managed cryptographic audits, or are you inquiring about our Automated Compliance SLAs for continuous, machine-generated audit reporting?",
+    "",
+    "[ ] We acknowledge the base Tier II Commercial Enterprise Exemption starts at $250k/annual, with Automated Compliance SLAs scoped separately based on regulatory requirements.",
+  ];
+  assert.equal(body, expected.join("\r\n"));
+  assert.equal(frontend.cisoIntakeTemplate("\r\n"), body);
+  assert.equal(frontend.CISO_INTAKE_COPY_TEXT, expected.join("\n"));
   assert.deepEqual(
     frontend.CISO_INTAKE_QUESTIONNAIRE.map(({ number, topic }) => [
       number,
@@ -61,27 +77,7 @@ test("CISO mailto pre-populates the subject and five-question template", () => {
       [5, "In-House Technical Stewardship"],
     ],
   );
-  for (const item of frontend.CISO_INTAKE_QUESTIONNAIRE) {
-    assert.ok(body.includes(`${item.number}. ${item.topic}: `), item.id);
-  }
-  assert.match(
-    body,
-    /Commercial Enterprise License \(Starting at \$250k\/Annual\)/,
-  );
-  assert.match(
-    body,
-    /Which Automated Compliance SLAs do you require for signed revocation snapshot exports, issuer-key rotation, and in-house deployment stewardship\?/,
-  );
-  assert.ok(
-    body.endsWith(
-      "Due-diligence brief: https://bitcoinstratigraphy.com/api/v1/enterprise/due-diligence-brief",
-    ),
-  );
-  assert.ok(
-    frontend.CISO_INTAKE_COPY_TEXT.startsWith(
-      "To: licensing@bitcoinstratigraphy.com\nSubject: Commercial Exemption License Inquiry",
-    ),
-  );
+  assert.doesNotMatch(body, /Due-diligence brief:|Answer:|Event Throughput:/);
 });
 
 test("Enterprise and Compliance pages share the CISO mailto and intake actions", () => {

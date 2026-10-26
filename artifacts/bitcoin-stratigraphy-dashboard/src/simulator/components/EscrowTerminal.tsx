@@ -175,8 +175,11 @@ export function EscrowTerminal() {
   const exportJson = settled
     ? JSON.stringify({ create_response: contract && { ...contract, settlement_capability: undefined }, settle_response: settled }, null, 2)
     : null;
-  const verifiedToll = ledgerUnavailable ? "temporarily unavailable"
-    : ledgerStats === null ? "loading…" : `${ledgerStats.total_settled_sats.toLocaleString("en-US")} sats`;
+  const verifiedToll = settled?.article_12_receipt.lightning_settlement
+    ? `Latest verified settlement: ${settled.article_12_receipt.lightning_settlement.amount_sats.toLocaleString("en-US")} sats`
+    : ledgerUnavailable ? "L402 NWC Pipeline: Status temporarily unavailable"
+    : ledgerStats === null ? "L402 NWC Pipeline: Connecting…"
+    : "L402 NWC Pipeline: Active & Synchronized";
   const stage = settled ? 3 : contract || existingId.trim() ? 2 : pending?.op === "create" ? 1 : 0;
   const st = (n: number) => (stage > n ? "done" : stage === n ? "active" : "idle");
   const inp = (id: string, label: string, v: string, set: (s: string) => void, extra: Record<string, unknown> = {}) => (
@@ -275,7 +278,7 @@ export function EscrowTerminal() {
 
       <div className="et-actions">
         <span className="et-metric" data-testid="metric-tolls" role="status">
-          Verified settle toll accrued: {verifiedToll}
+          {verifiedToll}
         </span>
         <span className="et-baseline" data-testid="metric-current-toll" role="status">
           Settlement toll preview: {quoteSummary}. Server-issued invoice and contract prices are authoritative.

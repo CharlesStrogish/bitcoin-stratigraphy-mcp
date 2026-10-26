@@ -93,3 +93,4 @@
 - [Liability notices](liability-notices.md) — notices are not legal assent; isolate changed root terms from old invoice caches without revoking paid tokens.
 - [Online ledger indexes](online-ledger-indexes.md) — Publish owns managed-production DDL; avoid long nested JSON index expressions and preserve literal JSON keys.
 - [Pipeline settlement trust](mcp-pipeline-settlement-trust.md) — one exact-request payment, sequential fail-fast work; receipts commit actual bytes but external effects cannot roll back.
+- [Public receipt broadcast trust](nostr-receipt-privacy.md) — publish only persisted, allowlisted proof summaries; relay failure never changes settlement or execution status.

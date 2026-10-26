@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { receiptMesh } from "./receiptMesh";
 import { isDeepStrictEqual } from "node:util";
 import { pool } from "@workspace/db";
 import { ESCROW_GENESIS } from "./escrowGenesis";
@@ -117,6 +118,10 @@ export async function withEscrowLedger<T>(
       [id, JSON.stringify(out.state)],
     );
     await client.query("COMMIT");
+    if (out.settlement) {
+      try { receiptMesh.escrow(out.settlement); }
+      catch { /* A committed settlement is never invalidated by mesh scheduling. */ }
+    }
     return out.result;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);

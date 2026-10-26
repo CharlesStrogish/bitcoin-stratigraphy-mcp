@@ -5368,6 +5368,7 @@ export function registerMcpRoute(
     sessionSecret?: string;
     usageStore?: MacaroonUsageStore;
     ledger?: RevenueLedger;
+    onPaidToolCompleted?: (name: string, result: CallToolResult, paymentHash: string) => void;
     readBitcoinTip?: () => Promise<BitcoinTip>;
     meshService?: Pick<MeshGossipService, "status" | "createConsensus">;
     revocationStore?: MacaroonRevocationStore;
@@ -5409,8 +5410,16 @@ export function registerMcpRoute(
           : (name: string, result: CallToolResult) => signToolResponse(name, result,
               fallbackSigningKey ??= loadToolIntegrityKey(), undefined, contextDigest);
         const protocol = app.locals.swarmProtocol as SwarmProtocol | undefined;
-        if (protocol) res.locals.onToolResult = (name: string, args: Record<string, unknown>, result: CallToolResult) =>
-          protocol.finish(req, res, name, args, result);
+        if (protocol || options.onPaidToolCompleted) {
+          res.locals.onToolResult = async (name: string, args: Record<string, unknown>, result: CallToolResult) => {
+            const finalized = protocol ? await protocol.finish(req, res, name, args, result) : result;
+            if (req.body?.method === "tools/call" && !finalized.isError && res.locals.l402?.paymentHash) {
+              try { options.onPaidToolCompleted?.(canonicalToolName(name), finalized, res.locals.l402.paymentHash); }
+              catch { req.log?.warn("Receipt mesh scheduling failed; paid tool response preserved"); }
+            }
+            return finalized;
+          };
+        }
       } catch (error) {
         if (error instanceof RangeError) {
           res.status(400).json({error: error.message}); return;

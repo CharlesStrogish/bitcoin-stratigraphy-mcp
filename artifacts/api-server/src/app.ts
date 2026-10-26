@@ -15,6 +15,8 @@ import { registerToolIntegrityRoute } from "./routes/tool-integrity";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
 import { logger } from "./lib/logger";
 import { createMcpAsyncTaskRunner } from "./lib/mcp-async-tasks";
+import { postgresPipelineReceiptStore } from "./lib/mcp-pipeline";
+import { receiptMesh, withPipelineReceiptBroadcast } from "./services/receiptMesh";
 import { loadToolIntegrityKey } from "./lib/tool-integrity";
 import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
 import { registerNostrStatusRoute } from "./routes/nostr-status";
@@ -141,6 +143,8 @@ registerMcpServerCardRoute(app);
 // webhook callback, so receivers verify both with the same public key.
 const toolIntegrityKey = loadToolIntegrityKey();
 registerMcpRoute(app, {
+  pipelineReceiptStore: withPipelineReceiptBroadcast(postgresPipelineReceiptStore()),
+  onPaidToolCompleted: (name, result, paymentHash) => receiptMesh.single(name, result, paymentHash),
   usageStore: macaroonUsageStore,
   ledger: revenueLedger,
   meshService,

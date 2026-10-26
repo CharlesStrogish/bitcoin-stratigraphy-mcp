@@ -1332,6 +1332,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/McpJsonRpcResponse"
+  /.well-known/mcp-configuration.json:
+    get:
+      operationId: getMcpConfigurationManifest
+      tags: [metadata]
+      summary: Public autonomous MCP configuration manifest
+      description: >-
+        Unauthenticated JSON discovery alias generated from the canonical tool
+        registry. Lists all 16 tools, per-tool L402 pricing and the conditional
+        21 percent AI treasury allocation within the existing 79/21 split.
+        This discovery request requires no L402 payment.
+      servers:
+        - url: https://bitcoinstratigraphy.com
+          description: Canonical production origin
+        - url: /
+          description: Same origin
+      security: []
+      responses:
+        "200":
+          description: MCP configuration manifest
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+                enum: ["*"]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpDiscoveryManifest"
   /.well-known/mcp.json:
     get:
       operationId: getMcpDiscoveryManifest
@@ -3220,6 +3248,28 @@ components:
             batch_quotes_create_invoices:
               type: boolean
               const: false
+            requirement:
+              type: string
+              description: L402 settlement requirement for paid tool execution
+            ai_treasury_yield:
+              type: object
+              required: [allocation_percent, merchant_percent, structure, basis, payout_mode, eligibility]
+              properties:
+                allocation_percent:
+                  type: integer
+                  const: 21
+                merchant_percent:
+                  type: integer
+                  const: 79
+                structure:
+                  type: string
+                basis:
+                  type: string
+                payout_mode:
+                  type: string
+                  const: ledger_only_no_automatic_disbursement
+                eligibility:
+                  type: string
         verification:
           type: object
           required: [zk_proving_system, curve, time_anchor, mesh_consensus]

@@ -157,6 +157,7 @@ export * from './mcpDiscoveryManifestMcpTransportsItemType';
 export * from './mcpDiscoveryManifestNpm';
 export * from './mcpDiscoveryManifestNpmPackage';
 export * from './mcpDiscoveryManifestPricing';
+export * from './mcpDiscoveryManifestPricingAiTreasuryYield';
 export * from './mcpDiscoveryManifestPricingCostDiscoveryMethodsItem';
 export * from './mcpDiscoveryManifestToolsItem';
 export * from './mcpDiscoveryManifestToolsItemAnnotations';

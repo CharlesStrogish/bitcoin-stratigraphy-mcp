@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/mcp-configuration.test.js",
   "./dist/liability-notice.test.js",
   "./dist/enterpriseEconomics.test.js",
   "./dist/certified-oracle.test.js",
@@ -157,6 +158,7 @@ await build({
     "escrowLedger.test": "./src/services/escrowLedger.test.ts",
     "escrowRecovery.test": "./tests/unit/escrowRecovery.test.ts",
     "startup-server.test": "./tests/unit/startup-server.test.ts",
+    "mcp-configuration.test": "./tests/unit/mcp-configuration.test.ts",
     "stratigraphy.contract.test": "./src/routes/stratigraphy.contract.test.ts",
     "pricing.test": "./tests/unit/pricing.test.ts",
     "settlement_redundancy.test": "./tests/unit/settlement_redundancy.test.ts",

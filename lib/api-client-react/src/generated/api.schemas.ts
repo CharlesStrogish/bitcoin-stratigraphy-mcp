@@ -921,11 +921,23 @@ export const McpDiscoveryManifestPricingCostDiscoveryMethodsItem = {
   POST: 'POST',
 } as const;
 
+export type McpDiscoveryManifestPricingAiTreasuryYield = {
+  allocation_percent: 21;
+  merchant_percent: 79;
+  structure: string;
+  basis: string;
+  payout_mode: 'ledger_only_no_automatic_disbursement';
+  eligibility: string;
+};
+
 export type McpDiscoveryManifestPricing = {
   model: string;
   cost_discovery_endpoint: string;
   cost_discovery_methods?: McpDiscoveryManifestPricingCostDiscoveryMethodsItem[];
   batch_quotes_create_invoices?: false;
+  /** L402 settlement requirement for paid tool execution */
+  requirement?: string;
+  ai_treasury_yield?: McpDiscoveryManifestPricingAiTreasuryYield;
 };
 
 export type McpDiscoveryManifestVerification = {

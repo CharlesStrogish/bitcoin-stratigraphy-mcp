@@ -1968,6 +1968,84 @@ export const useExecuteMcpRequest = <TError = ErrorType<McpJsonRpcResponse>,
       return useMutation(getExecuteMcpRequestMutationOptions(options));
     }
 
+export const getGetMcpConfigurationManifestUrl = () => {
+
+
+
+
+  return `/api/.well-known/mcp-configuration.json`
+}
+
+/**
+ * Unauthenticated JSON discovery alias generated from the canonical tool registry. Lists all 16 tools, per-tool L402 pricing and the conditional 21 percent AI treasury allocation within the existing 79/21 split. This discovery request requires no L402 payment.
+ * @summary Public autonomous MCP configuration manifest
+ */
+export const getMcpConfigurationManifest = async ( options?: Parameters<typeof customFetch>[1]): Promise<McpDiscoveryManifest> => {
+
+  return customFetch<McpDiscoveryManifest>(getGetMcpConfigurationManifestUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMcpConfigurationManifestQueryKey = () => {
+    return [
+    `/api/.well-known/mcp-configuration.json`
+    ] as const;
+    }
+
+
+export const getGetMcpConfigurationManifestQueryOptions = <TData = Awaited<ReturnType<typeof getMcpConfigurationManifest>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpConfigurationManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMcpConfigurationManifestQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMcpConfigurationManifest>>> = ({ signal }) => getMcpConfigurationManifest({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMcpConfigurationManifest>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMcpConfigurationManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getMcpConfigurationManifest>>>
+export type GetMcpConfigurationManifestQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public autonomous MCP configuration manifest
+ */
+
+export function useGetMcpConfigurationManifest<TData = Awaited<ReturnType<typeof getMcpConfigurationManifest>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpConfigurationManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMcpConfigurationManifestQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetMcpDiscoveryManifestUrl = () => {
 
 

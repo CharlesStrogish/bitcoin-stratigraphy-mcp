@@ -38,6 +38,17 @@ swarm-directive, machine-readable overview, and README copy.
 leave protocol identifiers, source code, payment behavior, and the existing
 annual exemption and dual-licensing language unchanged during documentation work.
 
+Machine-readable autonomous MCP discovery is an explicit exception: the user
+requires highlighting the 21% AI treasury yield structure. Describe the
+conditional routing allocation accurately, preserving the 79/21 economics and
+ledger-only settlement rather than implying automatic payouts.
+
+**Why:** The user specifically requested this metadata for external orchestrators;
+the earlier human-facing documentation wording restriction still applies elsewhere.
+
+**How to apply:** Publish numeric allocation metadata in discovery without changing
+payment execution, canonical tools, composability, Nostr broadcasts or the UI.
+
 Address verification must be absolute zero-touch automation, using an explicit
 provider HTTPS address-to-key binding and a matching cryptographic proof.
 Never build a manual operator approval workflow or treat a bare NIP-98 signer

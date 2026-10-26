@@ -21,6 +21,7 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+import type { McpDiscoveryManifestPricingAiTreasuryYield } from './mcpDiscoveryManifestPricingAiTreasuryYield';
 import type { McpDiscoveryManifestPricingCostDiscoveryMethodsItem } from './mcpDiscoveryManifestPricingCostDiscoveryMethodsItem';
 
 export type McpDiscoveryManifestPricing = {
@@ -28,4 +29,7 @@ export type McpDiscoveryManifestPricing = {
   cost_discovery_endpoint: string;
   cost_discovery_methods?: McpDiscoveryManifestPricingCostDiscoveryMethodsItem[];
   batch_quotes_create_invoices?: false;
+  /** L402 settlement requirement for paid tool execution */
+  requirement?: string;
+  ai_treasury_yield?: McpDiscoveryManifestPricingAiTreasuryYield;
 };

@@ -687,6 +687,151 @@ export const ExecuteMcpRequestResponse = zod.union([zod.unknown(),zod.unknown()]
 
 
 /**
+ * Unauthenticated JSON discovery alias generated from the canonical tool registry. Lists all 16 tools, per-tool L402 pricing and the conditional 21 percent AI treasury allocation within the existing 79/21 split. This discovery request requires no L402 payment.
+ * @summary Public autonomous MCP configuration manifest
+ */
+export const getMcpConfigurationManifestResponseToolsItemPriceSatsMin = 0;
+
+export const getMcpConfigurationManifestResponseToolsMin = 16;
+export const getMcpConfigurationManifestResponseToolsMax = 16;
+
+export const getMcpConfigurationManifestResponseL402PreflightGenesisReceiptMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const GetMcpConfigurationManifestResponse = zod.object({
+  "$schema": zod.string().url(),
+  "name": zod.string(),
+  "title": zod.string().optional(),
+  "version": zod.string().describe('Release version of the published engine and npm package'),
+  "description": zod.string(),
+  "canonical_url": zod.string().url().describe('Authoritative public origin, https:\/\/bitcoinstratigraphy.com'),
+  "author": zod.object({
+  "name": zod.string(),
+  "role": zod.string().optional(),
+  "url": zod.string().url()
+}),
+  "contact": zod.object({
+  "licensing": zod.string().email()
+}),
+  "homepage": zod.string().url(),
+  "documentation": zod.string().url().optional().describe('Direct link to the interactive Developer Portal and Live Tool Explorer'),
+  "links": zod.object({
+  "documentation": zod.string().url(),
+  "cookbooks": zod.string().url(),
+  "python_sdk": zod.string().url(),
+  "pricing": zod.string().url(),
+  "llms_txt": zod.string().url().optional(),
+  "llms_full_txt": zod.string().url().optional(),
+  "openapi": zod.string().url().optional(),
+  "server_card": zod.string().url().optional(),
+  "genesis_receipt": zod.string().url().optional(),
+  "due_diligence_brief": zod.string().url().optional()
+}).optional(),
+  "npm": zod.object({
+  "package": zod.enum(['@bitcoin-stratigraphy/mcp-server']),
+  "version": zod.string(),
+  "command": zod.string().describe('npx command that starts the self-hosted Streamable HTTP server'),
+  "registry_url": zod.string().url().optional(),
+  "runtime": zod.string().optional()
+}),
+  "tools": zod.array(zod.object({
+  "name": zod.string(),
+  "namespace": zod.enum(['stratigraphy', 'proof', 'mesh', 'payment', 'workflow']),
+  "title": zod.string(),
+  "description": zod.string(),
+  "price_sats": zod.number().int().min(getMcpConfigurationManifestResponseToolsItemPriceSatsMin),
+  "payment_required": zod.boolean(),
+  "batch": zod.object({
+  "max_calls": zod.number().int().optional(),
+  "header": zod.string().optional()
+}).optional(),
+  "annotations": zod.record(zod.string(), zod.unknown())
+})).min(getMcpConfigurationManifestResponseToolsMin).max(getMcpConfigurationManifestResponseToolsMax).describe('Descriptors mirroring the live tools\/list catalog; tools\/list remains authoritative.'),
+  "l402": zod.object({
+  "settlement_capabilities": zod.array(zod.enum(['sha256_preimage', 'nwc_lookup'])),
+  "settlement_paths": zod.array(zod.object({
+  "id": zod.enum(['sha256_preimage', 'nwc_lookup']),
+  "name": zod.string(),
+  "authorization": zod.string().describe('Authorization header template'),
+  "description": zod.string()
+}).describe('One accepted proof for retrying the identical request after paying its invoice.')),
+  "challenge": zod.record(zod.string(), zod.unknown()),
+  "pending_confirmation_status": zod.number().int().optional(),
+  "escrow_settlement_toll": zod.record(zod.string(), zod.unknown()).optional(),
+  "preflight": zod.object({
+  "description": zod.string(),
+  "genesis_receipt": zod.object({
+  "method": zod.enum(['GET']),
+  "path": zod.enum(['/api/v1/escrow/genesis-receipt']),
+  "canonical_url": zod.string().url(),
+  "escrow_id": zod.string().uuid(),
+  "merkle_root": zod.string().regex(getMcpConfigurationManifestResponseL402PreflightGenesisReceiptMerkleRootRegExp),
+  "settled_at_strata_block": zod.number().int(),
+  "toll_fee_sats": zod.number().int()
+}),
+  "discovery": zod.array(zod.object({
+  "name": zod.string(),
+  "method": zod.string(),
+  "path": zod.string(),
+  "canonical_url": zod.string().url()
+}))
+}).describe('Free, unauthenticated checks a cautious agent can run before paying.')
+}),
+  "attestation": zod.object({
+  "protocol": zod.string(),
+  "kind": zod.literal(38102),
+  "type": zod.string().optional(),
+  "directive": zod.string(),
+  "scope": zod.string().optional()
+}),
+  "licensing": zod.object({
+  "spdx": zod.string(),
+  "public_license": zod.string().optional(),
+  "commercial_exemption": zod.string(),
+  "contact": zod.string().email(),
+  "due_diligence_brief": zod.string().url().optional()
+}),
+  "mcp": zod.object({
+  "version": zod.string().describe('Newest supported MCP protocol version'),
+  "supported_versions": zod.array(zod.string()).optional().describe('Every MCP protocol version this endpoint accepts, newest first'),
+  "transports": zod.array(zod.object({
+  "type": zod.enum(['streamable-http']),
+  "endpoint": zod.string().url()
+})),
+  "capabilities": zod.object({
+  "tools": zod.object({
+  "count": zod.number().int(),
+  "namespaces": zod.array(zod.string())
+}),
+  "prompts": zod.boolean(),
+  "resources": zod.boolean()
+})
+}),
+  "pricing": zod.object({
+  "model": zod.string(),
+  "cost_discovery_endpoint": zod.string(),
+  "cost_discovery_methods": zod.array(zod.enum(['GET', 'POST'])).optional(),
+  "batch_quotes_create_invoices": zod.literal(false).optional(),
+  "requirement": zod.string().optional().describe('L402 settlement requirement for paid tool execution'),
+  "ai_treasury_yield": zod.object({
+  "allocation_percent": zod.literal(21),
+  "merchant_percent": zod.literal(79),
+  "structure": zod.string(),
+  "basis": zod.string(),
+  "payout_mode": zod.literal("ledger_only_no_automatic_disbursement"),
+  "eligibility": zod.string()
+}).optional()
+}),
+  "verification": zod.object({
+  "zk_proving_system": zod.string(),
+  "curve": zod.string(),
+  "time_anchor": zod.string(),
+  "mesh_consensus": zod.string()
+})
+})
+
+
+/**
  * Public, unmetered JSON discovery document with wildcard CORS. Its declared version values are manifest metadata and do not configure MCP negotiation.
  * @summary Public MCP auto-discovery manifest
  */
@@ -811,7 +956,16 @@ export const GetMcpDiscoveryManifestResponse = zod.object({
   "model": zod.string(),
   "cost_discovery_endpoint": zod.string(),
   "cost_discovery_methods": zod.array(zod.enum(['GET', 'POST'])).optional(),
-  "batch_quotes_create_invoices": zod.literal(false).optional()
+  "batch_quotes_create_invoices": zod.literal(false).optional(),
+  "requirement": zod.string().optional().describe('L402 settlement requirement for paid tool execution'),
+  "ai_treasury_yield": zod.object({
+  "allocation_percent": zod.literal(21),
+  "merchant_percent": zod.literal(79),
+  "structure": zod.string(),
+  "basis": zod.string(),
+  "payout_mode": zod.literal("ledger_only_no_automatic_disbursement"),
+  "eligibility": zod.string()
+}).optional()
 }),
   "verification": zod.object({
   "zk_proving_system": zod.string(),

@@ -1,7 +1,10 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import { mcpToolDefinitions } from "../routes/mcp";
 import { mcpToolPrices } from "./mcp-pricing";
-import { MCP_NATIVE_PROMPTS, MCP_NATIVE_RESOURCES } from "./mcp-native-discovery";
+import {
+  MCP_NATIVE_PROMPTS,
+  MCP_NATIVE_RESOURCES,
+} from "./mcp-native-discovery";
 import {
   MCP_SUPPORTED_PROTOCOL_VERSIONS,
   STATELESS_MCP_PROTOCOL_VERSION,
@@ -102,7 +105,7 @@ export const mcpDiscoveryManifest = {
       resources: true,
       prompts: true,
       tools: {
-        count: 16,
+        count: toolDescriptors.length,
         namespaces: ["stratigraphy", "proof", "mesh", "payment", "workflow"],
       },
     },
@@ -147,6 +150,18 @@ export const mcpDiscoveryManifest = {
     cost_discovery_endpoint: "/api/v1/cost",
     cost_discovery_methods: ["GET", "POST"],
     batch_quotes_create_invoices: false,
+    requirement:
+      "Paid tool execution requires verified L402 settlement. Per-tool price_sats and payment_required identify the paid tools; the two sandbox tools and this discovery manifest require no payment.",
+    ai_treasury_yield: {
+      allocation_percent: 21,
+      merchant_percent: 79,
+      structure: "programmatic L402 revenue sharing",
+      basis:
+        "Gross settled invoice amount; allocation is inside the existing 21% pool, not an additional fee.",
+      payout_mode: "ledger_only_no_automatic_disbursement",
+      eligibility:
+        "Requires a qualifying settled invoice and verified provider-bound payout address. Ordinary routing allocates 21% direct, or 14% direct plus 7% parent; qualifying verification allocates 15% upstream plus 6% caller. This is a conditional routing allocation, not a guaranteed investment return.",
+    },
   },
   verification: {
     zk_proving_system: "Groth16",

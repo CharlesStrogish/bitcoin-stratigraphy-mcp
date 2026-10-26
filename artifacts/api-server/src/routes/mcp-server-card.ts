@@ -252,12 +252,15 @@ export const glamaConnector = {
 } as const;
 
 export function registerMcpServerCardRoute(app: Express): void {
-  app.get("/.well-known/mcp.json", (_req, res): void => {
-    res.set("Access-Control-Allow-Origin", "*");
-    // Wildcard public discovery is intentionally not a credentialed CORS route.
-    res.removeHeader("Access-Control-Allow-Credentials");
-    res.status(200).json(mcpDiscoveryManifest);
-  });
+  app.get(
+    ["/.well-known/mcp.json", "/.well-known/mcp-configuration.json"],
+    (_req, res): void => {
+      res.set("Access-Control-Allow-Origin", "*");
+      // Wildcard public discovery is intentionally not a credentialed CORS route.
+      res.removeHeader("Access-Control-Allow-Credentials");
+      res.status(200).json(mcpDiscoveryManifest);
+    },
+  );
 
   for (const path of [
     "/smithery-verification",

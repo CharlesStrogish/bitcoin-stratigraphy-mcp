@@ -735,6 +735,67 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /api/v1/enterprise/credit-tab:
+    get:
+      operationId: getEnterpriseCreditTab
+      tags: [enterprise]
+      summary: Get the authenticated agent's trust score and credit tab
+      description: Requires fresh NIP-98 HTTP authentication. More than 50 distinct successfully paid identity-bound L402 invoices enables credit. The shared tab is capped at 2000 sats across all workers and sessions. Status polling does not extend the 15-minute idle execution window. Only authenticated historical routing settlements qualify.
+      security:
+        - NIP98: []
+      responses:
+        "200":
+          description: Current credit eligibility, session, unpaid balance and settlement endpoints
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        "401": {description: Missing or invalid fresh NIP-98 signature}
+        "503": {description: Credit storage unavailable}
+  /api/v1/enterprise/credit-tab/close:
+    post:
+      operationId: closeEnterpriseCreditTab
+      tags: [enterprise]
+      summary: End a credit session and invoice its entire frozen balance
+      description: Fresh NIP-98 authentication is required. Call at session end; an HTTP disconnect is not a session boundary. Closing, 15 minutes of inactivity, reaching the 2000-sat cap, or changing routing allocation freezes all further credit charges. A single identity-bound L402 macro-invoice pays the whole tab. Repeated closes reuse the invoice. Admitted tolls remain owed after tool failure or disconnection. Already-paid passes keep their existing rights.
+      security:
+        - NIP98: []
+      responses:
+        "200":
+          description: No unpaid balance
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        "402":
+          description: Full-tab L402 macro-invoice with macaroon, amount_sats and payment_hash
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        "401": {description: Missing or invalid fresh NIP-98 signature}
+        "409": {description: An older invoice is already paid and must be redeemed}
+        "503": {description: Storage or settlement unavailable; debt remains frozen}
+  /api/v1/enterprise/credit-tab/settle:
+    post:
+      operationId: settleEnterpriseCreditTab
+      tags: [enterprise]
+      summary: Issue or redeem the whole credit tab's L402 macro-invoice
+      description: Without an L402 credential, freezes the tab and returns its invoice. To redeem, send Authorization L402 macaroon:preimage and the same identity's fresh NIP-98 event in X-Nostr-Authorization, signed for this exact URL, method and body. Only the persisted exact-amount provider-bound invoice can clear the entire tab. Replays are idempotent and cannot clear new debt. An authentic expired macro credential may confirm its historical payment, but never authorizes tool execution. Standard non-VIP MCP requests retain the unchanged Hashcash and upfront L402 barrier. No debt is booked as revenue until verified full payment; the existing 79/21 allocation is unchanged.
+      security:
+        - NIP98: []
+      responses:
+        "200":
+          description: Tab settled or previous payment already applied
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        "402":
+          description: Full-tab L402 invoice
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        "401": {description: Missing or invalid NIP-98 authentication}
+        "403": {description: "Wrong identity, invoice, amount, asset or proof"}
+        "409": {description: Payment not confirmed}
+        "503": {description: Settlement or durable storage unavailable}
   /admin/revoke_key:
     post:
       operationId: revokeNip98Key

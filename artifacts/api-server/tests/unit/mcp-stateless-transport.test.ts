@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { powFetch as fetch } from "../helpers/pow-fetch";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, test } from "node:test";
@@ -48,13 +48,13 @@ const invoices = new Map<
   string,
   { preimage: string; amountMsats: number; description: string }
 >();
-let invoiceCount = 0;
+const creditIdentities = new Set<string>();
 const settlementRouter: SettlementRouter = {
   isConfigured: () => true,
   activeProvider: () => "stateless-test",
   circuitState: () => "closed",
   createInvoice: async (input) => {
-    const preimage = (++invoiceCount).toString(16).padStart(64, "0");
+    const preimage = randomBytes(32).toString("hex");
     const paymentHash = sha256Hex(Buffer.from(preimage, "hex"));
     invoices.set(paymentHash, {
       preimage,
@@ -113,6 +113,10 @@ before(async () => {
 
 after(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  const keys = [...creditIdentities];
+  await pool.query("DELETE FROM enterprise_credit_charges WHERE pubkey=ANY($1::text[])", [keys]);
+  await pool.query("DELETE FROM enterprise_credit_settlements WHERE pubkey=ANY($1::text[])", [keys]);
+  await pool.query("DELETE FROM enterprise_credit_accounts WHERE pubkey=ANY($1::text[])", [keys]);
   await pool.end();
 });
 
@@ -478,6 +482,7 @@ test("L402 challenges arrive as strict JSON-RPC data and paid retries succeed", 
 test("NIP-98 identities bind stateless passes through either header", async () => {
   const key = generateSecretKey();
   const pubkey = getPublicKey(key);
+  creditIdentities.add(pubkey);
   const message = stateless("tools/call", {
     name: "stratigraphy.get",
     arguments: { days: 1 },

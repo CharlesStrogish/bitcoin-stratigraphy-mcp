@@ -143,7 +143,7 @@ export function createX402PaymentMiddleware(
       // A quote is not proof of settlement; signatures still fail closed below.
       const sendJson = res.json.bind(res);
       res.json = ((body: unknown) => {
-        if (res.statusCode !== 402) return sendJson(body);
+        if (res.statusCode !== 402 || res.locals.creditTabSettlement) return sendJson(body);
         void createChallengeHeader(req)
           .then((challenge) => {
             res.setHeader("PAYMENT-REQUIRED", challenge);

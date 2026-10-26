@@ -6,6 +6,7 @@ import { pool } from "@workspace/db";
 import { canonical, issuerKeyId, signIssuerPayload } from "./article12-signature";
 import { canonicalToolName, mcpToolPrices, MCP_INVOICE_EXPIRY_SECONDS } from "./mcp-pricing";
 import { createL402Middleware } from "../middleware/l402";
+import type { EnterpriseCreditTabs } from "./enterprise-credit-tabs";
 import { invoicePow } from "./invoice-pow";
 import type { SettlementRouter } from "../services/settlement";
 import type { MacaroonUsageStore } from "./macaroon-usage-store";
@@ -143,6 +144,7 @@ export function postgresPipelineReceiptStore(database: {
 
 export function createMcpPipelineHandler(options: {
   settlementRouter: SettlementRouter; sessionSecret?: string;
+  creditTabs?: EnterpriseCreditTabs;
   usageStore?: MacaroonUsageStore; revocationStore: MacaroonRevocationStore; ledger?: RevenueLedger;
   store?: PipelineReceiptStore; key: () => KeyObject;
   schemaFor: (name: string) => ZodTypeAny;
@@ -199,7 +201,9 @@ export function createMcpPipelineHandler(options: {
       const startedAt = new Date().toISOString();
       const steps: Record<string, unknown>[] = [];
       const journal = { version: "mcp-pipeline-v1", request_sha256: plan.digest,
-        payment_hash: paid?.paymentHash ?? null, amount_sats: plan.amountSats,
+        payment_hash: paid?.paymentHash ?? null,
+        amount_sats: res.locals.creditTab ? 0 : plan.amountSats,
+        ...(res.locals.creditTab ? {credit_tab: res.locals.creditTab, deferred_amount_sats: plan.amountSats} : {}),
         provider: paid?.provider ?? null, started_at: startedAt, steps };
       if (!await store.reserve(recordKey, { ...journal, status: "running" })) {
         res.status(409).json({jsonrpc: "2.0", id,

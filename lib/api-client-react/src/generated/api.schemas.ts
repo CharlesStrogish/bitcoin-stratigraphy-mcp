@@ -2325,6 +2325,16 @@ export type PublicMetadataResponse = PublicMetadata;
  */
 export type PublicPreflightResponse = void;
 
+export type GetEnterpriseCreditTab200 = { [key: string]: unknown };
+
+export type CloseEnterpriseCreditTab200 = { [key: string]: unknown };
+
+export type CloseEnterpriseCreditTab402 = { [key: string]: unknown };
+
+export type SettleEnterpriseCreditTab200 = { [key: string]: unknown };
+
+export type SettleEnterpriseCreditTab402 = { [key: string]: unknown };
+
 export type RevokeNip98Key200 = {
   pubkey: string;
   revoked_at: string;

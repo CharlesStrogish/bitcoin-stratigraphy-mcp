@@ -38,6 +38,8 @@ import type {
 import type {
   AuditReport,
   AuditSubmission,
+  CloseEnterpriseCreditTab200,
+  CloseEnterpriseCreditTab402,
   CryptographicAuditEnvelope,
   CryptographicAuditInput,
   DatasetHealthStatus,
@@ -53,6 +55,7 @@ import type {
   EscrowSettlement,
   EscrowTollQuote,
   ExportHuggingFaceDatasetParams,
+  GetEnterpriseCreditTab200,
   GetNip05IdentityParams,
   GetPaidStratigraphyParams,
   GetRevenueAuditParams,
@@ -92,6 +95,8 @@ import type {
   QuoteMcpToolCosts400,
   ReadinessStatus,
   RevokeNip98Key200,
+  SettleEnterpriseCreditTab200,
+  SettleEnterpriseCreditTab402,
   SettlementAssetSelectionError,
   SignedRevocationSnapshot,
   SmitheryServerCard,
@@ -135,6 +140,228 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetEnterpriseCreditTabUrl = () => {
+
+
+
+
+  return `/api/api/v1/enterprise/credit-tab`
+}
+
+/**
+ * Requires fresh NIP-98 HTTP authentication. More than 50 distinct successfully paid identity-bound L402 invoices enables credit. The shared tab is capped at 2000 sats across all workers and sessions. Status polling does not extend the 15-minute idle execution window. Only authenticated historical routing settlements qualify.
+ * @summary Get the authenticated agent's trust score and credit tab
+ */
+export const getEnterpriseCreditTab = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetEnterpriseCreditTab200> => {
+
+  return customFetch<GetEnterpriseCreditTab200>(getGetEnterpriseCreditTabUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEnterpriseCreditTabQueryKey = () => {
+    return [
+    `/api/api/v1/enterprise/credit-tab`
+    ] as const;
+    }
+
+
+export const getGetEnterpriseCreditTabQueryOptions = <TData = Awaited<ReturnType<typeof getEnterpriseCreditTab>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEnterpriseCreditTab>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEnterpriseCreditTabQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEnterpriseCreditTab>>> = ({ signal }) => getEnterpriseCreditTab({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEnterpriseCreditTab>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEnterpriseCreditTabQueryResult = NonNullable<Awaited<ReturnType<typeof getEnterpriseCreditTab>>>
+export type GetEnterpriseCreditTabQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the authenticated agent's trust score and credit tab
+ */
+
+export function useGetEnterpriseCreditTab<TData = Awaited<ReturnType<typeof getEnterpriseCreditTab>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEnterpriseCreditTab>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEnterpriseCreditTabQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCloseEnterpriseCreditTabUrl = () => {
+
+
+
+
+  return `/api/api/v1/enterprise/credit-tab/close`
+}
+
+/**
+ * Fresh NIP-98 authentication is required. Call at session end; an HTTP disconnect is not a session boundary. Closing, 15 minutes of inactivity, reaching the 2000-sat cap, or changing routing allocation freezes all further credit charges. A single identity-bound L402 macro-invoice pays the whole tab. Repeated closes reuse the invoice. Admitted tolls remain owed after tool failure or disconnection. Already-paid passes keep their existing rights.
+ * @summary End a credit session and invoice its entire frozen balance
+ */
+export const closeEnterpriseCreditTab = async ( options?: Parameters<typeof customFetch>[1]): Promise<CloseEnterpriseCreditTab200> => {
+
+  return customFetch<CloseEnterpriseCreditTab200>(getCloseEnterpriseCreditTabUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCloseEnterpriseCreditTabMutationOptions = <TError = ErrorType<void | CloseEnterpriseCreditTab402>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeEnterpriseCreditTab>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof closeEnterpriseCreditTab>>, TError,void, TContext> => {
+
+const mutationKey = ['closeEnterpriseCreditTab'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeEnterpriseCreditTab>>, void> = () => {
+
+
+          return  closeEnterpriseCreditTab(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloseEnterpriseCreditTabMutationResult = NonNullable<Awaited<ReturnType<typeof closeEnterpriseCreditTab>>>
+
+    export type CloseEnterpriseCreditTabMutationError = ErrorType<void | CloseEnterpriseCreditTab402>
+
+    /**
+ * @summary End a credit session and invoice its entire frozen balance
+ */
+export const useCloseEnterpriseCreditTab = <TError = ErrorType<void | CloseEnterpriseCreditTab402>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeEnterpriseCreditTab>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof closeEnterpriseCreditTab>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCloseEnterpriseCreditTabMutationOptions(options));
+    }
+
+export const getSettleEnterpriseCreditTabUrl = () => {
+
+
+
+
+  return `/api/api/v1/enterprise/credit-tab/settle`
+}
+
+/**
+ * Without an L402 credential, freezes the tab and returns its invoice. To redeem, send Authorization L402 macaroon:preimage and the same identity's fresh NIP-98 event in X-Nostr-Authorization, signed for this exact URL, method and body. Only the persisted exact-amount provider-bound invoice can clear the entire tab. Replays are idempotent and cannot clear new debt. An authentic expired macro credential may confirm its historical payment, but never authorizes tool execution. Standard non-VIP MCP requests retain the unchanged Hashcash and upfront L402 barrier. No debt is booked as revenue until verified full payment; the existing 79/21 allocation is unchanged.
+ * @summary Issue or redeem the whole credit tab's L402 macro-invoice
+ */
+export const settleEnterpriseCreditTab = async ( options?: Parameters<typeof customFetch>[1]): Promise<SettleEnterpriseCreditTab200> => {
+
+  return customFetch<SettleEnterpriseCreditTab200>(getSettleEnterpriseCreditTabUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSettleEnterpriseCreditTabMutationOptions = <TError = ErrorType<void | SettleEnterpriseCreditTab402>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof settleEnterpriseCreditTab>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof settleEnterpriseCreditTab>>, TError,void, TContext> => {
+
+const mutationKey = ['settleEnterpriseCreditTab'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof settleEnterpriseCreditTab>>, void> = () => {
+
+
+          return  settleEnterpriseCreditTab(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SettleEnterpriseCreditTabMutationResult = NonNullable<Awaited<ReturnType<typeof settleEnterpriseCreditTab>>>
+
+    export type SettleEnterpriseCreditTabMutationError = ErrorType<void | SettleEnterpriseCreditTab402>
+
+    /**
+ * @summary Issue or redeem the whole credit tab's L402 macro-invoice
+ */
+export const useSettleEnterpriseCreditTab = <TError = ErrorType<void | SettleEnterpriseCreditTab402>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof settleEnterpriseCreditTab>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof settleEnterpriseCreditTab>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSettleEnterpriseCreditTabMutationOptions(options));
+    }
 
 export const getRevokeNip98KeyUrl = () => {
 

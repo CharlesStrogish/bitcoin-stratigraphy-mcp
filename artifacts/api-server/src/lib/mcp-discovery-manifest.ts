@@ -114,6 +114,18 @@ export const mcpDiscoveryManifest = {
   resources: MCP_NATIVE_RESOURCES,
   prompts: MCP_NATIVE_PROMPTS,
   l402: {
+    enterprise_credit_tabs: {
+      authentication: "Fresh NIP-98 signature on every request; self-declared identities never qualify",
+      qualification: "More than 50 distinct successfully settled identity-bound Lightning L402 invoices",
+      maximum_unpaid_sats: 2000,
+      idle_timeout_seconds: 900,
+      status_endpoint: canonicalUrl("/api/v1/enterprise/credit-tab"),
+      close_endpoint: canonicalUrl("/api/v1/enterprise/credit-tab/close"),
+      settlement_endpoint: canonicalUrl("/api/v1/enterprise/credit-tab/settle"),
+      settlement: "Close the tab explicitly at session end. Inactivity, the credit cap, or a routing change freezes the whole tab; repay its single L402 invoice before further credit execution.",
+      billing: "Tolls accrue durably before execution, including failed or interrupted admitted operations. Repeated NIP-98 credit events never re-execute. Prepaid passes retain their existing rights.",
+      economics: "Deferred debt is not received revenue. One verified macro-invoice settlement preserves the existing 79/21 allocation and records revenue exactly once.",
+    },
     invoice_proof_of_work: {
       request_endpoint: canonicalUrl("/invoice/request"),
       scope: "New single-tool, 100-call macro and ordered pipeline L402 invoices at /mcp and /invoice/request; paid credential verification requires no new work.",

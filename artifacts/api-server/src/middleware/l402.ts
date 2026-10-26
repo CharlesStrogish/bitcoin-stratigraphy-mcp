@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { clientKey } from "../lib/client-address";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
 import type { createInvoicePow } from "../lib/invoice-pow";
+import type { EnterpriseCreditTabs } from "../lib/enterprise-credit-tabs";
 import type { Request, RequestHandler, Response } from "express";
 import {
   attenuateSubscriptionMacaroon,
@@ -51,6 +52,8 @@ export type L402MiddlewareOptions = {
   allowBatch?: boolean;
   /** Enable only for new MCP invoices, never for settlement verification. */
   invoicePow?: ReturnType<typeof createInvoicePow>;
+  /** MCP-only deferred billing; never enabled for unrelated paid HTTP routes. */
+  creditTabs?: EnterpriseCreditTabs;
   expectedOutputSchema?: Record<string, unknown> | ((req: Request) => Record<string, unknown>);
   /**
    * Exact MCP tool this route executes, checked against `rpc` and
@@ -450,6 +453,17 @@ export function createL402Middleware(
               .json({ error: "L402 macaroon expired during verification" });
             return;
           }
+          if (options.creditTabs && nip98Pubkey && pass.agentId === nip98Pubkey &&
+              pass.agentAuthentication === "nip98") {
+            try {
+              await options.creditTabs.recordPaid(nip98Pubkey, pass.paymentProvider!, pass.paymentHash,
+                pass.amountMsats! / 1000);
+            } catch (error) {
+              req.log?.error({err: error}, "Paid invoice reputation storage unavailable");
+              res.status(503).json({error: "Paid invoice reputation storage unavailable; no quota consumed"});
+              return;
+            }
+          }
           if (
             pass.maxRequests !== undefined &&
             !(await usageStore.consume(pass.requestLimits, pass.validUntil))
@@ -512,6 +526,22 @@ export function createL402Middleware(
           });
           return;
         }
+      }
+    }
+    if (options.creditTabs && nip98Pubkey && !authorization && !req.get("PAYMENT-SIGNATURE")) {
+      try {
+        const admitted = await options.creditTabs.admit(req, res, nip98Pubkey, resolveAmountSats(req),
+          resolveScope(req), options.settlementRouter, secret ?? "");
+        if (admitted !== "standard") {
+          if (admitted === "admitted" && !res.headersSent) { attachLicensingCompliance(res); next(); }
+          return;
+        }
+      } catch (error) {
+        req.log?.warn({err: error}, "Credit tab admission refused");
+        const status = error instanceof Error && "status" in error &&
+          [401, 403, 409, 503].includes(Number(error.status)) ? Number(error.status) : 503;
+        res.status(status).json({error: status === 503 ? "Credit tab admission unavailable" : (error as Error).message});
+        return;
       }
     }
     // A verified signer becomes the authenticated agent_id; otherwise any

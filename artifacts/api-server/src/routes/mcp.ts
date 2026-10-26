@@ -91,6 +91,8 @@ import {
   indexEpistemicDatasetReceipt,
 } from "../services/epistemicDatasetReceipt";
 import { createL402Middleware } from "../middleware/l402";
+import { EnterpriseCreditTabs } from "../lib/enterprise-credit-tabs";
+import { registerEnterpriseCreditRoutes } from "./enterprise-credit";
 import { invoicePow } from "../lib/invoice-pow";
 import {
   createCdpX402ResourceServer,
@@ -5367,6 +5369,7 @@ export function registerMcpRoute(
     settlementRouter?: SettlementRouter;
     x402ResourceServer?: X402ResourceServerLike | null;
     sessionSecret?: string;
+    creditTabs?: EnterpriseCreditTabs;
     usageStore?: MacaroonUsageStore;
     ledger?: RevenueLedger;
     onPaidToolCompleted?: (name: string, result: CallToolResult, paymentHash: string) => void;
@@ -5456,6 +5459,10 @@ export function registerMcpRoute(
   };
   const settlementRouter =
     options.settlementRouter ?? createDefaultMultiSettlementRouter();
+  const creditTabs = options.creditTabs ?? new EnterpriseCreditTabs();
+  registerEnterpriseCreditRoutes(app, {
+    tabs: creditTabs, router: settlementRouter, sessionSecret: options.sessionSecret, ledger: options.ledger,
+  });
   let x402SetupError: unknown;
   let x402Ready = Boolean(options.x402ResourceServer);
   const x402ResourceServer = Promise.resolve(
@@ -5566,6 +5573,7 @@ export function registerMcpRoute(
       (() => {
         const l402 = createL402Middleware({
           invoicePow,
+          creditTabs,
           amountSats,
           expectedOutputSchema: mcpToolDefinitions.find((tool) =>
             tool.name === canonicalToolName(name))?.outputSchema,
@@ -5790,6 +5798,7 @@ export function registerMcpRoute(
     },
     createMcpPipelineHandler({
       settlementRouter, sessionSecret: options.sessionSecret,
+      creditTabs,
       usageStore: options.usageStore, revocationStore, ledger: options.ledger,
       store: options.pipelineReceiptStore, key: loadArticle12IssuerKey,
       schemaFor: name => name === "stratigraphy.list" ? stratigraphyCatalogInputSchema

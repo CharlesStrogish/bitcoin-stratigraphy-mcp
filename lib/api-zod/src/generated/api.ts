@@ -25,6 +25,27 @@ import * as zod from 'zod';
 
 
 /**
+ * Requires fresh NIP-98 HTTP authentication. More than 50 distinct successfully paid identity-bound L402 invoices enables credit. The shared tab is capped at 2000 sats across all workers and sessions. Status polling does not extend the 15-minute idle execution window. Only authenticated historical routing settlements qualify.
+ * @summary Get the authenticated agent's trust score and credit tab
+ */
+export const GetEnterpriseCreditTabResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * Fresh NIP-98 authentication is required. Call at session end; an HTTP disconnect is not a session boundary. Closing, 15 minutes of inactivity, reaching the 2000-sat cap, or changing routing allocation freezes all further credit charges. A single identity-bound L402 macro-invoice pays the whole tab. Repeated closes reuse the invoice. Admitted tolls remain owed after tool failure or disconnection. Already-paid passes keep their existing rights.
+ * @summary End a credit session and invoice its entire frozen balance
+ */
+export const CloseEnterpriseCreditTabResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * Without an L402 credential, freezes the tab and returns its invoice. To redeem, send Authorization L402 macaroon:preimage and the same identity's fresh NIP-98 event in X-Nostr-Authorization, signed for this exact URL, method and body. Only the persisted exact-amount provider-bound invoice can clear the entire tab. Replays are idempotent and cannot clear new debt. An authentic expired macro credential may confirm its historical payment, but never authorizes tool execution. Standard non-VIP MCP requests retain the unchanged Hashcash and upfront L402 barrier. No debt is booked as revenue until verified full payment; the existing 79/21 allocation is unchanged.
+ * @summary Issue or redeem the whole credit tab's L402 macro-invoice
+ */
+export const SettleEnterpriseCreditTabResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
  * Requires the configured MACAROON_OPERATOR_SECRET as a Bearer token. Writes the shared persistent registry; future authenticated requests from this key fail with 403 before invoicing or execution. Registry failures return 503. This does not cancel already-running jobs or prove current revocation status to an offline verifier.
  * @summary Permanently revoke a compromised NIP-98 agent public key
  */

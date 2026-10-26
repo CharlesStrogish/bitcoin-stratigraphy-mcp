@@ -6,6 +6,7 @@ import { pool } from "@workspace/db";
 import { canonical, issuerKeyId, signIssuerPayload } from "./article12-signature";
 import { canonicalToolName, mcpToolPrices, MCP_INVOICE_EXPIRY_SECONDS } from "./mcp-pricing";
 import { createL402Middleware } from "../middleware/l402";
+import { invoicePow } from "./invoice-pow";
 import type { SettlementRouter } from "../services/settlement";
 import type { MacaroonUsageStore } from "./macaroon-usage-store";
 import type { MacaroonRevocationStore } from "./macaroon-revocation-store";
@@ -151,6 +152,7 @@ export function createMcpPipelineHandler(options: {
   const store = options.store ?? postgresPipelineReceiptStore();
   const plans = new WeakMap<Request, Plan>();
   const gate = createL402Middleware({
+    invoicePow,
     ...options, amountSats: req => plans.get(req)!.amountSats,
     enforceCurrentAmount: true,
     scopePath: req => `/mcp/pipelines/${plans.get(req)!.digest}`,

@@ -4,6 +4,7 @@
  * Dependency-free, one-shot L402 client for the Bitcoin Stratigraphy MCP endpoint.
  * Each paid tool call has its own path-bound, single-use credential; do not cache it.
  */
+import { withInvoicePow } from "./invoice-pow.js";
 export const DEFAULT_MCP_SERVER_URL = "https://bitcoinstratigraphy.com/mcp";
 
 export type WalletPayment =
@@ -347,6 +348,7 @@ export class BitcoinStratigraphyClient {
     protected readonly wallet?: WalletHandler,
     protected readonly fetcher: typeof fetch = globalThis.fetch,
   ) {
+    this.fetcher = withInvoicePow(fetcher);
     const url = new URL(serverUrl);
     if (!["https:", "http:"].includes(url.protocol)) {
       throw new Error("MCP server URL must use HTTP or HTTPS");

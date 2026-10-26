@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { powFetch as fetch } from "../helpers/pow-fetch";
 import { createHash } from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";

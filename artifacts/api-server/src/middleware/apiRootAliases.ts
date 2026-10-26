@@ -6,7 +6,7 @@ import type { RequestHandler } from "express";
 // anyway: /api/openapi.json, /api/mcp and /api/.well-known/* reach the same
 // routes as their root URLs.
 const API_ROOT_ALIAS =
-  /^\/api(?=\/(?:openapi\.json|mcp\/?|\.well-known\/[^?#]+)(?:[?#]|$))/i;
+  /^\/api(?=\/(?:openapi\.json|mcp\/?|invoice\/request|\.well-known\/[^?#]+)(?:[?#]|$))/i;
 
 export function rewriteApiRootAlias(url: string): string {
   return API_ROOT_ALIAS.test(url) ? url.slice("/api".length) : url;

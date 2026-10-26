@@ -6,6 +6,7 @@ import hashlib
 import json
 import threading
 import unittest
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from sdk.python.client import BitcoinStratigraphyClient
@@ -27,6 +28,45 @@ CHALLENGE = json.dumps(
 
 
 class ClientTests(unittest.TestCase):
+    def test_hashcash_precedes_payment_and_retries_identical_request_once(self):
+        challenge = {
+            "algorithm": "sha256", "hash_input": "challenge:nonce",
+            "difficulty": 2, "challenge": "server-issued-unique-challenge",
+            "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(),
+        }
+        requests = []
+        wallet_calls = []
+        client = BitcoinStratigraphyClient(
+            "https://example.test/mcp", wallet=lambda invoice: wallet_calls.append(invoice) or PREIMAGE,
+        )
+
+        def send(body, authorization=None, proof_headers=None):
+            requests.append((body, authorization, proof_headers))
+            if len(requests) == 1:
+                return 400, {}, json.dumps({"error": {"data": {"proof_of_work": challenge}}}).encode()
+            if len(requests) == 2:
+                self.assertIsNone(authorization)
+                self.assertEqual(wallet_calls, [])
+                nonce = proof_headers["X-L402-PoW-Nonce"]
+                self.assertTrue(hashlib.sha256(f"{challenge['challenge']}:{nonce}".encode()).hexdigest().startswith("00"))
+                return 402, {"WWW-Authenticate": HEADER}, CHALLENGE
+            self.assertEqual(authorization, f"L402 {MACAROON}:{PREIMAGE}")
+            self.assertIsNone(proof_headers, "paid verification requires no compute")
+            return 200, {}, json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"structuredContent": {"ok": True}}}).encode()
+
+        client._send = send
+        self.assertEqual(client.call_tool("mesh.get_status", {}), {"ok": True})
+        self.assertEqual(wallet_calls, [INVOICE])
+        self.assertEqual(len({request[0] for request in requests}), 1)
+
+    def test_hashcash_rejects_unbounded_and_expired_compute(self):
+        for challenge in [
+            {"algorithm": "sha256", "difficulty": 64, "challenge": "x", "hash_input": "challenge:nonce"},
+            {"algorithm": "sha256", "difficulty": 2, "challenge": "x", "hash_input": "challenge:nonce", "expires_at": "2000-01-01T00:00:00Z"},
+        ]:
+            with self.assertRaises(ValueError):
+                BitcoinStratigraphyClient._solve_invoice_pow(challenge)
+
     def test_paid_call_uses_real_http_402_header_and_retries_identical_body(self):
         requests = []
 

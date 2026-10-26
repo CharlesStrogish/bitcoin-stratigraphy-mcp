@@ -1677,6 +1677,78 @@ export const usePreflightSmitheryServerCard = <TError = ErrorType<unknown>,
       return useMutation(getPreflightSmitheryServerCardMutationOptions(options));
     }
 
+export const getRequestMcpInvoiceUrl = () => {
+
+
+
+
+  return `/api/invoice/request`
+}
+
+/**
+ * Invoice-only entry point accepting the same paid tools/call or tools/pipeline JSON-RPC body as /mcp. Missing, invalid, expired or replayed proof returns HTTP 400 and a unique proof_of_work challenge (inside error.data for stateless MCP). Find a decimal nonce such that SHA-256(challenge + ":" + nonce) has three leading hexadecimal zeros; retry the identical request with X-L402-PoW-Challenge and X-L402-PoW-Nonce. Challenges expire in 120 seconds and are single-use, request-bound and worker-local. A worker change requires a fresh challenge. Only then is the Lightning node queried and the normal HTTP 402 L402 invoice issued. This route never redeems paid credentials or executes tools; pay and redeem at /mcp. Existing credential verification needs no new compute.
+ * @summary Request a compute-gated L402 invoice for a tool or pipeline
+ */
+export const requestMcpInvoice = async (mcpJsonRpcRequest: McpJsonRpcRequest, options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
+
+  return customFetch<unknown>(getRequestMcpInvoiceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mcpJsonRpcRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestMcpInvoiceMutationOptions = <TError = ErrorType<McpJsonRpcResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestMcpInvoice>>, TError,{data: BodyType<McpJsonRpcRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestMcpInvoice>>, TError,{data: BodyType<McpJsonRpcRequest>}, TContext> => {
+
+const mutationKey = ['requestMcpInvoice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestMcpInvoice>>, {data: BodyType<McpJsonRpcRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestMcpInvoice(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestMcpInvoiceMutationResult = NonNullable<Awaited<ReturnType<typeof requestMcpInvoice>>>
+    export type RequestMcpInvoiceMutationBody = BodyType<McpJsonRpcRequest>
+    export type RequestMcpInvoiceMutationError = ErrorType<McpJsonRpcResponse | void>
+
+    /**
+ * @summary Request a compute-gated L402 invoice for a tool or pipeline
+ */
+export const useRequestMcpInvoice = <TError = ErrorType<McpJsonRpcResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestMcpInvoice>>, TError,{data: BodyType<McpJsonRpcRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestMcpInvoice>>,
+        TError,
+        {data: BodyType<McpJsonRpcRequest>},
+        TContext
+      > => {
+      return useMutation(getRequestMcpInvoiceMutationOptions(options));
+    }
+
 export const getGetMcpProbeUrl = () => {
 
 
@@ -1905,7 +1977,7 @@ export const getExecuteMcpRequestUrl = () => {
 }
 
 /**
- * Stateless MCP 2026-07-28 (no initialize handshake and no Mcp-Session-Id): call server/discover, tools/list or tools/call, sending params._meta["io.modelcontextprotocol/protocolVersion"] and params._meta["io.modelcontextprotocol/clientCapabilities"] on every request with matching MCP-Protocol-Version and Mcp-Method headers, plus Mcp-Name for tools/call. Stateless failures are strict JSON-RPC; payment challenge fields appear in error.data. Handshake-era clients (2025-11-25 and earlier) may still call initialize, ping, tools/list or tools/call without _meta. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * Stateless MCP 2026-07-28 (no initialize handshake and no Mcp-Session-Id): call server/discover, tools/list or tools/call, sending params._meta["io.modelcontextprotocol/protocolVersion"] and params._meta["io.modelcontextprotocol/clientCapabilities"] on every request with matching MCP-Protocol-Version and Mcp-Method headers, plus Mcp-Name for tools/call. Stateless failures are strict JSON-RPC; payment challenge fields appear in error.data. Handshake-era clients (2025-11-25 and earlier) may still call initialize, ping, tools/list or tools/call without _meta. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. New L402 invoices first require the same single-use SHA-256 proof of work as /invoice/request; missing or invalid proof returns HTTP 400 before Lightning invoice generation. Paid credential verification is unchanged. A cost quote grants no tool entitlement. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
  * @summary JSON-RPC discovery and execution of the 16 canonical MCP tools
  */
 export const executeMcpRequest = async (mcpJsonRpcRequest: McpJsonRpcRequest, options?: Parameters<typeof customFetch>[1]): Promise<McpJsonRpcResponse> => {

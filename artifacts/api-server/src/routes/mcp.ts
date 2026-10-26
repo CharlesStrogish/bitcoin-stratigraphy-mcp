@@ -91,6 +91,7 @@ import {
   indexEpistemicDatasetReceipt,
 } from "../services/epistemicDatasetReceipt";
 import { createL402Middleware } from "../middleware/l402";
+import { invoicePow } from "../lib/invoice-pow";
 import {
   createCdpX402ResourceServer,
   createX402PaymentMiddleware,
@@ -5392,8 +5393,8 @@ export function registerMcpRoute(
   let fallbackSigningKey: ReturnType<typeof loadToolIntegrityKey> | undefined;
   const signResponse = (name: string, result: CallToolResult) =>
     signToolResponse(name, result, fallbackSigningKey ??= loadToolIntegrityKey());
-  app.use("/mcp", frameMcpErrors);
-  app.use("/mcp", (req, res, next) => {
+  app.use(["/mcp", "/invoice/request"], frameMcpErrors);
+  app.use(["/mcp", "/invoice/request"], (req, res, next) => {
     res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;
     res.locals.readToolIntegrity = readToolIntegrity;
     const messages = Array.isArray(req.body) ? req.body
@@ -5564,6 +5565,7 @@ export function registerMcpRoute(
       name,
       (() => {
         const l402 = createL402Middleware({
+          invoicePow,
           amountSats,
           expectedOutputSchema: mcpToolDefinitions.find((tool) =>
             tool.name === canonicalToolName(name))?.outputSchema,
@@ -5741,13 +5743,17 @@ export function registerMcpRoute(
     });
   };
   app.all(
-    "/mcp",
+    ["/mcp", "/invoice/request"],
     rateLimit,
     (req, res, next) => {
       res.locals.x402Configured = x402Ready;
       // This stateless endpoint returns JSON for POSTs. Discovery scanners can
       // advertise SSE too, so never open an idle event stream for a GET or HEAD.
       if (req.method === "GET" || req.method === "HEAD") {
+        if (/^\/invoice\/request\/?$/i.test(req.path)) {
+          res.status(400).json({error: "Use POST with paid-tool or pipeline JSON-RPC input"});
+          return;
+        }
         res.status(200).json({ status: "ok", service: "MCP Server" });
         return;
       }
@@ -5765,6 +5771,23 @@ export function registerMcpRoute(
     // Selects the protocol era and validates 2026-07-28 metadata and routing
     // headers before any payment, delegation or tool work.
     negotiateMcpProtocol,
+    (req, res, next) => {
+      if (!/^\/invoice\/request\/?$/i.test(req.path)) return next();
+      // Invoice-only alias: it must never redeem a credential or execute tools.
+      const calls = Array.isArray(req.body) ? req.body :
+        ["tools/pipeline", "tools/batch"].includes(req.body?.method)
+          ? req.body.params?.calls : [req.body];
+      const paidCall = Array.isArray(calls) && calls.some(call =>
+        call?.method === "tools/call" && typeof call.params?.name === "string" &&
+        mcpToolPrices[canonicalToolName(call.params?.name ?? "") as keyof typeof mcpToolPrices] > 0);
+      if (req.method !== "POST" || !paidCall ||
+          /^L402\b/i.test(req.get("Authorization") ?? "") ||
+          req.get("PAYMENT-SIGNATURE") || req.get("X-Payment")) {
+        res.status(400).json({error: "Invoice requests require unpaid paid-tool or pipeline JSON-RPC input; redeem paid credentials at /mcp"});
+        return;
+      }
+      next();
+    },
     createMcpPipelineHandler({
       settlementRouter, sessionSecret: options.sessionSecret,
       usageStore: options.usageStore, revocationStore, ledger: options.ledger,

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
 import assert from "node:assert/strict";
+import { powFetch as fetch } from "../helpers/pow-fetch";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { createServer } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";

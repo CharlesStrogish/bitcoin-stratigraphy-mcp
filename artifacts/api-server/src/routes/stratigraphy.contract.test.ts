@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
+import { powFetch as fetch } from "../lib/testing/pow-fetch";
 import {
   GetEnterpriseDueDiligenceBriefResponse,
   GetMcpDiscoveryManifestResponse,

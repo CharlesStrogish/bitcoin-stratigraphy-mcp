@@ -2,6 +2,7 @@ import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement 
 import { createHash, randomUUID } from "node:crypto";
 import { clientKey } from "../lib/client-address";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
+import type { createInvoicePow } from "../lib/invoice-pow";
 import type { Request, RequestHandler, Response } from "express";
 import {
   attenuateSubscriptionMacaroon,
@@ -48,6 +49,8 @@ export type L402MiddlewareOptions = {
   revocationStore?: MacaroonRevocationStore;
   requestKind?: RevenueRequestKind;
   allowBatch?: boolean;
+  /** Enable only for new MCP invoices, never for settlement verification. */
+  invoicePow?: ReturnType<typeof createInvoicePow>;
   expectedOutputSchema?: Record<string, unknown> | ((req: Request) => Record<string, unknown>);
   /**
    * Exact MCP tool this route executes, checked against `rpc` and
@@ -146,6 +149,18 @@ export function createL402Middleware(
     if (!options.settlementRouter.isConfigured("btc-lightning")) {
       res.status(500).json({ error: "Lightning settlement is not configured" });
       return;
+    }
+    const requestedBatch = req.get("X-L402-Batch-Size");
+    if (requestedBatch && (!options.allowBatch || requestedBatch !== "100")) {
+      res.status(400).json({error: "X-L402-Batch-Size must be 100 on a batch-capable route"});
+      return;
+    }
+    if (options.invoicePow) {
+      const binding = createHash("sha256").update(JSON.stringify([
+        req.method, resolveScope(req), req.query, req.body ?? null,
+        resolveAmountSats(req), requestedBatch ?? null, options.description, agent ?? null,
+      ])).digest("hex");
+      if (!options.invoicePow.admit(req, res, binding)) return;
     }
     const caller = clientKey(req);
     const currentTime = now();

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
+import { withInvoicePow } from "./invoice-pow";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 import {
@@ -128,6 +129,53 @@ function paymentRequired(
     headers: { "WWW-Authenticate": header, "Content-Type": "application/json" },
   });
 }
+
+test("MCP client solves pre-invoice work before payment, preserving body and settlement proof", async () => {
+  const pow = {
+    algorithm: "sha256", hash_input: "challenge:nonce", difficulty: 2,
+    challenge: "unique-server-challenge", expires_at: new Date(Date.now() + 120_000).toISOString(),
+  };
+  const requests: RequestInit[] = [];
+  let payments = 0;
+  const client = new BitcoinStratigraphyClient("https://example.test/mcp",
+    async () => { payments++; return preimage; },
+    async (_input, init) => {
+      requests.push(init!);
+      if (requests.length === 1)
+        return new Response(JSON.stringify({error: {data: {proof_of_work: pow}}}), {status: 400});
+      if (requests.length === 2) {
+        assert.equal(payments, 0);
+        const headers = new Headers(init?.headers);
+        assert.equal(headers.get("X-L402-PoW-Challenge"), pow.challenge);
+        const bytes = new TextEncoder().encode(`${pow.challenge}:${headers.get("X-L402-PoW-Nonce")}`);
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        assert.equal(new Uint8Array(digest)[0], 0);
+        return paymentRequired();
+      }
+      assert.equal(new Headers(init?.headers).get("Authorization"), `L402 ${challenge.macaroon}:${preimage}`);
+      assert.equal(new Headers(init?.headers).get("X-L402-PoW-Nonce"), null);
+      return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result: {structuredContent: {ok: true}}}));
+    });
+  assert.deepEqual(await client.callTool("mesh.get_status", {}), {ok: true});
+  assert.equal(payments, 1);
+  assert.equal(new Set(requests.map(request => request.body)).size, 1);
+});
+
+test("PoW client refuses excessive difficulty and never loops on a second challenge", async () => {
+  const details = {
+    algorithm: "sha256", hash_input: "challenge:nonce", difficulty: 64,
+    challenge: "x", expires_at: new Date(Date.now() + 120_000).toISOString(),
+  };
+  const fetcher = withInvoicePow(async () => new Response(JSON.stringify({proof_of_work: details}), {status: 400}));
+  await assert.rejects(fetcher("https://example.test"), /Unsupported invoice/);
+  let calls = 0;
+  const bounded = withInvoicePow(async () => {
+    calls++;
+    return new Response(JSON.stringify({proof_of_work: {...details, difficulty: 2}}), {status: 400});
+  }, () => "00");
+  assert.equal((await bounded("https://example.test")).status, 400);
+  assert.equal(calls, 2);
+});
 
 test("free tools work without a wallet and return structured JSON", async () => {
   const client = new BitcoinStratigraphyClient(

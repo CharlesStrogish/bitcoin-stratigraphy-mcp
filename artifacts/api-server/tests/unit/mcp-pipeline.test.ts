@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
 import assert from "node:assert/strict";
+import { powFetch as fetch } from "../helpers/pow-fetch";
 import { createHash, createPublicKey, generateKeyPairSync, verify } from "node:crypto";
 import http, { type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -113,6 +114,54 @@ async function pay(body: unknown, path = "/mcp") {
   invoice.paid = true;
   return {challenge, authorization: `L402 ${challenge.body.macaroon}:${invoice.preimage}`};
 }
+
+test("raw single-tool and pipeline invoice requests require fresh compute before any wallet call", async () => {
+  const rawPost = async (body: unknown, path: string, headers: Record<string, string> = {}) => {
+    const response = await globalThis.fetch(url + path, {
+      method: "POST", headers: {"Content-Type": "application/json", Accept: "application/json", ...headers},
+      body: JSON.stringify(body),
+    });
+    return {status: response.status, body: await response.json()};
+  };
+  for (const path of ["/mcp", "/invoice/request"]) {
+    for (const [body, extraHeaders] of [
+      [call(300), {}],
+      [pipeline([call(301), call(302)]), {}],
+      [call(303), {"X-L402-Batch-Size": "100"}],
+    ] as Array<[ReturnType<typeof call> | ReturnType<typeof pipeline>, Record<string, string>]>) {
+      const count = issued;
+      const missing = await rawPost(body, path, extraHeaders);
+      assert.equal(missing.status, 400, JSON.stringify(missing.body));
+      const pow = missing.body.proof_of_work ?? missing.body.error?.data?.proof_of_work;
+      assert.ok(pow.challenge);
+      const headers = {...extraHeaders, "X-L402-PoW-Challenge": pow.challenge, "X-L402-PoW-Nonce": "not-a-nonce"};
+      assert.equal((await rawPost(body, path, headers)).status, 400);
+      assert.equal(issued, count, "missing/invalid nonces never query Lightning");
+      let nonce = 0;
+      while (!sha(`${pow.challenge}:${nonce}`).startsWith("0".repeat(pow.difficulty))) nonce++;
+      headers["X-L402-PoW-Nonce"] = String(nonce);
+      assert.equal((await rawPost({...body, id: "altered-request"}, path, headers)).status, 400);
+      assert.equal(issued, count, "a solved proof cannot be transferred to an altered request");
+      const responses = await Promise.all([rawPost(body, path, headers), rawPost(body, path, headers)]);
+      assert.deepEqual(responses.map(result => result.status).sort(), [400, 402]);
+      assert.equal(issued, count + 1, "concurrent replay creates exactly one invoice");
+      const challenge = responses.find(result => result.status === 402)!.body;
+      const invoice = invoices.get(challenge.payment_hash)!;
+      assert.equal(challenge.amount_sats, extraHeaders["X-L402-Batch-Size"] ? 25_000 : body.method === "tools/pipeline" ? 500 : 250);
+      invoice.paid = true;
+      const authorization = `L402 ${challenge.macaroon}:${invoice.preimage}`;
+      // Paid credentials need no new compute and remain bound to the original call.
+      const result = await rawPost(body, "/mcp", {Authorization: authorization});
+      assert.equal(result.status, 200, JSON.stringify(result.body));
+      if (body.method === "tools/pipeline") assert.equal(result.body.result.status, "completed");
+      assert.equal(issued, count + 1);
+      for (const invoicePath of ["/invoice/request", "/invoice/request/", "/INVOICE/REQUEST"]) {
+        const deniedRedemption = await rawPost(body, invoicePath, {Authorization: authorization});
+        assert.equal(deniedRedemption.status, 400, "invoice-only alias cannot execute a paid request");
+      }
+    }
+  }
+});
 
 test("one summed invoice gates the real route, receipt signatures and catalog stays at sixteen", async () => {
   const body = pipeline();

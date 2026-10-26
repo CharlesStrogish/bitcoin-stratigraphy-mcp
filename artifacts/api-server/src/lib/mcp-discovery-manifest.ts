@@ -114,6 +114,17 @@ export const mcpDiscoveryManifest = {
   resources: MCP_NATIVE_RESOURCES,
   prompts: MCP_NATIVE_PROMPTS,
   l402: {
+    invoice_proof_of_work: {
+      request_endpoint: canonicalUrl("/invoice/request"),
+      scope: "New single-tool, 100-call macro and ordered pipeline L402 invoices at /mcp and /invoice/request; paid credential verification requires no new work.",
+      algorithm: "sha256",
+      difficulty: 3,
+      challenge_ttl_seconds: 120,
+      hash_input: "challenge:nonce",
+      challenge_header: "X-L402-PoW-Challenge",
+      nonce_header: "X-L402-PoW-Nonce",
+      instructions: "POST the intended JSON-RPC tools/call or tools/pipeline body. HTTP 400 includes proof_of_work (error.data.proof_of_work for stateless MCP). Find a decimal nonce whose SHA-256(challenge + ':' + nonce) has three leading hex zeros, then retry the identical body with both proof headers. A valid proof is single-use and returns the normal HTTP 402 L402 challenge. Pay and redeem at /mcp as before.",
+    },
     settlement_capabilities: L402_SETTLEMENT_PATHS.map((path) => path.id),
     settlement_paths: L402_SETTLEMENT_PATHS,
     challenge: {

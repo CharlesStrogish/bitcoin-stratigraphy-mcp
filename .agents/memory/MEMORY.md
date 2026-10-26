@@ -94,3 +94,4 @@
 - [Online ledger indexes](online-ledger-indexes.md) — Publish owns managed-production DDL; avoid long nested JSON index expressions and preserve literal JSON keys.
 - [Pipeline settlement trust](mcp-pipeline-settlement-trust.md) — one exact-request payment, sequential fail-fast work; receipts commit actual bytes but external effects cannot roll back.
 - [Public receipt broadcast trust](nostr-receipt-privacy.md) — publish only persisted, allowlisted proof summaries; relay failure never changes settlement or execution status.
+- [Invoice compute admission](invoice-pow-admission.md) — gate new MCP invoices, not paid verification; preserve request binding and atomic replay protection across workers.

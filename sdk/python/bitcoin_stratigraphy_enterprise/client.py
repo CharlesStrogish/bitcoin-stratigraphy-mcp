@@ -7,6 +7,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
+from datetime import datetime
 import urllib.error
 import urllib.request
 from typing import Any, Callable, Mapping
@@ -198,6 +200,22 @@ class BitcoinStratigraphyClient:
             body["params"] = dict(params)
         encoded = json.dumps(body, separators=(",", ":")).encode("utf-8")
         status, headers, data = self._send(encoded)
+        if status == 400:
+            try:
+                failure = json.loads(data)
+            except (ValueError, UnicodeDecodeError):
+                failure = {}
+            if not isinstance(failure, dict):
+                failure = {}
+            pow_challenge = failure.get("proof_of_work")
+            error = failure.get("error")
+            if pow_challenge is None and isinstance(error, dict):
+                details = error.get("data")
+                if isinstance(details, dict):
+                    pow_challenge = details.get("proof_of_work")
+            if pow_challenge is not None:
+                proof_headers = self._solve_invoice_pow(pow_challenge)
+                status, headers, data = self._send(encoded, proof_headers=proof_headers)
         if status == 402:
             macaroon, invoice, payment_hash = self._parse_challenge(headers, data)
             if self.wallet is None:
@@ -272,8 +290,37 @@ class BitcoinStratigraphyClient:
             raise ValueError("Invalid or conflicting L402 challenge")
         return match[1], match[2], body["payment_hash"]
 
+    @staticmethod
+    def _solve_invoice_pow(challenge: Any) -> dict[str, str]:
+        if (
+            not isinstance(challenge, dict)
+            or challenge.get("algorithm") != "sha256"
+            or challenge.get("hash_input") != "challenge:nonce"
+            or not isinstance(challenge.get("challenge"), str)
+            or len(challenge["challenge"]) > 1024
+            or type(challenge.get("difficulty")) is not int
+            or not 2 <= challenge["difficulty"] <= 4
+        ):
+            raise ValueError("Unsupported invoice proof-of-work challenge")
+        try:
+            expires = datetime.fromisoformat(challenge["expires_at"].replace("Z", "+00:00")).timestamp()
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise ValueError("Invalid invoice proof-of-work expiry") from exc
+        if expires <= time.time():
+            raise ValueError("Expired invoice proof-of-work challenge")
+        deadline = time.monotonic() + min(20.0, expires - time.time())
+        prefix = "0" * challenge["difficulty"]
+        for nonce in range(1_000_000):
+            if nonce % 256 == 0 and time.monotonic() >= deadline:
+                break
+            digest = hashlib.sha256(f"{challenge['challenge']}:{nonce}".encode()).hexdigest()
+            if digest.startswith(prefix):
+                return {"X-L402-PoW-Challenge": challenge["challenge"], "X-L402-PoW-Nonce": str(nonce)}
+        raise RuntimeError("Invoice proof-of-work computation budget exceeded")
+
     def _send(
-        self, body: bytes, authorization: str | None = None
+        self, body: bytes, authorization: str | None = None,
+        proof_headers: Mapping[str, str] | None = None,
     ) -> tuple[int, Mapping[str, str], bytes]:
         headers = {
             "Content-Type": "application/json",
@@ -290,6 +337,8 @@ class BitcoinStratigraphyClient:
                 if name.lower() == "authorization":
                     del headers[name]
             headers["Authorization"] = authorization
+        if proof_headers:
+            headers.update(proof_headers)
         if self._http is not None:
             response = self._http.request(
                 "POST",

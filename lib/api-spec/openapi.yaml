@@ -1186,6 +1186,60 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PublicPreflight"
+  /invoice/request:
+    post:
+      operationId: requestMcpInvoice
+      tags: [payment]
+      summary: Request a compute-gated L402 invoice for a tool or pipeline
+      description: >-
+        Invoice-only entry point accepting the same paid tools/call or
+        tools/pipeline JSON-RPC body as /mcp. Missing, invalid, expired or replayed
+        proof returns HTTP 400 and a unique proof_of_work challenge (inside
+        error.data for stateless MCP). Find a decimal nonce such that
+        SHA-256(challenge + ":" + nonce) has three leading hexadecimal zeros;
+        retry the identical request with X-L402-PoW-Challenge and X-L402-PoW-Nonce.
+        Challenges expire in 120 seconds and are single-use, request-bound and
+        worker-local. A worker change requires a fresh challenge. Only then is
+        the Lightning node queried and the normal HTTP 402 L402 invoice issued.
+        This route never redeems paid credentials or executes tools; pay and
+        redeem at /mcp. Existing credential verification needs no new compute.
+      servers:
+        - url: https://bitcoinstratigraphy.com
+          description: Canonical production origin
+        - url: /
+          description: Same origin
+      security: []
+      parameters:
+        - name: X-L402-PoW-Challenge
+          in: header
+          schema: { type: string, maxLength: 1024 }
+        - name: X-L402-PoW-Nonce
+          in: header
+          schema: { type: string, pattern: "^[0-9]{1,20}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpJsonRpcRequest"
+      responses:
+        "400":
+          description: Missing or invalid proof, or invalid invoice request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "402":
+          description: Proof accepted; Lightning invoice and scoped macaroon issued
+          headers:
+            WWW-Authenticate:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpJsonRpcResponse"
+        "503":
+          description: Proof admission capacity or durable pipeline storage unavailable
   /mcp:
     servers:
       - url: https://bitcoinstratigraphy.com
@@ -1237,7 +1291,10 @@ paths:
         are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live
         authoritative catalog. Tool calls use params.name and params.arguments.
         Paid calls require a scoped L402 Authorization credential obtained from
-        the HTTP 402 WWW-Authenticate challenge. A cost quote grants no tool
+        the HTTP 402 WWW-Authenticate challenge. New L402 invoices first require
+        the same single-use SHA-256 proof of work as /invoice/request; missing or
+        invalid proof returns HTTP 400 before Lightning invoice generation.
+        Paid credential verification is unchanged. A cost quote grants no tool
         entitlement. SDK clients may advertise application/json and
         text/event-stream, but POST returns finite JSON. Cookies are not used for
         cross-origin auth.

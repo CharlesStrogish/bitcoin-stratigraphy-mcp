@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import type { Request, Response } from "express";
+import type { InvoicePowStore } from "../../src/lib/postgres-invoice-pow-store";
 import {
   createInvoicePow,
   INVOICE_POW_TTL_MS,
@@ -11,10 +12,11 @@ import {
 const hash = (input: string) =>
   createHash("sha256").update(input).digest("hex");
 type Proof = { challenge: string; nonce: string };
-function attempt(
+async function attempt(
   gate: ReturnType<typeof createInvoicePow>,
   binding = "request-a",
   proof?: Proof,
+  secret = "shared-invoice-test-secret",
 ) {
   const headers = new Map(
     Object.entries({
@@ -37,10 +39,11 @@ function attempt(
     },
   };
   return {
-    admitted: gate.admit(
+    admitted: await gate.admit(
       { get: (name: string) => headers.get(name) } as Request,
       res as unknown as Response,
       binding,
+      secret,
     ),
     ...result,
   };
@@ -51,10 +54,26 @@ function solve(challenge: string): Proof {
   return { challenge, nonce: String(nonce) };
 }
 
-test("challenge issuance is unique; invalid, oversized, tampered and missing proofs fail closed", () => {
-  const gate = createInvoicePow({ difficulty: 2 });
-  const first = attempt(gate);
-  const second = attempt(gate);
+function memoryStore(now = Date.now): InvoicePowStore {
+  const consumed = new Map<string, number>();
+  return {
+    async consume(id, expires) {
+      if (expires <= now() || consumed.has(id)) return false;
+      consumed.set(id, expires);
+      return true;
+    },
+    async purgeExpired() {
+      for (const [id, expires] of consumed)
+        if (expires <= now()) consumed.delete(id);
+    },
+  };
+}
+
+test("challenge issuance is unique; invalid, oversized, tampered and missing proofs fail closed", async () => {
+  const store = memoryStore();
+  const gate = createInvoicePow({ difficulty: 2, store });
+  const first = await attempt(gate);
+  const second = await attempt(gate);
   assert.equal(first.status, 400);
   assert.notEqual(
     first.body.proof_of_work.challenge,
@@ -68,44 +87,72 @@ test("challenge issuance is unique; invalid, oversized, tampered and missing pro
     { ...proof, challenge: proof.challenge + "x" },
     { ...proof, challenge: "x".repeat(1025) },
   ])
-    assert.equal(attempt(gate, "request-a", invalid).status, 400);
+    assert.equal((await attempt(gate, "request-a", invalid)).status, 400);
   assert.equal(
-    attempt(gate, "changed-price-tool-body-or-agent", proof).status,
+    (await attempt(gate, "changed-price-tool-body-or-agent", proof)).status,
     400,
   );
-  assert.equal(attempt(gate, "request-a", proof).admitted, true);
-  assert.equal(attempt(gate, "request-a", proof).status, 400, "one-time use");
   assert.equal(
-    attempt(createInvoicePow({ difficulty: 2 }), "request-a", proof).status,
+    (await attempt(gate, "request-a", proof, "wrong-shared-secret")).status,
     400,
-    "a different worker cannot replay a token",
+  );
+  assert.equal(
+    (
+      await attempt(
+        createInvoicePow({
+          difficulty: 2,
+          now: () => Date.now() - 1_000,
+          store,
+        }),
+        "request-a",
+        proof,
+      )
+    ).admitted,
+    true,
+    "a different worker authenticates and reserves the same challenge",
+  );
+  assert.equal(
+    (await attempt(gate, "request-a", proof)).status,
+    400,
+    "global one-time use",
   );
 });
 
-test("expired proofs, wrong hash nonce and bounded replay storage cannot reach invoice generation", () => {
+test("expired proofs, wrong hash nonce and database failure cannot reach invoice generation", async () => {
   let now = Date.now();
   const gate = createInvoicePow({
     difficulty: 2,
     now: () => now,
-    maxConsumed: 1,
+    store: memoryStore(() => now),
   });
-  const first = solve(attempt(gate).body.proof_of_work.challenge);
+  const first = solve((await attempt(gate)).body.proof_of_work.challenge);
   let wrongNonce = 0;
   while (hash(`${first.challenge}:${wrongNonce}`).startsWith("00"))
     wrongNonce++;
   assert.equal(
-    attempt(gate, "request-a", { ...first, nonce: String(wrongNonce) }).status,
+    (await attempt(gate, "request-a", { ...first, nonce: String(wrongNonce) }))
+      .status,
     400,
   );
-  assert.equal(attempt(gate, "request-a", first).admitted, true);
-  const second = solve(attempt(gate).body.proof_of_work.challenge);
-  assert.equal(attempt(gate, "request-a", second).status, 503);
+  assert.equal((await attempt(gate, "request-a", first)).admitted, true);
+  const second = solve((await attempt(gate)).body.proof_of_work.challenge);
+  const failingWorker = createInvoicePow({
+    difficulty: 2,
+    now: () => now,
+    store: {
+      consume: async () => {
+        throw new Error("database offline");
+      },
+      purgeExpired: async () => {},
+    },
+  });
+  assert.equal((await attempt(failingWorker, "request-a", second)).status, 503);
   now += INVOICE_POW_TTL_MS;
-  assert.equal(attempt(gate, "request-a", second).status, 400);
-  const fresh = solve(attempt(gate).body.proof_of_work.challenge);
+  assert.equal((await attempt(gate, "request-a", second)).status, 400);
+  const fresh = solve((await attempt(gate)).body.proof_of_work.challenge);
   assert.equal(
-    attempt(gate, "request-a", fresh).admitted,
+    (await attempt(gate, "request-a", fresh)).admitted,
     true,
-    "expired replay entries are reclaimed",
+    "new proofs remain usable after earlier challenges expire",
   );
 });

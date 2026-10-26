@@ -11,19 +11,23 @@ payment verification or redemption of an existing paid credential.
 already-paid access or replacing the settlement checks. Admission is not payment.
 
 **How to apply:** Keep challenge binding tied to the exact intended request,
-price, scope and agent context. Reserve a solved challenge synchronously before
-the first wallet await; never reuse its admission after an upstream failure.
+price, scope and agent context. Await the atomic PostgreSQL reservation before
+the first wallet call; never reuse its admission after an upstream failure.
 Invoice-only entry points must reject credential redemption, including route
 case and trailing-slash variants, rather than becoming alternate execution URLs.
 
-Use bounded replay state and stateless challenge issuance. Process-local
-ephemeral signing keys intentionally fail closed when a retry changes workers.
+Use stateless challenge issuance authenticated by the existing shared server
+session secret, and shared PostgreSQL single-use reservations. Store only the
+solved challenge's hash and expiry; unverified requests must not allocate rows.
 
-**Why:** Keeping unverified challenge records would give attackers a new memory
-exhaustion vector. Sharing only a signing key across workers would let one
-solution create multiple invoices unless consumption is also shared atomically.
+**Why:** The user explicitly requires horizontal scaling without reissuing a
+challenge on a worker change. Keeping unverified challenge records would create
+a new storage-exhaustion vector. A shared signing key without atomic shared
+consumption would let one solution create multiple invoices.
 
-**How to apply:** For cross-worker reliability, introduce atomic shared,
-TTL-bounded proof consumption together with shared challenge authentication.
-Never fix retry failures by removing single-use checks or by accepting a token
-from another worker without reserving it globally.
+**How to apply:** All workers need the same existing session secret and database.
+Database admission must fail closed with no wallet call on storage failure.
+Delete expired reservations on startup and periodically even while idle; stop
+the cleanup worker on shutdown. Keep the three-zero difficulty and 120-second
+expiry unchanged. Schema changes go through development and managed Publish,
+never startup DDL. Do not reintroduce process-local keys or memory fallbacks.

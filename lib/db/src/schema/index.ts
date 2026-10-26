@@ -24,3 +24,4 @@ export * from "./ots-provenance-anchors";
 export * from "./stratigraphy-provenance-strata";
 export * from "./escrow-ledger";
 export * from "./mcp-extension-tasks";
+export * from "./invoice-pow-consumptions";

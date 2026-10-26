@@ -6,40 +6,54 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { Request, Response } from "express";
+import {
+  postgresInvoicePowStore,
+  type InvoicePowStore,
+} from "./postgres-invoice-pow-store";
 
 export const INVOICE_POW_DIFFICULTY = 3;
 export const INVOICE_POW_TTL_MS = 120_000;
 export const POW_CHALLENGE_HEADER = "X-L402-PoW-Challenge";
 export const POW_NONCE_HEADER = "X-L402-PoW-Nonce";
 
-/** Stateless issuance, bounded single-use admission, and no wallet/DB calls.
- * The ephemeral process key prevents replay across workers; a worker change or
- * restart simply requires a fresh challenge. No unverified caller state is kept.
+/** Stateless issuance authenticated with the existing shared session secret.
+ * Only valid solved proofs reserve PostgreSQL rows, atomically across workers.
+ * No raw nonce, request data or signing secret is stored in the database.
  */
 export function createInvoicePow(
   options: {
     now?: () => number;
     difficulty?: number;
-    maxConsumed?: number;
+    store?: InvoicePowStore;
   } = {},
 ) {
   const now = options.now ?? Date.now;
   const difficulty = options.difficulty ?? INVOICE_POW_DIFFICULTY;
-  const maxConsumed = options.maxConsumed ?? 20_000;
   if (!Number.isInteger(difficulty) || difficulty < 2 || difficulty > 4)
     throw new RangeError(
       "Invoice PoW difficulty must be 2–4 leading hex zeros",
     );
-  if (!Number.isSafeInteger(maxConsumed) || maxConsumed < 1)
-    throw new RangeError("Invoice PoW replay capacity must be positive");
-  const key = randomBytes(32);
-  const consumed = new Map<string, number>();
-  let lastCleanup = 0;
-  const mac = (value: string) =>
-    createHmac("sha256", key).update(value).digest();
+  const store = options.store ?? postgresInvoicePowStore;
 
   return {
-    admit(req: Request, res: Response, binding: string): boolean {
+    async admit(
+      req: Request,
+      res: Response,
+      binding: string,
+      secret: string,
+    ): Promise<boolean> {
+      if (!secret) {
+        res.set("Cache-Control", "no-store");
+        res
+          .status(503)
+          .json({ error: "Invoice proof authentication is not configured" });
+        return false;
+      }
+      const mac = (value: string) =>
+        createHmac("sha256", secret)
+          .update("bitcoin-stratigraphy/invoice-pow/v1\n")
+          .update(value)
+          .digest();
       const current = now();
       const challenge = req.get(POW_CHALLENGE_HEADER);
       const nonce = req.get(POW_NONCE_HEADER);
@@ -63,35 +77,34 @@ export function createInvoicePow(
                 payload.difficulty === difficulty &&
                 Number.isSafeInteger(payload.expires) &&
                 payload.expires > current &&
-                payload.expires <= current + INVOICE_POW_TTL_MS &&
-                !consumed.has(parts[1]!) &&
                 createHash("sha256")
                   .update(`${challenge}:${nonce}`)
                   .digest("hex")
                   .startsWith("0".repeat(difficulty))
               ) {
-                if (
-                  current - lastCleanup >= 10_000 ||
-                  consumed.size >= maxConsumed
-                ) {
-                  for (const [id, expires] of consumed)
-                    if (expires <= current) consumed.delete(id);
-                  lastCleanup = current;
-                }
-                if (consumed.size >= maxConsumed) {
-                  res.set("Retry-After", "120");
+                try {
+                  if (
+                    await store.consume(
+                      createHash("sha256").update(challenge).digest("hex"),
+                      payload.expires,
+                    )
+                  )
+                    return true;
+                } catch (error) {
+                  req.log?.warn(
+                    { err: error },
+                    "Invoice proof reservation unavailable",
+                  );
                   res.set("Cache-Control", "no-store");
+                  res.set("Retry-After", "5");
                   res
                     .status(503)
                     .json({
                       error:
-                        "Invoice proof admission is at capacity; retry later",
+                        "Invoice proof admission storage is unavailable; retry later",
                     });
                   return false;
                 }
-                // Synchronous reservation precedes the first wallet await.
-                consumed.set(parts[1]!, payload.expires);
-                return true;
               }
             } catch {
               /* Malformed authenticated payloads fail closed. */
@@ -130,5 +143,5 @@ export function createInvoicePow(
   };
 }
 
-// Shared by every MCP single-tool and pipeline gate in this process.
+// Every MCP single-tool and pipeline gate uses the shared PostgreSQL store.
 export const invoicePow = createInvoicePow();

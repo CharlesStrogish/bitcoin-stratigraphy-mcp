@@ -635,7 +635,7 @@ export const PreflightSmitheryServerCardResponse = zod.unknown()
 
 
 /**
- * Invoice-only entry point accepting the same paid tools/call or tools/pipeline JSON-RPC body as /mcp. Missing, invalid, expired or replayed proof returns HTTP 400 and a unique proof_of_work challenge (inside error.data for stateless MCP). Find a decimal nonce such that SHA-256(challenge + ":" + nonce) has three leading hexadecimal zeros; retry the identical request with X-L402-PoW-Challenge and X-L402-PoW-Nonce. Challenges expire in 120 seconds and are single-use, request-bound and worker-local. A worker change requires a fresh challenge. Only then is the Lightning node queried and the normal HTTP 402 L402 invoice issued. This route never redeems paid credentials or executes tools; pay and redeem at /mcp. Existing credential verification needs no new compute.
+ * Invoice-only entry point accepting the same paid tools/call or tools/pipeline JSON-RPC body as /mcp. Missing, invalid, expired or replayed proof returns HTTP 400 and a unique proof_of_work challenge (inside error.data for stateless MCP). Find a decimal nonce such that SHA-256(challenge + ":" + nonce) has three leading hexadecimal zeros; retry the identical request with X-L402-PoW-Challenge and X-L402-PoW-Nonce. Challenges expire in 120 seconds and are single-use, request-bound and shared across workers with atomic PostgreSQL replay protection. Only then is the Lightning node queried and the normal HTTP 402 L402 invoice issued. This route never redeems paid credentials or executes tools; pay and redeem at /mcp. Existing credential verification needs no new compute.
  * @summary Request a compute-gated L402 invoice for a tool or pipeline
  */
 export const requestMcpInvoiceHeaderXL402PoWChallengeMax = 1024;

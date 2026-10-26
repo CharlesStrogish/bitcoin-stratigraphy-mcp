@@ -160,7 +160,7 @@ export function createL402Middleware(
         req.method, resolveScope(req), req.query, req.body ?? null,
         resolveAmountSats(req), requestedBatch ?? null, options.description, agent ?? null,
       ])).digest("hex");
-      if (!options.invoicePow.admit(req, res, binding)) return;
+      if (!await options.invoicePow.admit(req, res, binding, secret)) return;
     }
     const caller = clientKey(req);
     const currentTime = now();

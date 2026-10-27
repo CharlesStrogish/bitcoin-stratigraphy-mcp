@@ -94,6 +94,8 @@ export * from './escrowTollQuoteTargetUsd';
 export * from './exportHuggingFaceDatasetFormat';
 export * from './exportHuggingFaceDatasetParams';
 export * from './fleetRegistration';
+export * from './fleetStatement';
+export * from './fleetStatementState';
 export * from './getEnterpriseCreditTab200';
 export * from './getNip05IdentityParams';
 export * from './getPaidStratigraphyParams';

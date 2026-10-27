@@ -29,6 +29,7 @@ export const CREDIT_TRUST_THRESHOLD = 50;
 export const CREDIT_IDLE_MS = 15 * 60_000;
 export const CREDIT_TAB_PATH = "/api/v1/enterprise/credit-tab";
 export const FLEET_REGISTER_PATH = "/api/v1/fleet/register";
+export const FLEET_STATEMENT_PATH = "/api/v1/fleet/statement";
 const SETTLE_PATH = CREDIT_TAB_PATH + "/settle";
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -153,6 +154,27 @@ export class EnterpriseCreditTabs {
         account.state.due = true;
       return this.summary(account);
     });
+  }
+  async statement(pubkey: string) {
+    const snapshot = await this.store.statement(pubkey);
+    if (
+      !snapshot ||
+      snapshot.isWorker ||
+      snapshot.account.trust_score <= CREDIT_TRUST_THRESHOLD
+    )
+      throw new CreditTabError(403, "Statement requires a VIP Commander");
+    const { account, lifetimeYieldMsats } = snapshot;
+    const pending = account.state.invoices.at(-1);
+    return {
+      commander_pubkey: account.pubkey,
+      session_id: account.state.sessionId,
+      state: account.state.due ? "settlement_due" : "credit_tab",
+      gross_unpaid_sats: account.unpaid_sats,
+      balance_msats: account.unpaid_sats * 1000 - account.yield_credit_msats,
+      yield_credit_msats: account.yield_credit_msats,
+      yield_applied_msats: pending?.yieldAppliedMsats ?? 0,
+      lifetime_yield_earned_msats: lifetimeYieldMsats,
+    };
   }
   async recordPaid(
     pubkey: string,

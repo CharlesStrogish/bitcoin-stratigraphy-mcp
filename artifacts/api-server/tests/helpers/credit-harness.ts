@@ -297,6 +297,7 @@ export function createCreditHarness() {
     request,
     seed,
     cleanup,
+    now: () => clock,
     advance: (ms: number) => {
       clock += ms;
     },

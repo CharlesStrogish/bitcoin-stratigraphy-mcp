@@ -60,6 +60,14 @@ export interface CreditTransaction {
   ): Promise<boolean>;
 }
 export interface EnterpriseCreditStore {
+  statement(pubkey: string): Promise<
+    | {
+        account: CreditAccount;
+        lifetimeYieldMsats: number;
+        isWorker: boolean;
+      }
+    | undefined
+  >;
   transaction<T>(
     pubkey: string,
     run: (tx: CreditTransaction) => Promise<T>,
@@ -83,6 +91,26 @@ export function createPostgresEnterpriseCreditStore(
   database = pool,
 ): EnterpriseCreditStore {
   return {
+    async statement(pubkey) {
+      // One MVCC snapshot; no account creation, row lock, or idle-state update.
+      const result = await database.query<
+        CreditAccount & { lifetime_yield_msats: string; is_worker: boolean }
+      >(
+        `SELECT a.*,
+          EXISTS(SELECT 1 FROM enterprise_credit_fleet WHERE worker_pubkey=a.pubkey) AS is_worker,
+          COALESCE((SELECT SUM(allocation_pool_msats)
+            FROM enterprise_credit_settlements
+            WHERE pubkey=a.pubkey AND source='credit-tab'),0)::text AS lifetime_yield_msats
+         FROM enterprise_credit_accounts a WHERE a.pubkey=$1`,
+        [pubkey],
+      );
+      const row = result.rows[0];
+      if (!row) return undefined;
+      const lifetimeYieldMsats = Number(row.lifetime_yield_msats);
+      if (!Number.isSafeInteger(lifetimeYieldMsats))
+        throw new Error("Lifetime yield exceeds safe integer reporting range");
+      return { account: row, lifetimeYieldMsats, isWorker: row.is_worker };
+    },
     async transaction(pubkey, run, options) {
       const client = await database.connect();
       try {

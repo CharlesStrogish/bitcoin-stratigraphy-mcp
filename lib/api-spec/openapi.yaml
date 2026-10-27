@@ -735,6 +735,39 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /api/v1/fleet/statement:
+    get:
+      operationId: getFleetStatement
+      tags: [Enterprise Licensing]
+      summary: Read the authenticated Commander's tab and yield statement
+      security:
+        - CommanderNip98: []
+      description: >-
+        Read-only, no-store snapshot requiring fresh URL/method-bound NIP-98 from
+        a VIP Commander with more than 50 verified paid invoices. Delegated Workers
+        cannot read the master statement. No account creation, invoice issuance,
+        idle-state transition or credit mutation occurs. Signed balance is gross
+        unpaid usage minus available treasury credit; negative values are credit.
+        Applied yield is the discount frozen on the latest pending macro-invoice
+        (zero without an invoice), not an additional deduction from treasury.
+        Lifetime yield sums persisted allocation_pool_msats on verified credit-tab
+        settlements, excluding ordinary L402 reputation and credit-only closures.
+        All yield values are integer millisatoshis, preserving fractional sats.
+      responses:
+        "200":
+          description: Consistent Commander-only balance snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FleetStatement"
+        "401":
+          description: Missing, stale or invalid request-bound NIP-98 authentication
+        "403":
+          description: Not a VIP Commander or declaration does not match signer
+        "405":
+          description: Only GET is allowed
+        "503":
+          description: Statement storage unavailable
   /api/v1/fleet/register:
     post:
       operationId: registerEnterpriseFleet
@@ -2410,6 +2443,11 @@ components:
             type: string
           description: Wildcard; Authorization is also explicitly listed when requested because Fetch excludes it from the wildcard
   securitySchemes:
+    CommanderNip98:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Fresh kind 27235 NIP-98 event as Nostr base64_event, signed by the Commander and bound to the exact request URL and GET method.
     EscrowOperator:
       type: apiKey
       in: header
@@ -2434,6 +2472,36 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    FleetStatement:
+      type: object
+      required: [commander_pubkey, session_id, state, gross_unpaid_sats, balance_msats, yield_credit_msats, yield_applied_msats, lifetime_yield_earned_msats]
+      properties:
+        commander_pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        session_id:
+          type: string
+        state:
+          type: string
+          enum: [credit_tab, settlement_due]
+        gross_unpaid_sats:
+          type: integer
+          minimum: 0
+        balance_msats:
+          type: integer
+          description: Signed gross debt minus treasury credit; negative means forward credit.
+        yield_credit_msats:
+          type: integer
+          minimum: 0
+          description: Available treasury, not yet consumed by a pending invoice.
+        yield_applied_msats:
+          type: integer
+          minimum: 0
+          description: Discount frozen on the latest pending invoice; zero if none.
+        lifetime_yield_earned_msats:
+          type: integer
+          minimum: 0
+          description: Sum of recorded allocation_pool_msats for verified credit-tab cash settlements.
     FleetRegistration:
       type: object
       additionalProperties: false

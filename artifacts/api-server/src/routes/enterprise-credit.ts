@@ -5,6 +5,7 @@ import type { Express } from "express";
 import {
   CREDIT_TAB_PATH,
   FLEET_REGISTER_PATH,
+  FLEET_STATEMENT_PATH,
   CreditTabError,
   verifiedCreditIdentity,
   type EnterpriseCreditTabs,
@@ -12,6 +13,7 @@ import {
 import type { SettlementRouter } from "../services/settlement";
 import type { RevenueLedger } from "../services/ledger";
 import { requestNip98Authorization } from "../lib/nip98-request";
+import { GetFleetStatementResponse } from "@workspace/api-zod";
 
 export function registerEnterpriseCreditRoutes(
   app: Express,
@@ -25,6 +27,7 @@ export function registerEnterpriseCreditRoutes(
   app.all(
     [
       FLEET_REGISTER_PATH,
+      FLEET_STATEMENT_PATH,
       CREDIT_TAB_PATH,
       CREDIT_TAB_PATH + "/close",
       CREDIT_TAB_PATH + "/settle",
@@ -33,6 +36,19 @@ export function registerEnterpriseCreditRoutes(
       res.setHeader("Cache-Control", "no-store");
       try {
         const pubkey = verifiedCreditIdentity(req);
+        if (req.path === FLEET_STATEMENT_PATH) {
+          if (req.method !== "GET") {
+            res.status(405).setHeader("Allow", "GET");
+            res.json({ error: "Use GET for the fleet statement" });
+            return;
+          }
+          res.json(
+            GetFleetStatementResponse.parse(
+              await options.tabs.statement(pubkey),
+            ),
+          );
+          return;
+        }
         if (req.path === FLEET_REGISTER_PATH) {
           if (req.method !== "POST") {
             res.status(405).setHeader("Allow", "POST");

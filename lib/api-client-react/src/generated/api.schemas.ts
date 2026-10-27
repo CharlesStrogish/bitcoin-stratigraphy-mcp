@@ -21,6 +21,40 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export type FleetStatementState = typeof FleetStatementState[keyof typeof FleetStatementState];
+
+
+export const FleetStatementState = {
+  credit_tab: 'credit_tab',
+  settlement_due: 'settlement_due',
+} as const;
+
+export interface FleetStatement {
+  /** @pattern ^[0-9a-f]{64}$ */
+  commander_pubkey: string;
+  session_id: string;
+  state: FleetStatementState;
+  /** @minimum 0 */
+  gross_unpaid_sats: number;
+  /** Signed gross debt minus treasury credit; negative means forward credit. */
+  balance_msats: number;
+  /**
+     * Available treasury, not yet consumed by a pending invoice.
+     * @minimum 0
+     */
+  yield_credit_msats: number;
+  /**
+     * Discount frozen on the latest pending invoice; zero if none.
+     * @minimum 0
+     */
+  yield_applied_msats: number;
+  /**
+     * Sum of recorded allocation_pool_msats for verified credit-tab cash settlements.
+     * @minimum 0
+     */
+  lifetime_yield_earned_msats: number;
+}
+
 export interface FleetRegistration {
   /**
      * @maxItems 1000

@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/enterprise-credit-recovery.test.js",
   "./dist/enterprise-credit-yield.test.js",
   "./dist/enterprise-fleet.test.js",
   "./dist/enterprise-credit.test.js",
@@ -153,7 +154,10 @@ await build({
 
 await build({
   entryPoints: {
-    "enterprise-credit-yield.test": "./tests/unit/enterprise-credit-yield.test.ts",
+    "enterprise-credit-recovery.test":
+      "./tests/unit/enterprise-credit-recovery.test.ts",
+    "enterprise-credit-yield.test":
+      "./tests/unit/enterprise-credit-yield.test.ts",
     "enterprise-fleet.test": "./tests/unit/enterprise-fleet.test.ts",
     "enterprise-credit.test": "./tests/unit/enterprise-credit.test.ts",
     "invoice-pow-postgres.test": "./tests/unit/invoice-pow-postgres.test.ts",

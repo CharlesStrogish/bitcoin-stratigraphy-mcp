@@ -25,6 +25,33 @@ import * as zod from 'zod';
 
 
 /**
+ * Read-only, no-store snapshot requiring fresh URL/method-bound NIP-98 from a VIP Commander with more than 50 verified paid invoices. Delegated Workers cannot read the master statement. No account creation, invoice issuance, idle-state transition or credit mutation occurs. Signed balance is gross unpaid usage minus available treasury credit; negative values are credit. Applied yield is the discount frozen on the latest pending macro-invoice (zero without an invoice), not an additional deduction from treasury. Lifetime yield sums persisted allocation_pool_msats on verified credit-tab settlements, excluding ordinary L402 reputation and credit-only closures. All yield values are integer millisatoshis, preserving fractional sats.
+ * @summary Read the authenticated Commander's tab and yield statement
+ */
+export const getFleetStatementResponseCommanderPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getFleetStatementResponseGrossUnpaidSatsMin = 0;
+
+export const getFleetStatementResponseYieldCreditMsatsMin = 0;
+
+export const getFleetStatementResponseYieldAppliedMsatsMin = 0;
+
+export const getFleetStatementResponseLifetimeYieldEarnedMsatsMin = 0;
+
+
+
+export const GetFleetStatementResponse = zod.object({
+  "commander_pubkey": zod.string().regex(getFleetStatementResponseCommanderPubkeyRegExp),
+  "session_id": zod.string(),
+  "state": zod.enum(['credit_tab', 'settlement_due']),
+  "gross_unpaid_sats": zod.number().int().min(getFleetStatementResponseGrossUnpaidSatsMin),
+  "balance_msats": zod.number().int().describe('Signed gross debt minus treasury credit; negative means forward credit.'),
+  "yield_credit_msats": zod.number().int().min(getFleetStatementResponseYieldCreditMsatsMin).describe('Available treasury, not yet consumed by a pending invoice.'),
+  "yield_applied_msats": zod.number().int().min(getFleetStatementResponseYieldAppliedMsatsMin).describe('Discount frozen on the latest pending invoice; zero if none.'),
+  "lifetime_yield_earned_msats": zod.number().int().min(getFleetStatementResponseLifetimeYieldEarnedMsatsMin).describe('Sum of recorded allocation_pool_msats for verified credit-tab cash settlements.')
+})
+
+
+/**
  * Requires fresh request/body-bound Commander NIP-98 authentication and more than 50 distinct verified paid invoices. POST add/remove arrays of lowercase 64-character NIP-98 public keys. Each Worker has one Commander; self-delegation, nested fleets and conflicting ownership are rejected atomically. Maximum 1000 Workers per Commander. Signatures are single-use. Workers retain their own execution identity and accrue existing tool tolls (250 sats per standard paid call) to one shared 2000-sat master tab. Removal prevents subsequent admissions but never forgives existing debt. Only the Commander can settle the master tab using the existing credit-tab settlement endpoint.
  * @summary Add or remove Workers authorized to spend the Commander's credit tab
  */

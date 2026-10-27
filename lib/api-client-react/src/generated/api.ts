@@ -56,6 +56,7 @@ import type {
   EscrowTollQuote,
   ExportHuggingFaceDatasetParams,
   FleetRegistration,
+  FleetStatement,
   GetEnterpriseCreditTab200,
   GetNip05IdentityParams,
   GetPaidStratigraphyParams,
@@ -142,6 +143,84 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetFleetStatementUrl = () => {
+
+
+
+
+  return `/api/api/v1/fleet/statement`
+}
+
+/**
+ * Read-only, no-store snapshot requiring fresh URL/method-bound NIP-98 from a VIP Commander with more than 50 verified paid invoices. Delegated Workers cannot read the master statement. No account creation, invoice issuance, idle-state transition or credit mutation occurs. Signed balance is gross unpaid usage minus available treasury credit; negative values are credit. Applied yield is the discount frozen on the latest pending macro-invoice (zero without an invoice), not an additional deduction from treasury. Lifetime yield sums persisted allocation_pool_msats on verified credit-tab settlements, excluding ordinary L402 reputation and credit-only closures. All yield values are integer millisatoshis, preserving fractional sats.
+ * @summary Read the authenticated Commander's tab and yield statement
+ */
+export const getFleetStatement = async ( options?: Parameters<typeof customFetch>[1]): Promise<FleetStatement> => {
+
+  return customFetch<FleetStatement>(getGetFleetStatementUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFleetStatementQueryKey = () => {
+    return [
+    `/api/api/v1/fleet/statement`
+    ] as const;
+    }
+
+
+export const getGetFleetStatementQueryOptions = <TData = Awaited<ReturnType<typeof getFleetStatement>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFleetStatement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFleetStatementQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFleetStatement>>> = ({ signal }) => getFleetStatement({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFleetStatement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFleetStatementQueryResult = NonNullable<Awaited<ReturnType<typeof getFleetStatement>>>
+export type GetFleetStatementQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the authenticated Commander's tab and yield statement
+ */
+
+export function useGetFleetStatement<TData = Awaited<ReturnType<typeof getFleetStatement>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFleetStatement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFleetStatementQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getRegisterEnterpriseFleetUrl = () => {
 

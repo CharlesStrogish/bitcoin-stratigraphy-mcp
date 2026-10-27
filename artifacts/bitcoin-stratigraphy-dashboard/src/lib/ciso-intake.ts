@@ -50,6 +50,9 @@ export const CISO_INTAKE_QUESTIONNAIRE = [
 export function cisoIntakeTemplate(lineBreak = "\n"): string {
   return [
     "=== BITCOIN STRATIGRAPHY: CISO INTAKE TEMPLATE ===",
+    "Free, centralized APIs carry maximum cross-vendor liability.",
+    "The only engine providing mathematically non-repudiable Article 12 Flight Recorders, shifting liability off the enterprise.",
+    "",
     "To request a custom Tier II Commercial Enterprise Exemption quote, please complete the following and email to: licensing@bitcoinstratigraphy.com",
     "",
     "Enterprise / Organization Name:",

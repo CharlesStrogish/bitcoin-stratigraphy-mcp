@@ -121,11 +121,13 @@ export default function EnterprisePage() {
               <span>Secure, Air-Gapped, and Commercially Licensed.</span>
             </h1>
             <p className="subtitle">
-              For CISOs protecting private AI swarm IP and needing auditable
-              reconstruction of agent activity. Deploy the complete 16-Tool
-              Stateless MCP Server (2026-07-28), secured by Ed25519
-              Cryptographically Signed Tool Integrity, behind your firewall
-              without relying on a third-party MCP proxy.
+              <strong className="text-foreground font-semibold">
+                Free, centralized APIs carry maximum cross-vendor liability.
+              </strong>{" "}
+              <span className="text-foreground">
+                The only engine providing mathematically non-repudiable Article
+                12 Flight Recorders, shifting liability off the enterprise.
+              </span>
             </p>
             <div className="ent-cta-row">
               <a href={MAIL} className="ent-cta" data-testid="link-contact-sales">

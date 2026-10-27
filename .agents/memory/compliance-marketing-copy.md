@@ -20,3 +20,14 @@ simulation labels and stale frontend toll copy.
 **How to apply:** Preserve unrelated approved compliance marketing copy; do not
 restore outdated escrow labels or interpret the indicative frontend price as a
 fixed server settlement fee.
+
+Enterprise License and shared CISO intake positioning is deliberately
+liability-led: contrast centralized vendors with the user's Article 12 Flight
+Recorder claims using short, verbatim marketing copy and high-contrast text.
+
+**Why:** The user requested a “Legal Moat” compliance-marketing update, not new
+legal terms or technical capabilities.
+
+**How to apply:** Preserve the supplied positioning when maintaining these
+surfaces; keep marketing changes separate from backend due-diligence contracts
+and payment infrastructure.

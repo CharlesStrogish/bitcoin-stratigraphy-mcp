@@ -44,6 +44,9 @@ test("CISO mailto and clipboard contain the exact enterprise SLA intake template
   const body = mailto.searchParams.get("body");
   const expected = [
     "=== BITCOIN STRATIGRAPHY: CISO INTAKE TEMPLATE ===",
+    "Free, centralized APIs carry maximum cross-vendor liability.",
+    "The only engine providing mathematically non-repudiable Article 12 Flight Recorders, shifting liability off the enterprise.",
+    "",
     "To request a custom Tier II Commercial Enterprise Exemption quote, please complete the following and email to: licensing@bitcoinstratigraphy.com",
     "",
     "Enterprise / Organization Name:",
@@ -78,6 +81,16 @@ test("CISO mailto and clipboard contain the exact enterprise SLA intake template
     ],
   );
   assert.doesNotMatch(body, /Due-diligence brief:|Answer:|Event Throughput:/);
+});
+
+test("enterprise liability copy is concise and high-contrast without changing the hero layout", () => {
+  const source = read(
+    "artifacts/bitcoin-stratigraphy-dashboard/src/pages/enterprise.tsx",
+  ).replace(/\s+/g, " ");
+  assert.match(source, /<p className="subtitle"> <strong className="text-foreground font-semibold"> Free, centralized APIs carry maximum cross-vendor liability\./);
+  assert.match(source, /<span className="text-foreground"> The only engine providing mathematically non-repudiable Article 12 Flight Recorders, shifting liability off the enterprise\./);
+  assert.match(source, /className="ent-hero"/);
+  assert.match(source, /className="ent-cta-row"/);
 });
 
 test("Enterprise and Compliance pages share the CISO mailto and intake actions", () => {

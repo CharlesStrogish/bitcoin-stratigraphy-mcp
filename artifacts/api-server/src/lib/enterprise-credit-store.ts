@@ -9,6 +9,8 @@ export type TabInvoice = {
   amountSats: number;
   description: string;
   expiresAt: number;
+  grossAmountSats?: number;
+  yieldAppliedMsats?: number;
 };
 export type CreditState = {
   sessionId: string;
@@ -29,6 +31,7 @@ export type CreditAccount = {
   pubkey: string;
   trust_score: number;
   unpaid_sats: number;
+  yield_credit_msats: number;
   state: CreditState;
 };
 export interface CreditTransaction {
@@ -232,12 +235,13 @@ export function createPostgresEnterpriseCreditStore(
           },
         });
         await client.query(
-          `UPDATE enterprise_credit_accounts SET trust_score=$2,unpaid_sats=$3,state=$4::jsonb WHERE pubkey=$1`,
+          `UPDATE enterprise_credit_accounts SET trust_score=$2,unpaid_sats=$3,state=$4::jsonb,yield_credit_msats=$5 WHERE pubkey=$1`,
           [
             pubkey,
             account.trust_score,
             account.unpaid_sats,
             JSON.stringify(account.state),
+            account.yield_credit_msats,
           ],
         );
         await client.query("COMMIT");

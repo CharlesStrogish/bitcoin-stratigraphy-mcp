@@ -129,6 +129,15 @@ export class EnterpriseCreditTabs {
           : "standard",
       session_id: account.state.sessionId,
       unpaid_sats: account.unpaid_sats,
+      yield_credit_msats: account.yield_credit_msats,
+      yield_credit_sats: account.yield_credit_msats / 1000,
+      balance_msats: account.unpaid_sats * 1000 - account.yield_credit_msats,
+      balance_sats:
+        (account.unpaid_sats * 1000 - account.yield_credit_msats) / 1000,
+      payable_sats: Math.max(
+        0,
+        account.unpaid_sats - Math.floor(account.yield_credit_msats / 1000),
+      ),
       maximum_unpaid_sats: CREDIT_LIMIT_SATS,
       idle_timeout_seconds: CREDIT_IDLE_MS / 1000,
       settlement_endpoint: SETTLE_PATH,
@@ -270,7 +279,7 @@ export class EnterpriseCreditTabs {
         );
       res.setHeader("Cache-Control", "no-store");
       res.locals.creditTabSettlement = true;
-      res.status(402).json(invoice);
+      res.status("invoice" in invoice ? 402 : 409).json(invoice);
       return "response";
     }
     res.locals.creditTab = outcome.credit;
@@ -292,6 +301,23 @@ export class EnterpriseCreditTabs {
     await this.status(pubkey, true); // Closing survives a subsequent wallet failure.
     return this.store.transaction(pubkey, async ({ account: a }) => {
       if (!a.unpaid_sats) return { ...this.summary(a), status: "settled" };
+      // Only confirmed payments create yield. Spending that yield can close a
+      // small tab without a zero-value invoice or another yield/reputation grant.
+      if (
+        !a.state.invoices.length &&
+        a.yield_credit_msats >= a.unpaid_sats * 1000
+      ) {
+        const applied = a.unpaid_sats * 1000;
+        a.yield_credit_msats -= applied;
+        a.unpaid_sats = 0;
+        a.state = newCreditState(this.now());
+        return {
+          ...this.summary(a),
+          status: "credit_applied",
+          yield_applied_msats: applied,
+          retry_required: true,
+        };
+      }
       let invoice = a.state.invoices.at(-1);
       if (invoice && invoice.expiresAt <= this.now()) {
         // Do not replace a possibly paid invoice during an outage. Keep old
@@ -318,6 +344,14 @@ export class EnterpriseCreditTabs {
         invoice = undefined;
       }
       if (!invoice) {
+        const grossAmountSats = a.unpaid_sats;
+        // Existing payment/revenue ledgers require integer sats. Keep any
+        // fractional sat in the treasury instead of rounding away earned yield.
+        const yieldAppliedMsats = Math.min(
+          Math.floor(a.yield_credit_msats / 1000) * 1000,
+          grossAmountSats * 1000,
+        );
+        const amountSats = grossAmountSats - yieldAppliedMsats / 1000;
         const description = `Bitcoin Stratigraphy credit tab ${a.state.sessionId}`;
         const outer = enterpriseContext.getStore();
         const context = {
@@ -331,7 +365,7 @@ export class EnterpriseCreditTabs {
         };
         const created = await enterpriseContext.run(context, () =>
           router.createInvoice({
-            amountMsats: a.unpaid_sats * 1000,
+            amountMsats: amountSats * 1000,
             description,
             expirySeconds: 3600,
             asset: "btc-lightning",
@@ -350,7 +384,7 @@ export class EnterpriseCreditTabs {
             paymentHash: created.paymentHash,
             tier: "1-day",
             validUntil: Math.floor(this.now() / 1000) + 3600,
-            amountMsats: a.unpaid_sats * 1000,
+            amountMsats: amountSats * 1000,
             paymentAsset: "btc-lightning",
             paymentProvider: created.provider,
             agentId: pubkey,
@@ -365,7 +399,9 @@ export class EnterpriseCreditTabs {
         invoice = {
           ...created,
           macaroon,
-          amountSats: a.unpaid_sats,
+          amountSats,
+          grossAmountSats,
+          yieldAppliedMsats,
           description,
           expiresAt: this.now() + 3600_000,
         };
@@ -378,6 +414,8 @@ export class EnterpriseCreditTabs {
         macaroon: invoice.macaroon,
         payment_hash: invoice.paymentHash,
         amount_sats: invoice.amountSats,
+        gross_amount_sats: invoice.grossAmountSats ?? invoice.amountSats,
+        yield_applied_msats: invoice.yieldAppliedMsats ?? 0,
         merchant_msats: invoice.amountSats * 790,
         allocation_pool_msats: invoice.amountSats * 210,
       };
@@ -423,7 +461,10 @@ export class EnterpriseCreditTabs {
       if (
         !invoice ||
         invoice.macaroon !== credential!.macaroon ||
-        invoice.amountSats !== a.unpaid_sats ||
+        (invoice.grossAmountSats ?? invoice.amountSats) !== a.unpaid_sats ||
+        (invoice.yieldAppliedMsats ?? 0) > a.yield_credit_msats ||
+        invoice.amountSats * 1000 + (invoice.yieldAppliedMsats ?? 0) !==
+          a.unpaid_sats * 1000 ||
         pass.amountMsats !== invoice.amountSats * 1000 ||
         invoice.provider !== pass.paymentProvider ||
         !a.state.due
@@ -484,12 +525,20 @@ export class EnterpriseCreditTabs {
         invoice.amountSats,
         "credit-tab",
       );
+      // Integer-msat arithmetic is exact: 21% of each paid sat is 210 msats.
+      // Apply only once in the same locked transaction as the payment receipt.
+      const earnedYieldMsats = invoice.amountSats * 210;
+      a.yield_credit_msats =
+        a.yield_credit_msats -
+        (invoice.yieldAppliedMsats ?? 0) +
+        earnedYieldMsats;
       a.unpaid_sats = 0;
       a.state = newCreditState(this.now());
       return {
         ...this.summary(a),
         status: "settled",
         payment_hash: invoice.paymentHash,
+        yield_earned_msats: earnedYieldMsats,
       };
     });
   }

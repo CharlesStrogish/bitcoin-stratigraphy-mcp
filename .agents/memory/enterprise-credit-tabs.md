@@ -70,3 +70,20 @@ invoice issuance and macaroon construction must run under the same billing-owner
 economics context; otherwise a Worker-triggered macro-invoice conflicts with the
 Commander's buyer binding. Never inherit a Worker's licensing account or payout
 headers when issuing the master invoice.
+
+Verified VIP macro-payments earn exactly 21% of actual paid sats as forward
+treasury credit, once per settlement. Discounted gross usage is not paid volume:
+a 2,000-sat payment earns 420 sats, the next 2,000-sat gross tab invoices 1,580,
+and that payment earns 331.8 sats. Spending treasury credit does not itself earn
+yield, reputation or cash revenue.
+
+**Why:** The user requested compound yield rollover while explicitly protecting
+Fleet Routing and its existing shared admission ceiling.
+
+**How to apply:** Preserve the 2,000-sat gross usage ceiling; keep treasury and
+signed net balance separate from that admission counter. Track yield exactly in
+integer millisats. Existing wallet/revenue ledgers use whole sats, so apply
+whole-sat invoice discounts and retain fractional-sat treasury remainders.
+Credit-only closures consume treasury without issuing zero-value invoices.
+Freeze each invoice's gross usage and applied discount; old proofs must not
+clear new usage, re-spend treasury or mint additional yield.

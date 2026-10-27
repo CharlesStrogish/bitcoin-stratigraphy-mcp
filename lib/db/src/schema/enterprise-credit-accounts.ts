@@ -9,12 +9,20 @@ export const enterpriseCreditAccountsTable = pgTable(
     pubkey: text("pubkey").primaryKey(),
     trustScore: integer("trust_score").notNull().default(0),
     unpaidSats: integer("unpaid_sats").notNull().default(0),
+    yieldCreditMsats: integer("yield_credit_msats").notNull().default(0),
+    balanceMsats: integer("balance_msats").generatedAlwaysAs(
+      sql`"unpaid_sats" * 1000 - "yield_credit_msats"`,
+    ),
     state: jsonb("state").$type<Record<string, unknown>>().notNull(),
   },
   (table) => [
     check(
       "enterprise_credit_accounts_balance_check",
       sql`${table.unpaidSats} >= 0 AND ${table.unpaidSats} <= 2000`,
+    ),
+    check(
+      "enterprise_credit_accounts_yield_check",
+      sql`${table.yieldCreditMsats} >= 0`,
     ),
     check(
       "enterprise_credit_accounts_trust_check",

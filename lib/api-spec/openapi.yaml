@@ -789,7 +789,7 @@ paths:
       operationId: getEnterpriseCreditTab
       tags: [enterprise]
       summary: Get the authenticated agent's trust score and credit tab
-      description: Requires fresh NIP-98 HTTP authentication. More than 50 distinct successfully paid identity-bound L402 invoices enables credit. The shared tab is capped at 2000 sats across all workers and sessions. Status polling does not extend the 15-minute idle execution window. Only authenticated historical routing settlements qualify.
+      description: Requires fresh NIP-98 HTTP authentication. More than 50 distinct successfully paid identity-bound L402 invoices enables credit. The shared gross tab is capped at 2000 sats across all workers and sessions. unpaid_sats remains gross admitted usage; yield_credit_msats is the persistent treasury, and balance_msats/balance_sats are the signed net balance, negative when credit exceeds usage. payable_sats is the whole-sat invoice amount after usable yield. Status polling does not extend the 15-minute idle execution window. Only authenticated historical routing settlements qualify.
       security:
         - NIP98: []
       responses:
@@ -805,12 +805,12 @@ paths:
       operationId: closeEnterpriseCreditTab
       tags: [enterprise]
       summary: End a credit session and invoice its entire frozen balance
-      description: Fresh NIP-98 authentication is required. Call at session end; an HTTP disconnect is not a session boundary. Closing, 15 minutes of inactivity, reaching the 2000-sat cap, or changing routing allocation freezes all further credit charges. A single identity-bound L402 macro-invoice pays the whole tab. Repeated closes reuse the invoice. Admitted tolls remain owed after tool failure or disconnection. Already-paid passes keep their existing rights.
+      description: Fresh NIP-98 authentication is required. Call at session end; an HTTP disconnect is not a session boundary. Closing, 15 minutes of inactivity, reaching the 2000-sat gross cap, or changing routing allocation freezes all further credit charges. A single identity-bound L402 macro-invoice pays the tab after applying treasury yield. gross_amount_sats and yield_applied_msats bind the discount to the frozen invoice. Fractional-sat yield remains in the treasury because invoices and revenue use whole sats. A fully treasury-covered tab closes without an invoice, new reputation, revenue or new yield. Repeated closes reuse the invoice. Admitted tolls remain owed after tool failure or disconnection. Already-paid passes keep their existing rights.
       security:
         - NIP98: []
       responses:
         "200":
-          description: No unpaid balance
+          description: No unpaid balance, or tab covered entirely by treasury yield
           content:
             application/json:
               schema: {type: object, additionalProperties: true}
@@ -827,7 +827,7 @@ paths:
       operationId: settleEnterpriseCreditTab
       tags: [enterprise]
       summary: Issue or redeem the whole credit tab's L402 macro-invoice
-      description: Without an L402 credential, freezes the tab and returns its invoice. To redeem, send Authorization L402 macaroon:preimage and the same identity's fresh NIP-98 event in X-Nostr-Authorization, signed for this exact URL, method and body. Only the persisted exact-amount provider-bound invoice can clear the entire tab. Replays are idempotent and cannot clear new debt. An authentic expired macro credential may confirm its historical payment, but never authorizes tool execution. Standard non-VIP MCP requests retain the unchanged Hashcash and upfront L402 barrier. No debt is booked as revenue until verified full payment; the existing 79/21 allocation is unchanged.
+      description: Without an L402 credential, freezes the tab and returns its invoice. To redeem, send Authorization L402 macaroon:preimage and the same identity's fresh NIP-98 event in X-Nostr-Authorization, signed for this exact URL, method and body. Only the persisted exact-amount provider-bound invoice can clear the entire tab. Each unique verified macro-payment earns exactly 21 percent of its actual paid volume as forward treasury credit, recorded in integer millisats; a 2000-sat payment opens a signed balance of -420 sats and reduces the next 2000-sat gross invoice to 1580 sats. Remaining fractional-sat credit rolls forward. Replays are idempotent and cannot clear new debt or mint additional yield. An authentic expired macro credential may confirm its historical payment, but never authorizes tool execution. Standard non-VIP MCP requests retain the unchanged Hashcash and upfront L402 barrier. Only actual paid sats are recorded as revenue, not discounts or credit-only tab closures; existing routing allocation metadata remains unchanged.
       security:
         - NIP98: []
       responses:

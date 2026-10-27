@@ -29,6 +29,22 @@ export const FleetStatementState = {
   settlement_due: 'settlement_due',
 } as const;
 
+export interface FleetWorkerSpend {
+  /** @pattern ^[0-9a-f]{64}$ */
+  worker_pubkey: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  spent_sats: number;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  max_spend_limit: number | null;
+}
+
 export interface FleetStatement {
   /** @pattern ^[0-9a-f]{64}$ */
   commander_pubkey: string;
@@ -53,14 +69,24 @@ export interface FleetStatement {
      * @minimum 0
      */
   lifetime_yield_earned_msats: number;
+  workers: FleetWorkerSpend[];
+}
+
+export interface FleetWorkerRegistration {
+  /** @pattern ^[0-9a-f]{64}$ */
+  pubkey: string;
+  /**
+     * Whole-sat lifetime cap under this Commander. Null is unlimited; omission preserves an existing limit.
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  max_spend_limit?: number | null;
 }
 
 export interface FleetRegistration {
-  /**
-     * @maxItems 1000
-     * @items.pattern ^[0-9a-f]{64}$
-     */
-  add?: string[];
+  /** @maxItems 1000 */
+  add?: (string | FleetWorkerRegistration)[];
   /**
      * @maxItems 1000
      * @items.pattern ^[0-9a-f]{64}$

@@ -753,6 +753,12 @@ paths:
         Lifetime yield sums persisted allocation_pool_msats on verified credit-tab
         settlements, excluding ordinary L402 reputation and credit-only closures.
         All yield values are integer millisatoshis, preserving fractional sats.
+        workers lists every currently registered Worker with cumulative spent_sats
+        and its optional max_spend_limit (null means unlimited). Spending counts
+        gross fleet-credit admissions, not cash repayment or treasury discounts.
+        Counters survive tab settlements, limit changes and remove/re-add cycles
+        under the same Commander. Legacy charges lack Worker attribution and are
+        excluded from Worker-level totals.
       responses:
         "200":
           description: Consistent Commander-only balance snapshot
@@ -783,6 +789,15 @@ paths:
         call) to one shared 2000-sat master tab. Removal prevents subsequent admissions
         but never forgives existing debt. Only the Commander can settle the master tab
         using the existing credit-tab settlement endpoint.
+        add accepts either legacy pubkey strings or objects with pubkey and an
+        optional max_spend_limit in whole sats. A null limit means unlimited;
+        zero disables new credit spending. Omitting the limit preserves an existing
+        Worker's limit, while a new Worker defaults to unlimited. Re-adding an
+        existing Worker can change its limit without resetting cumulative spend.
+        remove remains a pubkey-string array. Each admission checks the next
+        call's full toll against the limit, returning HTTP 403 Worker spend limit
+        exceeded before any execution, debt, invoice or replay reservation when
+        it would overspend. The shared 2000-sat master ceiling still applies.
       requestBody:
         required: true
         content:
@@ -2474,7 +2489,7 @@ components:
   schemas:
     FleetStatement:
       type: object
-      required: [commander_pubkey, session_id, state, gross_unpaid_sats, balance_msats, yield_credit_msats, yield_applied_msats, lifetime_yield_earned_msats]
+      required: [commander_pubkey, session_id, state, gross_unpaid_sats, balance_msats, yield_credit_msats, yield_applied_msats, lifetime_yield_earned_msats, workers]
       properties:
         commander_pubkey:
           type: string
@@ -2502,6 +2517,38 @@ components:
           type: integer
           minimum: 0
           description: Sum of recorded allocation_pool_msats for verified credit-tab cash settlements.
+        workers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FleetWorkerSpend"
+    FleetWorkerSpend:
+      type: object
+      required: [worker_pubkey, spent_sats, max_spend_limit]
+      properties:
+        worker_pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        spent_sats:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        max_spend_limit:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 9007199254740991
+    FleetWorkerRegistration:
+      type: object
+      additionalProperties: false
+      required: [pubkey]
+      properties:
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        max_spend_limit:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 9007199254740991
+          description: Whole-sat lifetime cap under this Commander. Null is unlimited; omission preserves an existing limit.
     FleetRegistration:
       type: object
       additionalProperties: false
@@ -2511,8 +2558,10 @@ components:
           type: array
           maxItems: 1000
           items:
-            type: string
-            pattern: '^[0-9a-f]{64}$'
+            oneOf:
+              - type: string
+                pattern: '^[0-9a-f]{64}$'
+              - $ref: "#/components/schemas/FleetWorkerRegistration"
         remove:
           type: array
           maxItems: 1000

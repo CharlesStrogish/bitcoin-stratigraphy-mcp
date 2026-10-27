@@ -22,6 +22,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FleetStatementState } from './fleetStatementState';
+import type { FleetWorkerSpend } from './fleetWorkerSpend';
 
 export interface FleetStatement {
   /** @pattern ^[0-9a-f]{64}$ */
@@ -47,4 +48,5 @@ export interface FleetStatement {
      * @minimum 0
      */
   lifetime_yield_earned_msats: number;
+  workers: FleetWorkerSpend[];
 }

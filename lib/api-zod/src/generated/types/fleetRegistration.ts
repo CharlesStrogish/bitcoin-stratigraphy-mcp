@@ -21,13 +21,11 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+import type { FleetWorkerRegistration } from './fleetWorkerRegistration';
 
 export interface FleetRegistration {
-  /**
-     * @maxItems 1000
-     * @items.pattern ^[0-9a-f]{64}$
-     */
-  add?: string[];
+  /** @maxItems 1000 */
+  add?: (string | FleetWorkerRegistration)[];
   /**
      * @maxItems 1000
      * @items.pattern ^[0-9a-f]{64}$

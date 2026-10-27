@@ -175,6 +175,13 @@ test("Commander statement is authenticated, strictly read-only, private and pres
       yield_credit_msats: 52500,
       yield_applied_msats: 52000,
       lifetime_yield_earned_msats: 52500,
+      workers: [
+        {
+          worker_pubkey: worker.pubkey,
+          spent_sats: 0,
+          max_spend_limit: null,
+        },
+      ],
     });
     assert.equal("invoice" in read.body, false);
     assert.equal("macaroon" in read.body, false);

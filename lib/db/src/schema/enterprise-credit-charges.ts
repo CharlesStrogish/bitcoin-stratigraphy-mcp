@@ -7,6 +7,8 @@ export const enterpriseCreditChargesTable = pgTable(
   {
     eventId: text("event_id").primaryKey(),
     pubkey: text("pubkey").notNull(),
+    // Nullable for legacy charges and the Commander's own admissions.
+    workerPubkey: text("worker_pubkey"),
     sessionId: text("session_id").notNull(),
     requestHash: text("request_hash").notNull(),
     amountSats: integer("amount_sats").notNull(),
@@ -15,6 +17,10 @@ export const enterpriseCreditChargesTable = pgTable(
       .defaultNow(),
   },
   (table) => [
+    index("enterprise_credit_charges_worker_idx").on(
+      table.pubkey,
+      table.workerPubkey,
+    ),
     index("enterprise_credit_charges_session_idx").on(
       table.pubkey,
       table.sessionId,

@@ -25,7 +25,7 @@ import * as zod from 'zod';
 
 
 /**
- * Read-only, no-store snapshot requiring fresh URL/method-bound NIP-98 from a VIP Commander with more than 50 verified paid invoices. Delegated Workers cannot read the master statement. No account creation, invoice issuance, idle-state transition or credit mutation occurs. Signed balance is gross unpaid usage minus available treasury credit; negative values are credit. Applied yield is the discount frozen on the latest pending macro-invoice (zero without an invoice), not an additional deduction from treasury. Lifetime yield sums persisted allocation_pool_msats on verified credit-tab settlements, excluding ordinary L402 reputation and credit-only closures. All yield values are integer millisatoshis, preserving fractional sats.
+ * Read-only, no-store snapshot requiring fresh URL/method-bound NIP-98 from a VIP Commander with more than 50 verified paid invoices. Delegated Workers cannot read the master statement. No account creation, invoice issuance, idle-state transition or credit mutation occurs. Signed balance is gross unpaid usage minus available treasury credit; negative values are credit. Applied yield is the discount frozen on the latest pending macro-invoice (zero without an invoice), not an additional deduction from treasury. Lifetime yield sums persisted allocation_pool_msats on verified credit-tab settlements, excluding ordinary L402 reputation and credit-only closures. All yield values are integer millisatoshis, preserving fractional sats. workers lists every currently registered Worker with cumulative spent_sats and its optional max_spend_limit (null means unlimited). Spending counts gross fleet-credit admissions, not cash repayment or treasury discounts. Counters survive tab settlements, limit changes and remove/re-add cycles under the same Commander. Legacy charges lack Worker attribution and are excluded from Worker-level totals.
  * @summary Read the authenticated Commander's tab and yield statement
  */
 export const getFleetStatementResponseCommanderPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -37,6 +37,13 @@ export const getFleetStatementResponseYieldAppliedMsatsMin = 0;
 
 export const getFleetStatementResponseLifetimeYieldEarnedMsatsMin = 0;
 
+export const getFleetStatementResponseWorkersItemWorkerPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getFleetStatementResponseWorkersItemSpentSatsMin = 0;
+export const getFleetStatementResponseWorkersItemSpentSatsMax = 9007199254740991;
+
+export const getFleetStatementResponseWorkersItemMaxSpendLimitMin = 0;
+export const getFleetStatementResponseWorkersItemMaxSpendLimitMax = 9007199254740991;
+
 
 
 export const GetFleetStatementResponse = zod.object({
@@ -47,15 +54,24 @@ export const GetFleetStatementResponse = zod.object({
   "balance_msats": zod.number().int().describe('Signed gross debt minus treasury credit; negative means forward credit.'),
   "yield_credit_msats": zod.number().int().min(getFleetStatementResponseYieldCreditMsatsMin).describe('Available treasury, not yet consumed by a pending invoice.'),
   "yield_applied_msats": zod.number().int().min(getFleetStatementResponseYieldAppliedMsatsMin).describe('Discount frozen on the latest pending invoice; zero if none.'),
-  "lifetime_yield_earned_msats": zod.number().int().min(getFleetStatementResponseLifetimeYieldEarnedMsatsMin).describe('Sum of recorded allocation_pool_msats for verified credit-tab cash settlements.')
+  "lifetime_yield_earned_msats": zod.number().int().min(getFleetStatementResponseLifetimeYieldEarnedMsatsMin).describe('Sum of recorded allocation_pool_msats for verified credit-tab cash settlements.'),
+  "workers": zod.array(zod.object({
+  "worker_pubkey": zod.string().regex(getFleetStatementResponseWorkersItemWorkerPubkeyRegExp),
+  "spent_sats": zod.number().int().min(getFleetStatementResponseWorkersItemSpentSatsMin).max(getFleetStatementResponseWorkersItemSpentSatsMax),
+  "max_spend_limit": zod.number().int().min(getFleetStatementResponseWorkersItemMaxSpendLimitMin).max(getFleetStatementResponseWorkersItemMaxSpendLimitMax).nullable()
+}))
 })
 
 
 /**
- * Requires fresh request/body-bound Commander NIP-98 authentication and more than 50 distinct verified paid invoices. POST add/remove arrays of lowercase 64-character NIP-98 public keys. Each Worker has one Commander; self-delegation, nested fleets and conflicting ownership are rejected atomically. Maximum 1000 Workers per Commander. Signatures are single-use. Workers retain their own execution identity and accrue existing tool tolls (250 sats per standard paid call) to one shared 2000-sat master tab. Removal prevents subsequent admissions but never forgives existing debt. Only the Commander can settle the master tab using the existing credit-tab settlement endpoint.
+ * Requires fresh request/body-bound Commander NIP-98 authentication and more than 50 distinct verified paid invoices. POST add/remove arrays of lowercase 64-character NIP-98 public keys. Each Worker has one Commander; self-delegation, nested fleets and conflicting ownership are rejected atomically. Maximum 1000 Workers per Commander. Signatures are single-use. Workers retain their own execution identity and accrue existing tool tolls (250 sats per standard paid call) to one shared 2000-sat master tab. Removal prevents subsequent admissions but never forgives existing debt. Only the Commander can settle the master tab using the existing credit-tab settlement endpoint. add accepts either legacy pubkey strings or objects with pubkey and an optional max_spend_limit in whole sats. A null limit means unlimited; zero disables new credit spending. Omitting the limit preserves an existing Worker's limit, while a new Worker defaults to unlimited. Re-adding an existing Worker can change its limit without resetting cumulative spend. remove remains a pubkey-string array. Each admission checks the next call's full toll against the limit, returning HTTP 403 Worker spend limit exceeded before any execution, debt, invoice or replay reservation when it would overspend. The shared 2000-sat master ceiling still applies.
  * @summary Add or remove Workers authorized to spend the Commander's credit tab
  */
-export const registerEnterpriseFleetBodyAddItemRegExp = new RegExp('^[0-9a-f]{64}$');
+export const registerEnterpriseFleetBodyAddItemOneRegExp = new RegExp('^[0-9a-f]{64}$');
+export const registerEnterpriseFleetBodyAddItemTwoPubkeyRegExp = new RegExp('^[0-9a-f]{64}$');
+export const registerEnterpriseFleetBodyAddItemTwoMaxSpendLimitMin = 0;
+export const registerEnterpriseFleetBodyAddItemTwoMaxSpendLimitMax = 9007199254740991;
+
 export const registerEnterpriseFleetBodyAddMax = 1000;
 
 export const registerEnterpriseFleetBodyRemoveItemRegExp = new RegExp('^[0-9a-f]{64}$');
@@ -64,7 +80,10 @@ export const registerEnterpriseFleetBodyRemoveMax = 1000;
 
 
 export const RegisterEnterpriseFleetBody = zod.object({
-  "add": zod.array(zod.string().regex(registerEnterpriseFleetBodyAddItemRegExp)).max(registerEnterpriseFleetBodyAddMax).optional(),
+  "add": zod.array(zod.union([zod.string().regex(registerEnterpriseFleetBodyAddItemOneRegExp),zod.object({
+  "pubkey": zod.string().regex(registerEnterpriseFleetBodyAddItemTwoPubkeyRegExp),
+  "max_spend_limit": zod.number().int().min(registerEnterpriseFleetBodyAddItemTwoMaxSpendLimitMin).max(registerEnterpriseFleetBodyAddItemTwoMaxSpendLimitMax).nullish().describe('Whole-sat lifetime cap under this Commander. Null is unlimited; omission preserves an existing limit.')
+})])).max(registerEnterpriseFleetBodyAddMax).optional(),
   "remove": zod.array(zod.string().regex(registerEnterpriseFleetBodyRemoveItemRegExp)).max(registerEnterpriseFleetBodyRemoveMax).optional()
 })
 

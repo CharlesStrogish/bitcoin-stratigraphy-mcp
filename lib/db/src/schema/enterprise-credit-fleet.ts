@@ -1,4 +1,11 @@
-import { check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  index,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -12,9 +19,19 @@ export const enterpriseCreditFleetTable = pgTable(
     commanderPubkey: text("commander_pubkey")
       .notNull()
       .references(() => enterpriseCreditAccountsTable.pubkey),
+    maxSpendLimit: bigint("max_spend_limit", { mode: "number" }),
+    spentSats: bigint("spent_sats", { mode: "number" }).notNull().default(0),
   },
   (table) => [
     index("enterprise_credit_fleet_commander_idx").on(table.commanderPubkey),
+    check(
+      "enterprise_credit_fleet_spend_check",
+      sql`${table.spentSats} BETWEEN 0 AND 9007199254740991`,
+    ),
+    check(
+      "enterprise_credit_fleet_limit_check",
+      sql`${table.maxSpendLimit} IS NULL OR ${table.maxSpendLimit} BETWEEN 0 AND 9007199254740991`,
+    ),
     check(
       "enterprise_credit_fleet_not_self",
       sql`${table.workerPubkey} <> ${table.commanderPubkey}`,

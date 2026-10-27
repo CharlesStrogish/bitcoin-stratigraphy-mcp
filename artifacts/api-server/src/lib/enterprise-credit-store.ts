@@ -34,10 +34,20 @@ export type CreditAccount = {
   yield_credit_msats: number;
   state: CreditState;
 };
+export type FleetMemberInput = {
+  pubkey: string;
+  max_spend_limit?: number | null;
+};
+export type WorkerSpend = {
+  worker_pubkey: string;
+  spent_sats: number;
+  max_spend_limit: number | null;
+};
 export interface CreditTransaction {
   account: CreditAccount;
+  worker?: WorkerSpend;
   updateFleet?(
-    add: string[],
+    add: FleetMemberInput[],
     remove: string[],
     eventId: string,
   ): Promise<string[]>;
@@ -65,6 +75,7 @@ export interface EnterpriseCreditStore {
         account: CreditAccount;
         lifetimeYieldMsats: number;
         isWorker: boolean;
+        workers: WorkerSpend[];
       }
     | undefined
   >;
@@ -94,10 +105,18 @@ export function createPostgresEnterpriseCreditStore(
     async statement(pubkey) {
       // One MVCC snapshot; no account creation, row lock, or idle-state update.
       const result = await database.query<
-        CreditAccount & { lifetime_yield_msats: string; is_worker: boolean }
+        CreditAccount & {
+          lifetime_yield_msats: string;
+          is_worker: boolean;
+          workers: WorkerSpend[];
+        }
       >(
         `SELECT a.*,
           EXISTS(SELECT 1 FROM enterprise_credit_fleet WHERE worker_pubkey=a.pubkey) AS is_worker,
+          COALESCE((SELECT jsonb_agg(jsonb_build_object(
+            'worker_pubkey',worker_pubkey,'spent_sats',spent_sats,
+            'max_spend_limit',max_spend_limit) ORDER BY worker_pubkey)
+            FROM enterprise_credit_fleet WHERE commander_pubkey=a.pubkey),'[]'::jsonb) AS workers,
           COALESCE((SELECT SUM(allocation_pool_msats)
             FROM enterprise_credit_settlements
             WHERE pubkey=a.pubkey AND source='credit-tab'),0)::text AS lifetime_yield_msats
@@ -109,7 +128,12 @@ export function createPostgresEnterpriseCreditStore(
       const lifetimeYieldMsats = Number(row.lifetime_yield_msats);
       if (!Number.isSafeInteger(lifetimeYieldMsats))
         throw new Error("Lifetime yield exceeds safe integer reporting range");
-      return { account: row, lifetimeYieldMsats, isWorker: row.is_worker };
+      return {
+        account: row,
+        lifetimeYieldMsats,
+        isWorker: row.is_worker,
+        workers: row.workers,
+      };
     },
     async transaction(pubkey, run, options) {
       const client = await database.connect();
@@ -138,17 +162,24 @@ export function createPostgresEnterpriseCreditStore(
           [pubkey],
         );
         const account = result.rows[0]!;
+        let worker: WorkerSpend | undefined;
         if (options?.routeFleet) {
           // Membership changes take the same owner account lock. Recheck after
           // acquiring it so removal cannot race a charge based on stale routing.
-          const owner = await client.query<{ commander_pubkey: string }>(
-            "SELECT commander_pubkey FROM enterprise_credit_fleet WHERE worker_pubkey=$1",
+          const owner = await client.query<
+            WorkerSpend & { commander_pubkey: string }
+          >(
+            `SELECT commander_pubkey,worker_pubkey,
+               spent_sats::float8 AS spent_sats,
+               max_spend_limit::float8 AS max_spend_limit
+             FROM enterprise_credit_fleet WHERE worker_pubkey=$1`,
             [signer],
           );
           if ((owner.rows[0]?.commander_pubkey ?? signer) !== pubkey)
             throw new FleetStoreError(
               "Fleet routing changed; retry with a fresh NIP-98 signature",
             );
+          worker = owner.rows[0];
         }
         if (inserted.rows.length) {
           // Historical routing invoices carry a buyer only after verified NIP-98.
@@ -172,6 +203,7 @@ export function createPostgresEnterpriseCreditStore(
         }
         const value = await run({
           account,
+          worker,
           async updateFleet(add, remove, eventId) {
             if (!options?.manageFleet)
               throw new Error(
@@ -180,14 +212,14 @@ export function createPostgresEnterpriseCreditStore(
             const nested = await client.query(
               `SELECT worker_pubkey FROM enterprise_credit_fleet
                WHERE worker_pubkey=$1 OR commander_pubkey=ANY($2::text[]) LIMIT 1`,
-              [pubkey, add],
+              [pubkey, add.map((member) => member.pubkey)],
             );
             if (nested.rows.length)
               throw new FleetStoreError("Nested fleets are not permitted");
             const conflicting = await client.query(
               `SELECT worker_pubkey FROM enterprise_credit_fleet
                WHERE worker_pubkey=ANY($1::text[]) AND commander_pubkey<>$2 LIMIT 1`,
-              [add, pubkey],
+              [add.map((member) => member.pubkey), pubkey],
             );
             if (conflicting.rows.length)
               throw new FleetStoreError(
@@ -207,9 +239,28 @@ export function createPostgresEnterpriseCreditStore(
               [pubkey, remove],
             );
             await client.query(
-              `INSERT INTO enterprise_credit_fleet(worker_pubkey,commander_pubkey)
-               SELECT unnest($1::text[]),$2 ON CONFLICT DO NOTHING`,
-              [add, pubkey],
+              `INSERT INTO enterprise_credit_fleet AS fleet
+                 (worker_pubkey,commander_pubkey,max_spend_limit,spent_sats)
+               SELECT member.pubkey,$2,member.max_spend_limit,
+                 COALESCE((SELECT SUM(amount_sats) FROM enterprise_credit_charges
+                   WHERE pubkey=$2 AND worker_pubkey=member.pubkey),0)
+               FROM jsonb_to_recordset($1::jsonb)
+                 AS member(pubkey text,max_spend_limit bigint,has_limit boolean)
+               WHERE true
+               ON CONFLICT(worker_pubkey) DO UPDATE SET max_spend_limit=
+                 CASE WHEN (SELECT member.has_limit FROM jsonb_to_recordset($1::jsonb)
+                   AS member(pubkey text,has_limit boolean)
+                   WHERE member.pubkey=EXCLUDED.worker_pubkey)
+                 THEN EXCLUDED.max_spend_limit ELSE fleet.max_spend_limit END`,
+              [
+                JSON.stringify(
+                  add.map((member) => ({
+                    ...member,
+                    has_limit: member.max_spend_limit !== undefined,
+                  })),
+                ),
+                pubkey,
+              ],
             );
             const fleet = await client.query<{ worker_pubkey: string }>(
               "SELECT worker_pubkey FROM enterprise_credit_fleet WHERE commander_pubkey=$1 ORDER BY worker_pubkey",
@@ -248,14 +299,24 @@ export function createPostgresEnterpriseCreditStore(
             return (
               (
                 await client.query(
-                  `INSERT INTO enterprise_credit_charges(event_id,pubkey,session_id,request_hash,amount_sats)
-               VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING event_id`,
+                  `WITH admitted AS (
+                     INSERT INTO enterprise_credit_charges
+                       (event_id,pubkey,session_id,request_hash,amount_sats,worker_pubkey)
+                     VALUES($1,$2,$3,$4,$5,$6)
+                     ON CONFLICT DO NOTHING RETURNING event_id
+                   ), worker_spend AS (
+                     UPDATE enterprise_credit_fleet SET spent_sats=spent_sats+$5
+                     WHERE worker_pubkey=$6 AND commander_pubkey=$2
+                       AND EXISTS(SELECT 1 FROM admitted)
+                   )
+                   SELECT event_id FROM admitted`,
                   [
                     eventId,
                     pubkey,
                     account.state.sessionId,
                     requestHash,
                     amount,
+                    worker ? signer : null,
                   ],
                 )
               ).rows.length === 1

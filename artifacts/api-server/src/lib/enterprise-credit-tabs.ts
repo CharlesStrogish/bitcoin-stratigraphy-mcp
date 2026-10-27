@@ -22,6 +22,7 @@ import {
   type CreditState,
   type EnterpriseCreditStore,
   FleetStoreError,
+  type FleetMemberInput,
 } from "./enterprise-credit-store";
 
 export const CREDIT_LIMIT_SATS = 2_000;
@@ -65,18 +66,34 @@ export class EnterpriseCreditTabs {
         "Provide add and/or remove arrays of Worker pubkeys",
       );
     const input = body as Record<string, unknown>;
+    const validKey = (key: unknown): key is string =>
+      typeof key === "string" && /^[0-9a-f]{64}$/.test(key) && key !== pubkey;
     const valid = (value: unknown): value is string[] =>
       Array.isArray(value) &&
       value.length <= 1000 &&
-      value.every(
-        (key) =>
-          typeof key === "string" &&
-          /^[0-9a-f]{64}$/.test(key) &&
-          key !== pubkey,
-      );
+      value.every((key) => validKey(key));
+    const validAdd = (value: unknown): boolean =>
+      Array.isArray(value) &&
+      value.length <= 1000 &&
+      value.every((member) => {
+        if (typeof member === "string") return validKey(member);
+        if (!member || typeof member !== "object" || Array.isArray(member))
+          return false;
+        const item = member as Record<string, unknown>;
+        return (
+          validKey(item.pubkey) &&
+          Object.keys(item).every(
+            (key) => key === "pubkey" || key === "max_spend_limit",
+          ) &&
+          (item.max_spend_limit === undefined ||
+            item.max_spend_limit === null ||
+            (Number.isSafeInteger(item.max_spend_limit) &&
+              (item.max_spend_limit as number) >= 0))
+        );
+      });
     if (
       Object.keys(input).some((key) => key !== "add" && key !== "remove") ||
-      !valid(input.add === undefined ? [] : input.add) ||
+      !validAdd(input.add === undefined ? [] : input.add) ||
       !valid(input.remove === undefined ? [] : input.remove) ||
       (input.add === undefined && input.remove === undefined)
     )
@@ -84,9 +101,18 @@ export class EnterpriseCreditTabs {
         400,
         "Use only add/remove arrays of up to 1000 distinct non-self lowercase hex pubkeys",
       );
-    const add = [...new Set((input.add ?? []) as string[])];
+    const add: FleetMemberInput[] = (
+      (input.add ?? []) as (string | FleetMemberInput)[]
+    ).map((member) =>
+      typeof member === "string" ? { pubkey: member } : member,
+    );
+    if (new Set(add.map((member) => member.pubkey)).size !== add.length)
+      throw new CreditTabError(
+        400,
+        "Duplicate Worker pubkeys are not permitted",
+      );
     const remove = [...new Set((input.remove ?? []) as string[])];
-    if (add.some((key) => remove.includes(key)))
+    if (add.some((member) => remove.includes(member.pubkey)))
       throw new CreditTabError(
         400,
         "A Worker cannot be both added and removed",
@@ -174,6 +200,7 @@ export class EnterpriseCreditTabs {
       yield_credit_msats: account.yield_credit_msats,
       yield_applied_msats: pending?.yieldAppliedMsats ?? 0,
       lifetime_yield_earned_msats: lifetimeYieldMsats,
+      workers: snapshot.workers,
     };
   }
   async recordPaid(
@@ -248,6 +275,11 @@ export class EnterpriseCreditTabs {
           return { kind: "standard" } as const;
         if (!Number.isSafeInteger(amountSats) || amountSats < 1)
           throw new Error("Invalid credit toll");
+        if (
+          tx.worker?.max_spend_limit != null &&
+          amountSats > tx.worker.max_spend_limit - tx.worker.spent_sats
+        )
+          throw new CreditTabError(403, "Worker spend limit exceeded");
         if (
           a.unpaid_sats &&
           (this.now() - a.state.lastActivity >= CREDIT_IDLE_MS ||

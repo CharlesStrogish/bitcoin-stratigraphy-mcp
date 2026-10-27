@@ -87,3 +87,19 @@ whole-sat invoice discounts and retain fractional-sat treasury remainders.
 Credit-only closures consume treasury without issuing zero-value invoices.
 Freeze each invoice's gross usage and applied discount; old proofs must not
 clear new usage, re-spend treasury or mint additional yield.
+
+Worker treasury firewalls are cumulative budgets under a Commander, not
+per-session allowances. Count gross admitted tolls, including admitted work that
+later fails; repayment, yield discounts and removal/re-addition must not erase
+that spend. An omitted limit preserves an existing Worker's policy; an explicit
+null lifts it and zero stops new fleet-credit spending. Prepaid rights remain
+separate because they do not spend the Commander's treasury.
+
+**Why:** The user requested historical per-Worker limits while protecting the
+shared master ceiling, yield arithmetic, canonical tools and UI. Budget decisions
+must not add database round trips or history aggregation to admission.
+
+**How to apply:** Enforce the next full toll atomically with admission under the
+Commander's existing serialization. Keep historical attribution for restoration
+after re-addition. Pre-firewall charges recorded only the billing owner, not the
+Worker signer: do not invent retroactive Worker allocations from those records.

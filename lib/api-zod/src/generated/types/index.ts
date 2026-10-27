@@ -96,6 +96,8 @@ export * from './exportHuggingFaceDatasetParams';
 export * from './fleetRegistration';
 export * from './fleetStatement';
 export * from './fleetStatementState';
+export * from './fleetWorkerRegistration';
+export * from './fleetWorkerSpend';
 export * from './getEnterpriseCreditTab200';
 export * from './getNip05IdentityParams';
 export * from './getPaidStratigraphyParams';

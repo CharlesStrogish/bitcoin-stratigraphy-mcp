@@ -34,6 +34,16 @@ export function CommandCenter() {
           SHA-256 Proof-of-Work deflects compute-exhaustion bots before invoice
           creation.
         </p>
+        <p>
+          <strong>White-Label Resellers &amp; Syndicate Orchestrators:</strong>{" "}
+          White-label the engine, not the infrastructure. Instead of spending
+          millions attempting to rebuild L402 Lightning nodes and Hashcash
+          defenses, operate as Commanders: route your users through Bitcoin
+          Stratigraphy&apos;s backend master tab and pocket the 21% Agent Yield
+          as your own profit margin. Build your applications on Bitcoin
+          Stratigraphy, the un-forkable &ldquo;Central Bank&rdquo; and base money
+          layer.
+        </p>
       </header>
       <McpToolsMatrix />
       <EnterpriseLicensingMatrix />

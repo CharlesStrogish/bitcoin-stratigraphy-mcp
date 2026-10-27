@@ -46,6 +46,20 @@ test("landing copy and crawler metadata expose the three registry architecture p
 });
 
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+test("landing invites white-label resellers to earn Commander yield on the shared engine", () => {
+  const copy = commandCenter.replace(/\s+/g, " ");
+  assert.ok(
+    copy.includes("<strong>White-Label Resellers &amp; Syndicate Orchestrators:</strong>"),
+  );
+  for (const phrase of [
+    "White-label the engine, not the infrastructure.",
+    "Instead of spending millions attempting to rebuild L402 Lightning nodes and Hashcash defenses",
+    "operate as Commanders: route your users through Bitcoin Stratigraphy&apos;s backend master tab",
+    "pocket the 21% Agent Yield as your own profit margin.",
+    "the un-forkable &ldquo;Central Bank&rdquo; and base money layer.",
+  ]) assert.ok(copy.includes(phrase), phrase);
+});
+
 const catalogTools = [
   ...catalog.matchAll(/\{\s*name: "([a-z_]+\.[a-z_]+)",\s*title: "([^"]+)"/g),
 ].map(([, name, title]) => ({ name, title }));

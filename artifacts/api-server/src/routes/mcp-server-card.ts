@@ -285,10 +285,16 @@ export function registerMcpServerCardRoute(app: Express): void {
   for (const path of [
     "/.well-known/mcp/connector.json",
     "/.well-known/glama-mcp-connector.json",
-    "/.well-known/glama.json",
   ]) {
     app.get(path, (_req, res): void => {
       res.status(200).json(glamaConnector);
     });
   }
+
+  app.get("/.well-known/glama.json", (_req, res): void => {
+    res.status(200).json({
+      $schema: "https://glama.ai/mcp/schemas/connector.json",
+      claim: "glama_claim_4N7ubcwaG0adHJjd-Go2ue11blsBugXo",
+    });
+  });
 }

@@ -96,3 +96,4 @@
 - [Public receipt broadcast trust](nostr-receipt-privacy.md) — publish only persisted, allowlisted proof summaries; relay failure never changes settlement or execution status.
 - [Invoice compute admission](invoice-pow-admission.md) — gate new MCP invoices, not paid verification; preserve request binding and atomic replay protection across workers.
 - [Enterprise credit tabs](enterprise-credit-tabs.md) — authenticated paid-history threshold, shared debt cap, explicit session closing and exact-once whole-tab settlement.
+- [Glama ownership](glama-ownership.md) — ownership claims are exact provider-supplied documents; preserve legacy connector metadata and the MCP manifest.

@@ -5284,7 +5284,6 @@ test("serves all public Glama connector discovery routes exactly", async () => {
   for (const path of [
     "/.well-known/mcp/connector.json",
     "/.well-known/glama-mcp-connector.json",
-    "/.well-known/glama.json",
   ]) {
     const response = await fetch(`${baseUrl}${path}`);
 
@@ -5296,6 +5295,20 @@ test("serves all public Glama connector discovery routes exactly", async () => {
     assert.equal(response.headers.get("www-authenticate"), null);
     assert.deepEqual(await response.json(), expectedConnector);
   }
+});
+
+test("serves the exact public Glama ownership verification payload without authentication", async () => {
+  const response = await fetch(`${baseUrl}/.well-known/glama.json`);
+  assert.equal(response.status, 200);
+  assert.match(
+    response.headers.get("content-type") ?? "",
+    /^application\/json\b/,
+  );
+  assert.equal(response.headers.get("www-authenticate"), null);
+  assert.deepEqual(await response.json(), {
+    $schema: "https://glama.ai/mcp/schemas/connector.json",
+    claim: "glama_claim_4N7ubcwaG0adHJjd-Go2ue11blsBugXo",
+  });
 });
 
 test("serves the root OpenAPI document as raw JSON", async () => {

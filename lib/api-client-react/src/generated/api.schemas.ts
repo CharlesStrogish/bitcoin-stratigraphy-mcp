@@ -21,6 +21,19 @@
  * - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
  * OpenAPI spec version: 0.1.0
  */
+export interface FleetRegistration {
+  /**
+     * @maxItems 1000
+     * @items.pattern ^[0-9a-f]{64}$
+     */
+  add?: string[];
+  /**
+     * @maxItems 1000
+     * @items.pattern ^[0-9a-f]{64}$
+     */
+  remove?: string[];
+}
+
 export interface Nip98KeyRevocationInput {
   /** @pattern ^[0-9a-fA-F]{64}$ */
   pubkey: string;
@@ -2324,6 +2337,19 @@ export type PublicMetadataResponse = PublicMetadata;
  * Empty, finite successful preflight
  */
 export type PublicPreflightResponse = void;
+
+export type RegisterEnterpriseFleet200MaximumUnpaidSats = typeof RegisterEnterpriseFleet200MaximumUnpaidSats[keyof typeof RegisterEnterpriseFleet200MaximumUnpaidSats];
+
+
+export const RegisterEnterpriseFleet200MaximumUnpaidSats = {
+  NUMBER_2000: 2000,
+} as const;
+
+export type RegisterEnterpriseFleet200 = {
+  commander_pubkey: string;
+  workers: string[];
+  maximum_unpaid_sats: RegisterEnterpriseFleet200MaximumUnpaidSats;
+};
 
 export type GetEnterpriseCreditTab200 = { [key: string]: unknown };
 

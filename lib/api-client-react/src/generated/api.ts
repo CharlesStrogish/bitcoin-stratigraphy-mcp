@@ -55,6 +55,7 @@ import type {
   EscrowSettlement,
   EscrowTollQuote,
   ExportHuggingFaceDatasetParams,
+  FleetRegistration,
   GetEnterpriseCreditTab200,
   GetNip05IdentityParams,
   GetPaidStratigraphyParams,
@@ -94,6 +95,7 @@ import type {
   PublicPreflightResponse,
   QuoteMcpToolCosts400,
   ReadinessStatus,
+  RegisterEnterpriseFleet200,
   RevokeNip98Key200,
   SettleEnterpriseCreditTab200,
   SettleEnterpriseCreditTab402,
@@ -140,6 +142,78 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getRegisterEnterpriseFleetUrl = () => {
+
+
+
+
+  return `/api/api/v1/fleet/register`
+}
+
+/**
+ * Requires fresh request/body-bound Commander NIP-98 authentication and more than 50 distinct verified paid invoices. POST add/remove arrays of lowercase 64-character NIP-98 public keys. Each Worker has one Commander; self-delegation, nested fleets and conflicting ownership are rejected atomically. Maximum 1000 Workers per Commander. Signatures are single-use. Workers retain their own execution identity and accrue existing tool tolls (250 sats per standard paid call) to one shared 2000-sat master tab. Removal prevents subsequent admissions but never forgives existing debt. Only the Commander can settle the master tab using the existing credit-tab settlement endpoint.
+ * @summary Add or remove Workers authorized to spend the Commander's credit tab
+ */
+export const registerEnterpriseFleet = async (fleetRegistration: FleetRegistration, options?: Parameters<typeof customFetch>[1]): Promise<RegisterEnterpriseFleet200> => {
+
+  return customFetch<RegisterEnterpriseFleet200>(getRegisterEnterpriseFleetUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(fleetRegistration)
+  }
+);}
+
+
+
+
+
+export const getRegisterEnterpriseFleetMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerEnterpriseFleet>>, TError,{data: BodyType<FleetRegistration>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerEnterpriseFleet>>, TError,{data: BodyType<FleetRegistration>}, TContext> => {
+
+const mutationKey = ['registerEnterpriseFleet'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerEnterpriseFleet>>, {data: BodyType<FleetRegistration>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerEnterpriseFleet(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterEnterpriseFleetMutationResult = NonNullable<Awaited<ReturnType<typeof registerEnterpriseFleet>>>
+    export type RegisterEnterpriseFleetMutationBody = BodyType<FleetRegistration>
+    export type RegisterEnterpriseFleetMutationError = ErrorType<void>
+
+    /**
+ * @summary Add or remove Workers authorized to spend the Commander's credit tab
+ */
+export const useRegisterEnterpriseFleet = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerEnterpriseFleet>>, TError,{data: BodyType<FleetRegistration>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerEnterpriseFleet>>,
+        TError,
+        {data: BodyType<FleetRegistration>},
+        TContext
+      > => {
+      return useMutation(getRegisterEnterpriseFleetMutationOptions(options));
+    }
 
 export const getGetEnterpriseCreditTabUrl = () => {
 

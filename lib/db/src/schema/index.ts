@@ -28,3 +28,4 @@ export * from "./invoice-pow-consumptions";
 export * from "./enterprise-credit-accounts";
 export * from "./enterprise-credit-settlements";
 export * from "./enterprise-credit-charges";
+export * from "./enterprise-credit-fleet";

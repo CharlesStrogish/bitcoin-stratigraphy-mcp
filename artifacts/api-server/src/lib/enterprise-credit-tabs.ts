@@ -21,12 +21,14 @@ import {
   type CreditAccount,
   type CreditState,
   type EnterpriseCreditStore,
+  FleetStoreError,
 } from "./enterprise-credit-store";
 
 export const CREDIT_LIMIT_SATS = 2_000;
 export const CREDIT_TRUST_THRESHOLD = 50;
 export const CREDIT_IDLE_MS = 15 * 60_000;
 export const CREDIT_TAB_PATH = "/api/v1/enterprise/credit-tab";
+export const FLEET_REGISTER_PATH = "/api/v1/fleet/register";
 const SETTLE_PATH = CREDIT_TAB_PATH + "/settle";
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -53,6 +55,67 @@ export class EnterpriseCreditTabs {
     readonly store: EnterpriseCreditStore = createPostgresEnterpriseCreditStore(),
     readonly now = Date.now,
   ) {}
+  async registerFleet(pubkey: string, body: unknown, eventId: string) {
+    if (!/^[0-9a-f]{64}$/.test(eventId))
+      throw new CreditTabError(401, "Invalid NIP-98 event id");
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      throw new CreditTabError(
+        400,
+        "Provide add and/or remove arrays of Worker pubkeys",
+      );
+    const input = body as Record<string, unknown>;
+    const valid = (value: unknown): value is string[] =>
+      Array.isArray(value) &&
+      value.length <= 1000 &&
+      value.every(
+        (key) =>
+          typeof key === "string" &&
+          /^[0-9a-f]{64}$/.test(key) &&
+          key !== pubkey,
+      );
+    if (
+      Object.keys(input).some((key) => key !== "add" && key !== "remove") ||
+      !valid(input.add === undefined ? [] : input.add) ||
+      !valid(input.remove === undefined ? [] : input.remove) ||
+      (input.add === undefined && input.remove === undefined)
+    )
+      throw new CreditTabError(
+        400,
+        "Use only add/remove arrays of up to 1000 distinct non-self lowercase hex pubkeys",
+      );
+    const add = [...new Set((input.add ?? []) as string[])];
+    const remove = [...new Set((input.remove ?? []) as string[])];
+    if (add.some((key) => remove.includes(key)))
+      throw new CreditTabError(
+        400,
+        "A Worker cannot be both added and removed",
+      );
+    try {
+      return await this.store.transaction(
+        pubkey,
+        async (tx) => {
+          if (tx.account.trust_score <= CREDIT_TRUST_THRESHOLD)
+            throw new CreditTabError(
+              403,
+              "Commander requires more than 50 verified paid invoices",
+            );
+          if (!tx.updateFleet)
+            throw new CreditTabError(503, "Fleet storage unavailable");
+          const workers = await tx.updateFleet(add, remove, eventId);
+          return {
+            commander_pubkey: pubkey,
+            workers,
+            maximum_unpaid_sats: CREDIT_LIMIT_SATS,
+          };
+        },
+        { manageFleet: true },
+      );
+    } catch (error) {
+      if (error instanceof FleetStoreError)
+        throw new CreditTabError(error.status, error.message);
+      throw error;
+    }
+  }
   summary(account: CreditAccount) {
     return {
       pubkey: account.pubkey,
@@ -143,52 +206,63 @@ export class EnterpriseCreditTabs {
       parentPayout: context?.parentPayout,
       verificationAllocation: context?.verificationAllocation,
     };
-    const outcome = await this.store.transaction(pubkey, async (tx) => {
-      const a = tx.account;
-      if (a.trust_score <= CREDIT_TRUST_THRESHOLD)
-        return { kind: "standard" } as const;
-      if (!Number.isSafeInteger(amountSats) || amountSats < 1)
-        throw new Error("Invalid credit toll");
-      if (
-        a.unpaid_sats &&
-        (this.now() - a.state.lastActivity >= CREDIT_IDLE_MS ||
-          routingKey(a.state.routing) !== routingKey(routing) ||
-          a.unpaid_sats + amountSats > CREDIT_LIMIT_SATS)
-      )
-        a.state.due = true;
-      if (a.state.due) return { kind: "due" } as const;
-      // A single operation larger than the tab limit must use the existing prepaid lane.
-      if (amountSats > CREDIT_LIMIT_SATS) return { kind: "standard" } as const;
-      const requestHash = hash(
-        JSON.stringify([
-          req.method,
-          req.originalUrl,
-          scope,
-          req.body,
-          amountSats,
-        ]),
-      );
-      if (!(await tx.charge(event.id, requestHash, amountSats)))
-        throw new CreditTabError(
-          409,
-          "NIP-98 credit admission already reserved; execution was not repeated",
+    const outcome = await this.store.transaction(
+      pubkey,
+      async (tx) => {
+        const a = tx.account;
+        const delegated = a.pubkey !== pubkey;
+        // A Worker may spend credit but may not redirect the owner's allocation.
+        const billingRouting = delegated ? (a.state.routing ?? {}) : routing;
+        if (a.trust_score <= CREDIT_TRUST_THRESHOLD)
+          return { kind: "standard" } as const;
+        if (!Number.isSafeInteger(amountSats) || amountSats < 1)
+          throw new Error("Invalid credit toll");
+        if (
+          a.unpaid_sats &&
+          (this.now() - a.state.lastActivity >= CREDIT_IDLE_MS ||
+            routingKey(a.state.routing) !== routingKey(billingRouting) ||
+            a.unpaid_sats + amountSats > CREDIT_LIMIT_SATS)
+        )
+          a.state.due = true;
+        if (a.state.due) return { kind: "due", commander: a.pubkey } as const;
+        // A single operation larger than the tab limit must use the existing prepaid lane.
+        if (amountSats > CREDIT_LIMIT_SATS)
+          return { kind: "standard" } as const;
+        const requestHash = hash(
+          JSON.stringify([
+            req.method,
+            req.originalUrl,
+            scope,
+            req.body,
+            amountSats,
+          ]),
         );
-      a.unpaid_sats += amountSats;
-      a.state.lastActivity = this.now();
-      a.state.routing = routing;
-      if (a.unpaid_sats === CREDIT_LIMIT_SATS) a.state.due = true;
-      return {
-        kind: "admitted",
-        credit: {
-          ...this.summary(a),
-          charge_id: event.id,
-          request_sha256: requestHash,
-        },
-      } as const;
-    });
+        if (!(await tx.charge(event.id, requestHash, amountSats)))
+          throw new CreditTabError(
+            409,
+            "NIP-98 credit admission already reserved; execution was not repeated",
+          );
+        a.unpaid_sats += amountSats;
+        a.state.lastActivity = this.now();
+        a.state.routing = billingRouting;
+        if (a.unpaid_sats === CREDIT_LIMIT_SATS) a.state.due = true;
+        return {
+          kind: "admitted",
+          credit: {
+            ...this.summary(a),
+            ...(delegated
+              ? { commander_pubkey: a.pubkey, worker_pubkey: pubkey }
+              : {}),
+            charge_id: event.id,
+            request_sha256: requestHash,
+          },
+        } as const;
+      },
+      { routeFleet: true },
+    );
     if (outcome.kind === "standard") return "standard";
     if (outcome.kind === "due") {
-      const invoice = await this.invoice(pubkey, router, secret);
+      const invoice = await this.invoice(outcome.commander, router, secret);
       if ("invoice" in invoice && "macaroon" in invoice)
         res.setHeader(
           "WWW-Authenticate",
@@ -248,10 +322,12 @@ export class EnterpriseCreditTabs {
         const outer = enterpriseContext.getStore();
         const context = {
           ...outer,
-          ...a.state.routing,
+          payout: a.state.routing?.payout,
+          parentPayout: a.state.routing?.parentPayout,
+          verificationAllocation: a.state.routing?.verificationAllocation,
           buyer: pubkey,
           invoices: new Map(),
-          account: outer?.account,
+          account: outer?.buyer === pubkey ? outer.account : undefined,
         };
         const created = await enterpriseContext.run(context, () =>
           router.createInvoice({
@@ -268,17 +344,19 @@ export class EnterpriseCreditTabs {
           (created.asset && created.asset !== "btc-lightning")
         )
           throw new Error("Invalid credit tab settlement invoice");
-        const root = createSubscriptionMacaroon({
-          secret,
-          paymentHash: created.paymentHash,
-          tier: "1-day",
-          validUntil: Math.floor(this.now() / 1000) + 3600,
-          amountMsats: a.unpaid_sats * 1000,
-          paymentAsset: "btc-lightning",
-          paymentProvider: created.provider,
-          agentId: pubkey,
-          agentAuthentication: "nip98",
-        });
+        const root = enterpriseContext.run(context, () =>
+          createSubscriptionMacaroon({
+            secret,
+            paymentHash: created.paymentHash,
+            tier: "1-day",
+            validUntil: Math.floor(this.now() / 1000) + 3600,
+            amountMsats: a.unpaid_sats * 1000,
+            paymentAsset: "btc-lightning",
+            paymentProvider: created.provider,
+            agentId: pubkey,
+            agentAuthentication: "nip98",
+          }),
+        );
         const macaroon = attenuateSubscriptionMacaroon(root, [
           `allowed_path=${SETTLE_PATH}`,
           "max_requests=1",

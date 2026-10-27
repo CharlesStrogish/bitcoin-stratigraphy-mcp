@@ -735,6 +735,55 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /api/v1/fleet/register:
+    post:
+      operationId: registerEnterpriseFleet
+      tags: [Enterprise Licensing]
+      summary: Add or remove Workers authorized to spend the Commander's credit tab
+      description: >-
+        Requires fresh request/body-bound Commander NIP-98 authentication and more than
+        50 distinct verified paid invoices. POST add/remove arrays of lowercase
+        64-character NIP-98 public keys. Each Worker has one Commander; self-delegation,
+        nested fleets and conflicting ownership are rejected atomically. Maximum 1000
+        Workers per Commander. Signatures are single-use. Workers retain their own
+        execution identity and accrue existing tool tolls (250 sats per standard paid
+        call) to one shared 2000-sat master tab. Removal prevents subsequent admissions
+        but never forgives existing debt. Only the Commander can settle the master tab
+        using the existing credit-tab settlement endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FleetRegistration"
+      responses:
+        "200":
+          description: Fleet updated atomically
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [commander_pubkey, workers, maximum_unpaid_sats]
+                properties:
+                  commander_pubkey:
+                    type: string
+                  workers:
+                    type: array
+                    items:
+                      type: string
+                  maximum_unpaid_sats:
+                    type: integer
+                    enum: [2000]
+        "400":
+          description: Invalid Worker arrays or overlapping add/remove entries
+        "401":
+          description: Missing or invalid NIP-98 authentication
+        "403":
+          description: Commander not VIP eligible or declaration does not match signer
+        "409":
+          description: Conflicting ownership, nested fleet, replayed signature or fleet limit
+        "503":
+          description: Fleet storage unavailable
   /api/v1/enterprise/credit-tab:
     get:
       operationId: getEnterpriseCreditTab
@@ -2385,6 +2434,23 @@ components:
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
   schemas:
+    FleetRegistration:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        add:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+            pattern: '^[0-9a-f]{64}$'
+        remove:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+            pattern: '^[0-9a-f]{64}$'
     Nip98KeyRevocationInput:
       type: object
       additionalProperties: false

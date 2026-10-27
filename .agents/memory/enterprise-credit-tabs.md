@@ -53,3 +53,20 @@ tests or earlier runs; rejecting an invoice reused by another buyer is correct.
 
 **How to apply:** Randomize mock invoice preimages rather than weakening payment
 ownership or trusting a repeated invoice as another successful contract.
+
+Fleet delegation authorizes distinct NIP-98 Worker identities to spend a VIP
+Commander's master credit tab. The 2,000-sat ceiling applies to the combined
+Commander and fleet, not separately to each key. Workers cannot administer the
+fleet, settle the master invoice, redirect its payout allocation or transfer
+their commercial exemption to the Commander. Removing a Worker prevents new
+admissions but does not erase already admitted debt.
+
+**Why:** The user authorized centralized swarm delegation, not transfer of
+billing ownership, settlement authority or licensing identity.
+
+**How to apply:** Keep one Commander per Worker and reject nested fleets.
+Separate the authenticated execution identity from the billing owner. Both
+invoice issuance and macaroon construction must run under the same billing-owner
+economics context; otherwise a Worker-triggered macro-invoice conflicts with the
+Commander's buyer binding. Never inherit a Worker's licensing account or payout
+headers when issuing the master invoice.

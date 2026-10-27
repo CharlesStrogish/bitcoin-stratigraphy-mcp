@@ -25,6 +25,30 @@ import * as zod from 'zod';
 
 
 /**
+ * Requires fresh request/body-bound Commander NIP-98 authentication and more than 50 distinct verified paid invoices. POST add/remove arrays of lowercase 64-character NIP-98 public keys. Each Worker has one Commander; self-delegation, nested fleets and conflicting ownership are rejected atomically. Maximum 1000 Workers per Commander. Signatures are single-use. Workers retain their own execution identity and accrue existing tool tolls (250 sats per standard paid call) to one shared 2000-sat master tab. Removal prevents subsequent admissions but never forgives existing debt. Only the Commander can settle the master tab using the existing credit-tab settlement endpoint.
+ * @summary Add or remove Workers authorized to spend the Commander's credit tab
+ */
+export const registerEnterpriseFleetBodyAddItemRegExp = new RegExp('^[0-9a-f]{64}$');
+export const registerEnterpriseFleetBodyAddMax = 1000;
+
+export const registerEnterpriseFleetBodyRemoveItemRegExp = new RegExp('^[0-9a-f]{64}$');
+export const registerEnterpriseFleetBodyRemoveMax = 1000;
+
+
+
+export const RegisterEnterpriseFleetBody = zod.object({
+  "add": zod.array(zod.string().regex(registerEnterpriseFleetBodyAddItemRegExp)).max(registerEnterpriseFleetBodyAddMax).optional(),
+  "remove": zod.array(zod.string().regex(registerEnterpriseFleetBodyRemoveItemRegExp)).max(registerEnterpriseFleetBodyRemoveMax).optional()
+})
+
+export const RegisterEnterpriseFleetResponse = zod.object({
+  "commander_pubkey": zod.string(),
+  "workers": zod.array(zod.string()),
+  "maximum_unpaid_sats": zod.literal(2000)
+})
+
+
+/**
  * Requires fresh NIP-98 HTTP authentication. More than 50 distinct successfully paid identity-bound L402 invoices enables credit. The shared tab is capped at 2000 sats across all workers and sessions. Status polling does not extend the 15-minute idle execution window. Only authenticated historical routing settlements qualify.
  * @summary Get the authenticated agent's trust score and credit tab
  */

@@ -4,12 +4,14 @@
 import type { Express } from "express";
 import {
   CREDIT_TAB_PATH,
+  FLEET_REGISTER_PATH,
   CreditTabError,
   verifiedCreditIdentity,
   type EnterpriseCreditTabs,
 } from "../lib/enterprise-credit-tabs";
 import type { SettlementRouter } from "../services/settlement";
 import type { RevenueLedger } from "../services/ledger";
+import { requestNip98Authorization } from "../lib/nip98-request";
 
 export function registerEnterpriseCreditRoutes(
   app: Express,
@@ -21,11 +23,33 @@ export function registerEnterpriseCreditRoutes(
   },
 ) {
   app.all(
-    [CREDIT_TAB_PATH, CREDIT_TAB_PATH + "/close", CREDIT_TAB_PATH + "/settle"],
+    [
+      FLEET_REGISTER_PATH,
+      CREDIT_TAB_PATH,
+      CREDIT_TAB_PATH + "/close",
+      CREDIT_TAB_PATH + "/settle",
+    ],
     async (req, res) => {
       res.setHeader("Cache-Control", "no-store");
       try {
         const pubkey = verifiedCreditIdentity(req);
+        if (req.path === FLEET_REGISTER_PATH) {
+          if (req.method !== "POST") {
+            res.status(405).setHeader("Allow", "POST");
+            res.json({ error: "Use POST for fleet registration" });
+            return;
+          }
+          const event = JSON.parse(
+            Buffer.from(
+              requestNip98Authorization(req)!.slice(6),
+              "base64",
+            ).toString(),
+          );
+          res.json(
+            await options.tabs.registerFleet(pubkey, req.body, event.id),
+          );
+          return;
+        }
         const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
         if (!secret)
           throw new CreditTabError(503, "Credit tab signing unavailable");

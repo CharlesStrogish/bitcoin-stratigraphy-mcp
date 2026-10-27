@@ -266,6 +266,14 @@ export function createCreditHarness() {
     );
     const keys = [...identities];
     await pool.query(
+      "DELETE FROM enterprise_credit_fleet WHERE commander_pubkey=ANY($1::text[])",
+      [keys],
+    );
+    await pool.query(
+      "DELETE FROM enterprise_credit_fleet_updates WHERE commander_pubkey=ANY($1::text[])",
+      [keys],
+    );
+    await pool.query(
       "DELETE FROM enterprise_credit_charges WHERE pubkey=ANY($1::text[])",
       [keys],
     );

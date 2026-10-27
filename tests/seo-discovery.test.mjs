@@ -51,12 +51,12 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   ]);
   assert.equal(
     meta(html, "description"),
-    "Enterprise-grade MCP server & L402 Oracle for autonomous AI swarms. Secure EU AI Act compliance, zero-trust verification, and commercial IP exemptions.",
+    "Enterprise MCP server with 21% AI agent yield, L402 VIP Credit Tabs and a Hashcash DDoS Shield to extend and protect autonomous AI swarm runways.",
   );
   for (const key of ["og:description", "twitter:description"]) {
     assert.equal(
       meta(html, key),
-      "Enterprise MCP server and L402 oracle providing state-anchored AI telemetry, cryptographic flight recorders, and EU AI Act Article 12 compliance logging.",
+      "Enterprise MCP server with 21% AI agent yield, L402 VIP Credit Tabs and a Hashcash DDoS Shield to extend and protect autonomous AI swarm runways.",
       key,
     );
   }

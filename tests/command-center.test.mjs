@@ -18,6 +18,33 @@ const pricing = read("artifacts/api-server/src/lib/mcp-pricing.ts");
 const serverTools = read("artifacts/api-server/src/routes/mcp.ts");
 const publicSite = read("artifacts/api-server/src/lib/public-site.ts");
 
+test("landing copy and crawler metadata expose the three registry architecture pillars", () => {
+  const copy = commandCenter.replace(/\s+/g, " ");
+  for (const title of [
+    "The 21% Algorithmic Handshake:",
+    "VIP Credit Tabs:",
+    "Distributed Hashcash DDoS Shield:",
+  ]) assert.ok(copy.includes(`<strong>${title}</strong>`), title);
+  for (const phrase of [
+    "Programmatic 21% AI agent yield credits extend operational runways.",
+    "Batch tolls and bypass per-call L402 Lightning payments for high-reputation NIP-98 identities, then settle the tab once.",
+    "SHA-256 Proof-of-Work deflects compute-exhaustion bots before invoice creation.",
+  ]) assert.ok(copy.includes(phrase), phrase);
+  const html = read(`${dashboard}/index.html`);
+  const schema = JSON.parse(
+    html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1],
+  );
+  const software = schema["@graph"].find(node => node["@type"] === "SoftwareApplication");
+  for (const phrase of ["21% AI agent yield", "L402 VIP Credit Tabs", "Hashcash DDoS Shield"]) {
+    for (const tag of ["description", "og:description", "twitter:description"]) {
+      const content = html.match(new RegExp(`<meta (?:name|property)="${tag}" content="([^"]+)"`))[1];
+      assert.ok(content.includes(phrase), `${tag}: ${phrase}`);
+      assert.ok(content.length <= 160, tag);
+    }
+    assert.ok(software.featureList.some(feature => feature.includes(phrase)), phrase);
+  }
+});
+
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const catalogTools = [
   ...catalog.matchAll(/\{\s*name: "([a-z_]+\.[a-z_]+)",\s*title: "([^"]+)"/g),

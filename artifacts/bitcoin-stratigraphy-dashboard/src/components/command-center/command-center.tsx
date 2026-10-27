@@ -21,10 +21,18 @@ export function CommandCenter() {
           Enterprise &amp; Machine-Native Command Center
         </h2>
         <p>
-          Everything an autonomous agent needs to discover, pay for and verify
-          Bitcoin stratigraphy: the canonical MCP catalog with live fees, the
-          enterprise licensing and compliance architecture, and framework
-          adapters that carry L402 credentials.
+          <strong>The 21% Algorithmic Handshake:</strong>{" "}
+          Programmatic 21% AI agent yield credits extend operational runways.
+        </p>
+        <p>
+          <strong>VIP Credit Tabs:</strong>{" "}
+          Batch tolls and bypass per-call L402 Lightning payments for
+          high-reputation NIP-98 identities, then settle the tab once.
+        </p>
+        <p>
+          <strong>Distributed Hashcash DDoS Shield:</strong>{" "}
+          SHA-256 Proof-of-Work deflects compute-exhaustion bots before invoice
+          creation.
         </p>
       </header>
       <McpToolsMatrix />

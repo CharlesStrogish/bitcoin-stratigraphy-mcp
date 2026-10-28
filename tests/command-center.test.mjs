@@ -46,6 +46,19 @@ test("landing copy and crawler metadata expose the three registry architecture p
 });
 
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+test("enterprise vault copy positions MPC and split-key controls as a forward-looking model", () => {
+  const copy = commandCenter.replace(/\s+/g, " ");
+  assert.ok(
+    copy.includes("<strong>Cryptographic Vault for AI Swarms:</strong>"),
+  );
+  for (const phrase of [
+    "For Fortune 500 risk teams",
+    "the architecture is built to support a forward-looking Multi-Party Compute (MPC) and Split-Key Security model",
+    "for sovereign AI treasuries.",
+    "The target control invariant: no single server holds a master orchestration key.",
+  ]) assert.ok(copy.includes(phrase), phrase);
+});
+
 test("landing invites white-label resellers to earn Commander yield on the shared engine", () => {
   const copy = commandCenter.replace(/\s+/g, " ");
   assert.ok(

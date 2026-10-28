@@ -21,6 +21,13 @@ export function CommandCenter() {
           Enterprise &amp; Machine-Native Command Center
         </h2>
         <p>
+          <strong>Cryptographic Vault for AI Swarms:</strong>{" "}
+          For Fortune 500 risk teams, the architecture is built to support a
+          forward-looking Multi-Party Compute (MPC) and Split-Key Security model
+          for sovereign AI treasuries. The target control invariant: no single
+          server holds a master orchestration key.
+        </p>
+        <p>
           <strong>The 21% Algorithmic Handshake:</strong>{" "}
           Programmatic 21% AI agent yield credits extend operational runways.
         </p>

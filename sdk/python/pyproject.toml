@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bitcoin-stratigraphy-enterprise"
 version = "0.2.0"
-description = "Private agent telemetry, prepaid root notarization, selective disclosure and independent evidence auditing"
+description = "The official L402 / NIP-98 transport adapter for the Bitcoin Stratigraphy Autonomous Data Engine."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "AGPL-3.0-only OR LicenseRef-Commercial"
@@ -15,7 +15,7 @@ dependencies = [
   "opentimestamps==0.4.5",
   "opentimestamps-client>=0.7.2,<0.8",
 ]
-keywords = ["agent", "telemetry", "merkle", "opentimestamps", "langchain", "crewai"]
+keywords = ["mcp", "crewai", "langchain", "l402", "lightning-network", "nip98", "ai-agents", "multi-party-compute"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Topic :: Security :: Cryptography",

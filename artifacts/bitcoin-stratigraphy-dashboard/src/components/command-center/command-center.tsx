@@ -2,6 +2,7 @@
 import { FrameworkAdapters } from "./framework-adapters";
 import { McpToolsMatrix } from "./mcp-tools-matrix";
 import { EnterpriseLicensingMatrix } from "./enterprise-licensing-matrix";
+import { SdkShowcase } from "../sdk-showcase";
 import "./command-center.css";
 
 export function CommandCenter() {
@@ -52,6 +53,7 @@ export function CommandCenter() {
           layer.
         </p>
       </header>
+      <SdkShowcase />
       <McpToolsMatrix />
       <EnterpriseLicensingMatrix />
       <FrameworkAdapters />

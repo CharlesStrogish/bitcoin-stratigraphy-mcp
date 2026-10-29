@@ -129,6 +129,8 @@ const expectedMcpToolDescriptions: Record<string, string> = {
 for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
   expectedMcpToolDescriptions[name] = contract.description;
 }
+expectedMcpToolDescriptions["stratigraphy.get"] =
+  "Fetch exact live or archived Bitcoin Stratigraphy pipeline telemetry by single UTC date or block height. USAGE ROUTING: Use `stratigraphy.get` to retrieve a single specific snapshot. Use `stratigraphy.list` to fetch the N most recent records. Use `stratigraphy.get_range` for bounded chronological datasets. Use `stratigraphy.get_diff` to compare two distinct points. L402 PAYMENT REQUIRED: Expect HTTP 402; parse the WWW-Authenticate header, pay the Lightning invoice via configured wallet, and retry the identical request with Authorization: L402 <macaroon>:<preimage>.";
 
 type OpenApiDocument = {
   paths: Record<string, { get?: unknown }>;
@@ -1817,7 +1819,9 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
       `${name} OpenAPI and tools/list descriptions must match exactly`,
     );
     assert.ok(listedTool.description.startsWith(expectedDescription), `${name} must preserve its contract guidance`);
-    if (STRATIGRAPHY_TOOL_DESCRIPTIONS[name] || name === "workflow.audit_trajectory") {
+    if (name === "stratigraphy.get") {
+      assert.equal(listedTool.description, expectedDescription);
+    } else if (STRATIGRAPHY_TOOL_DESCRIPTIONS[name] || name === "workflow.audit_trajectory") {
       assert.equal(listedTool.description, STRATIGRAPHY_TOOL_DESCRIPTIONS[name] ?? expectedDescription);
       assert.equal(
         mcpDiscoveryManifest.tools.find((tool) => tool.name === name)?.description,

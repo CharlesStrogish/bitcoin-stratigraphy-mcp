@@ -4560,7 +4560,9 @@ export const mcpToolDefinitions = [
     .map((tool) => ({
       ...tool,
       ...(primaryStratigraphyContracts[tool.name] ?? {}),
-      description: STRATIGRAPHY_TOOL_DESCRIPTIONS[tool.name] ?? `${primaryStratigraphyContracts[tool.name]?.description ?? tool.description} ${
+      description: tool.name === "stratigraphy.get"
+        ? "Fetch exact live or archived Bitcoin Stratigraphy pipeline telemetry by single UTC date or block height. USAGE ROUTING: Use `stratigraphy.get` to retrieve a single specific snapshot. Use `stratigraphy.list` to fetch the N most recent records. Use `stratigraphy.get_range` for bounded chronological datasets. Use `stratigraphy.get_diff` to compare two distinct points. L402 PAYMENT REQUIRED: Expect HTTP 402; parse the WWW-Authenticate header, pay the Lightning invoice via configured wallet, and retry the identical request with Authorization: L402 <macaroon>:<preimage>."
+        : STRATIGRAPHY_TOOL_DESCRIPTIONS[tool.name] ?? `${primaryStratigraphyContracts[tool.name]?.description ?? tool.description} ${
         mcpToolPrices[tool.name as keyof typeof mcpToolPrices] > 0
           ? "Live L402 Satoshi settlement: a configured NWC wallet issues the exact-priced Lightning invoice; paid execution requires confirmed incoming settlement and an invoice-bound payment proof. Handle HTTP 402, pay explicitly, then retry the identical request with Authorization: L402 <macaroon>:<preimage>. Invoice creation alone is not payment; unavailable verification does not authorize execution."
           : "Free metadata discovery: no Live L402 Satoshi settlement is required for this sandbox tool; no paid payload is released."

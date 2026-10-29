@@ -1,5 +1,27 @@
 # Bitcoin Stratigraphy Enterprise SDK
 
+## L402/NIP-98 orchestration transport
+
+The additive [`bitcoin-stratigraphy-mcp-client`](mcp-client/README.md) distribution
+provides a typed transport for the official MCP Python SDK, with Schnorr-signed
+NIP-98 headers, explicit L402 wallet handoff, isolated signing tests, and a
+four-line LangChain agent integration. Install it from `./sdk/python/mcp-client`;
+the enterprise SDK below remains unchanged and independently installable.
+
+With a secret-managed `private_key`, an async invoice-approving `wallet_handler`
+and your configured LangChain `model`, the integration is exactly four lines:
+
+```python
+from bitcoin_stratigraphy_mcp_client import L402Nip98Transport
+from langchain.agents import create_agent
+async with L402Nip98Transport(private_key, wallet_handler).langchain_tools() as tools:
+    agent = create_agent(model, tools=tools)
+```
+
+Invoke the agent inside that context. See the
+[transport guide](mcp-client/README.md) for installation, the typed wallet
+contract, payment safeguards and independent tests.
+
 ## Licensing, IP & Enterprise Terms
 
 Created & Architected by Charles R. Strogish.

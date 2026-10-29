@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=80.9"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bitcoin-stratigraphy-mcp-client"
+version = "0.1.0"
+description = "Typed NIP-98 and L402 transport for the official MCP Python SDK"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "AGPL-3.0-only OR LicenseRef-Commercial"
+license-files = ["LICENSE.md"]
+dependencies = [
+  "coincurve>=21,<22",
+  "httpx>=0.28.1,<0.29",
+  "mcp>=1.30,<2",
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Typing :: Typed",
+  "Topic :: Security :: Cryptography",
+]
+
+[project.optional-dependencies]
+langchain = ["langchain-mcp-adapters>=0.3.2,<0.4"]
+dev = ["mypy>=1.15,<2", "langchain-mcp-adapters>=0.3.2,<0.4"]
+
+[project.urls]
+Homepage = "https://bitcoinstratigraphy.com"
+Documentation = "https://bitcoinstratigraphy.com/docs"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+bitcoin_stratigraphy_mcp_client = ["py.typed"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src"]
+
+# Independent distribution; do not rename or replace the parent enterprise SDK.
+[tool.uv.workspace]
+members = []

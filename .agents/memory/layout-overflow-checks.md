@@ -27,3 +27,10 @@ answer.
 - Verify smooth scrolling with animation-frame samples, not a single delayed
   measurement. **Why:** Headless Chromium can defer animation start past an
   arbitrary timeout even when the scroll animates correctly.
+- For client-rendered sections, wait for the target element before scrolling;
+  an initial URL fragment can be evaluated before React mounts it.
+  **Why:** A screenshot can show the homepage top despite a valid section hash.
+- Clipboard reads and writes have separate browser permission and focus checks.
+  Confirm copy-button success and the exact argument sent to the real write API;
+  do not treat a denied diagnostic read as a failed application write.
+  **Why:** Headless Chromium can permit writes while denying reads.

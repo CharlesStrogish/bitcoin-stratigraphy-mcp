@@ -7,6 +7,7 @@ import express from "express";
 import { registerMcpRoute } from "../../src/routes/mcp";
 import { createPrimaryStratigraphyBackend, PrimaryStratigraphyUnavailable } from "../../src/services/primaryStratigraphy";
 import { AUDIT_TRAJECTORY_DESCRIPTION, AUDIT_TRAJECTORY_EXAMPLE } from "../../src/lib/workflow-audit";
+import { STRATIGRAPHY_METADATA } from "../../src/lib/mcp-response-metadata";
 import type { SettlementRouter } from "../../src/services/settlement";
 import { attenuateSubscriptionMacaroon, getMacaroonSignatureId } from "../../src/lib/subscription-pass";
 import { createMemoryMacaroonRevocationStore } from "../../src/lib/macaroon-revocation-store";
@@ -73,7 +74,10 @@ test("composite audit validates both boundaries and executes once under a 250-sa
     const macaroon = challenge.body.macaroon;
     const paid = await request("tools/call", params, `L402 ${macaroon}:${preimage}`);
     assert.equal(paid.response.status, 200);
-    assert.deepEqual(paid.body.result.structuredContent, AUDIT_TRAJECTORY_EXAMPLE);
+    assert.deepEqual(paid.body.result.structuredContent, {
+      ...AUDIT_TRAJECTORY_EXAMPLE,
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA,
+    });
     assert.equal(calls, 1, "one paid call, one unified backend evaluation");
     const bounded = attenuateSubscriptionMacaroon(macaroon, ["max_target=919999"]);
     assert.ok(bounded);

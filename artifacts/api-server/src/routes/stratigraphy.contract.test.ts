@@ -21,6 +21,7 @@ import healthRouter from "./health";
 import { indexedContractTestFixture, registerMcpRequestGuard, registerMcpRoute } from "./mcp";
 import { primaryStratigraphyContracts } from "../services/primaryStratigraphySchemas";
 import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
+import { STRATIGRAPHY_METADATA } from "../lib/mcp-response-metadata";
 import { verifyEpistemicDatasetReceipt } from "../services/epistemicDatasetReceipt";
 import type { SettlementRouter } from "../services/settlement";
 import {
@@ -865,6 +866,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       url,
     );
     assert.deepEqual(bareSettlement.result?.structuredContent, {
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA,
       verified: false,
       settlementToken: null,
     });
@@ -877,6 +879,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       url,
     );
     assert.deepEqual(canonicalBareSettlement.result?.structuredContent, {
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA,
       verified: false,
       settlementToken: null,
     });
@@ -935,6 +938,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       `L402 ${offer.macaroon}:${invoiceProof.preimage}`,
     );
     assert.deepEqual(mismatched.body.result?.structuredContent, {
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA,
       verified: false,
       settlementToken: null,
     });
@@ -2466,7 +2470,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         : expected.keys;
     assert.deepEqual(
       Object.keys(candidate.outputSchema.properties).sort(),
-      [...outputKeys].sort(),
+      [...outputKeys, "_stratigraphy_metadata"].sort(),
       `${candidate.name} outputSchema must describe the returned JSON fields`,
     );
     const expectedRequired =
@@ -3549,6 +3553,7 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
     const fromMultiplier = previous.quantitative_alpha.target_multiplier;
     const toMultiplier = current.quantitative_alpha.target_multiplier;
     const expected = {
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA,
       from: {
         height: 919856,
         date: "2026-09-08",
@@ -3642,6 +3647,7 @@ test("compares two paid indexed strata with signed height, multiplier, percentag
       toTarget: "919856",
     });
     assert.deepEqual(reverse, {
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA,
       from: expected.to,
       to: expected.from,
       delta: {
@@ -3821,6 +3827,7 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
       "legacy and canonical range calls must both be functional at the same price",
     );
     assert.deepEqual(await paidRange({ startTarget: "919712" }), {
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA,
       range: { start: "919712", end: "latest" },
       count: 3,
       format: "compact",
@@ -3834,6 +3841,7 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
         format: "minimal",
       }),
       {
+        _stratigraphy_metadata: STRATIGRAPHY_METADATA,
         range: { start: "919712", end: "2026-09-08" },
         count: 1,
         format: "minimal",
@@ -3847,6 +3855,7 @@ test("returns a bounded sequential range for one 250-sat MCP payment", async () 
         format: "kv",
       }),
       {
+        _stratigraphy_metadata: STRATIGRAPHY_METADATA,
         range: { start: "2026-09-08", end: "920000" },
         count: 2,
         format: "kv",
@@ -4316,6 +4325,7 @@ test("broadcasts a freshly signed canonical snapshot and requires a peer acknowl
     const { response, body } = await paidCall();
     assert.equal(response.status, 200);
     assert.deepEqual(body.result?.structuredContent, {
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA,
       signalType: "telemetry_snapshot",
       date: "2026-09-09",
       snapshotDigest: "78".repeat(32),

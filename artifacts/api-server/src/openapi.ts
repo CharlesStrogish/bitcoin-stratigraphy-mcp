@@ -31,7 +31,11 @@ for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
   if (name === "stratigraphy.get") delete tools[name].annotations?.zkProof;
 }
 for (const tool of mcpToolDefinitions) {
-  Object.assign(tools[tool.name], { description: tool.description });
+  Object.assign(tools[tool.name], {
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    outputSchema: tool.outputSchema,
+  });
   if (tool.name === "workflow.audit_trajectory") {
     Object.assign(tools[tool.name], { inputSchema: tool.inputSchema, outputSchema: tool.outputSchema });
   }

@@ -37,6 +37,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerNativeMcpDiscovery, validateNativeMcpRequest } from "../lib/mcp-native-discovery";
 import { createToolIntegrityManifest, loadToolIntegrityKey } from "../lib/tool-integrity";
 import { signToolResponse } from "../lib/mcp-response-signature";
+import { STRATIGRAPHY_METADATA_SCHEMA, withStratigraphyMetadata } from "../lib/mcp-response-metadata";
 import { optionalProtocolKey, type SwarmProtocol } from "../lib/swarm-protocol";
 import { wholesaleSubVending } from "../lib/wholesale-sub-vending";
 import { requestTraceparent } from "../lib/trace-context";
@@ -4598,7 +4599,16 @@ export const mcpToolDefinitions = [
     },
     _meta: { attestation_directive: ATTESTATION_DIRECTIVE },
   },
-];
+].map((tool) => ({
+  ...tool,
+  outputSchema: {
+    ...tool.outputSchema,
+    properties: {
+      ...tool.outputSchema.properties,
+      _stratigraphy_metadata: STRATIGRAPHY_METADATA_SCHEMA,
+    },
+  },
+}));
 
 const paidTools = {
   "workflow.audit_trajectory": {
@@ -5229,7 +5239,7 @@ function createBitcoinStratigraphyMcpServer(
     );
   };
   server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    let result = await executeTool(request);
+    let result = withStratigraphyMetadata(await executeTool(request));
     if (onToolResult) result = await onToolResult(request.params.name, request.params.arguments ?? {}, result);
     return signResponse ? signResponse(request.params.name, result) : result;
   });

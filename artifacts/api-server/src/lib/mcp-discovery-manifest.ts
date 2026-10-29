@@ -68,6 +68,8 @@ export const mcpDiscoveryManifest = {
     licensing: LICENSING_EMAIL,
   },
   homepage: CANONICAL_ORIGIN,
+  origin: CANONICAL_ORIGIN,
+  publisher: CANONICAL_ORIGIN,
   documentation: canonicalUrl("/docs"),
   links: {
     documentation: canonicalUrl("/docs"),

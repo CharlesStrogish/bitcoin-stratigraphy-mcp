@@ -51,11 +51,18 @@ test("each dedicated page is served its own head, not the homepage's", () => {
 
 test("registry publisher attribution preserves existing release and 16-tool metadata", () => {
   const registry = JSON.parse(load("glama.json"));
-  assert.equal(registry.publisher, "Charles R. Strogish");
+  assert.equal(registry.publisher, origin);
   assert.equal(registry.website, origin + "/");
   assert.equal(registry.toolCount, 16);
   assert.equal(registry.version, JSON.parse(load("package.json")).version);
   assert.equal(JSON.parse(load("mcp.json")).mcpServers["bitcoin-stratigraphy"].url, origin + "/mcp");
+  assert.equal(JSON.parse(load("mcp.json")).url, origin);
+  assert.equal(JSON.parse(load("mcp.json")).publisher, origin);
+  const serverInfo = load("artifacts/api-server/src/lib/mcp-stateless.ts");
+  assert.match(serverInfo, /websiteUrl: CANONICAL_ORIGIN/);
+  const discovery = load("artifacts/api-server/src/lib/mcp-discovery-manifest.ts");
+  for (const field of ["homepage", "origin", "publisher"])
+    assert.ok(discovery.includes(`${field}: CANONICAL_ORIGIN`), field);
 });
 
 test("documentation structured data and sitemap dates use the production domain", () => {

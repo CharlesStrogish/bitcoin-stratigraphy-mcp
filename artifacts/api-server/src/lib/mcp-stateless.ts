@@ -13,7 +13,7 @@ import {
   type JSONRPCResultResponse,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ENGINE_DESCRIPTION } from "./engine-metadata";
-import { RELEASE_VERSION } from "./public-site";
+import { CANONICAL_ORIGIN, RELEASE_VERSION } from "./public-site";
 
 /**
  * MCP 2026-07-28 stateless Streamable HTTP, served in front of the SDK's
@@ -52,6 +52,7 @@ export const MCP_UNSUPPORTED_PROTOCOL_VERSION = -32022;
 export const MCP_SERVER_INFO = {
   name: "bitcoin-stratigraphy",
   version: RELEASE_VERSION,
+  websiteUrl: CANONICAL_ORIGIN,
 } as const;
 
 /** A fresh object per call: the SDK merges capabilities in place. */

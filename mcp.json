@@ -1,4 +1,6 @@
 {
+  "url": "https://bitcoinstratigraphy.com",
+  "publisher": "https://bitcoinstratigraphy.com",
   "mcpServers": {
     "bitcoin-stratigraphy": {
       "url": "https://bitcoinstratigraphy.com/mcp"

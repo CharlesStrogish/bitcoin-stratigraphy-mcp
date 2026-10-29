@@ -4,7 +4,7 @@ import type { Express } from "express";
 import { mcpToolPrices } from "../lib/mcp-pricing";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
-import { RELEASE_VERSION, canonicalUrl } from "../lib/public-site";
+import { CANONICAL_ORIGIN, RELEASE_VERSION, canonicalUrl } from "../lib/public-site";
 import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
 import { AUDIT_TRAJECTORY_DESCRIPTION } from "../lib/workflow-audit";
 import { MCP_NATIVE_PROMPTS, MCP_NATIVE_RESOURCES } from "../lib/mcp-native-discovery";
@@ -17,6 +17,9 @@ export const MCP_RELEASE_DESCRIPTION =
 
 const baseServerCard = {
   name: "bitcoin-stratigraphy",
+  homepage: CANONICAL_ORIGIN,
+  origin: CANONICAL_ORIGIN,
+  publisher: CANONICAL_ORIGIN,
   description: ENGINE_DESCRIPTION,
   transport: {
     type: "streamable-http",
@@ -231,12 +234,16 @@ export const mcpServerCard = {
 /** Static registry discovery never opens an MCP session or executes tools. */
 export const smitheryServerCard = {
   name: "bitcoin-stratigraphy-mcp",
+  homepage: CANONICAL_ORIGIN,
+  origin: CANONICAL_ORIGIN,
+  publisher: CANONICAL_ORIGIN,
   displayName: "Bitcoin Stratigraphy Data Engine",
   description: MCP_RELEASE_DESCRIPTION,
   version: MCP_RELEASE_VERSION,
   serverInfo: {
     name: "bitcoin-stratigraphy-mcp",
     version: MCP_RELEASE_VERSION,
+    websiteUrl: CANONICAL_ORIGIN,
   },
   url: canonicalUrl("/mcp"),
   toolCount: mcpServerCard.capabilities.tools.length,

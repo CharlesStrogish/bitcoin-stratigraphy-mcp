@@ -1,5 +1,11 @@
 import type { Express, RequestHandler } from "express";
 import { LIMITATION_OF_LIABILITY } from "./liability-notice";
+import { CANONICAL_ORIGIN } from "../lib/public-site";
+
+export const PUBLIC_ALLOWED_ORIGINS: readonly string[] = [
+  CANONICAL_ORIGIN,
+  "https://www.bitcoinstratigraphy.com",
+];
 
 /**
  * Public API CORS is token-based, not cross-origin cookie authentication.
@@ -9,12 +15,15 @@ export function registerPublicCors(
   app: Express,
   publicRateLimit?: RequestHandler,
 ): void {
-  app.use((_req, res, next) => {
+  app.use((req, res, next) => {
+    const origin = req.get("Origin");
+    res.vary("Origin");
     res.set({
       "X-Limitation-Of-Liability": LIMITATION_OF_LIABILITY,
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin":
+        origin && PUBLIC_ALLOWED_ORIGINS.includes(origin) ? origin : "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "*",
       "Access-Control-Expose-Headers": [

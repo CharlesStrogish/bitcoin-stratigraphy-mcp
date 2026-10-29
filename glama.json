@@ -1,5 +1,5 @@
 {
-  "publisher": "Charles R. Strogish",
+  "publisher": "https://bitcoinstratigraphy.com",
   "website": "https://bitcoinstratigraphy.com/",
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": ["charlesstrogish"],

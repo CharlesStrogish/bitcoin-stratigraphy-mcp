@@ -1909,6 +1909,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
     clientInfo: { name: "contract-test", version: "1.0.0" },
   });
   assert.equal(initialized.result?.serverInfo.name, "bitcoin-stratigraphy");
+  assert.equal(initialized.result?.serverInfo.websiteUrl, CANONICAL_ORIGIN);
   assert.equal(initialized.result?.serverInfo.description, ENGINE_DESCRIPTION);
   assert.equal(initialized.result?.instructions, expectedMcpOverview);
   assert.equal(mcpServerCard.description, expectedMcpOverview);
@@ -4769,6 +4770,22 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
   });
   assert.equal(otherPreflight.status, 200);
   assert.equal(otherPreflight.headers.get("access-control-allow-origin"), "*");
+
+  for (const origin of [CANONICAL_ORIGIN, "https://www.bitcoinstratigraphy.com"]) {
+    const canonicalPreflight = await fetch(`${baseUrl}/mcp`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: origin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Authorization, Content-Type",
+      },
+    });
+    assert.equal(canonicalPreflight.status, 200);
+    assert.equal(canonicalPreflight.headers.get("access-control-allow-origin"), origin);
+    assert.equal(canonicalPreflight.headers.get("access-control-allow-credentials"), null);
+    assert.match(canonicalPreflight.headers.get("vary") ?? "", /Origin/i);
+    assert.match(canonicalPreflight.headers.get("access-control-allow-headers") ?? "", /Authorization/i);
+  }
 
   const list = await fetch(`${baseUrl}/mcp`, {
     method: "POST",

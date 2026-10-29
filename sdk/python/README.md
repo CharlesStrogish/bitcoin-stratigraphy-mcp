@@ -22,6 +22,30 @@ Invoke the agent inside that context. See the
 [transport guide](mcp-client/README.md) for installation, the typed wallet
 contract, payment safeguards and independent tests.
 
+## CrewAI Multi-Agent Integration
+
+Install the optional native integration with
+`pip install './sdk/python/mcp-client[crewai]'`. Supply the same secret-managed
+`private_key` and async `wallet_handler` used by the LangChain adapter, plus your
+configured CrewAI `llm`. Equip an agent in exactly four lines:
+
+```python
+from crewai import Agent
+from bitcoin_stratigraphy_mcp_client.crewai import CrewAISwarmTools
+with CrewAISwarmTools(private_key, wallet_handler) as tools:
+    agent = Agent(role="Treasury auditor", goal="Audit swarm data", backstory="Enterprise risk team", tools=tools, llm=llm)
+```
+
+Share `tools` with additional agents and keep `Crew(...).kickoff()` or
+`await Crew(...).kickoff_async()` inside the context. These are native CrewAI
+`BaseTool` instances, not LangChain wrappers. The context owns a background-loop
+MCP session; both synchronous and asynchronous calls use the existing NIP-98
+signer and L402 wallet handoff without changing server policy or tools.
+Wallet callbacks execute on that background loop: create loop-affine wallet
+clients there rather than reusing an HTTP client from another event loop.
+See the [native integration guide](mcp-client/README.md#crewai-multi-agent-integration)
+for lifecycle, dependency compatibility and offline tests.
+
 ## Licensing, IP & Enterprise Terms
 
 Created & Architected by Charles R. Strogish.

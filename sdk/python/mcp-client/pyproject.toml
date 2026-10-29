@@ -23,6 +23,7 @@ classifiers = [
 
 [project.optional-dependencies]
 langchain = ["langchain-mcp-adapters>=0.3.2,<0.4"]
+crewai = ["crewai>=1.6.1,<2"]
 dev = ["mypy>=1.15,<2", "langchain-mcp-adapters>=0.3.2,<0.4"]
 
 [project.urls]

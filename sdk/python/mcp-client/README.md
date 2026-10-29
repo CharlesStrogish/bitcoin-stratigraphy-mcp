@@ -35,8 +35,61 @@ async with L402Nip98Transport(private_key, wallet_handler).langchain_tools() as 
 
 Run `await agent.ainvoke(...)` **inside the same context** so the MCP session stays
 open while tools execute. The helper loads tools from a real `mcp.ClientSession`,
-not a replacement agent or a mock tool catalog. For CrewAI, use its supported MCP session/tool
-adapter rather than passing LangChain tools directly to a CrewAI agent.
+not a replacement agent or a mock tool catalog.
+
+## CrewAI Multi-Agent Integration
+
+Install the optional integration in your orchestration application:
+
+```bash
+python -m pip install './sdk/python/mcp-client[crewai]'
+```
+
+With `private_key`, `wallet_handler` and a configured CrewAI `llm`, this is the
+complete four-line tool-to-agent integration:
+
+```python
+from crewai import Agent
+from bitcoin_stratigraphy_mcp_client.crewai import CrewAISwarmTools
+with CrewAISwarmTools(private_key, wallet_handler) as tools:
+    agent = Agent(role="Treasury auditor", goal="Audit swarm data", backstory="Enterprise risk team", tools=tools, llm=llm)
+```
+
+Keep the context open while running `Crew(...).kickoff()` or
+`await Crew(...).kickoff_async()`. The same tools can be assigned to several agents
+within that context. Construct a new context for each independent swarm run.
+
+**Native tools, unchanged transport.** `CrewAIMCPTool` subclasses
+`crewai.tools.BaseTool`. Discovery uses the official MCP `tools/list` protocol,
+including pagination; each call forwards the original MCP name and exact
+validated arguments. CrewAI-safe display names replace punctuation with `_`;
+collisions are rejected rather than routed to the wrong tool.
+
+**Full schema and result fidelity.** Input JSON Schemas, including local `$defs`,
+required fields, nested objects and numeric constraints, are retained and
+validated before a network call or payment. External schema references are
+rejected to avoid fetching untrusted URLs. MCP text, structured content and
+other result fields are serialized as JSON for the agent; `isError` results raise
+`CrewAIToolError`. The wrapper disables CrewAI result caching, so repeated paid
+or stateful calls are not silently replaced with old outputs.
+
+**One session owner.** A dedicated AnyIO portal owns the HTTP client and MCP
+session. Sync CrewAI workers and async callers submit work to that loop rather
+than moving the transport between event loops. Exiting closes the session and
+transport; retained tool objects cannot execute after exit. Wallet callbacks run
+on the portal loop, so initialize loop-affine wallet clients inside the callback.
+Local payment failures are returned to the pending MCP caller through a
+client-only error envelope and re-raised; no error envelope is sent to the
+server, no additional payment is attempted, and callers do not hang on a failed
+background HTTP task.
+
+**Optional dependency boundary.** Ordinary package imports do not load CrewAI.
+Import `bitcoin_stratigraphy_mcp_client.crewai` explicitly when using it.
+This integration is verified against CrewAI 1.6.1. Install optional framework
+dependencies in your orchestration application's project, not in the server
+project: newer CrewAI releases may impose dependency constraints that conflict
+with the server's unrelated FastAPI tooling. Neither the backend requirements
+nor the original L402/NIP-98 transport implementation are changed.
 
 ## Wallet contract and payment safety
 
@@ -116,7 +169,14 @@ NIP-98-only tests can run independently without LangChain:
 PYTHONPATH=sdk/python/mcp-client/src python -m unittest discover -s sdk/python/mcp-client/tests -p test_nip98.py -v
 ```
 
-The optional LangChain integration test requires the `langchain` extra.
+The optional LangChain test requires the `langchain` extra. Native CrewAI tests
+require the `crewai` extra; without it, that isolated test module is skipped.
+For full SDK verification, install both extras and the `dev` extra first.
+
+```bash
+python -m pip install './sdk/python/mcp-client[langchain,crewai,dev]'
+PYTHONPATH=sdk/python/mcp-client/src python -m unittest discover -s sdk/python/mcp-client/tests -v
+```
 
 ## Licensing
 

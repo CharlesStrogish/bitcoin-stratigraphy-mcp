@@ -14,3 +14,14 @@ The user requested wildcard CORS across all server routes and immediate successf
 **Why:** Smithery's browser interface must be able to read the public API across origins without CORS blocking.
 
 **How to apply:** Do not restore reflected origins with credentialed cookie CORS. Preflights terminate before parsing or payment checks. Preserve wildcard allowed headers, but explicitly allow Authorization when requested because browsers do not include it in the wildcard.
+
+The canonical apex and www HTTPS origins are explicitly allowed and may receive
+their exact origin in the CORS response, without credentialed-cookie support.
+Keep wildcard access for other public registry origins.
+
+**Why:** The user explicitly requested both custom-domain origins in the HTTP
+transport's allowed origins while keeping the change limited to metadata and
+headers.
+
+**How to apply:** Vary origin-specific responses on Origin, retain immediate
+preflights, and do not narrow third-party registry access.

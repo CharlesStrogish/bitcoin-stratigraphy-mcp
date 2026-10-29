@@ -1,6 +1,6 @@
 ---
 name: Compliance marketing copy
-description: User's explicit verbatim-copy requirement for the enterprise compliance sandbox page.
+description: User's verbatim marketing-copy requirements for compliance surfaces and the SDK README.
 ---
 
 Use the exact original copy the user supplied for the enterprise compliance sandbox page. Do not add qualifications, corrections, labels, or warnings to that page's UI.
@@ -31,3 +31,13 @@ legal terms or technical capabilities.
 **How to apply:** Preserve the supplied positioning when maintaining these
 surfaces; keep marketing changes separate from backend due-diligence contracts
 and payment infrastructure.
+
+For the SDK README, retain the supplied Mathematical Advantage, Zero-Trust,
+21% Algorithmic Yield, and Enterprise Commercial Exemptions marketing wording.
+Do not soften the sales pitch; formatting and SDK import corrections are allowed.
+
+**Why:** The user explicitly required preservation of this marketing copy while
+requesting Markdown and import fixes.
+
+**How to apply:** Separate technical example corrections and Markdown formatting
+from edits to the approved SDK marketing language.

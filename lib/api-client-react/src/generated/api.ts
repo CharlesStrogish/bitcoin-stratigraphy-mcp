@@ -60,6 +60,7 @@ import type {
   GetEnterpriseCreditTab200,
   GetNip05IdentityParams,
   GetPaidStratigraphyParams,
+  GetPublicYieldProofs200Item,
   GetRevenueAuditParams,
   GetStratigraphyCostParams,
   GroundEpistemicContext200,
@@ -143,6 +144,94 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetPublicYieldProofsUrl = () => {
+
+
+
+
+  return `/api/yield-proofs.json`
+}
+
+/**
+ * Public and read-only; no NIP-98 or L402 credentials are required.
+ * Current enterprise history records allocations, not completed outgoing
+ * payouts, so this process-local scaffold starts empty and is not connected
+ * to the payment gate. No synthetic history is returned.
+ * Records expire after 24 hours, are limited to 256, and reset on restart.
+ * A trusted future settlement adapter must append only confirmed aggregate
+ * disbursements. The exact integer-msat check is paid = floor(gross * 21 / 100).
+ * SHA-256 commits UTF-8 JSON.stringify([timestamp, tool_executed,
+ * gross_invoice_msats, yield_paid_msats, 21]), with both msat values as
+ * decimal strings. It proves public-record consistency only, not Lightning
+ * settlement, regulatory compliance, a ZK statement or Bitcoin inclusion.
+ * @summary Read the sanitized rolling confirmed-yield payout scaffold
+ */
+export const getPublicYieldProofs = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetPublicYieldProofs200Item[]> => {
+
+  return customFetch<GetPublicYieldProofs200Item[]>(getGetPublicYieldProofsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicYieldProofsQueryKey = () => {
+    return [
+    `/api/yield-proofs.json`
+    ] as const;
+    }
+
+
+export const getGetPublicYieldProofsQueryOptions = <TData = Awaited<ReturnType<typeof getPublicYieldProofs>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicYieldProofs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicYieldProofsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicYieldProofs>>> = ({ signal }) => getPublicYieldProofs({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicYieldProofs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicYieldProofsQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicYieldProofs>>>
+export type GetPublicYieldProofsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read the sanitized rolling confirmed-yield payout scaffold
+ */
+
+export function useGetPublicYieldProofs<TData = Awaited<ReturnType<typeof getPublicYieldProofs>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicYieldProofs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicYieldProofsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetFleetStatementUrl = () => {
 

@@ -735,6 +735,68 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /yield-proofs.json:
+    servers:
+      - url: https://bitcoinstratigraphy.com
+    get:
+      operationId: getPublicYieldProofs
+      summary: Read the sanitized rolling confirmed-yield payout scaffold
+      description: |-
+        Public and read-only; no NIP-98 or L402 credentials are required.
+        Current enterprise history records allocations, not completed outgoing
+        payouts, so this process-local scaffold starts empty and is not connected
+        to the payment gate. No synthetic history is returned.
+        Records expire after 24 hours, are limited to 256, and reset on restart.
+        A trusted future settlement adapter must append only confirmed aggregate
+        disbursements. The exact integer-msat check is paid = floor(gross * 21 / 100).
+        SHA-256 commits UTF-8 JSON.stringify([timestamp, tool_executed,
+        gross_invoice_msats, yield_paid_msats, 21]), with both msat values as
+        decimal strings. It proves public-record consistency only, not Lightning
+        settlement, regulatory compliance, a ZK statement or Bitcoin inclusion.
+      security: []
+      responses:
+        "200":
+          description: Most recent sanitized records first; empty until confirmed payouts are recorded
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 256
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [timestamp, tool_executed, sats_yield_paid, cryptographic_receipt]
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    tool_executed:
+                      type: string
+                      description: Exact canonical paid MCP tool name
+                    sats_yield_paid:
+                      type: number
+                      exclusiveMinimum: 0
+                      description: Aggregate yield actually disbursed, expressed in sats with millisatoshi precision
+                    cryptographic_receipt:
+                      type: object
+                      additionalProperties: false
+                      required: [scheme, gross_invoice_msats, yield_paid_msats, allocation_percent, digest]
+                      properties:
+                        scheme:
+                          type: string
+                          enum: [sha256-yield-record-v1]
+                        gross_invoice_msats:
+                          type: string
+                          pattern: "^[1-9][0-9]*$"
+                        yield_paid_msats:
+                          type: string
+                          pattern: "^[1-9][0-9]*$"
+                        allocation_percent:
+                          type: integer
+                          enum: [21]
+                        digest:
+                          type: string
+                          pattern: "^[0-9a-f]{64}$"
   /api/v1/fleet/statement:
     get:
       operationId: getFleetStatement

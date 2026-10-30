@@ -25,6 +25,42 @@ import * as zod from 'zod';
 
 
 /**
+ * Public and read-only; no NIP-98 or L402 credentials are required.
+ * Current enterprise history records allocations, not completed outgoing
+ * payouts, so this process-local scaffold starts empty and is not connected
+ * to the payment gate. No synthetic history is returned.
+ * Records expire after 24 hours, are limited to 256, and reset on restart.
+ * A trusted future settlement adapter must append only confirmed aggregate
+ * disbursements. The exact integer-msat check is paid = floor(gross * 21 / 100).
+ * SHA-256 commits UTF-8 JSON.stringify([timestamp, tool_executed,
+ * gross_invoice_msats, yield_paid_msats, 21]), with both msat values as
+ * decimal strings. It proves public-record consistency only, not Lightning
+ * settlement, regulatory compliance, a ZK statement or Bitcoin inclusion.
+ * @summary Read the sanitized rolling confirmed-yield payout scaffold
+ */
+export const getPublicYieldProofsResponseSatsYieldPaidExclusiveMin = 0;
+
+export const getPublicYieldProofsResponseCryptographicReceiptGrossInvoiceMsatsRegExp = new RegExp('^[1-9][0-9]*$');
+export const getPublicYieldProofsResponseCryptographicReceiptYieldPaidMsatsRegExp = new RegExp('^[1-9][0-9]*$');
+export const getPublicYieldProofsResponseCryptographicReceiptDigestRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const GetPublicYieldProofsResponseItem = zod.object({
+  "timestamp": zod.coerce.date(),
+  "tool_executed": zod.string().describe('Exact canonical paid MCP tool name'),
+  "sats_yield_paid": zod.number().gt(getPublicYieldProofsResponseSatsYieldPaidExclusiveMin).describe('Aggregate yield actually disbursed, expressed in sats with millisatoshi precision'),
+  "cryptographic_receipt": zod.object({
+  "scheme": zod.enum(['sha256-yield-record-v1']),
+  "gross_invoice_msats": zod.string().regex(getPublicYieldProofsResponseCryptographicReceiptGrossInvoiceMsatsRegExp),
+  "yield_paid_msats": zod.string().regex(getPublicYieldProofsResponseCryptographicReceiptYieldPaidMsatsRegExp),
+  "allocation_percent": zod.literal(21),
+  "digest": zod.string().regex(getPublicYieldProofsResponseCryptographicReceiptDigestRegExp)
+})
+})
+export const GetPublicYieldProofsResponse = zod.array(GetPublicYieldProofsResponseItem).max(256)
+
+
+/**
  * Read-only, no-store snapshot requiring fresh URL/method-bound NIP-98 from a VIP Commander with more than 50 verified paid invoices. Delegated Workers cannot read the master statement. No account creation, invoice issuance, idle-state transition or credit mutation occurs. Signed balance is gross unpaid usage minus available treasury credit; negative values are credit. Applied yield is the discount frozen on the latest pending macro-invoice (zero without an invoice), not an additional deduction from treasury. Lifetime yield sums persisted allocation_pool_msats on verified credit-tab settlements, excluding ordinary L402 reputation and credit-only closures. All yield values are integer millisatoshis, preserving fractional sats. workers lists every currently registered Worker with cumulative spent_sats and its optional max_spend_limit (null means unlimited). Spending counts gross fleet-credit admissions, not cash repayment or treasury discounts. Counters survive tab settlements, limit changes and remove/re-add cycles under the same Commander. Legacy charges lack Worker attribution and are excluded from Worker-level totals.
  * @summary Read the authenticated Commander's tab and yield statement
  */

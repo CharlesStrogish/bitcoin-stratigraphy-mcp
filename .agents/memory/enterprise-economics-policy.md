@@ -7,6 +7,19 @@ Standard non-verification invoices retain the existing ledger-only allocation:
 21 percent direct without a parent, or 14 percent direct and 7 percent parent.
 Optional destinations are LNURL/Lightning addresses; never send automatic payouts.
 
+Public proof-of-yield feeds must not present settled incoming invoices or
+ledger allocations as completed outgoing yield disbursements. An empty
+confirmed-payout scaffold is intentional until a trusted outgoing settlement
+source exists; do not seed it with mock receipts.
+
+**Why:** The user requested public payout verification while prohibiting
+changes to payment execution, and existing enterprise history is allocation-only.
+A hash of public fields verifies record consistency, not that Lightning paid.
+
+**How to apply:** Keep the public feed separate from Treasury internals. Any
+future writer must confirm actual aggregate disbursement, preserve exact
+integer-msat allocation arithmetic, and disclose the proof's trust limits.
+
 For qualifying new verification invoices, the user explicitly requires exactly
 15 percent of gross upstream and the remaining 6 percent to the caller, funded
 inside the existing allocation pool, never as an additional merchant expense.

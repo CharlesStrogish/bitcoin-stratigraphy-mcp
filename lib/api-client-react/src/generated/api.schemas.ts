@@ -2398,6 +2398,43 @@ export type PublicMetadataResponse = PublicMetadata;
  */
 export type PublicPreflightResponse = void;
 
+export type GetPublicYieldProofs200ItemCryptographicReceiptScheme = typeof GetPublicYieldProofs200ItemCryptographicReceiptScheme[keyof typeof GetPublicYieldProofs200ItemCryptographicReceiptScheme];
+
+
+export const GetPublicYieldProofs200ItemCryptographicReceiptScheme = {
+  'sha256-yield-record-v1': 'sha256-yield-record-v1',
+} as const;
+
+export type GetPublicYieldProofs200ItemCryptographicReceiptAllocationPercent = typeof GetPublicYieldProofs200ItemCryptographicReceiptAllocationPercent[keyof typeof GetPublicYieldProofs200ItemCryptographicReceiptAllocationPercent];
+
+
+export const GetPublicYieldProofs200ItemCryptographicReceiptAllocationPercent = {
+  NUMBER_21: 21,
+} as const;
+
+export type GetPublicYieldProofs200ItemCryptographicReceipt = {
+  scheme: GetPublicYieldProofs200ItemCryptographicReceiptScheme;
+  /** @pattern ^[1-9][0-9]*$ */
+  gross_invoice_msats: string;
+  /** @pattern ^[1-9][0-9]*$ */
+  yield_paid_msats: string;
+  allocation_percent: GetPublicYieldProofs200ItemCryptographicReceiptAllocationPercent;
+  /** @pattern ^[0-9a-f]{64}$ */
+  digest: string;
+};
+
+export type GetPublicYieldProofs200Item = {
+  timestamp: string;
+  /** Exact canonical paid MCP tool name */
+  tool_executed: string;
+  /**
+     * Aggregate yield actually disbursed, expressed in sats with millisatoshi precision
+     * @exclusiveMinimum 0
+     */
+  sats_yield_paid: number;
+  cryptographic_receipt: GetPublicYieldProofs200ItemCryptographicReceipt;
+};
+
 export type RegisterEnterpriseFleet200MaximumUnpaidSats = typeof RegisterEnterpriseFleet200MaximumUnpaidSats[keyof typeof RegisterEnterpriseFleet200MaximumUnpaidSats];
 
 

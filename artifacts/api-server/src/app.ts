@@ -7,6 +7,7 @@ import { registerStratigraphyRoutes } from "./routes/stratigraphy";
 import { registerOpenApiRoute } from "./routes/openapi";
 import { registerDocsRoutes } from "./routes/docs";
 import { registerMachineMatrixRoutes } from "./routes/machine-matrix";
+import { registerYieldProofRoutes } from "./routes/yield-proofs";
 import {
   mcpToolDefinitions,
   registerMcpRequestGuard,
@@ -82,6 +83,7 @@ app.disable("x-powered-by");
 app.use(apiRootAliases);
 // Public read-only configuration must not depend on caller identity or payment.
 registerMachineMatrixRoutes(app);
+registerYieldProofRoutes(app);
 // Logged ahead of CORS and the public limiter so refusals reach deployment logs.
 app.use(
   pinoHttp({

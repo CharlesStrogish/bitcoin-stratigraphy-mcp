@@ -94,5 +94,5 @@ before testing if scope or authorization is unclear.
 ## Licensing is separate
 
 Reporting a vulnerability does not transfer ownership of a researcher's work
-or grant a commercial software license. See [LICENSE.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/LICENSE.md) for the
+or grant a commercial software license. See [LICENSE.md](https://bitcoinstratigraphy.com/LICENSE.md) for the
 AGPLv3/Commercial licensing framework.

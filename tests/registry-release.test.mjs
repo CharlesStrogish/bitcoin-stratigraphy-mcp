@@ -69,7 +69,10 @@ test("README prominently links native frameworks and all three readiness badges"
     readme.slice(0, 2200),
     new RegExp(`v${pkg.version.replaceAll(".", "\\.")} — 16 Canonical Tools`),
   );
-  assert.match(readme, /\]\(cookbooks\/frameworks\/\)/);
+  assert.match(
+    readme,
+    /\]\(https:\/\/github\.com\/CharlesStrogish\/bitcoin-stratigraphy-mcp\/tree\/main\/cookbooks\/frameworks\)/,
+  );
   for (const badge of [
     "LangChain Ready",
     "LlamaIndex Ready",

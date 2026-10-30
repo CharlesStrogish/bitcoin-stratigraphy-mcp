@@ -1,0 +1,21 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Bitcoin Stratigraphy Data Engine",
+  "name_for_model": "bitcoin_stratigraphy",
+  "description_for_human": "Bitcoin telemetry, L402 data access, and cryptographic audit receipts supporting EU AI Act Article 12 compliance workflows.",
+  "description_for_model": "Discover the Bitcoin Stratigraphy Data Engine: 16 canonical MCP tools for indexed Bitcoin stratigraphy, thermodynamic telemetry, Groth16 verification, OpenTimestamps notarization, signed Bitcoin-tip context receipts, and pinned-peer mesh operations. Execute JSON-RPC over HTTP POST at https://bitcoinstratigraphy.com/mcp; configure from https://bitcoinstratigraphy.com/.well-known/mcp-configuration.json. Two sandbox tools are free; the other 14 require verified L402 settlement. Paid requests use Authorization: L402 <macaroon>:<preimage>; never spend without a caller-authorized wallet budget. The 21% algorithmic yield is conditional programmatic L402 revenue sharing from settled routing invoices, recorded in a ledger with no automatic disbursement, not a guaranteed investment return. EU AI Act Article 12 compliance support consists of cryptographic logging and audit evidence; it is not regulatory certification or proof of legal compliance. Signed receipts bind submitted evidence, not actual agent reasoning; calendar acceptance is not Bitcoin confirmation.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://bitcoinstratigraphy.com/openapi.json",
+    "is_user_authenticated": false
+  },
+  "logo_url": "https://bitcoinstratigraphy.com/favicon.png",
+  "contact_email": "licensing@bitcoinstratigraphy.com",
+  "legal_info_url": "https://bitcoinstratigraphy.com/LICENSE.md",
+  "x-mcp-url": "https://bitcoinstratigraphy.com/mcp",
+  "x-mcp-configuration-url": "https://bitcoinstratigraphy.com/.well-known/mcp-configuration.json",
+  "x-authentication-scope": "Discovery requires no authentication. This manifest does not grant paid API access; paid MCP execution retains its existing L402 authorization requirements."
+}

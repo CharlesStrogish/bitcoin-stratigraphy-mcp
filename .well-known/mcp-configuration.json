@@ -1,0 +1,106 @@
+{
+  "name": "bitcoin-stratigraphy-mcp",
+  "title": "Bitcoin Stratigraphy Data Engine",
+  "version": "2.1.3",
+  "homepage": "https://bitcoinstratigraphy.com",
+  "origin": "https://bitcoinstratigraphy.com",
+  "publisher": "https://bitcoinstratigraphy.com",
+  "canonical_url": "https://bitcoinstratigraphy.com",
+  "url": "https://bitcoinstratigraphy.com/mcp",
+  "description": "Read-only, unauthenticated connection metadata for 16 canonical tools. Loading this file never creates an invoice or executes a tool.",
+  "links": {
+    "full_discovery": "https://bitcoinstratigraphy.com/.well-known/mcp.json",
+    "openapi": "https://bitcoinstratigraphy.com/openapi.json",
+    "documentation": "https://bitcoinstratigraphy.com/docs",
+    "connection_guide": "https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md",
+    "integrity": "https://bitcoinstratigraphy.com/.well-known/integrity.json",
+    "cost_quote": "https://bitcoinstratigraphy.com/api/v1/cost"
+  },
+  "transport": {
+    "type": "streamable-http",
+    "url": "https://bitcoinstratigraphy.com/mcp",
+    "method": "POST",
+    "encoding": "JSON-RPC 2.0",
+    "headers": {
+      "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream"
+    },
+    "response_content_type": "application/json",
+    "sse": {
+      "advertise_in_accept_header": true,
+      "standalone_get_stream": false,
+      "legacy_sse_endpoint": null,
+      "note": "Advertise both JSON and SSE for Streamable HTTP client compatibility. This server returns JSON for POST; GET /mcp is a finite discovery probe, not an SSE session. The paid REST SSE telemetry feed is a separate API."
+    },
+    "handshake": {
+      "recommended_compatibility_version": "2025-11-25",
+      "steps": ["initialize", "notifications/initialized", "tools/list", "tools/call"],
+      "MCP-Protocol-Version": "2025-11-25",
+      "session_id_required": false,
+      "note": "The server also supports stateless MCP 2026-07-28 with per-request _meta and matching Mcp-Method, Mcp-Name, and MCP-Protocol-Version headers. Use the full discovery document and connection guide for that request contract."
+    }
+  },
+  "mcp": {
+    "version": "2026-07-28",
+    "transports": [{"type": "streamable-http", "endpoint": "https://bitcoinstratigraphy.com/mcp"}],
+    "capabilities": {"tools": {"count": 16, "namespaces": ["stratigraphy", "proof", "mesh", "payment", "workflow"]}}
+  },
+  "discovery": {
+    "authentication_required": false,
+    "methods": ["GET", "HEAD", "OPTIONS"],
+    "side_effects": false
+  },
+  "l402": {
+    "required_for": "Paid tool execution only; loading discovery and protocol handshakes is free.",
+    "authorization": {
+      "header": "Authorization",
+      "scheme": "L402",
+      "template": "L402 <macaroon>:<preimage>",
+      "example": "Authorization: L402 <macaroon>:<preimage>",
+      "preimage": "64 hexadecimal characters whose SHA-256 matches the exact invoice payment hash.",
+      "binding": "Use the macaroon from the exact challenge and the matching paid invoice preimage; never mix credentials from different challenges."
+    },
+    "challenge": {
+      "http_status": 402,
+      "header": "WWW-Authenticate",
+      "template": "L402 macaroon=\"<macaroon>\", invoice=\"<BOLT11>\""
+    },
+    "preflight": "New invoice requests first require the server's one-use SHA-256 proof of work. Submit the intended JSON-RPC body; follow error.data.proof_of_work or proof_of_work in HTTP 400, then retry the identical body with X-L402-PoW-Challenge and X-L402-PoW-Nonce. Only then pay the returned HTTP 402 challenge using an authorized Lightning wallet and retry with Authorization. Existing paid credential verification requires no new proof of work.",
+    "wallet_policy": "Require an L402-capable wallet wrapper and explicit spending limits. Discovery never authorizes spending; never publish wallet secrets or preimages.",
+    "quote_endpoint": "https://bitcoinstratigraphy.com/api/v1/cost"
+  },
+  "pricing": {
+    "requirement": "Exactly two sandbox tools are free; all other tools require verified L402 settlement. Prices below are indicative base sats; obtain a live quote before payment.",
+    "ai_treasury_yield": {
+      "label": "21% algorithmic yield",
+      "allocation_percent": 21,
+      "merchant_percent": 79,
+      "payout_mode": "ledger_only_no_automatic_disbursement",
+      "basis": "Conditional allocation of gross settled qualifying invoices, not an investment yield or extra merchant fee.",
+      "eligibility": "Requires qualifying paid routing and independently verified provider-bound payout addresses. Ordinary allocation is 21% direct or 14% direct plus 7% parent; qualifying verification uses 15% upstream plus 6% caller. Unverified addresses remain pending; no automatic Lightning payouts or guaranteed returns."
+    }
+  },
+  "compliance": {
+    "framework": "EU AI Act Article 12 compliance support",
+    "capabilities": ["Cryptographic audit receipts", "State-anchored provenance", "Trace-context logging and offline receipt verification"],
+    "limits": "Audit evidence supports organizational compliance workflows; it is not regulatory certification, legal advice, proof of actual agent reasoning, or proof of compliance. Calendar acceptance and Bitcoin confirmation are distinct."
+  },
+  "tools": [
+    {"name": "stratigraphy.get", "description": "Retrieve indexed Bitcoin stratigraphy and telemetry.", "price_sats": 250, "payment_required": true},
+    {"name": "stratigraphy.get_digest", "description": "Return a compressed, source-grounded stratigraphy digest.", "price_sats": 250, "payment_required": true},
+    {"name": "stratigraphy.get_diff", "description": "Compare indexed stratigraphy snapshots.", "price_sats": 250, "payment_required": true},
+    {"name": "stratigraphy.get_range", "description": "Retrieve a selected historical range; optionally deliver the result by signed webhook.", "price_sats": 250, "payment_required": true},
+    {"name": "stratigraphy.list", "description": "Discover available indexed strata and range metadata; free sandbox capability.", "price_sats": 0, "payment_required": false},
+    {"name": "proof.attenuate", "description": "Narrow an existing macaroon's authority with supported delegation caveats.", "price_sats": 250, "payment_required": true},
+    {"name": "proof.verify", "description": "Verify supplied supported cryptographic proof or OpenTimestamps evidence.", "price_sats": 250, "payment_required": true},
+    {"name": "proof.get_by_hash", "description": "Look up a registered proof record by hash.", "price_sats": 250, "payment_required": true},
+    {"name": "proof.list", "description": "Discover proof lifecycle/status records; free sandbox capability.", "price_sats": 0, "payment_required": false},
+    {"name": "proof.submit", "description": "Submit proof evidence for processing; optionally receive a signed webhook result.", "price_sats": 250, "payment_required": true},
+    {"name": "proof.notarize", "description": "Request an OpenTimestamps receipt for a SHA-256 digest; calendar acceptance is not Bitcoin confirmation.", "price_sats": 250, "payment_required": true},
+    {"name": "proof.ground", "description": "Issue a signed Bitcoin-tip receipt for context or a dataset CID; not a ZK proof or on-chain transaction.", "price_sats": 250, "payment_required": true},
+    {"name": "mesh.get_status", "description": "Inspect configured pinned-peer mesh status.", "price_sats": 250, "payment_required": true},
+    {"name": "mesh.broadcast", "description": "Broadcast supported signed evidence to the configured Nostr peer mesh.", "price_sats": 250, "payment_required": true},
+    {"name": "payment.get_info", "description": "Inspect tool pricing and payment capabilities; this MCP tool is paid, while HTTP cost quotes are free.", "price_sats": 250, "payment_required": true},
+    {"name": "workflow.audit_trajectory", "description": "Compare two explicit targets and return a compact trajectory audit with available provenance references.", "price_sats": 250, "payment_required": true}
+  ]
+}

@@ -64,3 +64,15 @@ single-use, so a sum of prices cannot authorize multiple tool executions.
 **How to apply:** Return canonical execution names and per-tool L402 generation
 instructions. Keep quotes invoice-free, preserve original scopes for existing
 executable aliases, and distinguish the aggregate quote from actual settlement.
+
+OpenAI plugin discovery must distinguish the OpenAPI schema URL from the MCP
+JSON-RPC execution URL. Likewise, accepting `text/event-stream` does not imply
+that a standalone GET SSE stream exists.
+
+**Why:** The autonomous discovery request combined OpenAI plugin conventions,
+the canonical MCP endpoint, and SSE terminology. Conflating their roles would
+produce configuration that looks plausible but cannot configure a real client.
+
+**How to apply:** Point the plugin's OpenAPI URL at the actual schema and
+advertise MCP execution separately. Describe the live POST/GET behavior rather
+than adding an SSE endpoint or changing payment execution to match metadata.

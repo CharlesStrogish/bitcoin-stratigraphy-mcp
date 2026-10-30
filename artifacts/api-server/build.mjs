@@ -61,6 +61,13 @@ async function buildAll() {
     path.resolve(distDir, "public/.well-known"),
     { recursive: true },
   );
+  // Copy only the two authored public manifests, never an arbitrary root folder.
+  for (const filename of ["ai-plugin.json", "mcp-configuration.json"]) {
+    await cp(
+      path.resolve(artifactDir, "../../.well-known", filename),
+      path.resolve(distDir, "public/.well-known", filename),
+    );
+  }
   await cp(
     path.resolve(artifactDir, "src/public/docs"),
     path.resolve(distDir, "public/docs"),

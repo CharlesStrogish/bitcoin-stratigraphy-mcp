@@ -85,6 +85,7 @@
 - [Agent ID attribution](agent-id-attribution.md) — self-declared vs NIP-98 authenticated agent_id: caveats, is_authenticated rows, leaf digests, rollback hazards.
 - [Dual-era MCP transport](mcp-stateless-transport.md) — stateless 2026-07-28 beside handshake clients; strict JSON-RPC errors, header checks, per-instance limits.
 - [API server shared dist](api-server-shared-dist.md) — workflow builds and pnpm test both rewrite api-server dist; never overlap them, restart the server after tests.
+- [Node test bundle paths](node-test-bundle-paths.md) — keep isolated `node --test` bundles outside node_modules to avoid false missing-file errors.
 - [MCP async webhooks](mcp-async-webhooks.md) — user-defined 202 + POST callback, not Tasks; check before invoicing, dispatch after payment; v1a Ed25519 signatures.
 - [Publishing security validation](publishing-security-validation.md) — successful builds and patched runtime versions do not by themselves confirm security-gate clearance.
 - [MCP Tasks and trace trust](mcp-tasks-trace-trust.md) — polling coexists with push; corrections stay paid, handles stay private, and trace-aware leaves preserve historical proofs.

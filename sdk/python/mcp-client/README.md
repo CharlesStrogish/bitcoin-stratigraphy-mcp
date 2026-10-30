@@ -184,5 +184,5 @@ Created & Architected by Charles R. Strogish.
 Copyright (c) 2026 Charles R. Strogish.
 
 Dual-licensed under AGPL-3.0-only or a separately executed commercial license.
-See the parent SDK's [enterprise terms](../LICENSE.md) and the repository license.
+See the parent SDK's [enterprise terms](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/sdk/python/LICENSE.md) and the repository license.
 API payments do not grant commercial software rights.

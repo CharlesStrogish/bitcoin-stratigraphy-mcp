@@ -200,9 +200,9 @@ tool/transport error. That is not fixed by repeatedly approving the tool.
 - `proof.submit` and `mesh.broadcast` have side effects. Payment permission
   does not automatically authorize those operations.
 
-For an automated payer, see [L402 Agent Payments](L402_AGENT_PAYMENTS.md).
+For an automated payer, see [L402 Agent Payments](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/L402_AGENT_PAYMENTS.md).
 For custom Python agent runtimes, see
-[LangChain and CrewAI Integration](LANGCHAIN_CREWAI_GUIDE.md).
+[LangChain and CrewAI Integration](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/LANGCHAIN_CREWAI_GUIDE.md).
 
 ## Troubleshooting
 
@@ -252,5 +252,5 @@ revoke that connection in your wallet if it is no longer needed.
 - [Official MCP guide: connect local servers with Claude Desktop](https://modelcontextprotocol.io/docs/develop/connect-local-servers)
 - [mcp-remote bridge documentation](https://github.com/geelen/mcp-remote)
 - [MCP Streamable HTTP transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)
-- [Project connection reference](../CONNECT.md)
+- [Project connection reference](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md)
 - [Live MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)

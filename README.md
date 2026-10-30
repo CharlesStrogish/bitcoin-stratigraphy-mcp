@@ -89,14 +89,14 @@ the original Schnorr-signed NIP-98 request or establish regulatory compliance.
 
 **OpenTimestamps AI Notary Hub · LangChain/LlamaIndex Native · 100-call Macro-Macaroons · Free Sandbox available**
 
-Use [`proof.notarize`](cookbooks/frameworks/README.md#what-the-agent-reports)
+Use [`proof.notarize`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/README.md#what-the-agent-reports)
 to obtain a portable OpenTimestamps receipt for a SHA-256 hash.
-Explore the **[native framework quickstarts in `/cookbooks/frameworks`](cookbooks/frameworks/)**:
-[LangChain](cookbooks/frameworks/langchain_agent.py) and
-[LlamaIndex](cookbooks/frameworks/llamaindex_agent.py).
+Explore the **[native framework quickstarts in `/cookbooks/frameworks`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/tree/main/cookbooks/frameworks)**:
+[LangChain](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/langchain_agent.py) and
+[LlamaIndex](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/llamaindex_agent.py).
 
-[![LangChain Ready](https://img.shields.io/badge/LangChain-Ready-1C3C3C)](cookbooks/frameworks/langchain_agent.py)
-[![LlamaIndex Ready](https://img.shields.io/badge/LlamaIndex-Ready-6366F1)](cookbooks/frameworks/llamaindex_agent.py)
+[![LangChain Ready](https://img.shields.io/badge/LangChain-Ready-1C3C3C)](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/langchain_agent.py)
+[![LlamaIndex Ready](https://img.shields.io/badge/LlamaIndex-Ready-6366F1)](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/llamaindex_agent.py)
 [![OpenTimestamps Integrated](https://img.shields.io/badge/OpenTimestamps-Integrated-F7931A)](https://opentimestamps.org/)
 
 The catalog contains **14 paid tools and 2 free sandbox tools**:
@@ -131,7 +131,7 @@ Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin tele
   `/.well-known/integrity.json`. Clients that verify a trusted public-key pin
   can detect description tampering before exposing tools to an LLM.
   Signatures establish provenance, not blanket prevention of tool poisoning;
-  see [verification instructions](docs/tool-integrity.md).
+  see [verification instructions](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/tool-integrity.md).
 - **NIP-98 Agent Identity Binding:** Schnorr-signed NIP-98 HTTP events
   authenticate an agent's pubkey against the request URL, method, and payload
   hash. Authenticated identity is bound into L402 macaroons and the Postgres
@@ -143,7 +143,7 @@ Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin tele
   acknowledges the task and the server POSTs its result to `webhook_url`.
   Callbacks use Standard Webhooks `v1a` Ed25519 signatures with the same
   published integrity key. No per-receiver shared secret is required.
-  See [callback delivery and verification](#zero-polling-execution-webhook_url).
+  See [callback delivery and verification](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/README.md#zero-polling-execution-webhook_url).
 
 ## Licensing, IP & Enterprise Terms
 
@@ -163,7 +163,7 @@ pnpm run build:npm && pnpm run release:npm:check
 ```
 
 The publish command requires an npm account authorized for the
-`@bitcoin-stratigraphy` scope. See [runtime setup](npm/mcp-server/README.md) before
+`@bitcoin-stratigraphy` scope. See [runtime setup](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/npm/mcp-server/README.md) before
 installing: the executable uses Streamable HTTP, not stdio, and the licensed
 Python companion runs separately on loopback port 8000.
 Npm publication does not update the hosted HTTP server or automatically refresh
@@ -204,7 +204,7 @@ Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 
 Covered first-party software is **dual-licensed: GNU Affero General Public
 License version 3 (AGPLv3) or Enterprise Commercial terms**. The complete AGPLv3
-text and dual-licensing rider are in [LICENSE.md](LICENSE.md).
+text and dual-licensing rider are in [LICENSE.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/LICENSE.md).
 
 - **Open-source option:** Use, modification and redistribution are governed by
   AGPLv3. Commercial activity is permitted when AGPL conditions are met.
@@ -222,7 +222,7 @@ text and dual-licensing rider are in [LICENSE.md](LICENSE.md).
   licensed datasets retain their own terms. Previously granted licenses are not
   revoked. Payment for API access does not grant a commercial software license.
 - **Security:** Follow the coordinated disclosure guidelines in
-  [SECURITY.md](SECURITY.md). Do not publish vulnerabilities or credentials in
+  [SECURITY.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/SECURITY.md). Do not publish vulnerabilities or credentials in
   ordinary public issues.
 
 These notices do not guarantee legal protection or regulatory compliance.
@@ -257,7 +257,7 @@ from bitcoin_stratigraphy_enterprise import SwarmFlightRecorder, Article12Notary
 ```
 
 The package also provides bilateral settlement and independent offline auditing.
-See the [enterprise SDK guide](sdk/python/README.md) for prepaid anchoring,
+See the [enterprise SDK guide](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/sdk/python/README.md) for prepaid anchoring,
 LangChain/CrewAI integration, console commands and distribution builds.
 It is not yet published to PyPI. Legacy cookbook imports and CLI paths remain
 compatible.
@@ -396,7 +396,7 @@ Machine-native conditional micro-settlement for autonomous agent-to-agent delega
 - **Mesh consensus is scoped.** Broadcasts and quorum checks use configured,
   pinned peers; peer agreement does not establish source truth. Enterprise use
   still requires organizational supervision and durable evidence retention; see
-  [the compliance framework](docs/ENTERPRISE_COMPLIANCE.md).
+  [the compliance framework](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md).
 
 The Glama badge reflects our static, flawless Grade A tool-definition quality score across all 16 canonical tools, alongside a 4.0/5.0 overall directory rating.
 The Smithery badge displays the
@@ -480,7 +480,7 @@ scheme (`Webhook-Signature: v1a,…`, Ed25519) with the key published at
 `/.well-known/integrity.json`. Without `webhook_url` the call stays synchronous.
 Unsafe callback targets are refused before an invoice is issued, and tasks live
 in server memory, so a restart loses pending work. See
-[CONNECT.md](CONNECT.md#zero-polling-execution-with-webhook_url) for the request
+[CONNECT.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md#zero-polling-execution-with-webhook_url) for the request
 and callback shapes.
 
 ### `mesh.*` — 2 tools
@@ -537,7 +537,7 @@ The exported `verifyToolResponse` helper in
 trusted-key fingerprint, exact tool name, digest and a default five-minute clock
 tolerance. Independently pin `server_public_key` before verification. Signatures
 establish origin and content integrity, not factual correctness or request-level
-replay protection. See [canonicalization and verification](docs/tool-integrity.md#signed-synchronous-tool-responses).
+replay protection. See [canonicalization and verification](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/tool-integrity.md#signed-synchronous-tool-responses).
 
 `GET /api/v1/cost`, `POST /api/v1/cost` quotes and the native
 `stratigraphy://catalog/overview` resource expose a `batchSettlement` block.
@@ -659,7 +659,7 @@ The endpoint keeps no sessions: there is no `initialize` handshake and no
 client calls `server/discover` for supported versions and capabilities, then
 sends its protocol version and client capabilities in `params._meta` on every
 request, with matching `MCP-Protocol-Version`, `Mcp-Method` and (for
-`tools/call`) `Mcp-Name` headers. See [CONNECT.md](CONNECT.md) for the request
+`tools/call`) `Mcp-Name` headers. See [CONNECT.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md) for the request
 shape.
 
 Discovery with `stratigraphy.list` and `proof.list` is free. These connection
@@ -687,7 +687,7 @@ bridge connects Claude Desktop's local stdio client to the remote HTTP server:
 Restart Claude Desktop, then confirm `bitcoin-stratigraphy` appears in its MCP
 server list. Start with `stratigraphy.list` or `payment.get_info`.
 
-See [CONNECT.md — Claude Desktop](CONNECT.md#claude-desktop) for setup and payment details.
+See [CONNECT.md — Claude Desktop](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md#claude-desktop) for setup and payment details.
 
 ### Cursor
 
@@ -706,7 +706,7 @@ Add to `.cursor/mcp.json` or `~/.cursor/mcp.json`:
 Merge the entry into any existing `mcpServers` object, then enable the server in
 Cursor's MCP settings. Cursor connects directly over HTTP; no local server is needed.
 
-See [CONNECT.md — Cursor](CONNECT.md#cursor) for setup and payment details.
+See [CONNECT.md — Cursor](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md#cursor) for setup and payment details.
 
 ### Custom Agent Orchestrators
 
@@ -757,7 +757,7 @@ Paid tool execution requires a separate, wallet-enabled L402 integration:
 handle the HTTP `402` challenge, obtain explicit payment authorization, pay the
 Lightning invoice, and retry using `Authorization: L402 <macaroon>:<preimage>`.
 Never commit wallet secrets, macaroons, or payment preimages to client
-configuration or registry files. See [CONNECT.md](CONNECT.md) for payment details.
+configuration or registry files. See [CONNECT.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md) for payment details.
 
 ### ElizaOS
 
@@ -788,14 +788,14 @@ export const character: Character = {
 };
 ```
 
-See [CONNECT.md — ElizaOS character](CONNECT.md#elizaos-character) for setup and payment details.
+See [CONNECT.md — ElizaOS character](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md#elizaos-character) for setup and payment details.
 
 ## Ecosystem Registry Discovery
 
 - [Smithery listing](https://smithery.ai/servers/crstrogish/bitcoin-stratigraphy-mcp)
-  · root connection metadata: [`smithery.yaml`](smithery.yaml).
+  · root connection metadata: [`smithery.yaml`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/smithery.yaml).
 - [Glama listing and live score](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
-  · root metadata: [`glama.json`](glama.json).
+  · root metadata: [`glama.json`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/glama.json).
 - [Public MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
   · [Agent discovery guide](https://bitcoinstratigraphy.com/llms.txt).
 
@@ -843,6 +843,6 @@ state anchoring, data truth, absolute unforgeability or legal indemnification.
   request logs report high-risk AGPLv3 copyleft/no active commercial exemption.
   Actual AGPL duties depend on covered software and use.
 
-See [enterprise protocol economics and verification](docs/enterprise-protocol-economics.md)
+See [enterprise protocol economics and verification](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/enterprise-protocol-economics.md)
 for canonical hashing, signed-token checks, rate/price limits and air-gap
 behavior. All 16 canonical MCP schemas and parameter structures are unchanged.

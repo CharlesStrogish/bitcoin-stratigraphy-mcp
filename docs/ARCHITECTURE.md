@@ -165,7 +165,7 @@ sequenceDiagram
 - Standard Claude Desktop bridges and Python MCP clients do not auto-pay.
   Automatic settlement requires a separately configured, opt-in payer.
 
-See [L402 Agent Payments](L402_AGENT_PAYMENTS.md) for wallet configuration,
+See [L402 Agent Payments](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/L402_AGENT_PAYMENTS.md) for wallet configuration,
 budgets, reconciliation, and the existing client integration.
 
 </details>
@@ -350,12 +350,12 @@ not from these diagrams or a cached registry page.
 
 ## Integration guides and implementation references
 
-- [Claude Desktop setup](CLAUDE_DESKTOP_SETUP.md)
-- [LangChain and CrewAI Python integration](LANGCHAIN_CREWAI_GUIDE.md)
-- [Agent-owned L402 payments](L402_AGENT_PAYMENTS.md)
-- [Connection guide and 16-tool catalog](../CONNECT.md)
-- [MCP routing and tool implementation](../artifacts/api-server/src/routes/mcp.ts)
-- [Groth16 telemetry proof service](../artifacts/api-server/src/services/zkProofService.ts)
+- [Claude Desktop setup](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/CLAUDE_DESKTOP_SETUP.md)
+- [LangChain and CrewAI Python integration](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/LANGCHAIN_CREWAI_GUIDE.md)
+- [Agent-owned L402 payments](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/L402_AGENT_PAYMENTS.md)
+- [Connection guide and 16-tool catalog](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md)
+- [MCP routing and tool implementation](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/routes/mcp.ts)
+- [Groth16 telemetry proof service](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/services/zkProofService.ts)
 - [Mermaid sequence diagram syntax](https://mermaid.js.org/syntax/sequenceDiagram.html)
 - [Mermaid flowcharts and node links](https://mermaid.js.org/syntax/flowchart.html)
 

@@ -49,7 +49,7 @@ aggregate budget before enabling that path.
 Ask the service for current prices with the free `GET` or `POST /api/v1/cost`
 quote endpoint (or the paid `payment.get_info` tool) rather than treating a
 cached price list as authoritative. See
-[CONNECT.md](../CONNECT.md#tool-catalog-and-pricing) for the endpoint, MCP
+[CONNECT.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md#tool-catalog-and-pricing) for the endpoint, MCP
 setup, and published tool catalog.
 
 ## Wallet connection: agent payer only
@@ -313,7 +313,7 @@ automatically recovering every interrupted request.
 
 ## Using the existing TypeScript MCP client
 
-The actual MCP API in [`sdk/typescript/client.ts`](../sdk/typescript/client.ts)
+The actual MCP API in [`sdk/typescript/client.ts`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/sdk/typescript/client.ts)
 is `BitcoinStratigraphyClient`, with `callTool(name, args)` and typed helpers
 such as `getStratigraphyDigest(args)`. It does **not** export an
 `invokeMcp` function. Its constructor accepts `(serverUrl?, wallet?,
@@ -350,7 +350,7 @@ reconciliation. Build those controls around the payment path or use a
 challenge-aware transport/policy layer. Do not assume current advertised
 prices or the SDK's hash check enforce your complete spending policy.
 
-See the [SDK client guide](../sdk/README.md) for the documented call surface
+See the [SDK client guide](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/sdk/README.md) for the documented call surface
 and wallet callback contract. It also warns against substituting transaction
 IDs or UUIDs for preimages.
 
@@ -412,11 +412,11 @@ not in instructions supplied by the remote MCP server or the agent model.
 
 ## Sources
 
-- [Claude Desktop setup](CLAUDE_DESKTOP_SETUP.md) — discovery-only desktop connection; no automatic payer.
-- [LangChain and CrewAI integration](LANGCHAIN_CREWAI_GUIDE.md) — Python wrappers and the separate L402 transport boundary.
+- [Claude Desktop setup](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/CLAUDE_DESKTOP_SETUP.md) — discovery-only desktop connection; no automatic payer.
+- [LangChain and CrewAI integration](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/LANGCHAIN_CREWAI_GUIDE.md) — Python wrappers and the separate L402 transport boundary.
 - [NIP-47: Nostr Wallet Connect (official NIPs repository)](https://github.com/nostr-protocol/nips/blob/master/47.md) — protocol requests, response envelope, connection URI, and error codes.
 - [Alby JavaScript SDK NWC documentation](https://github.com/getAlby/js-sdk/blob/master/docs/nwc.md) — official `NWCClient` usage, `payInvoice({ invoice })`, and client setup.
 - [Alby JavaScript SDK API reference](https://getalby.github.io/js-sdk/classes/nwc.NWCClient.html) — `NWCClient` methods.
-- [Bitcoin Stratigraphy connection guide](../CONNECT.md) — MCP setup, discovery, pricing, and the L402 flow.
-- [Bitcoin Stratigraphy MCP SDK guide](../sdk/README.md) — TypeScript/Python MCP client usage and callback requirements.
-- [Bitcoin Stratigraphy TypeScript client source](../sdk/typescript/client.ts) — actual constructor, call methods, and current L402 handling.
+- [Bitcoin Stratigraphy connection guide](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md) — MCP setup, discovery, pricing, and the L402 flow.
+- [Bitcoin Stratigraphy MCP SDK guide](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/sdk/README.md) — TypeScript/Python MCP client usage and callback requirements.
+- [Bitcoin Stratigraphy TypeScript client source](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/sdk/typescript/client.ts) — actual constructor, call methods, and current L402 handling.

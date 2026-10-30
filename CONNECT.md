@@ -338,7 +338,7 @@ from `https://bitcoinstratigraphy.com/.well-known/integrity.json`, pin it, and
 verify each callback against the exact body bytes before parsing it. Reject
 timestamps more than five minutes old, accept only a `task_id` you received in
 a 202, and process each `Webhook-Id` once. See
-[docs/tool-integrity.md](docs/tool-integrity.md#webhook-callback-signatures)
+[docs/tool-integrity.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/tool-integrity.md#webhook-callback-signatures)
 for a Node.js verifier.
 
 Delivery is best effort. The server makes up to three attempts, retries only

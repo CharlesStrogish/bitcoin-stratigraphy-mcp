@@ -27,10 +27,10 @@ disclosure is not cryptographic zero knowledge.
 ## Native framework toolkits (Phase 2)
 
 For the 16-tool server and `proof.notarize`, use the standalone
-[LangChain MCPAdapter](frameworks/langchain_agent.py) quickstart.
-The [LlamaIndex MCP](frameworks/llamaindex_agent.py) source is preserved, but
+[LangChain MCPAdapter](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/langchain_agent.py) quickstart.
+The [LlamaIndex MCP](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/llamaindex_agent.py) source is preserved, but
 installation is temporarily unavailable because it requires vulnerable NLTK.
-The [framework setup guide](frameworks/README.md) documents separate optional
+The [framework setup guide](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/README.md) documents separate optional
 dependencies, prepaid 100-call L402 Macro-Macaroon headers, local wallet proxies,
 safe discovery mode, and explicit agent execution.
 
@@ -282,7 +282,7 @@ uses a private CA, configure the trusted CA rather than disabling verification.
 
 ## Article 12 automated audit-evidence cookbook
 
-[`article_12_compliance.py`](article_12_compliance.py) implements
+[`article_12_compliance.py`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/article_12_compliance.py) implements
 `Article12NotaryCallback`, a LangChain `BaseCallbackHandler` with public
 `start_run`, `record_event`, and `finish_run` methods for CrewAI-style loops.
 It supports **Article 12 record-keeping evidence**, not a legal-compliance
@@ -390,7 +390,7 @@ the receipt later. Client UTC timestamps alone are not trusted time.
 
 ### Independent audit verification (no MCP or L402)
 
-Run [`audit_verifier.py`](audit_verifier.py) against the original JSONL journal
+Run [`audit_verifier.py`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/audit_verifier.py) against the original JSONL journal
 after the callback has flushed. It reads the trace and status records by
 `trace_id`, checks the append-only hash chain and exact canonical SHA-256 trace
 digest, parses real detached OTS receipts, and upgrades pending commitments

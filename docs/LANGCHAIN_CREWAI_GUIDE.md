@@ -21,7 +21,7 @@ asset selection nor its paid SSE feed is a capability of the MCP transport.
 
 ## Tool catalog
 
-The following catalog is transcribed from [`CONNECT.md`](../CONNECT.md). Its
+The following catalog is transcribed from [`CONNECT.md`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md). Its
 prices are advertised sats from the server documentation, not a price
 guarantee; the live `payment.get_info` response is authoritative. The
 published MCP catalog currently contains 16 canonical tools.
@@ -507,7 +507,7 @@ async tool.
 - Paid calls require an L402-aware HTTP transport and a payment client with
   explicit spending controls. A normal `streamable_http_client` setup is not
   an L402 payment transport. Read
-  [`L402_AGENT_PAYMENTS.md`](L402_AGENT_PAYMENTS.md) before implementing a
+  [`L402_AGENT_PAYMENTS.md`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/L402_AGENT_PAYMENTS.md) before implementing a
   separately reviewed payment integration. Never turn a 402 into an
   automatic payment without checking the exact invoice, amount, scope,
   expiry, and wallet policy.
@@ -530,8 +530,8 @@ async tool.
   cancelled coroutine close a session that a worker may still be using.
 
 For Claude Desktop setup, see
-[`CLAUDE_DESKTOP_SETUP.md`](CLAUDE_DESKTOP_SETUP.md) and the broader client
-configuration and tool catalog in [`CONNECT.md`](../CONNECT.md).
+[`CLAUDE_DESKTOP_SETUP.md`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/CLAUDE_DESKTOP_SETUP.md) and the broader client
+configuration and tool catalog in [`CONNECT.md`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md).
 
 ## API references checked
 
@@ -548,6 +548,6 @@ documentation and source:
   (`BaseTool`, `args_schema`, `_run`, and async tool support).
 - [CrewAI: Asynchronous crew kickoff](https://docs.crewai.com/en/learn/kickoff-async)
   (`kickoff_async` is thread-based; `akickoff` is native async).
-- Repository [tool catalog and MCP connection notes](../CONNECT.md), with
+- Repository [tool catalog and MCP connection notes](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md), with
   canonical registrations and schemas in
-  [`artifacts/api-server/src/routes/mcp.ts`](../artifacts/api-server/src/routes/mcp.ts).
+  [`artifacts/api-server/src/routes/mcp.ts`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/routes/mcp.ts).

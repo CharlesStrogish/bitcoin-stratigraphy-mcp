@@ -3,8 +3,8 @@
 [![MCP](https://img.shields.io/badge/MCP-Streamable_HTTP-4856E8)](https://modelcontextprotocol.io/)
 [![L402](https://img.shields.io/badge/L402-Lightning_payments-F7931A)](https://docs.lightning.engineering/the-lightning-network/l402)
 [![OpenTimestamps](https://img.shields.io/badge/OpenTimestamps-Bitcoin_notarization-0B8043)](https://opentimestamps.org/)
-[![LangChain](https://img.shields.io/badge/LangChain-ReAct_toolkit-1C3C3C)](cookbooks/langchain_agent.py)
-[![LlamaIndex](https://img.shields.io/badge/LlamaIndex-source_only%20%7C%20security_hold-E0A100)](cookbooks/llamaindex_agent.py)
+[![LangChain](https://img.shields.io/badge/LangChain-ReAct_toolkit-1C3C3C)](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/langchain_agent.py)
+[![LlamaIndex](https://img.shields.io/badge/LlamaIndex-source_only%20%7C%20security_hold-E0A100)](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/llamaindex_agent.py)
 
 **Release:** 1.1.0 · **MCP registry name:** `crstrogish/bitcoin-stratigraphy`
 
@@ -36,9 +36,9 @@ installation only after auditing a safe, complete dependency tree.
 | Developer portal | `https://bitcoinstratigraphy.com/docs` |
 | Live OpenAPI | `https://bitcoinstratigraphy.com/openapi.json` |
 
-Use the MCP URL in any Streamable HTTP client. Import [mcp.json](mcp.json) where
+Use the MCP URL in any Streamable HTTP client. Import [mcp.json](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/mcp.json) where
 your client supports URL-based MCP configuration; some hosts require an explicit
-transport type in their own configuration format. [smithery.yaml](smithery.yaml)
+transport type in their own configuration format. [smithery.yaml](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/smithery.yaml)
 is canonical **remote registration metadata**, not a local-server launch recipe.
 
 The server advertises 16 canonical capabilities. `initialize` and `tools/list`
@@ -204,7 +204,7 @@ original dotted remote tool names.
 **Source-only until the dependency security hold is lifted.** The following
 copy-paste example documents the supported API shape for a future audited
 environment; it is not an instruction to install vulnerable dependencies now.
-The full paid-notarization example is [cookbooks/llamaindex_agent.py](cookbooks/llamaindex_agent.py).
+The full paid-notarization example is [cookbooks/llamaindex_agent.py](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/llamaindex_agent.py).
 
 ```python
 import asyncio
@@ -244,7 +244,7 @@ Model credentials and charges are separate from MCP payments.
 
 ## TypeScript SDK
 
-[sdk/typescript](sdk/typescript) contains both the REST client and MCP client
+[sdk/typescript](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/tree/main/sdk/typescript) contains both the REST client and MCP client
 sources, independent compiler configurations, local tests, and its own package
 manifest. SDK version 0.1.0 is independent of registry release 1.1.0.
 
@@ -315,12 +315,12 @@ Created & Architected by Charles R. Strogish.
 
 Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 Covered first-party software is dual-licensed under GNU AGPLv3 or a separately
-executed Enterprise Commercial License. See [LICENSE.md](LICENSE.md) for the
+executed Enterprise Commercial License. See [LICENSE.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/LICENSE.md) for the
 complete license and rider. AGPL permits commercial use when its conditions,
 including applicable corresponding-source and network-use obligations, are met.
 Proprietary, closed-source enterprise swarm deployments or multi-tenant hosting
 without the source disclosure required by AGPL need a Commercial License from
 Charles R. Strogish. API fees do not grant commercial software rights.
 Third-party frameworks and dependencies retain their own licenses and terms;
-previously granted licenses are not revoked. See [SECURITY.md](SECURITY.md) for
+previously granted licenses are not revoked. See [SECURITY.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/SECURITY.md) for
 coordinated vulnerability reporting.

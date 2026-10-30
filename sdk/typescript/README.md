@@ -6,7 +6,7 @@ Created & Architected by Charles R. Strogish.
 
 Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 Dual-licensed under AGPLv3 or a separately executed Enterprise Commercial
-License. See [LICENSE.md](LICENSE.md) for the complete terms. Commercial use is
+License. See [LICENSE.md](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/sdk/typescript/LICENSE.md) for the complete terms. Commercial use is
 permitted under AGPL when its conditions are met; proprietary deployments
 that cannot satisfy applicable source-disclosure obligations require a
 Commercial License from Charles R. Strogish. API payments do not grant

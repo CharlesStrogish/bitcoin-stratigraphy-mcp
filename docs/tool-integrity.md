@@ -5,7 +5,7 @@
 after the canonical 16-tool registry's description overrides have finished.
 No MCP tool, schema, price, payment gate or execution path is changed.
 The same key also signs asynchronous webhook callbacks; see
-[Webhook callback signatures](#webhook-callback-signatures).
+[Webhook callback signatures](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/tool-integrity.md#webhook-callback-signatures).
 
 ## Verify independently
 

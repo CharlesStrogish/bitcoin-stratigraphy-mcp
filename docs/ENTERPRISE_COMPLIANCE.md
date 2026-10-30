@@ -12,14 +12,14 @@
 
 ## Contents
 
-1. [Executive summary and regulatory matrix](#1-executive-summary-and-regulatory-matrix)
-2. [Cryptographic audit trail architecture](#2-cryptographic-audit-trail-architecture)
-3. [Groth16 ZK-SNARK circuit specifications](#3-groth16-zk-snark-circuit-specifications)
-4. [L402 bounded economic agency](#4-l402-bounded-economic-agency)
-5. [Production Python auditor example](#5-production-python-auditor-example)
-6. [Auditor operational runbook](#6-auditor-operational-runbook)
-7. [Governance ownership and release gates](#7-governance-ownership-and-release-gates)
-8. [References and validation](#8-references-and-validation)
+1. [Executive summary and regulatory matrix](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md#1-executive-summary-and-regulatory-matrix)
+2. [Cryptographic audit trail architecture](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md#2-cryptographic-audit-trail-architecture)
+3. [Groth16 ZK-SNARK circuit specifications](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md#3-groth16-zk-snark-circuit-specifications)
+4. [L402 bounded economic agency](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md#4-l402-bounded-economic-agency)
+5. [Production Python auditor example](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md#5-production-python-auditor-example)
+6. [Auditor operational runbook](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md#6-auditor-operational-runbook)
+7. [Governance ownership and release gates](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md#7-governance-ownership-and-release-gates)
+8. [References and validation](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md#8-references-and-validation)
 
 ## 1. Executive summary and regulatory matrix
 
@@ -836,16 +836,16 @@ the deployment has already passed them or change server enforcement.
 
 ### 8.2 Implementation evidence reviewed
 
-- [MCP catalog, input validation, execution, lookup, and paid-call gating](../artifacts/api-server/src/routes/mcp.ts).
-- [Macaroon issuance, attenuation, and verification](../artifacts/api-server/src/lib/subscription-pass.ts).
-- [Telemetry proof validation and bounded archive](../artifacts/api-server/src/services/zkProofService.ts)
-  and [telemetry circuit](../artifacts/api-server/src/services/zk/telemetry.circom).
-- [Context receipts](../artifacts/api-server/src/services/epistemicGrounding.ts),
-  [dataset receipt wrappers](../artifacts/api-server/src/services/epistemicDatasetReceipt.ts),
-  [cryptographic attestation verification](../artifacts/api-server/src/services/attestation.ts),
-  and [canonicalization/Merkle conventions](../artifacts/api-server/src/services/meshGossipService.ts).
-- [Tool catalog and prices](../CONNECT.md) and
-  [client payment integration guidance](L402_AGENT_PAYMENTS.md).
+- [MCP catalog, input validation, execution, lookup, and paid-call gating](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/routes/mcp.ts).
+- [Macaroon issuance, attenuation, and verification](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/lib/subscription-pass.ts).
+- [Telemetry proof validation and bounded archive](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/services/zkProofService.ts)
+  and [telemetry circuit](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/services/zk/telemetry.circom).
+- [Context receipts](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/services/epistemicGrounding.ts),
+  [dataset receipt wrappers](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/services/epistemicDatasetReceipt.ts),
+  [cryptographic attestation verification](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/services/attestation.ts),
+  and [canonicalization/Merkle conventions](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/services/meshGossipService.ts).
+- [Tool catalog and prices](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md) and
+  [client payment integration guidance](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/L402_AGENT_PAYMENTS.md).
 
 ### 8.3 Validation scope
 

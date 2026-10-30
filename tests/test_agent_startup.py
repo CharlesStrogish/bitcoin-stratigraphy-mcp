@@ -226,6 +226,43 @@ class RefusalAssertions:
 
 
 class StartupGateTests(RefusalAssertions, unittest.IsolatedAsyncioTestCase):
+    async def test_legacy_host_redirects_before_loading_without_changing_local_access(self):
+        calls = []
+
+        async def application(scope, receive, send):
+            calls.append(scope)
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"ok"})
+
+        gate = StartupGate(lambda: application)
+        for host in (b"old.replit.app", b"OLD.REPLIT.DEV:443", b"old.repl.co."):
+            messages = []
+
+            async def send(message):
+                messages.append(message)
+
+            scope = {
+                "type": "http", "path": "/agent-api/mcp",
+                "raw_path": b"/agent-api/mcp", "query_string": b"trace=a%2Fb&x=1",
+                "headers": [(b"host", host)],
+            }
+            await gate(scope, None, send)
+            self.assertEqual(messages[0]["status"], 301)
+            self.assertEqual(dict(messages[0]["headers"])[b"location"],
+                b"https://bitcoinstratigraphy.com/agent-api/mcp?trace=a%2Fb&x=1")
+            self.assertEqual(messages[1]["body"], b"")
+        self.assertEqual(calls, [])
+        self.assertEqual(gate.held, 0)
+        gate.app = application
+        for host in (b"localhost", b"127.0.0.1:8000", b"[::1]:8000",
+                     b"bitcoinstratigraphy.com", b"www.bitcoinstratigraphy.com",
+                     b"old.replit.app.evil.example"):
+            messages = []
+            scope["headers"] = [(b"host", host), (b"x-forwarded-host", b"old.replit.app")]
+            await gate(scope, None, send)
+            self.assertEqual(messages[0]["status"], 200)
+        self.assertEqual(len(calls), 6)
+
     async def start_gate(self, factory, **options):
         loader = Loader(factory)
         self.addCleanup(loader.release.set)

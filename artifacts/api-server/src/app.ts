@@ -38,6 +38,7 @@ import { createMeshGossipService } from "./services/meshGossipService";
 import { registerZkDriftRoute } from "./routes/zk-drift";
 import { apiRootAliases } from "./middleware/apiRootAliases";
 import { registerPublicCors } from "./middleware/publicCors";
+import { redirectLegacyDomain } from "./middleware/canonicalDomain";
 import { registerAuditRoutes } from "./routes/audit";
 import { registerEscrowRoutes } from "./routes/escrow";
 import { registerEnterpriseRoutes } from "./routes/enterprise";
@@ -57,6 +58,7 @@ import {
 } from "./middleware/nip98-revocation";
 
 const app: Express = express();
+app.use(redirectLegacyDomain);
 // Started by the server entry once the HTTP port is bound; escrow routes wait on it.
 export const escrowRecovery = createEscrowRecovery({ logger });
 const meshService = createMeshGossipService();

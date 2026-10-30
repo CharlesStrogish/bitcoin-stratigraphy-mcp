@@ -205,12 +205,18 @@ importers:
 
   artifacts/bitcoin-stratigraphy-dashboard:
     dependencies:
+      '@iarna/toml':
+        specifier: ^2.2.5
+        version: 2.2.5
       '@tanstack/react-table':
         specifier: ^9.2.4
         version: 9.2.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       d3-scale-chromatic:
         specifier: ^3.1.0
         version: 3.1.0
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
       papaparse:
         specifier: ^5.7.0
         version: 5.7.0

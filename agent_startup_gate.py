@@ -218,6 +218,26 @@ class StartupGate:
         return self.exit_code is not None or self._closing
 
     async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            host = dict(scope.get("headers", [])).get(b"host", b"")
+            hostname = host.lower().rsplit(b":", 1)[0].rstrip(b".")
+            if any(
+                hostname == domain or hostname.endswith(b"." + domain)
+                for domain in (b"replit.app", b"replit.dev", b"repl.co")
+            ):
+                raw_path = scope.get("raw_path", scope["path"].encode("utf-8"))
+                raw_path = raw_path if raw_path.startswith(b"/") else b"/"
+                query = scope.get("query_string", b"")
+                location = b"https://bitcoinstratigraphy.com" + raw_path
+                if query:
+                    location += b"?" + query
+                await send({
+                    "type": "http.response.start",
+                    "status": 301,
+                    "headers": [(b"location", location), (b"content-length", b"0")],
+                })
+                await send({"type": "http.response.body", "body": b""})
+                return
         if scope["type"] == "lifespan":
             await self._serve_lifespan(scope, receive, send)
         elif self.app is not None:

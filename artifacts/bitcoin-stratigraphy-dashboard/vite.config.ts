@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import { enterpriseSeoPlugin } from "./enterprise-seo-plugin";
+import { redirectLegacyDomain } from "./domain-redirect.mjs";
 
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
@@ -48,6 +49,15 @@ export default defineConfig(({ command }) => {
   return {
     base: basePath,
     plugins: [
+      {
+        name: "canonical-domain-redirect",
+        configureServer(server) {
+          server.middlewares.use(redirectLegacyDomain);
+        },
+        configurePreviewServer(server) {
+          server.middlewares.use(redirectLegacyDomain);
+        },
+      },
       react(),
       tailwindcss(),
       runtimeErrorOverlay(),

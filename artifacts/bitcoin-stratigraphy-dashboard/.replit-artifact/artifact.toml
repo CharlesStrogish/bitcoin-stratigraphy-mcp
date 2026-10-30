@@ -16,8 +16,16 @@ run = "pnpm --filter @workspace/bitcoin-stratigraphy-dashboard run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/bitcoin-stratigraphy-dashboard", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/bitcoin-stratigraphy-dashboard/dist/public"
+[services.production.run]
+args = [ "node", "artifacts/bitcoin-stratigraphy-dashboard/server.mjs" ]
+
+[services.production.run.env]
+NODE_ENV = "production"
+PORT = "20948"
+BASE_PATH = "/"
+
+[services.production.health.startup]
+path = "/"
 
 [[services.production.rewrites]]
 from = "/enterprise"

@@ -162,14 +162,14 @@ function Header({
           <h1>
             Bitcoin <span>Stratigraphy</span>
           </h1>
-          <p className="subtitle">
+          <h2 className="subtitle">
             Enterprise-grade L402 data engine and cryptographic notary hub.
             Providing State-Anchored AI data layers and Swarm Flight Recorders
             for EU AI Act Article 12 compliance — Created &amp; Architected by
             Charles R. Strogish.
             <br />
             Anchoring autonomous agents in thermodynamic truth to mathematically eliminate hallucinations.
-          </p>
+          </h2>
           <TrustBadges />
         </div>
         <div className="header-actions homepage-actions">

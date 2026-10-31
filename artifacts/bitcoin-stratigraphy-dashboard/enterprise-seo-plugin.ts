@@ -102,8 +102,8 @@ function escrowHead(html: string): string {
   const schema = JSON.stringify({
     "@context": "https://schema.org", ...ESCROW_APPLICATION,
   }).replace(/</g, "\\u003c");
-  return html.replace("</head>",
-    `<script id="escrow-application-jsonld" type="application/ld+json">${schema}</script>\n</head>`);
+  return html.replace("</script>",
+    `</script>\n<script id="escrow-application-jsonld" type="application/ld+json">${schema}</script>`);
 }
 
 /** Social crawlers receive route metadata without having to execute React. */

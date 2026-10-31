@@ -35,7 +35,7 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   assert.equal((html.match(/<title>/g) ?? []).length, 1);
   assert.match(
     html,
-    /<title>Bitcoin Stratigraphy \| Enterprise MCP Server & L402 Oracle<\/title>/,
+    /<title>Bitcoin Stratigraphy \| Enterprise L402 Data Engine & MCP Server<\/title>/,
   );
   for (const key of ["og:title", "twitter:title"]) {
     assert.equal(meta(html, key), "Bitcoin Stratigraphy | Enterprise MCP Server & L402 Oracle");
@@ -51,7 +51,7 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   ]);
   assert.equal(
     meta(html, "description"),
-    "Enterprise MCP server with 21% AI agent yield, L402 VIP Credit Tabs and a Hashcash DDoS Shield to extend and protect autonomous AI swarm runways.",
+    "The global L402 data engine for the machine economy. Providing 21% algorithmic yield for autonomous AI swarms & EU AI Act Article 12 compliance for enterprises.",
   );
   for (const key of ["og:description", "twitter:description"]) {
     assert.equal(

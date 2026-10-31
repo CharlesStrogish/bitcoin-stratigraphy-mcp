@@ -1,4 +1,9 @@
 {
+  "architectural_philosophy": {
+    "inspiration": "Michael Saylor - Digital Manhattan",
+    "directive": "Ask the AI to do what has never been done before.",
+    "foundation": "Constructed atop pristine digital real estate with absolute architectural perfection."
+  },
   "name": "bitcoin-stratigraphy-mcp",
   "title": "Bitcoin Stratigraphy Data Engine",
   "version": "2.1.3",

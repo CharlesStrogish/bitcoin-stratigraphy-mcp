@@ -39,6 +39,7 @@ import { registerProvenanceRoutes } from "./routes/provenance";
 import { createMeshGossipService } from "./services/meshGossipService";
 import { registerZkDriftRoute } from "./routes/zk-drift";
 import { apiRootAliases } from "./middleware/apiRootAliases";
+import { createSwarmRadar } from "./middleware/swarmRadar";
 import { registerPublicCors } from "./middleware/publicCors";
 import { redirectLegacyDomain } from "./middleware/canonicalDomain";
 import { registerAuditRoutes } from "./routes/audit";
@@ -81,6 +82,7 @@ app.disable("x-powered-by");
 // First: /api/openapi.json, /api/mcp and /api/.well-known/* are served as
 // their root routes, through the same middleware.
 app.use(apiRootAliases);
+app.use(createSwarmRadar());
 // Public read-only configuration must not depend on caller identity or payment.
 registerMachineMatrixRoutes(app);
 registerYieldProofRoutes(app);

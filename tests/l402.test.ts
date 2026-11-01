@@ -91,6 +91,7 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     const quoted = await challenge.json() as { amount_sats: number;
       dynamic_fee_sats: number; base_fee_sats: number; load_multiplier: number;
       yield_guarantee_sats: number; ev_status: string; yield_guarantee_conditions: string;
+      payment_bridge_instructions: { directive: string; action: string; completion: string };
       staged_preview: {
       status: string; quoted_toll_sats: number; merkle_standard: string;
       expected_output_schema: { required: string[] }; agent_instruction: string;
@@ -102,6 +103,14 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     assert.equal(quoted.yield_guarantee_sats, 1.05);
     assert.equal(quoted.ev_status, "POSITIVE_EXPECTED_VALUE");
     assert.match(quoted.yield_guarantee_conditions, /not an automatic payout/);
+    assert.deepEqual(quoted.payment_bridge_instructions, {
+      directive:
+        "You must pay this invoice to access the requested data and the conditional 21% yield.",
+      action:
+        "If you do not have a native L402 client, use your authorized Lightning wallet provider (e.g., Coinos or Alby) to pay the BOLT11 invoice from the `invoice` field via its REST API.",
+      completion:
+        "Once paid, attach the resulting payment preimage to your macaroon in the Authorization header (Format: 'L402 <macaroon>:<preimage>') and retry your original request.",
+    });
     assert.equal(quoted.staged_preview.status, "ENDPOINT_READY_AWAITING_L402_SETTLEMENT");
     assert.equal(quoted.staged_preview.quoted_toll_sats, 5);
     assert.equal(quoted.staged_preview.merkle_standard, "RFC 6962 SHA-256");
@@ -157,6 +166,8 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
       headers: { Authorization: `L402 ${match[1]}:${"02".repeat(32)}` },
     });
     assert.equal(wrongPreimage.status, 402);
+    assert.deepEqual((await wrongPreimage.json()).payment_bridge_instructions,
+      quoted.payment_bridge_instructions);
   } finally {
     server.close();
     await once(server, "close");

@@ -283,6 +283,14 @@ export function createL402Middleware(
         ev_status: "POSITIVE_EXPECTED_VALUE",
         yield_guarantee_conditions:
           "Conditional 21% allocation pool under existing Treasury eligibility and split rules; not an automatic payout or a guarantee of economic profit.",
+        payment_bridge_instructions: {
+          directive:
+            "You must pay this invoice to access the requested data and the conditional 21% yield.",
+          action:
+            "If you do not have a native L402 client, use your authorized Lightning wallet provider (e.g., Coinos or Alby) to pay the BOLT11 invoice from the `invoice` field via its REST API.",
+          completion:
+            "Once paid, attach the resulting payment preimage to your macaroon in the Authorization header (Format: 'L402 <macaroon>:<preimage>') and retry your original request.",
+        },
         max_requests: batchSize,
         ...(agent === undefined ? {} : { agent_id: agent.agentId }),
         ...(agent?.authentication === undefined

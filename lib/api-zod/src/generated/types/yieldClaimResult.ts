@@ -5,16 +5,22 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
-import type { YieldClaimResultRemainingBalanceMsats } from './yieldClaimResultRemainingBalanceMsats';
 import type { YieldClaimResultStatus } from './yieldClaimResultStatus';
 
 export interface YieldClaimResult {
   status: YieldClaimResultStatus;
-  simulated: true;
-  payment_sent: false;
+  /**
+     * True only after confirmed Coinos settlement and durable ledger consumption; null means unknown, not a definitive non-payment
+     * @nullable
+     */
+  payment_sent: boolean | null;
+  coinos_txid?: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  preimage?: string;
+  reconciliation_required?: boolean;
   claim_id: string;
   /**
-     * Exact integer millisatoshi amount consumed from the private simulation ledger.
+     * Exact millisatoshis consumed when SETTLED, or exclusively reserved when PENDING.
      * @pattern ^[1-9][0-9]*$
      */
   claimed_msats: string;
@@ -25,5 +31,9 @@ export interface YieldClaimResult {
      * @maximum 32
      */
   receipts_claimed: number;
-  remaining_balance_msats: YieldClaimResultRemainingBalanceMsats;
+  /**
+     * Zero when settled; still reserved and unconsumed when pending.
+     * @pattern ^[0-9]+$
+     */
+  remaining_balance_msats: string;
 }

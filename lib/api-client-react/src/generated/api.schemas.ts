@@ -17,18 +17,18 @@ export const YieldMetricsStatus = {
 
 export interface YieldMetrics {
   /**
-     * Number of committed simulated claim records; not all attempted withdrawals
+     * Terminal mainnet claims; excludes pending, rejected and historical mock claims
      * @minimum 0
      */
   total_claims_processed: number;
   /**
-     * Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied
+     * Confirmed mainnet payouts in sats, including fractional sats
      * @minimum 0
      */
   total_yield_distributed_sats: number;
   /**
-     * All recorded simulated claims succeeded; Genesis explicitly returns 100.00%
-     * @pattern ^100\.00%$
+     * Settled divided by terminal mainnet claims; Genesis returns 100.00%
+     * @pattern ^(100\.00|[0-9]{1,2}\.[0-9]{2})%$
      */
   payout_reliability_score: string;
   /** Snapshot availability, not real wallet or payment health */
@@ -57,6 +57,7 @@ export interface SwarmReferralKey {
   expires_at: number;
   discount_percent: SwarmReferralKeyDiscountPercent;
   royalty_percent: SwarmReferralKeyRoyaltyPercent;
+  /** Legacy allocation-only discovery flag; does not describe the live mainnet claim-yield endpoint */
   simulated: true;
   /**
      * @maxItems 32
@@ -83,34 +84,62 @@ export interface YieldClaimInput {
      */
   royalty_payment_hashes?: string[];
   /**
-     * Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.
+     * Unexpired fixed-amount mainnet BOLT11 invoice matching the selected earnings in exact millisatoshis.
      * @minLength 100
      * @maxLength 4096
      */
   bolt11_invoice: string;
 }
 
+export interface YieldPayoutReconciliation {
+  claim_id: string;
+}
+
+export type YieldPayoutReconciliationResultStatus = typeof YieldPayoutReconciliationResultStatus[keyof typeof YieldPayoutReconciliationResultStatus];
+
+
+export const YieldPayoutReconciliationResultStatus = {
+  SETTLED: 'SETTLED',
+  FAILED: 'FAILED',
+  PENDING: 'PENDING',
+} as const;
+
+export interface YieldPayoutReconciliationResult {
+  claim_id: string;
+  status: YieldPayoutReconciliationResultStatus;
+  /**
+     * True when settled, false on definitive failure, null when unknown
+     * @nullable
+     */
+  payment_sent: boolean | null;
+  reconciliation_required: boolean;
+  coinos_txid?: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  preimage?: string;
+}
+
 export type YieldClaimResultStatus = typeof YieldClaimResultStatus[keyof typeof YieldClaimResultStatus];
 
 
 export const YieldClaimResultStatus = {
-  SIMULATED_WITHDRAWAL: 'SIMULATED_WITHDRAWAL',
-} as const;
-
-export type YieldClaimResultRemainingBalanceMsats = typeof YieldClaimResultRemainingBalanceMsats[keyof typeof YieldClaimResultRemainingBalanceMsats];
-
-
-export const YieldClaimResultRemainingBalanceMsats = {
-  NUMBER_0: '0',
+  SETTLED: 'SETTLED',
+  PENDING: 'PENDING',
 } as const;
 
 export interface YieldClaimResult {
   status: YieldClaimResultStatus;
-  simulated: true;
-  payment_sent: false;
+  /**
+     * True only after confirmed Coinos settlement and durable ledger consumption; null means unknown, not a definitive non-payment
+     * @nullable
+     */
+  payment_sent: boolean | null;
+  coinos_txid?: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  preimage?: string;
+  reconciliation_required?: boolean;
   claim_id: string;
   /**
-     * Exact integer millisatoshi amount consumed from the private simulation ledger.
+     * Exact millisatoshis consumed when SETTLED, or exclusively reserved when PENDING.
      * @pattern ^[1-9][0-9]*$
      */
   claimed_msats: string;
@@ -121,7 +150,11 @@ export interface YieldClaimResult {
      * @maximum 32
      */
   receipts_claimed: number;
-  remaining_balance_msats: YieldClaimResultRemainingBalanceMsats;
+  /**
+     * Zero when settled; still reserved and unconsumed when pending.
+     * @pattern ^[0-9]+$
+     */
+  remaining_balance_msats: string;
 }
 
 export interface YieldClaimFailure {
@@ -2461,7 +2494,7 @@ export interface L402PaymentRequired {
      */
   undiscounted_fee_sats?: number;
   /**
-     * Five percent of the final settled invoice, rounded down to whole millisatoshis; simulated allocation only
+     * Five percent of the final settled invoice, rounded down to whole millisatoshis; allocated privately, not paid until explicitly claimed
      * @minimum 0
      */
   royalty_fee_sats?: number;

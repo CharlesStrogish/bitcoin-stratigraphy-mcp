@@ -741,16 +741,15 @@ paths:
       - url: https://bitcoinstratigraphy.com
     get:
       operationId: getYieldMetrics
-      summary: Read aggregate recorded simulated yield claims
+      summary: Read aggregate mainnet payout outcomes
       description: |
         Public, read-only alias of /yield-metrics.json. No authentication or payment.
-        Scope is simulated-outbound, not completed Lightning payments or settlement proof.
-        Counts committed private claim records in mock settlement mode and sums their
-        consumed yield amounts in sats. Failed, rejected and rolled-back attempts are
-        not recorded and are excluded. All recorded simulated claims are successful,
-        so reliability is successful recorded claims / total recorded claims, or
-        explicitly 100.00% when there are no claims (the zero-traffic Genesis State).
-        This score does not measure all attempted claims or real wallet reliability.
+        Scope is mainnet-outbound. Counts terminal mainnet claims (settled or failed)
+        and sums only settled amounts. Historical mock deductions, pending claims
+        and rejected requests are excluded. Reliability is settled / terminal claims,
+        or 100.00% when there are no terminal mainnet claims (Genesis State).
+        A retried claim's latest outcome is counted once, not as separate attempts.
+        This is a local accounting snapshot, not independent payment evidence.
         Healthy means a metrics snapshot was read successfully, not that a wallet is healthy.
         One asynchronous aggregate query is shared across concurrent callers and cached
         per process for 30 seconds; shared HTTP caches may retain it for 15 more seconds.
@@ -758,13 +757,13 @@ paths:
       security: []
       responses:
         "200":
-          description: Aggregate recorded simulated claims, including the empty-ledger Genesis State
+          description: Terminal mainnet claims and settled payout totals
           headers:
             X-Yield-Scope:
               schema:
                 type: string
-                const: simulated-outbound
-              description: Simulated outbound deductions, not sent Lightning payments
+                const: mainnet-outbound
+              description: Confirmed mainnet payouts, excluding historical simulated deductions
           content:
             application/json:
               schema:
@@ -776,21 +775,20 @@ paths:
       - url: https://bitcoinstratigraphy.com
     get:
       operationId: getYieldMetricsJson
-      summary: Read public simulated yield metrics at the canonical root URL
+      summary: Read public mainnet yield metrics at the canonical root URL
       description: |
-        Same four-field response, simulated-outbound scope, Genesis State behavior
-        and caching as /api/yield-metrics. Only committed simulated claims are counted;
-        this is not a real Lightning payout success rate or independent payment proof.
+        Same four-field response, mainnet-outbound scope, Genesis State behavior
+        and caching as /api/yield-metrics. Historical mock and pending claims are excluded.
       security: []
       responses:
         "200":
-          description: Aggregate recorded simulated claims; an empty ledger has 100.00% reliability
+          description: Mainnet payout totals; an empty ledger has 100.00% reliability
           headers:
             X-Yield-Scope:
               schema:
                 type: string
-                const: simulated-outbound
-              description: Simulated outbound deductions, not sent Lightning payments
+                const: mainnet-outbound
+              description: Mainnet terminal claim outcomes only
           content:
             application/json:
               schema:
@@ -814,13 +812,14 @@ paths:
         The discount is applied after the unchanged Thermodynamic calculation:
         final millisatoshis = quoted whole sats * 950. Wholesale Whale budgets
         and exact-toll routes are excluded and their fees and quotas unchanged.
-        Royalties are additional private simulated earnings, not carved from
+        Royalties are additional private earnings, not carved from
         the buyer's existing 21% allocation. Fractional-msat royalties round down.
         The balance response selects at most 32 pending invoice hashes, in
         lexical order; claimable_msats is their subtotal. To claim, POST those
         royalty_payment_hashes and a matching BOLT11 invoice to /api/claim-yield
         with a fresh payload-bound NIP-98 signature from this same agent.
-        Repeat this GET for further pages after claiming. No real payment is sent.
+        Repeat this GET for further pages after claiming. Explicit claim requests
+        execute mainnet payouts; this discovery endpoint itself sends no payment.
       parameters:
         - name: X-Nostr-Authorization
           in: header
@@ -829,7 +828,7 @@ paths:
           description: Fresh NIP-98 Authorization event; Authorization Nostr is also accepted
       responses:
         "200":
-          description: Agent-bound referral key and private simulated royalty selection
+          description: Agent-bound referral key and private royalty selection
           content:
             application/json:
               schema:
@@ -845,9 +844,9 @@ paths:
       - url: https://bitcoinstratigraphy.com
     post:
       operationId: claimYield
-      summary: Atomically consume private simulated L402 yield earnings
+      summary: Reserve earnings and settle a real mainnet Lightning payout
       description: |
-        Mock withdrawal only: no Lightning payment is sent. Supply 1–32 issuer-authenticated
+        Live Coinos REST payout. Supply 1–32 issuer-authenticated
         L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
         matching exactly 21 percent of their confirmed incoming L402 settlement amounts.
         Historical receipt expiry and request quota do not invalidate an earned receipt.
@@ -855,10 +854,19 @@ paths:
         invoice, a forged token or a public payout record does not establish earnings.
         Each payment hash can be consumed once across all descendant macaroons and workers.
         All receipts succeed together or none are consumed. Duplicate payment hashes within
-        one request are rejected. Successful mock claims durably deduct private balances;
-        they do not modify real Treasury allocations or the public /yield-proofs.json feed.
+        one request are rejected. A durable pending claim reserves earnings BEFORE
+        POST https://coinos.io/api/payments with the server's COINOS_API_TOKEN.
+        Only confirmed settlement deducts balances and records txid/preimage.
+        Definitive rejection releases reservations without deducting funds, allowing retry.
+        Timeout, 5xx, ambiguous response, or post-payment database failure leaves
+        the claim pending and reserved. A different invoice cannot reuse those
+        earnings. Identical pending retries return 202 without sending another payment.
+        An operator reconciles wallet evidence via POST /api/claim-yield/reconcile.
+        HTTP success alone without settlement evidence is not sufficient.
+        Historical mock claims remain consumed and never become mainnet payouts.
+        This endpoint does not modify the public /yield-proofs.json feed.
         Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
-        it does not contact a wallet or guarantee that a destination invoice is payable.
+        destination payability is established only by Coinos settlement.
         Optional royalty_payment_hashes select separate 5% referral earnings instead
         of, or together with, bearer receipts (maximum 32 combined). Royalty claims
         require a fresh payload-bound NIP-98 signature from their recorded owner;
@@ -882,7 +890,13 @@ paths:
         "401":
           description: Royalty claim missing valid owner NIP-98 authentication
         "200":
-          description: Private balances consumed atomically; simulated only, not a payment receipt
+          description: Confirmed mainnet payment and durably consumed private balances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldClaimResult"
+        "202":
+          description: Payout outcome pending; funds remain reserved and reconciliation is required
           content:
             application/json:
               schema:
@@ -912,13 +926,65 @@ paths:
               schema:
                 $ref: "#/components/schemas/YieldClaimFailure"
         "503":
-          description: Receipt verification or private ledger unavailable; no successful claim is reported
+          description: Receipt verification, Coinos credentials or private ledger unavailable; no successful claim is reported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldClaimFailure"
+        "502":
+          description: Definitive Coinos payment failure; balances remain unconsumed and reservations are released
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/YieldClaimFailure"
   /api/yield-proofs.json:
     $ref: "#/components/pathItems/PublicYieldProofsAlias"
+  /api/claim-yield/reconcile:
+    servers:
+      - url: https://bitcoinstratigraphy.com
+    post:
+      operationId: reconcileYieldPayout
+      summary: Reconcile a pending payout without resending it
+      description: |
+        Operator-only. Requires Authorization Bearer MACAROON_OPERATOR_SECRET.
+        Reads authenticated Coinos payment history and verifies invoice hash,
+        outgoing amount, terminal status or cryptographic preimage. An absent,
+        incomplete or ambiguous record NEVER releases a pending reservation.
+        Verified settlement atomically consumes the reserved balances. Failed
+        history records alone cannot identify which retry failed and never release
+        the current reservation. No payment POST is made by reconciliation.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YieldPayoutReconciliation"
+      responses:
+        "200":
+          description: Settled or already-failed terminal outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldPayoutReconciliationResult"
+        "202":
+          description: Outcome remains unknown; reservation retained
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldPayoutReconciliationResult"
+        "400":
+          description: Invalid reconciliation payload
+        "403":
+          description: Operator authorization required
+        "404":
+          description: Mainnet claim not found
+        "503":
+          description: Reconciliation configuration or storage unavailable
   /yield-proofs.json:
     servers:
       - url: https://bitcoinstratigraphy.com
@@ -2777,15 +2843,15 @@ components:
         total_claims_processed:
           type: integer
           minimum: 0
-          description: Number of committed simulated claim records; not all attempted withdrawals
+          description: Terminal mainnet claims; excludes pending, rejected and historical mock claims
         total_yield_distributed_sats:
           type: number
           minimum: 0
-          description: Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied
+          description: Confirmed mainnet payouts in sats, including fractional sats
         payout_reliability_score:
           type: string
-          pattern: '^100\.00%$'
-          description: All recorded simulated claims succeeded; Genesis explicitly returns 100.00%
+          pattern: '^(100\.00|[0-9]{1,2}\.[0-9]{2})%$'
+          description: Settled divided by terminal mainnet claims; Genesis returns 100.00%
         status:
           type: string
           enum: [Healthy]
@@ -2799,7 +2865,10 @@ components:
         expires_at: { type: integer }
         discount_percent: { type: integer, enum: [5] }
         royalty_percent: { type: integer, enum: [5] }
-        simulated: { type: boolean, enum: [true] }
+        simulated:
+          type: boolean
+          enum: [true]
+          description: Legacy allocation-only discovery flag; does not describe the live mainnet claim-yield endpoint
         royalty_payment_hashes:
           type: array
           maxItems: 32
@@ -2828,27 +2897,45 @@ components:
           type: string
           minLength: 100
           maxLength: 4096
-          description: Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.
+          description: Unexpired fixed-amount mainnet BOLT11 invoice matching the selected earnings in exact millisatoshis.
+    YieldPayoutReconciliation:
+      type: object
+      additionalProperties: false
+      required: [claim_id]
+      properties:
+        claim_id: { type: string, format: uuid }
+    YieldPayoutReconciliationResult:
+      type: object
+      required: [claim_id, status, payment_sent, reconciliation_required]
+      properties:
+        claim_id: { type: string, format: uuid }
+        status: { type: string, enum: [SETTLED, FAILED, PENDING] }
+        payment_sent:
+          type: [boolean, "null"]
+          description: True when settled, false on definitive failure, null when unknown
+        reconciliation_required: { type: boolean }
+        coinos_txid: { type: string }
+        preimage: { type: string, pattern: "^[0-9a-f]{64}$" }
     YieldClaimResult:
       type: object
-      required: [status, simulated, payment_sent, claim_id, claimed_msats, claimed_sats, receipts_claimed, remaining_balance_msats]
+      required: [status, payment_sent, claim_id, claimed_msats, claimed_sats, receipts_claimed, remaining_balance_msats]
       properties:
         status:
           type: string
-          enum: [SIMULATED_WITHDRAWAL]
-        simulated:
-          type: boolean
-          enum: [true]
+          enum: [SETTLED, PENDING]
         payment_sent:
-          type: boolean
-          enum: [false]
+          type: [boolean, "null"]
+          description: True only after confirmed Coinos settlement and durable ledger consumption; null means unknown, not a definitive non-payment
+        coinos_txid: { type: string }
+        preimage: { type: string, pattern: "^[0-9a-f]{64}$" }
+        reconciliation_required: { type: boolean }
         claim_id:
           type: string
           format: uuid
         claimed_msats:
           type: string
           pattern: "^[1-9][0-9]*$"
-          description: Exact integer millisatoshi amount consumed from the private simulation ledger.
+          description: Exact millisatoshis consumed when SETTLED, or exclusively reserved when PENDING.
         claimed_sats:
           type: number
           minimum: 0
@@ -2858,7 +2945,8 @@ components:
           maximum: 32
         remaining_balance_msats:
           type: string
-          enum: ["0"]
+          pattern: "^[0-9]+$"
+          description: Zero when settled; still reserved and unconsumed when pending.
     YieldClaimFailure:
       type: object
       required: [error]
@@ -5377,7 +5465,7 @@ components:
         royalty_fee_sats:
           type: number
           minimum: 0
-          description: Five percent of the final settled invoice, rounded down to whole millisatoshis; simulated allocation only
+          description: Five percent of the final settled invoice, rounded down to whole millisatoshis; allocated privately, not paid until explicitly claimed
         base_fee_sats:
           type: integer
           minimum: 1

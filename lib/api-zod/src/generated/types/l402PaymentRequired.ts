@@ -41,7 +41,7 @@ export interface L402PaymentRequired {
      */
   undiscounted_fee_sats?: number;
   /**
-     * Five percent of the final settled invoice, rounded down to whole millisatoshis; simulated allocation only
+     * Five percent of the final settled invoice, rounded down to whole millisatoshis; allocated privately, not paid until explicitly claimed
      * @minimum 0
      */
   royalty_fee_sats?: number;

@@ -20,9 +20,10 @@ A hash of public fields verifies record consistency, not that Lightning paid.
 future writer must confirm actual aggregate disbursement, preserve exact
 integer-msat allocation arithmetic, and disclose the proof's trust limits.
 
-The user authorized a separate private earnings ledger for bearer-receipt yield
-claims, with atomic consumption and fully deducted balances even while outbound
-Coinos settlement remains a logged mock. Their standing instruction is to keep
+The user authorized explicit mainnet Coinos withdrawals from the separate
+private earnings ledger, superseding its earlier mock-only settlement policy.
+See mainnet-treasury-safety.md for the authorized scope and safety rules.
+Their standing instruction is to keep
 the public `/yield-proofs.json` strictly an append-only transparency feed and
 not alter its schema or response.
 
@@ -32,22 +33,19 @@ private balance. Simulation must never be reported as an actual Lightning payout
 
 **How to apply:** Keep claim state private and payment-hash scoped across all
 macaroon descendants; require confirmed incoming settlement evidence. Preserve
-real Treasury allocation rules and the payment gates. Before adding real
-withdrawals, explicitly reconcile simulated deductions instead of assuming
-mock claims prove actual disbursement.
+real Treasury allocation rules and the payment gates. Historical simulated
+deductions remain historical; never automatically repay or relabel them.
 
-The initial public yield metrics intentionally cover only recorded simulated
-claims, with exactly four JSON fields. The user explicitly chose `100.00%` for
-both empty Genesis state and all committed simulated claims, with
-`X-Yield-Scope: simulated-outbound` and OpenAPI disclosure.
+Public yield metrics retain exactly four JSON fields and the user's `100.00%`
+empty Genesis convention. Mainnet activation authorizes changing their scope
+to actual mainnet outcomes, excluding historical mock claims and pending work.
 
-**Why:** Failed/rejected attempts are not persisted, and the user authorized
-using recorded simulated claims without expanding the schema or claim flow.
-This is not evidence of real Lightning settlement or an all-attempt success rate.
+**Why:** The user authorized live payouts, not the retrospective conversion
+of simulated deductions into evidence of Lightning settlement.
 
 **How to apply:** Keep the metrics read-only and separate from the unchanged
 public payout feed. Do not silently reinterpret simulated deductions as sent
-payments, or broaden the denominator without explicit authorization and evidence.
+payments. Describe the terminal-claim denominator, not an all-attempt success rate.
 
 For qualifying new verification invoices, the user explicitly requires exactly
 15 percent of gross upstream and the remaining 6 percent to the caller, funded

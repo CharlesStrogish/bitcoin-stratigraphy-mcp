@@ -1,6 +1,6 @@
 ---
 name: Swarm referral economics and ownership
-description: Referral discount and additional simulated royalties, ownership trust and compatibility boundaries.
+description: Referral discount, additional private royalties, ownership trust and compatibility boundaries.
 ---
 
 The Swarm Royalty Matrix applies a 5% buyer discount after the existing
@@ -19,8 +19,10 @@ and withdraw its owner's royalties. The shareable key is not a withdrawal
 credential. Bind owner and discounted pricing into issuer-authenticated invoice
 metadata; never trust referral headers on retries or holder-appended caveats.
 Credit once per confirmed payment hash, persist before execution, and leave
-balances consumed across retries, descendants and workers. Both kinds of claims
-remain explicitly simulated, with no automatic Lightning payout.
+balances consumed across retries, descendants and workers. Mainnet Treasury
+activation supersedes the earlier mock-only withdrawal policy: explicit claims
+can pay real Lightning funds under mainnet-treasury-safety.md. Referral discovery
+and incoming payment execution must not themselves trigger withdrawals.
 
 Exact discounted millisatoshis are authoritative for both allocations. The
 legacy revenue ledger records rounded-up whole sats; do not infer referred

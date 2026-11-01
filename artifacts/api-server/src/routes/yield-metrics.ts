@@ -12,7 +12,7 @@ export function registerYieldMetricsRoutes(
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
       "Access-Control-Expose-Headers": "X-Yield-Scope",
-      "X-Yield-Scope": "simulated-outbound",
+      "X-Yield-Scope": "mainnet-outbound",
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "no-store",
     });

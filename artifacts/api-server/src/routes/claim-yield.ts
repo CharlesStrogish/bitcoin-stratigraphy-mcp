@@ -7,6 +7,7 @@ import { logger } from "../lib/logger";
 import { YieldClaimError, type PrivateYieldEarnings } from "../lib/private-yield-earnings";
 import { parseYieldWithdrawalInvoice } from "../lib/yield-withdrawal-invoice";
 import { verifyRequestNip98Signer } from "../lib/nip98-request";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 const claimInput = z.object({
   macaroons: z.array(z.string().min(1).max(16384)).max(32).default([]),
@@ -18,7 +19,8 @@ const claimInput = z.object({
 export function registerClaimYieldRoute(
   app: Express,
   ledger: PrivateYieldEarnings,
-  options: { secret?: string; now?: () => number; logMock?: (claim: Record<string, unknown>) => void } = {},
+  options: { secret?: string; now?: () => number; logSettlement?: (claim: Record<string, unknown>) => void;
+    operatorSecret?: string } = {},
 ): void {
   app.post("/api/claim-yield", async (req, res): Promise<void> => {
     res.set("Cache-Control", "no-store");
@@ -54,7 +56,9 @@ export function registerClaimYieldRoute(
     }
     let invoice;
     try {
-      invoice = parseYieldWithdrawalInvoice(parsed.data.bolt11_invoice, options.now?.() ?? Date.now());
+      // The ledger rejects expired NEW attempts. Parsing here without a current
+      // expiry cutoff lets a lost-response retry recover an existing pending ID.
+      invoice = parseYieldWithdrawalInvoice(parsed.data.bolt11_invoice, 0);
     } catch {
       res.status(400).json({ error: "INVALID_OR_EXPIRED_BOLT11_INVOICE" });
       return;
@@ -66,22 +70,49 @@ export function registerClaimYieldRoute(
       })), invoice, parsed.data.bolt11_invoice, royaltyOwner ? {
         owner: royaltyOwner, paymentHashes: parsed.data.royalty_payment_hashes!,
       } : undefined);
-      // Log only after durable consumption. No wallet API, credentials, invoices or addresses.
-      const event = { event: "yield_withdrawal_simulated", claim_id: claim.claimId,
-        amount_msats: claim.totalMsats.toString(), receipt_count: claim.receiptCount, simulated: true };
-      try { (options.logMock ?? (value => logger.info(value, "Simulated yield withdrawal; no Lightning payment sent")))(event); }
+      const settled = claim.paymentStatus === "settled";
+      const event = { event: "yield_withdrawal_" + claim.paymentStatus, claim_id: claim.claimId,
+        amount_msats: claim.totalMsats.toString(), receipt_count: claim.receiptCount };
+      try { (options.logSettlement ?? (value => logger.info(value, "Mainnet yield withdrawal state")))(event); }
       catch { /* A logging failure cannot undo a committed claim. */ }
-      res.status(200).json({
-        status: "SIMULATED_WITHDRAWAL", simulated: true, payment_sent: false,
+      res.status(settled ? 200 : 202).json({
+        status: settled ? "SETTLED" : "PENDING", payment_sent: settled ? true : null,
         claim_id: claim.claimId, claimed_msats: claim.totalMsats.toString(),
         claimed_sats: Number(claim.totalMsats) / 1000, receipts_claimed: claim.receiptCount,
-        remaining_balance_msats: "0",
+        remaining_balance_msats: settled ? "0" : claim.totalMsats.toString(),
+        ...(claim.txid ? { coinos_txid: claim.txid } : {}),
+        ...(claim.preimage ? { preimage: claim.preimage } : {}),
+        ...(!settled ? { reconciliation_required: true } : {}),
       });
     } catch (error) {
       if (error instanceof YieldClaimError) { res.status(error.status).json({ error: error.code }); return; }
       // Avoid database error details containing receipt identifiers or the request body.
       req.log?.error({ event: "yield_claim_storage_unavailable" }, "Private yield claim failed");
       res.status(503).json({ error: "YIELD_LEDGER_UNAVAILABLE" });
+    }
+  });
+  app.post("/api/claim-yield/reconcile", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const operator = options.operatorSecret ?? process.env.MACAROON_OPERATOR_SECRET;
+    if (!operator) { res.status(503).json({ error: "RECONCILIATION_UNAVAILABLE" }); return; }
+    const digest = (value: string) => createHash("sha256").update(value).digest();
+    if (!timingSafeEqual(digest(req.get("Authorization") ?? ""), digest(`Bearer ${operator}`))) {
+      res.status(403).json({ error: "OPERATOR_AUTHORIZATION_REQUIRED" }); return;
+    }
+    const parsed = z.object({ claim_id: z.string().uuid() }).strict().safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "INVALID_RECONCILIATION_PAYLOAD" }); return; }
+    try {
+      if (!ledger.reconcile) throw new Error("No reconciliation backend");
+      const claim = await ledger.reconcile(parsed.data.claim_id);
+      res.status(claim.paymentStatus === "pending" ? 202 : 200).json({
+        claim_id: claim.claimId, status: claim.paymentStatus.toUpperCase(),
+        payment_sent: claim.paymentStatus === "pending" ? null : claim.paymentStatus === "settled",
+        reconciliation_required: claim.paymentStatus === "pending",
+        ...(claim.txid ? { coinos_txid: claim.txid } : {}), ...(claim.preimage ? { preimage: claim.preimage } : {}),
+      });
+    } catch (error) {
+      if (error instanceof YieldClaimError) { res.status(error.status).json({ error: error.code }); return; }
+      res.status(503).json({ error: "RECONCILIATION_UNAVAILABLE" });
     }
   });
 }

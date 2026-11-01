@@ -102,6 +102,8 @@ import type {
   YieldClaimInput,
   YieldClaimResult,
   YieldMetrics,
+  YieldPayoutReconciliation,
+  YieldPayoutReconciliationResult,
   ZkDriftRequest,
   ZkDriftResponse,
   ZkTelemetryEventEnvelope,
@@ -146,18 +148,17 @@ export const getGetYieldMetricsUrl = () => {
 
 /**
  * Public, read-only alias of /yield-metrics.json. No authentication or payment.
- * Scope is simulated-outbound, not completed Lightning payments or settlement proof.
- * Counts committed private claim records in mock settlement mode and sums their
- * consumed yield amounts in sats. Failed, rejected and rolled-back attempts are
- * not recorded and are excluded. All recorded simulated claims are successful,
- * so reliability is successful recorded claims / total recorded claims, or
- * explicitly 100.00% when there are no claims (the zero-traffic Genesis State).
- * This score does not measure all attempted claims or real wallet reliability.
+ * Scope is mainnet-outbound. Counts terminal mainnet claims (settled or failed)
+ * and sums only settled amounts. Historical mock deductions, pending claims
+ * and rejected requests are excluded. Reliability is settled / terminal claims,
+ * or 100.00% when there are no terminal mainnet claims (Genesis State).
+ * A retried claim's latest outcome is counted once, not as separate attempts.
+ * This is a local accounting snapshot, not independent payment evidence.
  * Healthy means a metrics snapshot was read successfully, not that a wallet is healthy.
  * One asynchronous aggregate query is shared across concurrent callers and cached
  * per process for 30 seconds; shared HTTP caches may retain it for 15 more seconds.
  * Storage failures return 503, never fabricated zero balances or a Healthy response.
- * @summary Read aggregate recorded simulated yield claims
+ * @summary Read aggregate mainnet payout outcomes
  */
 export const getYieldMetrics = async ( options?: Parameters<typeof customFetch>[1]): Promise<YieldMetrics> => {
 
@@ -204,7 +205,7 @@ export type GetYieldMetricsQueryError = ErrorType<void>
 
 
 /**
- * @summary Read aggregate recorded simulated yield claims
+ * @summary Read aggregate mainnet payout outcomes
  */
 
 export function useGetYieldMetrics<TData = Awaited<ReturnType<typeof getYieldMetrics>>, TError = ErrorType<void>>(
@@ -234,10 +235,9 @@ export const getGetYieldMetricsJsonUrl = () => {
 }
 
 /**
- * Same four-field response, simulated-outbound scope, Genesis State behavior
- * and caching as /api/yield-metrics. Only committed simulated claims are counted;
- * this is not a real Lightning payout success rate or independent payment proof.
- * @summary Read public simulated yield metrics at the canonical root URL
+ * Same four-field response, mainnet-outbound scope, Genesis State behavior
+ * and caching as /api/yield-metrics. Historical mock and pending claims are excluded.
+ * @summary Read public mainnet yield metrics at the canonical root URL
  */
 export const getYieldMetricsJson = async ( options?: Parameters<typeof customFetch>[1]): Promise<YieldMetrics> => {
 
@@ -284,7 +284,7 @@ export type GetYieldMetricsJsonQueryError = ErrorType<void>
 
 
 /**
- * @summary Read public simulated yield metrics at the canonical root URL
+ * @summary Read public mainnet yield metrics at the canonical root URL
  */
 
 export function useGetYieldMetricsJson<TData = Awaited<ReturnType<typeof getYieldMetricsJson>>, TError = ErrorType<void>>(
@@ -324,13 +324,14 @@ export const getGetSwarmReferralKeyUrl = () => {
  * The discount is applied after the unchanged Thermodynamic calculation:
  * final millisatoshis = quoted whole sats * 950. Wholesale Whale budgets
  * and exact-toll routes are excluded and their fees and quotas unchanged.
- * Royalties are additional private simulated earnings, not carved from
+ * Royalties are additional private earnings, not carved from
  * the buyer's existing 21% allocation. Fractional-msat royalties round down.
  * The balance response selects at most 32 pending invoice hashes, in
  * lexical order; claimable_msats is their subtotal. To claim, POST those
  * royalty_payment_hashes and a matching BOLT11 invoice to /api/claim-yield
  * with a fresh payload-bound NIP-98 signature from this same agent.
- * Repeat this GET for further pages after claiming. No real payment is sent.
+ * Repeat this GET for further pages after claiming. Explicit claim requests
+ * execute mainnet payouts; this discovery endpoint itself sends no payment.
  * @summary Issue an agent-bound Swarm referral key and read private royalty balances
  */
 export const getSwarmReferralKey = async ( options?: Parameters<typeof customFetch>[1]): Promise<SwarmReferralKey> => {
@@ -408,7 +409,7 @@ export const getClaimYieldUrl = () => {
 }
 
 /**
- * Mock withdrawal only: no Lightning payment is sent. Supply 1–32 issuer-authenticated
+ * Live Coinos REST payout. Supply 1–32 issuer-authenticated
  * L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
  * matching exactly 21 percent of their confirmed incoming L402 settlement amounts.
  * Historical receipt expiry and request quota do not invalidate an earned receipt.
@@ -416,17 +417,26 @@ export const getClaimYieldUrl = () => {
  * invoice, a forged token or a public payout record does not establish earnings.
  * Each payment hash can be consumed once across all descendant macaroons and workers.
  * All receipts succeed together or none are consumed. Duplicate payment hashes within
- * one request are rejected. Successful mock claims durably deduct private balances;
- * they do not modify real Treasury allocations or the public /yield-proofs.json feed.
+ * one request are rejected. A durable pending claim reserves earnings BEFORE
+ * POST https://coinos.io/api/payments with the server's COINOS_API_TOKEN.
+ * Only confirmed settlement deducts balances and records txid/preimage.
+ * Definitive rejection releases reservations without deducting funds, allowing retry.
+ * Timeout, 5xx, ambiguous response, or post-payment database failure leaves
+ * the claim pending and reserved. A different invoice cannot reuse those
+ * earnings. Identical pending retries return 202 without sending another payment.
+ * An operator reconciles wallet evidence via POST /api/claim-yield/reconcile.
+ * HTTP success alone without settlement evidence is not sufficient.
+ * Historical mock claims remain consumed and never become mainnet payouts.
+ * This endpoint does not modify the public /yield-proofs.json feed.
  * Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
- * it does not contact a wallet or guarantee that a destination invoice is payable.
+ * destination payability is established only by Coinos settlement.
  * Optional royalty_payment_hashes select separate 5% referral earnings instead
  * of, or together with, bearer receipts (maximum 32 combined). Royalty claims
  * require a fresh payload-bound NIP-98 signature from their recorded owner;
  * possession of the publicly shareable referral key is insufficient. Get
  * pending hashes and their exact subtotal from /api/swarm-referral-key.
  * Referred buyers retain 21% of their exact discounted settled millisatoshis.
- * @summary Atomically consume private simulated L402 yield earnings
+ * @summary Reserve earnings and settle a real mainnet Lightning payout
  */
 export const claimYield = async (yieldClaimInput: YieldClaimInput, options?: Parameters<typeof customFetch>[1]): Promise<YieldClaimResult> => {
 
@@ -475,7 +485,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ClaimYieldMutationError = ErrorType<YieldClaimFailure | void>
 
     /**
- * @summary Atomically consume private simulated L402 yield earnings
+ * @summary Reserve earnings and settle a real mainnet Lightning payout
  */
 export const useClaimYield = <TError = ErrorType<YieldClaimFailure | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimYield>>, TError,{data: BodyType<YieldClaimInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -486,6 +496,84 @@ export const useClaimYield = <TError = ErrorType<YieldClaimFailure | void>,
         TContext
       > => {
       return useMutation(getClaimYieldMutationOptions(options));
+    }
+
+export const getReconcileYieldPayoutUrl = () => {
+
+
+
+
+  return `/api/claim-yield/reconcile`
+}
+
+/**
+ * Operator-only. Requires Authorization Bearer MACAROON_OPERATOR_SECRET.
+ * Reads authenticated Coinos payment history and verifies invoice hash,
+ * outgoing amount, terminal status or cryptographic preimage. An absent,
+ * incomplete or ambiguous record NEVER releases a pending reservation.
+ * Verified settlement atomically consumes the reserved balances. Failed
+ * history records alone cannot identify which retry failed and never release
+ * the current reservation. No payment POST is made by reconciliation.
+ * @summary Reconcile a pending payout without resending it
+ */
+export const reconcileYieldPayout = async (yieldPayoutReconciliation: YieldPayoutReconciliation, options?: Parameters<typeof customFetch>[1]): Promise<YieldPayoutReconciliationResult> => {
+
+  return customFetch<YieldPayoutReconciliationResult>(getReconcileYieldPayoutUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(yieldPayoutReconciliation)
+  }
+);}
+
+
+
+
+
+export const getReconcileYieldPayoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconcileYieldPayout>>, TError,{data: BodyType<YieldPayoutReconciliation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reconcileYieldPayout>>, TError,{data: BodyType<YieldPayoutReconciliation>}, TContext> => {
+
+const mutationKey = ['reconcileYieldPayout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reconcileYieldPayout>>, {data: BodyType<YieldPayoutReconciliation>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  reconcileYieldPayout(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReconcileYieldPayoutMutationResult = NonNullable<Awaited<ReturnType<typeof reconcileYieldPayout>>>
+    export type ReconcileYieldPayoutMutationBody = BodyType<YieldPayoutReconciliation>
+    export type ReconcileYieldPayoutMutationError = ErrorType<void>
+
+    /**
+ * @summary Reconcile a pending payout without resending it
+ */
+export const useReconcileYieldPayout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconcileYieldPayout>>, TError,{data: BodyType<YieldPayoutReconciliation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reconcileYieldPayout>>,
+        TError,
+        {data: BodyType<YieldPayoutReconciliation>},
+        TContext
+      > => {
+      return useMutation(getReconcileYieldPayoutMutationOptions(options));
     }
 
 export const getGetPublicYieldProofsUrl = () => {

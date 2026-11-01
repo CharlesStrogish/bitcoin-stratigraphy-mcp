@@ -16,6 +16,7 @@ import { registerSwarmReferralRoute } from "../../src/routes/swarm-referral";
 import { registerClaimYieldRoute } from "../../src/routes/claim-yield";
 import { createMemoryRevenueLedger } from "../../src/services/ledger";
 import type { SettlementRouter } from "../../src/services/settlement";
+import { migratePayoutFixture, mockCoinosPayout } from "../helpers/coinos-payout";
 
 const secret = "swarm-referral-regression-secret";
 const hash = () => randomBytes(32).toString("hex");
@@ -72,6 +73,7 @@ test("PostgreSQL referral discounts, one-time owner royalties and independent 21
         gross_msats bigint NOT NULL, earned_msats bigint NOT NULL, balance_msats bigint NOT NULL,
         claim_id text REFERENCES private_yield_claims(id), claimed_at timestamptz);
     `);
+    await migratePayoutFixture(database);
     await database.query(await readFile("../../scripts/sql/swarm-royalties.sql", "utf8"));
     const royalties = createSwarmRoyalties(database);
     const ledger = createMemoryRevenueLedger();
@@ -103,7 +105,7 @@ test("PostgreSQL referral discounts, one-time owner royalties and independent 21
     app.use(express.json());
     app.locals.swarmRoyalties = royalties;
     registerSwarmReferralRoute(app, royalties, { secret });
-    registerClaimYieldRoute(app, createPrivateYieldEarnings(database), { secret, logMock: () => {} });
+    registerClaimYieldRoute(app, createPrivateYieldEarnings(database, Date.now, mockCoinosPayout().client), { secret, logSettlement: () => {} });
     const common = { amountSats: 250, scopePath: "/paid", description: "swarm test",
       sessionSecret: secret, settlementRouter: wallet, ledger, allowBatch: true, maxChallengesPerMinute: 1000 };
     app.get("/paid", createL402Middleware(common), (_req, res) => res.json({ paid: true }));
@@ -176,10 +178,12 @@ test("PostgreSQL referral discounts, one-time owner royalties and independent 21
     assert.equal((await claim(body)).status, 403);
     delete app.locals.swarmReferralRevoked;
     const claims = await Promise.all([claim(body), claim(body)]);
-    assert.deepEqual(claims.map(response => response.status).sort(), [200, 409]);
+    assert.equal(claims.filter(response => response.status === 200).length, 1);
+    assert.ok(claims.filter(response => response.status !== 200).every(response =>
+      response.status === 202 || response.status === 409), "An in-flight duplicate is pending or already settled, never repaid");
     const result = await claims.find(response => response.status === 200)!.json();
     assert.equal(result.claimed_msats, "11875");
-    assert.equal(result.payment_sent, false);
+    assert.equal(result.payment_sent, true);
     assert.equal((await getKey()).claimable_msats, "0");
     // Exact historical 21% buyer earnings stay separate, even after the owner claims.
     const buyer = await claim({ macaroons: [quote.macaroon], bolt11_invoice: invoice(49875n) }, ownerKey, false);

@@ -22,7 +22,7 @@ export interface YieldClaimInput {
      */
   royalty_payment_hashes?: string[];
   /**
-     * Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.
+     * Unexpired fixed-amount mainnet BOLT11 invoice matching the selected earnings in exact millisatoshis.
      * @minLength 100
      * @maxLength 4096
      */

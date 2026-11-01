@@ -9,18 +9,18 @@ import type { YieldMetricsStatus } from './yieldMetricsStatus';
 
 export interface YieldMetrics {
   /**
-     * Number of committed simulated claim records; not all attempted withdrawals
+     * Terminal mainnet claims; excludes pending, rejected and historical mock claims
      * @minimum 0
      */
   total_claims_processed: number;
   /**
-     * Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied
+     * Confirmed mainnet payouts in sats, including fractional sats
      * @minimum 0
      */
   total_yield_distributed_sats: number;
   /**
-     * All recorded simulated claims succeeded; Genesis explicitly returns 100.00%
-     * @pattern ^100\.00%$
+     * Settled divided by terminal mainnet claims; Genesis returns 100.00%
+     * @pattern ^(100\.00|[0-9]{1,2}\.[0-9]{2})%$
      */
   payout_reliability_score: string;
   /** Snapshot availability, not real wallet or payment health */

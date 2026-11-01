@@ -10,5 +10,6 @@ export type YieldClaimResultStatus = typeof YieldClaimResultStatus[keyof typeof 
 
 
 export const YieldClaimResultStatus = {
-  SIMULATED_WITHDRAWAL: 'SIMULATED_WITHDRAWAL',
+  SETTLED: 'SETTLED',
+  PENDING: 'PENDING',
 } as const;

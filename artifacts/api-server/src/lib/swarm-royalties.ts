@@ -26,7 +26,10 @@ export function createSwarmRoyalties(database = pool) {
     async balance(owner: string) {
       const result = await database.query<{ payment_hash: string; balance_msats: string }>(
         `SELECT payment_hash,balance_msats::text FROM private_swarm_royalties
-         WHERE owner=$1 AND claim_id IS NULL AND balance_msats>0 ORDER BY payment_hash LIMIT 32`, [owner]);
+         WHERE owner=$1 AND claim_id IS NULL AND balance_msats>0
+           AND NOT EXISTS (SELECT 1 FROM private_yield_payout_items i
+             WHERE i.source='royalty' AND i.payment_hash=private_swarm_royalties.payment_hash)
+         ORDER BY payment_hash LIMIT 32`, [owner]);
       return { royalty_payment_hashes: result.rows.map(row => row.payment_hash),
         claimable_msats: result.rows.reduce((sum, row) => sum + BigInt(row.balance_msats), 0n).toString() };
     },

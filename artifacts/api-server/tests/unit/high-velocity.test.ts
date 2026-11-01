@@ -14,6 +14,7 @@ import { createPrivateYieldEarnings } from "../../src/lib/private-yield-earnings
 import { registerClaimYieldRoute } from "../../src/routes/claim-yield";
 import type { MacaroonUsageStore } from "../../src/lib/macaroon-usage-store";
 import type { SettlementRouter } from "../../src/services/settlement";
+import { migratePayoutFixture, mockCoinosPayout } from "../helpers/coinos-payout";
 
 const secret = "high-velocity-regression-secret";
 const hash = () => randomBytes(32).toString("hex");
@@ -173,6 +174,7 @@ test("PostgreSQL Whale quotas persist across adapters and descendants; full bulk
         gross_msats bigint NOT NULL, earned_msats bigint NOT NULL, balance_msats bigint NOT NULL,
         claim_id text REFERENCES private_yield_claims(id), claimed_at timestamptz);
     `);
+    await migratePayoutFixture(fixture);
     const ledger = createMemoryRevenueLedger();
     const record = ledger.record.bind(ledger);
     ledger.record = async entry => {
@@ -181,8 +183,8 @@ test("PostgreSQL Whale quotas persist across adapters and descendants; full bulk
       return fresh;
     };
     rig = await harness({ ledger, usageStore: createPostgresMacaroonUsageStore(database),
-      configure: (app, now) => registerClaimYieldRoute(app, createPrivateYieldEarnings(database, now),
-        { secret, now, logMock: () => {} }) });
+      configure: (app, now) => registerClaimYieldRoute(app, createPrivateYieldEarnings(database, now, mockCoinosPayout().client),
+        { secret, now, logSettlement: () => {} }) });
     const offer = await rig.offer();
     const pass = inspectSubscriptionMacaroon(offer.macaroon, secret)!;
     const child = attenuateSubscriptionMacaroon(offer.macaroon, ["max_requests=3"])!;
@@ -205,7 +207,7 @@ test("PostgreSQL Whale quotas persist across adapters and descendants; full bulk
     const claim = await withdrawal.json();
     assert.equal(claim.claimed_msats, "1050000");
     assert.equal(claim.claimed_sats, 1050);
-    assert.equal(claim.payment_sent, false);
+    assert.equal(claim.payment_sent, true);
     assert.equal(claim.remaining_balance_msats, "0");
     const replay = await fetch(rig.url + "/api/claim-yield", {
       method: "POST", headers: { "Content-Type": "application/json" },

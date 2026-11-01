@@ -1,15 +1,15 @@
 import { pool } from "@workspace/db";
 import type { YieldMetrics } from "@workspace/api-zod";
 
-type AggregateRow = { total_claims: string; total_msats: string };
+type AggregateRow = { total_claims: string; total_msats: string; successful_claims: string };
 
-// One read-only snapshot: committed claim totals already equal atomically consumed
-// earnings. Joining individual earnings would multiply multi-receipt claims.
+// Mainnet terminal outcomes only. Never relabel historical mock deductions as payments.
 export const YIELD_METRICS_SQL = `
   SELECT COUNT(*)::text AS total_claims,
-         COALESCE(SUM(total_msats), 0)::text AS total_msats
+         COALESCE(SUM(total_msats) FILTER (WHERE payment_status='settled'), 0)::text AS total_msats,
+         COUNT(*) FILTER (WHERE payment_status='settled')::text AS successful_claims
   FROM private_yield_claims
-  WHERE settlement_mode = 'mock'
+  WHERE settlement_mode = 'mainnet' AND payment_status IN ('settled','failed')
 `;
 
 export function createYieldMetricsReader(options: {
@@ -37,9 +37,10 @@ export function createYieldMetricsReader(options: {
               msats > BigInt(Number.MAX_SAFE_INTEGER)) {
             throw new Error("Yield metrics exceed exact numeric bounds");
           }
-          // Only committed simulated claims are recorded. Rolled-back/rejected
-          // attempts and real Lightning payout reliability are outside this scope.
-          const successfulClaims = count;
+          const successfulClaims = Number(row.successful_claims);
+          if (!Number.isSafeInteger(successfulClaims) || successfulClaims < 0 || successfulClaims > count) {
+            throw new Error("Invalid settled payout count");
+          }
           cached = {
             total_claims_processed: count,
             total_yield_distributed_sats: Number(msats) / 1000,

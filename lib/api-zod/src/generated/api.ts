@@ -10,51 +10,49 @@ import * as zod from 'zod';
 
 /**
  * Public, read-only alias of /yield-metrics.json. No authentication or payment.
- * Scope is simulated-outbound, not completed Lightning payments or settlement proof.
- * Counts committed private claim records in mock settlement mode and sums their
- * consumed yield amounts in sats. Failed, rejected and rolled-back attempts are
- * not recorded and are excluded. All recorded simulated claims are successful,
- * so reliability is successful recorded claims / total recorded claims, or
- * explicitly 100.00% when there are no claims (the zero-traffic Genesis State).
- * This score does not measure all attempted claims or real wallet reliability.
+ * Scope is mainnet-outbound. Counts terminal mainnet claims (settled or failed)
+ * and sums only settled amounts. Historical mock deductions, pending claims
+ * and rejected requests are excluded. Reliability is settled / terminal claims,
+ * or 100.00% when there are no terminal mainnet claims (Genesis State).
+ * A retried claim's latest outcome is counted once, not as separate attempts.
+ * This is a local accounting snapshot, not independent payment evidence.
  * Healthy means a metrics snapshot was read successfully, not that a wallet is healthy.
  * One asynchronous aggregate query is shared across concurrent callers and cached
  * per process for 30 seconds; shared HTTP caches may retain it for 15 more seconds.
  * Storage failures return 503, never fabricated zero balances or a Healthy response.
- * @summary Read aggregate recorded simulated yield claims
+ * @summary Read aggregate mainnet payout outcomes
  */
 export const getYieldMetricsResponseTotalClaimsProcessedMin = 0;
 
 export const getYieldMetricsResponseTotalYieldDistributedSatsMin = 0;
 
-export const getYieldMetricsResponsePayoutReliabilityScoreRegExp = new RegExp('^100\\.00%$');
+export const getYieldMetricsResponsePayoutReliabilityScoreRegExp = new RegExp('^(100\\.00|[0-9]{1,2}\\.[0-9]{2})%$');
 
 
 export const GetYieldMetricsResponse = zod.object({
-  "total_claims_processed": zod.number().int().min(getYieldMetricsResponseTotalClaimsProcessedMin).describe('Number of committed simulated claim records; not all attempted withdrawals'),
-  "total_yield_distributed_sats": zod.number().min(getYieldMetricsResponseTotalYieldDistributedSatsMin).describe('Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied'),
-  "payout_reliability_score": zod.string().regex(getYieldMetricsResponsePayoutReliabilityScoreRegExp).describe('All recorded simulated claims succeeded; Genesis explicitly returns 100.00%'),
+  "total_claims_processed": zod.number().int().min(getYieldMetricsResponseTotalClaimsProcessedMin).describe('Terminal mainnet claims; excludes pending, rejected and historical mock claims'),
+  "total_yield_distributed_sats": zod.number().min(getYieldMetricsResponseTotalYieldDistributedSatsMin).describe('Confirmed mainnet payouts in sats, including fractional sats'),
+  "payout_reliability_score": zod.string().regex(getYieldMetricsResponsePayoutReliabilityScoreRegExp).describe('Settled divided by terminal mainnet claims; Genesis returns 100.00%'),
   "status": zod.enum(['Healthy']).describe('Snapshot availability, not real wallet or payment health')
 })
 
 
 /**
- * Same four-field response, simulated-outbound scope, Genesis State behavior
- * and caching as /api/yield-metrics. Only committed simulated claims are counted;
- * this is not a real Lightning payout success rate or independent payment proof.
- * @summary Read public simulated yield metrics at the canonical root URL
+ * Same four-field response, mainnet-outbound scope, Genesis State behavior
+ * and caching as /api/yield-metrics. Historical mock and pending claims are excluded.
+ * @summary Read public mainnet yield metrics at the canonical root URL
  */
 export const getYieldMetricsJsonResponseTotalClaimsProcessedMin = 0;
 
 export const getYieldMetricsJsonResponseTotalYieldDistributedSatsMin = 0;
 
-export const getYieldMetricsJsonResponsePayoutReliabilityScoreRegExp = new RegExp('^100\\.00%$');
+export const getYieldMetricsJsonResponsePayoutReliabilityScoreRegExp = new RegExp('^(100\\.00|[0-9]{1,2}\\.[0-9]{2})%$');
 
 
 export const GetYieldMetricsJsonResponse = zod.object({
-  "total_claims_processed": zod.number().int().min(getYieldMetricsJsonResponseTotalClaimsProcessedMin).describe('Number of committed simulated claim records; not all attempted withdrawals'),
-  "total_yield_distributed_sats": zod.number().min(getYieldMetricsJsonResponseTotalYieldDistributedSatsMin).describe('Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied'),
-  "payout_reliability_score": zod.string().regex(getYieldMetricsJsonResponsePayoutReliabilityScoreRegExp).describe('All recorded simulated claims succeeded; Genesis explicitly returns 100.00%'),
+  "total_claims_processed": zod.number().int().min(getYieldMetricsJsonResponseTotalClaimsProcessedMin).describe('Terminal mainnet claims; excludes pending, rejected and historical mock claims'),
+  "total_yield_distributed_sats": zod.number().min(getYieldMetricsJsonResponseTotalYieldDistributedSatsMin).describe('Confirmed mainnet payouts in sats, including fractional sats'),
+  "payout_reliability_score": zod.string().regex(getYieldMetricsJsonResponsePayoutReliabilityScoreRegExp).describe('Settled divided by terminal mainnet claims; Genesis returns 100.00%'),
   "status": zod.enum(['Healthy']).describe('Snapshot availability, not real wallet or payment health')
 })
 
@@ -70,13 +68,14 @@ export const GetYieldMetricsJsonResponse = zod.object({
  * The discount is applied after the unchanged Thermodynamic calculation:
  * final millisatoshis = quoted whole sats * 950. Wholesale Whale budgets
  * and exact-toll routes are excluded and their fees and quotas unchanged.
- * Royalties are additional private simulated earnings, not carved from
+ * Royalties are additional private earnings, not carved from
  * the buyer's existing 21% allocation. Fractional-msat royalties round down.
  * The balance response selects at most 32 pending invoice hashes, in
  * lexical order; claimable_msats is their subtotal. To claim, POST those
  * royalty_payment_hashes and a matching BOLT11 invoice to /api/claim-yield
  * with a fresh payload-bound NIP-98 signature from this same agent.
- * Repeat this GET for further pages after claiming. No real payment is sent.
+ * Repeat this GET for further pages after claiming. Explicit claim requests
+ * execute mainnet payouts; this discovery endpoint itself sends no payment.
  * @summary Issue an agent-bound Swarm referral key and read private royalty balances
  */
 export const GetSwarmReferralKeyHeader = zod.object({
@@ -98,14 +97,14 @@ export const GetSwarmReferralKeyResponse = zod.object({
   "expires_at": zod.number().int(),
   "discount_percent": zod.literal(5),
   "royalty_percent": zod.literal(5),
-  "simulated": zod.literal(true),
+  "simulated": zod.literal(true).describe('Legacy allocation-only discovery flag; does not describe the live mainnet claim-yield endpoint'),
   "royalty_payment_hashes": zod.array(zod.string().regex(getSwarmReferralKeyResponseRoyaltyPaymentHashesItemRegExp)).max(getSwarmReferralKeyResponseRoyaltyPaymentHashesMax),
   "claimable_msats": zod.string().regex(getSwarmReferralKeyResponseClaimableMsatsRegExp)
 })
 
 
 /**
- * Mock withdrawal only: no Lightning payment is sent. Supply 1–32 issuer-authenticated
+ * Live Coinos REST payout. Supply 1–32 issuer-authenticated
  * L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
  * matching exactly 21 percent of their confirmed incoming L402 settlement amounts.
  * Historical receipt expiry and request quota do not invalidate an earned receipt.
@@ -113,17 +112,26 @@ export const GetSwarmReferralKeyResponse = zod.object({
  * invoice, a forged token or a public payout record does not establish earnings.
  * Each payment hash can be consumed once across all descendant macaroons and workers.
  * All receipts succeed together or none are consumed. Duplicate payment hashes within
- * one request are rejected. Successful mock claims durably deduct private balances;
- * they do not modify real Treasury allocations or the public /yield-proofs.json feed.
+ * one request are rejected. A durable pending claim reserves earnings BEFORE
+ * POST https://coinos.io/api/payments with the server's COINOS_API_TOKEN.
+ * Only confirmed settlement deducts balances and records txid/preimage.
+ * Definitive rejection releases reservations without deducting funds, allowing retry.
+ * Timeout, 5xx, ambiguous response, or post-payment database failure leaves
+ * the claim pending and reserved. A different invoice cannot reuse those
+ * earnings. Identical pending retries return 202 without sending another payment.
+ * An operator reconciles wallet evidence via POST /api/claim-yield/reconcile.
+ * HTTP success alone without settlement evidence is not sufficient.
+ * Historical mock claims remain consumed and never become mainnet payouts.
+ * This endpoint does not modify the public /yield-proofs.json feed.
  * Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
- * it does not contact a wallet or guarantee that a destination invoice is payable.
+ * destination payability is established only by Coinos settlement.
  * Optional royalty_payment_hashes select separate 5% referral earnings instead
  * of, or together with, bearer receipts (maximum 32 combined). Royalty claims
  * require a fresh payload-bound NIP-98 signature from their recorded owner;
  * possession of the publicly shareable referral key is insufficient. Get
  * pending hashes and their exact subtotal from /api/swarm-referral-key.
  * Referred buyers retain 21% of their exact discounted settled millisatoshis.
- * @summary Atomically consume private simulated L402 yield earnings
+ * @summary Reserve earnings and settle a real mainnet Lightning payout
  */
 export const ClaimYieldHeader = zod.object({
   "X-Nostr-Authorization": zod.string().optional().describe('Required for royalty selections; fresh NIP-98 proof from their owner')
@@ -144,25 +152,29 @@ export const claimYieldBodyBolt11InvoiceMax = 4096;
 export const ClaimYieldBody = zod.object({
   "macaroons": zod.array(zod.string().min(1).max(claimYieldBodyMacaroonsItemMax)).max(claimYieldBodyMacaroonsMax).optional().describe('Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.'),
   "royalty_payment_hashes": zod.array(zod.string().regex(claimYieldBodyRoyaltyPaymentHashesItemRegExp)).min(1).max(claimYieldBodyRoyaltyPaymentHashesMax).optional().describe('Optional separate referral royalty selections, requiring fresh owner NIP-98 authentication. At least one receipt or royalty hash and at most 32 combined are required.'),
-  "bolt11_invoice": zod.string().min(claimYieldBodyBolt11InvoiceMin).max(claimYieldBodyBolt11InvoiceMax).describe('Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.')
+  "bolt11_invoice": zod.string().min(claimYieldBodyBolt11InvoiceMin).max(claimYieldBodyBolt11InvoiceMax).describe('Unexpired fixed-amount mainnet BOLT11 invoice matching the selected earnings in exact millisatoshis.')
 })
 
+export const claimYieldResponsePreimageRegExp = new RegExp('^[0-9a-f]{64}$');
 export const claimYieldResponseClaimedMsatsRegExp = new RegExp('^[1-9][0-9]*$');
 export const claimYieldResponseClaimedSatsMin = 0;
 
 export const claimYieldResponseReceiptsClaimedMax = 32;
 
+export const claimYieldResponseRemainingBalanceMsatsRegExp = new RegExp('^[0-9]+$');
 
 
 export const ClaimYieldResponse = zod.object({
-  "status": zod.enum(['SIMULATED_WITHDRAWAL']),
-  "simulated": zod.literal(true),
-  "payment_sent": zod.literal(false),
+  "status": zod.enum(['SETTLED', 'PENDING']),
+  "payment_sent": zod.boolean().nullable().describe('True only after confirmed Coinos settlement and durable ledger consumption; null means unknown, not a definitive non-payment'),
+  "coinos_txid": zod.string().optional(),
+  "preimage": zod.string().regex(claimYieldResponsePreimageRegExp).optional(),
+  "reconciliation_required": zod.boolean().optional(),
   "claim_id": zod.string().uuid(),
-  "claimed_msats": zod.string().regex(claimYieldResponseClaimedMsatsRegExp).describe('Exact integer millisatoshi amount consumed from the private simulation ledger.'),
+  "claimed_msats": zod.string().regex(claimYieldResponseClaimedMsatsRegExp).describe('Exact millisatoshis consumed when SETTLED, or exclusively reserved when PENDING.'),
   "claimed_sats": zod.number().min(claimYieldResponseClaimedSatsMin),
   "receipts_claimed": zod.number().int().min(1).max(claimYieldResponseReceiptsClaimedMax),
-  "remaining_balance_msats": zod.enum(['0'])
+  "remaining_balance_msats": zod.string().regex(claimYieldResponseRemainingBalanceMsatsRegExp).describe('Zero when settled; still reserved and unconsumed when pending.')
 })
 
 
@@ -171,6 +183,37 @@ export const ClaimYieldResponse = zod.object({
  * @summary Read the public yield ledger through its legacy API alias
  */
 export const GetPublicYieldProofsAliasResponse = zod.void()
+
+
+/**
+ * Operator-only. Requires Authorization Bearer MACAROON_OPERATOR_SECRET.
+ * Reads authenticated Coinos payment history and verifies invoice hash,
+ * outgoing amount, terminal status or cryptographic preimage. An absent,
+ * incomplete or ambiguous record NEVER releases a pending reservation.
+ * Verified settlement atomically consumes the reserved balances. Failed
+ * history records alone cannot identify which retry failed and never release
+ * the current reservation. No payment POST is made by reconciliation.
+ * @summary Reconcile a pending payout without resending it
+ */
+export const ReconcileYieldPayoutHeader = zod.object({
+  "Authorization": zod.string()
+})
+
+export const ReconcileYieldPayoutBody = zod.object({
+  "claim_id": zod.string().uuid()
+})
+
+export const reconcileYieldPayoutResponsePreimageRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ReconcileYieldPayoutResponse = zod.object({
+  "claim_id": zod.string().uuid(),
+  "status": zod.enum(['SETTLED', 'FAILED', 'PENDING']),
+  "payment_sent": zod.boolean().nullable().describe('True when settled, false on definitive failure, null when unknown'),
+  "reconciliation_required": zod.boolean(),
+  "coinos_txid": zod.string().optional(),
+  "preimage": zod.string().regex(reconcileYieldPayoutResponsePreimageRegExp).optional()
+})
 
 
 /**

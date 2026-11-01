@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { once } from "node:events";
 import test from "node:test";
 import { bech32 } from "@scure/base";
@@ -11,6 +11,8 @@ import { createSubscriptionMacaroon, attenuateSubscriptionMacaroon } from "../..
 import { createPublicYieldLedger } from "../../src/lib/public-yield-ledger";
 import { parseYieldWithdrawalInvoice } from "../../src/lib/yield-withdrawal-invoice";
 import { apiRootAliases } from "../../src/middleware/apiRootAliases";
+import { migratePayoutFixture, mockCoinosPayout } from "../helpers/coinos-payout";
+import { createCoinosPayout } from "../../src/lib/coinos-payout";
 
 const secret = "private-yield-regression-secret";
 const clock = Date.parse("2026-11-01T12:00:00Z");
@@ -44,6 +46,43 @@ test("BOLT11 BTC, milli, micro, nano and pico units convert to exact millisatosh
   assert.throws(() => parseYieldWithdrawalInvoice(bech32.encode("lnbc1p", words, 4096), clock));
 });
 
+test("Coinos HTTP evidence is invoice-bound; ambiguous successes, missing history and CI default transport fail closed", async () => {
+  const preimage = hash();
+  const paymentHash = createHash("sha256").update(Buffer.from(preimage, "hex")).digest("hex");
+  const text = invoice(21_000n, paymentHash);
+  const parsed = parseYieldWithdrawalInvoice(text, clock);
+  let response: unknown = { uid: "real-provider-txid", ref: preimage };
+  let status = 200;
+  const client = createCoinosPayout({ token: () => "test-only-rest-token",
+    fetch: async (url, options) => {
+      assert.equal(new URL(String(url)).origin, "https://coinos.io");
+      assert.equal(options?.redirect, "error");
+      return Response.json(response, { status });
+    } });
+  assert.deepEqual(await client.pay(text, parsed),
+    { status: "settled", txid: "real-provider-txid", preimage });
+  response = { uid: "not-settled", ref: hash() };
+  assert.equal((await client.pay(text, parsed)).status, "pending");
+  response = { success: true };
+  assert.equal((await client.pay(text, parsed)).status, "pending");
+  response = { error: "already paid" }; status = 400;
+  assert.equal((await client.pay(text, parsed)).status, "pending");
+  response = { error: "Invalid invoice" };
+  assert.equal((await client.pay(text, parsed)).status, "failed");
+  response = []; status = 200;
+  assert.equal((await client.lookup(parsed)).status, "pending", "Missing history is NOT proof of failure");
+  response = [{ ref: preimage, amount: 21 }];
+  assert.equal((await client.lookup(parsed)).status, "pending", "Incoming wallet records cannot prove an outgoing claim");
+  response = [{ ref: preimage, amount: -22 }];
+  assert.equal((await client.lookup(parsed)).status, "pending", "Reconciliation must bind the exact outgoing amount");
+  response = [{ ref: preimage, amount: -21 }];
+  assert.equal((await client.lookup(parsed)).status, "settled");
+  response = [{ uid: "older-attempt", hash: paymentHash, amount: -21, status: "failed" }];
+  assert.equal((await client.lookup(parsed)).status, "pending", "An older failed attempt cannot release the current reservation");
+  assert.equal(createCoinosPayout({ token: () => "even-if-a-token-is-set-in-ci" }).configured(), false,
+    "NODE_ENV=test forbids the default live transport");
+});
+
 test("private yield claims are durable, atomic and double-spend safe against real PostgreSQL", async t => {
   const schema = "yield_claim_test_" + randomBytes(8).toString("hex");
   assert.match(schema, /^[a-z0-9_]+$/);
@@ -55,11 +94,14 @@ test("private yield claims are durable, atomic and double-spend safe against rea
   } } as typeof pool;
   const fixture = await isolated.connect();
   const logs: Record<string, unknown>[] = [];
+  const coinos = mockCoinosPayout();
+  let currentClock = clock;
   const app = express();
   app.use(apiRootAliases);
   app.use(express.json());
-  registerClaimYieldRoute(app, createPrivateYieldEarnings(isolated, () => clock), {
-    secret, now: () => clock, logMock: event => { logs.push(event); },
+  const earnings = createPrivateYieldEarnings(isolated, () => currentClock, coinos.client);
+  registerClaimYieldRoute(app, earnings, {
+    secret, now: () => currentClock, logSettlement: event => { logs.push(event); }, operatorSecret: "test-operator",
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -84,14 +126,30 @@ test("private yield claims are durable, atomic and double-spend safe against rea
         payment_hash text PRIMARY KEY, provider text NOT NULL, gross_msats bigint NOT NULL,
         earned_msats bigint NOT NULL, balance_msats bigint NOT NULL,
         claim_id text REFERENCES private_yield_claims(id), claimed_at timestamptz);
+      CREATE TABLE private_swarm_royalties (
+        payment_hash text PRIMARY KEY, owner text NOT NULL, provider text NOT NULL,
+        gross_msats bigint NOT NULL, earned_msats bigint NOT NULL, balance_msats bigint NOT NULL,
+        claim_id text REFERENCES private_yield_claims(id), claimed_at timestamptz);
     `);
-    await t.test("successful mock fully deducts balance; replay and descendant claims fail", async () => {
+    await migratePayoutFixture(fixture);
+    coinos.observe(async invoice => {
+      const state = await fixture.query(
+        "SELECT payment_status FROM private_yield_claims WHERE invoice_payment_hash=$1", [invoice.paymentHash]);
+      assert.equal(state.rows[0]?.payment_status, "pending", "Pending state must be committed BEFORE outbound HTTP");
+      const reservations = await fixture.query(
+        "SELECT COUNT(*)::int AS count FROM private_yield_payout_items i JOIN private_yield_claims c ON c.id=i.claim_id WHERE c.invoice_payment_hash=$1",
+        [invoice.paymentHash]);
+      assert.ok(reservations.rows[0].count > 0);
+    });
+    await t.test("successful mocked Coinos HTTP settlement fully deducts balances; replay and descendants fail", async () => {
       const item = await seed();
       const result = await send([item.macaroon]);
       assert.equal(result.status, 200);
       const body = await result.json();
-      assert.equal(body.status, "SIMULATED_WITHDRAWAL");
-      assert.equal(body.payment_sent, false);
+      assert.equal(body.status, "SETTLED");
+      assert.equal(body.payment_sent, true);
+      assert.ok(body.coinos_txid);
+      assert.equal(body.simulated, undefined);
       assert.equal(body.claimed_msats, "21000");
       assert.equal(body.remaining_balance_msats, "0");
       assert.equal((await send([item.macaroon])).status, 409);
@@ -101,11 +159,126 @@ test("private yield claims are durable, atomic and double-spend safe against rea
       assert.equal(state.rows[0].balance_msats, "0");
       assert.equal(state.rows[0].claim_id, body.claim_id);
       // A recreated adapter sees committed state, not a process-local replay cache.
-      await assert.rejects(createPrivateYieldEarnings(isolated, () => clock).claim(
+      await assert.rejects(createPrivateYieldEarnings(isolated, () => clock, coinos.client).claim(
         [{ paymentHash: item.hash, provider: "test-wallet", amountMsats: 100_000 }],
         { amountMsats: 21_000n, paymentHash: hash(), expiresAt: clock + 3600_000 }, "mock",
       ), (error: any) => error.status === 409);
       assert.equal(logs.length, 1);
+    });
+    await t.test("definitive Coinos failure releases the reservation without consuming funds and permits retry", async () => {
+      const item = await seed();
+      const destination = invoice(21_000n);
+      coinos.setMode("failure");
+      assert.equal((await send([item.macaroon], destination)).status, 502);
+      const state = await fixture.query("SELECT balance_msats,claim_id FROM private_yield_earnings WHERE payment_hash=$1", [item.hash]);
+      assert.equal(state.rows[0].balance_msats, "21000");
+      assert.equal(state.rows[0].claim_id, null);
+      const failed = await fixture.query("SELECT payment_status FROM private_yield_claims WHERE invoice_digest=$1",
+        [(await import("node:crypto")).createHash("sha256").update(destination).digest("hex")]);
+      assert.equal(failed.rows[0].payment_status, "failed");
+      coinos.setMode("success");
+      assert.equal((await send([item.macaroon], destination)).status, 200);
+    });
+    await t.test("timeout remains pending across adapters and alternate invoices until authenticated reconciliation", async () => {
+      const item = await seed();
+      const destination = invoice(21_000n);
+      coinos.setMode("timeout");
+      const before = coinos.calls;
+      const response = await send([item.macaroon], destination);
+      assert.equal(response.status, 202);
+      const pending = await response.json();
+      assert.equal(pending.payment_sent, null);
+      const state = await fixture.query("SELECT balance_msats,claim_id FROM private_yield_earnings WHERE payment_hash=$1", [item.hash]);
+      assert.equal(state.rows[0].balance_msats, "21000");
+      assert.equal(state.rows[0].claim_id, null);
+      assert.equal((await send([item.macaroon], destination)).status, 202);
+      currentClock = clock + 7200_000;
+      try { assert.equal((await send([item.macaroon], destination)).status, 202, "Expired pending invoices can recover claim status without paying again"); }
+      finally { currentClock = clock; }
+      assert.equal((await send([item.macaroon])).status, 409);
+      assert.equal(coinos.calls, before + 1, "Pending retries never POST again");
+      const restarted = createPrivateYieldEarnings(isolated, () => clock, coinos.client);
+      assert.equal((await restarted.claim([{ paymentHash: item.hash, provider: "test-wallet", amountMsats: 100_000 }],
+        parseYieldWithdrawalInvoice(destination, clock), destination)).paymentStatus, "pending");
+      const reconcile = (authorized: boolean) => fetch(url + "/reconcile", {
+        method: "POST", headers: { "Content-Type": "application/json",
+          ...(authorized ? { Authorization: "Bearer test-operator" } : {}) },
+        body: JSON.stringify({ claim_id: pending.claim_id }),
+      });
+      assert.equal((await reconcile(false)).status, 403);
+      coinos.setMode("success"); // Wallet history now confirms the original payment.
+      assert.equal((await reconcile(true)).status, 200);
+      assert.equal(coinos.calls, before + 1, "Reconciliation only reads history");
+      assert.equal((await send([item.macaroon])).status, 409);
+    });
+    await t.test("ambiguous 5xx remains reserved; no automatic release or repayment", async () => {
+      const item = await seed();
+      coinos.setMode("ambiguous");
+      assert.equal((await send([item.macaroon])).status, 202);
+      assert.equal((await send([item.macaroon])).status, 409);
+      coinos.setMode("success");
+    });
+    await t.test("successful external payment with a failed local connection stays reserved until reconciliation", async () => {
+      const item = await seed();
+      const destination = invoice(21_000n);
+      let connections = 0;
+      const outage = { connect: async () => {
+        if (++connections === 2) throw new Error("Mock post-payment database outage");
+        return isolated.connect();
+      } } as typeof pool;
+      const before = coinos.calls;
+      const pending = await createPrivateYieldEarnings(outage, () => clock, coinos.client).claim(
+        [{ paymentHash: item.hash, provider: "test-wallet", amountMsats: 100_000 }],
+        parseYieldWithdrawalInvoice(destination, clock), destination);
+      assert.equal(pending.paymentStatus, "pending");
+      assert.equal((await send([item.macaroon])).status, 409);
+      const state = await fixture.query("SELECT balance_msats FROM private_yield_earnings WHERE payment_hash=$1", [item.hash]);
+      assert.equal(state.rows[0].balance_msats, "21000");
+      assert.equal((await earnings.reconcile!(pending.claimId)).paymentStatus, "settled");
+      assert.equal(coinos.calls, before + 1, "Database recovery never sends another payment");
+    });
+    await t.test("combined 21% yield and 5% owner royalty reservations release or settle together", async () => {
+      const item = await seed();
+      const royalty = hash(), owner = hash();
+      await fixture.query("INSERT INTO private_swarm_royalties VALUES ($1,$2,'test-wallet',100000,5000,5000,NULL,NULL)", [royalty, owner]);
+      const text = invoice(26_000n), parsed = parseYieldWithdrawalInvoice(text, clock);
+      const selected = [{ paymentHash: item.hash, provider: "test-wallet", amountMsats: 100_000 }];
+      coinos.setMode("failure");
+      await assert.rejects(earnings.claim(selected, parsed, text, { owner, paymentHashes: [royalty] }),
+        (error: any) => error.status === 502);
+      assert.equal((await fixture.query("SELECT balance_msats FROM private_swarm_royalties WHERE payment_hash=$1", [royalty])).rows[0].balance_msats, "5000");
+      coinos.setMode("timeout");
+      const pending = await earnings.claim(selected, parsed, text, { owner, paymentHashes: [royalty] });
+      assert.equal(pending.paymentStatus, "pending");
+      assert.equal((await fixture.query("SELECT COUNT(*)::int AS count FROM private_yield_payout_items WHERE claim_id=$1", [pending.claimId])).rows[0].count, 2);
+      coinos.setMode("success");
+      assert.equal((await earnings.reconcile!(pending.claimId)).paymentStatus, "settled");
+      assert.equal((await fixture.query("SELECT balance_msats FROM private_swarm_royalties WHERE payment_hash=$1", [royalty])).rows[0].balance_msats, "0");
+      assert.equal((await fixture.query("SELECT balance_msats FROM private_yield_earnings WHERE payment_hash=$1", [item.hash])).rows[0].balance_msats, "0");
+    });
+    await t.test("stale reconciliation cannot release a newer same-invoice attempt", async () => {
+      const item = await seed(), text = invoice(21_000n), parsed = parseYieldWithdrawalInvoice(text, clock);
+      const selected = [{ paymentHash: item.hash, provider: "test-wallet", amountMsats: 100_000 }];
+      coinos.setMode("timeout");
+      const initial = await earnings.claim(selected, parsed, text);
+      let entered!: () => void, finish!: () => void;
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      const gate = new Promise<void>(resolve => { finish = resolve; });
+      const failure = { status: "failed" as const, code: "MOCK_VERIFIED_FAILURE" };
+      const slow = createPrivateYieldEarnings(isolated, () => clock, {
+        ...coinos.client, lookup: async () => { entered(); await gate; return failure; },
+      });
+      const delayed = slow.reconcile!(initial.claimId);
+      await started;
+      const verifier = createPrivateYieldEarnings(isolated, () => clock, { ...coinos.client, lookup: async () => failure });
+      assert.equal((await verifier.reconcile!(initial.claimId)).paymentStatus, "failed");
+      const retry = await earnings.claim(selected, parsed, text);
+      assert.equal(retry.attempt, 2);
+      finish();
+      assert.equal((await delayed).paymentStatus, "pending");
+      assert.equal((await fixture.query("SELECT COUNT(*)::int AS count FROM private_yield_payout_items WHERE claim_id=$1", [retry.claimId])).rows[0].count, 1);
+      coinos.setMode("success");
+      assert.equal((await earnings.reconcile!(retry.claimId)).paymentStatus, "settled");
     });
     await t.test("concurrent requests have exactly one winner", async () => {
       const item = await seed();

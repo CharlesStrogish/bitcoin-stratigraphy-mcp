@@ -16,6 +16,7 @@ export interface SwarmReferralKey {
   expires_at: number;
   discount_percent: SwarmReferralKeyDiscountPercent;
   royalty_percent: SwarmReferralKeyRoyaltyPercent;
+  /** Legacy allocation-only discovery flag; does not describe the live mainnet claim-yield endpoint */
   simulated: true;
   /**
      * @maxItems 32

@@ -6,9 +6,6 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type YieldClaimResultRemainingBalanceMsats = typeof YieldClaimResultRemainingBalanceMsats[keyof typeof YieldClaimResultRemainingBalanceMsats];
-
-
-export const YieldClaimResultRemainingBalanceMsats = {
-  NUMBER_0: '0',
-} as const;
+export interface YieldPayoutReconciliation {
+  claim_id: string;
+}

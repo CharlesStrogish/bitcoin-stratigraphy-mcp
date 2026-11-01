@@ -9,12 +9,18 @@
 export interface YieldClaimInput {
   /**
      * Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.
-     * @minItems 1
      * @maxItems 32
      * @items.minLength 1
      * @items.maxLength 16384
      */
-  macaroons: string[];
+  macaroons?: string[];
+  /**
+     * Optional separate referral royalty selections, requiring fresh owner NIP-98 authentication. At least one receipt or royalty hash and at most 32 combined are required.
+     * @minItems 1
+     * @maxItems 32
+     * @items.pattern ^[0-9a-f]{64}$
+     */
+  royalty_payment_hashes?: string[];
   /**
      * Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.
      * @minLength 100

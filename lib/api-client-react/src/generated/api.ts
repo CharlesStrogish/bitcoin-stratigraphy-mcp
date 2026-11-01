@@ -92,6 +92,7 @@ import type {
   SmitheryServerCard,
   StratigraphyCost,
   StratigraphyEntry,
+  SwarmReferralKey,
   TokenRevocationServiceUnavailableError,
   ToolIntegrityManifest,
   VerifyZkProof400,
@@ -304,6 +305,100 @@ export function useGetYieldMetricsJson<TData = Awaited<ReturnType<typeof getYiel
 
 
 
+export const getGetSwarmReferralKeyUrl = () => {
+
+
+
+
+  return `/api/swarm-referral-key`
+}
+
+/**
+ * Requires a fresh NIP-98 signature binding this GET URL and method. The
+ * returned HMAC-authenticated key names the verified agent and expires in
+ * 30 days. Share it as X-Swarm-Referral on new Lightning L402 challenges.
+ * One direct referrer receives 5% of the final confirmed invoice; agents
+ * may recursively recruit by issuing and sharing their own keys. This is
+ * not an unbounded multi-level commission. Sharing the key never grants
+ * withdrawal authority. Invalid, expired or forged keys are ignored.
+ * The discount is applied after the unchanged Thermodynamic calculation:
+ * final millisatoshis = quoted whole sats * 950. Wholesale Whale budgets
+ * and exact-toll routes are excluded and their fees and quotas unchanged.
+ * Royalties are additional private simulated earnings, not carved from
+ * the buyer's existing 21% allocation. Fractional-msat royalties round down.
+ * The balance response selects at most 32 pending invoice hashes, in
+ * lexical order; claimable_msats is their subtotal. To claim, POST those
+ * royalty_payment_hashes and a matching BOLT11 invoice to /api/claim-yield
+ * with a fresh payload-bound NIP-98 signature from this same agent.
+ * Repeat this GET for further pages after claiming. No real payment is sent.
+ * @summary Issue an agent-bound Swarm referral key and read private royalty balances
+ */
+export const getSwarmReferralKey = async ( options?: Parameters<typeof customFetch>[1]): Promise<SwarmReferralKey> => {
+
+  return customFetch<SwarmReferralKey>(getGetSwarmReferralKeyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSwarmReferralKeyQueryKey = () => {
+    return [
+    `/api/swarm-referral-key`
+    ] as const;
+    }
+
+
+export const getGetSwarmReferralKeyQueryOptions = <TData = Awaited<ReturnType<typeof getSwarmReferralKey>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSwarmReferralKey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSwarmReferralKeyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSwarmReferralKey>>> = ({ signal }) => getSwarmReferralKey({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSwarmReferralKey>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSwarmReferralKeyQueryResult = NonNullable<Awaited<ReturnType<typeof getSwarmReferralKey>>>
+export type GetSwarmReferralKeyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Issue an agent-bound Swarm referral key and read private royalty balances
+ */
+
+export function useGetSwarmReferralKey<TData = Awaited<ReturnType<typeof getSwarmReferralKey>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSwarmReferralKey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSwarmReferralKeyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getClaimYieldUrl = () => {
 
 
@@ -325,6 +420,12 @@ export const getClaimYieldUrl = () => {
  * they do not modify real Treasury allocations or the public /yield-proofs.json feed.
  * Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
  * it does not contact a wallet or guarantee that a destination invoice is payable.
+ * Optional royalty_payment_hashes select separate 5% referral earnings instead
+ * of, or together with, bearer receipts (maximum 32 combined). Royalty claims
+ * require a fresh payload-bound NIP-98 signature from their recorded owner;
+ * possession of the publicly shareable referral key is insufficient. Get
+ * pending hashes and their exact subtotal from /api/swarm-referral-key.
+ * Referred buyers retain 21% of their exact discounted settled millisatoshis.
  * @summary Atomically consume private simulated L402 yield earnings
  */
 export const claimYield = async (yieldClaimInput: YieldClaimInput, options?: Parameters<typeof customFetch>[1]): Promise<YieldClaimResult> => {
@@ -342,7 +443,7 @@ export const claimYield = async (yieldClaimInput: YieldClaimInput, options?: Par
 
 
 
-export const getClaimYieldMutationOptions = <TError = ErrorType<YieldClaimFailure>,
+export const getClaimYieldMutationOptions = <TError = ErrorType<YieldClaimFailure | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimYield>>, TError,{data: BodyType<YieldClaimInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof claimYield>>, TError,{data: BodyType<YieldClaimInput>}, TContext> => {
 
@@ -371,12 +472,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ClaimYieldMutationResult = NonNullable<Awaited<ReturnType<typeof claimYield>>>
     export type ClaimYieldMutationBody = BodyType<YieldClaimInput>
-    export type ClaimYieldMutationError = ErrorType<YieldClaimFailure>
+    export type ClaimYieldMutationError = ErrorType<YieldClaimFailure | void>
 
     /**
  * @summary Atomically consume private simulated L402 yield earnings
  */
-export const useClaimYield = <TError = ErrorType<YieldClaimFailure>,
+export const useClaimYield = <TError = ErrorType<YieldClaimFailure | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimYield>>, TError,{data: BodyType<YieldClaimInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof claimYield>>,

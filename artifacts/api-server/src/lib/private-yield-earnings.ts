@@ -5,10 +5,12 @@ import type { YieldWithdrawalInvoice } from "./yield-withdrawal-invoice";
 export class YieldClaimError extends Error {
   constructor(public readonly status: number, public readonly code: string) { super(code); }
 }
-export type PaidYieldReceipt = { paymentHash: string; provider: string; amountMsats: number };
+export type PaidYieldReceipt = { paymentHash: string; provider: string; amountMsats: number; referralOwner?: string };
+export type RoyaltyClaimSelection = { owner: string; paymentHashes: string[] };
 export type YieldClaim = { claimId: string; totalMsats: bigint; receiptCount: number };
 export interface PrivateYieldEarnings {
-  claim(receipts: PaidYieldReceipt[], invoice: YieldWithdrawalInvoice, invoiceText: string): Promise<YieldClaim>;
+  claim(receipts: PaidYieldReceipt[], invoice: YieldWithdrawalInvoice, invoiceText: string,
+    royalties?: RoyaltyClaimSelection): Promise<YieldClaim>;
 }
 
 /**
@@ -21,9 +23,13 @@ export function createPrivateYieldEarnings(
   now: () => number = Date.now,
 ): PrivateYieldEarnings {
   return {
-    async claim(receipts, invoice, invoiceText) {
+    async claim(receipts, invoice, invoiceText, royalties) {
       const hashes = receipts.map(receipt => receipt.paymentHash);
-      if (!hashes.length || hashes.length > 32 || new Set(hashes).size !== hashes.length) {
+      const royaltyHashes = royalties?.paymentHashes ?? [];
+      if (!hashes.length && !royaltyHashes.length || hashes.length + royaltyHashes.length > 32 ||
+          new Set(hashes).size !== hashes.length || new Set(royaltyHashes).size !== royaltyHashes.length ||
+          royaltyHashes.some(hash => !/^[0-9a-f]{64}$/.test(hash)) ||
+          (royaltyHashes.length > 0 && !/^[0-9a-f]{64}$/.test(royalties?.owner ?? ""))) {
         throw new YieldClaimError(400, "DUPLICATE_OR_INVALID_RECEIPTS");
       }
       const ordered = [...receipts].sort((a, b) => a.paymentHash.localeCompare(b.paymentHash));
@@ -40,7 +46,19 @@ export function createPrivateYieldEarnings(
             [receipt.paymentHash],
           );
           if (!paid.rows[0]) throw new YieldClaimError(404, "PAID_RECEIPT_NOT_FOUND");
-          const gross = BigInt(paid.rows[0].sats) * 1000n;
+          let gross = BigInt(paid.rows[0].sats) * 1000n;
+          if (receipt.referralOwner) {
+            // Legacy revenue totals use whole sats; the signed referred invoice
+            // and its separately persisted settlement retain exact millisatoshis.
+            const exact = await client.query<{ gross_msats: string }>(
+              `SELECT gross_msats::text FROM private_swarm_royalties
+               WHERE payment_hash=$1 AND owner=$2 AND provider=$3 FOR SHARE`,
+              [receipt.paymentHash, receipt.referralOwner, receipt.provider]);
+            if (!exact.rows[0] || (BigInt(exact.rows[0].gross_msats) + 999n) / 1000n !== BigInt(paid.rows[0].sats)) {
+              throw new YieldClaimError(403, "REFERRAL_SETTLEMENT_MISMATCH");
+            }
+            gross = BigInt(exact.rows[0].gross_msats);
+          }
           if (!Number.isSafeInteger(receipt.amountMsats) || receipt.amountMsats <= 0 ||
               gross !== BigInt(receipt.amountMsats)) {
             throw new YieldClaimError(403, "RECEIPT_AMOUNT_MISMATCH");
@@ -67,6 +85,21 @@ export function createPrivateYieldEarnings(
           if (BigInt(balance.balance_msats) !== earned) throw new Error("Invalid private earnings balance");
           totalMsats += earned;
         }
+        for (const paymentHash of [...royaltyHashes].sort()) {
+          await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            ["private-royalty:" + paymentHash]);
+          const result = await client.query<{
+            owner: string; balance_msats: string; earned_msats: string; gross_msats: string; claim_id: string | null;
+          }>("SELECT * FROM private_swarm_royalties WHERE payment_hash=$1 FOR UPDATE", [paymentHash]);
+          const record = result.rows[0];
+          if (!record || record.owner !== royalties!.owner) throw new YieldClaimError(403, "ROYALTY_OWNER_MISMATCH");
+          if (record.claim_id || BigInt(record.balance_msats) === 0n) throw new YieldClaimError(409, "YIELD_ALREADY_CLAIMED");
+          const earned = BigInt(record.gross_msats) * 5n / 100n;
+          if (BigInt(record.earned_msats) !== earned || BigInt(record.balance_msats) !== earned) {
+            throw new YieldClaimError(403, "ROYALTY_BINDING_MISMATCH");
+          }
+          totalMsats += earned;
+        }
         if (totalMsats > BigInt(Number.MAX_SAFE_INTEGER) || invoice.amountMsats !== totalMsats) {
           throw new YieldClaimError(400, "INVOICE_AMOUNT_MISMATCH");
         }
@@ -84,8 +117,15 @@ export function createPrivateYieldEarnings(
           [hashes, claimId, new Date(now())],
         );
         if (consumed.rowCount !== hashes.length) throw new Error("Incomplete atomic yield consumption");
+        if (royaltyHashes.length) {
+          const consumedRoyalties = await client.query(
+            `UPDATE private_swarm_royalties SET balance_msats=0,claim_id=$2,claimed_at=$3
+             WHERE payment_hash=ANY($1::text[]) AND owner=$4 AND claim_id IS NULL AND balance_msats>0 RETURNING payment_hash`,
+            [royaltyHashes, claimId, new Date(now()), royalties!.owner]);
+          if (consumedRoyalties.rowCount !== royaltyHashes.length) throw new Error("Incomplete atomic royalty consumption");
+        }
         await client.query("COMMIT");
-        return { claimId, totalMsats, receiptCount: hashes.length };
+        return { claimId, totalMsats, receiptCount: hashes.length + royaltyHashes.length };
       } catch (error) {
         await client.query("ROLLBACK").catch(() => {});
         if ((error as { code?: string }).code === "23505") {

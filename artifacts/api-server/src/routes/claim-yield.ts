@@ -6,11 +6,14 @@ import { inspectSubscriptionMacaroon } from "../lib/subscription-pass";
 import { logger } from "../lib/logger";
 import { YieldClaimError, type PrivateYieldEarnings } from "../lib/private-yield-earnings";
 import { parseYieldWithdrawalInvoice } from "../lib/yield-withdrawal-invoice";
+import { verifyRequestNip98Signer } from "../lib/nip98-request";
 
 const claimInput = z.object({
-  macaroons: z.array(z.string().min(1).max(16384)).min(1).max(32),
+  macaroons: z.array(z.string().min(1).max(16384)).max(32).default([]),
+  royalty_payment_hashes: z.array(z.string().regex(/^[0-9a-f]{64}$/)).min(1).max(32).optional(),
   bolt11_invoice: z.string().min(100).max(4096),
-}).strict();
+}).strict().refine(value => value.macaroons.length + (value.royalty_payment_hashes?.length ?? 0) >= 1 &&
+  value.macaroons.length + (value.royalty_payment_hashes?.length ?? 0) <= 32);
 
 export function registerClaimYieldRoute(
   app: Express,
@@ -26,6 +29,21 @@ export function registerClaimYieldRoute(
     }
     const secret = options.secret ?? process.env.SESSION_SECRET;
     if (!secret) { res.status(503).json({ error: "CLAIM_VERIFICATION_UNAVAILABLE" }); return; }
+    let royaltyOwner: string | undefined;
+    if (parsed.data.royalty_payment_hashes?.length) {
+      const signer = verifyRequestNip98Signer(req, options.now?.() ?? Date.now());
+      if (!signer.provided || !signer.pubkey) {
+        res.status(401).json({ error: "NIP98_AUTHENTICATION_REQUIRED" }); return;
+      }
+      try {
+        if (await req.app.locals.swarmReferralRevoked?.(signer.pubkey)) {
+          res.status(403).json({ error: "ROYALTY_OWNER_REVOKED" }); return;
+        }
+      } catch {
+        res.status(503).json({ error: "ROYALTY_IDENTITY_UNAVAILABLE" }); return;
+      }
+      royaltyOwner = signer.pubkey;
+    }
     // Historical bearer receipts, not renewed API authorization: expiry/quota are
     // irrelevant here. HMAC integrity and exact confirmed settlement remain mandatory.
     const passes = parsed.data.macaroons.map(macaroon => inspectSubscriptionMacaroon(macaroon, secret));
@@ -44,7 +62,10 @@ export function registerClaimYieldRoute(
     try {
       const claim = await ledger.claim(passes.map(pass => ({
         paymentHash: pass!.paymentHash, provider: pass!.paymentProvider!, amountMsats: pass!.amountMsats!,
-      })), invoice, parsed.data.bolt11_invoice);
+        ...(pass!.swarmReferral ? { referralOwner: pass!.swarmReferral.owner } : {}),
+      })), invoice, parsed.data.bolt11_invoice, royaltyOwner ? {
+        owner: royaltyOwner, paymentHashes: parsed.data.royalty_payment_hashes!,
+      } : undefined);
       // Log only after durable consumption. No wallet API, credentials, invoices or addresses.
       const event = { event: "yield_withdrawal_simulated", claim_id: claim.claimId,
         amount_msats: claim.totalMsats.toString(), receipt_count: claim.receiptCount, simulated: true };

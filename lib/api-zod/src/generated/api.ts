@@ -60,6 +60,51 @@ export const GetYieldMetricsJsonResponse = zod.object({
 
 
 /**
+ * Requires a fresh NIP-98 signature binding this GET URL and method. The
+ * returned HMAC-authenticated key names the verified agent and expires in
+ * 30 days. Share it as X-Swarm-Referral on new Lightning L402 challenges.
+ * One direct referrer receives 5% of the final confirmed invoice; agents
+ * may recursively recruit by issuing and sharing their own keys. This is
+ * not an unbounded multi-level commission. Sharing the key never grants
+ * withdrawal authority. Invalid, expired or forged keys are ignored.
+ * The discount is applied after the unchanged Thermodynamic calculation:
+ * final millisatoshis = quoted whole sats * 950. Wholesale Whale budgets
+ * and exact-toll routes are excluded and their fees and quotas unchanged.
+ * Royalties are additional private simulated earnings, not carved from
+ * the buyer's existing 21% allocation. Fractional-msat royalties round down.
+ * The balance response selects at most 32 pending invoice hashes, in
+ * lexical order; claimable_msats is their subtotal. To claim, POST those
+ * royalty_payment_hashes and a matching BOLT11 invoice to /api/claim-yield
+ * with a fresh payload-bound NIP-98 signature from this same agent.
+ * Repeat this GET for further pages after claiming. No real payment is sent.
+ * @summary Issue an agent-bound Swarm referral key and read private royalty balances
+ */
+export const GetSwarmReferralKeyHeader = zod.object({
+  "X-Nostr-Authorization": zod.string().describe('Fresh NIP-98 Authorization event; Authorization Nostr is also accepted')
+})
+
+export const getSwarmReferralKeyResponseReferralKeyMax = 256;
+
+export const getSwarmReferralKeyResponseAgentIdRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getSwarmReferralKeyResponseRoyaltyPaymentHashesItemRegExp = new RegExp('^[0-9a-f]{64}$');
+export const getSwarmReferralKeyResponseRoyaltyPaymentHashesMax = 32;
+
+export const getSwarmReferralKeyResponseClaimableMsatsRegExp = new RegExp('^[0-9]+$');
+
+
+export const GetSwarmReferralKeyResponse = zod.object({
+  "referral_key": zod.string().max(getSwarmReferralKeyResponseReferralKeyMax),
+  "agent_id": zod.string().regex(getSwarmReferralKeyResponseAgentIdRegExp),
+  "expires_at": zod.number().int(),
+  "discount_percent": zod.literal(5),
+  "royalty_percent": zod.literal(5),
+  "simulated": zod.literal(true),
+  "royalty_payment_hashes": zod.array(zod.string().regex(getSwarmReferralKeyResponseRoyaltyPaymentHashesItemRegExp)).max(getSwarmReferralKeyResponseRoyaltyPaymentHashesMax),
+  "claimable_msats": zod.string().regex(getSwarmReferralKeyResponseClaimableMsatsRegExp)
+})
+
+
+/**
  * Mock withdrawal only: no Lightning payment is sent. Supply 1–32 issuer-authenticated
  * L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
  * matching exactly 21 percent of their confirmed incoming L402 settlement amounts.
@@ -72,11 +117,24 @@ export const GetYieldMetricsJsonResponse = zod.object({
  * they do not modify real Treasury allocations or the public /yield-proofs.json feed.
  * Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
  * it does not contact a wallet or guarantee that a destination invoice is payable.
+ * Optional royalty_payment_hashes select separate 5% referral earnings instead
+ * of, or together with, bearer receipts (maximum 32 combined). Royalty claims
+ * require a fresh payload-bound NIP-98 signature from their recorded owner;
+ * possession of the publicly shareable referral key is insufficient. Get
+ * pending hashes and their exact subtotal from /api/swarm-referral-key.
+ * Referred buyers retain 21% of their exact discounted settled millisatoshis.
  * @summary Atomically consume private simulated L402 yield earnings
  */
+export const ClaimYieldHeader = zod.object({
+  "X-Nostr-Authorization": zod.string().optional().describe('Required for royalty selections; fresh NIP-98 proof from their owner')
+})
+
 export const claimYieldBodyMacaroonsItemMax = 16384;
 
 export const claimYieldBodyMacaroonsMax = 32;
+
+export const claimYieldBodyRoyaltyPaymentHashesItemRegExp = new RegExp('^[0-9a-f]{64}$');
+export const claimYieldBodyRoyaltyPaymentHashesMax = 32;
 
 export const claimYieldBodyBolt11InvoiceMin = 100;
 export const claimYieldBodyBolt11InvoiceMax = 4096;
@@ -84,7 +142,8 @@ export const claimYieldBodyBolt11InvoiceMax = 4096;
 
 
 export const ClaimYieldBody = zod.object({
-  "macaroons": zod.array(zod.string().min(1).max(claimYieldBodyMacaroonsItemMax)).min(1).max(claimYieldBodyMacaroonsMax).describe('Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.'),
+  "macaroons": zod.array(zod.string().min(1).max(claimYieldBodyMacaroonsItemMax)).max(claimYieldBodyMacaroonsMax).optional().describe('Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.'),
+  "royalty_payment_hashes": zod.array(zod.string().regex(claimYieldBodyRoyaltyPaymentHashesItemRegExp)).min(1).max(claimYieldBodyRoyaltyPaymentHashesMax).optional().describe('Optional separate referral royalty selections, requiring fresh owner NIP-98 authentication. At least one receipt or royalty hash and at most 32 combined are required.'),
   "bolt11_invoice": zod.string().min(claimYieldBodyBolt11InvoiceMin).max(claimYieldBodyBolt11InvoiceMax).describe('Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.')
 })
 
@@ -903,11 +962,14 @@ export const PreflightMcpResponse = zod.unknown()
 export const executeMcpRequestHeaderXRequestedBudgetMin = 2;
 export const executeMcpRequestHeaderXRequestedBudgetMax = 1000000;
 
+export const executeMcpRequestHeaderXSwarmReferralMax = 256;
+
 
 
 export const ExecuteMcpRequestHeader = zod.object({
   "MCP-Protocol-Version": zod.string().optional().describe('MCP protocol version: 2026-07-28 (must equal the _meta protocol version) or a handshake-era version such as 2025-11-25'),
   "X-Requested-Budget": zod.number().int().min(executeMcpRequestHeaderXRequestedBudgetMin).max(executeMcpRequestHeaderXRequestedBudgetMax).optional().describe('Optional Whale Protocol invoice budget in sats; exact multiple of a fixed base unit fee for at least two prepaid calls. Omit on paid retries; incompatible with X-L402-Batch-Size and x402.'),
+  "X-Swarm-Referral": zod.string().max(executeMcpRequestHeaderXSwarmReferralMax).optional().describe('Optional signed key from GET \/api\/swarm-referral-key. Applies a 5% post-surge buyer discount and separate 5% owner royalty on confirmed Lightning settlement. Invalid keys are ignored. No discount on Whale budgets or exact tolls; referral attribution is invoice-bound and cannot be replaced on retry. Lightning L402 only.'),
   "Mcp-Method": zod.string().optional().describe('JSON-RPC method mirrored for routing; required for 2026-07-28 requests'),
   "Mcp-Name": zod.string().optional().describe('params.name for tools\/call, mirrored for routing; required for 2026-07-28 tools\/call. Non-ASCII values use =?base64?...?='),
   "Authorization": zod.string().optional().describe('For paid calls: L402 <macaroon>:<preimage>. Discovery needs no credential.'),

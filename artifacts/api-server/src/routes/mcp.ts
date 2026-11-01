@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { createMcpPipelineHandler, type PipelineReceiptStore } from "../lib/mcp-pipeline";
 import { loadArticle12IssuerKey } from "../lib/article12-signature";
 import { frameMcpErrors, validateMcpEnvelope } from "../middleware/mcpJsonRpc";
+import { verifySwarmReferralKey } from "../lib/swarm-referral";
 import {
   MCP_SERVER_INFO,
   answerStatelessMcpRequest,
@@ -5634,7 +5635,9 @@ export function registerMcpRoute(
             await l402(req, res, next);
             return;
           }
-          if (req.header("X-L402-Batch-Size") || req.header("X-Requested-Budget")) {
+          if (req.header("X-L402-Batch-Size") || req.header("X-Requested-Budget") ||
+              verifySwarmReferralKey(req.header("X-Swarm-Referral"),
+                options.sessionSecret ?? process.env.SESSION_SECRET ?? "", Date.now())) {
             if (req.header("PAYMENT-SIGNATURE")) {
               res
                 .status(400)

@@ -20,6 +20,8 @@ import {
   type AgentAuthentication,
 } from "../lib/agent-id-caveat";
 import { verifyRequestNip98Signer } from "../lib/nip98-request";
+import { verifySwarmReferralKey } from "../lib/swarm-referral";
+import type { SwarmRoyalties } from "../lib/swarm-royalties";
 import { assertEnterpriseVerificationTarget } from "../lib/enterprise-economics";
 import {
   createMemoryMacaroonUsageStore,
@@ -48,6 +50,7 @@ export type L402MiddlewareOptions = {
   usageStore?: MacaroonUsageStore;
   maxChallengesPerMinute?: number;
   ledger?: RevenueLedger;
+  swarmRoyalties?: SwarmRoyalties;
   revocationStore?: MacaroonRevocationStore;
   requestKind?: RevenueRequestKind;
   allowBatch?: boolean;
@@ -157,6 +160,9 @@ export function createL402Middleware(
     }
     const requestedBatch = req.get("X-L402-Batch-Size");
     const requestedBudget = req.get("X-Requested-Budget");
+    // Wholesale funding and authoritative settlement tolls are never discounted.
+    const referralOwner = requestedBudget === undefined && !options.enforceCurrentAmount
+      ? verifySwarmReferralKey(req.get("X-Swarm-Referral"), secret, now()) : null;
     let budgetSats: number | undefined;
     let budgetRequests: number | undefined;
     if (requestedBudget !== undefined) {
@@ -179,6 +185,7 @@ export function createL402Middleware(
       const binding = createHash("sha256").update(JSON.stringify([
         req.method, resolveScope(req), req.query, req.body ?? null,
         resolveAmountSats(req), requestedBatch ?? null, requestedBudget ?? null, options.description, agent ?? null,
+        ...(referralOwner ? [referralOwner] : []),
       ])).digest("hex");
       if (!await options.invoicePow.admit(req, res, binding, secret)) return;
     }
@@ -238,18 +245,21 @@ export function createL402Middleware(
         baseAmountSats: budgetSats, amountSats: budgetSats, multiplier: 1,
         yieldGuaranteeSats: (budgetSats * 21) / 100,
       };
-      const { amountSats } = quote;
-      if (!Number.isSafeInteger(amountSats * 1_000))
+      if (referralOwner && (!options.ledger || !(options.swarmRoyalties ?? req.app.locals.swarmRoyalties))) {
+        res.status(503).json({ error: "Royalty accounting unavailable; no invoice created" }); return;
+      }
+      const amountMsats = referralOwner ? Number(BigInt(quote.amountSats) * 950n) : quote.amountSats * 1000;
+      const amountSats = amountMsats / 1000;
+      if (!Number.isSafeInteger(amountMsats))
         throw new RangeError("Batch price exceeds safe range");
-      const amountMsats = amountSats * 1_000;
       const invoice = await options.settlementRouter.createInvoice({
         amountMsats,
         description:
-          budgetSats !== undefined
+          (budgetSats !== undefined
             ? `${options.description} (High-Velocity ${budgetSats}-sat budget)`
             : batchSize === 100
             ? `${options.description} (100-call batch)`
-            : options.description,
+            : options.description) + (referralOwner ? ` (Swarm referral ${referralOwner})` : ""),
         expirySeconds: invoiceExpirySeconds,
         asset: "btc-lightning",
       });
@@ -268,6 +278,7 @@ export function createL402Middleware(
         validUntil: Math.floor(now() / 1_000) + invoiceExpirySeconds,
         amountMsats,
         baseAmountMsats: quote.baseAmountSats * 1_000,
+        ...(referralOwner ? { swarmReferral: { owner: referralOwner, quotedAmountMsats: quote.amountSats * 1000 } } : {}),
         ...(budgetSats === undefined ? {} : { highVelocityUnitMsats: resolveAmountSats(req) * 1_000 }),
         paymentAsset: "btc-lightning",
         paymentProvider: invoice.provider,
@@ -300,7 +311,9 @@ export function createL402Middleware(
         dynamic_fee_sats: amountSats,
         base_fee_sats: quote.baseAmountSats,
         load_multiplier: quote.multiplier,
-        yield_guarantee_sats: quote.yieldGuaranteeSats,
+        yield_guarantee_sats: referralOwner ? (amountMsats * 21) / 100000 : quote.yieldGuaranteeSats,
+        ...(referralOwner ? { referral_discount_percent: 5, royalty_percent: 5,
+          undiscounted_fee_sats: quote.amountSats, royalty_fee_sats: Number(BigInt(amountMsats) * 5n / 100n) / 1000 } : {}),
         ev_status: "POSITIVE_EXPECTED_VALUE",
         yield_guarantee_conditions:
           "Conditional 21% allocation pool under existing Treasury eligibility and split rules; not an automatic payout or a guarantee of economic profit.",
@@ -439,6 +452,7 @@ export function createL402Middleware(
         (pass.paymentHash === preimageHash || preimageHash === null) &&
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
+        (!pass.swarmReferral || !options.enforceCurrentAmount) &&
         (pass.highVelocityUnitMsats !== undefined
           ? (!options.enforceCurrentAmount && typeof options.amountSats === "number" &&
               pass.highVelocityUnitMsats === resolveAmountSats(req) * 1_000)
@@ -462,11 +476,11 @@ export function createL402Middleware(
         try {
           const batch =
             !pass.highVelocityUnitMsats && options.allowBatch && pass.requestLimits[0]?.maxRequests === 100;
-          const description = pass.highVelocityUnitMsats
+          const description = (pass.highVelocityUnitMsats
             ? `${options.description} (High-Velocity ${pass.amountMsats / 1000}-sat budget)`
             : batch
             ? `${options.description} (100-call batch)`
-            : options.description;
+            : options.description) + (pass.swarmReferral ? ` (Swarm referral ${pass.swarmReferral.owner})` : "");
           const expectedAmountMsats = pass.amountMsats;
           const settlementKey = L402EdgeCache.key(
             secret,
@@ -519,6 +533,24 @@ export function createL402Middleware(
               return;
             }
           }
+          if (pass.swarmReferral) {
+            try {
+              const royalties: SwarmRoyalties | undefined = options.swarmRoyalties ?? req.app.locals.swarmRoyalties;
+              if (!options.ledger || !royalties) throw new Error("Royalty accounting unavailable");
+              await recordRevenueWithRetry(options.ledger, {
+                id: randomUUID(), timestamp: new Date(verification.settledAt < 10_000_000_000
+                  ? verification.settledAt * 1000 : verification.settledAt).toISOString(),
+                channel: "L402", requestKind: options.requestKind ?? "stratigraphy",
+                satsReceived: Math.ceil(pass.amountMsats / 1000), paymentHash: pass.paymentHash,
+                ...(/^[0-9a-f]{64}$/.test(authorization.preimage)
+                  ? { preimage: authorization.preimage } : { merchantVerified: true as const }),
+                clientIdentifier: clientKey(req),
+              });
+              await royalties.credit(pass);
+            } catch {
+              res.status(503).json({ error: "Royalty accounting unavailable; no quota consumed" }); return;
+            }
+          }
           if (
             pass.maxRequests !== undefined &&
             !(await usageStore.consume(pass.requestLimits, pass.validUntil))
@@ -528,7 +560,7 @@ export function createL402Middleware(
               .json({ error: "L402 macaroon has already been used" });
             return;
           }
-          if (options.ledger) {
+          if (options.ledger && !pass.swarmReferral) {
             try {
               await recordRevenueWithRetry(options.ledger, {
                 id: randomUUID(),
@@ -583,7 +615,9 @@ export function createL402Middleware(
         }
       }
     }
-    if (options.creditTabs && nip98Pubkey && !authorization && !req.get("PAYMENT-SIGNATURE")) {
+    if (options.creditTabs && nip98Pubkey && !authorization && !req.get("PAYMENT-SIGNATURE") &&
+        !(req.get("X-Requested-Budget") === undefined && !options.enforceCurrentAmount &&
+          verifySwarmReferralKey(req.get("X-Swarm-Referral"), options.sessionSecret ?? process.env.SESSION_SECRET ?? "", now()))) {
       try {
         const admitted = await options.creditTabs.admit(req, res, nip98Pubkey, resolveAmountSats(req),
           resolveScope(req), options.settlementRouter, secret ?? "");

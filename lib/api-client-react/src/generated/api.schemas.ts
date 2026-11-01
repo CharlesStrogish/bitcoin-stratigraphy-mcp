@@ -35,15 +35,53 @@ export interface YieldMetrics {
   status: YieldMetricsStatus;
 }
 
+export type SwarmReferralKeyDiscountPercent = typeof SwarmReferralKeyDiscountPercent[keyof typeof SwarmReferralKeyDiscountPercent];
+
+
+export const SwarmReferralKeyDiscountPercent = {
+  NUMBER_5: 5,
+} as const;
+
+export type SwarmReferralKeyRoyaltyPercent = typeof SwarmReferralKeyRoyaltyPercent[keyof typeof SwarmReferralKeyRoyaltyPercent];
+
+
+export const SwarmReferralKeyRoyaltyPercent = {
+  NUMBER_5: 5,
+} as const;
+
+export interface SwarmReferralKey {
+  /** @maxLength 256 */
+  referral_key: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  agent_id: string;
+  expires_at: number;
+  discount_percent: SwarmReferralKeyDiscountPercent;
+  royalty_percent: SwarmReferralKeyRoyaltyPercent;
+  simulated: true;
+  /**
+     * @maxItems 32
+     * @items.pattern ^[0-9a-f]{64}$
+     */
+  royalty_payment_hashes: string[];
+  /** @pattern ^[0-9]+$ */
+  claimable_msats: string;
+}
+
 export interface YieldClaimInput {
   /**
      * Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.
-     * @minItems 1
      * @maxItems 32
      * @items.minLength 1
      * @items.maxLength 16384
      */
-  macaroons: string[];
+  macaroons?: string[];
+  /**
+     * Optional separate referral royalty selections, requiring fresh owner NIP-98 authentication. At least one receipt or royalty hash and at most 32 combined are required.
+     * @minItems 1
+     * @maxItems 32
+     * @items.pattern ^[0-9a-f]{64}$
+     */
+  royalty_payment_hashes?: string[];
   /**
      * Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.
      * @minLength 100
@@ -2340,6 +2378,20 @@ export interface L402Challenge {
   preflight?: L402Preflight;
 }
 
+export type L402PaymentRequiredReferralDiscountPercent = typeof L402PaymentRequiredReferralDiscountPercent[keyof typeof L402PaymentRequiredReferralDiscountPercent];
+
+
+export const L402PaymentRequiredReferralDiscountPercent = {
+  NUMBER_5: 5,
+} as const;
+
+export type L402PaymentRequiredRoyaltyPercent = typeof L402PaymentRequiredRoyaltyPercent[keyof typeof L402PaymentRequiredRoyaltyPercent];
+
+
+export const L402PaymentRequiredRoyaltyPercent = {
+  NUMBER_5: 5,
+} as const;
+
 /**
  * Present only for Whale Protocol funding
  */
@@ -2394,13 +2446,25 @@ export interface L402PaymentRequired {
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
-  /** @minimum 1 */
+  /** @minimum 0.001 */
   amount_sats: number;
   /**
      * Final invoice cost, identical to amount_sats and the signed macaroon amount.
-     * @minimum 1
+     * @minimum 0.001
      */
   dynamic_fee_sats?: number;
+  referral_discount_percent?: L402PaymentRequiredReferralDiscountPercent;
+  royalty_percent?: L402PaymentRequiredRoyaltyPercent;
+  /**
+     * Thermodynamic quote before the optional 5% referral discount
+     * @minimum 1
+     */
+  undiscounted_fee_sats?: number;
+  /**
+     * Five percent of the final settled invoice, rounded down to whole millisatoshis; simulated allocation only
+     * @minimum 0
+     */
+  royalty_fee_sats?: number;
   /**
      * Base cost before admission-pressure pricing, including the batch size or full High-Velocity funding budget.
      * @minimum 1

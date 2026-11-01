@@ -22,6 +22,7 @@ import {
 import { equivalentToolNames } from "./mcp-pricing";
 import { enterpriseContext, enterpriseMacaroonFields } from "./enterprise-economics";
 import { LIABILITY_CAVEAT } from "../middleware/liability-notice";
+import { parseReferralInvoice, referralInvoiceProof, type SwarmReferral } from "./swarm-referral";
 
 const ENTERPRISE_KEYS = ["enterprise_buyer", "routing_kickback", "commercial_exemption", "commercial_exemption_exp"];
 function economicsProof(secret: string, paymentHash: string, fields: Map<string, string>): string {
@@ -75,6 +76,7 @@ export type VerifiedSubscriptionMacaroon = {
   amountMsats?: number;
   baseAmountMsats?: number;
   highVelocityUnitMsats?: number;
+  swarmReferral?: SwarmReferral;
   agentPubkey?: string;
   agentTier?: AgentTier;
   /** Caller-declared sub-agent from the single `agent_id = <id>` caveat. */
@@ -153,6 +155,7 @@ export function createSubscriptionMacaroon(input: {
   amountMsats?: number;
   baseAmountMsats?: number;
   highVelocityUnitMsats?: number;
+  swarmReferral?: SwarmReferral;
   agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
   /** Sub-agent attribution; every use must declare the same ID. */
   agentId?: string;
@@ -181,6 +184,12 @@ export function createSubscriptionMacaroon(input: {
     );
   }
   const identifier = "bitcoin-stratigraphy-subscription-v1";
+  if (input.swarmReferral && (input.highVelocityUnitMsats !== undefined ||
+      !parseReferralInvoice(`${input.swarmReferral.owner}:${input.swarmReferral.quotedAmountMsats}:${
+        referralInvoiceProof(input.secret, input.paymentHash, input.amountMsats!, input.baseAmountMsats!, input.swarmReferral)}`,
+        input.secret, input.paymentHash, input.amountMsats, input.baseAmountMsats))) {
+    throw new RangeError("Invalid referral invoice");
+  }
   if (input.highVelocityUnitMsats !== undefined &&
       (!Number.isSafeInteger(input.highVelocityUnitMsats) || input.highVelocityUnitMsats <= 0 ||
        !Number.isSafeInteger(input.amountMsats) || input.amountMsats !== input.baseAmountMsats ||
@@ -201,6 +210,10 @@ export function createSubscriptionMacaroon(input: {
       : [`base_amount_msats=${input.baseAmountMsats}`]),
     ...(input.highVelocityUnitMsats === undefined ? [] : [
       `high_velocity=${input.highVelocityUnitMsats}:${highVelocityProof(input.secret, input.paymentHash, input.amountMsats!, input.highVelocityUnitMsats)}`,
+    ]),
+    ...(input.swarmReferral === undefined ? [] : [
+      `swarm_referral=${input.swarmReferral.owner}:${input.swarmReferral.quotedAmountMsats}:${
+        referralInvoiceProof(input.secret, input.paymentHash, input.amountMsats!, input.baseAmountMsats!, input.swarmReferral)}`,
     ]),
     ...constructPaymentAssetCaveat(input.paymentAsset),
     ...constructPaymentProviderCaveat(input.paymentProvider),
@@ -233,6 +246,7 @@ const ROOT_CAVEAT_KEYS = new Set([
   "amount_msats",
   "base_amount_msats",
   "high_velocity",
+  "swarm_referral",
   "agent_pubkey",
   "agent_tier",
   "payment_asset",
@@ -369,6 +383,10 @@ export function inspectSubscriptionMacaroon(
     const baseAmountMsatsValue = rootValues.get("base_amount_msats");
     const baseAmountMsats = baseAmountMsatsValue === undefined
       ? undefined : Number(baseAmountMsatsValue);
+    const referralValue = rootValues.get("swarm_referral");
+    const swarmReferral = referralValue === undefined ? undefined :
+      parseReferralInvoice(referralValue, secret, paymentHash, amountMsats, baseAmountMsats);
+    if (swarmReferral === null || (swarmReferral && rootValues.has("high_velocity"))) return null;
     const velocity = rootValues.get("high_velocity");
     let highVelocityUnitMsats: number | undefined;
     if (velocity !== undefined) {
@@ -395,7 +413,7 @@ export function inspectSubscriptionMacaroon(
       (baseAmountMsatsValue !== undefined &&
         (!/^[1-9]\d*$/.test(baseAmountMsatsValue) ||
           !Number.isSafeInteger(baseAmountMsats) ||
-          amountMsats === undefined || baseAmountMsats! > amountMsats)) ||
+           amountMsats === undefined || (!swarmReferral && baseAmountMsats! > amountMsats))) ||
       agentCaveats === null ||
       paymentAssetCaveat === null ||
       paymentProviderCaveat === null ||
@@ -414,6 +432,7 @@ export function inspectSubscriptionMacaroon(
           (amountMsatsValue === undefined ? 0 : 1) +
           (baseAmountMsatsValue === undefined ? 0 : 1) +
           (velocity === undefined ? 0 : 1) +
+          (swarmReferral === undefined ? 0 : 1) +
           (paymentAssetCaveat === undefined ? 0 : 1) +
           (paymentProviderCaveat === undefined ? 0 : 1) +
           (agentCaveats === undefined ? 0 : 2) +
@@ -438,6 +457,7 @@ export function inspectSubscriptionMacaroon(
       amountMsats,
       baseAmountMsats,
       ...(highVelocityUnitMsats === undefined ? {} : { highVelocityUnitMsats }),
+      ...(swarmReferral === undefined ? {} : { swarmReferral }),
       agentPubkey: agentCaveats?.agentPubkey,
       agentTier: agentCaveats?.agentTier,
       ...(agentId === undefined ? {} : { agentId }),

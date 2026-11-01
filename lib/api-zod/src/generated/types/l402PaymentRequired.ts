@@ -9,6 +9,8 @@ import type { L402PaymentRequiredAgentAuthentication } from './l402PaymentRequir
 import type { L402PaymentRequiredEvStatus } from './l402PaymentRequiredEvStatus';
 import type { L402PaymentRequiredPaymentBridgeInstructions } from './l402PaymentRequiredPaymentBridgeInstructions';
 import type { L402PaymentRequiredPaymentMode } from './l402PaymentRequiredPaymentMode';
+import type { L402PaymentRequiredReferralDiscountPercent } from './l402PaymentRequiredReferralDiscountPercent';
+import type { L402PaymentRequiredRoyaltyPercent } from './l402PaymentRequiredRoyaltyPercent';
 import type { L402PaymentRequiredStagedPreview } from './l402PaymentRequiredStagedPreview';
 import type { L402Preflight } from './l402Preflight';
 import type { L402SettlementPath } from './l402SettlementPath';
@@ -24,13 +26,25 @@ export interface L402PaymentRequired {
   invoice: string;
   /** @pattern ^[0-9a-f]{64}$ */
   payment_hash: string;
-  /** @minimum 1 */
+  /** @minimum 0.001 */
   amount_sats: number;
   /**
      * Final invoice cost, identical to amount_sats and the signed macaroon amount.
-     * @minimum 1
+     * @minimum 0.001
      */
   dynamic_fee_sats?: number;
+  referral_discount_percent?: L402PaymentRequiredReferralDiscountPercent;
+  royalty_percent?: L402PaymentRequiredRoyaltyPercent;
+  /**
+     * Thermodynamic quote before the optional 5% referral discount
+     * @minimum 1
+     */
+  undiscounted_fee_sats?: number;
+  /**
+     * Five percent of the final settled invoice, rounded down to whole millisatoshis; simulated allocation only
+     * @minimum 0
+     */
+  royalty_fee_sats?: number;
   /**
      * Base cost before admission-pressure pricing, including the batch size or full High-Velocity funding budget.
      * @minimum 1

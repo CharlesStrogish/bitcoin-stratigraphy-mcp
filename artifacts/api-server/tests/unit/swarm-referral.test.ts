@@ -16,7 +16,7 @@ import { registerSwarmReferralRoute } from "../../src/routes/swarm-referral";
 import { registerClaimYieldRoute } from "../../src/routes/claim-yield";
 import { createMemoryRevenueLedger } from "../../src/services/ledger";
 import type { SettlementRouter } from "../../src/services/settlement";
-import { migratePayoutFixture, mockCoinosPayout } from "../helpers/coinos-payout";
+import { migratePayoutFixture, mockNwcPayout, mockPayoutHash } from "../helpers/nwc-payout";
 
 const secret = "swarm-referral-regression-secret";
 const hash = () => randomBytes(32).toString("hex");
@@ -33,7 +33,7 @@ function invoice(msats: bigint): string {
   let timestamp = Math.floor(Date.now() / 1000);
   const words = Array(7).fill(0);
   for (let i = 6; i >= 0; i--) { words[i] = timestamp % 32; timestamp = Math.floor(timestamp / 32); }
-  words.push(1, 1, 20, ...bech32.toWords(Buffer.from(hash(), "hex")));
+  words.push(1, 1, 20, ...bech32.toWords(Buffer.from(mockPayoutHash(), "hex")));
   const text = bech32.toWords(Buffer.from("simulated referral claim"));
   words.push(13, Math.floor(text.length / 32), text.length % 32, ...text, ...Array(104).fill(0));
   return bech32.encode(`lnbc${msats * 10n}p`, words, 4096);
@@ -105,7 +105,7 @@ test("PostgreSQL referral discounts, one-time owner royalties and independent 21
     app.use(express.json());
     app.locals.swarmRoyalties = royalties;
     registerSwarmReferralRoute(app, royalties, { secret });
-    registerClaimYieldRoute(app, createPrivateYieldEarnings(database, Date.now, mockCoinosPayout().client), { secret, logSettlement: () => {} });
+    registerClaimYieldRoute(app, createPrivateYieldEarnings(database, Date.now, mockNwcPayout().client), { secret, logSettlement: () => {} });
     const common = { amountSats: 250, scopePath: "/paid", description: "swarm test",
       sessionSecret: secret, settlementRouter: wallet, ledger, allowBatch: true, maxChallengesPerMinute: 1000 };
     app.get("/paid", createL402Middleware(common), (_req, res) => res.json({ paid: true }));

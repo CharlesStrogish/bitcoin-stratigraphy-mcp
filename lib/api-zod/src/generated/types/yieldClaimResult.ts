@@ -10,7 +10,7 @@ import type { YieldClaimResultStatus } from './yieldClaimResultStatus';
 export interface YieldClaimResult {
   status: YieldClaimResultStatus;
   /**
-     * True only after confirmed Coinos settlement and durable ledger consumption; null means unknown, not a definitive non-payment
+     * True only after confirmed NWC settlement and durable ledger consumption; null means unknown, not a definitive non-payment
      * @nullable
      */
   payment_sent: boolean | null;

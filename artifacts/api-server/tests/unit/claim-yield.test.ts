@@ -11,13 +11,14 @@ import { createSubscriptionMacaroon, attenuateSubscriptionMacaroon } from "../..
 import { createPublicYieldLedger } from "../../src/lib/public-yield-ledger";
 import { parseYieldWithdrawalInvoice } from "../../src/lib/yield-withdrawal-invoice";
 import { apiRootAliases } from "../../src/middleware/apiRootAliases";
-import { migratePayoutFixture, mockCoinosPayout } from "../helpers/coinos-payout";
-import { createCoinosPayout } from "../../src/lib/coinos-payout";
+import { migratePayoutFixture, mockNwcPayout, mockPayoutHash, mockNwcUri } from "../helpers/nwc-payout";
+import { createNwcPayout, type PayoutNwcClient } from "../../src/lib/nwc-payout";
+import { Nip47WalletError } from "@getalby/sdk";
 
 const secret = "private-yield-regression-secret";
 const clock = Date.parse("2026-11-01T12:00:00Z");
 const hash = () => randomBytes(32).toString("hex");
-function invoice(msats: bigint, paymentHash = hash(), time = clock): string {
+function invoice(msats: bigint, paymentHash = mockPayoutHash(), time = clock): string {
   let timestamp = Math.floor(time / 1000);
   const words = Array(7).fill(0);
   for (let i = 6; i >= 0; i--) { words[i] = timestamp % 32; timestamp = Math.floor(timestamp / 32); }
@@ -46,41 +47,87 @@ test("BOLT11 BTC, milli, micro, nano and pico units convert to exact millisatosh
   assert.throws(() => parseYieldWithdrawalInvoice(bech32.encode("lnbc1p", words, 4096), clock));
 });
 
-test("Coinos HTTP evidence is invoice-bound; ambiguous successes, missing history and CI default transport fail closed", async () => {
+test("NWC evidence is invoice-bound; ambiguous results, missing history and CI live transport fail closed", async () => {
   const preimage = hash();
   const paymentHash = createHash("sha256").update(Buffer.from(preimage, "hex")).digest("hex");
   const text = invoice(21_000n, paymentHash);
   const parsed = parseYieldWithdrawalInvoice(text, clock);
-  let response: unknown = { uid: "real-provider-txid", ref: preimage };
-  let status = 200;
-  const client = createCoinosPayout({ token: () => "test-only-rest-token",
-    fetch: async (url, options) => {
-      assert.equal(new URL(String(url)).origin, "https://coinos.io");
-      assert.equal(options?.redirect, "error");
-      return Response.json(response, { status });
+  let response: unknown = { preimage, fees_paid: 0 };
+  let error: Error | undefined;
+  let closed = 0;
+  let sends = 0;
+  const client = createNwcPayout({ uri: () => mockNwcUri,
+    clientFactory: uri => {
+      assert.equal(uri, mockNwcUri);
+      return {
+        async payInvoice(request) {
+          assert.deepEqual(request, { invoice: text });
+          sends++;
+          if (error) throw error;
+          return response as Awaited<ReturnType<PayoutNwcClient["payInvoice"]>>;
+        },
+        async lookupInvoice(request) {
+          assert.deepEqual(request, { payment_hash: paymentHash });
+          if (error) throw error;
+          return response as Awaited<ReturnType<PayoutNwcClient["lookupInvoice"]>>;
+        },
+        close() { closed++; },
+      };
     } });
   assert.deepEqual(await client.pay(text, parsed),
-    { status: "settled", txid: "real-provider-txid", preimage });
-  response = { uid: "not-settled", ref: hash() };
+    { status: "settled", txid: paymentHash, preimage });
+  response = { preimage: hash() };
   assert.equal((await client.pay(text, parsed)).status, "pending");
   response = { success: true };
   assert.equal((await client.pay(text, parsed)).status, "pending");
-  response = { error: "already paid" }; status = 400;
-  assert.equal((await client.pay(text, parsed)).status, "pending");
-  response = { error: "Invalid invoice" };
-  assert.equal((await client.pay(text, parsed)).status, "failed");
-  response = []; status = 200;
+  for (const code of ["INTERNAL", "OTHER", "PAYMENT_FAILED", "NOT_FOUND", "ALREADY_PAID"]) {
+    error = new Nip47WalletError("untrusted wallet message", code);
+    assert.equal((await client.pay(text, parsed)).status, "pending");
+  }
+  error = Object.assign(new Error("unverified rejection"), { code: "INSUFFICIENT_BALANCE" });
+  assert.equal((await client.pay(text, parsed)).status, "pending", "A generic transport error cannot release funds");
+  for (const code of ["INSUFFICIENT_BALANCE", "QUOTA_EXCEEDED", "RESTRICTED", "UNAUTHORIZED", "NOT_IMPLEMENTED"]) {
+    error = new Nip47WalletError("mock wallet rejection", code);
+    assert.equal((await client.pay(text, parsed)).status, "failed");
+  }
+  error = new Nip47WalletError("missing transaction", "NOT_FOUND");
   assert.equal((await client.lookup(parsed)).status, "pending", "Missing history is NOT proof of failure");
-  response = [{ ref: preimage, amount: 21 }];
+  error = undefined;
+  response = { type: "incoming", state: "settled", payment_hash: paymentHash, preimage, amount: 21000, settled_at: 1 };
   assert.equal((await client.lookup(parsed)).status, "pending", "Incoming wallet records cannot prove an outgoing claim");
-  response = [{ ref: preimage, amount: -22 }];
+  response = { ...response as object, type: "outgoing", amount: 22000 };
   assert.equal((await client.lookup(parsed)).status, "pending", "Reconciliation must bind the exact outgoing amount");
-  response = [{ ref: preimage, amount: -21 }];
+  response = { ...response as object, amount: 21000, payment_hash: hash() };
+  assert.equal((await client.lookup(parsed)).status, "pending");
+  response = { ...response as object, payment_hash: paymentHash };
   assert.equal((await client.lookup(parsed)).status, "settled");
-  response = [{ uid: "older-attempt", hash: paymentHash, amount: -21, status: "failed" }];
+  response = { ...response as object, preimage: undefined };
+  assert.equal((await client.lookup(parsed)).status, "settled", "Exact terminal outgoing evidence may omit preimage");
+  response = { ...response as object, preimage: hash() };
+  assert.equal((await client.lookup(parsed)).status, "pending", "An invalid present preimage fails closed");
+  response = { ...response as object, state: "failed" };
   assert.equal((await client.lookup(parsed)).status, "pending", "An older failed attempt cannot release the current reservation");
-  assert.equal(createCoinosPayout({ token: () => "even-if-a-token-is-set-in-ci" }).configured(), false,
+  assert.equal(createNwcPayout({ uri: () => mockNwcUri }).configured(), false,
     "NODE_ENV=test forbids the default live transport");
+  assert.equal(createNwcPayout({ uri: () => "invalid", clientFactory: () => { throw new Error("unreachable"); } }).configured(), false);
+  assert.ok(closed > sends, "Every send and read closes its dedicated client");
+});
+
+test("NWC hangs return pending and close the client without retrying pay_invoice", async () => {
+  let closed = 0, sends = 0;
+  const client = createNwcPayout({
+    uri: () => mockNwcUri, timeoutMs: 5,
+    clientFactory: () => ({
+      payInvoice() { sends++; return new Promise(() => {}); },
+      lookupInvoice() { return new Promise(() => {}); },
+      close() { closed++; },
+    }),
+  });
+  const text = invoice(21000n), parsed = parseYieldWithdrawalInvoice(text, clock);
+  assert.equal((await client.pay(text, parsed)).status, "pending");
+  assert.equal((await client.lookup(parsed)).status, "pending");
+  assert.equal(sends, 1);
+  assert.equal(closed, 2);
 });
 
 test("private yield claims are durable, atomic and double-spend safe against real PostgreSQL", async t => {
@@ -94,7 +141,7 @@ test("private yield claims are durable, atomic and double-spend safe against rea
   } } as typeof pool;
   const fixture = await isolated.connect();
   const logs: Record<string, unknown>[] = [];
-  const coinos = mockCoinosPayout();
+  const coinos = mockNwcPayout();
   let currentClock = clock;
   const app = express();
   app.use(apiRootAliases);
@@ -141,7 +188,7 @@ test("private yield claims are durable, atomic and double-spend safe against rea
         [invoice.paymentHash]);
       assert.ok(reservations.rows[0].count > 0);
     });
-    await t.test("successful mocked Coinos HTTP settlement fully deducts balances; replay and descendants fail", async () => {
+    await t.test("successful mocked NWC settlement fully deducts balances; replay and descendants fail", async () => {
       const item = await seed();
       const result = await send([item.macaroon]);
       assert.equal(result.status, 200);
@@ -165,7 +212,7 @@ test("private yield claims are durable, atomic and double-spend safe against rea
       ), (error: any) => error.status === 409);
       assert.equal(logs.length, 1);
     });
-    await t.test("definitive Coinos failure releases the reservation without consuming funds and permits retry", async () => {
+    await t.test("definitive NWC failure releases the reservation without consuming funds and permits retry", async () => {
       const item = await seed();
       const destination = invoice(21_000n);
       coinos.setMode("failure");
@@ -196,7 +243,7 @@ test("private yield claims are durable, atomic and double-spend safe against rea
       try { assert.equal((await send([item.macaroon], destination)).status, 202, "Expired pending invoices can recover claim status without paying again"); }
       finally { currentClock = clock; }
       assert.equal((await send([item.macaroon])).status, 409);
-      assert.equal(coinos.calls, before + 1, "Pending retries never POST again");
+      assert.equal(coinos.calls, before + 1, "Pending retries never pay_invoice again");
       const restarted = createPrivateYieldEarnings(isolated, () => clock, coinos.client);
       assert.equal((await restarted.claim([{ paymentHash: item.hash, provider: "test-wallet", amountMsats: 100_000 }],
         parseYieldWithdrawalInvoice(destination, clock), destination)).paymentStatus, "pending");

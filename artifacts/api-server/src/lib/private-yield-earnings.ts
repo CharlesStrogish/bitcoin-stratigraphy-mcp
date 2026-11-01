@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
 import type { YieldWithdrawalInvoice } from "./yield-withdrawal-invoice";
-import { createCoinosPayout, type CoinosPayout, type PayoutOutcome } from "./coinos-payout";
+import { createNwcPayout, type NwcPayout, type PayoutOutcome } from "./nwc-payout";
 
 export class YieldClaimError extends Error {
   constructor(public readonly status: number, public readonly code: string) { super(code); }
@@ -23,7 +23,7 @@ export interface PrivateYieldEarnings {
 export function createPrivateYieldEarnings(
   database = pool,
   now: () => number = Date.now,
-  payouts: CoinosPayout = createCoinosPayout(),
+  payouts: NwcPayout = createNwcPayout(),
 ): PrivateYieldEarnings {
   type ClaimRow = { id: string; total_msats: string; receipt_count: number; payment_status: "pending" | "settled" | "failed";
     invoice_payment_hash: string; invoice_digest: string; selection_digest: string;
@@ -77,7 +77,7 @@ export function createPrivateYieldEarnings(
   }
   return {
     async claim(receipts, invoice, invoiceText, royalties) {
-      if (!payouts.configured()) throw new YieldClaimError(503, "COINOS_PAYOUT_UNAVAILABLE");
+      if (!payouts.configured()) throw new YieldClaimError(503, "NWC_PAYOUT_UNAVAILABLE");
       const hashes = receipts.map(receipt => receipt.paymentHash);
       const royaltyHashes = royalties?.paymentHashes ?? [];
       if (!hashes.length && !royaltyHashes.length || hashes.length + royaltyHashes.length > 32 ||
@@ -207,11 +207,11 @@ export function createPrivateYieldEarnings(
       try { outcome = await payouts.pay(invoiceText, invoice); }
       catch { outcome = { status: "pending" }; }
       const completed = await finalize(prepared!, outcome);
-      if (completed.paymentStatus === "failed") throw new YieldClaimError(502, "COINOS_PAYMENT_FAILED_BALANCES_RELEASED");
+      if (completed.paymentStatus === "failed") throw new YieldClaimError(502, "NWC_PAYMENT_FAILED_BALANCES_RELEASED");
       return completed;
     },
     async reconcile(claimId) {
-      if (!payouts.configured()) throw new YieldClaimError(503, "COINOS_PAYOUT_UNAVAILABLE");
+      if (!payouts.configured()) throw new YieldClaimError(503, "NWC_PAYOUT_UNAVAILABLE");
       const client = await database.connect();
       let row: ClaimRow | undefined;
       try {

@@ -14,7 +14,7 @@ import { createPrivateYieldEarnings } from "../../src/lib/private-yield-earnings
 import { registerClaimYieldRoute } from "../../src/routes/claim-yield";
 import type { MacaroonUsageStore } from "../../src/lib/macaroon-usage-store";
 import type { SettlementRouter } from "../../src/services/settlement";
-import { migratePayoutFixture, mockCoinosPayout } from "../helpers/coinos-payout";
+import { migratePayoutFixture, mockNwcPayout, mockPayoutHash } from "../helpers/nwc-payout";
 
 const secret = "high-velocity-regression-secret";
 const hash = () => randomBytes(32).toString("hex");
@@ -144,7 +144,7 @@ function payoutInvoice(msats: bigint): string {
   let seconds = Math.floor(Date.now() / 1000);
   const words = Array(7).fill(0);
   for (let i = 6; i >= 0; i--) { words[i] = seconds % 32; seconds = Math.floor(seconds / 32); }
-  words.push(1, 1, 20, ...bech32.toWords(Buffer.from(hash(), "hex")));
+  words.push(1, 1, 20, ...bech32.toWords(Buffer.from(mockPayoutHash(), "hex")));
   const description = bech32.toWords(Buffer.from("mock whale yield"));
   words.push(13, Math.floor(description.length / 32), description.length % 32, ...description, ...Array(104).fill(0));
   return bech32.encode(`lnbc${msats * 10n}p`, words, 4096);
@@ -183,7 +183,7 @@ test("PostgreSQL Whale quotas persist across adapters and descendants; full bulk
       return fresh;
     };
     rig = await harness({ ledger, usageStore: createPostgresMacaroonUsageStore(database),
-      configure: (app, now) => registerClaimYieldRoute(app, createPrivateYieldEarnings(database, now, mockCoinosPayout().client),
+      configure: (app, now) => registerClaimYieldRoute(app, createPrivateYieldEarnings(database, now, mockNwcPayout().client),
         { secret, now, logSettlement: () => {} }) });
     const offer = await rig.offer();
     const pass = inspectSubscriptionMacaroon(offer.macaroon, secret)!;

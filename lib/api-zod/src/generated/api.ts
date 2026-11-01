@@ -104,7 +104,7 @@ export const GetSwarmReferralKeyResponse = zod.object({
 
 
 /**
- * Live Coinos REST payout. Supply 1–32 issuer-authenticated
+ * Live Nostr Wallet Connect (NIP-47) payout. Supply 1–32 issuer-authenticated
  * L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
  * matching exactly 21 percent of their confirmed incoming L402 settlement amounts.
  * Historical receipt expiry and request quota do not invalidate an earned receipt.
@@ -113,18 +113,21 @@ export const GetSwarmReferralKeyResponse = zod.object({
  * Each payment hash can be consumed once across all descendant macaroons and workers.
  * All receipts succeed together or none are consumed. Duplicate payment hashes within
  * one request are rejected. A durable pending claim reserves earnings BEFORE
- * POST https://coinos.io/api/payments with the server's COINOS_API_TOKEN.
+ * pay_invoice over NWC using the server's NWC_URI secret.
  * Only confirmed settlement deducts balances and records txid/preimage.
  * Definitive rejection releases reservations without deducting funds, allowing retry.
- * Timeout, 5xx, ambiguous response, or post-payment database failure leaves
+ * Timeout, relay failure, ambiguous response, or post-payment database failure leaves
  * the claim pending and reserved. A different invoice cannot reuse those
  * earnings. Identical pending retries return 202 without sending another payment.
  * An operator reconciles wallet evidence via POST /api/claim-yield/reconcile.
- * HTTP success alone without settlement evidence is not sufficient.
+ * Relay acceptance alone without settlement evidence is not sufficient.
+ * NWC pay_invoice settlement requires a preimage matching the invoice hash.
+ * Reconciliation requires a matching settled outgoing transaction and exact amount.
+ * The legacy coinos_txid response field carries the Lightning payment hash for NWC.
  * Historical mock claims remain consumed and never become mainnet payouts.
  * This endpoint does not modify the public /yield-proofs.json feed.
  * Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
- * destination payability is established only by Coinos settlement.
+ * destination payability is established only by wallet settlement.
  * Optional royalty_payment_hashes select separate 5% referral earnings instead
  * of, or together with, bearer receipts (maximum 32 combined). Royalty claims
  * require a fresh payload-bound NIP-98 signature from their recorded owner;
@@ -166,7 +169,7 @@ export const claimYieldResponseRemainingBalanceMsatsRegExp = new RegExp('^[0-9]+
 
 export const ClaimYieldResponse = zod.object({
   "status": zod.enum(['SETTLED', 'PENDING']),
-  "payment_sent": zod.boolean().nullable().describe('True only after confirmed Coinos settlement and durable ledger consumption; null means unknown, not a definitive non-payment'),
+  "payment_sent": zod.boolean().nullable().describe('True only after confirmed NWC settlement and durable ledger consumption; null means unknown, not a definitive non-payment'),
   "coinos_txid": zod.string().optional(),
   "preimage": zod.string().regex(claimYieldResponsePreimageRegExp).optional(),
   "reconciliation_required": zod.boolean().optional(),
@@ -187,8 +190,8 @@ export const GetPublicYieldProofsAliasResponse = zod.void()
 
 /**
  * Operator-only. Requires Authorization Bearer MACAROON_OPERATOR_SECRET.
- * Reads authenticated Coinos payment history and verifies invoice hash,
- * outgoing amount, terminal status or cryptographic preimage. An absent,
+ * Uses NWC lookup_invoice and verifies invoice hash, exact outgoing
+ * amount and settled status, including any returned cryptographic preimage. An absent,
  * incomplete or ambiguous record NEVER releases a pending reservation.
  * Verified settlement atomically consumes the reserved balances. Failed
  * history records alone cannot identify which retry failed and never release

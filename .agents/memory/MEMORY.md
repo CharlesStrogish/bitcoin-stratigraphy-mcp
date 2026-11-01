@@ -101,4 +101,4 @@
 - [Invoice compute admission](invoice-pow-admission.md) — gate new MCP invoices, not paid verification; preserve request binding and atomic replay protection across workers.
 - [Enterprise credit tabs](enterprise-credit-tabs.md) — authenticated paid-history threshold, shared debt cap, explicit session closing and exact-once whole-tab settlement.
 - [Glama ownership](glama-ownership.md) — ownership claims are exact provider-supplied documents; preserve legacy connector metadata and the MCP manifest.
-- [Mainnet Treasury safety](mainnet-treasury-safety.md) — live Coinos claims authorize safety-only schema changes; unknown outcomes stay reserved and tests never spend real funds.
+- [Mainnet Treasury safety](mainnet-treasury-safety.md) — outbound claims use NWC; schemas/state machine are frozen, unknown outcomes stay reserved and tests never spend real funds.

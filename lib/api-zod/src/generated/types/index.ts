@@ -110,6 +110,8 @@ export * from './l402Challenge';
 export * from './l402PaymentRequired';
 export * from './l402PaymentRequiredAgentAuthentication';
 export * from './l402PaymentRequiredEvStatus';
+export * from './l402PaymentRequiredPaymentBridgeInstructions';
+export * from './l402PaymentRequiredPaymentMode';
 export * from './l402PaymentRequiredStagedPreview';
 export * from './l402Preflight';
 export * from './l402PreflightDiscoveryItem';

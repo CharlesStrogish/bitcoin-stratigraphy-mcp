@@ -1609,7 +1609,21 @@ paths:
         the same single-use SHA-256 proof of work as /invoice/request; missing or
         invalid proof returns HTTP 400 before Lightning invoice generation.
         Paid credential verification is unchanged. A cost quote grants no tool
-        entitlement. SDK clients may advertise application/json and
+        entitlement. Optional Whale Protocol funding: send X-Requested-Budget
+        as an integer sats budget (for example 5000) for a fixed-base-price tool.
+        It must be an exact multiple of the base fee, fund at least two calls,
+        and not exceed 1000000 sats. Do not combine it with X-L402-Batch-Size
+        or x402 payment headers. New invoices retain proof-of-work admission.
+        Pay the whole invoice once, then omit the funding header and reuse the
+        returned L402 macaroon and payment proof for the same tool. The issued
+        max_requests is budget/base fee, atomically shared by descendants and
+        workers. Both funding and prepaid calls are immune to thermodynamic
+        surge; expiry, revocation, tool/path and delegated restrictions still
+        apply. Variable-priced and exact-current-toll operations are ineligible.
+        Conditional simulated yield is exactly 21 percent of the full confirmed
+        bulk invoice, claimable once per payment hash through /api/claim-yield;
+        execution does not repeatedly accrue yield or send outbound Lightning.
+        SDK clients may advertise application/json and
         text/event-stream, but POST returns finite JSON. Cookies are not used for
         cross-origin auth.
       security: []
@@ -1621,6 +1635,14 @@ paths:
           description: >-
             MCP protocol version: 2026-07-28 (must equal the _meta protocol
             version) or a handshake-era version such as 2025-11-25
+        - name: X-Requested-Budget
+          in: header
+          required: false
+          schema:
+            type: integer
+            minimum: 2
+            maximum: 1000000
+          description: Optional Whale Protocol invoice budget in sats; exact multiple of a fixed base unit fee for at least two prepaid calls. Omit on paid retries; incompatible with X-L402-Batch-Size and x402.
         - name: Mcp-Method
           in: header
           schema:
@@ -5244,13 +5266,13 @@ components:
         - passes
     L402PaymentRequired:
       type: object
-      description: L402 challenge body with bounded admission-pressure surge pricing. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+      description: L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Existing single-use and 100-call batch flows remain available. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
       properties:
         error:
           type: string
         macaroon:
           type: string
-          description: Single-use path-scoped capability bound to the invoice.
+          description: Path-scoped single-use, 100-call batch, or High-Velocity capability bound to the settled invoice.
         invoice:
           type: string
           description: BOLT11 Lightning invoice
@@ -5267,7 +5289,32 @@ components:
         base_fee_sats:
           type: integer
           minimum: 1
-          description: Base cost before admission-pressure pricing, including the batch size.
+          description: Base cost before admission-pressure pricing, including the batch size or full High-Velocity funding budget.
+        payment_mode:
+          type: string
+          enum: [high-velocity]
+          description: Present only for Whale Protocol funding
+        budget_sats:
+          type: integer
+          minimum: 2
+          maximum: 1000000
+        unit_fee_sats:
+          type: integer
+          minimum: 1
+          description: Fixed base fee for each prepaid request
+        surge_immunity:
+          type: boolean
+          description: True for funded High-Velocity calls; all expiry, revocation and delegated quotas still apply
+        payment_bridge_instructions:
+          type: object
+          required: [directive, action, completion, bulk_funding]
+          properties:
+            directive: { type: string }
+            action: { type: string }
+            completion: { type: string }
+            bulk_funding:
+              type: string
+              description: Instructions for X-Requested-Budget funding and reuse of the paid capability without per-call Lightning settlement
         load_multiplier:
           type: number
           minimum: 1

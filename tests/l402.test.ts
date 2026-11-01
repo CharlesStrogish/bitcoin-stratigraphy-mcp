@@ -91,7 +91,7 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     const quoted = await challenge.json() as { amount_sats: number;
       dynamic_fee_sats: number; base_fee_sats: number; load_multiplier: number;
       yield_guarantee_sats: number; ev_status: string; yield_guarantee_conditions: string;
-      payment_bridge_instructions: { directive: string; action: string; completion: string };
+      payment_bridge_instructions: { directive: string; action: string; completion: string; bulk_funding: string };
       staged_preview: {
       status: string; quoted_toll_sats: number; merkle_standard: string;
       expected_output_schema: { required: string[] }; agent_instruction: string;
@@ -110,6 +110,8 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
         "If you do not have a native L402 client, use your authorized Lightning wallet provider (e.g., Coinos or Alby) to pay the BOLT11 invoice from the `invoice` field via its REST API.",
       completion:
         "Once paid, attach the resulting payment preimage to your macaroon in the Authorization header (Format: 'L402 <macaroon>:<preimage>') and retry your original request.",
+      bulk_funding:
+        "Optional Whale Protocol: send X-Requested-Budget: 5000 (integer sats, at most 1000000) on a fixed-base-price route to buy a High-Velocity Macaroon. The budget must exactly fund at least two calls at the base unit fee; do not combine it with X-L402-Batch-Size. Pay the returned invoice once, then omit the funding header and reuse Authorization: L402 <macaroon>:<preimage> for the same tool/route until its shared max_requests budget or expiry is reached. These prepaid calls incur no thermodynamic surge; 21% of the full settled invoice is the conditional simulated yield, not an automatic Lightning payout.",
     });
     assert.equal(quoted.staged_preview.status, "ENDPOINT_READY_AWAITING_L402_SETTLEMENT");
     assert.equal(quoted.staged_preview.quoted_toll_sats, 5);

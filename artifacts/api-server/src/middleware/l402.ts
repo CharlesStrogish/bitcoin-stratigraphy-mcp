@@ -156,6 +156,21 @@ export function createL402Middleware(
       return;
     }
     const requestedBatch = req.get("X-L402-Batch-Size");
+    const requestedBudget = req.get("X-Requested-Budget");
+    let budgetSats: number | undefined;
+    let budgetRequests: number | undefined;
+    if (requestedBudget !== undefined) {
+      const unitFee = typeof options.amountSats === "number" ? resolveAmountSats(req) : 0;
+      budgetSats = Number(requestedBudget);
+      if (requestedBatch !== undefined || typeof options.amountSats !== "number" ||
+          options.enforceCurrentAmount || !/^[1-9]\d*$/.test(requestedBudget) ||
+          !Number.isSafeInteger(budgetSats) || budgetSats > 1_000_000 ||
+          budgetSats < unitFee * 2 || budgetSats % unitFee !== 0) {
+        res.status(400).json({ error: "X-Requested-Budget requires a fixed-base-price route, no batch header, and an exact multiple of the unit fee for at least two calls (maximum 1000000 sats)" });
+        return;
+      }
+      budgetRequests = budgetSats / unitFee;
+    }
     if (requestedBatch && (!options.allowBatch || requestedBatch !== "100")) {
       res.status(400).json({error: "X-L402-Batch-Size must be 100 on a batch-capable route"});
       return;
@@ -163,7 +178,7 @@ export function createL402Middleware(
     if (options.invoicePow) {
       const binding = createHash("sha256").update(JSON.stringify([
         req.method, resolveScope(req), req.query, req.body ?? null,
-        resolveAmountSats(req), requestedBatch ?? null, options.description, agent ?? null,
+        resolveAmountSats(req), requestedBatch ?? null, requestedBudget ?? null, options.description, agent ?? null,
       ])).digest("hex");
       if (!await options.invoicePow.admit(req, res, binding, secret)) return;
     }
@@ -216,10 +231,13 @@ export function createL402Middleware(
         });
         return;
       }
-      const batchSize = requestedBatch ? 100 : 1;
-      const quote = thermodynamicQuote(
+      const batchSize = budgetRequests ?? (requestedBatch ? 100 : 1);
+      const quote = budgetSats === undefined ? thermodynamicQuote(
         resolveAmountSats(req), batchSize, options.enforceCurrentAmount === true,
-      );
+      ) : {
+        baseAmountSats: budgetSats, amountSats: budgetSats, multiplier: 1,
+        yieldGuaranteeSats: (budgetSats * 21) / 100,
+      };
       const { amountSats } = quote;
       if (!Number.isSafeInteger(amountSats * 1_000))
         throw new RangeError("Batch price exceeds safe range");
@@ -227,7 +245,9 @@ export function createL402Middleware(
       const invoice = await options.settlementRouter.createInvoice({
         amountMsats,
         description:
-          batchSize === 100
+          budgetSats !== undefined
+            ? `${options.description} (High-Velocity ${budgetSats}-sat budget)`
+            : batchSize === 100
             ? `${options.description} (100-call batch)`
             : options.description,
         expirySeconds: invoiceExpirySeconds,
@@ -248,6 +268,7 @@ export function createL402Middleware(
         validUntil: Math.floor(now() / 1_000) + invoiceExpirySeconds,
         amountMsats,
         baseAmountMsats: quote.baseAmountSats * 1_000,
+        ...(budgetSats === undefined ? {} : { highVelocityUnitMsats: resolveAmountSats(req) * 1_000 }),
         paymentAsset: "btc-lightning",
         paymentProvider: invoice.provider,
         ...(agent === undefined
@@ -290,8 +311,14 @@ export function createL402Middleware(
             "If you do not have a native L402 client, use your authorized Lightning wallet provider (e.g., Coinos or Alby) to pay the BOLT11 invoice from the `invoice` field via its REST API.",
           completion:
             "Once paid, attach the resulting payment preimage to your macaroon in the Authorization header (Format: 'L402 <macaroon>:<preimage>') and retry your original request.",
+          bulk_funding:
+            "Optional Whale Protocol: send X-Requested-Budget: 5000 (integer sats, at most 1000000) on a fixed-base-price route to buy a High-Velocity Macaroon. The budget must exactly fund at least two calls at the base unit fee; do not combine it with X-L402-Batch-Size. Pay the returned invoice once, then omit the funding header and reuse Authorization: L402 <macaroon>:<preimage> for the same tool/route until its shared max_requests budget or expiry is reached. These prepaid calls incur no thermodynamic surge; 21% of the full settled invoice is the conditional simulated yield, not an automatic Lightning payout.",
         },
         max_requests: batchSize,
+        ...(budgetSats === undefined ? {} : {
+          payment_mode: "high-velocity", budget_sats: budgetSats,
+          unit_fee_sats: resolveAmountSats(req), surge_immunity: true,
+        }),
         ...(agent === undefined ? {} : { agent_id: agent.agentId }),
         ...(agent?.authentication === undefined
           ? {}
@@ -385,7 +412,7 @@ export function createL402Middleware(
         }
         if (options.revocationStore) {
           try {
-            const ids = pass.delegatePubkey || pass.requestLimits[0]?.maxRequests === 100
+            const ids = pass.highVelocityUnitMsats || pass.delegatePubkey || pass.requestLimits[0]?.maxRequests === 100
               ? [...(pass.ancestorTokenIds ?? []), pass.tokenId] : [pass.tokenId];
             let revoked = false;
             for (const id of ids) {
@@ -412,7 +439,10 @@ export function createL402Middleware(
         (pass.paymentHash === preimageHash || preimageHash === null) &&
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
-        (typeof options.amountSats !== "number" && !options.enforceCurrentAmount ||
+        (pass.highVelocityUnitMsats !== undefined
+          ? (!options.enforceCurrentAmount && typeof options.amountSats === "number" &&
+              pass.highVelocityUnitMsats === resolveAmountSats(req) * 1_000)
+          : (typeof options.amountSats !== "number" && !options.enforceCurrentAmount ||
           (options.enforceCurrentAmount
             ? pass.amountMsats
             : pass.baseAmountMsats ?? pass.amountMsats) ===
@@ -420,7 +450,7 @@ export function createL402Middleware(
               1_000 *
               (options.allowBatch && pass.requestLimits[0]?.maxRequests === 100
                 ? 100
-                : 1)) &&
+                : 1))) &&
         pass.paymentAsset === "btc-lightning" &&
         pass.paymentProvider &&
         pass.allowedPaths.length > 0 &&
@@ -431,8 +461,10 @@ export function createL402Middleware(
         let verification;
         try {
           const batch =
-            options.allowBatch && pass.requestLimits[0]?.maxRequests === 100;
-          const description = batch
+            !pass.highVelocityUnitMsats && options.allowBatch && pass.requestLimits[0]?.maxRequests === 100;
+          const description = pass.highVelocityUnitMsats
+            ? `${options.description} (High-Velocity ${pass.amountMsats / 1000}-sat budget)`
+            : batch
             ? `${options.description} (100-call batch)`
             : options.description;
           const expectedAmountMsats = pass.amountMsats;

@@ -58,6 +58,7 @@
 - [Public OpenAPI contract](openapi-contract-policy.md) — preserve all existing endpoints; update the API-owned specification instead of adding a shadowed static copy.
 - [MCP freemium policy](mcp-freemium-policy.md) — exactly two free sandbox capabilities; all other canonical tools require paid access.
 - [Macro payment caching](macro-payment-caching.md) — share exact invoice proofs across descendants, but never cache away expiry, revocation, or inherited quotas.
+- [High-Velocity funding](high-velocity-funding.md) — Whale budgets buy shared fixed-price, tool-scoped quotas, not transferable wallet credit; require issuer-only pricing privileges.
 - [OpenTimestamps dependency choice](opentimestamps-dependency-choice.md) — use the official Python library; the latest JavaScript package was blocked by vulnerable legacy dependencies.
 - [Daily provenance policy](daily-provenance-policy.md) — UTC archive dates must be real captures; retries preserve exact bytes, and calendar receipts are not Bitcoin verification.
 - [Bilateral settlement trust](b2b-settlement-trust.md) — seal receipts separately from contract signatures; independent Bitcoin evidence is not an exact legal clock or payment proof.

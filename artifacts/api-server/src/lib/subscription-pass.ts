@@ -29,6 +29,11 @@ function economicsProof(secret: string, paymentHash: string, fields: Map<string,
     JSON.stringify([paymentHash, ENTERPRISE_KEYS.map(key => [key, fields.get(key) ?? null])])).digest("hex");
 }
 
+function highVelocityProof(secret: string, paymentHash: string, amountMsats: number, unitMsats: number): string {
+  return createHmac("sha256", secret).update("bitcoin-stratigraphy/high-velocity/v1\n" +
+    JSON.stringify([paymentHash, amountMsats, unitMsats])).digest("hex");
+}
+
 export type SubscriptionTier = "1-day" | "30-day";
 
 export const SUBSCRIPTION_TIERS = {
@@ -69,6 +74,7 @@ export type VerifiedSubscriptionMacaroon = {
   tokenId: string;
   amountMsats?: number;
   baseAmountMsats?: number;
+  highVelocityUnitMsats?: number;
   agentPubkey?: string;
   agentTier?: AgentTier;
   /** Caller-declared sub-agent from the single `agent_id = <id>` caveat. */
@@ -146,6 +152,7 @@ export function createSubscriptionMacaroon(input: {
   validUntil: number;
   amountMsats?: number;
   baseAmountMsats?: number;
+  highVelocityUnitMsats?: number;
   agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
   /** Sub-agent attribution; every use must declare the same ID. */
   agentId?: string;
@@ -174,6 +181,13 @@ export function createSubscriptionMacaroon(input: {
     );
   }
   const identifier = "bitcoin-stratigraphy-subscription-v1";
+  if (input.highVelocityUnitMsats !== undefined &&
+      (!Number.isSafeInteger(input.highVelocityUnitMsats) || input.highVelocityUnitMsats <= 0 ||
+       !Number.isSafeInteger(input.amountMsats) || input.amountMsats !== input.baseAmountMsats ||
+       input.amountMsats! / input.highVelocityUnitMsats < 2 ||
+       input.amountMsats! % input.highVelocityUnitMsats !== 0)) {
+    throw new RangeError("Invalid High-Velocity funding");
+  }
   const caveats = [
     `payment_hash=${input.paymentHash}`,
     `tier=${input.tier}`,
@@ -185,6 +199,9 @@ export function createSubscriptionMacaroon(input: {
     ...(input.baseAmountMsats === undefined
       ? []
       : [`base_amount_msats=${input.baseAmountMsats}`]),
+    ...(input.highVelocityUnitMsats === undefined ? [] : [
+      `high_velocity=${input.highVelocityUnitMsats}:${highVelocityProof(input.secret, input.paymentHash, input.amountMsats!, input.highVelocityUnitMsats)}`,
+    ]),
     ...constructPaymentAssetCaveat(input.paymentAsset),
     ...constructPaymentProviderCaveat(input.paymentProvider),
     ...constructAgentIdentityCaveats(input.agentIdentity),
@@ -215,6 +232,7 @@ const ROOT_CAVEAT_KEYS = new Set([
   "valid_until",
   "amount_msats",
   "base_amount_msats",
+  "high_velocity",
   "agent_pubkey",
   "agent_tier",
   "payment_asset",
@@ -351,6 +369,19 @@ export function inspectSubscriptionMacaroon(
     const baseAmountMsatsValue = rootValues.get("base_amount_msats");
     const baseAmountMsats = baseAmountMsatsValue === undefined
       ? undefined : Number(baseAmountMsatsValue);
+    const velocity = rootValues.get("high_velocity");
+    let highVelocityUnitMsats: number | undefined;
+    if (velocity !== undefined) {
+      const match = /^([1-9]\d*):([0-9a-f]{64})$/.exec(velocity);
+      if (!match || amountMsats === undefined) return null;
+      highVelocityUnitMsats = Number(match[1]);
+      if (!Number.isSafeInteger(highVelocityUnitMsats) || highVelocityUnitMsats <= 0 ||
+          amountMsats !== baseAmountMsats || amountMsats % highVelocityUnitMsats !== 0 ||
+          amountMsats / highVelocityUnitMsats < 2 ||
+          meteredScopes[0]?.maxRequests !== amountMsats / highVelocityUnitMsats ||
+          !timingSafeEqual(Buffer.from(match[2]!, "hex"), Buffer.from(
+            highVelocityProof(secret, paymentHash, amountMsats, highVelocityUnitMsats), "hex"))) return null;
+    }
     const agentCaveats = parseAgentIdentityCaveats(rootValues);
     const paymentAssetCaveat = parsePaymentAssetCaveat(rootValues);
     const paymentProviderCaveat = parsePaymentProviderCaveat(rootValues);
@@ -382,6 +413,7 @@ export function inspectSubscriptionMacaroon(
           (rootValues.has("liability") ? 1 : 0) +
           (amountMsatsValue === undefined ? 0 : 1) +
           (baseAmountMsatsValue === undefined ? 0 : 1) +
+          (velocity === undefined ? 0 : 1) +
           (paymentAssetCaveat === undefined ? 0 : 1) +
           (paymentProviderCaveat === undefined ? 0 : 1) +
           (agentCaveats === undefined ? 0 : 2) +
@@ -405,6 +437,7 @@ export function inspectSubscriptionMacaroon(
       tokenId: token.signature,
       amountMsats,
       baseAmountMsats,
+      ...(highVelocityUnitMsats === undefined ? {} : { highVelocityUnitMsats }),
       agentPubkey: agentCaveats?.agentPubkey,
       agentTier: agentCaveats?.agentTier,
       ...(agentId === undefined ? {} : { agentId }),

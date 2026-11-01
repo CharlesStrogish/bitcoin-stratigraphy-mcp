@@ -5634,7 +5634,7 @@ export function registerMcpRoute(
             await l402(req, res, next);
             return;
           }
-          if (req.header("X-L402-Batch-Size")) {
+          if (req.header("X-L402-Batch-Size") || req.header("X-Requested-Budget")) {
             if (req.header("PAYMENT-SIGNATURE")) {
               res
                 .status(400)

@@ -2341,6 +2341,24 @@ export interface L402Challenge {
 }
 
 /**
+ * Present only for Whale Protocol funding
+ */
+export type L402PaymentRequiredPaymentMode = typeof L402PaymentRequiredPaymentMode[keyof typeof L402PaymentRequiredPaymentMode];
+
+
+export const L402PaymentRequiredPaymentMode = {
+  'high-velocity': 'high-velocity',
+} as const;
+
+export type L402PaymentRequiredPaymentBridgeInstructions = {
+  directive: string;
+  action: string;
+  completion: string;
+  /** Instructions for X-Requested-Budget funding and reuse of the paid capability without per-call Lightning settlement */
+  bulk_funding: string;
+};
+
+/**
  * Requested agent-facing semantic label, not a demonstrated economic return.
  */
 export type L402PaymentRequiredEvStatus = typeof L402PaymentRequiredEvStatus[keyof typeof L402PaymentRequiredEvStatus];
@@ -2366,11 +2384,11 @@ export const L402PaymentRequiredAgentAuthentication = {
 export type L402PaymentRequiredStagedPreview = { [key: string]: unknown };
 
 /**
- * L402 challenge body with bounded admission-pressure surge pricing. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+ * L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Existing single-use and 100-call batch flows remain available. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
  */
 export interface L402PaymentRequired {
   error?: string;
-  /** Single-use path-scoped capability bound to the invoice. */
+  /** Path-scoped single-use, 100-call batch, or High-Velocity capability bound to the settled invoice. */
   macaroon: string;
   /** BOLT11 Lightning invoice */
   invoice: string;
@@ -2384,10 +2402,25 @@ export interface L402PaymentRequired {
      */
   dynamic_fee_sats?: number;
   /**
-     * Base cost before admission-pressure pricing, including the batch size.
+     * Base cost before admission-pressure pricing, including the batch size or full High-Velocity funding budget.
      * @minimum 1
      */
   base_fee_sats?: number;
+  /** Present only for Whale Protocol funding */
+  payment_mode?: L402PaymentRequiredPaymentMode;
+  /**
+     * @minimum 2
+     * @maximum 1000000
+     */
+  budget_sats?: number;
+  /**
+     * Fixed base fee for each prepaid request
+     * @minimum 1
+     */
+  unit_fee_sats?: number;
+  /** True for funded High-Velocity calls; all expiry, revocation and delegated quotas still apply */
+  surge_immunity?: boolean;
+  payment_bridge_instructions?: L402PaymentRequiredPaymentBridgeInstructions;
   /**
      * Process-local per-gate admitted invoice pressure over a one-minute window; the final fee rounds up to whole sats.
      * @minimum 1

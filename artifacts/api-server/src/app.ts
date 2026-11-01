@@ -40,6 +40,7 @@ import { createMeshGossipService } from "./services/meshGossipService";
 import { registerZkDriftRoute } from "./routes/zk-drift";
 import { apiRootAliases } from "./middleware/apiRootAliases";
 import { createSwarmRadar } from "./middleware/swarmRadar";
+import { registerIndexNowRoute } from "./routes/indexnow";
 import { registerPublicCors } from "./middleware/publicCors";
 import { redirectLegacyDomain } from "./middleware/canonicalDomain";
 import { registerAuditRoutes } from "./routes/audit";
@@ -86,6 +87,7 @@ app.use(createSwarmRadar());
 // Public read-only configuration must not depend on caller identity or payment.
 registerMachineMatrixRoutes(app);
 registerYieldProofRoutes(app);
+registerIndexNowRoute(app);
 // Logged ahead of CORS and the public limiter so refusals reach deployment logs.
 app.use(
   pinoHttp({

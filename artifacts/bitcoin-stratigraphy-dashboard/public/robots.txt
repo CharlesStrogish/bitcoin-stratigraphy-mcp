@@ -1,21 +1,13 @@
 User-agent: *
 Allow: /
-Disallow: /api/
-Allow: /api/docs
-Disallow: /tmp/
-Disallow: /generated-artifacts/
-Disallow: /.data/
-Disallow: /.local/
-Disallow: /attached_assets/
 
-User-agent: OAI-SearchBot
+User-agent: GPTBot
 Allow: /
 
 User-agent: ClaudeBot
 Allow: /
 
-User-agent: PerplexityBot
+User-agent: Google-Extended
 Allow: /
 
-# Agent discovery: https://bitcoinstratigraphy.com/llms.txt
 Sitemap: https://bitcoinstratigraphy.com/sitemap.xml

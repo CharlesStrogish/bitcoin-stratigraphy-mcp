@@ -141,17 +141,15 @@ test("crawler rules and sitemap include developer pages and MCP discovery", asyn
     "artifacts/bitcoin-stratigraphy-dashboard/public/robots.txt",
   );
   assert.match(robots, /^User-agent: \*$/m);
-  // Keep default exclusions and explicitly allow the requested AI crawlers.
+  // Explicitly welcome the requested AI crawlers without path exclusions.
   assert.deepEqual(
     robots.split("\n").map((line) => line.trim()).filter(
       (line) => /^(User-agent|Allow|Disallow):/i.test(line),
     ),
-    ["User-agent: *", "Allow: /", "Disallow: /api/", "Allow: /api/docs",
-      "Disallow: /tmp/", "Disallow: /generated-artifacts/", "Disallow: /.data/",
-      "Disallow: /.local/", "Disallow: /attached_assets/",
-      "User-agent: OAI-SearchBot", "Allow: /",
+    ["User-agent: *", "Allow: /",
+      "User-agent: GPTBot", "Allow: /",
       "User-agent: ClaudeBot", "Allow: /",
-      "User-agent: PerplexityBot", "Allow: /"],
+      "User-agent: Google-Extended", "Allow: /"],
   );
   assert.ok(robots.trimEnd().endsWith(`Sitemap: ${origin}/sitemap.xml`));
   const xml = await load(

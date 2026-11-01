@@ -9,6 +9,54 @@ import * as zod from 'zod';
 
 
 /**
+ * Mock withdrawal only: no Lightning payment is sent. Supply 1–32 issuer-authenticated
+ * L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
+ * matching exactly 21 percent of their confirmed incoming L402 settlement amounts.
+ * Historical receipt expiry and request quota do not invalidate an earned receipt.
+ * Receipts must exist in the confirmed private revenue ledger; an issued unpaid
+ * invoice, a forged token or a public payout record does not establish earnings.
+ * Each payment hash can be consumed once across all descendant macaroons and workers.
+ * All receipts succeed together or none are consumed. Duplicate payment hashes within
+ * one request are rejected. Successful mock claims durably deduct private balances;
+ * they do not modify real Treasury allocations or the public /yield-proofs.json feed.
+ * Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
+ * it does not contact a wallet or guarantee that a destination invoice is payable.
+ * @summary Atomically consume private simulated L402 yield earnings
+ */
+export const claimYieldBodyMacaroonsItemMax = 16384;
+
+export const claimYieldBodyMacaroonsMax = 32;
+
+export const claimYieldBodyBolt11InvoiceMin = 100;
+export const claimYieldBodyBolt11InvoiceMax = 4096;
+
+
+
+export const ClaimYieldBody = zod.object({
+  "macaroons": zod.array(zod.string().min(1).max(claimYieldBodyMacaroonsItemMax)).min(1).max(claimYieldBodyMacaroonsMax).describe('Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.'),
+  "bolt11_invoice": zod.string().min(claimYieldBodyBolt11InvoiceMin).max(claimYieldBodyBolt11InvoiceMax).describe('Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.')
+})
+
+export const claimYieldResponseClaimedMsatsRegExp = new RegExp('^[1-9][0-9]*$');
+export const claimYieldResponseClaimedSatsMin = 0;
+
+export const claimYieldResponseReceiptsClaimedMax = 32;
+
+
+
+export const ClaimYieldResponse = zod.object({
+  "status": zod.enum(['SIMULATED_WITHDRAWAL']),
+  "simulated": zod.literal(true),
+  "payment_sent": zod.literal(false),
+  "claim_id": zod.string().uuid(),
+  "claimed_msats": zod.string().regex(claimYieldResponseClaimedMsatsRegExp).describe('Exact integer millisatoshi amount consumed from the private simulation ledger.'),
+  "claimed_sats": zod.number().min(claimYieldResponseClaimedSatsMin),
+  "receipts_claimed": zod.number().int().min(1).max(claimYieldResponseReceiptsClaimedMax),
+  "remaining_balance_msats": zod.enum(['0'])
+})
+
+
+/**
  * Same read-only, unauthenticated ledger and proof limitations as GET /yield-proofs.json.
  * @summary Read the public yield ledger through its legacy API alias
  */

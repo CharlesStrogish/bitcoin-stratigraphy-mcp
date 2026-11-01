@@ -29,3 +29,4 @@ export * from "./enterprise-credit-accounts";
 export * from "./enterprise-credit-settlements";
 export * from "./enterprise-credit-charges";
 export * from "./enterprise-credit-fleet";
+export * from "./private-yield-earnings";

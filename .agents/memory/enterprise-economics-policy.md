@@ -20,6 +20,22 @@ A hash of public fields verifies record consistency, not that Lightning paid.
 future writer must confirm actual aggregate disbursement, preserve exact
 integer-msat allocation arithmetic, and disclose the proof's trust limits.
 
+The user authorized a separate private earnings ledger for bearer-receipt yield
+claims, with atomic consumption and fully deducted balances even while outbound
+Coinos settlement remains a logged mock. Their standing instruction is to keep
+the public `/yield-proofs.json` strictly an append-only transparency feed and
+not alter its schema or response.
+
+**Why:** The public feed describes completed outgoing payouts, not unclaimed
+earnings. Issued invoices and public records alone cannot establish a claimable
+private balance. Simulation must never be reported as an actual Lightning payout.
+
+**How to apply:** Keep claim state private and payment-hash scoped across all
+macaroon descendants; require confirmed incoming settlement evidence. Preserve
+real Treasury allocation rules and the payment gates. Before adding real
+withdrawals, explicitly reconcile simulated deductions instead of assuming
+mock claims prove actual disbursement.
+
 For qualifying new verification invoices, the user explicitly requires exactly
 15 percent of gross upstream and the remaining 6 percent to the caller, funded
 inside the existing allocation pool, never as an additional merchant expense.

@@ -97,6 +97,9 @@ import type {
   VerifyZkProof400,
   VerifyZkProof503,
   WalletGatewayError,
+  YieldClaimFailure,
+  YieldClaimInput,
+  YieldClaimResult,
   ZkDriftRequest,
   ZkDriftResponse,
   ZkTelemetryEventEnvelope,
@@ -130,6 +133,89 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getClaimYieldUrl = () => {
+
+
+
+
+  return `/api/claim-yield`
+}
+
+/**
+ * Mock withdrawal only: no Lightning payment is sent. Supply 1–32 issuer-authenticated
+ * L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
+ * matching exactly 21 percent of their confirmed incoming L402 settlement amounts.
+ * Historical receipt expiry and request quota do not invalidate an earned receipt.
+ * Receipts must exist in the confirmed private revenue ledger; an issued unpaid
+ * invoice, a forged token or a public payout record does not establish earnings.
+ * Each payment hash can be consumed once across all descendant macaroons and workers.
+ * All receipts succeed together or none are consumed. Duplicate payment hashes within
+ * one request are rejected. Successful mock claims durably deduct private balances;
+ * they do not modify real Treasury allocations or the public /yield-proofs.json feed.
+ * Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
+ * it does not contact a wallet or guarantee that a destination invoice is payable.
+ * @summary Atomically consume private simulated L402 yield earnings
+ */
+export const claimYield = async (yieldClaimInput: YieldClaimInput, options?: Parameters<typeof customFetch>[1]): Promise<YieldClaimResult> => {
+
+  return customFetch<YieldClaimResult>(getClaimYieldUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(yieldClaimInput)
+  }
+);}
+
+
+
+
+
+export const getClaimYieldMutationOptions = <TError = ErrorType<YieldClaimFailure>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimYield>>, TError,{data: BodyType<YieldClaimInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimYield>>, TError,{data: BodyType<YieldClaimInput>}, TContext> => {
+
+const mutationKey = ['claimYield'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimYield>>, {data: BodyType<YieldClaimInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  claimYield(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimYieldMutationResult = NonNullable<Awaited<ReturnType<typeof claimYield>>>
+    export type ClaimYieldMutationBody = BodyType<YieldClaimInput>
+    export type ClaimYieldMutationError = ErrorType<YieldClaimFailure>
+
+    /**
+ * @summary Atomically consume private simulated L402 yield earnings
+ */
+export const useClaimYield = <TError = ErrorType<YieldClaimFailure>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimYield>>, TError,{data: BodyType<YieldClaimInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimYield>>,
+        TError,
+        {data: BodyType<YieldClaimInput>},
+        TContext
+      > => {
+      return useMutation(getClaimYieldMutationOptions(options));
+    }
 
 export const getGetPublicYieldProofsUrl = () => {
 

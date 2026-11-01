@@ -5,6 +5,61 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+export interface YieldClaimInput {
+  /**
+     * Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.
+     * @minItems 1
+     * @maxItems 32
+     * @items.minLength 1
+     * @items.maxLength 16384
+     */
+  macaroons: string[];
+  /**
+     * Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.
+     * @minLength 100
+     * @maxLength 4096
+     */
+  bolt11_invoice: string;
+}
+
+export type YieldClaimResultStatus = typeof YieldClaimResultStatus[keyof typeof YieldClaimResultStatus];
+
+
+export const YieldClaimResultStatus = {
+  SIMULATED_WITHDRAWAL: 'SIMULATED_WITHDRAWAL',
+} as const;
+
+export type YieldClaimResultRemainingBalanceMsats = typeof YieldClaimResultRemainingBalanceMsats[keyof typeof YieldClaimResultRemainingBalanceMsats];
+
+
+export const YieldClaimResultRemainingBalanceMsats = {
+  NUMBER_0: '0',
+} as const;
+
+export interface YieldClaimResult {
+  status: YieldClaimResultStatus;
+  simulated: true;
+  payment_sent: false;
+  claim_id: string;
+  /**
+     * Exact integer millisatoshi amount consumed from the private simulation ledger.
+     * @pattern ^[1-9][0-9]*$
+     */
+  claimed_msats: string;
+  /** @minimum 0 */
+  claimed_sats: number;
+  /**
+     * @minimum 1
+     * @maximum 32
+     */
+  receipts_claimed: number;
+  remaining_balance_msats: YieldClaimResultRemainingBalanceMsats;
+}
+
+export interface YieldClaimFailure {
+  error: string;
+}
+
 export type GetPublicYieldProofs200ItemCryptographicReceiptScheme = typeof GetPublicYieldProofs200ItemCryptographicReceiptScheme[keyof typeof GetPublicYieldProofs200ItemCryptographicReceiptScheme];
 
 

@@ -736,6 +736,69 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /api/claim-yield:
+    servers:
+      - url: https://bitcoinstratigraphy.com
+    post:
+      operationId: claimYield
+      summary: Atomically consume private simulated L402 yield earnings
+      description: |
+        Mock withdrawal only: no Lightning payment is sent. Supply 1–32 issuer-authenticated
+        L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
+        matching exactly 21 percent of their confirmed incoming L402 settlement amounts.
+        Historical receipt expiry and request quota do not invalidate an earned receipt.
+        Receipts must exist in the confirmed private revenue ledger; an issued unpaid
+        invoice, a forged token or a public payout record does not establish earnings.
+        Each payment hash can be consumed once across all descendant macaroons and workers.
+        All receipts succeed together or none are consumed. Duplicate payment hashes within
+        one request are rejected. Successful mock claims durably deduct private balances;
+        they do not modify real Treasury allocations or the public /yield-proofs.json feed.
+        Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;
+        it does not contact a wallet or guarantee that a destination invoice is payable.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YieldClaimInput"
+      responses:
+        "200":
+          description: Private balances consumed atomically; simulated only, not a payment receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldClaimResult"
+        "400":
+          description: Invalid body, duplicate receipt, invalid or expired invoice, or invoice amount mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldClaimFailure"
+        "403":
+          description: Invalid bearer receipt or signed amount/provider mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldClaimFailure"
+        "404":
+          description: No confirmed incoming L402 settlement exists for a supplied receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldClaimFailure"
+        "409":
+          description: Yield already consumed or destination invoice payment hash already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldClaimFailure"
+        "503":
+          description: Receipt verification or private ledger unavailable; no successful claim is reported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldClaimFailure"
   /api/yield-proofs.json:
     $ref: "#/components/pathItems/PublicYieldProofsAlias"
   /yield-proofs.json:
@@ -2557,6 +2620,61 @@ components:
                   items:
                     $ref: "#/components/schemas/GetPublicYieldProofs200Item"
   schemas:
+    YieldClaimInput:
+      type: object
+      additionalProperties: false
+      required: [macaroons, bolt11_invoice]
+      properties:
+        macaroons:
+          type: array
+          minItems: 1
+          maxItems: 32
+          description: Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 16384
+        bolt11_invoice:
+          type: string
+          minLength: 100
+          maxLength: 4096
+          description: Unexpired fixed-amount mainnet BOLT11 invoice matching the total simulated yield in exact millisatoshis.
+    YieldClaimResult:
+      type: object
+      required: [status, simulated, payment_sent, claim_id, claimed_msats, claimed_sats, receipts_claimed, remaining_balance_msats]
+      properties:
+        status:
+          type: string
+          enum: [SIMULATED_WITHDRAWAL]
+        simulated:
+          type: boolean
+          enum: [true]
+        payment_sent:
+          type: boolean
+          enum: [false]
+        claim_id:
+          type: string
+          format: uuid
+        claimed_msats:
+          type: string
+          pattern: "^[1-9][0-9]*$"
+          description: Exact integer millisatoshi amount consumed from the private simulation ledger.
+        claimed_sats:
+          type: number
+          minimum: 0
+        receipts_claimed:
+          type: integer
+          minimum: 1
+          maximum: 32
+        remaining_balance_msats:
+          type: string
+          enum: ["0"]
+    YieldClaimFailure:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
     # Keep the existing generated item name for client source compatibility.
     GetPublicYieldProofs200Item:
       type: object

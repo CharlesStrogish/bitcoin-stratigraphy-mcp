@@ -132,6 +132,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.32.1
         version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+      '@scure/base':
+        specifier: ^2.0.0
+        version: 2.0.0
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod

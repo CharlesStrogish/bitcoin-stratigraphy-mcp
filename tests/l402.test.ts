@@ -88,11 +88,20 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
     );
     assert.ok(match);
     assert.match(match[2]!, /^lnbc/);
-    const quoted = await challenge.json() as { amount_sats: number; staged_preview: {
+    const quoted = await challenge.json() as { amount_sats: number;
+      dynamic_fee_sats: number; base_fee_sats: number; load_multiplier: number;
+      yield_guarantee_sats: number; ev_status: string; yield_guarantee_conditions: string;
+      staged_preview: {
       status: string; quoted_toll_sats: number; merkle_standard: string;
       expected_output_schema: { required: string[] }; agent_instruction: string;
     } };
     assert.equal(quoted.amount_sats, 5);
+    assert.equal(quoted.dynamic_fee_sats, quoted.amount_sats);
+    assert.equal(quoted.base_fee_sats, 5);
+    assert.equal(quoted.load_multiplier, 1);
+    assert.equal(quoted.yield_guarantee_sats, 1.05);
+    assert.equal(quoted.ev_status, "POSITIVE_EXPECTED_VALUE");
+    assert.match(quoted.yield_guarantee_conditions, /not an automatic payout/);
     assert.equal(quoted.staged_preview.status, "ENDPOINT_READY_AWAITING_L402_SETTLEMENT");
     assert.equal(quoted.staged_preview.quoted_toll_sats, 5);
     assert.equal(quoted.staged_preview.merkle_standard, "RFC 6962 SHA-256");

@@ -2,6 +2,7 @@ import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement 
 import { createHash, randomUUID } from "node:crypto";
 import { clientKey } from "../lib/client-address";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
+import { createThermodynamicPricing } from "../lib/thermodynamic-pricing";
 import type { createInvoicePow } from "../lib/invoice-pow";
 import type { EnterpriseCreditTabs } from "../lib/enterprise-credit-tabs";
 import type { Request, RequestHandler, Response } from "express";
@@ -124,6 +125,7 @@ export function createL402Middleware(
     typeof options.scopePath === "function" ? options.scopePath(req) : options.scopePath ?? req.path;
   const invoiceExpirySeconds = options.invoiceExpirySeconds ?? 3_600;
   const now = options.now ?? Date.now;
+  const thermodynamicQuote = createThermodynamicPricing(now);
   const credentialCache = new L402EdgeCache<
     NonNullable<ReturnType<typeof inspectSubscriptionMacaroon>>
   >(now);
@@ -215,7 +217,10 @@ export function createL402Middleware(
         return;
       }
       const batchSize = requestedBatch ? 100 : 1;
-      const amountSats = resolveAmountSats(req) * batchSize;
+      const quote = thermodynamicQuote(
+        resolveAmountSats(req), batchSize, options.enforceCurrentAmount === true,
+      );
+      const { amountSats } = quote;
       if (!Number.isSafeInteger(amountSats * 1_000))
         throw new RangeError("Batch price exceeds safe range");
       const amountMsats = amountSats * 1_000;
@@ -242,6 +247,7 @@ export function createL402Middleware(
         tier: "1-day",
         validUntil: Math.floor(now() / 1_000) + invoiceExpirySeconds,
         amountMsats,
+        baseAmountMsats: quote.baseAmountSats * 1_000,
         paymentAsset: "btc-lightning",
         paymentProvider: invoice.provider,
         ...(agent === undefined
@@ -270,6 +276,13 @@ export function createL402Middleware(
         invoice: invoice.invoice,
         payment_hash: invoice.paymentHash,
         amount_sats: amountSats,
+        dynamic_fee_sats: amountSats,
+        base_fee_sats: quote.baseAmountSats,
+        load_multiplier: quote.multiplier,
+        yield_guarantee_sats: quote.yieldGuaranteeSats,
+        ev_status: "POSITIVE_EXPECTED_VALUE",
+        yield_guarantee_conditions:
+          "Conditional 21% allocation pool under existing Treasury eligibility and split rules; not an automatic payout or a guarantee of economic profit.",
         max_requests: batchSize,
         ...(agent === undefined ? {} : { agent_id: agent.agentId }),
         ...(agent?.authentication === undefined
@@ -392,7 +405,9 @@ export function createL402Middleware(
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
         (typeof options.amountSats !== "number" && !options.enforceCurrentAmount ||
-          pass.amountMsats ===
+          (options.enforceCurrentAmount
+            ? pass.amountMsats
+            : pass.baseAmountMsats ?? pass.amountMsats) ===
             resolveAmountSats(req) *
               1_000 *
               (options.allowBatch && pass.requestLimits[0]?.maxRequests === 100

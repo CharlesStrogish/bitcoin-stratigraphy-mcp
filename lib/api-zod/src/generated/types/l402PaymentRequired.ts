@@ -6,12 +6,13 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { L402PaymentRequiredAgentAuthentication } from './l402PaymentRequiredAgentAuthentication';
+import type { L402PaymentRequiredEvStatus } from './l402PaymentRequiredEvStatus';
 import type { L402PaymentRequiredStagedPreview } from './l402PaymentRequiredStagedPreview';
 import type { L402Preflight } from './l402Preflight';
 import type { L402SettlementPath } from './l402SettlementPath';
 
 /**
- * Fixed-fee L402 challenge body. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+ * L402 challenge body with bounded admission-pressure surge pricing. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
  */
 export interface L402PaymentRequired {
   error?: string;
@@ -23,6 +24,31 @@ export interface L402PaymentRequired {
   payment_hash: string;
   /** @minimum 1 */
   amount_sats: number;
+  /**
+     * Final invoice cost, identical to amount_sats and the signed macaroon amount.
+     * @minimum 1
+     */
+  dynamic_fee_sats?: number;
+  /**
+     * Base cost before admission-pressure pricing, including the batch size.
+     * @minimum 1
+     */
+  base_fee_sats?: number;
+  /**
+     * Process-local per-gate admitted invoice pressure over a one-minute window; the final fee rounds up to whole sats.
+     * @minimum 1
+     * @maximum 3
+     */
+  load_multiplier?: number;
+  /**
+     * Exactly 21 percent of dynamic_fee_sats as a conditional allocation pool, not automatic disbursement.
+     * @minimum 0
+     */
+  yield_guarantee_sats?: number;
+  /** Requested agent-facing semantic label, not a demonstrated economic return. */
+  ev_status?: L402PaymentRequiredEvStatus;
+  /** Existing Treasury eligibility and split conditions still apply. */
+  yield_guarantee_conditions?: string;
   /** @minimum 1 */
   max_requests?: number;
   /**

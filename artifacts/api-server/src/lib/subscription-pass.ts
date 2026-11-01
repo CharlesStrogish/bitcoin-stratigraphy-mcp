@@ -68,6 +68,7 @@ export type VerifiedSubscriptionMacaroon = {
   requestLimits: Array<{ tokenId: string; maxRequests: number }>;
   tokenId: string;
   amountMsats?: number;
+  baseAmountMsats?: number;
   agentPubkey?: string;
   agentTier?: AgentTier;
   /** Caller-declared sub-agent from the single `agent_id = <id>` caveat. */
@@ -144,6 +145,7 @@ export function createSubscriptionMacaroon(input: {
   tier: SubscriptionTier;
   validUntil: number;
   amountMsats?: number;
+  baseAmountMsats?: number;
   agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
   /** Sub-agent attribution; every use must declare the same ID. */
   agentId?: string;
@@ -180,6 +182,9 @@ export function createSubscriptionMacaroon(input: {
     ...(input.amountMsats === undefined
       ? []
       : [`amount_msats=${input.amountMsats}`]),
+    ...(input.baseAmountMsats === undefined
+      ? []
+      : [`base_amount_msats=${input.baseAmountMsats}`]),
     ...constructPaymentAssetCaveat(input.paymentAsset),
     ...constructPaymentProviderCaveat(input.paymentProvider),
     ...constructAgentIdentityCaveats(input.agentIdentity),
@@ -209,6 +214,7 @@ const ROOT_CAVEAT_KEYS = new Set([
   "tier",
   "valid_until",
   "amount_msats",
+  "base_amount_msats",
   "agent_pubkey",
   "agent_tier",
   "payment_asset",
@@ -248,7 +254,7 @@ export function inspectSubscriptionMacaroon(
     let agentAuthentication: AgentAuthentication | undefined;
     const requestLimits: number[] = [];
     const meteredScopes: Array<{ tokenId: string; maxRequests: number }> = [];
-    for (const caveat of token.caveats) {
+    for (const [index, caveat] of token.caveats.entries()) {
       ancestorTokenIds.push(runningSignature.toString("hex"));
       runningSignature = hmac(runningSignature, caveat);
       if (caveat === LIABILITY_CAVEAT) {
@@ -305,7 +311,11 @@ export function inspectSubscriptionMacaroon(
         if (
           separator <= 0 ||
           !ROOT_CAVEAT_KEYS.has(key) ||
-          rootValues.has(key)
+          rootValues.has(key) ||
+          // The issuer places base immediately after amount, before asset/provider.
+          // Holders cannot append it to a legacy asset-bound credential.
+          (key === "base_amount_msats" &&
+            token.caveats[index - 1] !== `amount_msats=${rootValues.get("amount_msats")}`)
         ) {
           return null;
         }
@@ -338,6 +348,9 @@ export function inspectSubscriptionMacaroon(
     const amountMsatsValue = rootValues.get("amount_msats");
     const amountMsats =
       amountMsatsValue === undefined ? undefined : Number(amountMsatsValue);
+    const baseAmountMsatsValue = rootValues.get("base_amount_msats");
+    const baseAmountMsats = baseAmountMsatsValue === undefined
+      ? undefined : Number(baseAmountMsatsValue);
     const agentCaveats = parseAgentIdentityCaveats(rootValues);
     const paymentAssetCaveat = parsePaymentAssetCaveat(rootValues);
     const paymentProviderCaveat = parsePaymentProviderCaveat(rootValues);
@@ -348,6 +361,10 @@ export function inspectSubscriptionMacaroon(
       (amountMsatsValue !== undefined &&
         (!/^[1-9]\d*$/.test(amountMsatsValue) ||
           !Number.isSafeInteger(amountMsats))) ||
+      (baseAmountMsatsValue !== undefined &&
+        (!/^[1-9]\d*$/.test(baseAmountMsatsValue) ||
+          !Number.isSafeInteger(baseAmountMsats) ||
+          amountMsats === undefined || baseAmountMsats! > amountMsats)) ||
       agentCaveats === null ||
       paymentAssetCaveat === null ||
       paymentProviderCaveat === null ||
@@ -364,6 +381,7 @@ export function inspectSubscriptionMacaroon(
         3 +
           (rootValues.has("liability") ? 1 : 0) +
           (amountMsatsValue === undefined ? 0 : 1) +
+          (baseAmountMsatsValue === undefined ? 0 : 1) +
           (paymentAssetCaveat === undefined ? 0 : 1) +
           (paymentProviderCaveat === undefined ? 0 : 1) +
           (agentCaveats === undefined ? 0 : 2) +
@@ -386,6 +404,7 @@ export function inspectSubscriptionMacaroon(
       requestLimits: meteredScopes,
       tokenId: token.signature,
       amountMsats,
+      baseAmountMsats,
       agentPubkey: agentCaveats?.agentPubkey,
       agentTier: agentCaveats?.agentTier,
       ...(agentId === undefined ? {} : { agentId }),

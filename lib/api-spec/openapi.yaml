@@ -5040,7 +5040,7 @@ components:
         - passes
     L402PaymentRequired:
       type: object
-      description: Fixed-fee L402 challenge body. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+      description: L402 challenge body with bounded admission-pressure surge pricing. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
       properties:
         error:
           type: string
@@ -5056,6 +5056,30 @@ components:
         amount_sats:
           type: integer
           minimum: 1
+        dynamic_fee_sats:
+          type: integer
+          minimum: 1
+          description: Final invoice cost, identical to amount_sats and the signed macaroon amount.
+        base_fee_sats:
+          type: integer
+          minimum: 1
+          description: Base cost before admission-pressure pricing, including the batch size.
+        load_multiplier:
+          type: number
+          minimum: 1
+          maximum: 3
+          description: Process-local per-gate admitted invoice pressure over a one-minute window; the final fee rounds up to whole sats.
+        yield_guarantee_sats:
+          type: number
+          minimum: 0
+          description: Exactly 21 percent of dynamic_fee_sats as a conditional allocation pool, not automatic disbursement.
+        ev_status:
+          type: string
+          enum: [POSITIVE_EXPECTED_VALUE]
+          description: Requested agent-facing semantic label, not a demonstrated economic return.
+        yield_guarantee_conditions:
+          type: string
+          description: Existing Treasury eligibility and split conditions still apply.
         max_requests:
           type: integer
           minimum: 1

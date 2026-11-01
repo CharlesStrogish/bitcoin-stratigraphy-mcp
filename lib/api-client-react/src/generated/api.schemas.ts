@@ -2256,6 +2256,16 @@ export interface L402Challenge {
 }
 
 /**
+ * Requested agent-facing semantic label, not a demonstrated economic return.
+ */
+export type L402PaymentRequiredEvStatus = typeof L402PaymentRequiredEvStatus[keyof typeof L402PaymentRequiredEvStatus];
+
+
+export const L402PaymentRequiredEvStatus = {
+  POSITIVE_EXPECTED_VALUE: 'POSITIVE_EXPECTED_VALUE',
+} as const;
+
+/**
  * Present when a valid NIP-98 event signed the challenge request. The macaroon also carries "agent_authentication = nip98", so every redemption must send a fresh NIP-98 event from agent_id in X-Nostr-Authorization; a missing event returns 401 and a different signer 403.
  */
 export type L402PaymentRequiredAgentAuthentication = typeof L402PaymentRequiredAgentAuthentication[keyof typeof L402PaymentRequiredAgentAuthentication];
@@ -2271,7 +2281,7 @@ export const L402PaymentRequiredAgentAuthentication = {
 export type L402PaymentRequiredStagedPreview = { [key: string]: unknown };
 
 /**
- * Fixed-fee L402 challenge body. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+ * L402 challenge body with bounded admission-pressure surge pricing. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
  */
 export interface L402PaymentRequired {
   error?: string;
@@ -2283,6 +2293,31 @@ export interface L402PaymentRequired {
   payment_hash: string;
   /** @minimum 1 */
   amount_sats: number;
+  /**
+     * Final invoice cost, identical to amount_sats and the signed macaroon amount.
+     * @minimum 1
+     */
+  dynamic_fee_sats?: number;
+  /**
+     * Base cost before admission-pressure pricing, including the batch size.
+     * @minimum 1
+     */
+  base_fee_sats?: number;
+  /**
+     * Process-local per-gate admitted invoice pressure over a one-minute window; the final fee rounds up to whole sats.
+     * @minimum 1
+     * @maximum 3
+     */
+  load_multiplier?: number;
+  /**
+     * Exactly 21 percent of dynamic_fee_sats as a conditional allocation pool, not automatic disbursement.
+     * @minimum 0
+     */
+  yield_guarantee_sats?: number;
+  /** Requested agent-facing semantic label, not a demonstrated economic return. */
+  ev_status?: L402PaymentRequiredEvStatus;
+  /** Existing Treasury eligibility and split conditions still apply. */
+  yield_guarantee_conditions?: string;
   /** @minimum 1 */
   max_requests?: number;
   /**

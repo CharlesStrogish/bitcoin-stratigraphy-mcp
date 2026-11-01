@@ -5885,7 +5885,8 @@ export function registerMcpRoute(
             if (pass && pass.paymentHash === paymentHash && !input.txHash &&
                 pass.paymentAsset === "btc-lightning" && pass.paymentProvider &&
                 pass.allowedPaths.length === 1 && Object.hasOwn(paidTools, tool) &&
-                pass.amountMsats === paidTools[tool as keyof typeof paidTools].amountSats * 1000 *
+                pass.amountMsats !== undefined &&
+                (pass.baseAmountMsats ?? pass.amountMsats) === paidTools[tool as keyof typeof paidTools].amountSats * 1000 *
                   (pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1) &&
                 (!/^[0-9a-fA-F]{64}$/.test(preimage) || createHash("sha256")
                   .update(Buffer.from(preimage, "hex")).digest("hex") === paymentHash) &&
@@ -6135,7 +6136,8 @@ export function registerMcpRoute(
           !pass.paymentProvider ||
           pass.allowedPaths.length !== 1 ||
           !Object.hasOwn(paidTools, originalTool) ||
-          pass.amountMsats !==
+          pass.amountMsats === undefined ||
+          (pass.baseAmountMsats ?? pass.amountMsats) !==
             paidTools[originalTool as keyof typeof paidTools].amountSats *
               1_000 *
               (pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1)

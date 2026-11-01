@@ -19,6 +19,20 @@ const clientTransformer: InputTransformerFn = (config) => {
   // Avoid a duplicate hook: the client's fixed /api base would prefix it twice.
   // This only filters client generation, never the published full contract.
   delete config.paths?.["/api/yield-proofs.json"];
+  // Some origin-level paths already include /api. Orval prepends the fixed
+  // client base unconditionally, so strip that prefix in its input copy only.
+  // Rebuild in insertion order to keep generated operations stable.
+  if (config.paths) {
+    const paths: typeof config.paths = {};
+    for (const [route, item] of Object.entries(config.paths)) {
+      const clientRoute = route.startsWith("/api/") ? route.slice(4) : route;
+      if (Object.hasOwn(paths, clientRoute)) {
+        throw new Error(`Conflicting generated client route: ${clientRoute}`);
+      }
+      paths[clientRoute] = item;
+    }
+    config.paths = paths;
+  }
   return config;
 };
 

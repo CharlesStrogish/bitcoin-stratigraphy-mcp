@@ -20,3 +20,9 @@ An Orval output operation transformer does not control the final request URL.
 **Why:** Orval computes the full URL from the original path independently of the transformed operation's `route`. Changing that property left a duplicated `/api` prefix in generated code.
 
 **How to apply:** Inspect generated URLs. When documenting a duplicate alias already reached by the canonical typed hook, exclude that duplicate from client generation only; retain it in the published contract.
+
+Normalize already-prefixed paths in the client generator's input copy, not by removing the shared client base or adding backend aliases.
+
+**Why:** The contract mixes origin-level `/api/...` paths with paths relative to the `/api` server. Removing the client base globally would break previously correct routes; changing backend routing would hide the generator error and alter the public API.
+
+**How to apply:** Preserve the published contract and operation order, fail explicitly on normalized-path collisions, and verify real generated requests with both same-origin and configured remote-origin transport.

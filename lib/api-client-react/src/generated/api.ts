@@ -224,7 +224,7 @@ export const getGetFleetStatementUrl = () => {
 
 
 
-  return `/api/api/v1/fleet/statement`
+  return `/api/v1/fleet/statement`
 }
 
 /**
@@ -248,7 +248,7 @@ export const getFleetStatement = async ( options?: Parameters<typeof customFetch
 
 export const getGetFleetStatementQueryKey = () => {
     return [
-    `/api/api/v1/fleet/statement`
+    `/api/v1/fleet/statement`
     ] as const;
     }
 
@@ -302,7 +302,7 @@ export const getRegisterEnterpriseFleetUrl = () => {
 
 
 
-  return `/api/api/v1/fleet/register`
+  return `/api/v1/fleet/register`
 }
 
 /**
@@ -374,7 +374,7 @@ export const getGetEnterpriseCreditTabUrl = () => {
 
 
 
-  return `/api/api/v1/enterprise/credit-tab`
+  return `/api/v1/enterprise/credit-tab`
 }
 
 /**
@@ -398,7 +398,7 @@ export const getEnterpriseCreditTab = async ( options?: Parameters<typeof custom
 
 export const getGetEnterpriseCreditTabQueryKey = () => {
     return [
-    `/api/api/v1/enterprise/credit-tab`
+    `/api/v1/enterprise/credit-tab`
     ] as const;
     }
 
@@ -452,7 +452,7 @@ export const getCloseEnterpriseCreditTabUrl = () => {
 
 
 
-  return `/api/api/v1/enterprise/credit-tab/close`
+  return `/api/v1/enterprise/credit-tab/close`
 }
 
 /**
@@ -524,7 +524,7 @@ export const getSettleEnterpriseCreditTabUrl = () => {
 
 
 
-  return `/api/api/v1/enterprise/credit-tab/settle`
+  return `/api/v1/enterprise/credit-tab/settle`
 }
 
 /**

@@ -13,12 +13,21 @@ const titleTransformer: InputTransformerFn = (config) => {
   return config;
 };
 
+const clientTransformer: InputTransformerFn = (config) => {
+  config = titleTransformer(config);
+  // The existing canonical ledger hook already requests /api/yield-proofs.json.
+  // Avoid a duplicate hook: the client's fixed /api base would prefix it twice.
+  // This only filters client generation, never the published full contract.
+  delete config.paths?.["/api/yield-proofs.json"];
+  return config;
+};
+
 export default defineConfig({
   "api-client-react": {
     input: {
       target: "./openapi.yaml",
       override: {
-        transformer: titleTransformer,
+        transformer: clientTransformer,
       },
     },
     output: {

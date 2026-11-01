@@ -1489,6 +1489,8 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     in: "header",
     name: "Authorization",
     description:
+      "L402 protocol requiring Macaroon and Preimage (Format: 'L402 <macaroon>:<preimage>')",
+    "x-verification-details":
       "L402 <signed_macaroon>:<preimage> verifies the SHA-256 proof and exact merchant settlement. For wallets without a preimage, use L402 <signed_macaroon>:NWC_LOOKUP, a CoinOS UUID hint, or the signed macaroon alone; merchant NWC lookup must confirm the exact incoming invoice. Bare payment hashes require the original cryptographic proof and are not authorization for merchant-only lookup. Pending merchant verification returns 409 without replacing the original invoice.",
   });
   assert.deepEqual(servedContract.readiness, {
@@ -1743,7 +1745,7 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
   const sharedDocument = parse(sharedYaml) as {
     "x-mcp-tools"?: Record<string, unknown>;
     "x-mcp-tool-groups"?: unknown;
-    info?: { description?: unknown };
+    info?: { title?: unknown; version?: unknown; description?: unknown; "x-operational-description"?: unknown };
   };
   const smitheryMetadata = parse(smitheryYaml) as { description?: unknown };
   const glamaMetadata = JSON.parse(glamaJson) as { description?: unknown };
@@ -1755,7 +1757,11 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
     xMcpTools && typeof xMcpTools === "object" && !Array.isArray(xMcpTools),
     "Shared OpenAPI document must define x-mcp-tools",
   );
-  assert.equal(sharedDocument.info?.description, ENGINE_DESCRIPTION);
+  assert.equal(sharedDocument.info?.title, "Bitcoin Stratigraphy Data Engine");
+  assert.equal(sharedDocument.info?.version, "1.0.0");
+  assert.equal(sharedDocument.info?.description, "Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.");
+  assert.equal(sharedDocument.info?.["x-operational-description"], ENGINE_DESCRIPTION);
+  assert.deepEqual(publicDocument.info, sharedDocument.info);
   assert.equal(smitheryMetadata.description, glamaMetadata.description);
   const registryDescription = String(smitheryMetadata.description);
   assert.ok(registryDescription.startsWith(`${smitheryServerCard.description}\n\n`));

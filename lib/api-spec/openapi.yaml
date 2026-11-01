@@ -1,9 +1,10 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
-  title: Api
-  version: 0.1.0
-  description: |-
+  # Orval pins its internal title to Api to preserve generated import paths.
+  title: Bitcoin Stratigraphy Data Engine
+  version: 1.0.0
+  description: "Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield."
+  x-operational-description: |-
     Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.
 
     Key Capabilities:
@@ -735,6 +736,8 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /api/yield-proofs.json:
+    $ref: "#/components/pathItems/PublicYieldProofsAlias"
   /yield-proofs.json:
     servers:
       - url: https://bitcoinstratigraphy.com
@@ -763,40 +766,7 @@ paths:
                 type: array
                 maxItems: 256
                 items:
-                  type: object
-                  additionalProperties: false
-                  required: [timestamp, tool_executed, sats_yield_paid, cryptographic_receipt]
-                  properties:
-                    timestamp:
-                      type: string
-                      format: date-time
-                    tool_executed:
-                      type: string
-                      description: Exact canonical paid MCP tool name
-                    sats_yield_paid:
-                      type: number
-                      exclusiveMinimum: 0
-                      description: Aggregate yield actually disbursed, expressed in sats with millisatoshi precision
-                    cryptographic_receipt:
-                      type: object
-                      additionalProperties: false
-                      required: [scheme, gross_invoice_msats, yield_paid_msats, allocation_percent, digest]
-                      properties:
-                        scheme:
-                          type: string
-                          enum: [sha256-yield-record-v1]
-                        gross_invoice_msats:
-                          type: string
-                          pattern: "^[1-9][0-9]*$"
-                        yield_paid_msats:
-                          type: string
-                          pattern: "^[1-9][0-9]*$"
-                        allocation_percent:
-                          type: integer
-                          enum: [21]
-                        digest:
-                          type: string
-                          pattern: "^[0-9a-f]{64}$"
+                  $ref: "#/components/schemas/GetPublicYieldProofs200Item"
   /api/v1/fleet/statement:
     get:
       operationId: getFleetStatement
@@ -1609,6 +1579,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/McpJsonRpcResponse"
+  /.well-known/ai-plugin.json:
+    servers:
+      - url: https://bitcoinstratigraphy.com
+      - url: /
+    get:
+      operationId: getAiPluginManifest
+      tags: [metadata]
+      summary: Read the public AI plugin discovery manifest
+      description: Read-only discovery metadata; fetching it neither authorizes paid execution nor creates an invoice.
+      security: []
+      responses:
+        "200":
+          description: AI plugin manifest describing the OpenAPI and MCP entry points
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiPluginManifest"
   /.well-known/mcp-configuration.json:
     get:
       operationId: getMcpConfigurationManifest
@@ -1636,7 +1623,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/McpDiscoveryManifest"
+                $ref: "#/components/schemas/McpConfigurationManifest"
   /.well-known/mcp.json:
     get:
       operationId: getMcpDiscoveryManifest
@@ -2538,7 +2525,8 @@ components:
       type: apiKey
       in: header
       name: Authorization
-      description: "L402 <signed_macaroon>:<preimage> verifies the SHA-256 proof and exact merchant settlement. For wallets without a preimage, use L402 <signed_macaroon>:NWC_LOOKUP, a CoinOS UUID hint, or the signed macaroon alone; merchant NWC lookup must confirm the exact incoming invoice. Bare payment hashes require the original cryptographic proof and are not authorization for merchant-only lookup. Pending merchant verification returns 409 without replacing the original invoice."
+      description: "L402 protocol requiring Macaroon and Preimage (Format: 'L402 <macaroon>:<preimage>')"
+      x-verification-details: "L402 <signed_macaroon>:<preimage> verifies the SHA-256 proof and exact merchant settlement. For wallets without a preimage, use L402 <signed_macaroon>:NWC_LOOKUP, a CoinOS UUID hint, or the signed macaroon alone; merchant NWC lookup must confirm the exact incoming invoice. Bare payment hashes require the original cryptographic proof and are not authorization for merchant-only lookup. Pending merchant verification returns 409 without replacing the original invoice."
     NIP98:
       type: apiKey
       in: header
@@ -2548,7 +2536,144 @@ components:
       type: http
       scheme: bearer
       description: Dedicated operator secret supplied through MACAROON_OPERATOR_SECRET.
+  pathItems:
+    PublicYieldProofsAlias:
+      servers:
+        - url: https://bitcoinstratigraphy.com
+        - url: /
+      get:
+        operationId: getPublicYieldProofsAlias
+        summary: Read the public yield ledger through its legacy API alias
+        description: Same read-only, unauthenticated ledger and proof limitations as GET /yield-proofs.json.
+        security: []
+        responses:
+          "200":
+            description: Most recent sanitized records first; empty until confirmed payouts are recorded
+            content:
+              application/json:
+                schema:
+                  type: array
+                  maxItems: 256
+                  items:
+                    $ref: "#/components/schemas/GetPublicYieldProofs200Item"
   schemas:
+    # Keep the existing generated item name for client source compatibility.
+    GetPublicYieldProofs200Item:
+      type: object
+      additionalProperties: false
+      required: [timestamp, tool_executed, sats_yield_paid, cryptographic_receipt]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        tool_executed:
+          type: string
+          description: Exact canonical paid MCP tool name
+        sats_yield_paid:
+          type: number
+          exclusiveMinimum: 0
+          description: Aggregate yield actually disbursed, expressed in sats with millisatoshi precision
+        cryptographic_receipt:
+          type: object
+          additionalProperties: false
+          required: [scheme, gross_invoice_msats, yield_paid_msats, allocation_percent, digest]
+          properties:
+            scheme:
+              type: string
+              enum: [sha256-yield-record-v1]
+            gross_invoice_msats:
+              type: string
+              pattern: "^[1-9][0-9]*$"
+            yield_paid_msats:
+              type: string
+              pattern: "^[1-9][0-9]*$"
+            allocation_percent:
+              type: integer
+              enum: [21]
+            digest:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+    AiPluginManifest:
+      type: object
+      required: [schema_version, name_for_human, name_for_model, description_for_human, description_for_model, auth, api, logo_url, contact_email, legal_info_url]
+      properties:
+        schema_version:
+          type: string
+          enum: [v1]
+        name_for_human:
+          type: string
+        name_for_model:
+          type: string
+        description_for_human:
+          type: string
+        description_for_model:
+          type: string
+        auth:
+          type: object
+          required: [type]
+          properties:
+            type:
+              type: string
+              enum: [none]
+        api:
+          type: object
+          required: [type, url, is_user_authenticated]
+          properties:
+            type:
+              type: string
+              enum: [openapi]
+            url:
+              type: string
+              format: uri
+            is_user_authenticated:
+              type: boolean
+              enum: [false]
+        logo_url:
+          type: string
+          format: uri
+        contact_email:
+          type: string
+        legal_info_url:
+          type: string
+          format: uri
+    McpConfigurationManifest:
+      type: object
+      required: [name, title, version, description, url, transport, tools]
+      properties:
+        name:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+          format: uri
+        transport:
+          type: object
+          required: [type, url, method]
+          properties:
+            type:
+              type: string
+              enum: [streamable-http]
+            url:
+              type: string
+              format: uri
+            method:
+              type: string
+              enum: [POST]
+        tools:
+          type: array
+          items:
+            type: object
+            required: [name, description]
+            properties:
+              name:
+                type: string
+              description:
+                type: string
     FleetStatement:
       type: object
       required: [commander_pubkey, session_id, state, gross_unpaid_sats, balance_msats, yield_credit_msats, yield_applied_msats, lifetime_yield_earned_msats, workers]

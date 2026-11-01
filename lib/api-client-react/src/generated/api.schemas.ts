@@ -5,6 +5,36 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+/**
+ * Snapshot availability, not real wallet or payment health
+ */
+export type YieldMetricsStatus = typeof YieldMetricsStatus[keyof typeof YieldMetricsStatus];
+
+
+export const YieldMetricsStatus = {
+  Healthy: 'Healthy',
+} as const;
+
+export interface YieldMetrics {
+  /**
+     * Number of committed simulated claim records; not all attempted withdrawals
+     * @minimum 0
+     */
+  total_claims_processed: number;
+  /**
+     * Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied
+     * @minimum 0
+     */
+  total_yield_distributed_sats: number;
+  /**
+     * All recorded simulated claims succeeded; Genesis explicitly returns 100.00%
+     * @pattern ^100\.00%$
+     */
+  payout_reliability_score: string;
+  /** Snapshot availability, not real wallet or payment health */
+  status: YieldMetricsStatus;
+}
+
 export interface YieldClaimInput {
   /**
      * Previously paid issuer-authenticated bearer receipts; never send these to the public payout feed.

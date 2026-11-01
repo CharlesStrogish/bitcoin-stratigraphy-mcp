@@ -9,6 +9,57 @@ import * as zod from 'zod';
 
 
 /**
+ * Public, read-only alias of /yield-metrics.json. No authentication or payment.
+ * Scope is simulated-outbound, not completed Lightning payments or settlement proof.
+ * Counts committed private claim records in mock settlement mode and sums their
+ * consumed yield amounts in sats. Failed, rejected and rolled-back attempts are
+ * not recorded and are excluded. All recorded simulated claims are successful,
+ * so reliability is successful recorded claims / total recorded claims, or
+ * explicitly 100.00% when there are no claims (the zero-traffic Genesis State).
+ * This score does not measure all attempted claims or real wallet reliability.
+ * Healthy means a metrics snapshot was read successfully, not that a wallet is healthy.
+ * One asynchronous aggregate query is shared across concurrent callers and cached
+ * per process for 30 seconds; shared HTTP caches may retain it for 15 more seconds.
+ * Storage failures return 503, never fabricated zero balances or a Healthy response.
+ * @summary Read aggregate recorded simulated yield claims
+ */
+export const getYieldMetricsResponseTotalClaimsProcessedMin = 0;
+
+export const getYieldMetricsResponseTotalYieldDistributedSatsMin = 0;
+
+export const getYieldMetricsResponsePayoutReliabilityScoreRegExp = new RegExp('^100\\.00%$');
+
+
+export const GetYieldMetricsResponse = zod.object({
+  "total_claims_processed": zod.number().int().min(getYieldMetricsResponseTotalClaimsProcessedMin).describe('Number of committed simulated claim records; not all attempted withdrawals'),
+  "total_yield_distributed_sats": zod.number().min(getYieldMetricsResponseTotalYieldDistributedSatsMin).describe('Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied'),
+  "payout_reliability_score": zod.string().regex(getYieldMetricsResponsePayoutReliabilityScoreRegExp).describe('All recorded simulated claims succeeded; Genesis explicitly returns 100.00%'),
+  "status": zod.enum(['Healthy']).describe('Snapshot availability, not real wallet or payment health')
+})
+
+
+/**
+ * Same four-field response, simulated-outbound scope, Genesis State behavior
+ * and caching as /api/yield-metrics. Only committed simulated claims are counted;
+ * this is not a real Lightning payout success rate or independent payment proof.
+ * @summary Read public simulated yield metrics at the canonical root URL
+ */
+export const getYieldMetricsJsonResponseTotalClaimsProcessedMin = 0;
+
+export const getYieldMetricsJsonResponseTotalYieldDistributedSatsMin = 0;
+
+export const getYieldMetricsJsonResponsePayoutReliabilityScoreRegExp = new RegExp('^100\\.00%$');
+
+
+export const GetYieldMetricsJsonResponse = zod.object({
+  "total_claims_processed": zod.number().int().min(getYieldMetricsJsonResponseTotalClaimsProcessedMin).describe('Number of committed simulated claim records; not all attempted withdrawals'),
+  "total_yield_distributed_sats": zod.number().min(getYieldMetricsJsonResponseTotalYieldDistributedSatsMin).describe('Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied'),
+  "payout_reliability_score": zod.string().regex(getYieldMetricsJsonResponsePayoutReliabilityScoreRegExp).describe('All recorded simulated claims succeeded; Genesis explicitly returns 100.00%'),
+  "status": zod.enum(['Healthy']).describe('Snapshot availability, not real wallet or payment health')
+})
+
+
+/**
  * Mock withdrawal only: no Lightning payment is sent. Supply 1–32 issuer-authenticated
  * L402 macaroons as private bearer receipts and a fixed-amount mainnet BOLT11 invoice
  * matching exactly 21 percent of their confirmed incoming L402 settlement amounts.

@@ -8,6 +8,7 @@ import { registerOpenApiRoute } from "./routes/openapi";
 import { registerDocsRoutes } from "./routes/docs";
 import { registerMachineMatrixRoutes } from "./routes/machine-matrix";
 import { registerYieldProofRoutes } from "./routes/yield-proofs";
+import { registerYieldMetricsRoutes } from "./routes/yield-metrics";
 import {
   mcpToolDefinitions,
   registerMcpRequestGuard,
@@ -89,6 +90,7 @@ app.use(createSwarmRadar());
 // Public read-only configuration must not depend on caller identity or payment.
 registerMachineMatrixRoutes(app);
 registerYieldProofRoutes(app);
+registerYieldMetricsRoutes(app);
 registerIndexNowRoute(app);
 // Logged ahead of CORS and the public limiter so refusals reach deployment logs.
 app.use(

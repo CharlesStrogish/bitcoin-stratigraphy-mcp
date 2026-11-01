@@ -36,6 +36,19 @@ real Treasury allocation rules and the payment gates. Before adding real
 withdrawals, explicitly reconcile simulated deductions instead of assuming
 mock claims prove actual disbursement.
 
+The initial public yield metrics intentionally cover only recorded simulated
+claims, with exactly four JSON fields. The user explicitly chose `100.00%` for
+both empty Genesis state and all committed simulated claims, with
+`X-Yield-Scope: simulated-outbound` and OpenAPI disclosure.
+
+**Why:** Failed/rejected attempts are not persisted, and the user authorized
+using recorded simulated claims without expanding the schema or claim flow.
+This is not evidence of real Lightning settlement or an all-attempt success rate.
+
+**How to apply:** Keep the metrics read-only and separate from the unchanged
+public payout feed. Do not silently reinterpret simulated deductions as sent
+payments, or broaden the denominator without explicit authorization and evidence.
+
 For qualifying new verification invoices, the user explicitly requires exactly
 15 percent of gross upstream and the remaining 6 percent to the caller, funded
 inside the existing allocation pool, never as an additional merchant expense.

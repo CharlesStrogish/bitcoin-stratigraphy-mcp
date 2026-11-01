@@ -273,6 +273,8 @@ export * from './yieldClaimInput';
 export * from './yieldClaimResult';
 export * from './yieldClaimResultRemainingBalanceMsats';
 export * from './yieldClaimResultStatus';
+export * from './yieldMetrics';
+export * from './yieldMetricsStatus';
 export * from './zkDriftProof';
 export * from './zkDriftRequest';
 export * from './zkDriftResponse';

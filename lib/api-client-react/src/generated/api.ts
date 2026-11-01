@@ -100,6 +100,7 @@ import type {
   YieldClaimFailure,
   YieldClaimInput,
   YieldClaimResult,
+  YieldMetrics,
   ZkDriftRequest,
   ZkDriftResponse,
   ZkTelemetryEventEnvelope,
@@ -133,6 +134,175 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetYieldMetricsUrl = () => {
+
+
+
+
+  return `/api/yield-metrics`
+}
+
+/**
+ * Public, read-only alias of /yield-metrics.json. No authentication or payment.
+ * Scope is simulated-outbound, not completed Lightning payments or settlement proof.
+ * Counts committed private claim records in mock settlement mode and sums their
+ * consumed yield amounts in sats. Failed, rejected and rolled-back attempts are
+ * not recorded and are excluded. All recorded simulated claims are successful,
+ * so reliability is successful recorded claims / total recorded claims, or
+ * explicitly 100.00% when there are no claims (the zero-traffic Genesis State).
+ * This score does not measure all attempted claims or real wallet reliability.
+ * Healthy means a metrics snapshot was read successfully, not that a wallet is healthy.
+ * One asynchronous aggregate query is shared across concurrent callers and cached
+ * per process for 30 seconds; shared HTTP caches may retain it for 15 more seconds.
+ * Storage failures return 503, never fabricated zero balances or a Healthy response.
+ * @summary Read aggregate recorded simulated yield claims
+ */
+export const getYieldMetrics = async ( options?: Parameters<typeof customFetch>[1]): Promise<YieldMetrics> => {
+
+  return customFetch<YieldMetrics>(getGetYieldMetricsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetYieldMetricsQueryKey = () => {
+    return [
+    `/api/yield-metrics`
+    ] as const;
+    }
+
+
+export const getGetYieldMetricsQueryOptions = <TData = Awaited<ReturnType<typeof getYieldMetrics>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getYieldMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetYieldMetricsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getYieldMetrics>>> = ({ signal }) => getYieldMetrics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getYieldMetrics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetYieldMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getYieldMetrics>>>
+export type GetYieldMetricsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read aggregate recorded simulated yield claims
+ */
+
+export function useGetYieldMetrics<TData = Awaited<ReturnType<typeof getYieldMetrics>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getYieldMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetYieldMetricsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetYieldMetricsJsonUrl = () => {
+
+
+
+
+  return `/api/yield-metrics.json`
+}
+
+/**
+ * Same four-field response, simulated-outbound scope, Genesis State behavior
+ * and caching as /api/yield-metrics. Only committed simulated claims are counted;
+ * this is not a real Lightning payout success rate or independent payment proof.
+ * @summary Read public simulated yield metrics at the canonical root URL
+ */
+export const getYieldMetricsJson = async ( options?: Parameters<typeof customFetch>[1]): Promise<YieldMetrics> => {
+
+  return customFetch<YieldMetrics>(getGetYieldMetricsJsonUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetYieldMetricsJsonQueryKey = () => {
+    return [
+    `/api/yield-metrics.json`
+    ] as const;
+    }
+
+
+export const getGetYieldMetricsJsonQueryOptions = <TData = Awaited<ReturnType<typeof getYieldMetricsJson>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getYieldMetricsJson>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetYieldMetricsJsonQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getYieldMetricsJson>>> = ({ signal }) => getYieldMetricsJson({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getYieldMetricsJson>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetYieldMetricsJsonQueryResult = NonNullable<Awaited<ReturnType<typeof getYieldMetricsJson>>>
+export type GetYieldMetricsJsonQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read public simulated yield metrics at the canonical root URL
+ */
+
+export function useGetYieldMetricsJson<TData = Awaited<ReturnType<typeof getYieldMetricsJson>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getYieldMetricsJson>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetYieldMetricsJsonQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getClaimYieldUrl = () => {
 

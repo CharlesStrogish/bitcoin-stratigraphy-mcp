@@ -736,6 +736,67 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /api/yield-metrics:
+    servers:
+      - url: https://bitcoinstratigraphy.com
+    get:
+      operationId: getYieldMetrics
+      summary: Read aggregate recorded simulated yield claims
+      description: |
+        Public, read-only alias of /yield-metrics.json. No authentication or payment.
+        Scope is simulated-outbound, not completed Lightning payments or settlement proof.
+        Counts committed private claim records in mock settlement mode and sums their
+        consumed yield amounts in sats. Failed, rejected and rolled-back attempts are
+        not recorded and are excluded. All recorded simulated claims are successful,
+        so reliability is successful recorded claims / total recorded claims, or
+        explicitly 100.00% when there are no claims (the zero-traffic Genesis State).
+        This score does not measure all attempted claims or real wallet reliability.
+        Healthy means a metrics snapshot was read successfully, not that a wallet is healthy.
+        One asynchronous aggregate query is shared across concurrent callers and cached
+        per process for 30 seconds; shared HTTP caches may retain it for 15 more seconds.
+        Storage failures return 503, never fabricated zero balances or a Healthy response.
+      security: []
+      responses:
+        "200":
+          description: Aggregate recorded simulated claims, including the empty-ledger Genesis State
+          headers:
+            X-Yield-Scope:
+              schema:
+                type: string
+                const: simulated-outbound
+              description: Simulated outbound deductions, not sent Lightning payments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldMetrics"
+        "503":
+          description: Claim metrics storage is unavailable; retry after five seconds
+  /yield-metrics.json:
+    servers:
+      - url: https://bitcoinstratigraphy.com
+    get:
+      operationId: getYieldMetricsJson
+      summary: Read public simulated yield metrics at the canonical root URL
+      description: |
+        Same four-field response, simulated-outbound scope, Genesis State behavior
+        and caching as /api/yield-metrics. Only committed simulated claims are counted;
+        this is not a real Lightning payout success rate or independent payment proof.
+      security: []
+      responses:
+        "200":
+          description: Aggregate recorded simulated claims; an empty ledger has 100.00% reliability
+          headers:
+            X-Yield-Scope:
+              schema:
+                type: string
+                const: simulated-outbound
+              description: Simulated outbound deductions, not sent Lightning payments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YieldMetrics"
+        "503":
+          description: Claim metrics storage is unavailable; retry after five seconds
   /api/claim-yield:
     servers:
       - url: https://bitcoinstratigraphy.com
@@ -2620,6 +2681,31 @@ components:
                   items:
                     $ref: "#/components/schemas/GetPublicYieldProofs200Item"
   schemas:
+    YieldMetrics:
+      type: object
+      additionalProperties: false
+      required:
+        - total_claims_processed
+        - total_yield_distributed_sats
+        - payout_reliability_score
+        - status
+      properties:
+        total_claims_processed:
+          type: integer
+          minimum: 0
+          description: Number of committed simulated claim records; not all attempted withdrawals
+        total_yield_distributed_sats:
+          type: number
+          minimum: 0
+          description: Consumed simulated yield in sats, including fractional sats; no Lightning payment is implied
+        payout_reliability_score:
+          type: string
+          pattern: '^100\.00%$'
+          description: All recorded simulated claims succeeded; Genesis explicitly returns 100.00%
+        status:
+          type: string
+          enum: [Healthy]
+          description: Snapshot availability, not real wallet or payment health
     YieldClaimInput:
       type: object
       additionalProperties: false

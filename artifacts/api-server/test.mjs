@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/yield-metrics.test.js",
   "./dist/claim-yield.test.js",
   "./dist/thermodynamic-pricing.test.js",
   "./dist/indexnow.test.js",
@@ -161,6 +162,7 @@ await build({
 
 await build({
   entryPoints: {
+    "yield-metrics.test": "./tests/unit/yield-metrics.test.ts",
     "claim-yield.test": "./tests/unit/claim-yield.test.ts",
     "thermodynamic-pricing.test": "./tests/unit/thermodynamic-pricing.test.ts",
     "indexnow.test": "./tests/unit/indexnow.test.ts",

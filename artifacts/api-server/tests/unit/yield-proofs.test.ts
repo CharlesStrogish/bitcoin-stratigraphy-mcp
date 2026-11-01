@@ -5,6 +5,7 @@ import test from "node:test";
 import express from "express";
 import { createPublicYieldLedger } from "../../src/lib/public-yield-ledger";
 import { registerYieldProofRoutes } from "../../src/routes/yield-proofs";
+import { apiRootAliases } from "../../src/middleware/apiRootAliases";
 
 const epoch = Date.parse("2026-10-30T12:00:00.000Z");
 const confirmed = () => ({
@@ -84,6 +85,7 @@ test("yield scaffold is bounded, newest-first and expires without timers", () =>
 test("yield route is public before auth, aliases correctly, stays read-only and defaults to no fabricated history", async () => {
   const ledger = createPublicYieldLedger(() => epoch);
   const app = express();
+  app.use(apiRootAliases);
   registerYieldProofRoutes(app, ledger);
   app.use((_req, res) => { res.status(401).end(); });
   const server = app.listen(0, "127.0.0.1");

@@ -13,6 +13,10 @@ const METHODS = ["get", "post", "put", "patch", "delete", "head", "options"];
 test("maps /api aliases of root documents and the MCP endpoint to their root routes", () => {
   for (const [alias, root] of [
     ["/api/openapi.json", "/openapi.json"],
+    ["/api/yield-proofs.json", "/yield-proofs.json"],
+    ["/api/yield-proofs.json?limit=1", "/yield-proofs.json?limit=1"],
+    ["/api/yield-proofs.json#receipt", "/yield-proofs.json#receipt"],
+    ["/API/YIELD-PROOFS.JSON", "/YIELD-PROOFS.JSON"],
     ["/api/mcp", "/mcp"],
     ["/api/mcp/", "/mcp/"],
     ["/api/mcp?session=1", "/mcp?session=1"],
@@ -33,6 +37,9 @@ test("maps /api aliases of root documents and the MCP endpoint to their root rou
     "/api/mcp/tools",
     "/api/mcpx",
     "/api/openapi.jsonx",
+    "/api/yield-proofs.jsonx",
+    "/api/yield-proofs.json/private",
+    "/apix/yield-proofs.json",
     "/api/.well-known/",
     "/apix/mcp",
     "/mcp",
@@ -63,6 +70,7 @@ test("every OpenAPI path served from the origin also resolves under the /api ser
     }
   }
   assert.ok(rootPaths.has("/mcp") && rootPaths.has("/.well-known/nostr.json"));
+  assert.ok(rootPaths.has("/yield-proofs.json"));
   for (const path of rootPaths) {
     assert.equal(rewriteApiRootAlias(`/api${path}`), path, path);
   }

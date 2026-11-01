@@ -3,10 +3,10 @@ import type { RequestHandler } from "express";
 
 // The OpenAPI document gives these root routes their own origin-level
 // servers, but some clients resolve every path against the "/api" server
-// anyway: /api/openapi.json, /api/mcp and /api/.well-known/* reach the same
-// routes as their root URLs.
+// anyway: /api/openapi.json, /api/mcp, /api/yield-proofs.json and
+// /api/.well-known/* reach the same routes as their root URLs.
 const API_ROOT_ALIAS =
-  /^\/api(?=\/(?:openapi\.json|mcp\/?|invoice\/request|\.well-known\/[^?#]+)(?:[?#]|$))/i;
+  /^\/api(?=\/(?:openapi\.json|yield-proofs\.json|mcp\/?|invoice\/request|\.well-known\/[^?#]+)(?:[?#]|$))/i;
 
 export function rewriteApiRootAlias(url: string): string {
   return API_ROOT_ALIAS.test(url) ? url.slice("/api".length) : url;

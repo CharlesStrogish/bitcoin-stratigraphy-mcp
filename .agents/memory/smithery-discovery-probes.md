@@ -3,6 +3,17 @@ name: Smithery discovery probes
 description: User-requested static discovery contract and the intentional decision to keep MCP scanner probes finite.
 ---
 
+New repository discovery metadata targets direct LLM crawler ingestion and the
+existing mcpservers.org/Glama listings. Do not add or reference Smithery-specific
+configuration or introduce Smithery CLI/SDK publication steps.
+
+**Why:** The user explicitly replaced Smithery-based discovery with direct model
+ingestion, describing the CLI/SDKs as deprecated.
+
+**How to apply:** Preserve existing runtime probe behavior while keeping new
+discovery documentation registry-independent. The user explicitly authorized
+the JSON-LD description's "21% thermodynamic yield" wording.
+
 Keep Smithery discovery static, public, and independent of the negotiated MCP protocol version. Registry release metadata may include the canonical tool count and tool annotations.
 
 **Why:** The user originally requested a minimal card to prevent scanner timeouts, then explicitly requested expanded release metadata and version synchronization. Preserve prompt responses without live tool execution or payment checks.

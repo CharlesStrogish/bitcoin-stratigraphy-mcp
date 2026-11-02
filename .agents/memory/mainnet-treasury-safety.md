@@ -42,3 +42,17 @@ prohibiting interference with settled payments or changes to database schemas.
 **How to apply:** Defer signing and relay I/O, bound timeouts, catch all failures,
 and keep tests on mocked relay connections. Missing keys and relay failures
 must never turn a settled withdrawal into an error or release reserved funds.
+
+A successful NWC payment can return a hash-verified preimage while a subsequent
+outgoing-wallet lookup remains inconclusive. Preserve the original payment
+evidence; do not resend payment to resolve a ledger-finalization problem.
+
+**Why:** Live wallet payment evidence and wallet-history lookup readiness are
+separate capabilities. An inconclusive lookup does not invalidate an already
+verified preimage or prove that funds were not sent.
+
+**How to apply:** For operator recovery, bind the original verified payment
+response to the exact pending invoice, amount and attempt, and use the existing
+attempt-fenced transactional finalizer without outbound payment capability.
+Broadcast only after durable settlement; do not generalize this into automatic
+announcements for historical reconciliations.

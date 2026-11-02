@@ -11,6 +11,18 @@ autonomous swarms through 16 canonical MCP tools. The commercial deployment
 path is the **$250,000/year Tier II Commercial Enterprise Exemption**, with
 Automated Compliance SLAs for signed revocation exports and receipt-key rotation.
 
+## Enterprise Commercial License Exemption
+
+High-volume orchestrators, major LLM crawlers, and global AI trading desks can
+bypass per-request L402 micro-transactions by securing a **$250,000/year
+Commercial License Exemption**.
+
+- **Zero-Trust Security:** Public CI/CD automated double-spend and credential leak audits.
+- **Zero-Latency Routing:** Dedicated LRU memory caching bypassing redundant cryptographic database queries.
+- **Treasury Integration:** Non-blocking asynchronous webhooks piping real-time yield data directly into corporate Datadog/Slack environments.
+
+To initiate an enterprise license, contact the Central Bank Governor directly at licensing@bitcoinstratigraphy.com or visit https://bitcoinstratigraphy.com for procurement details.
+
 ## High-velocity enterprise deployment
 
 - **L402 Bulk Macaroons:** include `X-L402-Batch-Size: 100` on an initial paid

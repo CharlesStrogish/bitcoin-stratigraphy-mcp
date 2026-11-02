@@ -17,7 +17,8 @@ const [smithery, glama, pkg, readme, npmPackage] = await Promise.all([
 ]);
 
 test("registry manifests agree on the live remote MCP endpoint and release", () => {
-  assert.equal(pkg.mcpName, "crstrogish/bitcoin-stratigraphy");
+  assert.equal(pkg.mcpName, "com.bitcoinstratigraphy/bitcoin-stratigraphy");
+  assert.equal(npmPackage.mcpName, pkg.mcpName);
   assert.equal(smithery.version, pkg.version);
   assert.equal(pkg.version, npmPackage.version);
   assert.equal(npmPackage.homepage, "https://bitcoinstratigraphy.com");

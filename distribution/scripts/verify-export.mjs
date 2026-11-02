@@ -40,7 +40,7 @@ for (const file of files(root)) {
   }
 }
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-if (pkg.mcpName !== "crstrogish/bitcoin-stratigraphy") fail("Missing canonical MCP identity");
+if (pkg.mcpName !== "com.bitcoinstratigraphy/bitcoin-stratigraphy") fail("Missing canonical MCP identity");
 const spec = JSON.parse(readFileSync(join(root, "openapi.json"), "utf8"));
 function references(value) {
   if (!value || typeof value !== "object") return;

@@ -89,6 +89,18 @@ the earlier human-facing documentation wording restriction still applies elsewhe
 **How to apply:** Publish numeric allocation metadata in discovery without changing
 payment execution, canonical tools, composability, Nostr broadcasts or the UI.
 
+The distribution-assets agent system prompt and front-facing developer-template
+README are also explicitly authorized to describe the "21% thermodynamic yield."
+This is a narrow exception to the older human-facing numeric-wording restriction.
+
+**Why:** The user specifically requested numerical yield positioning for these
+copy/paste agent-integration and distribution assets.
+
+**How to apply:** Use the requested positioning in these assets while explaining
+confirmed-purchase eligibility, one claim per original payment, and the difference
+between claimable earnings and settled withdrawals. Do not extend this copy
+exception to unrelated pages or alter the underlying economics.
+
 Address verification must be absolute zero-touch automation, using an explicit
 provider HTTPS address-to-key binding and a matching cryptographic proof.
 Never build a manual operator approval workflow or treat a bare NIP-98 signer

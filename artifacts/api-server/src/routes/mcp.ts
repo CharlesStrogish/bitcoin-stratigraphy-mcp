@@ -72,11 +72,11 @@ import {
   attenuateSubscriptionMacaroon,
   delegationCaveatRejection,
   getMacaroonSignatureId,
-  inspectSubscriptionMacaroon,
   macaroonAuthorizesTool,
   verifySubscriptionMacaroon,
   type VerifiedSubscriptionMacaroon,
 } from "../lib/subscription-pass";
+import { l402CredentialCache } from "../lib/l402-credential-cache";
 import {
   formatRpcCaveat,
   formatTimeCaveat,
@@ -4706,7 +4706,7 @@ function presentedMcpCredential(
   const authorization = parseL402Header(authorizationHeader);
   const pass =
     authorization && secret
-      ? inspectSubscriptionMacaroon(authorization.macaroon, secret)
+      ? l402CredentialCache().inspectAuthenticity(authorization.macaroon, secret)
       : null;
   return pass && pass.validUntil * 1_000 > nowMs ? pass : null;
 }

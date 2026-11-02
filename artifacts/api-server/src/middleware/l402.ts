@@ -2,6 +2,7 @@ import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement 
 import { createHash, randomUUID } from "node:crypto";
 import { clientKey } from "../lib/client-address";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
+import { l402CredentialCache } from "../lib/l402-credential-cache";
 import { createThermodynamicPricing } from "../lib/thermodynamic-pricing";
 import type { createInvoicePow } from "../lib/invoice-pow";
 import type { EnterpriseCreditTabs } from "../lib/enterprise-credit-tabs";
@@ -10,7 +11,6 @@ import {
   attenuateSubscriptionMacaroon,
   createSubscriptionMacaroon,
   delegationCaveatRejection,
-  inspectSubscriptionMacaroon,
 } from "../lib/subscription-pass";
 import { MCP_TOOL_NAME_PATTERN } from "../lib/delegation-caveats";
 import {
@@ -129,9 +129,7 @@ export function createL402Middleware(
   const invoiceExpirySeconds = options.invoiceExpirySeconds ?? 3_600;
   const now = options.now ?? Date.now;
   const thermodynamicQuote = createThermodynamicPricing(now);
-  const credentialCache = new L402EdgeCache<
-    NonNullable<ReturnType<typeof inspectSubscriptionMacaroon>>
-  >(now);
+  const credentialCache = l402CredentialCache(now);
   const settlementCache = new L402EdgeCache<
     Awaited<ReturnType<SettlementRouter["verifyPayment"]>>
   >(now);
@@ -378,11 +376,11 @@ export function createL402Middleware(
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
     const authorization = parseL402Header(req.header("Authorization"));
     if (secret && authorization) {
-      const credentialKey = L402EdgeCache.key(secret, authorization.macaroon);
       const requestTime = now();
-      const authentic =
-        credentialCache.get(credentialKey) ??
-        inspectSubscriptionMacaroon(authorization.macaroon, secret);
+      const authentic = credentialCache.inspectAuthenticity(
+        authorization.macaroon,
+        secret,
+      );
       // An expired root credential renews through a fresh 402 challenge.
       const pass =
         authentic && authentic.validUntil * 1_000 > requestTime
@@ -394,11 +392,6 @@ export function createL402Middleware(
           res.status(error instanceof RangeError ? 403 : 503).json({error: error instanceof RangeError ? error.message : "Invoice allocation validation unavailable"});
           return;
         }
-        credentialCache.set(
-          credentialKey,
-          pass,
-          pass.expiresAt ?? pass.validUntil * 1_000,
-        );
         // Delegated deadlines, tool scope and agent binding are refused
         // explicitly, before any revocation, wallet, or usage-quota work.
         const rejection =

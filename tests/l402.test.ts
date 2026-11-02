@@ -4,6 +4,8 @@ import { once } from "node:events";
 import test from "node:test";
 import { createMemoryMacaroonRevocationStore } from "../artifacts/api-server/src/lib/macaroon-revocation-store";
 import { L402EdgeCache } from "../artifacts/api-server/src/lib/l402-edge-cache";
+import { L402CredentialCache, l402CredentialCache } from "../artifacts/api-server/src/lib/l402-credential-cache";
+import { createMemoryMacaroonUsageStore } from "../artifacts/api-server/src/lib/macaroon-usage-store";
 import express from "express";
 import { finalizeEvent, getPublicKey } from "nostr-tools";
 import { createL402Middleware, parseL402Header } from "../artifacts/api-server/src/middleware/l402";
@@ -15,6 +17,7 @@ import {
   createSubscriptionMacaroon,
   attenuateSubscriptionMacaroon,
   verifySubscriptionMacaroon,
+  inspectSubscriptionMacaroon,
 } from "../artifacts/api-server/src/lib/subscription-pass";
 import type { SettlementRouter } from "../artifacts/api-server/src/services/settlement";
 import { createMemoryRevenueLedger } from "../artifacts/api-server/src/services/ledger";
@@ -179,8 +182,26 @@ test("issues an L402 challenge and accepts a hash-bound settled preimage", async
 test("a 25000-sat 100-call macro depletes atomically using one invoice and one wallet verification", async () => {
   let invoiceCount = 0;
   let verificationCount = 0;
-  const revocationStore = createMemoryMacaroonRevocationStore();
+  let revocationChecks = 0;
+  let revocationUnavailable = false;
+  let quotaChecks = 0;
+  const backingRevocations = createMemoryMacaroonRevocationStore();
+  const revocationStore = {
+    ...backingRevocations,
+    async isRevoked(id: string) {
+      revocationChecks++;
+      if (revocationUnavailable) throw new Error("database unavailable");
+      return backingRevocations.isRevoked(id);
+    },
+  };
   let clock = 1_789_963_200_000;
+  const backingUsage = createMemoryMacaroonUsageStore(() => clock);
+  const usageStore = {
+    async consume(...args: Parameters<typeof backingUsage.consume>) {
+      quotaChecks++;
+      return backingUsage.consume(...args);
+    },
+  };
   const app = express();
   const provider: SettlementRouter = {
     ...fakeSettlementRouter(),
@@ -217,6 +238,7 @@ test("a 25000-sat 100-call macro depletes atomically using one invoice and one w
       allowBatch: true,
       now: () => clock,
       revocationStore,
+      usageStore,
     }),
     (_req, res) => res.json({ paid: true }),
   );
@@ -251,8 +273,16 @@ test("a 25000-sat 100-call macro depletes atomically using one invoice and one w
     assert.ok(pass);
     assert.deepEqual(pass?.allowedPaths, ["/batch"]);
     const headers = { Authorization: `L402 ${offer.macaroon}:${PREIMAGE}` };
+    // Warm both caches before concurrent admissions. A cache hit is never a
+    // substitute for the live revocation lookup or atomic shared quota store.
+    assert.equal((await fetch(url, { headers })).status, 200);
+    const warmRevocationChecks = revocationChecks;
+    revocationUnavailable = true;
+    assert.equal((await fetch(url, { headers })).status, 503);
+    assert.equal(quotaChecks, 1, "revocation outage must not consume quota");
+    revocationUnavailable = false;
     const responses = await Promise.all(
-      Array.from({ length: 100 }, () => fetch(url, { headers })),
+      Array.from({ length: 99 }, () => fetch(url, { headers })),
     );
     for (const response of responses) {
       assert.equal(response.status, 200);
@@ -261,6 +291,9 @@ test("a 25000-sat 100-call macro depletes atomically using one invoice and one w
     const exhausted = await fetch(url, { headers });
     assert.equal(exhausted.status, 429);
     assert.equal(exhausted.headers.get("www-authenticate"), null);
+    assert.equal(quotaChecks, 101, "cache hits still consume all inherited quotas");
+    assert.ok(revocationChecks >= warmRevocationChecks + 101,
+      "every cache hit must perform fresh revocation checks");
     assert.equal(invoiceCount, 1);
     assert.equal(verificationCount, 1);
     const child = attenuateSubscriptionMacaroon(offer.macaroon, [
@@ -338,6 +371,114 @@ test("edge cache is bounded, expires entries, coalesces lookups, and never cache
   }
   assert.equal(lookups, 3);
   assert.equal(cache.get("pending"), undefined);
+});
+
+test("credential cache reuses only exact authentic tokens and isolates issuer rotation and mutations", () => {
+  let clock = 1_789_963_200_000;
+  let inspections = 0;
+  const secret = "synthetic-cache-issuer";
+  const token = createSubscriptionMacaroon({
+    secret, paymentHash: PAYMENT_HASH, tier: "1-day",
+    validUntil: Math.floor(clock / 1000) + 60,
+  });
+  const cache = new L402CredentialCache(() => clock, 10_000, (...args) => {
+    inspections++;
+    return inspectSubscriptionMacaroon(...args);
+  });
+  const first = cache.inspectAuthenticity(token, secret);
+  assert.ok(first);
+  first.allowedPaths.push("/must-not-poison-the-cache");
+  const second = cache.inspectAuthenticity(token, secret);
+  assert.ok(second);
+  assert.deepEqual(second.allowedPaths, []);
+  assert.equal(inspections, 1, "a hit skips the HMAC chain and caveat parser");
+  second.requestLimits.push({ tokenId: "forged", maxRequests: 999 });
+  assert.deepEqual(cache.inspectAuthenticity(token, secret)?.requestLimits, []);
+
+  const parsed = JSON.parse(Buffer.from(token, "base64url").toString());
+  parsed.caveats.push("max_requests=999");
+  const tampered = Buffer.from(JSON.stringify(parsed)).toString("base64url");
+  for (let i = 0; i < 2; i++) {
+    assert.equal(cache.inspectAuthenticity(tampered, secret), null);
+    assert.equal(cache.inspectAuthenticity(token, "rotated-issuer-secret"), null);
+  }
+  assert.equal(inspections, 5, "invalid tokens and wrong issuer keys are never cached");
+  assert.equal(cache.size, 1);
+
+  const child = attenuateSubscriptionMacaroon(token, [
+    `time_before=${new Date(clock + 50).toISOString()}`, "max_requests=1",
+  ]);
+  assert.ok(child);
+  assert.equal(cache.inspectAuthenticity(child, secret)?.maxRequests, 1);
+  assert.equal(inspections, 6, "descendants must verify their own HMAC chain");
+  clock += 49;
+  assert.ok(cache.inspectAuthenticity(child, secret));
+  assert.equal(inspections, 6);
+  clock += 1;
+  const expiredChild = cache.inspectAuthenticity(child, secret);
+  assert.equal(expiredChild?.timeCaveatDeadline, clock);
+  assert.equal(inspections, 7, "a hit must not slide or extend the descendant TTL");
+  assert.equal(cache.size, 1, "expired authentic diagnostics are never retained");
+
+  clock += 59_950;
+  cache.inspectAuthenticity(token, secret);
+  assert.equal(inspections, 8, "root expiry evicts the cached signature too");
+  assert.equal(cache.size, 0);
+});
+
+test("production routes share credential verification but custom clocks remain isolated", () => {
+  assert.equal(l402CredentialCache(), l402CredentialCache(Date.now));
+  const clock = () => 1000;
+  assert.equal(l402CredentialCache(clock), l402CredentialCache(clock));
+  assert.notEqual(l402CredentialCache(clock), l402CredentialCache());
+});
+
+test("LRU storage enforces entry and byte budgets without extending absolute expiration", () => {
+  let clock = 1000;
+  const cache = new L402EdgeCache<string>(() => clock);
+  for (let i = 0; i < 10_001; i++) cache.set(`session-${i}`, "authentic", 60_000);
+  assert.equal(cache.size, 10_000);
+  assert.equal(cache.get("session-0"), undefined);
+  assert.equal(cache.get("session-1"), "authentic");
+  cache.set("new-session", "authentic", 60_000);
+  assert.equal(cache.get("session-2"), undefined, "recent access updates LRU order");
+  clock = 59_999;
+  assert.equal(cache.get("session-1"), "authentic");
+  clock = 60_000;
+  assert.equal(cache.get("session-1"), undefined, "access never renews expiration");
+  cache.set("invalid-deadline", "value", Infinity);
+  assert.equal(cache.get("invalid-deadline"), undefined);
+
+  const bytes = new L402EdgeCache<string>();
+  const deadline = Date.now() + 60_000;
+  bytes.set("oversized", "x".repeat(256 * 1024), deadline);
+  assert.equal(bytes.size, 0, "oversized values must not be retained");
+  for (let i = 0; i < 200; i++) bytes.set(`large-${i}`, "x".repeat(240 * 1024), deadline);
+  assert.ok(bytes.size < 200);
+  assert.ok(bytes.calculatedSize <= 32 * 1024 * 1024);
+});
+
+test("bounded in-flight verification fails closed and releases capacity after failure", async () => {
+  const cache = new L402EdgeCache<string>(Date.now, 1);
+  let rejectLoad!: (error: Error) => void;
+  let loads = 0;
+  const load = () => {
+    loads++;
+    return new Promise<string>((_resolve, reject) => { rejectLoad = reject; });
+  };
+  const deadline = Date.now() + 60_000;
+  const first = cache.resolve("first", deadline, load, () => true);
+  const duplicate = cache.resolve("first", deadline, load, () => true);
+  await assert.rejects(
+    cache.resolve("second", deadline, async () => "unexpected", () => true),
+    /capacity exceeded/,
+  );
+  rejectLoad(new Error("verification unavailable"));
+  const results = await Promise.allSettled([first, duplicate]);
+  assert.equal(loads, 1);
+  assert.ok(results.every(result => result.status === "rejected"));
+  assert.equal(cache.size, 0);
+  assert.equal(await cache.resolve("second", deadline, async () => "valid", () => true), "valid");
 });
 
 test("verifies signed cryptographic attestations and rejects tampering", () => {

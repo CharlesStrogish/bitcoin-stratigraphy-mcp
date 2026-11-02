@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
+import { LRUCache } from "lru-cache";
 
 /** Bounded TTL/LRU cache. Keys are fingerprints, never raw bearer credentials. */
 export class L402EdgeCache<T> {
-  private readonly entries = new Map<string, { value: T; expires: number }>();
+  private readonly entries: LRUCache<string, { value: T; expires: number }>;
   private readonly pending = new Map<string, Promise<T>>();
 
   constructor(
@@ -11,7 +12,23 @@ export class L402EdgeCache<T> {
   ) {
     if (!Number.isSafeInteger(capacity) || capacity < 1)
       throw new RangeError("Cache capacity must be positive");
+    this.entries = new LRUCache({
+      max: capacity,
+      // Accounted byte budgets complement the entry bound. Oversize values
+      // are verified normally but not retained. These are not a process-RSS cap.
+      maxSize: 32 * 1024 * 1024,
+      maxEntrySize: 256 * 1024,
+      sizeCalculation: (entry, key) =>
+        Buffer.byteLength(key) +
+        Buffer.byteLength(JSON.stringify(entry.value) ?? "") + 512,
+      allowStale: false,
+      updateAgeOnGet: false,
+      ttlResolution: 0,
+    });
   }
+
+  get size(): number { return this.entries.size; }
+  get calculatedSize(): number { return this.entries.calculatedSize; }
 
   static key(...parts: string[]): string {
     return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
@@ -24,18 +41,16 @@ export class L402EdgeCache<T> {
       this.entries.delete(key);
       return undefined;
     }
-    this.entries.delete(key);
-    this.entries.set(key, entry);
     return entry.value;
   }
 
   set(key: string, value: T, expires: number): void {
-    if (expires <= this.now()) return;
-    this.entries.delete(key);
-    while (this.entries.size >= this.capacity) {
-      this.entries.delete(this.entries.keys().next().value!);
+    const ttl = expires - this.now();
+    if (!Number.isFinite(ttl) || ttl <= 0) {
+      this.entries.delete(key);
+      return;
     }
-    this.entries.set(key, { value, expires });
+    this.entries.set(key, { value, expires }, { ttl });
   }
 
   async resolve(

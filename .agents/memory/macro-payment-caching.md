@@ -8,3 +8,15 @@ Allow authentic descendant macaroons to share a positive settlement lookup only 
 **Why:** Keying wallet verification only by the final descendant signature needlessly repeats wallet lookups for one paid invoice; treating a settlement cache hit as unrestricted access would bypass delegated restrictions.
 
 **How to apply:** Keep signature/caveat validation distinct from invoice proof caching. Every redemption still checks revocation and atomically consumes every inherited quota. Authorization-cache expiry must honor descendant time_before deadlines, while ancestor quota counters survive until the root token expires.
+
+The user's enterprise caching upgrade targets the core API, not the outbound
+Fiduciary Router client. Cache only the heavy cryptographic signature/macaroon
+verification; a hit must still run database revocation checks and atomic quota
+consumption. Never cache the entire authorization decision.
+
+**Why:** The user explicitly confirmed this scope and security boundary after
+clarifying the client/server architecture.
+
+**How to apply:** Preserve live database admission on every redemption when
+optimizing CPU verification, even if that prevents a zero-database-query or
+zero-latency claim.

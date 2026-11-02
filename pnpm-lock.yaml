@@ -159,6 +159,9 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
+      lru-cache:
+        specifier: ^11.5.3
+        version: 11.5.3
       nostr-tools:
         specifier: 2.25.2
         version: 2.25.2(typescript@5.9.3)

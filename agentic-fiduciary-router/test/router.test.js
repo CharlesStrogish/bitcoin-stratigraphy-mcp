@@ -59,7 +59,9 @@ async function setup(t, options = {}) {
     async payInvoice(text) {
       payments++;
       assert.equal(text, challengeInvoice);
-      if (options.paymentError) throw new Error("private-credential-must-not-escape");
+      if (options.paymentError) throw new Error(
+        typeof options.paymentError === "string" ? options.paymentError : "private-credential-must-not-escape",
+      );
       if (options.payGate) await options.payGate;
       return { preimage: options.badPreimage ? "02".repeat(32) : preimage,
         fees_paid: options.highFees ? 11000 : 1000 };
@@ -182,6 +184,21 @@ test("bad preimages never authorize retry, and uncertain payments cannot be repa
     assert.equal(ctx.counts().paidRetries, 0);
     assert.equal((await ctx.state()).invoices[paymentHash].status, "pending");
   }
+});
+
+test("wallet credential errors are redacted and cannot trigger a second payment", async t => {
+  const secret = "synthetic-wallet-and-operator-credential-sentinel";
+  const ctx = await setup(t, { paymentError: secret });
+  await assert.rejects(ctx.run(), error => {
+    assert.equal(error.message, "PAYMENT_UNCERTAIN_DO_NOT_REPAY");
+    assert.ok(!String(error.stack).includes(secret));
+    return true;
+  });
+  await assert.rejects(ctx.run(), /PAYMENT_PENDING_DO_NOT_REPAY/);
+  assert.equal(ctx.counts().payments, 1);
+  assert.equal(ctx.counts().paidRetries, 0);
+  assert.ok(!JSON.stringify(await ctx.state()).includes(secret));
+  assert.ok(!JSON.stringify(ctx.errors).includes(secret));
 });
 
 test("a repeated 402 and application-level failures do not cause yield claims", async t => {

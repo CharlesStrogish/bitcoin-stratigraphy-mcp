@@ -1,0 +1,49 @@
+name: Fiduciary Compliance Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  fiduciary-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: agentic-fiduciary-router
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+
+      # This independent package uses pnpm locally; npm creates a CI-only lock
+      # for auditing. Disable dependency lifecycle scripts during installation.
+      - name: Install router dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Strict dependency security audit
+        run: npm audit --audit-level=low
+
+      - name: Check router syntax
+        run: npm run check
+
+      # Synthetic fixtures only: never use GitHub secrets or a real wallet.
+      - name: Simulate L402 payments and check credential isolation
+        run: npm test
+        env:
+          FIDUCIARY_AUDIT_MOCKS: "1"
+          NWC_URI: "nostr+walletconnect://1111111111111111111111111111111111111111111111111111111111111111?relay=wss%3A%2F%2Frelay.invalid&secret=2222222222222222222222222222222222222222222222222222222222222222"
+          OPERATOR_SECRET: "mock-fiduciary-audit-operator-not-a-real-secret"
+

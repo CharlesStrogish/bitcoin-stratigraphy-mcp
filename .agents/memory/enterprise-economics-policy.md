@@ -89,8 +89,9 @@ the earlier human-facing documentation wording restriction still applies elsewhe
 **How to apply:** Publish numeric allocation metadata in discovery without changing
 payment execution, canonical tools, composability, Nostr broadcasts or the UI.
 
-The distribution-assets agent system prompt and front-facing developer-template
-README are also explicitly authorized to describe the "21% thermodynamic yield."
+The distribution-assets agent system prompt, front-facing developer-template
+README, and standalone fiduciary-router README are explicitly authorized to
+describe the "21% thermodynamic yield."
 This is a narrow exception to the older human-facing numeric-wording restriction.
 
 **Why:** The user specifically requested numerical yield positioning for these

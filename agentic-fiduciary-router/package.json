@@ -1,6 +1,6 @@
 {
-  "name": "agentic-fiduciary-router",
-  "version": "0.1.0",
+  "name": "@bitcoin-stratigraphy/fiduciary-router",
+  "version": "1.0.0",
   "description": "Fiduciary cost-optimization fetch middleware for autonomous agents using Lightning L402",
   "type": "module",
   "main": "./index.js",

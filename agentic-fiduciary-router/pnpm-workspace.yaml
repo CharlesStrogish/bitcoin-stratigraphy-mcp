@@ -1,0 +1,5 @@
+# Independent npm distribution: never resolve dependencies from the parent app.
+packages:
+  - "."
+minimumReleaseAge: 1440
+onlyBuiltDependencies: []

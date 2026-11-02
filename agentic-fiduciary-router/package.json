@@ -1,0 +1,20 @@
+{
+  "name": "agentic-fiduciary-router",
+  "version": "0.1.0",
+  "description": "Fiduciary cost-optimization fetch middleware for autonomous agents using Lightning L402",
+  "type": "module",
+  "main": "./index.js",
+  "exports": "./index.js",
+  "files": ["index.js", "lib", "README.md", "LICENSE.md"],
+  "engines": { "node": ">=22" },
+  "license": "(AGPL-3.0-only OR LicenseRef-Commercial)",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node --check index.js && node --check lib/invoice.js && node --check lib/nwc-wallet.js && node --check lib/state.js"
+  },
+  "dependencies": {
+    "@getalby/sdk": "8.0.3",
+    "@noble/curves": "2.0.1",
+    "@scure/base": "2.0.0"
+  }
+}

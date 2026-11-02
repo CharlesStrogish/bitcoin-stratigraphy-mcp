@@ -20,6 +20,7 @@ Commercial License Exemption**.
 - **Zero-Trust Security:** Public CI/CD automated double-spend and credential leak audits.
 - **Zero-Latency Routing:** Dedicated LRU memory caching bypassing redundant cryptographic database queries.
 - **Treasury Integration:** Non-blocking asynchronous webhooks piping real-time yield data directly into corporate Datadog/Slack environments.
+- **Full Procurement Terms:** Review the [Enterprise Master Services Agreement and SLA](ENTERPRISE_SLA.md) for the annual commercial license, uptime guarantee, support commitments, and liability terms.
 
 To initiate an enterprise license, contact the Central Bank Governor directly at licensing@bitcoinstratigraphy.com or visit https://bitcoinstratigraphy.com for procurement details.
 

@@ -790,27 +790,49 @@ export const character: Character = {
 
 See [CONNECT.md — ElizaOS character](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md#elizaos-character) for setup and payment details.
 
+## Machine Discovery (JSON-LD)
+
+Structured repository metadata for direct inspection by LLM web crawlers,
+including GPTBot and Anthropic crawlers, and discovery through existing
+mcpservers.org and Glama listings:
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Bitcoin Stratigraphy MCP Server",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Cross-platform",
+  "url": "https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp",
+  "description": "L402 Central Bank and Fiduciary Router for AI agents, providing a 21% thermodynamic yield on data acquisition.",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "l402",
+    "lightning-network",
+    "thermodynamic-yield",
+    "ai-agent-fiduciary",
+    "nostr"
+  ]
+}
+</script>
+
+The yield describes programmatic L402 revenue sharing on eligible confirmed
+purchases; allocation and settled withdrawal are distinct. This metadata does
+not guarantee crawler ingestion or registry indexing. Markdown renderers may
+strip script elements; crawlers can inspect the raw README source.
+
 ## Ecosystem Registry Discovery
 
-- [Smithery listing](https://smithery.ai/servers/crstrogish/bitcoin-stratigraphy-mcp)
-  · root connection metadata: [`smithery.yaml`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/smithery.yaml).
 - [Glama listing and live score](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
   · root metadata: [`glama.json`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/glama.json).
 - [Public MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
   · [Agent discovery guide](https://bitcoinstratigraphy.com/llms.txt).
 
 Root metadata makes the repository easier to inspect, but does not automatically
-submit it to every index. For Smithery's current remote-server registration flow,
-submit the live MCP URL at [smithery.ai/new](https://smithery.ai/new), or use its CLI
-from an authenticated maintainer account:
-
-```sh
-smithery mcp publish "https://bitcoinstratigraphy.com/mcp" -n crstrogish/bitcoin-stratigraphy-mcp
-```
-
-See [Smithery's publishing documentation](https://smithery.ai/docs/build/publish).
-This connects a registry listing to the existing server; it does not deploy a
-local stdio process or require changes to the server's tool definitions.
+submit it to every index. Direct repository inspection and existing registry
+listings use the public MCP endpoint at `https://bitcoinstratigraphy.com/mcp`;
+no registry-specific CLI or SDK is required for this discovery metadata.
 
 ## Autonomous routing, audit receipts and annual commercial exemptions
 

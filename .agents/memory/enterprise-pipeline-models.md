@@ -23,7 +23,7 @@ Public positioning must stay focused on institutional Bitcoin thermodynamic
 state-anchoring, L402 micropayments and EU AI Act Article 12 compliance. Do not
 introduce references to the "422-day dataset" or "$10M Hal Finney horizon" in
 the UI, product docs or READMEs. Preserve all 16 canonical MCP tool schemas and
-descriptions, including the existing Glama/Smithery configurations.
+descriptions, including the existing Glama configuration.
 
 **Why:** The user explicitly imposed these enterprise-upgrade guardrails.
 

@@ -1607,23 +1607,23 @@ paths:
       - url: /
         description: Same origin
     get:
-      operationId: getSmitheryServerCard
+      operationId: getRegistryServerCard
       tags: [discovery]
-      summary: Static Smithery server discovery
+      summary: Static public MCP server discovery
       description: Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
       security: []
       responses:
         "200":
-          description: Exact public Smithery card
+          description: Public MCP registry card
           headers:
             Access-Control-Allow-Origin:
               $ref: "#/components/headers/PublicCorsOrigin"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SmitheryServerCard"
+                $ref: "#/components/schemas/RegistryServerCard"
     options:
-      operationId: preflightSmitheryServerCard
+      operationId: preflightRegistryServerCard
       tags: [discovery]
       summary: Immediate public browser preflight
       security: []
@@ -3565,7 +3565,7 @@ components:
     PublicMetadata:
       type: object
       additionalProperties: true
-    SmitheryServerCard:
+    RegistryServerCard:
       type: object
       required: [name, displayName, description, version, serverInfo, url, toolCount, capabilities]
       properties:
@@ -3595,8 +3595,8 @@ components:
           description: Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp
         toolCount:
           type: integer
-          minimum: 15
-          maximum: 15
+          minimum: 16
+          maximum: 16
         capabilities:
           type: object
           additionalProperties: true

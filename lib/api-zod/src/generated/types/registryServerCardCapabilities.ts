@@ -6,4 +6,4 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type SmitheryServerCardCapabilities = { [key: string]: unknown };
+export type RegistryServerCardCapabilities = { [key: string]: unknown };

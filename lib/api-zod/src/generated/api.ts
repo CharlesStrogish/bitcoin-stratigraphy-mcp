@@ -932,14 +932,14 @@ export const GetWellKnownLlmsResponse = zod.string()
 
 /**
  * Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
- * @summary Static Smithery server discovery
+ * @summary Static public MCP server discovery
  */
-export const getSmitheryServerCardResponseToolCountMin = 15;
-export const getSmitheryServerCardResponseToolCountMax = 15;
+export const getRegistryServerCardResponseToolCountMin = 16;
+export const getRegistryServerCardResponseToolCountMax = 16;
 
 
 
-export const GetSmitheryServerCardResponse = zod.object({
+export const GetRegistryServerCardResponse = zod.object({
   "name": zod.literal("bitcoin-stratigraphy-mcp"),
   "displayName": zod.literal("Bitcoin Stratigraphy Data Engine"),
   "description": zod.string(),
@@ -949,7 +949,7 @@ export const GetSmitheryServerCardResponse = zod.object({
   "version": zod.string()
 }),
   "url": zod.string().url().describe('Canonical Streamable HTTP endpoint, https:\/\/bitcoinstratigraphy.com\/mcp'),
-  "toolCount": zod.number().int().min(getSmitheryServerCardResponseToolCountMin).max(getSmitheryServerCardResponseToolCountMax),
+  "toolCount": zod.number().int().min(getRegistryServerCardResponseToolCountMin).max(getRegistryServerCardResponseToolCountMax),
   "capabilities": zod.record(zod.string(), zod.unknown())
 })
 
@@ -957,7 +957,7 @@ export const GetSmitheryServerCardResponse = zod.object({
 /**
  * @summary Immediate public browser preflight
  */
-export const PreflightSmitheryServerCardResponse = zod.unknown()
+export const PreflightRegistryServerCardResponse = zod.unknown()
 
 
 /**

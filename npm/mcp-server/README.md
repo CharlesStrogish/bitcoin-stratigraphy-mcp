@@ -111,7 +111,7 @@ npm publish --access public --tag latest
 
 Use an npm account authorized for the `@bitcoin-stratigraphy` scope.
 Publishing npm does not update a running HTTP deployment or automatically
-republish its Smithery/official MCP Registry listing. Update the hosted endpoint
+republish its Glama, mcpservers.org, or official MCP Registry listing. Update the hosted endpoint
 and refresh those listings separately using their own publishing workflows.
 
 ## License

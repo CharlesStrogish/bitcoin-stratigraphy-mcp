@@ -5,6 +5,7 @@ import { powFetch as fetch } from "../lib/testing/pow-fetch";
 import {
   GetEnterpriseDueDiligenceBriefResponse,
   GetMcpDiscoveryManifestResponse,
+  GetRegistryServerCardResponse,
   QuoteMcpToolCostsResponse,
   type McpBatchCostQuote,
 } from "@workspace/api-zod";
@@ -27,7 +28,7 @@ import type { SettlementRouter } from "../services/settlement";
 import {
   glamaConnector,
   mcpServerCard,
-  smitheryServerCard,
+  registryServerCard,
   registerMcpServerCardRoute,
 } from "./mcp-server-card";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
@@ -1737,9 +1738,8 @@ test("serves exact stratigraphy descriptions across tools/list and all discovery
 });
 
 test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity", async () => {
-  const [sharedYaml, smitheryYaml, glamaJson] = await Promise.all([
+  const [sharedYaml, glamaJson] = await Promise.all([
     readFile(resolve(process.cwd(), "../../lib/api-spec/openapi.yaml"), "utf8"),
-    readFile(resolve(process.cwd(), "../../smithery.yaml"), "utf8"),
     readFile(resolve(process.cwd(), "../../glama.json"), "utf8"),
   ]);
   const sharedDocument = parse(sharedYaml) as {
@@ -1747,7 +1747,6 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
     "x-mcp-tool-groups"?: unknown;
     info?: { title?: unknown; version?: unknown; description?: unknown; "x-operational-description"?: unknown };
   };
-  const smitheryMetadata = parse(smitheryYaml) as { description?: unknown };
   const glamaMetadata = JSON.parse(glamaJson) as { description?: unknown };
   // Runtime metadata applies authoritative pricing and the live stratigraphy
   // contracts; check what clients actually receive, not the YAML defaults.
@@ -1762,9 +1761,8 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
   assert.equal(sharedDocument.info?.description, "Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.");
   assert.equal(sharedDocument.info?.["x-operational-description"], ENGINE_DESCRIPTION);
   assert.deepEqual(publicDocument.info, sharedDocument.info);
-  assert.equal(smitheryMetadata.description, glamaMetadata.description);
-  const registryDescription = String(smitheryMetadata.description);
-  assert.ok(registryDescription.startsWith(`${smitheryServerCard.description}\n\n`));
+  const registryDescription = String(glamaMetadata.description);
+  assert.ok(registryDescription.startsWith(`${registryServerCard.description}\n\n`));
   assert.ok(registryDescription.endsWith(ENGINE_DESCRIPTION));
   for (const phrase of ["Hal Finney Horizon tracker", "15 J/TH thermodynamic energy calculation", "Live L402 Satoshi settlement"]) {
     assert.ok(registryDescription.includes(phrase), phrase);
@@ -4873,7 +4871,7 @@ test("serves MCP health, explicit CORS preflight, and JSON POST responses", asyn
   );
 });
 
-test("serves wildcard CORS on success and errors and immediately finishes Smithery preflights", async () => {
+test("serves wildcard CORS on success and errors and immediately finishes registry preflights", async () => {
   const requestsBefore = invoiceRequestCount;
   const mcpRequestsBefore = mcpInvoiceCount;
   for (const path of [
@@ -4883,7 +4881,7 @@ test("serves wildcard CORS on success and errors and immediately finishes Smithe
     "/missing-public-route",
   ]) {
     const response = await fetch(baseUrl + path, {
-      headers: { Origin: "https://smithery.ai" },
+      headers: { Origin: "https://glama.ai" },
       signal: AbortSignal.timeout(2_000),
     });
     assert.equal(
@@ -4915,7 +4913,7 @@ test("serves wildcard CORS on success and errors and immediately finishes Smithe
       const preflight = await fetch(baseUrl + path, {
         method: "OPTIONS",
         headers: {
-          Origin: "https://smithery.ai",
+          Origin: "https://glama.ai",
           "Access-Control-Request-Method": "POST",
           "Access-Control-Request-Headers": requestedHeaders,
           "Content-Type": "application/json",
@@ -4966,7 +4964,7 @@ test("finishes MCP GET and HEAD probes even when scanners advertise SSE", async 
         method,
         headers: {
           Accept: accept,
-          "User-Agent": "SmitheryBot",
+          "User-Agent": "RegistryDiscoveryBot",
           "MCP-Protocol-Version": "2025-03-26",
           "X-Forwarded-For": "198.51.100.80",
         },
@@ -5257,7 +5255,7 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   const response = await fetch(`${baseUrl}/.well-known/mcp/server-card.json`, {
     headers: {
       Authorization: `L402 ${paymentHash}:${preimage}`,
-      "User-Agent": "SmitheryBot",
+      "User-Agent": "RegistryDiscoveryBot",
     },
     signal: AbortSignal.timeout(2_000),
   });
@@ -5269,8 +5267,9 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   );
   assert.equal(response.headers.get("www-authenticate"), null);
   const card = await response.json();
-  assert.deepEqual(card, smitheryServerCard);
-  assert.equal(card.version, smitheryServerCard.version);
+  GetRegistryServerCardResponse.parse(card);
+  assert.deepEqual(card, registryServerCard);
+  assert.equal(card.version, registryServerCard.version);
   assert.equal(card.serverInfo.version, card.version);
   assert.equal(card.toolCount, 16);
   assert.equal(card.capabilities.tools.length, card.toolCount);
@@ -5288,28 +5287,6 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   assert.equal(head.status, 200);
   assert.equal(await head.text(), "");
   assert.equal(invoiceRequestCount, requestsBefore);
-});
-
-test("serves Smithery verification text at both public root paths", async () => {
-  for (const path of [
-    "/smithery-verification",
-    "/.well-known/smithery-verification",
-  ]) {
-    const response = await fetch(`${baseUrl}${path}`);
-    assert.equal(response.status, 200, path);
-    assert.match(
-      response.headers.get("content-type") ?? "",
-      /^text\/plain\b/,
-      path,
-    );
-    assert.equal(response.headers.get("www-authenticate"), null, path);
-    assert.equal(
-      await response.text(),
-      "smithery-verification=f52238c37708d18a60b49b4f0d4d6f946b1d0d954e4f629e837bdb8bb726d591\n" +
-        "smithery-verification=58fb\n",
-      path,
-    );
-  }
 });
 
 test("serves all public Glama connector discovery routes exactly", async () => {

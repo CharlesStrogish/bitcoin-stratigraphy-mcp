@@ -1,8 +1,8 @@
-Please update all documentation, server metadata, and Smithery configuration files across the project to reflect our recent engine upgrades.
+Please update all documentation and server metadata across the project to reflect our recent engine upgrades.
 
 Here are the specific updates to apply:
 
-1. Update `README.md` and `smithery.yaml` (or `smithery.json`):
+1. Update `README.md` and the public MCP discovery metadata:
    - Replace the project summary and capabilities with the following text:
 
 "Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.
@@ -18,7 +18,7 @@ Key Capabilities:
 
 2. Update Server Code Metadata:
    - Check the main MCP server entry point (e.g., `index.ts`, `server.ts`, or `mcp.ts`) where the server description and capabilities are declared upon initialization.
-   - Update the server description string to match the updated capability overview above so that Smithery and connecting client swarms receive the full feature set on handshake.
+   - Update the server description string to match the updated capability overview above so that connecting client swarms receive the full feature set on handshake.
 
-3. Verify Smithery Sync:
+3. Verify Registry Sync:
    - Ensure tool annotations and module groupings (`stratigraphy.*`, `proof.*`, `mesh.*`, `payment.*`) in the OpenAPI or MCP schema exports are clean, readable, and fully synced.

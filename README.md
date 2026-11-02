@@ -126,7 +126,6 @@ verify `.ots` receipts later. Native clients require prepaid L402 headers or
 a trusted, budget-controlled wallet proxy; they do not pay automatically.
 
 [![Glama TDQS](https://img.shields.io/badge/Glama-Grade%20A%20%28All%2016%20Tools%29-10b981)](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
-[![Smithery Rating](https://img.shields.io/badge/Smithery-100%2F100-brightgreen)](https://smithery.ai/servers/crstrogish/bitcoin-stratigraphy-mcp)
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2026--07--28-orange)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![L402 Enabled](https://img.shields.io/badge/Monetization-L402%20Lightning-yellow)](https://l402.org)
 
@@ -180,7 +179,7 @@ The publish command requires an npm account authorized for the
 installing: the executable uses Streamable HTTP, not stdio, and the licensed
 Python companion runs separately on loopback port 8000.
 Npm publication does not update the hosted HTTP server or automatically refresh
-Smithery/official MCP Registry entries; publish the endpoint changes and refresh
+Glama, mcpservers.org, or official MCP Registry entries; publish the endpoint changes and refresh
 those listings through their respective workflows.
 
 ### Local Bitcoin Core telemetry (enterprise pipeline)
@@ -412,9 +411,8 @@ Machine-native conditional micro-settlement for autonomous agent-to-agent delega
   [the compliance framework](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md).
 
 The Glama badge reflects our static, flawless Grade A tool-definition quality score across all 16 canonical tools, alongside a 4.0/5.0 overall directory rating.
-The Smithery badge displays the
-supplied **100/100** listing score. Follow the registry links for current results;
-neither badge is an independent security audit or blanket verification of data.
+Follow the Glama and mcpservers.org links for current directory results;
+directory badges are not independent security audits or blanket verification of data.
 Signed Bitcoin-tip receipts are attestations, not Groth16 proofs or Bitcoin
 proof-of-work validity proofs.
 

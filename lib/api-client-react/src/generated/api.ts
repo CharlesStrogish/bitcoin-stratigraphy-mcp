@@ -84,12 +84,12 @@ import type {
   QuoteMcpToolCosts400,
   ReadinessStatus,
   RegisterEnterpriseFleet200,
+  RegistryServerCard,
   RevokeNip98Key200,
   SettleEnterpriseCreditTab200,
   SettleEnterpriseCreditTab402,
   SettlementAssetSelectionError,
   SignedRevocationSnapshot,
-  SmitheryServerCard,
   StratigraphyCost,
   StratigraphyEntry,
   SwarmReferralKey,
@@ -2435,7 +2435,7 @@ export function useGetWellKnownLlms<TData = Awaited<ReturnType<typeof getWellKno
 
 
 
-export const getGetSmitheryServerCardUrl = () => {
+export const getGetRegistryServerCardUrl = () => {
 
 
 
@@ -2445,11 +2445,11 @@ export const getGetSmitheryServerCardUrl = () => {
 
 /**
  * Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
- * @summary Static Smithery server discovery
+ * @summary Static public MCP server discovery
  */
-export const getSmitheryServerCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<SmitheryServerCard> => {
+export const getRegistryServerCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<RegistryServerCard> => {
 
-  return customFetch<SmitheryServerCard>(getGetSmitheryServerCardUrl(),
+  return customFetch<RegistryServerCard>(getGetRegistryServerCardUrl(),
   {
     ...options,
     method: 'GET'
@@ -2462,45 +2462,45 @@ export const getSmitheryServerCard = async ( options?: Parameters<typeof customF
 
 
 
-export const getGetSmitheryServerCardQueryKey = () => {
+export const getGetRegistryServerCardQueryKey = () => {
     return [
     `/api/.well-known/mcp/server-card.json`
     ] as const;
     }
 
 
-export const getGetSmitheryServerCardQueryOptions = <TData = Awaited<ReturnType<typeof getSmitheryServerCard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSmitheryServerCard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetRegistryServerCardQueryOptions = <TData = Awaited<ReturnType<typeof getRegistryServerCard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRegistryServerCard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetSmitheryServerCardQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetRegistryServerCardQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSmitheryServerCard>>> = ({ signal }) => getSmitheryServerCard({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRegistryServerCard>>> = ({ signal }) => getRegistryServerCard({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSmitheryServerCard>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRegistryServerCard>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetSmitheryServerCardQueryResult = NonNullable<Awaited<ReturnType<typeof getSmitheryServerCard>>>
-export type GetSmitheryServerCardQueryError = ErrorType<unknown>
+export type GetRegistryServerCardQueryResult = NonNullable<Awaited<ReturnType<typeof getRegistryServerCard>>>
+export type GetRegistryServerCardQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Static Smithery server discovery
+ * @summary Static public MCP server discovery
  */
 
-export function useGetSmitheryServerCard<TData = Awaited<ReturnType<typeof getSmitheryServerCard>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSmitheryServerCard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetRegistryServerCard<TData = Awaited<ReturnType<typeof getRegistryServerCard>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRegistryServerCard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetSmitheryServerCardQueryOptions(options)
+  const queryOptions = getGetRegistryServerCardQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2513,7 +2513,7 @@ export function useGetSmitheryServerCard<TData = Awaited<ReturnType<typeof getSm
 
 
 
-export const getPreflightSmitheryServerCardUrl = () => {
+export const getPreflightRegistryServerCardUrl = () => {
 
 
 
@@ -2524,9 +2524,9 @@ export const getPreflightSmitheryServerCardUrl = () => {
 /**
  * @summary Immediate public browser preflight
  */
-export const preflightSmitheryServerCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicPreflightResponse> => {
+export const preflightRegistryServerCard = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicPreflightResponse> => {
 
-  return customFetch<PublicPreflightResponse>(getPreflightSmitheryServerCardUrl(),
+  return customFetch<PublicPreflightResponse>(getPreflightRegistryServerCardUrl(),
   {
     ...options,
     method: 'OPTIONS'
@@ -2539,11 +2539,11 @@ export const preflightSmitheryServerCard = async ( options?: Parameters<typeof c
 
 
 
-export const getPreflightSmitheryServerCardMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightSmitheryServerCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof preflightSmitheryServerCard>>, TError,void, TContext> => {
+export const getPreflightRegistryServerCardMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightRegistryServerCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof preflightRegistryServerCard>>, TError,void, TContext> => {
 
-const mutationKey = ['preflightSmitheryServerCard'];
+const mutationKey = ['preflightRegistryServerCard'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2553,10 +2553,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preflightSmitheryServerCard>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preflightRegistryServerCard>>, void> = () => {
 
 
-          return  preflightSmitheryServerCard(requestOptions)
+          return  preflightRegistryServerCard(requestOptions)
         }
 
 
@@ -2566,22 +2566,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PreflightSmitheryServerCardMutationResult = NonNullable<Awaited<ReturnType<typeof preflightSmitheryServerCard>>>
+    export type PreflightRegistryServerCardMutationResult = NonNullable<Awaited<ReturnType<typeof preflightRegistryServerCard>>>
 
-    export type PreflightSmitheryServerCardMutationError = ErrorType<unknown>
+    export type PreflightRegistryServerCardMutationError = ErrorType<unknown>
 
     /**
  * @summary Immediate public browser preflight
  */
-export const usePreflightSmitheryServerCard = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightSmitheryServerCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+export const usePreflightRegistryServerCard = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightRegistryServerCard>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof preflightSmitheryServerCard>>,
+        Awaited<ReturnType<typeof preflightRegistryServerCard>>,
         TError,
         void,
         TContext
       > => {
-      return useMutation(getPreflightSmitheryServerCardMutationOptions(options));
+      return useMutation(getPreflightRegistryServerCardMutationOptions(options));
     }
 
 export const getRequestMcpInvoiceUrl = () => {

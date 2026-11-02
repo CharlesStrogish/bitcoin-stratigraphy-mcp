@@ -156,7 +156,7 @@ async def check_server_card(client: httpx.AsyncClient) -> str:
         },
         "Static server card differs from the canonical five-field contract",
     )
-    return "HTTP 200; exact canonical Smithery card; wildcard CORS"
+    return "HTTP 200; canonical public MCP registry card; wildcard CORS"
 
 
 async def check_manifest(client: httpx.AsyncClient) -> str:

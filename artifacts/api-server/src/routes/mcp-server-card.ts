@@ -232,7 +232,7 @@ export const mcpServerCard = {
 };
 
 /** Static registry discovery never opens an MCP session or executes tools. */
-export const smitheryServerCard = {
+export const registryServerCard = {
   name: "bitcoin-stratigraphy-mcp",
   homepage: CANONICAL_ORIGIN,
   origin: CANONICAL_ORIGIN,
@@ -269,24 +269,8 @@ export function registerMcpServerCardRoute(app: Express): void {
     },
   );
 
-  for (const path of [
-    "/smithery-verification",
-    "/.well-known/smithery-verification",
-  ]) {
-    app.get(path, (_req, res): void => {
-      res.set("Cache-Control", "no-store");
-      res
-        .status(200)
-        .type("text/plain")
-        .send(
-          "smithery-verification=f52238c37708d18a60b49b4f0d4d6f946b1d0d954e4f629e837bdb8bb726d591\n" +
-            "smithery-verification=58fb\n",
-        );
-    });
-  }
-
   app.get("/.well-known/mcp/server-card.json", (_req, res): void => {
-    res.status(200).json(smitheryServerCard);
+    res.status(200).json(registryServerCard);
   });
 
   for (const path of [

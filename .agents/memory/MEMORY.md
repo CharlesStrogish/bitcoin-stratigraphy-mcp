@@ -42,8 +42,7 @@
 - [Git subdirectory SDK installs](git-subdirectory-sdk-installs.md) — pnpm Git preparation needs an explicit workspace boundary and consumer build-script trust.
 - [Vendored archive integrity](vendored-archive-integrity.md) — a repacked local SDK archive can make unrelated frozen installs fail after lockfile regeneration.
 - [Nested Replit config validation](nested-replit-config-validation.md) — the validator replaces the workspace root .replit even when its temp file lives in a subdirectory.
-- [Smithery badge reliability](smithery-badge-reliability.md) — the remote badge endpoint returned HTTP 500; prefer the local SVG fallback until a working dynamic endpoint is verified.
-- [Smithery discovery probes](smithery-discovery-probes.md) — static card, finite GET/HEAD probes, and public wildcard token-based CORS are intentional user requirements.
+- [Registry discovery policy](registry-discovery-policy.md) — Glama and mcpservers.org only; preserve generic MCP discovery, finite probes, CORS and the canonical identity.
 - [Public training export policy](public-training-export-policy.md) — crawler dataset exports stay open while interactive MCP queries remain L402-paid; describe index/proof limits plainly.
 - [OTS pool receipt calendars](ots-pool-receipt-calendars.md) — public pools can return underlying calendar URLs; inspect real receipts before tightening the accepted issuer list.
 - [Independent audit evidence](independent-audit-evidence.md) — confirm Bitcoin commitments without paid MCP access; distinguish calendar acceptance, public-header corroboration, and full-node validation.

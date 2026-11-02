@@ -47,7 +47,6 @@ writeFileSync(
     "Run the commands below from this `cookbooks/` directory; matching scripts and requirements are bundled beside this guide.",
   ),
 );
-copy("smithery.yaml");
 copy("lib/api-spec/openapi.yaml", "openapi.yaml");
 const require = createRequire(join(root, "artifacts/api-server/package.json"));
 const { parse } = require("yaml");
@@ -62,6 +61,7 @@ for (const name of [
   "src",
   "client.ts",
   "client.test.ts",
+  "invoice-pow.ts",
   "tsconfig.json",
   "tsconfig.mcp.json",
   "LICENSE",
@@ -90,9 +90,8 @@ copy("distribution/test", "test");
 copy("distribution/scripts", "scripts");
 copy("distribution/README.standalone.md", "README.md");
 const canonical = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-const manifest = readFileSync(join(root, "smithery.yaml"), "utf8");
-const version = manifest.match(/^version: "([^"]+)"$/m)?.[1];
-if (!version) throw new Error("Canonical registry manifest has no version");
+const version = canonical.version;
+if (!version) throw new Error("Canonical package has no version");
 json("package.json", {
   name: "bitcoin-stratigraphy-mcp",
   mcpName: canonical.mcpName,

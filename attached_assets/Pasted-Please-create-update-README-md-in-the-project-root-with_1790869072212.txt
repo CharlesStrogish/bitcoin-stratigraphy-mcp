@@ -5,7 +5,6 @@ Please create/update `README.md` in the project root with the following comprehe
 # Bitcoin Stratigraphy MCP Server
 
 [![Glama TDQS](https://img.shields.io/badge/Glama-Grade%20A%20%284.4%2F5.0%29-emerald)](https://glama.ai/mcp/connectors)
-[![Smithery Rating](https://img.shields.io/badge/Smithery-100%2F100-brightgreen)](https://smithery.ai)
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2024--11--25-orange)](https://modelcontextprotocol.io)
 [![L402 Enabled](https://img.shields.io/badge/Monetization-L402%20Lightning-yellow)](https://l402.org)
 

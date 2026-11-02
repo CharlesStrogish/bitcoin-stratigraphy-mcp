@@ -4,7 +4,6 @@
   "timestamp_utc": "2026-09-19T20:45:00Z",
   "author": "Charles R. Strogish",
   "benchmarks": {
-    "smithery_quality_score": "100/100",
     "glama_tdqs_score": "4.7/5.0",
     "active_mcp_tools": 10
   },

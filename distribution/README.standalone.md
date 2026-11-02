@@ -38,8 +38,9 @@ installation only after auditing a safe, complete dependency tree.
 
 Use the MCP URL in any Streamable HTTP client. Import [mcp.json](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/mcp.json) where
 your client supports URL-based MCP configuration; some hosts require an explicit
-transport type in their own configuration format. [smithery.yaml](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/smithery.yaml)
-is canonical **remote registration metadata**, not a local-server launch recipe.
+transport type in their own configuration format. The public
+[`/.well-known/mcp/server-card.json`](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
+provides remote discovery metadata, not a local-server launch recipe.
 
 The server advertises 16 canonical capabilities. `initialize` and `tools/list`
 are free protocol discovery operations. Exactly two tool executions are free:
@@ -264,7 +265,6 @@ distribution commands. It is not the private workspace orchestration manifest.
 ```text
 README.md                 Distribution and operational guide
 package.json              Portable MCP metadata and sandbox/test commands
-smithery.yaml             Canonical remote registration manifest
 mcp.json                  Remote MCP client configuration
 openapi.yaml              Canonical self-contained REST/OpenAPI contract
 openapi.json              JSON rendering of the same canonical contract

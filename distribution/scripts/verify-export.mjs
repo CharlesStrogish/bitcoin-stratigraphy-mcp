@@ -56,7 +56,7 @@ function references(value) {
 }
 references(spec);
 for (const path of [
-  "smithery.yaml", "openapi.yaml", "openapi.json", "mcp.json", "LICENSE",
+  "openapi.yaml", "openapi.json", "mcp.json", "LICENSE",
   "cookbooks/langchain_agent.py", "cookbooks/llamaindex_agent.py",
   "sdk/typescript/client.ts", "sdk/python/client.py",
   "examples/free-sandbox.mjs", "scripts/verify-export.mjs", "test/free-sandbox.test.mjs",

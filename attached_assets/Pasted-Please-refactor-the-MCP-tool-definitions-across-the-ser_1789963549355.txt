@@ -1,4 +1,4 @@
-Please refactor the MCP tool definitions across the server codebase to achieve a perfect 5.0/5.0 TDQS score on Glama while maintaining our 100/100 Smithery score and keeping all 70 unit tests passing.
+Please refactor the MCP tool definitions across the server codebase to achieve a perfect 5.0/5.0 TDQS score on Glama while keeping all 70 unit tests passing.
 
 Do not alter the dot-notation namespaces (mesh.status, proof.list, proof.status, proof.submit, proof.verify, stratigraphy.get, stratigraphy.list) or return payload structure.
 

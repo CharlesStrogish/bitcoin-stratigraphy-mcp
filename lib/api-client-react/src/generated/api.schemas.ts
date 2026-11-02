@@ -817,28 +817,28 @@ export interface AuditReport {
 
 export interface PublicMetadata { [key: string]: unknown }
 
-export type SmitheryServerCardServerInfo = {
+export type RegistryServerCardServerInfo = {
   name: 'bitcoin-stratigraphy-mcp';
   version: string;
 };
 
-export type SmitheryServerCardCapabilities = { [key: string]: unknown };
+export type RegistryServerCardCapabilities = { [key: string]: unknown };
 
-export interface SmitheryServerCard {
+export interface RegistryServerCard {
   name: 'bitcoin-stratigraphy-mcp';
   displayName: 'Bitcoin Stratigraphy Data Engine';
   description: string;
   /** Registry card release metadata; not the negotiated MCP protocol version. */
   version: string;
-  serverInfo: SmitheryServerCardServerInfo;
+  serverInfo: RegistryServerCardServerInfo;
   /** Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp */
   url: string;
   /**
-     * @minimum 15
-     * @maximum 15
+     * @minimum 16
+     * @maximum 16
      */
   toolCount: number;
-  capabilities: SmitheryServerCardCapabilities;
+  capabilities: RegistryServerCardCapabilities;
 }
 
 export const McpProbeValue = {

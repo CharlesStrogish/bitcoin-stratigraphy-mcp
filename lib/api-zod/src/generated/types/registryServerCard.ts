@@ -5,22 +5,22 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
-import type { SmitheryServerCardCapabilities } from './smitheryServerCardCapabilities';
-import type { SmitheryServerCardServerInfo } from './smitheryServerCardServerInfo';
+import type { RegistryServerCardCapabilities } from './registryServerCardCapabilities';
+import type { RegistryServerCardServerInfo } from './registryServerCardServerInfo';
 
-export interface SmitheryServerCard {
+export interface RegistryServerCard {
   name: 'bitcoin-stratigraphy-mcp';
   displayName: 'Bitcoin Stratigraphy Data Engine';
   description: string;
   /** Registry card release metadata; not the negotiated MCP protocol version. */
   version: string;
-  serverInfo: SmitheryServerCardServerInfo;
+  serverInfo: RegistryServerCardServerInfo;
   /** Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp */
   url: string;
   /**
-     * @minimum 15
-     * @maximum 15
+     * @minimum 16
+     * @maximum 16
      */
   toolCount: number;
-  capabilities: SmitheryServerCardCapabilities;
+  capabilities: RegistryServerCardCapabilities;
 }

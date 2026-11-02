@@ -71,3 +71,16 @@ failure occurred before HTTP negotiation and was not an MCP protocol defect.
 **How to apply:** Keep TLS verification enabled and trust the configured system
 or explicitly supplied CA; expose nested async transport exceptions so TLS
 failures are distinguishable from protocol or payment failures.
+
+A publish can fail before compilation when executing the managed `uv` binary
+returns `text file busy`; do not treat that error as a Python dependency conflict
+or a JavaScript test failure.
+
+**Why:** A failed installation-stage publish could not execute `uv lock`, while
+the existing live build remained healthy and subsequent `uv --version` and
+`uv lock --check --offline` both succeeded without source changes.
+
+**How to apply:** Inspect the failed build's own logs, then check the executable
+and lockfile before changing dependencies. Retry publishing when those checks
+pass. Avoid deleting the active Python environment as a first response; the
+checks do not prove what held the executable busy during the failed build.

@@ -47,6 +47,16 @@ of simulated deductions into evidence of Lightning settlement.
 public payout feed. Do not silently reinterpret simulated deductions as sent
 payments. Describe the terminal-claim denominator, not an all-attempt success rate.
 
+The enterprise settlement webhook's requested `yield_distributed` field is a
+calculated 21-percent monitoring allocation, not proof of an outgoing payout.
+Never use that notice as a writer or evidence source for confirmed payout feeds.
+
+**Why:** The user requires this exact field name and percentage immediately after
+incoming settlement, which is separate from Treasury withdrawal finalization.
+
+**How to apply:** Preserve the strict monitoring payload while distinguishing
+incoming spend, calculated allocation and actual outgoing settlement in receivers.
+
 For qualifying new verification invoices, the user explicitly requires exactly
 15 percent of gross upstream and the remaining 6 percent to the caller, funded
 inside the existing allocation pool, never as an additional merchant expense.

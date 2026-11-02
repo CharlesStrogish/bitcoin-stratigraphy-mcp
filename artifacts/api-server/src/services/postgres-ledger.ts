@@ -1,6 +1,10 @@
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { pool } from "@workspace/db";
 import {
+  dispatchEnterpriseSettlement,
+  type EnterpriseSettlementNotice,
+} from "./enterprise-webhook";
+import {
   goalProgress,
   sanitizeLedgerEntry,
   validateLedgerEntry,
@@ -44,6 +48,7 @@ function integer(value: unknown): number {
 export function createPostgresRevenueLedger(
   databasePool: DatabasePool = pool,
   secret = process.env.SESSION_SECRET,
+  notify: (notice: EnterpriseSettlementNotice) => void = dispatchEnterpriseSettlement,
 ): RevenueLedger {
   if (!secret) {
     throw new Error(
@@ -76,7 +81,21 @@ export function createPostgresRevenueLedger(
           encrypt(entry.clientIdentifier, secret),
         ],
       );
-      return result.rows.length === 1;
+      const inserted = result.rows.length === 1;
+      if (inserted && entry.channel === "L402") {
+        // The autocommitted INSERT succeeded. Replays return no row, so only
+        // newly persisted incoming settlements schedule a monitoring notice.
+        try {
+          notify({
+            transaction_id: result.rows[0].id,
+            satoshis_captured: entry.satsReceived,
+            timestamp: entry.timestamp,
+          });
+        } catch {
+          // Notification errors must never trigger a ledger/payment retry.
+        }
+      }
+      return inserted;
     },
     async getDailyVolume() {
       const result = await databasePool.query<{ total: string }>(

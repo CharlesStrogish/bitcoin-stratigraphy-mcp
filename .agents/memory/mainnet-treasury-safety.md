@@ -30,3 +30,15 @@ mainnet funds during testing.
 
 **How to apply:** Exercise real PostgreSQL transactions with a mocked NWC
 client; keep success, definitive failure and timeout/ambiguity cases distinct.
+
+Yield withdrawal announcements use the dedicated NOSTR_SERVER_PRIVKEY (hex or
+nsec), not another signing or NWC key. Publish the user's exact Kind 1 note
+with the actual settled amount only after a successful mainnet claim response.
+Never expose private withdrawal material in public events.
+
+**Why:** The user requires a public Proof-of-Yield oracle while explicitly
+prohibiting interference with settled payments or changes to database schemas.
+
+**How to apply:** Defer signing and relay I/O, bound timeouts, catch all failures,
+and keep tests on mocked relay connections. Missing keys and relay failures
+must never turn a settled withdrawal into an error or release reserved funds.

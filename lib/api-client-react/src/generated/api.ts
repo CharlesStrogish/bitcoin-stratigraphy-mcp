@@ -429,6 +429,10 @@ export const getClaimYieldUrl = () => {
  * NWC pay_invoice settlement requires a preimage matching the invoice hash.
  * Reconciliation requires a matching settled outgoing transaction and exact amount.
  * The legacy coinos_txid response field carries the Lightning payment hash for NWC.
+ * After the settled response, a best-effort background oracle signs a Kind 1
+ * Nostr note using NOSTR_SERVER_PRIVKEY (hex or nsec) and publishes only the
+ * withdrawal amount to public relays. Missing keys, relay failures and timeouts
+ * never change withdrawal success. Pending and failed claims are not announced.
  * Historical mock claims remain consumed and never become mainnet payouts.
  * This endpoint does not modify the public /yield-proofs.json feed.
  * Invoice validation checks BOLT11 encoding, fixed amount, payment hash and expiry;

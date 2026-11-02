@@ -8,6 +8,7 @@ import { YieldClaimError, type PrivateYieldEarnings } from "../lib/private-yield
 import { parseYieldWithdrawalInvoice } from "../lib/yield-withdrawal-invoice";
 import { verifyRequestNip98Signer } from "../lib/nip98-request";
 import { createHash, timingSafeEqual } from "node:crypto";
+import { scheduleYieldBroadcast, type YieldBroadcast } from "../services/yieldOracle";
 
 const claimInput = z.object({
   macaroons: z.array(z.string().min(1).max(16384)).max(32).default([]),
@@ -20,7 +21,7 @@ export function registerClaimYieldRoute(
   app: Express,
   ledger: PrivateYieldEarnings,
   options: { secret?: string; now?: () => number; logSettlement?: (claim: Record<string, unknown>) => void;
-    operatorSecret?: string } = {},
+    operatorSecret?: string; broadcastYield?: YieldBroadcast } = {},
 ): void {
   app.post("/api/claim-yield", async (req, res): Promise<void> => {
     res.set("Cache-Control", "no-store");
@@ -84,6 +85,7 @@ export function registerClaimYieldRoute(
         ...(claim.preimage ? { preimage: claim.preimage } : {}),
         ...(!settled ? { reconciliation_required: true } : {}),
       });
+      if (settled) scheduleYieldBroadcast(claim.totalMsats, options.broadcastYield);
     } catch (error) {
       if (error instanceof YieldClaimError) { res.status(error.status).json({ error: error.code }); return; }
       // Avoid database error details containing receipt identifiers or the request body.

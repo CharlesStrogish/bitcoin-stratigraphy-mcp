@@ -25,5 +25,11 @@ Resetting local state to make onboarding easier can spend twice or bypass the
 previously authorized cumulative budget.
 
 **How to apply:** Reuse the existing durable payment core in distributable agent
-wrappers. Keep unknown outcomes reserved and require deliberate recovery instead
-of silently retrying payment or selecting a new state directory.
+wrappers where the language permits. A standalone Python port must preserve the
+same trust boundaries without requiring a Node bridge: signed invoice validation,
+exact-request proof binding, persistent cross-process spending reservations, and
+unknown outcomes held for deliberate recovery. Never silently retry a payment or
+select a new state directory.
+
+**Why a separate Python implementation:** The user requested a standalone PyPI
+package for LangChain, CrewAI and AutoGen, rather than a bridge to the Node SDK.

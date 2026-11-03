@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bitcoinstratigraphy-agent-yield"
+version = "0.1.0"
+description = "One-call MCP discovery, budgeted L402 settlement and fiduciary tools for Python agents."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "AGPL-3.0-only OR LicenseRef-Commercial"
+license-files = ["LICENSE.md"]
+dependencies = ["httpx==0.28.1", "bech32==1.2.0", "coincurve==21.0.0"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.2.0"]
+
+[project.urls]
+Homepage = "https://bitcoinstratigraphy.com"
+Repository = "https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bitcoinstratigraphy_agent_yield"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/README.md", "/LICENSE.md", "/pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"

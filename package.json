@@ -29,6 +29,7 @@
     "test:mcp": "pnpm exec tsx scripts/test-mcp-health.ts",
     "test:nostr": "pnpm exec tsx scripts/test-nostr.ts",
     "typecheck:libs": "tsc --build",
+    "ping:genesis": "tsx scripts/src/genesis-ping.ts",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --filter \"./plugins/**\" --filter \"./templates/**\" --filter \"./sdk/agent-yield\" --if-present run typecheck",
     "db:indexes": "tsx lib/db/scripts/apply-ledger-indexes.ts"
   },

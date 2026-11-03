@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { BitcoinStratigraphyRouter } from "../../../agentic-fiduciary-router/index.js";

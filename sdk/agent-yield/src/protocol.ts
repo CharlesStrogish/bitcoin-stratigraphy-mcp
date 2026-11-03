@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 /** JSON and finite SSE responses are both valid MCP Streamable HTTP results. */
 export async function readRpc(response: Response, id: number): Promise<unknown> {
   if (!response.ok) throw new Error(`MCP_HTTP_${response.status}`);

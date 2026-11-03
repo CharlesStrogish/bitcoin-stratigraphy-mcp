@@ -245,6 +245,8 @@ await build({
   format: "esm",
   loader: { ".yaml": "text" },
   external: [
+    // Preserve Zod 4's ESM initialization order across SDK and generated imports.
+    "zod",
     "express",
     "@getalby/sdk",
     "nostr-tools",

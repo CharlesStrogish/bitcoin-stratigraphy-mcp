@@ -29,7 +29,7 @@ export const CryptographicAuditInput = z
       .min(1)
       .max(16_000)
       .refine((value) => value.trim().length > 0),
-    stratigraphy_data_used: z.record(z.unknown()),
+    stratigraphy_data_used: z.record(z.string(), z.unknown()),
   })
   .strict();
 

@@ -59,7 +59,8 @@ function referencePaths(value: unknown, step: number, path: (string | number)[] 
 
 function deferredIssue(issue: ZodIssue, paths: (string | number)[][]): boolean {
   if (issue.code === "invalid_union")
-    return issue.unionErrors.some(branch => branch.issues.every(item => deferredIssue(item, paths)));
+    return issue.inclusive !== false &&
+      issue.errors.some(branch => branch.every(item => deferredIssue(item, paths)));
   return paths.some(path => path.every((part, index) => issue.path[index] === part));
 }
 
@@ -227,7 +228,7 @@ export function createMcpPipelineHandler(options: {
           const stepStartedAt = new Date().toISOString();
           try {
             if (controller.signal.aborted) throw new Error("Pipeline interrupted");
-            args = options.schemaFor(name).parse(resolvePipelineArguments(call.params.arguments ?? {}, results));
+            args = options.schemaFor(name).parse(resolvePipelineArguments(call.params.arguments ?? {}, results)) as Record<string, unknown>;
             if (Object.hasOwn(args!, "webhook_url")) throw new RangeError("Pipeline steps cannot spawn webhook jobs");
             outcome = await options.execute(req, res, name, args!, controller.signal);
           } catch (error) {

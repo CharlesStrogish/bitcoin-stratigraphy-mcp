@@ -4,10 +4,14 @@
 httpx==0.28.1
 pydantic>=2.11,<3
 langchain-mcp-adapters==0.3.2
-langgraph==1.2.12
+langgraph==1.2.14
 langchain-openai>=1.6.7,<2
 autogen-agentchat==0.7.5
 autogen-ext[openai]==0.7.5
 # Shared MCP/OpenAI versions used by the supported examples.
 mcp>=1.30.0,<2
 openai>=2.45,<3
+# Pin the examples' transitive HTTP and upload dependencies to audited releases.
+httpcore2==2.13.1
+httpx2==2.13.1
+python-multipart==0.0.32

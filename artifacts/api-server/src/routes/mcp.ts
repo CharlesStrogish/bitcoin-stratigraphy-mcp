@@ -4776,6 +4776,9 @@ function createBitcoinStratigraphyMcpServer(
       return readIntegrity();
     },
   });
+  // SDK registration enables list-change notifications by default. Our catalog
+  // is static for each connection, so preserve the advertised legacy contract.
+  server.server.registerCapabilities(mcpServerCapabilities());
 
   server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: mcpToolDefinitions,

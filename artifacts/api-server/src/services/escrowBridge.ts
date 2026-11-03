@@ -23,7 +23,7 @@ export type EscrowAgentAttribution = {
 const workerResult = z.object({
   status: z.union([z.literal(200), z.literal(201), z.literal(400),
     z.literal(404), z.literal(422), z.literal(503)]),
-  body: z.record(z.unknown()),
+  body: z.record(z.string(), z.unknown()),
 });
 export type EscrowWorkerResult = z.infer<typeof workerResult>;
 export type EscrowLightningSettlement = {

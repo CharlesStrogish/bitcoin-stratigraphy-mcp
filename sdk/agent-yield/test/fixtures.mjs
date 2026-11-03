@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import { createHash } from "node:crypto";
 import { bech32 } from "@scure/base";
 import { secp256k1 } from "@noble/curves/secp256k1.js";

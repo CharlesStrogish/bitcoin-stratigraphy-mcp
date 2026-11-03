@@ -3,7 +3,7 @@ import { createHmac, randomBytes } from "node:crypto";
 import { z } from "zod";
 
 const envelopeSchema = z.object({
-  result: z.record(z.unknown()),
+  result: z.record(z.string(), z.unknown()),
   targetHeights: z.array(z.number().int().nonnegative()),
 }).strict();
 

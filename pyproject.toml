@@ -17,7 +17,7 @@ dependencies = [
     "httpx2>=2.13.1,<3",
     "langchain-mcp-adapters==0.3.2",
     "langchain-openai>=1,<2",
-    "langgraph==1.2.12",
+    "langgraph==1.2.14",
     "mcp>=1.30.0,<2",
     "openai>=2.45,<3",
     "opentimestamps>=0.4.5",
@@ -38,3 +38,11 @@ members = [
 
 [tool.uv.sources]
 bitcoin-stratigraphy-enterprise = { workspace = true }
+
+[tool.uv]
+constraint-dependencies = [
+    "gitpython>=3.2.1",
+    "langgraph-sdk>=0.4.6",
+    "opentelemetry-api>=1.45.1",
+    "pyasn1>=0.6.5",
+]

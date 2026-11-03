@@ -102,3 +102,4 @@
 - [Glama ownership](glama-ownership.md) — ownership claims are exact provider-supplied documents; preserve legacy connector metadata and the MCP manifest.
 - [Mainnet Treasury safety](mainnet-treasury-safety.md) — outbound claims use NWC; schemas/state machine are frozen, unknown outcomes stay reserved and tests never spend real funds.
 - [Dependency release policy](dependency-release-policy.md) — require zero findings at every severity, including development and Python dependencies; never call an audit proof of security.
+- [SDK terminal output](sdk-terminal-output.md) — keep yield receipts on stderr to preserve MCP JSON-RPC integrity.

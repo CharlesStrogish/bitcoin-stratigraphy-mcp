@@ -1,6 +1,6 @@
 {
   "name": "@bitcoinstratigraphy/agent-yield",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "One-call MCP discovery and budgeted L402 middleware for autonomous agents",
   "type": "module",
   "main": "./dist/sdk/agent-yield/src/index.js",

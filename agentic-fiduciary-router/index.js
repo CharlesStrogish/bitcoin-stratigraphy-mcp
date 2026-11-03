@@ -84,7 +84,13 @@ export class BitcoinStratigraphyRouter {
     ]));
     if (response.headers.get("content-type")?.includes("application/json")) {
       let quote;
-      try { quote = await response.clone().json(); } catch { throw new Error("INVALID_QUOTE"); }
+      try {
+        const payload = await response.clone().json();
+        // Stateless MCP wraps the same challenge in JSON-RPC error.data;
+        // legacy MCP and REST keep the original top-level framing.
+        quote = payload?.jsonrpc === "2.0" && payload.error?.code === 402
+          ? payload.error.data : payload;
+      } catch { throw new Error("INVALID_QUOTE"); }
       if (quote.macaroon !== challenge.macaroon || quote.invoice !== challenge.invoice ||
           quote.payment_hash !== invoice.paymentHash || !Number.isSafeInteger(quote.amount_sats) ||
           BigInt(quote.amount_sats) * 1000n !== invoice.amountMsats) throw new Error("QUOTE_MISMATCH");
@@ -137,6 +143,8 @@ export class BitcoinStratigraphyRouter {
     if (/^Nostr\s/i.test(nostr ?? "")) headers.set("X-Nostr-Authorization", nostr);
     const fresh = new Headers(await this.#identityHeaders(request.url, request.method, bytes));
     for (const [key, value] of fresh) headers.set(key, value);
+    const freshNostr = fresh.get("authorization");
+    if (/^Nostr\s/i.test(freshNostr ?? "")) headers.set("X-Nostr-Authorization", freshNostr);
     headers.set("Authorization", `L402 ${challenge.macaroon}:${preimage}`);
     const result = await this.#request(new Request(request, { headers }));
     // Data execution and yield payment are separate. Never buy another invoice.

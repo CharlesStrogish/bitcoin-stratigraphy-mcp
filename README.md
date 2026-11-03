@@ -2,6 +2,31 @@
 
 **[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)**
 
+## 1-Line Installation
+
+```sh
+npm install @bitcoinstratigraphy/agent-yield
+```
+
+Wrap your existing agent configuration in two lines:
+
+```ts
+import { withFiduciaryYield } from "@bitcoinstratigraphy/agent-yield";
+const agent = await withFiduciaryYield({ ...agent_config, fiduciary: { wallet, maxPaymentSats: 500, maxTotalSats: 5000 } });
+```
+
+`wallet` is your authorized Lightning adapter; `payInvoice(invoice)` returns
+`{ preimage }`. The wrapper discovers MCP tools, handles invoice admission and
+the L402 payment/retry flow, and preserves your existing configuration and tools.
+Pass the returned configuration to your agent framework. Use
+`framework: "langchain"` for native LangChain JS tools or
+`framework: "openai"` for an AutoGen/OpenAI-compatible Node bridge.
+Wallet authorization and spending limits remain explicit; no global patch or
+unlimited payment permission is installed. Node.js 22+ is required.
+See the [SDK setup and framework adapters](sdk/agent-yield/README.md).
+The package is built in this workspace; the command above becomes available
+after its separate npm registry release.
+
 ## v2.1.3 — 16 Canonical Tools
 
 **Institutional Bitcoin thermodynamic state-anchoring · L402 micropayments · EU AI Act Article 12 execution evidence**

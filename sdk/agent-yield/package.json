@@ -1,0 +1,50 @@
+{
+  "name": "@bitcoinstratigraphy/agent-yield",
+  "version": "0.1.0",
+  "description": "One-call MCP discovery and budgeted L402 middleware for autonomous agents",
+  "type": "module",
+  "main": "./dist/sdk/agent-yield/src/index.js",
+  "types": "./dist/sdk/agent-yield/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/sdk/agent-yield/src/index.d.ts",
+      "import": "./dist/sdk/agent-yield/src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "(AGPL-3.0-only OR LicenseRef-Commercial)",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "pnpm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm run build && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@getalby/sdk": "8.0.3",
+    "@noble/curves": "2.0.1",
+    "@scure/base": "2.0.0"
+  },
+  "peerDependencies": {
+    "@langchain/core": ">=1.0.0 <2"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@langchain/core": "1.3.2",
+    "@types/node": "catalog:",
+    "typescript": "~5.9.3"
+  }
+}

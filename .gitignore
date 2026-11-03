@@ -50,6 +50,7 @@ Thumbs.db
 .data/
 
 # Private enterprise audit evidence; never commit trace data.
+**/.agent-yield-state/
 /audit_trail.jsonl
 /audit_trail.jsonl.*
 

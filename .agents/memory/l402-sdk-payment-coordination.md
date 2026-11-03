@@ -14,3 +14,16 @@ Associate each response with the Authorization credential that produced it. A de
 **Why:** Two requests using one stale credential can receive 402 responses at different times. Without generation-aware handling, the later response can trigger a duplicate invoice payment.
 
 **How to apply:** Before paying a 402, compare the current credential with the credential sent on that request. Retry a newer credential; only pay when no newer credential exists, and deduplicate in-flight payment work.
+
+One-call agent onboarding simplifies connection, not spending authorization.
+Keep explicit per-payment and cumulative limits and durable reservations across
+worker restarts; do not replace the router's payment ledger with a convenience
+client's in-memory token cache.
+
+**Why:** An uncertain wallet operation can settle after the caller times out.
+Resetting local state to make onboarding easier can spend twice or bypass the
+previously authorized cumulative budget.
+
+**How to apply:** Reuse the existing durable payment core in distributable agent
+wrappers. Keep unknown outcomes reserved and require deliberate recovery instead
+of silently retrying payment or selecting a new state directory.

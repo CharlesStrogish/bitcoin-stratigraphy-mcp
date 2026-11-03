@@ -683,6 +683,28 @@ importers:
         specifier: 'catalog:'
         version: 4.23.4
 
+  sdk/agent-yield:
+    dependencies:
+      '@getalby/sdk':
+        specifier: 8.0.3
+        version: 8.0.3(typescript@5.9.3)
+      '@noble/curves':
+        specifier: 2.0.1
+        version: 2.0.1
+      '@scure/base':
+        specifier: 2.0.0
+        version: 2.0.0
+    devDependencies:
+      '@langchain/core':
+        specifier: 1.3.2
+        version: 1.3.2(ws@8.22.0)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.5
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+
   sdk/typescript:
     devDependencies:
       '@types/node':
@@ -1079,6 +1101,10 @@ packages:
 
   '@langchain/core@1.2.12':
     resolution: {integrity: sha512-DvNsrN5Gz+bgEy/B/kK1AvxxcrwdrflI8hZJxqo/DtA17FMUeWM5k0o1c6G8ChH8+sIakV2UsDudFmNZJp1ugQ==}
+    engines: {node: '>=20'}
+
+  '@langchain/core@1.3.2':
+    resolution: {integrity: sha512-kXI5wkIRy6MVNBFzFdN4MyNAGPTsodVZFQ9BRQTyOCNnKy+qPuipMCl+qaybtN6rQ+0YrJvfTxYd+u4goAHtFQ==}
     engines: {node: '>=20'}
 
   '@langchain/textsplitters@1.0.1':
@@ -3633,6 +3659,26 @@ packages:
       ws:
         optional: true
 
+  langsmith@0.11.6:
+    resolution: {integrity: sha512-5hfJM5DEZpXFxUS3U9nY2CMyBRmFnhkJj7znUODJ8vsr/Jx38tGJl4GIhV484xAY7yQFWrFOTDr33PB95kHUKg==}
+    peerDependencies:
+      '@opentelemetry/api': '*'
+      '@opentelemetry/exporter-trace-otlp-proto': '*'
+      '@opentelemetry/sdk-trace-base': '*'
+      openai: '*'
+      ws: '>=7'
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+      '@opentelemetry/exporter-trace-otlp-proto':
+        optional: true
+      '@opentelemetry/sdk-trace-base':
+        optional: true
+      openai:
+        optional: true
+      ws:
+        optional: true
+
   leven@4.1.0:
     resolution: {integrity: sha512-KZ9W9nWDT7rF7Dazg8xyLHGLrmpgq2nVNFUckhqdW3szVP6YhCpp/RAnpmVExA9JvrMynjwSLVrEj3AepHR6ew==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
@@ -4965,6 +5011,22 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       js-tiktoken: 1.0.21
       langsmith: 0.10.5(ws@8.22.0)
+      mustache: 4.2.0
+      p-queue: 6.6.2
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+      - '@opentelemetry/exporter-trace-otlp-proto'
+      - '@opentelemetry/sdk-trace-base'
+      - openai
+      - ws
+
+  '@langchain/core@1.3.2(ws@8.22.0)':
+    dependencies:
+      '@cfworker/json-schema': 4.1.1
+      '@standard-schema/spec': 1.1.0
+      js-tiktoken: 1.0.21
+      langsmith: 0.11.6(ws@8.22.0)
       mustache: 4.2.0
       p-queue: 6.6.2
       zod: 3.25.76
@@ -7517,6 +7579,12 @@ snapshots:
   jsonpointer@5.0.1: {}
 
   langsmith@0.10.5(ws@8.22.0):
+    dependencies:
+      p-queue: 6.6.2
+    optionalDependencies:
+      ws: 8.22.0
+
+  langsmith@0.11.6(ws@8.22.0):
     dependencies:
       p-queue: 6.6.2
     optionalDependencies:

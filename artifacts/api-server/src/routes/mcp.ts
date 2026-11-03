@@ -93,6 +93,10 @@ import {
   indexEpistemicDatasetReceipt,
 } from "../services/epistemicDatasetReceipt";
 import { createL402Middleware } from "../middleware/l402";
+import {
+  type GenesisGrantStore,
+  type GenesisGrantReservation,
+} from "../lib/genesis-grant-store";
 import { EnterpriseCreditTabs } from "../lib/enterprise-credit-tabs";
 import { registerEnterpriseCreditRoutes } from "./enterprise-credit";
 import { invoicePow } from "../lib/invoice-pow";
@@ -4759,6 +4763,7 @@ function createBitcoinStratigraphyMcpServer(
   readIntegrity?: () => ReturnType<typeof createToolIntegrityManifest>,
   signResponse?: (name: string, result: CallToolResult) => CallToolResult,
   onToolResult?: (name: string, args: Record<string, unknown>, result: CallToolResult) => Promise<CallToolResult>,
+  onGenesisResult?: (successful: boolean) => Promise<void>,
 ) {
   const server = new McpServer(
     { ...MCP_SERVER_INFO, description: ENGINE_DESCRIPTION },
@@ -5245,9 +5250,16 @@ function createBitcoinStratigraphyMcpServer(
     );
   };
   server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    let result = withStratigraphyMetadata(await executeTool(request));
-    if (onToolResult) result = await onToolResult(request.params.name, request.params.arguments ?? {}, result);
-    return signResponse ? signResponse(request.params.name, result) : result;
+    try {
+      let result = withStratigraphyMetadata(await executeTool(request));
+      if (onToolResult) result = await onToolResult(request.params.name, request.params.arguments ?? {}, result);
+      const signed = signResponse ? signResponse(request.params.name, result) : result;
+      await onGenesisResult?.(!signed.isError);
+      return signed;
+    } catch (error) {
+      await onGenesisResult?.(false);
+      throw error;
+    }
   });
 
   return server;
@@ -5279,6 +5291,7 @@ function mcpServerFactory(
     locals.readToolIntegrity as (() => ReturnType<typeof createToolIntegrityManifest>) | undefined,
     locals.signToolResponse as ((name: string, result: CallToolResult) => CallToolResult) | undefined,
     locals.onToolResult as ((name: string, args: Record<string, unknown>, result: CallToolResult) => Promise<CallToolResult>) | undefined,
+    (locals.genesisGrant as GenesisGrantReservation | undefined)?.complete,
   );
 }
 
@@ -5386,6 +5399,7 @@ export function registerMcpRoute(
     x402ResourceServer?: X402ResourceServerLike | null;
     sessionSecret?: string;
     creditTabs?: EnterpriseCreditTabs;
+    genesisGrantStore?: GenesisGrantStore;
     usageStore?: MacaroonUsageStore;
     ledger?: RevenueLedger;
     onPaidToolCompleted?: (name: string, result: CallToolResult, paymentHash: string) => void;
@@ -5476,6 +5490,7 @@ export function registerMcpRoute(
   const settlementRouter =
     options.settlementRouter ?? createDefaultMultiSettlementRouter();
   const creditTabs = options.creditTabs ?? new EnterpriseCreditTabs();
+  const genesisGrantStore = options.genesisGrantStore;
   registerEnterpriseCreditRoutes(app, {
     tabs: creditTabs, router: settlementRouter, sessionSecret: options.sessionSecret, ledger: options.ledger,
   });
@@ -5590,6 +5605,7 @@ export function registerMcpRoute(
         const l402 = createL402Middleware({
           invoicePow,
           creditTabs,
+          genesisGrantStore,
           amountSats,
           expectedOutputSchema: mcpToolDefinitions.find((tool) =>
             tool.name === canonicalToolName(name))?.outputSchema,

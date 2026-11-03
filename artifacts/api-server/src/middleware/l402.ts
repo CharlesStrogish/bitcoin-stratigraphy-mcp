@@ -6,6 +6,7 @@ import { l402CredentialCache } from "../lib/l402-credential-cache";
 import { createThermodynamicPricing } from "../lib/thermodynamic-pricing";
 import type { createInvoicePow } from "../lib/invoice-pow";
 import type { EnterpriseCreditTabs } from "../lib/enterprise-credit-tabs";
+import type { GenesisGrantStore } from "../lib/genesis-grant-store";
 import type { Request, RequestHandler, Response } from "express";
 import {
   attenuateSubscriptionMacaroon,
@@ -58,6 +59,8 @@ export type L402MiddlewareOptions = {
   invoicePow?: ReturnType<typeof createInvoicePow>;
   /** MCP-only deferred billing; never enabled for unrelated paid HTTP routes. */
   creditTabs?: EnterpriseCreditTabs;
+  /** Only enabled by MCP tool gates, never REST or invoice-only endpoints. */
+  genesisGrantStore?: GenesisGrantStore;
   expectedOutputSchema?: Record<string, unknown> | ((req: Request) => Record<string, unknown>);
   /**
    * Exact MCP tool this route executes, checked against `rpc` and
@@ -606,6 +609,38 @@ export function createL402Middleware(
           });
           return;
         }
+      }
+    }
+    if (options.genesisGrantStore && nip98Pubkey && req.body?.method === "tools/call" &&
+        !/^L402\b/i.test(req.get("Authorization") ?? "") &&
+        !req.get("PAYMENT-SIGNATURE") && !req.get("X-Payment") &&
+        !req.originalUrl.split("?")[0]!.match(/\/invoice\/request\/?$/i)) {
+      try {
+        const grant = await options.genesisGrantStore.reserve(nip98Pubkey);
+        if (grant) {
+          const complete = (successful: boolean) => {
+            if (!successful && !res.headersSent) res.removeHeader("X-Genesis-Grant");
+            return grant.complete(successful);
+          };
+          res.locals.genesisGrant = { ...grant, complete };
+          res.setHeader("Cache-Control", "no-store");
+          res.setHeader("X-Genesis-Grant",
+            `${grant.remaining} calls remaining before L402 activation`);
+          // Successful results finalize durably in the MCP execution handler.
+          // Validation/transport errors before that handler refund their slot.
+          res.once("finish", () => {
+            if (res.statusCode !== 202 && !res.locals.pollingTaskStarted)
+              void complete(false).catch(error =>
+                req.log?.error({ err: error }, "Genesis grant cleanup unavailable"));
+          });
+          attachLicensingCompliance(res);
+          next();
+          return;
+        }
+      } catch (error) {
+        req.log?.error({ err: error }, "Genesis grant accounting unavailable");
+        res.status(503).json({ error: "Genesis grant accounting unavailable" });
+        return;
       }
     }
     if (options.creditTabs && nip98Pubkey && !authorization && !req.get("PAYMENT-SIGNATURE") &&

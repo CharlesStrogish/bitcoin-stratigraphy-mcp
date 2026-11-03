@@ -29,6 +29,7 @@ export function registerPublicCors(
       "Access-Control-Expose-Headers": [
         "*",
         "WWW-Authenticate",
+        "X-Genesis-Grant",
         "X-Limitation-Of-Liability",
         "X-L402-Receipt",
         "X-L402-Licensing-Compliance",

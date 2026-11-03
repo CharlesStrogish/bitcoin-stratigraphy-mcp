@@ -80,7 +80,8 @@ test("one shared handler decorates all canonical tools before signing and declar
   const source = readFileSync(
     new URL("../artifacts/api-server/src/routes/mcp.ts", import.meta.url), "utf8",
   );
-  assert.match(source, /let result = withStratigraphyMetadata\(await executeTool\(request\)\);\s*if \(onToolResult\)[^\n]*\s*return signResponse \? signResponse/);
+  assert.match(source, /let result = withStratigraphyMetadata\(await executeTool\(request\)\);\s*if \(onToolResult\)[^\n]*\s*const signed = signResponse \? signResponse/);
+  assert.match(source, /await onGenesisResult\?\.\(!signed\.isError\);\s*return signed/);
   assert.match(source, /_stratigraphy_metadata: STRATIGRAPHY_METADATA_SCHEMA/);
   assert.equal(source.match(/withStratigraphyMetadata\(await executeTool\(request\)\)/g).length, 1);
 });

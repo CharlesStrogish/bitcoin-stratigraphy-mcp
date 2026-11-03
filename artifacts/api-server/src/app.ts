@@ -24,6 +24,7 @@ import { loadToolIntegrityKey } from "./lib/tool-integrity";
 import { createPostgresPaymentChallengeStore } from "./lib/postgres-payment-challenge-store";
 import { registerNostrStatusRoute } from "./routes/nostr-status";
 import { createPostgresMacaroonUsageStore } from "./lib/postgres-macaroon-usage-store";
+import { createPostgresGenesisGrantStore } from "./lib/genesis-grant-store";
 import { createPostgresMacaroonRevocationStore } from "./lib/postgres-macaroon-revocation-store";
 import { createPostgresRevenueLedger } from "./services/postgres-ledger";
 import { registerRevenueAnalyticsRoutes } from "./routes/analytics";
@@ -165,6 +166,7 @@ registerMcpServerCardRoute(app);
 // webhook callback, so receivers verify both with the same public key.
 const toolIntegrityKey = loadToolIntegrityKey();
 registerMcpRoute(app, {
+  genesisGrantStore: createPostgresGenesisGrantStore(),
   pipelineReceiptStore: withPipelineReceiptBroadcast(postgresPipelineReceiptStore()),
   onPaidToolCompleted: (name, result, paymentHash) => receiptMesh.single(name, result, paymentHash),
   usageStore: macaroonUsageStore,

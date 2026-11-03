@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/genesis-grant.test.js",
   "./dist/enterprise-webhook.test.js",
   "./dist/swarm-referral.test.js",
   "./dist/high-velocity.test.js",
@@ -166,6 +167,7 @@ await build({
 
 await build({
   entryPoints: {
+    "genesis-grant.test": "./tests/unit/genesis-grant.test.ts",
     "enterprise-webhook.test": "./tests/unit/enterprise-webhook.test.ts",
     "swarm-referral.test": "./tests/unit/swarm-referral.test.ts",
     "high-velocity.test": "./tests/unit/high-velocity.test.ts",

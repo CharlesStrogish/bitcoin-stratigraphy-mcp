@@ -55,7 +55,7 @@
 - [Cookbook dependency security](cookbook-dependency-security.md) — optional client frameworks must not introduce vulnerable dependencies into the publishable project.
 - [OpenAPI Zod generation](openapi-zod-codegen.md) — URI formats on literals and item-less array unions produce invalid generated Zod validators.
 - [Public OpenAPI contract](openapi-contract-policy.md) — preserve all existing endpoints; update the API-owned specification instead of adding a shadowed static copy.
-- [MCP freemium policy](mcp-freemium-policy.md) — exactly two free sandbox capabilities; all other canonical tools require paid access.
+- [MCP freemium policy](mcp-freemium-policy.md) — two permanent free sandbox tools; ten-call NIP-98 Genesis Grant, then normal paid access.
 - [Macro payment caching](macro-payment-caching.md) — share exact invoice proofs across descendants, but never cache away expiry, revocation, or inherited quotas.
 - [High-Velocity funding](high-velocity-funding.md) — Whale budgets buy shared fixed-price, tool-scoped quotas, not transferable wallet credit; require issuer-only pricing privileges.
 - [Swarm royalty policy](swarm-royalty-policy.md) — separate 5% referrals, authenticated owner withdrawals, exact discounted msats; preserve the existing 21%, Whale quotas and tool count.

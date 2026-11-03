@@ -17,12 +17,23 @@ async function setup(t, options = {}) {
   const stateDirectory = await mkdtemp(join(tmpdir(), "agent-yield-"));
   t.after(() => rm(stateDirectory, { recursive: true, force: true }));
   const bolt11 = invoice();
+  const receivingInvoice = invoice(21000n);
   let payments = 0, discoveries = 0, claimInvoices = 0;
   const requests = [], errors = [];
   const fetch = async (input, init) => {
     const request = new Request(input, init);
     assert.equal(request.redirect, "error");
     const body = await request.clone().json();
+    if (request.url === "https://bitcoinstratigraphy.com/api/claim-yield") {
+      assert.deepEqual(body, {
+        macaroons: ["synthetic-macaroon"], bolt11_invoice: receivingInvoice,
+      });
+      if (options.claimError) throw new Error("synthetic-claim-failure");
+      return json({
+        status: options.claimPending ? "PENDING" : "SETTLED",
+        payment_sent: options.claimPending ? null : true, claim_id: "synthetic-claim",
+      }, options.claimPending ? 202 : 200);
+    }
     requests.push({ body, headers: request.headers, url: request.url });
     assert.equal(request.headers.get("MCP-Protocol-Version"), "2026-07-28");
     assert.equal(request.headers.get("Mcp-Method"), body.method);
@@ -70,8 +81,10 @@ async function setup(t, options = {}) {
       if (options.uncertain) throw new Error("secret-never-reflect");
       return { preimage: options.badProof ? "02".repeat(32) : preimage };
     },
-    async makeInvoice() {
+    async makeInvoice(amountMsats) {
       claimInvoices++;
+      assert.equal(amountMsats, 21000);
+      if (options.receiving) return { invoice: receivingInvoice };
       // Yield errors must not affect successful data execution.
       throw new Error("synthetic-receiving-wallet-unavailable");
     },
@@ -279,4 +292,97 @@ test("raw fetch preserves binary request bytes and foreign-origin 402s never pay
   assert.equal(response.status, 402);
   assert.deepEqual(seen, Buffer.from(bytes));
   assert.equal(s.counts().payments, 0);
+});
+
+function captureReceipts(t) {
+  const lines = [];
+  t.mock.method(console, "error", line => lines.push(line));
+  // Explicitly enable receipts even if the test runner inherited quiet mode.
+  const prior = process.env.QUIET_STRATIGRAPHY;
+  delete process.env.QUIET_STRATIGRAPHY;
+  t.after(() => {
+    if (prior === undefined) delete process.env.QUIET_STRATIGRAPHY;
+    else process.env.QUIET_STRATIGRAPHY = prior;
+  });
+  return lines;
+}
+
+test("receipts show yellow allocation then green settlement, preserving callbacks and single payment", async t => {
+  const lines = captureReceipts(t);
+  const events = [];
+  const s = await setup(t, { receiving: true, policy: {
+    onYieldClaim: event => events.push(event),
+  } });
+  const agent = await withFiduciaryYield(s.config);
+  assert.deepEqual(await agent.fiduciary.callTool("proof.verify"), { verified: true });
+  await agent.fiduciary.drain();
+  assert.deepEqual(lines, [
+    "\x1b[33m[Bitcoin Stratigraphy] ⚡ Thermodynamic Yield Allocated: 21 Sats (settlement pending).\x1b[0m",
+    "\x1b[32m[Bitcoin Stratigraphy] ⚡ Thermodynamic Yield Earned: 21 Sats routed to agent wallet.\x1b[0m",
+  ]);
+  assert.deepEqual(events, [{ status: "settled", claimId: "synthetic-claim", amountMsats: "21000" }]);
+  assert.equal(s.counts().payments, 1);
+  // Reusing the proof or recovering an already-settled claim adds no receipt.
+  // Restart preserves the exact RPC request ID/body bound to the invoice.
+  const restarted = await withFiduciaryYield(s.config);
+  await restarted.fiduciary.callTool("proof.verify");
+  await restarted.fiduciary.recoverClaim(hash);
+  await restarted.fiduciary.drain();
+  assert.equal(lines.length, 2);
+  assert.equal(s.counts().payments, 1);
+  assert.ok(lines.every(line => !line.includes(preimage) && !line.includes(invoice())));
+});
+
+test("quiet mode suppresses receipts without suppressing settlement or callbacks", async t => {
+  const lines = captureReceipts(t);
+  process.env.QUIET_STRATIGRAPHY = "true";
+  const events = [];
+  const s = await setup(t, { receiving: true, policy: {
+    onYieldClaim: event => events.push(event),
+  } });
+  const agent = await withFiduciaryYield(s.config);
+  await agent.fiduciary.callTool("proof.verify");
+  await agent.fiduciary.drain();
+  assert.deepEqual(lines, []);
+  assert.equal(events[0].status, "settled");
+  assert.equal(s.counts().payments, 1);
+});
+
+test("pending and failed claims show only an allocation, never earned funds", async t => {
+  const lines = captureReceipts(t);
+  for (const options of [{}, { receiving: true, claimPending: true }, { receiving: true, claimError: true }]) {
+    const s = await setup(t, options);
+    const agent = await withFiduciaryYield(s.config);
+    await agent.fiduciary.callTool("proof.verify");
+    await agent.fiduciary.drain();
+  }
+  assert.equal(lines.length, 3);
+  assert.ok(lines.every(line => line.startsWith("\x1b[33m") && !line.includes("Earned")));
+});
+
+test("free, rejected and invalid-result flows print no yield receipts", async t => {
+  const lines = captureReceipts(t);
+  const free = await setup(t);
+  const agent = await withFiduciaryYield(free.config);
+  await agent.fiduciary.callTool("stratigraphy.list");
+  for (const options of [{ badProof: true }, { repeat402: true }, { toolError: true }, { wrongId: true }]) {
+    const s = await setup(t, options);
+    const failed = await withFiduciaryYield(s.config);
+    await assert.rejects(failed.fiduciary.callTool("proof.verify"));
+    await failed.fiduciary.drain();
+  }
+  assert.deepEqual(lines, []);
+});
+
+test("a throwing terminal and user callback cannot break settled payment flows", async t => {
+  captureReceipts(t);
+  t.mock.method(console, "error", () => { throw new Error("terminal unavailable"); });
+  const s = await setup(t, { receiving: true, policy: {
+    onYieldClaim: async () => { throw new Error("observer unavailable"); },
+  } });
+  const agent = await withFiduciaryYield(s.config);
+  assert.deepEqual(await agent.fiduciary.callTool("proof.verify"), { verified: true });
+  await agent.fiduciary.drain();
+  assert.deepEqual(s.errors, []);
+  assert.equal(s.counts().payments, 1);
 });

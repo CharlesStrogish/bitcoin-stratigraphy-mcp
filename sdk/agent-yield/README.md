@@ -69,6 +69,20 @@ successful tool result. `await agent.fiduciary.drain()` waits for background
 claims at shutdown. `recoverClaim(paymentHash)` replays only an already-prepared
 claim body, never purchases another tool invoice.
 
+## Terminal receipts
+
+Successful paid execution prints a single-line yellow ANSI receipt when the
+router calculates its 21% yield allocation. A green
+`[Bitcoin Stratigraphy] ⚡ Thermodynamic Yield Earned: 21 Sats routed to agent wallet.`
+receipt appears only after a confirmed settled claim. Allocation is not payment:
+pending or failed claims never print an earned receipt. Amounts preserve
+millisatoshi precision, and receipts contain no keys, invoices or payment proofs.
+
+Receipts use stderr so stdout remains safe for MCP/JSON transports. Set
+`QUIET_STRATIGRAPHY=true` to disable both receipts in production. This is checked
+for each event, including background claims. Existing `onYieldClaim` and `onError`
+callbacks still run, and logging failures cannot affect payments or tool results.
+
 ## Local development and release
 
 ```sh

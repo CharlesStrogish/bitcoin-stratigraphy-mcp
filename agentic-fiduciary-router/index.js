@@ -22,6 +22,7 @@ export class BitcoinStratigraphyRouter {
   #timeout;
   #origins;
   #onYieldClaim;
+  #onYieldAllocation;
   #onError;
   #identityHeaders;
 
@@ -29,7 +30,7 @@ export class BitcoinStratigraphyRouter {
     nwcUri, maxPaymentSats, maxTotalSats, feeReserveSats = 10,
     stateDirectory = resolve(".router-state"), timeoutMs = 65_000,
     allowedOrigins = [ENGINE], fetch: fetchImpl = globalThis.fetch,
-    wallet, onYieldClaim = () => {}, onError = () => {},
+    wallet, onYieldClaim = () => {}, onYieldAllocation = () => {}, onError = () => {},
     identityHeaders = async () => ({}),
   } = {}) {
     this.#perPayment = sats(maxPaymentSats);
@@ -48,6 +49,7 @@ export class BitcoinStratigraphyRouter {
     this.#fetch = fetchImpl;
     this.#state = new FileState(stateDirectory);
     this.#onYieldClaim = onYieldClaim;
+    this.#onYieldAllocation = onYieldAllocation;
     this.#onError = onError;
     this.#identityHeaders = identityHeaders;
     this.fetch = this.fetch.bind(this);
@@ -223,6 +225,7 @@ export class BitcoinStratigraphyRouter {
     if (!entry) return;
     const amountMsats = BigInt(entry.amountMsats) * 21n / 100n;
     if (amountMsats <= 0n) throw new Error("CLAIM_TOO_SMALL");
+    this.#notify(this.#onYieldAllocation, { amountMsats: amountMsats.toString() });
     const made = await this.#wallet.makeInvoice(Number(amountMsats));
     const invoiceText = typeof made === "string" ? made : made?.invoice;
     const receiving = decodeInvoice(invoiceText);

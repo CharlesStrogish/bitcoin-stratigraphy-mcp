@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { BitcoinStratigraphyRouter } from "../../../agentic-fiduciary-router/index.js";
 import { withInvoicePow } from "../../typescript/invoice-pow.js";
 import { readRpc } from "./protocol.js";
+import { terminalReceipt } from "./terminal-receipts.js";
 
 export const DEFAULT_MCP_URL = "https://bitcoinstratigraphy.com/mcp";
 
@@ -57,7 +58,10 @@ interface RouterCore {
 // The JS router is the single source of payment truth. tsc includes it and its
 // local dependencies in dist, making the packed SDK independent of this repo.
 const Router = BitcoinStratigraphyRouter as unknown as new (
-  options: FiduciaryOptions & { allowedOrigins: string[] },
+  options: FiduciaryOptions & {
+    allowedOrigins: string[];
+    onYieldAllocation: (event: { amountMsats: string }) => void;
+  },
 ) => RouterCore;
 
 export class FiduciaryClient {
@@ -105,6 +109,11 @@ export class FiduciaryClient {
       stateDirectory: options.stateDirectory ?? resolve(".agent-yield-state"),
       allowedOrigins: [url.origin],
       fetch: transport,
+      onYieldAllocation: event => terminalReceipt("allocated", event.amountMsats),
+      onYieldClaim: event => {
+        if (event.status === "settled") terminalReceipt("settled", event.amountMsats);
+        return options.onYieldClaim?.(event);
+      },
     });
     this.fetch = async (input, init) => {
       const request = new Request(input, init);

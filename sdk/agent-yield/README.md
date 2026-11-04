@@ -40,7 +40,55 @@ and does not retrofit private internals of an already-created agent.
   names back to canonical MCP names. Python AutoGen cannot import a Node
   module directly; use a Node bridge or the existing Python MCP SDK.
 
-## Automatic connection and settlement
+## Fiduciary Armor (0.2)
+
+Set `fiduciary.max_spend_sats` (default **5000**, integer satoshis) alongside
+the existing required `maxPaymentSats` and `maxTotalSats`. The new session
+circuit breaker is an additional in-memory cap, not a replacement for durable
+cross-process accounting. It reserves invoice principal plus `feeReserveSats`
+before wallet access, then accounts for verified payments and reported routing
+fees. Unreported fees retain their conservative allowance; unknown payment
+outcomes remain reserved. A wallet must enforce its own fee ceiling. Unexpected
+excess fees latch the session breaker and keep the existing durable block.
+
+Once capacity is exhausted, tool calls/raw routed fetches throw
+`CircuitBreakerError: Maximum authorized thermodynamic spend reached.`
+without making another outbound routing request. When a price is not yet known,
+one unpaid 402 quote may be needed; an oversized quote latches the breaker
+**before payment or the authorized HTTP retry**. Subsequent calls stay blocked.
+Public catalog discovery and recovery of existing yield claims remain available.
+In-flight requests already admitted can finish within their reserved capacity.
+Instantiate a new client to start a new session; **never delete durable wallet
+state to reset spending authorization**.
+
+All successful tool entry points, including framework tools, now return a
+`TruthReceipt` rather than the bare result:
+
+```ts
+const receipt = await agent.fiduciary.callTool("proof.verify", args);
+console.log(receipt.payload); // the previous return value
+// receipt.thermodynamic_cost: exact decimal-string sats (invoice principal)
+// receipt.timestamp: UTC client-observed settlement time
+// receipt.cryptographic_proof: verified L402 payment preimage
+```
+
+`payment_hash` binds the preimage to its invoice, and `payload_sha256` is a local
+digest of the SDK's JSON serialization of the returned payload. **L402 proves
+payment, not payload integrity or Bitcoin anchoring.** `evidence_scope` explicitly
+states `payment_only`; the local digest is not a signed server attestation.
+Genesis/free calls have zero observed cost, a null proof, and
+`payment_not_observed` scope; externally supplied credentials also have no new
+SDK-observed payment. Their timestamp is receipt creation, not settlement.
+Legacy paid records lacking a stored settlement time report `timestamp: null`
+with `timestamp_kind: "unknown"` rather than inventing a time.
+
+Treat receipts containing preimages as sensitive payment evidence, not public
+telemetry or prompt content. Raw `agent.fetch` deliberately remains a native
+HTTP `Response`; it enforces the breaker but does not change HTTP framing.
+Yellow/green stderr receipts include remaining capacity and never print proofs.
+This return-shape change is staged as **0.2.0**; building does not publish it.
+
+### Transport and settlement
 
 Stateless MCP 2026-07-28 discovery, pagination, JSON/SSE responses and bounded
 invoice-admission proof-of-work are handled internally. Paid calls receive

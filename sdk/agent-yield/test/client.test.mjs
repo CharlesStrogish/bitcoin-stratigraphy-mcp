@@ -111,7 +111,10 @@ test("one call preserves config, discovers tools, and runs free tools without wa
   assert.equal(s.config.tools.length, 1);
   assert.equal(globalThis.fetch, originalFetch);
   assert.equal(agent.tools.length, 3);
-  assert.deepEqual(await agent.fiduciary.tools[0].invoke({}), [{ type: "text", text: "free" }]);
+  const receipt = await agent.fiduciary.tools[0].invoke({});
+  assert.deepEqual(receipt.payload, [{ type: "text", text: "free" }]);
+  assert.equal(receipt.cryptographic_proof, null);
+  assert.equal(receipt.thermodynamic_cost, "0");
   assert.deepEqual(s.counts(), { payments: 0, discoveries: 1, claimInvoices: 0 });
 });
 
@@ -119,7 +122,7 @@ for (const mode of [{}, { legacy: true }, { sse: true }, { pow: true }]) {
   test(`automatic discovery/payment/retry ${JSON.stringify(mode)}`, async t => {
     const s = await setup(t, mode);
     const agent = await withFiduciaryYield(s.config);
-    assert.deepEqual(await agent.fiduciary.callTool("proof.verify", { proof: "example" }), { verified: true });
+    assert.deepEqual((await agent.fiduciary.callTool("proof.verify", { proof: "example" })).payload, { verified: true });
     await agent.fiduciary.drain();
     assert.equal(s.counts().payments, 1);
     assert.equal(s.counts().discoveries, 1);
@@ -190,7 +193,7 @@ test("OpenAI bridge maps valid names back to canonical MCP tools", async t => {
   const agent = await withFiduciaryYield({ ...s.config, framework: "openai" });
   const descriptor = agent.tools[1];
   assert.match(descriptor.function.name, /^[a-zA-Z0-9_-]{1,64}$/);
-  assert.deepEqual(await agent.fiduciary.executeTool(descriptor.function.name), [{ type: "text", text: "free" }]);
+  assert.deepEqual((await agent.fiduciary.executeTool(descriptor.function.name)).payload, [{ type: "text", text: "free" }]);
   await assert.rejects(agent.fiduciary.executeTool("unknown"), /MCP_UNKNOWN_TOOL/);
 });
 
@@ -200,7 +203,7 @@ test("native LangChain tools invoke through the same discovered MCP transport", 
   const free = agent.tools[1];
   assert.equal(typeof free.invoke, "function");
   assert.match(free.name, /^[a-zA-Z0-9_-]{1,64}$/);
-  assert.deepEqual(await free.invoke({}), [{ type: "text", text: "free" }]);
+  assert.deepEqual((await free.invoke({})).payload, [{ type: "text", text: "free" }]);
   assert.equal(s.counts().payments, 0);
 });
 
@@ -314,11 +317,11 @@ test("receipts show yellow allocation then green settlement, preserving callback
     onYieldClaim: event => events.push(event),
   } });
   const agent = await withFiduciaryYield(s.config);
-  assert.deepEqual(await agent.fiduciary.callTool("proof.verify"), { verified: true });
+  assert.deepEqual((await agent.fiduciary.callTool("proof.verify")).payload, { verified: true });
   await agent.fiduciary.drain();
   assert.deepEqual(lines, [
-    "\x1b[33m[Bitcoin Stratigraphy] ⚡ Thermodynamic Yield Allocated: 21 Sats (settlement pending).\x1b[0m",
-    "\x1b[32m[Bitcoin Stratigraphy] ⚡ Thermodynamic Yield Earned: 21 Sats routed to agent wallet.\x1b[0m",
+    "\x1b[33m[Bitcoin Stratigraphy] ⚡ Thermodynamic Yield Allocated: 21 Sats (settlement pending). Circuit breaker: 4890 Sats remaining.\x1b[0m",
+    "\x1b[32m[Bitcoin Stratigraphy] ⚡ Thermodynamic Yield Earned: 21 Sats routed to agent wallet. Circuit breaker: 4890 Sats remaining.\x1b[0m",
   ]);
   assert.deepEqual(events, [{ status: "settled", claimId: "synthetic-claim", amountMsats: "21000" }]);
   assert.equal(s.counts().payments, 1);
@@ -381,7 +384,7 @@ test("a throwing terminal and user callback cannot break settled payment flows",
     onYieldClaim: async () => { throw new Error("observer unavailable"); },
   } });
   const agent = await withFiduciaryYield(s.config);
-  assert.deepEqual(await agent.fiduciary.callTool("proof.verify"), { verified: true });
+  assert.deepEqual((await agent.fiduciary.callTool("proof.verify")).payload, { verified: true });
   await agent.fiduciary.drain();
   assert.deepEqual(s.errors, []);
   assert.equal(s.counts().payments, 1);

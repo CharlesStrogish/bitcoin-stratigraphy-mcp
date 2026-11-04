@@ -5,6 +5,7 @@
 export function terminalReceipt(
   kind: "allocated" | "settled",
   amountMsats: string,
+  remainingMsats?: string,
 ): void {
   try {
     if (process.env.QUIET_STRATIGRAPHY?.toLowerCase() === "true") return;
@@ -18,6 +19,12 @@ export function terminalReceipt(
       ? `Thermodynamic Yield Earned: ${sats} Sats routed to agent wallet.`
       : `Thermodynamic Yield Allocated: ${sats} Sats (settlement pending).`;
     // stderr keeps stdout usable for MCP/JSON protocols; no keys or proofs.
-    console.error(`${color}[Bitcoin Stratigraphy] ⚡ ${message}\x1b[0m`);
+    let capacity = "";
+    if (remainingMsats !== undefined && /^\d+$/.test(remainingMsats)) {
+      const remaining = BigInt(remainingMsats);
+      const decimals = (remaining % 1000n).toString().padStart(3, "0").replace(/0+$/, "");
+      capacity = ` Circuit breaker: ${remaining / 1000n}${decimals ? `.${decimals}` : ""} Sats remaining.`;
+    }
+    console.error(`${color}[Bitcoin Stratigraphy] ⚡ ${message}${capacity}\x1b[0m`);
   } catch { /* Logging is best effort, never a payment dependency. */ }
 }

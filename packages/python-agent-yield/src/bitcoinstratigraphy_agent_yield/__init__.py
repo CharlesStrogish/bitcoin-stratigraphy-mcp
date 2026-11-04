@@ -3,12 +3,15 @@
 from .adapters import AgentTool, with_fiduciary_yield
 from .client import DEFAULT_MCP_URL, FiduciaryClient
 from .errors import FiduciaryError
+from .armor import CircuitBreakerError, TruthReceipt
 
 __all__ = [
+    "CircuitBreakerError",
+    "TruthReceipt",
     "AgentTool",
     "DEFAULT_MCP_URL",
     "FiduciaryClient",
     "FiduciaryError",
     "with_fiduciary_yield",
 ]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

@@ -100,7 +100,52 @@ Cancelling the awaiting task does not reverse an in-progress wallet operation.
 Close the config's client at application shutdown. For public-tools object
 wrapping, supply an application-owned `http_client` and close it yourself.
 
-## Connection and payment guarantees
+## Fiduciary Armor (0.2)
+
+Add `"max_spend_sats": 5000` to your `fiduciary` policy; **5000 sats** is the
+default. This in-memory, thread-safe session breaker is independent of the
+existing durable wallet budgets. Each payment reserves invoice principal plus
+the configured fee allowance before wallet access. Reported routing fees count
+toward session spend; unreported fees and uncertain payments conservatively
+retain their reservations. Wallet adapters must enforce their own fee ceiling.
+Excess reported fees block future durable spending and can latch the session cap.
+
+Exhausted sessions throw
+`CircuitBreakerError: Maximum authorized thermodynamic spend reached.`
+before another outbound tool request. If the price is unknown, one unpaid 402
+quote may be needed; an oversized quote latches the breaker before wallet access
+or a paid HTTP retry. All later tool requests are blocked. Public discovery and
+recovery of existing claims remain available, and already-admitted payments can
+finish within their reservations. A new client starts a new session, but the
+durable ledger still prevents resetting wallet authorization.
+
+Every successful sync/async/framework tool now returns a JSON-serializable
+`TruthReceipt` dictionary with attribute access for the four main fields:
+
+```python
+receipt = agent["fiduciary"].call_tool("proof.verify", arguments)
+data = receipt.payload  # previous return value
+# receipt.thermodynamic_cost: exact decimal-string sats (invoice principal)
+# receipt.timestamp: UTC client-observed settlement time
+# receipt.cryptographic_proof: verified payment preimage
+```
+
+The additional `payment_hash` verifies the preimage and `payload_sha256` is a
+local digest of this SDK's JSON serialization of the returned payload.
+**Payment proof is not a signature over the data or proof of Bitcoin anchoring.**
+`evidence_scope` says `payment_only`, not independently verified data integrity.
+Free/Genesis calls have zero observed cost and null payment proof, scope
+`payment_not_observed`, and a receipt-observation timestamp. Externally supplied
+credentials also have no new SDK-observed payment. Old paid records without a
+stored time retain a null timestamp and `timestamp_kind: "unknown"`.
+
+Treat receipt preimages as sensitive; do not send them to public logs or prompts.
+Yellow/green stderr receipts include remaining circuit capacity, never proofs.
+The private SQLite ledger upgrades existing files to retain observed settlement
+times without inventing timestamps for historical payments.
+This return-shape change is staged as **0.2.0**, not automatically published.
+
+### Transport and settlement
 
 - Discovers the live paginated catalog at `https://bitcoinstratigraphy.com/mcp`.
   Handles MCP `2026-07-28`, JSON and SSE, bounded response sizes, timeout and

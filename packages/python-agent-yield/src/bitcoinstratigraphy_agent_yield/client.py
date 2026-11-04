@@ -23,6 +23,7 @@ from .protocol import (
 )
 from .receipts import terminal_receipt
 from .state import PaymentState
+from .armor import SpendCircuit, TruthReceipt
 
 DEFAULT_MCP_URL = "https://bitcoinstratigraphy.com/mcp"
 
@@ -34,6 +35,7 @@ class FiduciaryClient:
         wallet=None,
         max_payment_sats: int = 0,
         max_total_sats: int = 0,
+        max_spend_sats: int = 5000,
         fee_reserve_sats: int = 10,
         state_directory: str = ".agent-yield-state",
         mcp_url: str = DEFAULT_MCP_URL,
@@ -64,6 +66,7 @@ class FiduciaryClient:
         ):
             raise FiduciaryError("INVALID_TIMEOUT")
         self.url = mcp_url
+        self.circuit = SpendCircuit(max_spend_sats)
         self.claim_url = f"{parts.scheme}://{parts.netloc}/api/claim-yield"
         self.wallet, self.timeout = wallet, timeout
         self.limit, self.total, self.fee = (
@@ -200,17 +203,27 @@ class FiduciaryClient:
         binding = hashlib.sha256(
             f"POST\n{self.url}\n".encode() + body + json.dumps(binding_headers).encode()
         ).hexdigest()
-        record = self.state.reserve(
-            invoice.payment_hash,
-            binding,
-            bolt11,
-            macaroon,
-            invoice.amount_msats,
-            self.fee,
-            self.limit,
-            self.total,
+        release = self.circuit.reserve(
+            invoice.payment_hash, invoice.amount_msats + self.fee
         )
+        try:
+            record = self.state.reserve(
+                invoice.payment_hash,
+                binding,
+                bolt11,
+                macaroon,
+                invoice.amount_msats,
+                self.fee,
+                self.limit,
+                self.total,
+            )
+        except BaseException:
+            if release:
+                release()  # No wallet operation has started.
+            raise
         if record:
+            if release:
+                release()
             preimage = record["preimage"]
         else:
             try:
@@ -226,6 +239,9 @@ class FiduciaryClient:
                 payment.get("fees_paid"),
                 self.fee,
             )
+            fees = payment.get("fees_paid")
+            if type(fees) is int and fees >= 0:
+                self.circuit.settle(invoice.payment_hash, invoice.amount_msats + fees)
         if not verify_preimage(preimage, invoice.payment_hash):
             raise FiduciaryError("STORED_PROOF_INVALID")
         if invoice.expires_at <= time.time():
@@ -238,6 +254,8 @@ class FiduciaryClient:
         return self._send(self.url, body, headers), invoice.payment_hash
 
     def _rpc(self, method, params):
+        if method == "tools/call":
+            self.circuit.assert_capacity()
         request_id = uuid.uuid4().hex
         body = json.dumps(
             {
@@ -335,7 +353,10 @@ class FiduciaryClient:
                 self._claim(payment_hash)
             except Exception:
                 self._notify(self.on_error, {"code": "YIELD_CLAIM_RECOVERY_REQUIRED"})
-        return result.get("structuredContent", result.get("content", result))
+        return TruthReceipt(
+            result.get("structuredContent", result.get("content", result)),
+            self.state.payment(payment_hash) if payment_hash else None,
+        )
 
     async def acall_tool(self, name, arguments=None):
         """Native async entry point; blocking wallet adapters stay off the event loop."""
@@ -348,7 +369,7 @@ class FiduciaryClient:
         if not record:
             return
         amount = record["amount"] * 21 // 100
-        terminal_receipt("allocated", amount)
+        terminal_receipt("allocated", amount, self.circuit.remaining_msats)
         if amount <= 0:
             raise FiduciaryError("CLAIM_TOO_SMALL")
         made = self.wallet.make_invoice(amount)
@@ -386,7 +407,7 @@ class FiduciaryClient:
         if not changed:
             return
         if settled:
-            terminal_receipt("settled", amount)
+            terminal_receipt("settled", amount, self.circuit.remaining_msats)
         self._notify(
             self.on_yield_claim, {"status": status, "amount_msats": str(amount)}
         )

@@ -25,6 +25,8 @@ export class BitcoinStratigraphyRouter {
   #onYieldAllocation;
   #onError;
   #identityHeaders;
+  #circuitBreaker;
+  #receipts = new WeakMap();
 
   constructor({
     nwcUri, maxPaymentSats, maxTotalSats, feeReserveSats = 10,
@@ -32,6 +34,7 @@ export class BitcoinStratigraphyRouter {
     allowedOrigins = [ENGINE], fetch: fetchImpl = globalThis.fetch,
     wallet, onYieldClaim = () => {}, onYieldAllocation = () => {}, onError = () => {},
     identityHeaders = async () => ({}),
+    circuitBreaker,
   } = {}) {
     this.#perPayment = sats(maxPaymentSats);
     this.#total = sats(maxTotalSats);
@@ -52,6 +55,7 @@ export class BitcoinStratigraphyRouter {
     this.#onYieldAllocation = onYieldAllocation;
     this.#onError = onError;
     this.#identityHeaders = identityHeaders;
+    this.#circuitBreaker = circuitBreaker;
     this.fetch = this.fetch.bind(this);
   }
 
@@ -66,6 +70,7 @@ export class BitcoinStratigraphyRouter {
   }
 
   async fetch(input, init) {
+    this.#circuitBreaker?.assertCapacity();
     const request = new Request(input, init);
     // Callers' pre-existing credentials are not replaced or repurchased.
     const response = await this.#request(request.clone());
@@ -101,7 +106,10 @@ export class BitcoinStratigraphyRouter {
     }
     if (request.signal.aborted) throw new Error("REQUEST_ABORTED");
     if (invoice.expiresAt <= Date.now() + this.#timeout + 5000) throw new Error("INVOICE_EXPIRED_OR_TOO_CLOSE");
-    const record = await this.#state.transaction(state => {
+    const reservation = this.#circuitBreaker?.reserve(invoice.paymentHash, invoice.amountMsats + this.#feeReserve);
+    let record;
+    try {
+    record = await this.#state.transaction(state => {
       const prior = state.invoices[invoice.paymentHash];
       if (prior) {
         if (prior.binding !== binding || prior.invoice !== challenge.invoice ||
@@ -120,24 +128,35 @@ export class BitcoinStratigraphyRouter {
       };
       return { reused: false };
     });
+    } catch (error) {
+      reservation?.release(); // No wallet operation has started.
+      throw error;
+    }
+    if (record.reused) reservation?.release();
     let preimage = record.preimage;
+    let settledAt = record.settledAt ?? null;
     if (!record.reused) {
       let payment;
       try { payment = await this.#wallet.payInvoice(challenge.invoice); }
       catch { throw new Error("PAYMENT_UNCERTAIN_DO_NOT_REPAY"); }
       if (!verifyPreimage(payment?.preimage, invoice.paymentHash)) throw new Error("PAYMENT_PROOF_INVALID_DO_NOT_REPAY");
       preimage = payment.preimage.toLowerCase();
+      settledAt = new Date().toISOString();
       await this.#state.transaction(state => {
         const entry = state.invoices[invoice.paymentHash];
         if (!entry || entry.status !== "pending" || entry.binding !== binding) throw new Error("STATE_CONFLICT");
         entry.status = "paid";
         entry.preimage = preimage;
+        entry.settledAt = settledAt;
         // NIP-47 does not standardize a sender-side fee ceiling. Fail closed
         // for future spending if the wallet reports more than our allowance.
         if (payment.fees_paid !== undefined &&
             (!Number.isSafeInteger(payment.fees_paid) || payment.fees_paid < 0 ||
              BigInt(payment.fees_paid) > this.#feeReserve)) state.blocked = true;
       });
+      if (Number.isSafeInteger(payment.fees_paid) && payment.fees_paid >= 0) {
+        this.#circuitBreaker?.settle(invoice.paymentHash, invoice.amountMsats + BigInt(payment.fees_paid));
+      }
     }
     if (invoice.expiresAt <= Date.now()) throw new Error("PAID_INVOICE_EXPIRED_RECOVER_PROOF");
     const headers = new Headers(request.headers);
@@ -149,6 +168,10 @@ export class BitcoinStratigraphyRouter {
     if (/^Nostr\s/i.test(freshNostr ?? "")) headers.set("X-Nostr-Authorization", freshNostr);
     headers.set("Authorization", `L402 ${challenge.macaroon}:${preimage}`);
     const result = await this.#request(new Request(request, { headers }));
+    this.#receipts.set(result, {
+      amountMsats: invoice.amountMsats.toString(),
+      preimage, paymentHash: invoice.paymentHash, settledAt,
+    });
     // Data execution and yield payment are separate. Never buy another invoice.
     if (result.ok && new URL(request.url).origin === ENGINE) {
       const evidence = result.clone();
@@ -163,6 +186,9 @@ export class BitcoinStratigraphyRouter {
     }
     return result;
   }
+
+  /** Local verified payment evidence for this exact Response, never a header. */
+  paymentReceipt(response) { return this.#receipts.get(response) ?? null; }
 
   async #executionSucceeded(response, requestId) {
     const type = response.headers.get("content-type") ?? "";

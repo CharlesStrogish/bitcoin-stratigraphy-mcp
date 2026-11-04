@@ -17,8 +17,8 @@ def test_native_langchain_sync_and_async(setup_client):
     tool = config["tools"][1]
     assert isinstance(tool, StructuredTool)
     assert tool.args_schema["properties"]["height"]["type"] == "integer"
-    assert tool.invoke({"height": 1})[0]["text"] == "free"
-    assert asyncio.run(tool.ainvoke({"height": 1}))[0]["text"] == "free"
+    assert tool.invoke({"height": 1}).payload[0]["text"] == "free"
+    assert asyncio.run(tool.ainvoke({"height": 1})).payload[0]["text"] == "free"
     assert not s.payments
 
 
@@ -33,7 +33,9 @@ def test_native_autogen_async_and_schema(setup_client):
     assert isinstance(tool, BaseTool)
     assert tool.schema["parameters"]["required"] == ["height"]
     assert (
-        asyncio.run(tool.run_json({"height": 1}, CancellationToken()))[0]["text"]
+        asyncio.run(tool.run_json({"height": 1}, CancellationToken())).payload[0][
+            "text"
+        ]
         == "free"
     )
     cancelled = CancellationToken()
@@ -68,8 +70,8 @@ def test_crewai_public_basetool_contract_without_installing_crewai(
     tool = config["tools"][1]
     assert isinstance(tool, BaseTool)
     assert tool.args_schema.model_json_schema()["properties"]["height"]["minimum"] == 0
-    assert tool.run(height=1)[0]["text"] == "free"
-    assert asyncio.run(tool._arun(height=2))[0]["text"] == "free"
+    assert tool.run(height=1).payload[0]["text"] == "free"
+    assert asyncio.run(tool._arun(height=2)).payload[0]["text"] == "free"
 
     class Agent(BaseModel):
         tools: list

@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .errors import FiduciaryError
+from .armor import utc_now
 
 
 class PaymentState:
@@ -31,6 +32,10 @@ class PaymentState:
                 status TEXT NOT NULL, preimage TEXT, claim_status TEXT, claim_body TEXT
             )""")
             db.execute("CREATE TABLE IF NOT EXISTS policy (blocked INTEGER NOT NULL)")
+            if "settled_at" not in {
+                row[1] for row in db.execute("PRAGMA table_info(invoices)")
+            }:
+                db.execute("ALTER TABLE invoices ADD COLUMN settled_at TEXT")
             if not db.execute("SELECT 1 FROM policy").fetchone():
                 db.execute("INSERT INTO policy VALUES (0)")
 
@@ -76,7 +81,8 @@ class PaymentState:
             ):
                 raise FiduciaryError("SPENDING_LIMIT_EXCEEDED")
             db.execute(
-                "INSERT INTO invoices VALUES (?,?,?,?,?,?,'pending',NULL,NULL,NULL)",
+                "INSERT INTO invoices (hash,binding,invoice,macaroon,amount,reserved,status) "
+                "VALUES (?,?,?,?,?,?,'pending')",
                 (payment_hash, binding, invoice, macaroon, amount, amount + fee),
             )
             return None
@@ -84,8 +90,8 @@ class PaymentState:
     def paid(self, payment_hash, preimage, fees, fee_reserve):
         with self.transaction() as db:
             changed = db.execute(
-                "UPDATE invoices SET status='paid',preimage=? WHERE hash=? AND status='pending'",
-                (preimage, payment_hash),
+                "UPDATE invoices SET status='paid',preimage=?,settled_at=? WHERE hash=? AND status='pending'",
+                (preimage, utc_now(), payment_hash),
             ).rowcount
             if changed != 1:
                 raise FiduciaryError("PAYMENT_STATE_CONFLICT")
@@ -105,6 +111,15 @@ class PaymentState:
                 "UPDATE invoices SET claim_status='preparing' WHERE hash=?",
                 (payment_hash,),
             )
+            return dict(row)
+
+    def payment(self, payment_hash):
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM invoices WHERE hash=? AND status='paid'", (payment_hash,)
+            ).fetchone()
+            if not row:
+                raise FiduciaryError("PAYMENT_EVIDENCE_UNAVAILABLE")
             return dict(row)
 
     def prepare_claim(self, payment_hash, body):

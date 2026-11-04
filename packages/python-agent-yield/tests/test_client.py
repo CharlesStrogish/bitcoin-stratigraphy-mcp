@@ -24,7 +24,7 @@ def test_wrapper_preserves_config_and_free_tools(setup_client, capsys):
     assert config["tools"] == [existing]
     assert wrapped["tools"][0] is existing
     assert wrapped["model"] == "existing"
-    assert wrapped["tools"][1].invoke({}) == [{"type": "text", "text": "free"}]
+    assert wrapped["tools"][1].invoke({}).payload == [{"type": "text", "text": "free"}]
     assert not s.payments
     assert not capsys.readouterr().out
 
@@ -32,7 +32,9 @@ def test_wrapper_preserves_config_and_free_tools(setup_client, capsys):
 @pytest.mark.parametrize("mode", [{}, {"legacy": True}, {"sse": True}, {"pow": True}])
 def test_payment_and_identical_retry(setup_client, mode, capsys):
     s = setup_client(**mode)
-    assert s.client.call_tool("proof.verify", {"height": 42}) == {"verified": True}
+    assert s.client.call_tool("proof.verify", {"height": 42}).payload == {
+        "verified": True
+    }
     assert len(s.payments) == len(s.claims) == 1
     tool_calls = [r for r in s.calls if r.headers["Mcp-Method"] == "tools/call"]
     assert len({r.content for r in tool_calls}) == 1
@@ -44,6 +46,7 @@ def test_payment_and_identical_retry(setup_client, mode, capsys):
     assert not captured.out
     assert "\x1b[33m" in captured.err and "\x1b[32m" in captured.err
     assert "21 Sats" in captured.err
+    assert "Circuit breaker: 4900 Sats remaining." in captured.err
     assert s.invoice not in captured.err and PREIMAGE not in captured.err
 
 
@@ -59,7 +62,9 @@ def test_payment_and_identical_retry(setup_client, mode, capsys):
 )
 def test_no_false_earned_receipts(setup_client, capsys, mode):
     s = setup_client(**mode)
-    assert s.client.call_tool("proof.verify", {"height": 1}) == {"verified": True}
+    assert s.client.call_tool("proof.verify", {"height": 1}).payload == {
+        "verified": True
+    }
     assert len(s.payments) == 1
     output = capsys.readouterr()
     assert "Allocated" in output.err and "Earned" not in output.err
@@ -138,7 +143,7 @@ def test_multiple_workers_do_not_double_pay(setup_client):
 
     def call(client):
         try:
-            return client.call_tool("proof.verify", {})
+            return client.call_tool("proof.verify", {}).payload
         except FiduciaryError as error:
             return str(error)
 
@@ -161,7 +166,9 @@ def test_oversized_fees_block_further_spending(setup_client):
 
 def test_async_tools_and_genesis_are_unpaid(setup_client, capsys):
     s = setup_client(free=True)
-    assert asyncio.run(s.client.acall_tool("proof.verify", {}))[0]["text"] == "free"
+    receipt = asyncio.run(s.client.acall_tool("proof.verify", {}))
+    assert receipt.payload[0]["text"] == "free"
+    assert receipt.cryptographic_proof is None and receipt.thermodynamic_cost == "0"
     assert not s.payments and not s.claims and not capsys.readouterr().err
 
 

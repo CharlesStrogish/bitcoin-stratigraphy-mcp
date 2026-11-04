@@ -33,3 +33,20 @@ select a new state directory.
 
 **Why a separate Python implementation:** The user requested a standalone PyPI
 package for LangChain, CrewAI and AutoGen, rather than a bridge to the Node SDK.
+
+Fiduciary Armor adds a per-client in-memory session ceiling (default 5000 sats)
+on top of, never instead of, durable wallet budgets. Reserve fee headroom before
+wallet access and retain unknown outcomes. The session latches on an oversized
+quote; it cannot know a new tool's price until an unpaid invoice challenge.
+
+**Why:** The user requested hard circuit breakers to halt runaway agent loops.
+Already-admitted concurrent operations may finish within their reservations;
+catalog discovery and recovery of existing withdrawals must remain usable.
+
+TruthReceipts expose payment evidence and a local payload digest, not a claim
+of server-signed data integrity or Bitcoin anchoring. Keep settlement-observation
+times distinct from receipt-observation times; leave unknown legacy times null.
+
+**Why:** A payment preimage proves invoice settlement, not the returned data's
+contents. Preimages in receipts remain sensitive payment evidence and must
+never enter terminal logs.

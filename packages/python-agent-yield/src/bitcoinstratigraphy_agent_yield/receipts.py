@@ -4,7 +4,9 @@ import os
 import sys
 
 
-def terminal_receipt(kind: str, amount_msats: int) -> None:
+def terminal_receipt(
+    kind: str, amount_msats: int, remaining_msats: int | None = None
+) -> None:
     try:
         if os.getenv("QUIET_STRATIGRAPHY", "").lower() == "true":
             return
@@ -22,6 +24,16 @@ def terminal_receipt(kind: str, amount_msats: int) -> None:
             )
         else:
             return
-        print(f"{color}[Bitcoin Stratigraphy] ⚡ {message}\x1b[0m", file=sys.stderr)
+        capacity = ""
+        if type(remaining_msats) is int and remaining_msats >= 0:
+            from .armor import sats_string
+
+            capacity = (
+                f" Circuit breaker: {sats_string(remaining_msats)} Sats remaining."
+            )
+        print(
+            f"{color}[Bitcoin Stratigraphy] ⚡ {message}{capacity}\x1b[0m",
+            file=sys.stderr,
+        )
     except Exception:
         pass  # Diagnostics must never affect payment or execution.

@@ -6,6 +6,8 @@ import { BitcoinStratigraphyRouter } from "../../../agentic-fiduciary-router/ind
 import { withInvoicePow } from "../../typescript/invoice-pow.js";
 import { readRpc } from "./protocol.js";
 import { terminalReceipt } from "./terminal-receipts.js";
+import { SpendCircuit, TruthReceipt, type PaymentEvidence } from "./armor.js";
+export { CircuitBreakerError, TruthReceipt } from "./armor.js";
 
 export const DEFAULT_MCP_URL = "https://bitcoinstratigraphy.com/mcp";
 
@@ -15,6 +17,8 @@ export interface YieldWallet {
   makeInvoice?(amountMsats: number): Promise<{ invoice: string }>;
 }
 export interface FiduciaryOptions {
+  /** Session spend cap including reported fees / reserved fee headroom. */
+  max_spend_sats?: number;
   wallet?: YieldWallet;
   nwcUri?: string;
   maxPaymentSats: number;
@@ -35,7 +39,7 @@ export interface DiscoveredTool {
   inputSchema: Record<string, unknown>;
 }
 export interface AgentTool extends DiscoveredTool {
-  invoke(args?: Record<string, unknown>): Promise<unknown>;
+  invoke(args?: Record<string, unknown>): Promise<TruthReceipt>;
 }
 export interface OpenAITool {
   type: "function";
@@ -45,12 +49,13 @@ export interface FiduciaryConnection {
   fetch: typeof fetch;
   tools: AgentTool[];
   openAITools: OpenAITool[];
-  callTool(name: string, args?: Record<string, unknown>): Promise<unknown>;
-  executeTool(name: string, args?: Record<string, unknown>): Promise<unknown>;
+  callTool(name: string, args?: Record<string, unknown>): Promise<TruthReceipt>;
+  executeTool(name: string, args?: Record<string, unknown>): Promise<TruthReceipt>;
   drain(): Promise<void>;
   recoverClaim(paymentHash: string): Promise<void>;
 }
 interface RouterCore {
+  paymentReceipt(response: Response): PaymentEvidence | null;
   fetch: typeof fetch;
   drain(): Promise<void>;
   recoverClaim(paymentHash: string): Promise<void>;
@@ -61,6 +66,7 @@ const Router = BitcoinStratigraphyRouter as unknown as new (
   options: FiduciaryOptions & {
     allowedOrigins: string[];
     onYieldAllocation: (event: { amountMsats: string }) => void;
+    circuitBreaker: SpendCircuit;
   },
 ) => RouterCore;
 
@@ -73,8 +79,11 @@ export class FiduciaryClient {
   private readonly identity: NonNullable<FiduciaryOptions["identityHeaders"]>;
   private nextId = 0;
   private catalog?: Promise<DiscoveredTool[]>;
+  private readonly receipts = new WeakMap<object, PaymentEvidence | null>();
+  private readonly circuit: SpendCircuit;
 
   constructor(options: FiduciaryOptions) {
+    this.circuit = new SpendCircuit(options.max_spend_sats ?? 5000);
     const url = new URL(options.mcpUrl ?? DEFAULT_MCP_URL);
     if (url.protocol !== "https:" || url.username || url.password || url.hash) {
       throw new Error("HTTPS_MCP_URL_REQUIRED");
@@ -105,13 +114,14 @@ export class FiduciaryClient {
     });
     this.router = new Router({
       ...options,
+      circuitBreaker: this.circuit,
       nwcUri: options.nwcUri ?? (options.wallet ? undefined : process.env.NWC_URI),
       stateDirectory: options.stateDirectory ?? resolve(".agent-yield-state"),
       allowedOrigins: [url.origin],
       fetch: transport,
-      onYieldAllocation: event => terminalReceipt("allocated", event.amountMsats),
+      onYieldAllocation: event => terminalReceipt("allocated", event.amountMsats, this.circuit.remainingMsats.toString()),
       onYieldClaim: event => {
-        if (event.status === "settled") terminalReceipt("settled", event.amountMsats);
+        if (event.status === "settled") terminalReceipt("settled", event.amountMsats, this.circuit.remainingMsats.toString());
         return options.onYieldClaim?.(event);
       },
     });
@@ -144,7 +154,12 @@ export class FiduciaryClient {
     // tools/list is public discovery. Never let an unexpected discovery 402
     // charge a wallet before the agent has selected a tool.
     const fetcher = method === "tools/list" ? this.discoveryFetch : this.fetch;
-    return readRpc(await fetcher(this.url, { method: "POST", headers, body }), id);
+    const response = await fetcher(this.url, { method: "POST", headers, body });
+    const result = await readRpc(response, id);
+    if (result && typeof result === "object") {
+      this.receipts.set(result, this.router.paymentReceipt(response));
+    }
+    return result;
   }
 
   listTools(): Promise<DiscoveredTool[]> {
@@ -182,7 +197,8 @@ export class FiduciaryClient {
     return tools;
   }
 
-  async callTool(name: string, args: Record<string, unknown> = {}): Promise<unknown> {
+  async callTool(name: string, args: Record<string, unknown> = {}): Promise<TruthReceipt> {
+    this.circuit.assertCapacity();
     if (!(await this.listTools()).some(tool => tool.name === name)) throw new Error("MCP_UNKNOWN_TOOL");
     const result = await this.rpc("tools/call", { name, arguments: args }) as {
       isError?: boolean; structuredContent?: unknown; content?: unknown[];
@@ -190,7 +206,7 @@ export class FiduciaryClient {
     if (!result || typeof result !== "object") throw new Error("MCP_INVALID_TOOL_RESULT");
     if (result.isError) throw new Error("MCP_TOOL_FAILED");
     // Text-only tools are legitimate too; do not require structuredContent.
-    return result.structuredContent ?? result.content ?? result;
+    return new TruthReceipt(result.structuredContent ?? result.content ?? result, this.receipts.get(result));
   }
 
   drain(): Promise<void> { return this.router.drain(); }

@@ -43,8 +43,9 @@ quote; it cannot know a new tool's price until an unpaid invoice challenge.
 Already-admitted concurrent operations may finish within their reservations;
 catalog discovery and recovery of existing withdrawals must remain usable.
 
-TruthReceipts expose payment evidence and a local payload digest, not a claim
-of server-signed data integrity or Bitcoin anchoring. Keep settlement-observation
+TruthReceipt payment fields expose payment evidence and a local payload digest,
+not data-integrity or Bitcoin-anchoring proof. Keep transport provenance
+verification separate from those payment fields. Keep settlement-observation
 times distinct from receipt-observation times; leave unknown legacy times null.
 
 **Why:** A payment preimage proves invoice settlement, not the returned data's

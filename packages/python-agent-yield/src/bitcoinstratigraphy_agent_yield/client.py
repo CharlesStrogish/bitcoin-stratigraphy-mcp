@@ -24,6 +24,7 @@ from .protocol import (
 from .receipts import terminal_receipt
 from .state import PaymentState
 from .armor import SpendCircuit, TruthReceipt
+from .provenance import verify_payload
 
 DEFAULT_MCP_URL = "https://bitcoinstratigraphy.com/mcp"
 
@@ -45,6 +46,7 @@ class FiduciaryClient:
         headers: Mapping | None = None,
         on_error: Callable | None = None,
         on_yield_claim: Callable | None = None,
+        server_public_key: str | bytes | None = None,
     ):
         parts = urlsplit(mcp_url)
         if (
@@ -66,6 +68,7 @@ class FiduciaryClient:
         ):
             raise FiduciaryError("INVALID_TIMEOUT")
         self.url = mcp_url
+        self.server_public_key = server_public_key
         self.circuit = SpendCircuit(max_spend_sats)
         self.claim_url = f"{parts.scheme}://{parts.netloc}/api/claim-yield"
         self.wallet, self.timeout = wallet, timeout
@@ -124,6 +127,7 @@ class FiduciaryClient:
                         and "text/event-stream"
                         in response.headers.get("content-type", "")
                         and sse_complete(data, request_id)
+                        and headers.get("Mcp-Method") != "tools/call"
                     ):
                         break
                 # Do not follow redirects with credentials, invoices or proofs.
@@ -300,6 +304,8 @@ class FiduciaryClient:
             and response.headers.get("www-authenticate", "").lower().startswith("l402 ")
         ):
             response, payment_hash = self._payment(response, body, headers)
+        if method == "tools/call" and response.is_success:
+            verify_payload(response, body, self.server_public_key)
         result = read_rpc(response, request_id)
         return result, payment_hash
 
@@ -356,6 +362,7 @@ class FiduciaryClient:
         return TruthReceipt(
             result.get("structuredContent", result.get("content", result)),
             self.state.payment(payment_hash) if payment_hash else None,
+            provenance_verified=True,
         )
 
     async def acall_tool(self, name, arguments=None):

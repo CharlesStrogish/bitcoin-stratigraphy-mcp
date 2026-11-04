@@ -3,6 +3,8 @@
 One-call Python onboarding for Bitcoin Stratigraphy MCP tools: HTTPX discovery,
 automatic bounded L402 retries, durable spending reservations, and the same
 stderr terminal receipts as `@bitcoinstratigraphy/agent-yield`.
+Server-signed payload enforcement is currently unreleased checkout functionality;
+the previously published 0.2.0 package does not include it.
 
 Install from PyPI:
 
@@ -60,8 +62,8 @@ These are native `autogen_core.tools.BaseTool`s, not OpenAI descriptors requirin
 a separate dispatcher. Cancellation is checked before starting execution.
 
 Framework imports are lazy. Install your chosen framework separately; the base
-wheel has **only three direct runtime dependencies**, all exactly pinned:
-HTTPX, bech32 and coincurve. No LangChain, CrewAI, AutoGen, NWC or MCP framework
+wheel has **four direct runtime dependencies**:
+HTTPX, bech32, coincurve and cryptography. No LangChain, CrewAI, AutoGen, NWC or MCP framework
 is forced on other consumers. Native adapters target the current public
 LangChain Core 1.x, CrewAI 1.x and AutoGen Core 0.7 APIs.
 
@@ -69,6 +71,7 @@ LangChain Core 1.x, CrewAI 1.x and AutoGen Core 0.7 APIs.
 
 ```python
 policy = {
+    "server_public_key": independently_trusted_server_public_key_pem,
     "wallet": authorized_wallet,
     "max_payment_sats": 500,
     "max_total_sats": 5000,
@@ -128,12 +131,25 @@ data = receipt.payload  # previous return value
 # receipt.thermodynamic_cost: exact decimal-string sats (invoice principal)
 # receipt.timestamp: UTC client-observed settlement time
 # receipt.cryptographic_proof: verified payment preimage
+# receipt["provenance_verified"]: True (server payload signature verified)
 ```
 
 The additional `payment_hash` verifies the preimage and `payload_sha256` is a
 local digest of this SDK's JSON serialization of the returned payload.
 **Payment proof is not a signature over the data or proof of Bitcoin anchoring.**
-`evidence_scope` says `payment_only`, not independently verified data integrity.
+`evidence_scope` describes the payment evidence only.
+Separately, every successful SDK tool call verifies the server's Ed25519 HTTP
+signature using your independently pinned `server_public_key` (SPKI PEM), before
+parsing or returning a `TruthReceipt`. This includes free/Genesis calls.
+`provenance_verified` is `True` only on SDK-verified results; manually constructed
+receipts default to `False`. A missing pin or missing, invalid or tampered signature
+raises `FiduciaryTamperingError: Data payload signature verification failed.`
+Discovery does not require a pin.
+
+See [payload attestations](../../docs/payload-attestations.md) for the protocol,
+server configuration and key rotation. This proves server origin and byte
+integrity, not factual accuracy, freshness, Bitcoin anchoring or an AI's later
+interpretation.
 Free/Genesis calls have zero observed cost and null payment proof, scope
 `payment_not_observed`, and a receipt-observation timestamp. Externally supplied
 credentials also have no new SDK-observed payment. Old paid records without a

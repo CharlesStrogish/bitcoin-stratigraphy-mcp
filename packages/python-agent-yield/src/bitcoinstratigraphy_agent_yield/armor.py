@@ -80,8 +80,9 @@ class SpendCircuit:
 class TruthReceipt(dict):
     """A serializable object; a payment preimage is not a signed data anchor."""
 
-    def __init__(self, payload, evidence=None):
+    def __init__(self, payload, evidence=None, *, provenance_verified=False):
         super().__init__(
+            provenance_verified=provenance_verified,
             payload=payload,
             thermodynamic_cost=sats_string(evidence["amount"] if evidence else 0),
             timestamp=evidence["settled_at"] if evidence else utc_now(),
@@ -103,6 +104,10 @@ class TruthReceipt(dict):
     @property
     def payload(self):
         return self["payload"]
+
+    @property
+    def provenance_verified(self):
+        return self["provenance_verified"]
 
     @property
     def thermodynamic_cost(self):

@@ -74,6 +74,7 @@ import type {
   NostrHeartbeatStatus,
   NostrIdentityInput,
   PaidStratigraphyResponse,
+  PayloadSigningIdentity,
   PaymentChallengeRateLimitError,
   PaymentChallengeServiceUnavailableError,
   PaymentConfigurationError,
@@ -2655,6 +2656,84 @@ export const useRequestMcpInvoice = <TError = ErrorType<McpJsonRpcResponse | voi
       > => {
       return useMutation(getRequestMcpInvoiceMutationOptions(options));
     }
+
+export const getGetMcpPayloadKeyUrl = () => {
+
+
+
+
+  return `/api/mcp/payload-key`
+}
+
+/**
+ * Informational public key only. Clients must independently authenticate and pin this SPKI PEM key; never trust a replacement from an untrusted response.
+ * @summary Public Ed25519 payload signing identity
+ */
+export const getMcpPayloadKey = async ( options?: Parameters<typeof customFetch>[1]): Promise<PayloadSigningIdentity> => {
+
+  return customFetch<PayloadSigningIdentity>(getGetMcpPayloadKeyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMcpPayloadKeyQueryKey = () => {
+    return [
+    `/api/mcp/payload-key`
+    ] as const;
+    }
+
+
+export const getGetMcpPayloadKeyQueryOptions = <TData = Awaited<ReturnType<typeof getMcpPayloadKey>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpPayloadKey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMcpPayloadKeyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMcpPayloadKey>>> = ({ signal }) => getMcpPayloadKey({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMcpPayloadKey>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMcpPayloadKeyQueryResult = NonNullable<Awaited<ReturnType<typeof getMcpPayloadKey>>>
+export type GetMcpPayloadKeyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Public Ed25519 payload signing identity
+ */
+
+export function useGetMcpPayloadKey<TData = Awaited<ReturnType<typeof getMcpPayloadKey>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpPayloadKey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMcpPayloadKeyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetMcpProbeUrl = () => {
 

@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { bech32 } from "@scure/base";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 
@@ -36,3 +36,19 @@ export const json = (value, status = 200, headers = {}) =>
   new Response(JSON.stringify(value), {
     status, headers: { "Content-Type": "application/json", ...headers },
   });
+
+const signingKey = generateKeyPairSync("ed25519");
+export const serverPublicKey = signingKey.publicKey.export({ type: "spki", format: "pem" }).toString();
+export const signedFetch = (fetcher, alter = response => response) => async (input, init) => {
+  const request = new Request(input, init);
+  const requestBody = await request.clone().text();
+  const response = await fetcher(request);
+  if (!response.ok) return response;
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const digest = createHash("sha256").update(requestBody).digest("hex");
+  const headers = new Headers(response.headers);
+  headers.set("X-Stratigraphy-Signature", `v1,${sign(null, Buffer.concat([
+    Buffer.from(`bitcoinstratigraphy/payload/v1\n${digest}\n`), bytes,
+  ]), signingKey.privateKey).toString("base64")}`);
+  return alter(new Response(bytes, { status: response.status, headers }), requestBody);
+};

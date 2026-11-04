@@ -205,6 +205,8 @@ export * from './nostrIdentityEvent';
 export * from './nostrIdentityInput';
 export * from './nostrSignedEvent';
 export * from './paidStratigraphyResponse';
+export * from './payloadSigningIdentity';
+export * from './payloadSigningIdentityAlgorithm';
 export * from './paymentChallengeRateLimitError';
 export * from './paymentChallengeServiceUnavailableError';
 export * from './paymentConfigurationError';

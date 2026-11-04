@@ -1684,6 +1684,25 @@ paths:
                 $ref: "#/components/schemas/McpJsonRpcResponse"
         "503":
           description: Proof admission capacity or durable pipeline storage unavailable
+  /mcp/payload-key:
+    servers:
+      - url: /
+    get:
+      operationId: getMcpPayloadKey
+      tags: [discovery]
+      summary: Public Ed25519 payload signing identity
+      description: >-
+        Informational public key only. Clients must independently authenticate
+        and pin this SPKI PEM key; never trust a replacement from an untrusted response.
+      responses:
+        "200":
+          description: Public payload signing identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayloadSigningIdentity"
+        "503":
+          description: Payload signing unavailable
   /mcp:
     servers:
       - url: https://bitcoinstratigraphy.com
@@ -1808,7 +1827,21 @@ paths:
               $ref: "#/components/schemas/McpJsonRpcRequest"
       responses:
         "200":
-          description: JSON-RPC result or tool error
+          description: JSON-RPC result or tool error; final bytes signed with the dedicated Ed25519 payload key
+          headers:
+            X-Stratigraphy-Signature:
+              description: >-
+                v1, followed by base64 Ed25519 signature over UTF-8
+                bitcoinstratigraphy/payload/v1, newline, lowercase SHA-256 hex
+                of exact request body bytes, newline, then exact response body
+                bytes. JSON-RPC framing and finite SSE framing are included.
+                This proves server provenance, not factual accuracy or freshness.
+              schema:
+                type: string
+            X-Stratigraphy-Key-Id:
+              description: SHA-256 of signing public key SPKI DER; informational, not a trust anchor
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -2838,6 +2871,19 @@ components:
                   items:
                     $ref: "#/components/schemas/GetPublicYieldProofs200Item"
   schemas:
+    PayloadSigningIdentity:
+      type: object
+      required: [algorithm, publicKey, keyId]
+      properties:
+        algorithm:
+          type: string
+          enum: [Ed25519]
+        publicKey:
+          type: string
+          description: SPKI PEM public key; independently pin before use
+        keyId:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
     YieldMetrics:
       type: object
       additionalProperties: false

@@ -6,7 +6,7 @@ import { mkdtemp, rm, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withFiduciaryYield, FiduciaryClient } from "../dist/sdk/agent-yield/src/index.js";
-import { preimage, hash, invoice, json } from "./fixtures.mjs";
+import { preimage, hash, invoice, json, signedFetch, serverPublicKey } from "./fixtures.mjs";
 
 const catalog = [
   { name: "stratigraphy.list", description: "Free catalog", inputSchema: { type: "object", properties: {} } },
@@ -92,7 +92,7 @@ async function setup(t, options = {}) {
   const config = {
     model: "existing-model", tools: [{ name: "existing-tool" }],
     fiduciary: {
-      fetch, wallet, stateDirectory, maxPaymentSats: 500, maxTotalSats: 5000,
+      fetch: signedFetch(fetch), serverPublicKey, wallet, stateDirectory, maxPaymentSats: 500, maxTotalSats: 5000,
       onError: event => errors.push(event), ...options.policy,
     },
   };

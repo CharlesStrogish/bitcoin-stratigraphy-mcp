@@ -11,7 +11,7 @@ from bitcoinstratigraphy_agent_yield import (
     TruthReceipt,
 )
 from bitcoinstratigraphy_agent_yield.armor import SpendCircuit
-from conftest import make_invoice
+from conftest import make_invoice, signed_transport, SERVER_PUBLIC_KEY
 
 
 def client(tmp_path, limit=5000, uncertain=False):
@@ -72,8 +72,9 @@ def client(tmp_path, limit=5000, uncertain=False):
             },
         )
 
-    http = httpx.Client(transport=httpx.MockTransport(transport))
+    http = httpx.Client(transport=httpx.MockTransport(signed_transport(transport)))
     sdk = FiduciaryClient(
+        server_public_key=SERVER_PUBLIC_KEY,
         wallet=Wallet(),
         max_spend_sats=limit,
         max_payment_sats=500,

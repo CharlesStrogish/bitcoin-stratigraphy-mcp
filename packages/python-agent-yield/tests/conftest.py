@@ -1,14 +1,40 @@
 import hashlib
 import json
 import time
+import base64
 from types import SimpleNamespace
 
 import httpx
 import pytest
 from bech32 import bech32_encode, convertbits
 from coincurve import PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from bitcoinstratigraphy_agent_yield import FiduciaryClient
+
+SIGNING_KEY = Ed25519PrivateKey.generate()
+SERVER_PUBLIC_KEY = (
+    SIGNING_KEY.public_key()
+    .public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+    .decode()
+)
+
+
+def signed_transport(transport):
+    def send(request):
+        response = transport(request)
+        if response.is_success:
+            response.read()
+            prefix = f"bitcoinstratigraphy/payload/v1\n{hashlib.sha256(request.content).hexdigest()}\n".encode()
+            response.headers["X-Stratigraphy-Signature"] = (
+                "v1,"
+                + base64.b64encode(SIGNING_KEY.sign(prefix + response.content)).decode()
+            )
+        return response
+
+    return send
+
 
 PREIMAGE = "01" * 32
 PAYMENT_HASH = hashlib.sha256(bytes.fromhex(PREIMAGE)).hexdigest()
@@ -216,9 +242,10 @@ def setup_client(tmp_path):
                 )
             return httpx.Response(200, json=reply)
 
-        http = httpx.Client(transport=httpx.MockTransport(transport))
+        http = httpx.Client(transport=httpx.MockTransport(signed_transport(transport)))
         opened.append(http)
         policy = {
+            "server_public_key": SERVER_PUBLIC_KEY,
             "wallet": Wallet(),
             "max_payment_sats": 500,
             "max_total_sats": 5000,

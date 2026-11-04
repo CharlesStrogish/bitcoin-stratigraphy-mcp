@@ -19,6 +19,8 @@ test("maps /api aliases of root documents and the MCP endpoint to their root rou
     ["/API/YIELD-PROOFS.JSON", "/YIELD-PROOFS.JSON"],
     ["/api/mcp", "/mcp"],
     ["/api/mcp/", "/mcp/"],
+    ["/api/mcp/payload-key", "/mcp/payload-key"],
+    ["/api/mcp/payload-key?check=1", "/mcp/payload-key?check=1"],
     ["/api/mcp?session=1", "/mcp?session=1"],
     ["/api/.well-known/nostr.json?name=_", "/.well-known/nostr.json?name=_"],
     [
@@ -36,6 +38,8 @@ test("maps /api aliases of root documents and the MCP endpoint to their root rou
     "/api/v1/stratigraphy",
     "/api/mcp/tools",
     "/api/mcpx",
+    "/api/mcp/payload-keyx",
+    "/api/mcp/payload-key/private",
     "/api/openapi.jsonx",
     "/api/yield-proofs.jsonx",
     "/api/yield-proofs.json/private",

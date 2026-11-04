@@ -985,6 +985,20 @@ export const RequestMcpInvoiceResponse = zod.void()
 
 
 /**
+ * Informational public key only. Clients must independently authenticate and pin this SPKI PEM key; never trust a replacement from an untrusted response.
+ * @summary Public Ed25519 payload signing identity
+ */
+export const getMcpPayloadKeyResponseKeyIdRegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const GetMcpPayloadKeyResponse = zod.object({
+  "algorithm": zod.enum(['Ed25519']),
+  "publicKey": zod.string().describe('SPKI PEM public key; independently pin before use'),
+  "keyId": zod.string().regex(getMcpPayloadKeyResponseKeyIdRegExp)
+})
+
+
+/**
  * @summary Finite MCP scanner probe, not an idle SSE stream
  */
 export const GetMcpProbeResponse = zod.object({

@@ -4,8 +4,10 @@ from .adapters import AgentTool, with_fiduciary_yield
 from .client import DEFAULT_MCP_URL, FiduciaryClient
 from .errors import FiduciaryError
 from .armor import CircuitBreakerError, TruthReceipt
+from .errors import FiduciaryTamperingError
 
 __all__ = [
+    "FiduciaryTamperingError",
     "CircuitBreakerError",
     "TruthReceipt",
     "AgentTool",

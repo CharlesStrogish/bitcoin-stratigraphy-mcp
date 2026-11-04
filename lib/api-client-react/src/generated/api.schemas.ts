@@ -5,6 +5,21 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+export type PayloadSigningIdentityAlgorithm = typeof PayloadSigningIdentityAlgorithm[keyof typeof PayloadSigningIdentityAlgorithm];
+
+
+export const PayloadSigningIdentityAlgorithm = {
+  Ed25519: 'Ed25519',
+} as const;
+
+export interface PayloadSigningIdentity {
+  algorithm: PayloadSigningIdentityAlgorithm;
+  /** SPKI PEM public key; independently pin before use */
+  publicKey: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  keyId: string;
+}
+
 /**
  * Snapshot availability, not real wallet or payment health
  */

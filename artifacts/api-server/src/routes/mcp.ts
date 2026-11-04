@@ -38,6 +38,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerNativeMcpDiscovery, validateNativeMcpRequest } from "../lib/mcp-native-discovery";
 import { createToolIntegrityManifest, loadToolIntegrityKey } from "../lib/tool-integrity";
 import { signToolResponse } from "../lib/mcp-response-signature";
+import { loadPayloadSigningKey, payloadAttestation, payloadPublicIdentity } from "../lib/payload-attestation";
 import { STRATIGRAPHY_METADATA_SCHEMA, withStratigraphyMetadata } from "../lib/mcp-response-metadata";
 import { optionalProtocolKey, type SwarmProtocol } from "../lib/swarm-protocol";
 import { wholesaleSubVending } from "../lib/wholesale-sub-vending";
@@ -5426,6 +5427,13 @@ export function registerMcpRoute(
   let fallbackSigningKey: ReturnType<typeof loadToolIntegrityKey> | undefined;
   const signResponse = (name: string, result: CallToolResult) =>
     signToolResponse(name, result, fallbackSigningKey ??= loadToolIntegrityKey());
+  let payloadKey: ReturnType<typeof loadPayloadSigningKey> | undefined;
+  const readPayloadKey = () => payloadKey ??= loadPayloadSigningKey();
+  app.get("/mcp/payload-key", (_req, res) => {
+    try { res.json(payloadPublicIdentity(readPayloadKey())); }
+    catch { res.status(503).json({ error: "Payload signing unavailable" }); }
+  });
+  app.use("/mcp", payloadAttestation(readPayloadKey));
   app.use(["/mcp", "/invoice/request"], frameMcpErrors);
   app.use(["/mcp", "/invoice/request"], (req, res, next) => {
     res.locals.notarizeHash = options.notarizeHash ?? notarizeHash;

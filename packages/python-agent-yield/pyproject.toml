@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "AGPL-3.0-only OR LicenseRef-Commercial"
 license-files = ["LICENSE.md"]
-dependencies = ["httpx==0.28.1", "bech32==1.2.0", "coincurve==21.0.0"]
+dependencies = ["httpx==0.28.1", "bech32==1.2.0", "coincurve==21.0.0", "cryptography>=50.0.2"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python :: 3",

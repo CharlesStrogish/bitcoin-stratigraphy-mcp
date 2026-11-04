@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FiduciaryClient, CircuitBreakerError, TruthReceipt } from "../dist/sdk/agent-yield/src/index.js";
 import { SpendCircuit } from "../dist/sdk/agent-yield/src/armor.js";
-import { invoice, json } from "./fixtures.mjs";
+import { invoice, json, signedFetch, serverPublicKey } from "./fixtures.mjs";
 
 async function setup(t, max_spend_sats, uncertain = false, feeReserveSats = 0) {
   const stateDirectory = await mkdtemp(join(tmpdir(), "sdk-armor-"));
@@ -32,7 +32,7 @@ async function setup(t, max_spend_sats, uncertain = false, feeReserveSats = 0) {
   };
   const client = new FiduciaryClient({
     max_spend_sats, stateDirectory, maxPaymentSats: 500, maxTotalSats: 10000,
-    feeReserveSats, fetch,
+    feeReserveSats, fetch: signedFetch(fetch), serverPublicKey,
     wallet: { async payInvoice(text) {
       payments++;
       if (uncertain) throw new Error("unknown outcome");

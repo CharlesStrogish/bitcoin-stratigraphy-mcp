@@ -12,7 +12,7 @@ npm install @bitcoinstratigraphy/agent-yield
 
 ```ts
 import { withFiduciaryYield } from "@bitcoinstratigraphy/agent-yield";
-const agent = await withFiduciaryYield({ ...agent_config, fiduciary: { wallet, maxPaymentSats: 500, maxTotalSats: 5000 } });
+const agent = await withFiduciaryYield({ ...agent_config, fiduciary: { wallet, serverPublicKey: independentlyTrustedServerPublicKeyPem, maxPaymentSats: 500, maxTotalSats: 5000 } });
 ```
 
 `agent_config` is your existing agent configuration. `wallet` is your authorized
@@ -20,6 +20,8 @@ wallet adapter: `payInvoice(bolt11)` resolves to `{ preimage, fees_paid? }`;
 fees are integer millisatoshis. Alternatively supply `nwcUri` or configure
 `NWC_URI` in your secret manager. Never include wallet secrets in prompts,
 source files or logs. No wallet is created or funded by installing the package.
+Server-signed payload enforcement is currently unreleased checkout functionality;
+the previously published 0.2.0 package does not include it.
 
 The asynchronous factory automatically discovers the live MCP catalog,
 preserves existing tools, and adds callable tools and `agent.fetch`. Pass the
@@ -70,12 +72,30 @@ console.log(receipt.payload); // the previous return value
 // receipt.thermodynamic_cost: exact decimal-string sats (invoice principal)
 // receipt.timestamp: UTC client-observed settlement time
 // receipt.cryptographic_proof: verified L402 payment preimage
+// receipt.provenance_verified: true (server payload signature verified)
 ```
 
 `payment_hash` binds the preimage to its invoice, and `payload_sha256` is a local
 digest of the SDK's JSON serialization of the returned payload. **L402 proves
 payment, not payload integrity or Bitcoin anchoring.** `evidence_scope` explicitly
 states `payment_only`; the local digest is not a signed server attestation.
+Separately, the SDK verifies the server's Ed25519 HTTP payload signature against
+your independently pinned `fiduciary.serverPublicKey` (SPKI PEM) before parsing
+the result or returning a receipt. Successful SDK tool receipts have
+`provenance_verified: true`. A missing key pin or missing, invalid or tampered
+signature throws `FiduciaryTamperingError: Data payload signature verification failed.`
+This also applies to free/Genesis tools. Discovery remains available without a
+pin; low-level `fetch` does not create or certify a TruthReceipt. Manually
+constructed receipts default to `provenance_verified: false`.
+
+```ts
+agent_config.fiduciary.serverPublicKey = independentlyTrustedServerPublicKeyPem;
+```
+
+See [payload attestations](../../docs/payload-attestations.md) for the wire format,
+server configuration and key rotation. Signature verification proves the server
+returned these bytes, not factual accuracy, freshness, Bitcoin anchoring, or the
+faithfulness of an AI's later narrative.
 Genesis/free calls have zero observed cost, a null proof, and
 `payment_not_observed` scope; externally supplied credentials also have no new
 SDK-observed payment. Their timestamp is receipt creation, not settlement.

@@ -7,6 +7,8 @@ import { withInvoicePow } from "../../typescript/invoice-pow.js";
 import { readRpc } from "./protocol.js";
 import { terminalReceipt } from "./terminal-receipts.js";
 import { SpendCircuit, TruthReceipt, type PaymentEvidence } from "./armor.js";
+import { verifyPayload } from "./provenance.js";
+export { FiduciaryTamperingError } from "./provenance.js";
 export { CircuitBreakerError, TruthReceipt } from "./armor.js";
 
 export const DEFAULT_MCP_URL = "https://bitcoinstratigraphy.com/mcp";
@@ -17,6 +19,8 @@ export interface YieldWallet {
   makeInvoice?(amountMsats: number): Promise<{ invoice: string }>;
 }
 export interface FiduciaryOptions {
+  /** Independently trusted Ed25519 public key, SPKI PEM. Required for tool results. */
+  serverPublicKey?: string;
   /** Session spend cap including reported fees / reserved fee headroom. */
   max_spend_sats?: number;
   wallet?: YieldWallet;
@@ -81,8 +85,10 @@ export class FiduciaryClient {
   private catalog?: Promise<DiscoveredTool[]>;
   private readonly receipts = new WeakMap<object, PaymentEvidence | null>();
   private readonly circuit: SpendCircuit;
+  private readonly serverPublicKey?: string;
 
   constructor(options: FiduciaryOptions) {
+    this.serverPublicKey = options.serverPublicKey;
     this.circuit = new SpendCircuit(options.max_spend_sats ?? 5000);
     const url = new URL(options.mcpUrl ?? DEFAULT_MCP_URL);
     if (url.protocol !== "https:" || url.username || url.password || url.hash) {
@@ -155,7 +161,9 @@ export class FiduciaryClient {
     // charge a wallet before the agent has selected a tool.
     const fetcher = method === "tools/list" ? this.discoveryFetch : this.fetch;
     const response = await fetcher(this.url, { method: "POST", headers, body });
-    const result = await readRpc(response, id);
+    const result = await readRpc(response, id, method === "tools/call"
+      ? bytes => verifyPayload(bytes, response.headers.get("X-Stratigraphy-Signature"), body, this.serverPublicKey)
+      : undefined);
     if (result && typeof result === "object") {
       this.receipts.set(result, this.router.paymentReceipt(response));
     }
@@ -206,7 +214,7 @@ export class FiduciaryClient {
     if (!result || typeof result !== "object") throw new Error("MCP_INVALID_TOOL_RESULT");
     if (result.isError) throw new Error("MCP_TOOL_FAILED");
     // Text-only tools are legitimate too; do not require structuredContent.
-    return new TruthReceipt(result.structuredContent ?? result.content ?? result, this.receipts.get(result));
+    return new TruthReceipt(result.structuredContent ?? result.content ?? result, this.receipts.get(result), true);
   }
 
   drain(): Promise<void> { return this.router.drain(); }

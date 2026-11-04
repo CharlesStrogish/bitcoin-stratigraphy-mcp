@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import { createHash } from "node:crypto";
 
 export class CircuitBreakerError extends Error {
@@ -67,6 +69,7 @@ export interface PaymentEvidence {
 
 /** Payment evidence is NOT a signature over the payload or a Bitcoin anchor. */
 export class TruthReceipt<T = unknown> {
+  readonly provenance_verified: boolean;
   readonly thermodynamic_cost: string;
   readonly timestamp: string | null;
   readonly cryptographic_proof: string | null;
@@ -75,7 +78,8 @@ export class TruthReceipt<T = unknown> {
   readonly timestamp_kind: "client_observed_settlement" | "receipt_observed" | "unknown";
   readonly payload_sha256: string;
 
-  constructor(readonly payload: T, evidence?: PaymentEvidence | null) {
+  constructor(readonly payload: T, evidence?: PaymentEvidence | null, provenanceVerified = false) {
+    this.provenance_verified = provenanceVerified;
     this.thermodynamic_cost = satsString(BigInt(evidence?.amountMsats ?? "0"));
     this.timestamp = evidence ? evidence.settledAt : new Date().toISOString();
     this.cryptographic_proof = evidence?.preimage ?? null;

@@ -57,6 +57,7 @@ const outputs = [
   "./dist/article12-verifier.test.js",
   "./dist/mcp-stateless-transport.test.js",
   "./dist/mcp-response-signature.test.js",
+  "./dist/payload-attestation.test.js",
   "./dist/mcp-async-webhooks.test.js",
   "./dist/mcp-pipeline.test.js",
   "./dist/receiptMesh.test.js",
@@ -226,6 +227,7 @@ await build({
       "./tests/unit/mcp-stateless-transport.test.ts",
     "mcp-response-signature.test":
       "./tests/unit/mcp-response-signature.test.ts",
+    "payload-attestation.test": "./tests/unit/payload-attestation.test.ts",
     "mcp-async-webhooks.test": "./tests/unit/mcp-async-webhooks.test.ts",
     "mcp-pipeline.test": "./tests/unit/mcp-pipeline.test.ts",
     "receiptMesh.test": "./tests/unit/receiptMesh.test.ts",

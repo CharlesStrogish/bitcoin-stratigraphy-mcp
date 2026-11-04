@@ -4,13 +4,13 @@ One-call Python onboarding for Bitcoin Stratigraphy MCP tools: HTTPX discovery,
 automatic bounded L402 retries, durable spending reservations, and the same
 stderr terminal receipts as `@bitcoinstratigraphy/agent-yield`.
 
-**Scaffolded for PyPI; not published yet.** Intended one-line installation:
+Install from PyPI:
 
 ```sh
 pip install bitcoinstratigraphy-agent-yield
 ```
 
-Until publication, install from this checkout:
+For local development, install from this checkout:
 
 ```sh
 pip install ./packages/python-agent-yield
@@ -171,4 +171,4 @@ Native LangChain/AutoGen integration tests run when those frameworks are
 installed; the CrewAI adapter has a public-API contract fixture without pulling
 CrewAI's full dependency tree into this standalone package.
 Wheel/sdist build output belongs in `generated-artifacts/`, never source control.
-Publication and package-name availability are separate release steps.
+Building never uploads to PyPI; publication is an explicit release step.

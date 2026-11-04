@@ -20,8 +20,8 @@ wallet adapter: `payInvoice(bolt11)` resolves to `{ preimage, fees_paid? }`;
 fees are integer millisatoshis. Alternatively supply `nwcUri` or configure
 `NWC_URI` in your secret manager. Never include wallet secrets in prompts,
 source files or logs. No wallet is created or funded by installing the package.
-Server-signed payload enforcement is currently unreleased checkout functionality;
-the previously published 0.2.0 package does not include it.
+Version **0.3.0** introduces server-signed payload enforcement.
+The previously published 0.2.0 package does not include it.
 
 The asynchronous factory automatically discovers the live MCP catalog,
 preserves existing tools, and adds callable tools and `agent.fetch`. Pass the

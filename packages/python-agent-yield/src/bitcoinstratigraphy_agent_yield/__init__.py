@@ -16,4 +16,4 @@ __all__ = [
     "FiduciaryError",
     "with_fiduciary_yield",
 ]
-__version__ = "0.2.0"
+__version__ = "0.3.0"

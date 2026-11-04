@@ -3,8 +3,8 @@
 One-call Python onboarding for Bitcoin Stratigraphy MCP tools: HTTPX discovery,
 automatic bounded L402 retries, durable spending reservations, and the same
 stderr terminal receipts as `@bitcoinstratigraphy/agent-yield`.
-Server-signed payload enforcement is currently unreleased checkout functionality;
-the previously published 0.2.0 package does not include it.
+Version **0.3.0** introduces server-signed payload enforcement.
+The previously published 0.2.0 package does not include it.
 
 Install from PyPI:
 

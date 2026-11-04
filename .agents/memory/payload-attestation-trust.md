@@ -10,6 +10,8 @@ trusted key pin; never bootstrap trust from the response being verified.
 **Why:** The user requested SDK-enforced payload attestations, building on their
 explicit distinction between L402 payment proof and data integrity. A signature
 can establish origin and byte integrity, not truth or an AI's future behavior.
+The user explicitly approved the Ed25519 implementation and one-byte tamper
+rejection test as "perfect."
 
 **How to apply:** Verify the exact received bytes before parsing and receipt
 creation. Avoid cross-language JSON canonicalization. Keep the payload signing

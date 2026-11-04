@@ -49,4 +49,6 @@ times distinct from receipt-observation times; leave unknown legacy times null.
 
 **Why:** A payment preimage proves invoice settlement, not the returned data's
 contents. Preimages in receipts remain sensitive payment evidence and must
-never enter terminal logs.
+never enter terminal logs. The user explicitly approved distinguishing L402
+payment proof from data-integrity proof to protect the protocol's cryptographic
+guarantees.

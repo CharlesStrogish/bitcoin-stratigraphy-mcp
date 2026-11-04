@@ -143,7 +143,7 @@ Treat receipt preimages as sensitive; do not send them to public logs or prompts
 Yellow/green stderr receipts include remaining circuit capacity, never proofs.
 The private SQLite ledger upgrades existing files to retain observed settlement
 times without inventing timestamps for historical payments.
-This return-shape change is staged as **0.2.0**, not automatically published.
+This return-shape change is available in **0.2.0**. Building does not publish updates.
 
 ### Transport and settlement
 

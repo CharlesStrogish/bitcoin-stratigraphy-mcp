@@ -86,7 +86,7 @@ Treat receipts containing preimages as sensitive payment evidence, not public
 telemetry or prompt content. Raw `agent.fetch` deliberately remains a native
 HTTP `Response`; it enforces the breaker but does not change HTTP framing.
 Yellow/green stderr receipts include remaining capacity and never print proofs.
-This return-shape change is staged as **0.2.0**; building does not publish it.
+This return-shape change is available in **0.2.0**. Building does not publish updates.
 
 ### Transport and settlement
 

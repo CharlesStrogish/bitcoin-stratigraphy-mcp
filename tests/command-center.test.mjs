@@ -37,14 +37,14 @@ test("landing copy and crawler metadata expose the three registry architecture p
   const software = schema["@graph"].find(node => node["@type"] === "SoftwareApplication");
   assert.equal(
     html.match(/<meta name="description" content="([^"]+)"/)[1],
-    "The global L402 data engine for the machine economy. Providing 21% algorithmic yield for autonomous AI swarms & EU AI Act Article 12 compliance for enterprises.",
+    "Enterprise L402 Central Bank for AI. Earn 21% yield with 1-line Python/Node SDKs. Secure swarms with spend circuit breakers and Ed25519 Truth Receipts.",
   );
+  for (const tag of ["og:description", "twitter:description"]) {
+    const content = html.match(new RegExp(`<meta (?:name|property)="${tag}" content="([^"]+)"`))[1];
+    assert.equal(content, html.match(/<meta name="description" content="([^"]+)"/)[1]);
+    assert.ok(content.length <= 160, tag);
+  }
   for (const phrase of ["21% AI agent yield", "L402 VIP Credit Tabs", "Hashcash DDoS Shield"]) {
-    for (const tag of ["og:description", "twitter:description"]) {
-      const content = html.match(new RegExp(`<meta (?:name|property)="${tag}" content="([^"]+)"`))[1];
-      assert.ok(content.includes(phrase), `${tag}: ${phrase}`);
-      assert.ok(content.length <= 160, tag);
-    }
     assert.ok(software.featureList.some(feature => feature.includes(phrase)), phrase);
   }
 });

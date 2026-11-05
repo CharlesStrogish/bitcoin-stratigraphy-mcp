@@ -51,12 +51,12 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   ]);
   assert.equal(
     meta(html, "description"),
-    "The global L402 data engine for the machine economy. Providing 21% algorithmic yield for autonomous AI swarms & EU AI Act Article 12 compliance for enterprises.",
+    "Enterprise L402 Central Bank for AI. Earn 21% yield with 1-line Python/Node SDKs. Secure swarms with spend circuit breakers and Ed25519 Truth Receipts.",
   );
   for (const key of ["og:description", "twitter:description"]) {
     assert.equal(
       meta(html, key),
-      "Enterprise MCP server with 21% AI agent yield, L402 VIP Credit Tabs and a Hashcash DDoS Shield to extend and protect autonomous AI swarm runways.",
+      "Enterprise L402 Central Bank for AI. Earn 21% yield with 1-line Python/Node SDKs. Secure swarms with spend circuit breakers and Ed25519 Truth Receipts.",
       key,
     );
   }

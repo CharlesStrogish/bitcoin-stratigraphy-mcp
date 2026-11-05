@@ -1,5 +1,11 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import type { Plugin } from "vite";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ManifestoContent from "./src/pages/manifesto-content";
+import {
+  MANIFESTO_ARTICLE, MANIFESTO_DESCRIPTION, MANIFESTO_TITLE, MANIFESTO_URL,
+} from "./src/lib/manifesto-seo";
 import {
   ENTERPRISE_DESCRIPTION,
   ENTERPRISE_TITLE,
@@ -22,6 +28,12 @@ import {
 import { pageUrl } from "./src/lib/site";
 
 const routes = [
+  {
+    path: "manifesto",
+    title: MANIFESTO_TITLE,
+    description: MANIFESTO_DESCRIPTION,
+    url: MANIFESTO_URL,
+  },
   {
     path: "simulator",
     title: SIMULATOR_TITLE,
@@ -94,6 +106,18 @@ function pageHead(html: string, page: (typeof routes)[number]): string {
       "</head>",
       `<script id="compliance-article-jsonld" type="application/ld+json">${article}</script>\n  </head>`,
     );
+  }
+  if (page.path === "manifesto") {
+    result = result.replace(
+      /<meta\b(?=[^>]*\bproperty="og:type")[^>]*>/,
+      '<meta property="og:type" content="article" />',
+    );
+    result = result.replace(
+      "</head>",
+      `<script id="manifesto-article-jsonld" type="application/ld+json">${JSON.stringify(MANIFESTO_ARTICLE).replace(/</g, "\\u003c")}</script>\n  </head>`,
+    );
+    const content = renderToStaticMarkup(createElement(ManifestoContent, { base: "/" }));
+    result = result.replace('<div id="root"></div>', `<div id="root">${content}</div>`);
   }
   return result;
 }

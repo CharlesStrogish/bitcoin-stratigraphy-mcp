@@ -41,3 +41,13 @@ requesting Markdown and import fixes.
 
 **How to apply:** Separate technical example corrections and Markdown formatting
 from edits to the approved SDK marketing language.
+
+Keep the enterprise SEO manifesto separate from the Technical Whitepaper.
+
+**Why:** The user explicitly designated `/whitepaper` as the strict compliance
+document and prohibited overwriting, altering, or combining it with the supplied
+long-form SEO article.
+
+**How to apply:** Maintain the manifesto as a separate landing page. Preserve its
+supplied copy while linking compliance, Truth Receipts, and circuit-breaker
+mentions to the unchanged technical specification.

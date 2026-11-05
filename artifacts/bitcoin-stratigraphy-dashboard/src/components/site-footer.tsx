@@ -13,6 +13,13 @@ export default function SiteFooter() {
             <WhitepaperLink />
             <a
               className="control-button"
+              href={`${import.meta.env.BASE_URL}manifesto`}
+              data-testid="link-footer-manifesto"
+            >
+              Manifesto
+            </a>
+            <a
+              className="control-button"
               href={`${import.meta.env.BASE_URL}compliance`}
               data-testid="link-footer-compliance"
             >

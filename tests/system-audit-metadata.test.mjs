@@ -13,7 +13,7 @@ const { enterpriseSeoPlugin } = await tsImport(
 test("public static routes expose production canonicals and authored valid JSON-LD", () => {
   const plugin = enterpriseSeoPlugin();
   const template = load("artifacts/bitcoin-stratigraphy-dashboard/index.html");
-  for (const path of ["/", "/simulator", "/compliance", "/standard", "/enterprise", "/whitepaper"]) {
+  for (const path of ["/", "/simulator", "/compliance", "/standard", "/enterprise", "/whitepaper", "/manifesto"]) {
     const html = plugin.transformIndexHtml.handler(template, { path });
     // Dedicated pages are directory indexes; their canonical ends with "/".
     const url = path === "/" ? `${origin}/` : `${origin}${path}/`;
@@ -40,13 +40,40 @@ test("each dedicated page is served its own head, not the homepage's", () => {
   )].map((match) => [match[1], match[2]]);
   const catchAll = rewrites.findIndex(([from]) => from === "/*");
   assert.ok(catchAll >= 0);
-  for (const page of ["simulator", "compliance", "standard", "enterprise", "whitepaper"]) {
+  for (const page of ["simulator", "compliance", "standard", "enterprise", "whitepaper", "manifesto"]) {
     for (const from of [`/${page}`, `/${page}/`]) {
       const index = rewrites.findIndex(([source]) => source === from);
       assert.ok(index >= 0 && index < catchAll, from);
       assert.equal(rewrites[index][1], `/${page}/index.html`, from);
     }
   }
+});
+
+test("manifesto serves its full article, metadata and conversion links without overwriting the whitepaper", () => {
+  const plugin = enterpriseSeoPlugin();
+  const template = load("artifacts/bitcoin-stratigraphy-dashboard/index.html");
+  const html = plugin.transformIndexHtml.handler(template, { path: "/manifesto/" });
+  assert.match(html, /<title>Bitcoin Stratigraphy \| The Global Central Bank for Autonomous AI<\/title>/);
+  assert.equal((html.match(/<h1>/g) ?? []).length, 1);
+  for (const section of [
+    "fiduciary-armor", "fiduciary-oracle", "developer-friction", "canonical-tools",
+    "agent-directives", "enterprise-exemption", "legal",
+  ]) assert.ok(html.includes(`id="${section}"`), section);
+  for (const id of ["link-starter-top", "link-starter-bottom"]) {
+    assert.match(html, new RegExp(`<a[^>]*href="https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/tree/main/starter-swarm-python"[^>]*data-testid="${id}"`));
+  }
+  assert.ok(html.includes('href="mailto:licensing@bitcoinstratigraphy.com"'));
+  assert.match(html, /href="\/whitepaper"[^>]*>Truth Receipts<\/a>/);
+  assert.match(html, /href="\/whitepaper"[^>]*>compliance<\/a>/);
+  assert.match(html, /href="\/whitepaper"[^>]*>circuit breakers<\/a>/);
+  assert.ok(html.includes("Mandatory law and applicable signed agreements govern enforceability; obtain qualified legal review."));
+  assert.ok(html.includes('id="manifesto-article-jsonld"'));
+  const whitepaper = plugin.transformIndexHtml.handler(template, { path: "/whitepaper" });
+  assert.match(whitepaper, /<title>Technical Whitepaper: State-Anchored AI Architecture &amp; Article 12 Compliance<\/title>/);
+  assert.ok(!whitepaper.includes('id="manifesto-article-jsonld"'));
+  assert.ok(!whitepaper.includes('class="mf-page"'));
+  assert.ok(load("artifacts/bitcoin-stratigraphy-dashboard/public/sitemap.xml").includes(`${origin}/manifesto/`));
+  assert.ok(load("artifacts/bitcoin-stratigraphy-dashboard/src/components/site-footer.tsx").includes("link-footer-manifesto"));
 });
 
 test("registry publisher attribution preserves existing release and 16-tool metadata", () => {

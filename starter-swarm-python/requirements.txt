@@ -1,0 +1,6 @@
+bitcoinstratigraphy-agent-yield==0.3.0
+langchain
+openai
+python-dotenv
+# LangChain's OpenAI model integration is a separate package.
+langchain-openai

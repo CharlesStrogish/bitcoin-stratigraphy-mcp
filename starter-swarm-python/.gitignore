@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.cert
+*.macaroon
+.agent-yield-state/
+__pycache__/
+*.py[cod]

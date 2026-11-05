@@ -197,6 +197,14 @@
   text-underline-offset: 3px;
   overflow-wrap: anywhere;
 }
+.mf-page a.mf-cta:not(.mf-cta-alt) {
+  color: #12161f;
+  font-weight: 700;
+}
+.mf-page a[href^="mailto:"] {
+  word-break: break-all;
+  max-width: 100%;
+}
 .mf-article code {
   font-family: var(--app-font-mono);
   font-size: 0.88em;

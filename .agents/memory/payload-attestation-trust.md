@@ -18,3 +18,14 @@ creation. Avoid cross-language JSON canonicalization. Keep the payload signing
 identity domain-separated from manifest/envelope/webhook keys so introducing
 stronger SDK enforcement cannot silently rotate existing consumer identities.
 Coordinate all signing-key rotations with independently distributed client pins.
+
+For the standalone Python starter, preserve the explicit LND REST wallet adapter
+and independently provisioned server public-key pin rather than silently
+auto-discovering trusted keys.
+
+**Why:** The user explicitly approved both choices as "perfect" for the developer
+on-ramp. This approval concerns origin and byte integrity, not factual truth or
+guaranteed security of the entire template.
+
+**How to apply:** Keep wallet credentials outside agent prompts and keep pin
+provisioning independent of the response being verified when revising the starter.

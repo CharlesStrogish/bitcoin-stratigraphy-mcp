@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { tsImport } from "tsx/esm/api";
@@ -85,7 +86,7 @@ test("security attestation is public, prerendered and interlinked without changi
     assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
     assert.match(html, /Zero-Trust Security Attestation &amp; AI Audit Report/);
     for (const text of [
-      "Claude Opus 5.5 (Multi-Agent Swarm via Replit Power Mode)",
+      "Claude Opus 5.5 (Multi-Agent Swarm via Replit MAX Mode - Highest Thinking Protocol)",
       "12-Hour Continuous Penetration &amp; Logic Audit",
       "700+ rigorous regression and penetration tests",
       "0 critical, high, medium, or low vulnerabilities",
@@ -126,6 +127,27 @@ test("registry publisher attribution preserves existing release and 16-tool meta
   const discovery = load("artifacts/api-server/src/lib/mcp-discovery-manifest.ts");
   for (const field of ["homepage", "origin", "publisher"])
     assert.ok(discovery.includes(`${field}: CANONICAL_ORIGIN`), field);
+});
+
+test("public audit download has the exact SHA-256 advertised in the security page", () => {
+  const artifact = JSON.parse(load(
+    "artifacts/bitcoin-stratigraphy-dashboard/src/lib/security-audit-artifact.json",
+  ));
+  assert.equal(artifact.filename, "opus-max-audit-log-2026.txt");
+  const bytes = readFileSync(new URL(
+    `../artifacts/bitcoin-stratigraphy-dashboard/public/${artifact.filename}`,
+    import.meta.url,
+  ));
+  assert.equal(artifact.sha256, createHash("sha256").update(bytes).digest("hex"));
+  const html = enterpriseSeoPlugin().transformIndexHtml.handler(
+    load("artifacts/bitcoin-stratigraphy-dashboard/index.html"), { path: "/security" },
+  );
+  assert.match(html, /Raw Audit Log:/);
+  assert.match(html, /Artifact SHA-256:/);
+  assert.ok(html.includes(artifact.sha256));
+  assert.match(html, /href="\/opus-max-audit-log-2026\.txt" download="opus-max-audit-log-2026\.txt"/);
+  assert.match(bytes.toString("utf8"), /Validation summary/);
+  assert.match(bytes.toString("utf8"), /not proof of auditor identity/i);
 });
 
 test("documentation structured data and sitemap dates use the production domain", () => {

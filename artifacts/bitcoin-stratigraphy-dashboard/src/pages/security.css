@@ -70,6 +70,25 @@
   color: #f1d58a !important;
   margin: 0 !important;
 }
+.sec-artifact {
+  margin-top: 24px;
+  padding: clamp(16px, 3vw, 24px);
+  border: 1px solid rgba(240, 180, 40, 0.35);
+  border-radius: 4px;
+  background: rgba(240, 180, 40, 0.04);
+}
+.sec-artifact p:last-child {
+  margin-bottom: 0;
+}
+.sec-artifact a,
+.sec-artifact code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.sec-artifact code {
+  display: block;
+  margin-top: 8px;
+}
 @media (prefers-reduced-motion: reduce) {
   .sec-block {
     transition: none;

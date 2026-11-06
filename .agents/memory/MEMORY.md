@@ -104,3 +104,4 @@
 - [Dependency release policy](dependency-release-policy.md) — require zero findings at every severity, including development and Python dependencies; never call an audit proof of security.
 - [SDK terminal output](sdk-terminal-output.md) — keep yield receipts on stderr to preserve MCP JSON-RPC integrity.
 - [Payload attestation trust](payload-attestation-trust.md) — independently pinned exact-byte verification; isolate signing identities and payment evidence.
+- [Public audit evidence](public-audit-evidence.md) — hashed downloads bind observed test summaries, not auditor identity or security guarantees; exclude private diagnostics.

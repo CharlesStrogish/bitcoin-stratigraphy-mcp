@@ -1698,7 +1698,7 @@ h1,
 .header-actions {
   flex-wrap: wrap;
 }
-/* Eight grid cells: seven actions and a paired CSV/PDF export group. */
+/* Ten navigation actions plus two export buttons form twelve balanced slots. */
 .homepage-header-main {
   flex-direction: column;
   align-items: stretch;
@@ -1727,6 +1727,7 @@ h1,
 }
 .header-exports {
   display: grid;
+  grid-column: span 2;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   min-width: 0;

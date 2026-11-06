@@ -207,10 +207,20 @@ test("homepage keeps CSV and PDF together in a balanced responsive action grid",
     css,
     /@media \(max-width: 767px\)\s*\{\s*\.header-actions\.homepage-actions\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
   );
+  assert.match(css, /\.header-exports\s*\{[^}]*grid-column: span 2;/);
   assert.match(
     css,
     /\.live-escrow-section > \[data-testid="link-compliance-guide"\]\s*\{[^}]*margin: 20px 0 16px/,
   );
+});
+
+test("homepage action grid links to the Manifesto and Security Audit", () => {
+  const actions = app.split('className="header-actions homepage-actions"')[1]
+    .split('className="header-exports"')[0];
+  assert.match(actions, /href=\{`\$\{import\.meta\.env\.BASE_URL\}manifesto`\}[\s\S]*?<ScrollText[^>]*\/> Manifesto/);
+  assert.match(actions, /href=\{`\$\{import\.meta\.env\.BASE_URL\}security`\}[\s\S]*?<ShieldCheck[^>]*\/> Security Audit/);
+  const manifestoCss = read(`${dashboard}/src/pages/manifesto.css`);
+  assert.match(manifestoCss, /@media \(max-width: 767px\)\s*\{\s*\.mf-mail\s*\{[^}]*font-size: 0\.875rem;[^}]*padding-inline: 10px;/);
 });
 
 test("homepage polling leaves most of the public rate budget to the visitor", () => {

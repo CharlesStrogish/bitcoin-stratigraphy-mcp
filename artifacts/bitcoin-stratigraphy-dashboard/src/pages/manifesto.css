@@ -234,12 +234,18 @@
 }
 .mf-mail {
   display: inline-block;
-  font: 500 1.1rem var(--app-font-mono);
+  font: 500 1rem var(--app-font-mono);
   padding: 12px 16px;
   border: 1px solid hsl(var(--primary));
   border-radius: 4px;
   text-decoration: none;
   margin-bottom: 18px;
+}
+@media (max-width: 767px) {
+  .mf-mail {
+    font-size: 0.875rem;
+    padding-inline: 10px;
+  }
 }
 .mf-legal {
   font-size: 0.95rem;

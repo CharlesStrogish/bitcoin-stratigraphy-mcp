@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import type { StratigraphyEntry } from "@workspace/api-client-react";
 import stratigraphyDataset from "../../api-server/data/stratigraphy.json";
-import { Check, Download, FileText, LayoutGrid, Play, Zap } from "lucide-react";
+import { Check, Download, FileText, LayoutGrid, Play, ScrollText, ShieldCheck, Zap } from "lucide-react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -186,6 +186,20 @@ function Header({
           <EnterpriseLicenseLink />
           <Article12VerifierLink />
           <WhitepaperLink />
+          <a
+            className="control-button"
+            href={`${import.meta.env.BASE_URL}manifesto`}
+            data-testid="link-home-manifesto"
+          >
+            <ScrollText size={14} aria-hidden="true" /> Manifesto
+          </a>
+          <a
+            className="control-button"
+            href={`${import.meta.env.BASE_URL}security`}
+            data-testid="link-home-security"
+          >
+            <ShieldCheck size={14} aria-hidden="true" /> Security Audit
+          </a>
           <a
             className="control-button"
             href={`${import.meta.env.BASE_URL}docs`}

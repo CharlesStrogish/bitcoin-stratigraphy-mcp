@@ -76,6 +76,14 @@ from = "/manifesto/"
 to = "/manifesto/index.html"
 
 [[services.production.rewrites]]
+from = "/security"
+to = "/security/index.html"
+
+[[services.production.rewrites]]
+from = "/security/"
+to = "/security/index.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

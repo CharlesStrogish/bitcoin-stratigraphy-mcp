@@ -179,7 +179,7 @@ test("homepage metadata stays unchanged and dedicated static pages remain emitte
   );
   assert.deepEqual(
     emitted.map((asset) => asset.fileName),
-    ["simulator/index.html", "standard/index.html", "enterprise/index.html",
+    ["security/index.html", "manifesto/index.html", "simulator/index.html", "standard/index.html", "enterprise/index.html",
       "whitepaper/index.html", "compliance/index.html"],
   );
   for (const asset of emitted) {

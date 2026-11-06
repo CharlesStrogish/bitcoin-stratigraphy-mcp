@@ -6,13 +6,16 @@ import { pageUrl, siteUrl } from "@/lib/site";
 import {
   MANIFESTO_ARTICLE, MANIFESTO_DESCRIPTION, MANIFESTO_TITLE,
 } from "@/lib/manifesto-seo";
+import {
+  SECURITY_ARTICLE, SECURITY_DESCRIPTION, SECURITY_TITLE,
+} from "@/lib/security-seo";
 
 /** Keep crawler-facing URLs and escrow attribution correct after SPA navigation. */
 export function PublicRouteHead() {
   const [location] = useLocation();
   useEffect(() => {
     const path = location.split("?")[0]!.replace(/\/$/, "") || "/";
-    const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance", "/manifesto"];
+    const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance", "/manifesto", "/security"];
     if (!publicPaths.includes(path)) return;
     const url = path === "/" ? siteUrl("/") : pageUrl(path);
     document.querySelector('link[rel="canonical"]')?.setAttribute("href", url);
@@ -31,16 +34,22 @@ export function PublicRouteHead() {
     });
   }, [location]);
   useEffect(() => {
-    if (location.split("?")[0]!.replace(/\/$/, "") !== "/manifesto") return;
+    const path = location.split("?")[0]!.replace(/\/$/, "");
+    if (path !== "/manifesto" && path !== "/security") return;
+    const isSecurity = path === "/security";
+    const title = isSecurity ? SECURITY_TITLE : MANIFESTO_TITLE;
+    const description = isSecurity ? SECURITY_DESCRIPTION : MANIFESTO_DESCRIPTION;
+    const article = isSecurity ? SECURITY_ARTICLE : MANIFESTO_ARTICLE;
+    const articleId = `${isSecurity ? "security" : "manifesto"}-article-jsonld`;
     const previousTitle = document.title;
-    document.title = MANIFESTO_TITLE;
+    document.title = title;
     const changes = [
-      ['meta[name="description"]', MANIFESTO_DESCRIPTION],
-      ['meta[property="og:title"]', MANIFESTO_TITLE],
-      ['meta[property="og:description"]', MANIFESTO_DESCRIPTION],
+      ['meta[name="description"]', description],
+      ['meta[property="og:title"]', title],
+      ['meta[property="og:description"]', description],
       ['meta[property="og:type"]', "article"],
-      ['meta[name="twitter:title"]', MANIFESTO_TITLE],
-      ['meta[name="twitter:description"]', MANIFESTO_DESCRIPTION],
+      ['meta[name="twitter:title"]', title],
+      ['meta[name="twitter:description"]', description],
     ].map(([selector, value]) => {
       const element = document.querySelector(selector!);
       const previous = element?.getAttribute("content");
@@ -48,11 +57,11 @@ export function PublicRouteHead() {
       return { element, previous };
     });
     const script = document.createElement("script");
-    script.id = "manifesto-article-jsonld-client";
+    script.id = `${articleId}-client`;
     script.type = "application/ld+json";
     // The initial prerender already contains the same structured data.
-    if (!document.getElementById("manifesto-article-jsonld")) {
-      script.textContent = JSON.stringify(MANIFESTO_ARTICLE);
+    if (!document.getElementById(articleId)) {
+      script.textContent = JSON.stringify(article);
       document.head.appendChild(script);
     }
     return () => {
@@ -62,7 +71,7 @@ export function PublicRouteHead() {
         else element?.setAttribute("content", previous);
       }
       script.remove();
-      document.getElementById("manifesto-article-jsonld")?.remove();
+      document.getElementById(articleId)?.remove();
     };
   }, [location]);
   return null;

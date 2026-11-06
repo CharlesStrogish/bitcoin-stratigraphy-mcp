@@ -13,7 +13,7 @@ const { enterpriseSeoPlugin } = await tsImport(
 test("public static routes expose production canonicals and authored valid JSON-LD", () => {
   const plugin = enterpriseSeoPlugin();
   const template = load("artifacts/bitcoin-stratigraphy-dashboard/index.html");
-  for (const path of ["/", "/simulator", "/compliance", "/standard", "/enterprise", "/whitepaper", "/manifesto"]) {
+  for (const path of ["/", "/simulator", "/compliance", "/standard", "/enterprise", "/whitepaper", "/manifesto", "/security"]) {
     const html = plugin.transformIndexHtml.handler(template, { path });
     // Dedicated pages are directory indexes; their canonical ends with "/".
     const url = path === "/" ? `${origin}/` : `${origin}${path}/`;
@@ -40,7 +40,7 @@ test("each dedicated page is served its own head, not the homepage's", () => {
   )].map((match) => [match[1], match[2]]);
   const catchAll = rewrites.findIndex(([from]) => from === "/*");
   assert.ok(catchAll >= 0);
-  for (const page of ["simulator", "compliance", "standard", "enterprise", "whitepaper", "manifesto"]) {
+  for (const page of ["simulator", "compliance", "standard", "enterprise", "whitepaper", "manifesto", "security"]) {
     for (const from of [`/${page}`, `/${page}/`]) {
       const index = rewrites.findIndex(([source]) => source === from);
       assert.ok(index >= 0 && index < catchAll, from);
@@ -74,6 +74,42 @@ test("manifesto serves its full article, metadata and conversion links without o
   assert.ok(!whitepaper.includes('class="mf-page"'));
   assert.ok(load("artifacts/bitcoin-stratigraphy-dashboard/public/sitemap.xml").includes(`${origin}/manifesto/`));
   assert.ok(load("artifacts/bitcoin-stratigraphy-dashboard/src/components/site-footer.tsx").includes("link-footer-manifesto"));
+});
+
+test("security attestation is public, prerendered and interlinked without changing the whitepaper", () => {
+  const plugin = enterpriseSeoPlugin();
+  const template = load("artifacts/bitcoin-stratigraphy-dashboard/index.html");
+  for (const path of ["/security", "/security/"]) {
+    const html = plugin.transformIndexHtml.handler(template, { path });
+    assert.match(html, /<title>Security Attestation \| Bitcoin Stratigraphy<\/title>/);
+    assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
+    assert.match(html, /Zero-Trust Security Attestation &amp; AI Audit Report/);
+    for (const text of [
+      "Claude Opus 5.5 (Multi-Agent Swarm via Replit Power Mode)",
+      "12-Hour Continuous Penetration &amp; Logic Audit",
+      "700+ rigorous regression and penetration tests",
+      "0 critical, high, medium, or low vulnerabilities",
+      "Macaroon Attenuation",
+      "Signature Forgery",
+      "Payload Tampering Rejection",
+      "Cache Poisoning &amp; Leakage",
+      "Machine-Readable Verification",
+      "max_spend_sats",
+      "tool_name:timestamp:contentSha256",
+      "FiduciaryTamperingError",
+      "guaranteeing zero risk of runaway context billing.",
+    ]) assert.ok(html.includes(text), text);
+    assert.match(html, /name="description" content="[^"]*700-test zero-vulnerability/);
+    assert.ok(html.includes('id="security-article-jsonld"'));
+    assert.ok(!html.includes('id="manifesto-article-jsonld"'));
+  }
+  const manifesto = plugin.transformIndexHtml.handler(template, { path: "/manifesto" });
+  assert.match(manifesto, /href="\/security"[^>]*>View the 700-Point AI Security Audit<\/a>/);
+  const footer = load("artifacts/bitcoin-stratigraphy-dashboard/src/components/site-footer.tsx");
+  assert.ok(footer.includes("link-footer-security"));
+  assert.ok(load("artifacts/bitcoin-stratigraphy-dashboard/public/sitemap.xml").includes(`${origin}/security/`));
+  const whitepaper = plugin.transformIndexHtml.handler(template, { path: "/whitepaper" });
+  assert.ok(!whitepaper.includes('id="security-article-jsonld"'));
 });
 
 test("registry publisher attribution preserves existing release and 16-tool metadata", () => {

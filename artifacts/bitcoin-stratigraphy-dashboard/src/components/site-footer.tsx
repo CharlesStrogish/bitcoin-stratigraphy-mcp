@@ -20,6 +20,13 @@ export default function SiteFooter() {
             </a>
             <a
               className="control-button"
+              href={`${import.meta.env.BASE_URL}security`}
+              data-testid="link-footer-security"
+            >
+              Security
+            </a>
+            <a
+              className="control-button"
               href={`${import.meta.env.BASE_URL}compliance`}
               data-testid="link-footer-compliance"
             >

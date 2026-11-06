@@ -486,6 +486,15 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                     Read the Whitepaper
                   </a>
                 </div>
+                <p style={{ marginTop: 20, marginBottom: 0 }}>
+                  <a
+                    href={`${BASE}security`}
+                    className="mf-cta mf-cta-alt"
+                    data-testid="link-security-audit"
+                  >
+                    View the 700-Point AI Security Audit
+                  </a>
+                </p>
                 <a href="#top" className="mf-top">
                   Back to top
                 </a>

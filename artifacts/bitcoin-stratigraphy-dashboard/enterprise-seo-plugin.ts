@@ -3,6 +3,10 @@ import type { Plugin } from "vite";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ManifestoContent from "./src/pages/manifesto-content";
+import SecurityContent from "./src/pages/security-content";
+import {
+  SECURITY_ARTICLE, SECURITY_DESCRIPTION, SECURITY_TITLE, SECURITY_URL,
+} from "./src/lib/security-seo";
 import {
   MANIFESTO_ARTICLE, MANIFESTO_DESCRIPTION, MANIFESTO_TITLE, MANIFESTO_URL,
 } from "./src/lib/manifesto-seo";
@@ -28,6 +32,12 @@ import {
 import { pageUrl } from "./src/lib/site";
 
 const routes = [
+  {
+    path: "security",
+    title: SECURITY_TITLE,
+    description: SECURITY_DESCRIPTION,
+    url: SECURITY_URL,
+  },
   {
     path: "manifesto",
     title: MANIFESTO_TITLE,
@@ -107,16 +117,18 @@ function pageHead(html: string, page: (typeof routes)[number]): string {
       `<script id="compliance-article-jsonld" type="application/ld+json">${article}</script>\n  </head>`,
     );
   }
-  if (page.path === "manifesto") {
+  if (page.path === "manifesto" || page.path === "security") {
+    const isSecurity = page.path === "security";
+    const article = isSecurity ? SECURITY_ARTICLE : MANIFESTO_ARTICLE;
     result = result.replace(
       /<meta\b(?=[^>]*\bproperty="og:type")[^>]*>/,
       '<meta property="og:type" content="article" />',
     );
     result = result.replace(
       "</head>",
-      `<script id="manifesto-article-jsonld" type="application/ld+json">${JSON.stringify(MANIFESTO_ARTICLE).replace(/</g, "\\u003c")}</script>\n  </head>`,
+      `<script id="${page.path}-article-jsonld" type="application/ld+json">${JSON.stringify(article).replace(/</g, "\\u003c")}</script>\n  </head>`,
     );
-    const content = renderToStaticMarkup(createElement(ManifestoContent, { base: "/" }));
+    const content = renderToStaticMarkup(createElement(isSecurity ? SecurityContent : ManifestoContent, { base: "/" }));
     result = result.replace('<div id="root"></div>', `<div id="root">${content}</div>`);
   }
   return result;

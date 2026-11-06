@@ -16,6 +16,7 @@ import EnterprisePage from "@/pages/enterprise";
 import EnterpriseLicenseLink from "@/components/enterprise-license-link";
 import WhitepaperPage from "@/pages/whitepaper";
 import ManifestoPage from "@/pages/manifesto";
+import SecurityPage from "@/pages/security";
 import WhitepaperLink from "@/components/whitepaper-link";
 import SiteFooter from "@/components/site-footer";
 import Article12VerifierLink from "@/components/article12-verifier-link";
@@ -301,6 +302,7 @@ function Router() {
         <Route path="/enterprise" component={EnterprisePage} />
         <Route path="/whitepaper" component={WhitepaperPage} />
         <Route path="/manifesto" component={ManifestoPage} />
+        <Route path="/security" component={SecurityPage} />
         <Route path="/simulator" component={SimulatorPage} />
         <Route path="/compliance" component={CompliancePage} />
         <Route component={NotFound} />

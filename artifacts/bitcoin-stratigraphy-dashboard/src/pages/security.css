@@ -1,0 +1,77 @@
+/* Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available). */
+.sec-meta {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 1px;
+  margin: 32px 0 0;
+  max-width: 64rem;
+  background: rgba(240, 180, 40, 0.22);
+  border: 1px solid rgba(240, 180, 40, 0.22);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.sec-meta > div {
+  background: #151a24;
+  padding: 16px 18px;
+  min-width: 0;
+}
+.sec-meta dt {
+  font: 500 10px var(--app-font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: hsl(var(--primary));
+  margin-bottom: 6px;
+}
+.sec-meta dd {
+  margin: 0;
+  color: #d7dce8;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+.sec-page .sec-first {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+.sec-verdict {
+  border-left: 2px solid hsl(var(--primary));
+  padding: 4px 0 4px 18px;
+  font-size: 1.2rem;
+  line-height: 1.6;
+  color: #f1f3f9;
+}
+.sec-block {
+  scroll-margin-top: 24px;
+  margin-top: 28px;
+  padding: clamp(16px, 3vw, 24px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.2s;
+}
+.sec-block:hover {
+  border-color: rgba(240, 180, 40, 0.35);
+}
+.sec-block h3 {
+  margin-top: 0;
+}
+.sec-block ul {
+  margin-bottom: 0;
+}
+.sec-block li:last-child {
+  margin-bottom: 0;
+}
+.sec-directive-text {
+  font: inherit !important;
+  letter-spacing: normal !important;
+  color: #f1d58a !important;
+  margin: 0 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sec-block {
+    transition: none;
+  }
+}

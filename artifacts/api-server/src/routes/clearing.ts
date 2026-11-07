@@ -21,6 +21,11 @@ import {
   signDevelopmentClearingReceipt,
   verifyClearingExecution,
 } from "../services/clearingExecution";
+import {
+  CLEARING_PAYOUT_DISABLED,
+  settleClearingContractPayout,
+} from "../services/clearingPayout";
+import { LndPayoutError } from "../adapters/lnd";
 
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
 const workerKey = hex32.refine((key) => {
@@ -50,6 +55,9 @@ const settleInput = z
       .string()
       .min(1)
       .max(64 * 1024),
+    // Bound to the exact worker by the existing NIP-98 payload signature.
+    // Optional to preserve the existing no-payout development contract.
+    payout_invoice: z.string().min(1).max(4096).optional(),
   })
   .strict();
 
@@ -89,6 +97,13 @@ export const clearingToolDefinitions = [
       properties: {
         escrow_id: { type: "string", format: "uuid" },
         execution_trace: { type: "string", minLength: 1, maxLength: 65536 },
+        payout_invoice: {
+          type: "string",
+          minLength: 1,
+          maxLength: 4096,
+          description:
+            "Worker-signed BOLT11 payout invoice. Payouts remain unconditionally disabled pending independent Phase 2 MPC setup and reviewed activation.",
+        },
       },
       required: ["escrow_id", "execution_trace"],
     },
@@ -177,6 +192,16 @@ export function clearingController(options: {
         // Do not disclose another worker's private contract or its existence.
         if (!contract || contract.worker_pubkey !== buyer) {
           fail(403, "CLEARING_WORKER_NOT_AUTHORIZED");
+          return;
+        }
+        if (input.payout_invoice !== undefined) {
+          // Always throws, before any LND configuration, estimate, reservation
+          // or send. Development mode and new key files cannot bypass this.
+          await settleClearingContractPayout(
+            contract,
+            input.execution_trace,
+            input.payout_invoice,
+          );
           return;
         }
         if (!developmentClearingEnabled()) {
@@ -385,7 +410,18 @@ export function clearingController(options: {
           structuredContent: result,
         },
       });
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof LndPayoutError &&
+        error.code === CLEARING_PAYOUT_DISABLED
+      ) {
+        fail(503, CLEARING_PAYOUT_DISABLED, {
+          settlement_available: false,
+          payout_executed: false,
+          zk_receipt_issued: false,
+        });
+        return;
+      }
       // Provider/SQL diagnostics can contain credentials. Never reflect them.
       fail(503, "CLEARING_STORAGE_OR_PROVIDER_UNAVAILABLE");
     }

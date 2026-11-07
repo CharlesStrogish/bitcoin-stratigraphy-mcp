@@ -82,6 +82,19 @@ worker and contract. Enforce principal plus maximum routing fee within funded
 escrow before sending; observing excess fees afterward is not enforcement.
 Keep unknown outbound results reserved and reconcile without sending again.
 
+Clearing's fee-cap policy is 1% of funded escrow, rounded down to whole sats,
+further capped by escrow headroom after the invoice principal. Account for
+actual fees in millisatoshis; leave unused fee allowance in the escrow.
+
+**Why:** The user requested mathematical reserve protection against routing-fee
+spikes, with all business costs borne by the contract escrow. The implemented
+policy uses the user's suggested 1% cap without permitting operator subsidy.
+
+**How to apply:** Reject over-cap estimates before sending, but rely on LND's
+explicit send-time fee limit for stale-estimate protection. Reserve principal
+plus the maximum fee durably before I/O. Never enable production payouts merely
+because keys or wallet credentials have been installed.
+
 The user subsequently selected “Keep payouts disabled.” Ceremony preparation
 or successful key verification is not permission to enable real-money routing.
 

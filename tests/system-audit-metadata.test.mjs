@@ -77,6 +77,25 @@ test("manifesto serves its full article, metadata and conversion links without o
   assert.ok(load("artifacts/bitcoin-stratigraphy-dashboard/src/components/site-footer.tsx").includes("link-footer-manifesto"));
 });
 
+test("manifesto trust badge exposes the exact embeddable Markdown before the final CTA", () => {
+  const plugin = enterpriseSeoPlugin();
+  const html = plugin.transformIndexHtml.handler(
+    load("artifacts/bitcoin-stratigraphy-dashboard/index.html"), { path: "/manifesto/" },
+  );
+  const badgeUrl = "https://img.shields.io/badge/Secured_by-Bitcoin_Stratigraphy-F7931A?style=for-the-badge&logo=bitcoin&logoColor=white";
+  const markdown = `[![Secured by Bitcoin Stratigraphy](${badgeUrl})](https://bitcoinstratigraphy.com)`;
+  const section = html.match(/<section id="fiduciary-trust-badge"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(section);
+  assert.ok(section.includes("8. The Fiduciary Trust Badge"));
+  assert.ok(section.includes(`src="${badgeUrl.replaceAll("&", "&amp;")}"`));
+  const code = section.match(/<pre[^>]*><code>([\s\S]*?)<\/code><\/pre>/)?.[1];
+  assert.equal(code?.replaceAll("&amp;", "&"), markdown);
+  assert.ok(section.includes("Copy Markdown"));
+  assert.ok(section.includes('role="status"'));
+  assert.ok(html.includes('href="#fiduciary-trust-badge"'));
+  assert.ok(html.indexOf('id="fiduciary-trust-badge"') < html.indexOf('aria-label="Get started"'));
+});
+
 test("security attestation is public, prerendered and interlinked without changing the whitepaper", () => {
   const plugin = enterpriseSeoPlugin();
   const template = load("artifacts/bitcoin-stratigraphy-dashboard/index.html");

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import React from "react";
 import type { ReactNode } from "react";
+import ManifestoTrustBadge from "../components/manifesto-trust-badge";
 
 const EMAIL = "licensing@bitcoinstratigraphy.com";
 const STARTER =
@@ -25,6 +26,7 @@ const SECTIONS = [
   ["agent-directives", "5", "Machine-Readable Directives"],
   ["enterprise-exemption", "6", "Enterprise Commercial License Exemption"],
   ["legal", "7", "Legal, Copyright, and Liability"],
+  ["fiduciary-trust-badge", "8", "The Fiduciary Trust Badge"],
 ];
 
 const TITLE =
@@ -462,6 +464,8 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                   )}
                 </p>
               </section>
+
+              <ManifestoTrustBadge />
 
               <aside className="panel mf-end" aria-label="Get started">
                 <div className="eyebrow">

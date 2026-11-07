@@ -137,7 +137,12 @@ class StarterTests(unittest.TestCase):
                 def build_agent(**options):
                     self.assertEqual(
                         {tool.name for tool in options["tools"]},
-                        {"latest_bitcoin_digest", "get_escrow"}
+                        {
+                            "latest_bitcoin_digest",
+                            "get_escrow",
+                            "clearing_create_contract",
+                            "clearing_settle_contract",
+                        }
                         if stake
                         else {"latest_bitcoin_digest"},
                     )

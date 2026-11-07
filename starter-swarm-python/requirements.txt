@@ -1,4 +1,6 @@
 bitcoinstratigraphy-agent-yield==1.1.0
+# Maintained native NIP-47 wallet client; used only by the clearing extension.
+nostr-sdk==0.45.1
 # Native NIP-98 authentication uses Nostr BIP-340/Schnorr, not Ed25519.
 coincurve==21.0.0
 langchain

@@ -2,6 +2,13 @@
 
 **Fork this repo, add your keys, and instantly run an autonomous agent with 21% thermodynamic yield, L402 circuit breakers, and Ed25519 Truth Receipts.**
 
+## A2A clearing extension
+
+The starter now includes an isolated clearing registry and NWC payer. See
+[CLEARING.md](CLEARING.md) for setup, exact tool names, payment limits, and
+retry behavior. **Contract creation automatically spends real sats while
+settlement remains unavailable.** No core data or staking lookup logic changes.
+
 Give your first agent a real spending policy—not unlimited access to your wallet.
 This standalone Python template connects LangChain and OpenAI to Bitcoin
 Stratigraphy's canonical `stratigraphy.get_digest` tool through the public

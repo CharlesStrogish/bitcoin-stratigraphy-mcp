@@ -25,6 +25,8 @@ from dotenv import load_dotenv
 
 from wallet import FEE_LIMIT_SATS, LndWallet
 from staking import YieldSettings, YieldStakingClient
+from clearing import ClearingTools
+from nwc_wallet import NwcWallet
 
 ROOT = Path(__file__).resolve().parent
 MAX_SPEND_SATS = 1000  # Fiduciary Armor: deliberately not controlled by the LLM.
@@ -89,6 +91,7 @@ def main() -> None:
         else "",
     )
     client = None
+    clearing_wallet = None
     receipts: list[TruthReceipt] = []
     try:
         # Configure the public SDK before constructing the LangChain graph.
@@ -135,6 +138,9 @@ def main() -> None:
         tools = [latest_bitcoin_digest]
         if yield_settings.signer:
             tools.append(get_escrow)
+            if os.getenv("NWC_URI", "").strip():
+                clearing_wallet = NwcWallet(required("NWC_URI"))
+            tools.extend(ClearingTools(client, clearing_wallet).langchain_tools())
         agent = create_agent(
             model=ChatOpenAI(
                 model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
@@ -178,6 +184,8 @@ def main() -> None:
             )
             client.close()
         wallet.close()
+        if clearing_wallet is not None:
+            clearing_wallet.close()
 
 
 if __name__ == "__main__":

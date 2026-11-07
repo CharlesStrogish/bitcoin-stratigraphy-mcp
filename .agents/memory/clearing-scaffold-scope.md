@@ -1,6 +1,6 @@
 ---
 name: A2A clearing trust boundaries
-description: Development-only preimage proofs, production fail-closed settlement and protected core boundaries.
+description: Independent production setup, worker-invoice payouts, escrow-funded fees and protected core boundaries.
 ---
 
 Keep the 16 Fiduciary data tools and v1.1.0 payment.get_escrow logic unchanged
@@ -56,3 +56,48 @@ merchant funding confirmation. Describe receipts as preimage-knowledge evidence,
 not arbitrary execution, legal indemnity, payouts or fully trustless custody.
 Never run tests against the 16 core data tools for clearing work; preserve the
 existing regression assertions rather than weakening them.
+
+For production activation, the user subsequently required independent
+participant contributions rather than a single-operator simulation. Use at
+least three actual independent phase-two contributors; different names or
+invocations by this agent are not substitutes.
+
+**Why:** After the distinction was explained, the user selected “Independent
+participant contributions.”
+
+**How to apply:** Authenticate participants and their public handoffs outside
+the ceremony coordinator's own claims. Do not label an uncontributed initial
+key, simulated contributions or development keys as the accepted production
+ceremony. Require the real verified contribution chain before activation.
+
+Production workers supply Lightning payout invoices in their NIP-98-signed
+settlement requests. Routing fees come from the escrow balance, not additional
+operator funds or existing staking balances.
+
+**Why:** The user selected “Worker-signed Lightning invoice” and “Escrow balance”
+when asked to authorize the payout and fee model.
+
+**How to apply:** Bind destination, principal and fee authorization to the exact
+worker and contract. Enforce principal plus maximum routing fee within funded
+escrow before sending; observing excess fees afterward is not enforcement.
+Keep unknown outbound results reserved and reconcile without sending again.
+
+The user subsequently selected “Keep payouts disabled.” Ceremony preparation
+or successful key verification is not permission to enable real-money routing.
+
+**Why:** The user explicitly chose to keep payouts disabled when asked which
+fee-capped payout backend to support.
+
+**How to apply:** Preserve the live payout lock while preparing public ceremony
+materials. Do not silently activate production or run real payment tests.
+
+Distinguish an upstream-published phase-one checksum match from a completed
+local cryptographic transcript replay. Do not relabel one as the other.
+
+**Why:** A full replay of the public phase-one transcript consumed more than
+11 minutes of CPU without completion and was stopped. Expensive replay must
+be explicit, not an unbounded automatic step.
+
+**How to apply:** Record the actual validation scope in ceremony metadata and
+its commitment. Reusing hash-pinned public parameters must not imply that the
+entire transcript was independently replayed locally or authorize activation.

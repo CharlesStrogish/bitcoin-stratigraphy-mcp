@@ -1,5 +1,9 @@
 # Clearing execution circuit — LOCAL DEVELOPMENT ONLY
 
+For the separate independent-participant production ceremony requirements and
+starting-package tooling, see [MPC_CEREMONY.md](MPC_CEREMONY.md). Those tools do
+not promote development keys or activate production settlement.
+
 This implements the approved **local development setup**, not production
 activation. No existing data-tool handler, price, payment path, or Python SDK
 distribution is changed.

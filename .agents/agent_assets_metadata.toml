@@ -70,3 +70,17 @@ mtime_ms = 1791724739969
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/a70e7ed7-a382-45f2-b010-a0643dbff69f/c7b5c367-75bb-4860-bb1d-7e9ceb840b6c"
 storage_version_token = "1791724740599888"
 content_type = "text/html"
+
+[[outputs]]
+id = "4KsVkDzb1VrEKyiYvEdoN"
+uri = "file://generated-artifacts/clearing-mpc/clearing-mpc-starting-package-UNFINALIZED.zip"
+type = "unspecified"
+title = "Unfinalized MPC starting package"
+description = "Public phase-one parameters, compiled circuit, initial circuit_0000.zkey, checksummed manifest and contributor handoff tools. Published phase-one checksum verified; full local transcript replay did not complete. Zero of three independent phase-two contributions. Not production keys; payouts remain disabled."
+logical_id = "8f7a22bb-aba7-493b-a3e6-fd94c6debd01"
+content_hash = "sha256:d3fd701a5c65e1852a0bbc9fc1dc3e97fb51dbef08ef73792bcf300e6c8ecd22"
+size = 6077809
+mtime_ms = 1794069220646
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/8f7a22bb-aba7-493b-a3e6-fd94c6debd01/cecc1a9a-fda3-472e-97cd-ba515f924e7c"
+storage_version_token = "1794069226000284"
+content_type = "application/octet-stream"

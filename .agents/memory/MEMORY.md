@@ -102,7 +102,7 @@
 - [Glama ownership](glama-ownership.md) — ownership claims are exact provider-supplied documents; preserve legacy connector metadata and the MCP manifest.
 - [Mainnet Treasury safety](mainnet-treasury-safety.md) — outbound claims use NWC; schemas/state machine are frozen, unknown outcomes stay reserved and tests never spend real funds.
 - [Yield staking policy](yield-staking-policy.md) — preserve explicit withdrawals; staking and Treasury must reserve the same yield exclusively, without automatic payouts.
-- [Clearing trust boundaries](clearing-scaffold-scope.md) — local development preimage proofs only; production stays disabled, with core data tools and staking protected.
+- [Clearing trust boundaries](clearing-scaffold-scope.md) — production needs independent contributors, worker-signed invoices and escrow-funded capped fees; protect core tools and staking.
 - [Dependency release policy](dependency-release-policy.md) — require zero findings at every severity, including development and Python dependencies; never call an audit proof of security.
 - [SDK terminal output](sdk-terminal-output.md) — keep yield receipts on stderr to preserve MCP JSON-RPC integrity.
 - [Payload attestation trust](payload-attestation-trust.md) — independently pinned exact-byte verification; isolate signing identities and payment evidence.

@@ -90,13 +90,24 @@ export const clearingToolDefinitions = [
   {
     name: "clearing.settle_contract",
     description:
-      "Production settlement remains disabled. Explicit local development mode verifies the exact NIP-98 worker, a contract-bound Groth16 Poseidon preimage proof and merchant-confirmed funding before atomically recording settled status and a signed development receipt. No payout, arbitrary-execution guarantee, or legal indemnity.",
+      "Settles an escrow contract for Agent-to-Agent tasks (production settlement remains disabled). Use this tool after clearing.create_contract to submit the worker's proof for local development settlement and obtain a signed development receipt; no funds are paid out. Explicit local development mode verifies the exact NIP-98 worker, a contract-bound Groth16 Poseidon preimage proof and merchant-confirmed funding before atomically recording settled status and the receipt. The proof demonstrates preimage knowledge, not arbitrary task completion. No production payout, arbitrary-execution guarantee, or legal indemnity.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
-        escrow_id: { type: "string", format: "uuid" },
-        execution_trace: { type: "string", minLength: 1, maxLength: 65536 },
+        escrow_id: {
+          type: "string",
+          format: "uuid",
+          description:
+            "The unique UUID string identifying the escrow contract to settle, returned by clearing.create_contract (e.g., '550e8400-e29b-41d4-a716-446655440000'). Merchant-confirmed funding is required for local development settlement; an unpaid contract is not funded escrow.",
+        },
+        execution_trace: {
+          type: "string",
+          minLength: 1,
+          maxLength: 65536,
+          description:
+            "The worker-generated Groth16 Poseidon preimage proof envelope, provided as a JSON-encoded string containing scheme, proof, and publicSignals. Use scheme 'clearing-poseidon-preimage-development-v1' and two canonical decimal-string public signals binding the exact task hash and escrow UUID. This proves preimage knowledge, not arbitrary task completion. Serialize the envelope as a string, not a bare hex string or JSON object, and never include the private preimage.",
+        },
         payout_invoice: {
           type: "string",
           minLength: 1,

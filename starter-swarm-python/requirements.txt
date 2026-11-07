@@ -1,4 +1,6 @@
 bitcoinstratigraphy-agent-yield==0.3.0
+# Native NIP-98 authentication uses Nostr BIP-340/Schnorr, not Ed25519.
+coincurve==21.0.0
 langchain
 openai
 python-dotenv

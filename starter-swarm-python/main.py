@@ -18,13 +18,13 @@ from bitcoinstratigraphy_agent_yield import (
     CircuitBreakerError,
     FiduciaryTamperingError,
     TruthReceipt,
-    with_fiduciary_yield,
 )
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from dotenv import load_dotenv
 
 from wallet import FEE_LIMIT_SATS, LndWallet
+from staking import YieldSettings, YieldStakingClient
 
 ROOT = Path(__file__).resolve().parent
 MAX_SPEND_SATS = 1000  # Fiduciary Armor: deliberately not controlled by the LLM.
@@ -49,7 +49,9 @@ def trusted_public_key() -> str:
     """Require an independently provisioned Ed25519 SPKI PEM; no trust-on-first-use."""
     pem = local_path(required("STRATIGRAPHY_SERVER_PUBLIC_KEY_PATH")).read_text()
     key = serialization.load_pem_public_key(pem.encode())
-    if not isinstance(key, Ed25519PublicKey) or not pem.startswith("-----BEGIN PUBLIC KEY-----"):
+    if not isinstance(key, Ed25519PublicKey) or not pem.startswith(
+        "-----BEGIN PUBLIC KEY-----"
+    ):
         raise ValueError("The server pin must be an Ed25519 SPKI PEM public key.")
     return pem
 
@@ -71,6 +73,7 @@ def display_receipt(receipt: TruthReceipt, remaining_msats: int) -> None:
 def main() -> None:
     # Existing process variables win, so secrets managers also work without .env.
     load_dotenv(ROOT / ".env", override=False)
+    yield_settings = YieldSettings.from_env()
     required("OPENAI_API_KEY")
     pin = trusted_public_key()
     # Import optional framework packages only when actually running the agent.
@@ -88,32 +91,26 @@ def main() -> None:
     client = None
     receipts: list[TruthReceipt] = []
     try:
-        # The SDK wraps the configuration BEFORE LangChain constructs its graph.
-        # Its tools/client perform discovery, L402 settlement, durable reservations,
-        # exact-byte Ed25519 verification, and eligible yield claims.
-        config = with_fiduciary_yield(
-            {
-                "framework": "langchain",
-                "tools": [],
-                "fiduciary": {
-                    "wallet": wallet,
-                    "server_public_key": pin,
-                    "max_spend_sats": 1000,
-                    "max_payment_sats": MAX_SPEND_SATS - FEE_LIMIT_SATS,
-                    "max_total_sats": MAX_SPEND_SATS,
-                    "fee_reserve_sats": FEE_LIMIT_SATS,
-                    "state_directory": str(ROOT / ".agent-yield-state"),
-                    "on_yield_claim": lambda claim: print(
-                        f"21% yield claim: {claim['status']} "
-                        f"({claim['amount_msats']} msats)", flush=True
-                    ),
-                    "on_error": lambda event: print(
-                        f"SDK notice: {event['code']}", file=sys.stderr
-                    ),
-                },
-            }
+        # Configure the public SDK before constructing the LangChain graph.
+        # Keep its durable budget, L402 settlement and pinned receipt verifier.
+        client = YieldStakingClient(
+            yield_settings=yield_settings,
+            wallet=wallet,
+            server_public_key=pin,
+            max_spend_sats=1000,
+            max_payment_sats=MAX_SPEND_SATS - FEE_LIMIT_SATS,
+            max_total_sats=MAX_SPEND_SATS,
+            fee_reserve_sats=FEE_LIMIT_SATS,
+            state_directory=str(ROOT / ".agent-yield-state"),
+            on_yield_claim=lambda claim: print(
+                f"21% yield claim: {claim['status']} ({claim['amount_msats']} msats)",
+                flush=True,
+            ),
+            on_error=lambda event: print(
+                f"SDK notice: {event['code']}", file=sys.stderr
+            ),
         )
-        client = config["fiduciary"]
+        client.list_tools()
 
         @tool
         def latest_bitcoin_digest() -> dict | list | str:
@@ -130,6 +127,14 @@ def main() -> None:
             # Never expose payment preimages to OpenAI or an agent trace.
             return receipts[0].payload
 
+        @tool
+        def get_escrow() -> dict:
+            """Read this agent's authenticated staked yield; never pays or withdraws."""
+            return client.get_escrow()
+
+        tools = [latest_bitcoin_digest]
+        if yield_settings.signer:
+            tools.append(get_escrow)
         agent = create_agent(
             model=ChatOpenAI(
                 model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
@@ -138,7 +143,7 @@ def main() -> None:
                 timeout=30,
                 max_retries=0,
             ),
-            tools=[latest_bitcoin_digest],
+            tools=tools,
             system_prompt=(
                 "Call latest_bitcoin_digest exactly once before answering. "
                 "Summarize its indexed date, height and digest in plain English. "
@@ -152,11 +157,17 @@ def main() -> None:
             flush=True,
         )
         result = agent.invoke(
-            {"messages": [{"role": "user", "content": "Fetch the latest Bitcoin digest."}]},
+            {
+                "messages": [
+                    {"role": "user", "content": "Fetch the latest Bitcoin digest."}
+                ]
+            },
             config={"recursion_limit": 6},
         )
         if not receipts:
-            raise RuntimeError("The model did not call the canonical tool; no receipt earned.")
+            raise RuntimeError(
+                "The model did not call the canonical tool; no receipt earned."
+            )
         print("Agent summary:\n" + str(result["messages"][-1].content))
     finally:
         if client is not None:

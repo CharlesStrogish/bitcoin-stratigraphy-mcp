@@ -19,7 +19,6 @@ from bitcoinstratigraphy_agent_yield import (
     CircuitBreakerError,
     FiduciaryTamperingError,
     TruthReceipt,
-    with_fiduciary_yield,
 )
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -28,6 +27,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 import main
+from staking import YieldStakingClient
 from wallet import LndWallet, WalletError
 
 
@@ -56,7 +56,7 @@ class OfflineModel(BaseChatModel):
 
 
 class StarterTests(unittest.TestCase):
-    def run_agent(self, tamper=False):
+    def run_agent(self, tamper=False, stake=False):
         signing_key = Ed25519PrivateKey.generate()
         pin = signing_key.public_key().public_bytes(
             Encoding.PEM, PublicFormat.SubjectPublicKeyInfo
@@ -64,18 +64,35 @@ class StarterTests(unittest.TestCase):
         calls = []
 
         def respond(request):
+            self.assertEqual(
+                request.headers["X-Yield-Mode"], "stake" if stake else "withdraw"
+            )
+            if stake:
+                self.assertTrue(
+                    request.headers["X-Nostr-Authorization"].startswith("Nostr ")
+                )
             body = json.loads(request.content)
             if body["method"] == "tools/list":
                 result = {
-                    "tools": [{
-                        "name": main.CANONICAL_TOOL,
-                        "description": "Indexed digest",
-                        "inputSchema": {"type": "object", "properties": {}},
-                    }]
+                    "tools": [
+                        {
+                            "name": main.CANONICAL_TOOL,
+                            "description": "Indexed digest",
+                            "inputSchema": {"type": "object", "properties": {}},
+                        }
+                    ]
                 }
             else:
                 calls.append(body["params"])
                 result = {"structuredContent": {"h": 900000, "ts": "2026-11-01"}}
+            if stake and body["method"] == "tools/list":
+                result["tools"].append(
+                    {
+                        "name": "payment.get_escrow",
+                        "description": "Read-only escrow",
+                        "inputSchema": {"type": "object", "properties": {}},
+                    }
+                )
             payload = json.dumps(
                 {"jsonrpc": "2.0", "id": body["id"], "result": result}
             ).encode()
@@ -87,7 +104,8 @@ class StarterTests(unittest.TestCase):
             if tamper and body["method"] == "tools/call":
                 payload += b" "
             return httpx.Response(
-                200, content=payload,
+                200,
+                content=payload,
                 headers={"X-Stratigraphy-Signature": f"v1,{signature}"},
             )
 
@@ -102,20 +120,36 @@ class StarterTests(unittest.TestCase):
                 "LND_MACAROON_HEX": "aa",
                 "STRATIGRAPHY_SERVER_PUBLIC_KEY_PATH": "./server-public-key.pem",
             }
+            if stake:
+                env.update(
+                    STRATIGRAPHY_YIELD_MODE="stake",
+                    STRATIGRAPHY_NOSTR_PRIVATE_KEY="11" * 32,
+                )
             with httpx.Client(transport=httpx.MockTransport(respond)) as http:
-                def configure(config):
-                    policy = config["fiduciary"]
+                from langchain.agents import create_agent
+
+                def configure(**policy):
                     self.assertEqual(policy["max_spend_sats"], 1000)
                     self.assertEqual(policy["max_total_sats"], 1000)
                     policy["http_client"] = http
-                    return with_fiduciary_yield(config)
+                    return YieldStakingClient(**policy)
+
+                def build_agent(**options):
+                    self.assertEqual(
+                        {tool.name for tool in options["tools"]},
+                        {"latest_bitcoin_digest", "get_escrow"}
+                        if stake
+                        else {"latest_bitcoin_digest"},
+                    )
+                    return create_agent(**options)
 
                 with (
                     patch.dict(os.environ, env, clear=True),
                     patch.object(main, "ROOT", root),
                     patch.object(main, "LndWallet", return_value=wallet),
-                    patch.object(main, "with_fiduciary_yield", side_effect=configure),
+                    patch.object(main, "YieldStakingClient", side_effect=configure),
                     patch("langchain_openai.ChatOpenAI", return_value=OfflineModel()),
+                    patch("langchain.agents.create_agent", side_effect=build_agent),
                     redirect_stdout(output),
                 ):
                     if tamper:
@@ -140,6 +174,12 @@ class StarterTests(unittest.TestCase):
         output, _ = self.run_agent(tamper=True)
         self.assertNotIn('"provenance_verified": true', output)
 
+    def test_staking_exposes_read_only_escrow_without_breaking_digest_agent(self):
+        output, calls = self.run_agent(stake=True)
+        self.assertIn('"provenance_verified": true', output)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["name"], main.CANONICAL_TOOL)
+
     def test_receipt_output_redacts_payment_preimage(self):
         secret = "ab" * 32
         receipt = TruthReceipt({"digest": "example"}, provenance_verified=True)
@@ -153,6 +193,7 @@ class StarterTests(unittest.TestCase):
 
     def test_breaker_blocks_reservation_above_hardcoded_cap(self):
         from bitcoinstratigraphy_agent_yield.armor import SpendCircuit
+
         circuit = SpendCircuit(main.MAX_SPEND_SATS)
         with self.assertRaises(CircuitBreakerError):
             circuit.reserve("offline-invoice", 1000001)
@@ -181,10 +222,16 @@ class StarterTests(unittest.TestCase):
             body = json.loads(request.content)
             requests.append((request.url.path, body))
             if request.url.path == "/v2/router/send":
-                return httpx.Response(200, json={"result": {
-                    "status": "SUCCEEDED", "payment_preimage": "01" * 32,
-                    "fee_msat": "125",
-                }})
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": {
+                            "status": "SUCCEEDED",
+                            "payment_preimage": "01" * 32,
+                            "fee_msat": "125",
+                        }
+                    },
+                )
             return httpx.Response(200, json={"payment_request": "offline-invoice"})
 
         wallet = self.wallet_with_transport(respond)
@@ -221,8 +268,11 @@ class StarterTests(unittest.TestCase):
                     wallet.pay_invoice("offline-invoice")
 
     def test_wallet_rejects_insecure_or_credential_bearing_origins(self):
-        for url in ("http://wallet.invalid", "https://secret@wallet.invalid",
-                    "https://wallet.invalid?token=secret"):
+        for url in (
+            "http://wallet.invalid",
+            "https://secret@wallet.invalid",
+            "https://wallet.invalid?token=secret",
+        ):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 LndWallet(url, "aa")
 

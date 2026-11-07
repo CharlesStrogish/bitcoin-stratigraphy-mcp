@@ -10,7 +10,9 @@ Stratigraphy's canonical `stratigraphy.get_digest` tool through the public
 One command starts the agent. One canonical query returns a verified receipt.
 A **hardcoded 1,000-sat Fiduciary Armor circuit breaker** shows how much spending
 capacity remains. Eligible paid calls also trigger the SDK's **21% yield claim**
-flow, with the actual claim status printed separately.
+flow in withdrawal mode, with the actual claim status printed separately.
+The included client extension supports the v1.1.0 server staking architecture
+without requiring an unpublished SDK version.
 
 ## 1–2–3 Quickstart
 
@@ -41,6 +43,8 @@ Edit your local `.env`:
 | `LND_MACAROON_HEX` | Hex-encoded LND macaroon with payment and invoice permissions |
 | `LND_TLS_CERT_PATH` | Local LND certificate/CA file; blank only for system-trusted TLS |
 | `STRATIGRAPHY_SERVER_PUBLIC_KEY_PATH` | Path to the operator's independently trusted Ed25519 SPKI PEM |
+| `STRATIGRAPHY_YIELD_MODE` | `stake` or `withdraw`; omitted means `withdraw` for legacy compatibility |
+| `STRATIGRAPHY_NOSTR_PRIVATE_KEY` | Dedicated agent-owned 32-byte hex Nostr key; required for staking and escrow lookup |
 
 Use a dedicated low-balance wallet and restricted LND macaroon. The included
 adapter supports **LND REST**, not NWC, LNbits, or a wallet seed phrase. It sends
@@ -79,6 +83,80 @@ redacted from terminal output and never passed to the language model. The
 single-query tool reuses its successful receipt if the model calls it again.
 If no tool call occurs, the program fails rather than claiming success.
 
+## 1-Click Yield Staking (VIP Compute)
+
+Agents can now park their 21% thermodynamic yield inside the Central Bank's
+escrow by setting `STRATIGRAPHY_YIELD_MODE=stake`.
+
+The new `.env.example` opts into `stake`; fill in a dedicated
+`STRATIGRAPHY_NOSTR_PRIVATE_KEY` before running it. Existing `.env` files that
+omit the mode retain `withdraw` behavior, including the SDK's existing eligible
+Lightning claim flow. Invalid modes and staking without an identity fail before
+wallet or HTTP activity. No wallet seed or server private key is required.
+Staking also requires a server that advertises `payment.get_escrow`; the client
+refuses paid calls in stake mode against an older catalog instead of assuming
+an old server honored the new header. Default withdrawal mode remains compatible
+with those older catalogs. Deploy the server's staking code and database
+migration before opting a client into staking.
+
+The client sends `X-Yield-Mode` on discovery, invoice admission, paid retries,
+and withdrawal claim requests. In stake mode, it signs the initial paid request
+and each retry with a fresh, exact-request NIP-98 event and does **not** create a
+receiving invoice or submit a competing withdrawal claim. The server credits
+settled, owner-bound receipts exactly once; an invoice or a failed request alone
+does not establish a new balance. Changing back to `withdraw` affects future
+calls, not previously staked capital. This client does not implement unstaking.
+
+`get_escrow()` and `call_tool("payment.get_escrow", {})` return only:
+
+```json
+{
+  "pubkey": "<authenticated agent's Nostr public key>",
+  "staked_sats": 10001,
+  "vip_status": true,
+  "unlocked_features": ["zero_latency_routing"]
+}
+```
+
+These are illustrative values, not a promised balance. `vip_status` is true
+strictly above 10,000 whole staked sats. The server currently returns
+`zero_latency_routing` as an informational architecture label, even for a zero
+balance: **it does not activate zero-latency priority routing, expanded context
+limits, or a payment bypass.** Those compute features remain planned, not an
+implemented guarantee.
+
+The existing server implements this utility as a **JSON-RPC MCP POST to `/mcp`**,
+not an HTTP GET route. NIP-98 identity uses **BIP-340/Schnorr on secp256k1**;
+Ed25519 is the separate server-response signature verified against your pin.
+Every lookup binds its URL, POST method, timestamp, nonce and exact body bytes.
+The client rejects mismatched identities, malformed four-field responses,
+unverified server signatures and redirects. A lookup never pays an unexpected
+402 invoice and remains available when the spending budget is exhausted.
+
+For application code running from this directory:
+
+```python
+from pathlib import Path
+from dotenv import load_dotenv
+from staking import YieldSettings, YieldStakingClient
+
+load_dotenv(override=False)
+with YieldStakingClient(
+    yield_settings=YieldSettings.from_env(),
+    server_public_key=Path("server-public-key.pem").read_text(),
+    max_spend_sats=0,  # Read-only lookup needs no spending authorization or wallet.
+) as client:
+    balance = client.get_escrow()
+    print(balance)
+```
+
+When an agent identity is configured, the starter also exposes a narrow
+LangChain `get_escrow` tool alongside the existing digest tool. It never exposes
+wallet operations or arbitrary MCP calls to the language model. The base
+`bitcoinstratigraphy-agent-yield==0.3.0` dependency remains pinned; `staking.py`
+is shipped with this standalone starter and reuses its bounded transport,
+payment limits and independent Ed25519 receipt verification.
+
 ## What the armor protects
 
 | Protection | Behavior |
@@ -88,7 +166,7 @@ If no tool call occurs, the program fails rather than claiming success.
 | Durable total authorization | 1,000 sats across runs using the same private SQLite ledger |
 | Wallet fee ceiling | LND is instructed to reject routes costing more than 10 sats |
 | Payload provenance | Exact response bytes must verify against your pinned Ed25519 key |
-| Tool exposure | The model gets one narrow digest tool, never a payment tool |
+| Tool exposure | One narrow digest tool plus an optional read-only escrow tool; never wallet operations |
 
 The session limit resets when a new SDK client starts; the durable authorization
 does not. Reservations can reduce available capacity before a payment is
@@ -126,10 +204,13 @@ deployment are needed to use this template.
 ## Check the template without spending
 
 ```sh
-python -m unittest -v test_starter.py
+python -m unittest -v test_starter.py test_staking.py
 ```
 
 The offline suite uses the actual LangChain graph and SDK with synthetic signed
 responses and mocked model/wallet transports. It checks signature tampering,
 receipt redaction, the spending cap, routing fees, and uncertain payments.
+It also verifies NIP-98 signatures against the exact HTTP bytes, mode headers
+through real SDK payment retries, default withdrawals, suppression of competing
+claims in staking mode, and fail-closed read-only escrow lookup.
 No OpenAI key, real wallet, or network payment is needed for these checks.

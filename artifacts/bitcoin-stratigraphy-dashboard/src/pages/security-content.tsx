@@ -108,7 +108,7 @@ export default function SecurityContent({ base = "/" }: { base?: string }) {
                       <strong>Signature Forgery:</strong> Passed 100%. The server correctly rejected all requests bearing malformed, missing, or spoofed NIP-98 headers.
                     </li>
                     <li>
-                      <strong>Payload Tampering Rejection:</strong> Passed 100%. 1-byte mutation tests on the <code>tool_name:timestamp:contentSha256</code> payload successfully triggered a <code>FiduciaryTamperingError</code> across all 16 canonical tools, verifying that LLM hallucinations cannot bypass the cryptographic receipt.
+                      <strong>Payload Tampering Rejection:</strong> Passed 100% in the historical audit of the original 16-tool core. 1-byte mutation tests on the <code>tool_name:timestamp:contentSha256</code> payload successfully triggered a <code>FiduciaryTamperingError</code>. The platform now has 19-tool full capacity; this historical finding does not establish audit coverage for the optional clearing extension or prevent every LLM hallucination.
                     </li>
                   </ul>
                 </div>

@@ -22,7 +22,7 @@ const SECTIONS = [
   ["fiduciary-armor", "1", "Fiduciary Armor"],
   ["fiduciary-oracle", "2", "The Fiduciary Oracle"],
   ["developer-friction", "3", "Developer Friction is Dead"],
-  ["canonical-tools", "4", "The 16 Canonical Tools"],
+  ["canonical-tools", "4", "19 Fiduciary-grade MCP Tools"],
   ["agent-directives", "5", "Machine-Readable Directives"],
   ["enterprise-exemption", "6", "Enterprise Commercial License Exemption"],
   ["legal", "7", "Legal, Copyright, and Liability"],
@@ -201,7 +201,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 </p>
                 <p>
                   {L(
-                    "Bitcoin Stratigraphy operates as a Fiduciary Oracle. Every successful synchronous execution across our 16 canonical tools returns a signed TruthReceipt.",
+                    "Bitcoin Stratigraphy operates as a Fiduciary Oracle with 19 Fiduciary-grade MCP Tools at full capacity. Successful synchronous core tool calls return signed response receipts. The host-enabled clearing infrastructure is separate; production clearing settlement and payouts remain disabled.",
                   )}
                 </p>
                 <p>
@@ -261,10 +261,10 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
               </section>
 
               <section id="canonical-tools">
-                <h2>4. The 16 Canonical Tools: The Engine of the AI Economy</h2>
+                <h2>4. 19 Fiduciary-grade MCP Tools: The Engine of the AI Economy</h2>
                 <p>
                   {L(
-                    "Bitcoin Stratigraphy serves enterprise swarms exclusively through 16 A-Grade canonical MCP (Model Context Protocol) tools, meticulously scoped across five namespaces. These tools are the exact, verified instruments autonomous agents repeat-buy daily to anchor their reasoning in thermodynamic reality.",
+                    "Bitcoin Stratigraphy supports 19 Fiduciary-grade MCP Tools at full capacity across six namespaces. The expanded capacity includes payment.get_escrow and the host-enabled clearing.create_contract / clearing.settle_contract extension. The core tools are described below; use tools/list to discover the connected host's enabled catalog. Production clearing settlement and payouts remain disabled. Existing registry grades apply to the evaluated core, not a confirmed grade for every extension.",
                   )}
                 </p>
                 <h3>

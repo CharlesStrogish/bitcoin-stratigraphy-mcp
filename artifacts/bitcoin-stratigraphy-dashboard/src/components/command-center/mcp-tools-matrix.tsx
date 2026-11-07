@@ -197,9 +197,13 @@ export function McpToolsMatrix() {
       <div className="cc-module-head">
         <div className="cc-module-intro">
           <div className="section-kicker">01 · MCP tools matrix</div>
-          <h3 id="cc-tools-title">The 16 Canonical MCP Tools</h3>
+          <h3 id="cc-tools-title">19 Fiduciary-grade MCP Tools</h3>
           <p>
-            Dot-notation tools in five namespaces over Streamable HTTP. Fees are
+            Full capacity spans six namespaces over Streamable HTTP, including
+            payment.get_escrow and the host-enabled clearing.create_contract /
+            clearing.settle_contract extension. Production clearing settlement
+            and payouts remain disabled. The matrix below covers the original
+            core; use tools/list for this host's enabled catalog. Core fees are
             quoted live by <code>POST /api/v1/cost</code>, which never creates
             an invoice.
           </p>

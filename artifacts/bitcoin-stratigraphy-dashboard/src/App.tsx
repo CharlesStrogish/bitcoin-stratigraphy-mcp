@@ -225,7 +225,7 @@ function Header({
             href="#mcp-tools"
             data-testid="link-tool-catalog"
           >
-            <LayoutGrid size={14} aria-hidden="true" /> 16-Tool Catalog
+            <LayoutGrid size={14} aria-hidden="true" /> 19-Tool Capacity
           </a>
           <div
             className="header-exports"

@@ -12,7 +12,7 @@
   "publisher": "https://bitcoinstratigraphy.com",
   "canonical_url": "https://bitcoinstratigraphy.com",
   "url": "https://bitcoinstratigraphy.com/mcp",
-  "description": "Read-only, unauthenticated connection metadata for 16 canonical tools and the authenticated payment.get_escrow utility. Loading this file never creates an invoice or executes a tool.",
+  "description": "Read-only, unauthenticated connection metadata within the platform's full capacity of 19 Fiduciary-grade MCP Tools across six namespaces: the original core, the authenticated payment.get_escrow utility, and the host-enabled clearing.create_contract / clearing.settle_contract extension. The tool entries below describe the core and escrow utility; use tools/list for this host's enabled catalog. Production clearing settlement and payouts remain disabled. Loading this file never creates an invoice or executes a tool.",
   "links": {
     "full_discovery": "https://bitcoinstratigraphy.com/.well-known/mcp.json",
     "openapi": "https://bitcoinstratigraphy.com/openapi.json",

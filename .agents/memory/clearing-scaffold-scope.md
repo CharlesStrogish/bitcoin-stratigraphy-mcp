@@ -6,6 +6,7 @@ description: User-approved fail-closed execution verification and protected core
 Keep the 16 Fiduciary data tools and v1.1.0 payment.get_escrow logic unchanged
 when implementing clearing. Clearing contracts must be isolated from existing
 staking balances and legacy escrow settlement records.
+Do not run tests against the 16 core data tools when working on clearing.
 
 **Why:** The user explicitly imposed all three protections, including keeping
 the existing regression tests passing.

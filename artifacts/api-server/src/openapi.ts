@@ -19,8 +19,8 @@ for (const [name, amountSats] of Object.entries(mcpToolPrices)) {
     },
   };
 }
-// The canonical 16-tool registry owns these live data contracts. Keep the
-// public OpenAPI extension in sync without adding any additional MCP tools.
+// The canonical 16-tool registry owns these live data contracts. The separate
+// authenticated payment utility is added below without changing core contracts.
 for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
   Object.assign(tools[name], contract);
   Object.assign(tools[name], {
@@ -29,6 +29,7 @@ for (const [name, contract] of Object.entries(primaryStratigraphyContracts)) {
   if (name === "stratigraphy.get") delete tools[name].annotations?.zkProof;
 }
 for (const tool of mcpToolDefinitions) {
+  tools[tool.name] ??= { annotations: tool.annotations };
   Object.assign(tools[tool.name], {
     description: tool.description,
     inputSchema: tool.inputSchema,

@@ -232,7 +232,7 @@ test("public integrity route matches live tools/list after final overlays, witho
     const body = (await list.json()) as {
       result: { tools: Array<{ name: string; description: string }> };
     };
-    assert.equal(body.result.tools.length, 16);
+    assert.equal(body.result.tools.length, 17);
     assert.deepEqual(
       manifest.tools.map((t) => t.name),
       body.result.tools.map((t) => t.name),

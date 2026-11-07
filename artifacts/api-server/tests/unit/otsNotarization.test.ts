@@ -112,7 +112,7 @@ test("proof.notarize is the paid 15th tool and issues a tool-scoped 100-call L40
   try {
     const listing = await call("tools/list", {});
     const tools = (await listing.json()).result.tools;
-    assert.equal(tools.length, 16);
+    assert.equal(tools.length, 17);
     const definition = tools.find(
       (tool: { name: string }) => tool.name === "proof.notarize",
     );
@@ -124,7 +124,7 @@ test("proof.notarize is the paid 15th tool and issues a tool-scoped 100-call L40
     assert.equal(
       tools.filter(
         (tool: { annotations: { l402: { amountSats: number } } }) =>
-          tool.annotations.l402.amountSats === 0,
+          tool.annotations.l402?.amountSats === 0,
       ).length,
       2,
     );

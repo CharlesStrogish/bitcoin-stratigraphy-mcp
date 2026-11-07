@@ -111,6 +111,9 @@ export function createPrivateYieldEarnings(
           // Lock absent rows too, across all workers and all descendant macaroons.
           await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
             ["private-yield:" + receipt.paymentHash]);
+          const staked = await client.query(
+            "SELECT 1 FROM yield_staking_receipts WHERE payment_hash=$1", [receipt.paymentHash]);
+          if (staked.rows.length) throw new YieldClaimError(409, "YIELD_ALREADY_STAKED");
           const reserved = await client.query("SELECT claim_id FROM private_yield_payout_items WHERE source='yield' AND payment_hash=$1",
             [receipt.paymentHash]);
           if (reserved.rows.length) throw new YieldClaimError(409, "YIELD_RESERVED_OR_CLAIMED");

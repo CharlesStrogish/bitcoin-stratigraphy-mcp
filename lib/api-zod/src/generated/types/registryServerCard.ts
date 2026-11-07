@@ -18,8 +18,8 @@ export interface RegistryServerCard {
   /** Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp */
   url: string;
   /**
-     * @minimum 16
-     * @maximum 16
+     * @minimum 17
+     * @maximum 17
      */
   toolCount: number;
   capabilities: RegistryServerCardCapabilities;

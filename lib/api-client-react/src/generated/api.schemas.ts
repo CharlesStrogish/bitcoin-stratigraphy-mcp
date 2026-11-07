@@ -419,7 +419,7 @@ export interface ToolIntegrityManifest {
   key_id: string;
   /**
      * @minItems 16
-     * @maxItems 16
+     * @maxItems 17
      */
   tools: ToolIntegrityEntry[];
 }
@@ -849,8 +849,8 @@ export interface RegistryServerCard {
   /** Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp */
   url: string;
   /**
-     * @minimum 16
-     * @maximum 16
+     * @minimum 17
+     * @maximum 17
      */
   toolCount: number;
   capabilities: RegistryServerCardCapabilities;
@@ -1309,8 +1309,8 @@ export interface McpDiscoveryManifest {
   npm: McpDiscoveryManifestNpm;
   /**
      * Descriptors mirroring the live tools/list catalog; tools/list remains authoritative.
-     * @minItems 16
-     * @maxItems 16
+     * @minItems 17
+     * @maxItems 17
      */
   tools: McpDiscoveryManifestToolsItem[];
   l402: McpDiscoveryManifestL402;

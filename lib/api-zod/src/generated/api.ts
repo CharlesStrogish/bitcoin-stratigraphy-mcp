@@ -111,6 +111,7 @@ export const GetSwarmReferralKeyResponse = zod.object({
  * Receipts must exist in the confirmed private revenue ledger; an issued unpaid
  * invoice, a forged token or a public payout record does not establish earnings.
  * Each payment hash can be consumed once across all descendant macaroons and workers.
+ * Yield reserved through X-Yield-Mode stake is excluded and returns YIELD_ALREADY_STAKED.
  * All receipts succeed together or none are consumed. Duplicate payment hashes within
  * one request are rejected. A durable pending claim reserves earnings BEFORE
  * pay_invoice over NWC using the server's NWC_URI secret.
@@ -893,7 +894,7 @@ export const GetNostrDiscoveryInfoResponse = zod.record(zod.string(), zod.unknow
 export const getToolIntegrityManifestResponseKeyIdRegExp = new RegExp('^[0-9a-f]{64}$');
 export const getToolIntegrityManifestResponseToolsItemDescriptionHashRegExp = new RegExp('^[0-9a-f]{64}$');
 export const getToolIntegrityManifestResponseToolsMin = 16;
-export const getToolIntegrityManifestResponseToolsMax = 16;
+export const getToolIntegrityManifestResponseToolsMax = 17;
 
 
 
@@ -934,8 +935,8 @@ export const GetWellKnownLlmsResponse = zod.string()
  * Public, finite discovery independent of tool execution and payment. The static card version is not the engine release or MCP protocol version.
  * @summary Static public MCP server discovery
  */
-export const getRegistryServerCardResponseToolCountMin = 16;
-export const getRegistryServerCardResponseToolCountMax = 16;
+export const getRegistryServerCardResponseToolCountMin = 17;
+export const getRegistryServerCardResponseToolCountMax = 17;
 
 
 
@@ -1111,8 +1112,8 @@ export const GetMcpConfigurationManifestResponse = zod.object({
  */
 export const getMcpDiscoveryManifestResponseToolsItemPriceSatsMin = 0;
 
-export const getMcpDiscoveryManifestResponseToolsMin = 16;
-export const getMcpDiscoveryManifestResponseToolsMax = 16;
+export const getMcpDiscoveryManifestResponseToolsMin = 17;
+export const getMcpDiscoveryManifestResponseToolsMax = 17;
 
 export const getMcpDiscoveryManifestResponseL402PreflightGenesisReceiptMerkleRootRegExp = new RegExp('^[0-9a-f]{64}$');
 

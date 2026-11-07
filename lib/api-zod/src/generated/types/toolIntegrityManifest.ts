@@ -27,7 +27,7 @@ export interface ToolIntegrityManifest {
   key_id: string;
   /**
      * @minItems 16
-     * @maxItems 16
+     * @maxItems 17
      */
   tools: ToolIntegrityEntry[];
 }

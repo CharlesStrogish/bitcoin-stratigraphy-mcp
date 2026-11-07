@@ -12,7 +12,7 @@
   "publisher": "https://bitcoinstratigraphy.com",
   "canonical_url": "https://bitcoinstratigraphy.com",
   "url": "https://bitcoinstratigraphy.com/mcp",
-  "description": "Read-only, unauthenticated connection metadata for 16 canonical tools. Loading this file never creates an invoice or executes a tool.",
+  "description": "Read-only, unauthenticated connection metadata for 16 canonical tools and the authenticated payment.get_escrow utility. Loading this file never creates an invoice or executes a tool.",
   "links": {
     "full_discovery": "https://bitcoinstratigraphy.com/.well-known/mcp.json",
     "openapi": "https://bitcoinstratigraphy.com/openapi.json",
@@ -48,7 +48,7 @@
   "mcp": {
     "version": "2026-07-28",
     "transports": [{"type": "streamable-http", "endpoint": "https://bitcoinstratigraphy.com/mcp"}],
-    "capabilities": {"tools": {"count": 16, "namespaces": ["stratigraphy", "proof", "mesh", "payment", "workflow"]}}
+    "capabilities": {"tools": {"count": 17, "namespaces": ["stratigraphy", "proof", "mesh", "payment", "workflow"]}}
   },
   "discovery": {
     "authentication_required": false,
@@ -106,6 +106,7 @@
     {"name": "mesh.get_status", "description": "Inspect configured pinned-peer mesh status.", "price_sats": 250, "payment_required": true},
     {"name": "mesh.broadcast", "description": "Broadcast supported signed evidence to the configured Nostr peer mesh.", "price_sats": 250, "payment_required": true},
     {"name": "payment.get_info", "description": "Inspect tool pricing and payment capabilities; this MCP tool is paid, while HTTP cost quotes are free.", "price_sats": 250, "payment_required": true},
-    {"name": "workflow.audit_trajectory", "description": "Compare two explicit targets and return a compact trajectory audit with available provenance references.", "price_sats": 250, "payment_required": true}
+    {"name": "workflow.audit_trajectory", "description": "Compare two explicit targets and return a compact trajectory audit with available provenance references.", "price_sats": 250, "payment_required": true},
+    {"name": "payment.get_escrow", "description": "Read the authenticated NIP-98 signer's yield staking balance without transferring funds.", "price_sats": 0, "payment_required": false, "authentication_required": "NIP-98"}
   ]
 }

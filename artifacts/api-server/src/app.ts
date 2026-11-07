@@ -47,6 +47,7 @@ import { registerClaimYieldRoute } from "./routes/claim-yield";
 import { registerSwarmReferralRoute } from "./routes/swarm-referral";
 import { createSwarmRoyalties } from "./lib/swarm-royalties";
 import { createPrivateYieldEarnings } from "./lib/private-yield-earnings";
+import { createYieldStaking } from "./lib/yield-staking";
 import { registerPublicCors } from "./middleware/publicCors";
 import { redirectLegacyDomain } from "./middleware/canonicalDomain";
 import { registerAuditRoutes } from "./routes/audit";
@@ -139,6 +140,7 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 registerClaimYieldRoute(app, createPrivateYieldEarnings());
+app.locals.yieldStaking = createYieldStaking();
 
 app.use(nip98RevocationGuard);
 const swarmRoyalties = createSwarmRoyalties();

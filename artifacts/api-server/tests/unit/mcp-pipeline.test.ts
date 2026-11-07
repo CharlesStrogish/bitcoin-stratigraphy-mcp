@@ -192,7 +192,7 @@ test("one summed invoice gates the real route, receipt signatures and catalog st
     new RegExp(invoices.get(challenge.body.payment_hash)!.preimage));
   const retry = await post(body, authorization);
   assert.equal(retry.status, 429);
-  assert.equal(mcpToolDefinitions.length, 16);
+  assert.equal(mcpToolDefinitions.length, 17);
 });
 
 test("result references pass actual earlier outputs sequentially and duplicate prices are charged", async () => {

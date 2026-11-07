@@ -26,7 +26,7 @@ function loadMatrixSnapshot(): MatrixSnapshot {
 
 function assertMatrixMatchesRuntime(snapshot: MatrixSnapshot): void {
   const runtime = mcpDiscoveryManifest;
-  assert.equal(runtime.tools.length, 16);
+  assert.equal(runtime.tools.length, 17);
   assert.equal(snapshot.version, runtime.version, "release version drift");
   assert.equal(
     snapshot.version,
@@ -61,7 +61,7 @@ function assertMatrixMatchesRuntime(snapshot: MatrixSnapshot): void {
   );
   assert.equal(
     snapshot.tools.filter((tool) => !tool.payment_required).length,
-    2,
+    3,
   );
 }
 
@@ -217,20 +217,20 @@ test("public MCP configuration returns 200 and exactly 16 canonical tools withou
       assert.equal(response.headers.get("www-authenticate"), null);
       assert.equal(response.headers.get("access-control-allow-origin"), "*");
       const manifest = await response.json();
-      assert.equal(manifest.tools.length, 16);
-      assert.equal(manifest.mcp.capabilities.tools.count, 16);
+      assert.equal(manifest.tools.length, 17);
+      assert.equal(manifest.mcp.capabilities.tools.count, 17);
       assert.deepEqual(
         manifest.tools.map((tool: { name: string }) => tool.name),
         mcpToolDefinitions.map((tool) => tool.name),
       );
       assert.equal(
         new Set(manifest.tools.map((tool: { name: string }) => tool.name)).size,
-        16,
+        17,
       );
       for (const tool of manifest.tools) {
         assert.equal(
           tool.price_sats,
-          mcpToolPrices[tool.name as keyof typeof mcpToolPrices],
+          tool.name === "payment.get_escrow" ? 0 : mcpToolPrices[tool.name as keyof typeof mcpToolPrices],
         );
         assert.equal(tool.payment_required, tool.price_sats > 0);
       }
@@ -238,7 +238,7 @@ test("public MCP configuration returns 200 and exactly 16 canonical tools withou
         manifest.tools.filter(
           (tool: { payment_required: boolean }) => !tool.payment_required,
         ).length,
-        2,
+        3,
       );
       assert.match(manifest.pricing.requirement, /L402/);
       assert.equal(manifest.pricing.ai_treasury_yield.allocation_percent, 21);

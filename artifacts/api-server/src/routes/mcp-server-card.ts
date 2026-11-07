@@ -8,6 +8,7 @@ import { CANONICAL_ORIGIN, RELEASE_VERSION, canonicalUrl } from "../lib/public-s
 import { STRATIGRAPHY_TOOL_DESCRIPTIONS } from "../lib/stratigraphy-tool-descriptions";
 import { AUDIT_TRAJECTORY_DESCRIPTION } from "../lib/workflow-audit";
 import { MCP_NATIVE_PROMPTS, MCP_NATIVE_RESOURCES } from "../lib/mcp-native-discovery";
+import { paymentEscrowToolDefinition } from "../lib/payment-escrow-tool";
 
 export const MCP_RELEASE_VERSION = RELEASE_VERSION;
 export const MCP_RELEASE_DESCRIPTION =
@@ -212,7 +213,7 @@ export const mcpServerCard = {
   ...baseServerCard,
   capabilities: {
     ...baseServerCard.capabilities,
-    tools: baseServerCard.capabilities.tools.map((tool) => ({
+    tools: [...baseServerCard.capabilities.tools.map((tool) => ({
       ...tool,
       ...(tool.name === "workflow.audit_trajectory" ? { description: AUDIT_TRAJECTORY_DESCRIPTION } : {}),
       ...(STRATIGRAPHY_TOOL_DESCRIPTIONS[tool.name]
@@ -227,7 +228,7 @@ export const mcpServerCard = {
             : {}),
         },
       },
-    })),
+    })), paymentEscrowToolDefinition],
   },
 };
 

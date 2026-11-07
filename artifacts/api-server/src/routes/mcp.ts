@@ -94,6 +94,8 @@ import {
   indexEpistemicDatasetReceipt,
 } from "../services/epistemicDatasetReceipt";
 import { createL402Middleware } from "../middleware/l402";
+import { paymentEscrowAuthentication, paymentEscrowToolDefinition } from "../lib/payment-escrow-tool";
+import type { YieldEscrow, YieldStaking } from "../lib/yield-staking";
 import {
   type GenesisGrantStore,
   type GenesisGrantReservation,
@@ -4285,7 +4287,7 @@ const notarizeToolDefinition = {
     required: ["hash", "otsProofHex", "otsStatus"],
   },
 };
-export const mcpToolDefinitions = [
+const canonicalMcpToolDefinitions = [
   ...[...baseMcpToolDefinitions, notarizeToolDefinition]
     .filter(
       (tool) =>
@@ -4617,6 +4619,7 @@ export const mcpToolDefinitions = [
     },
   },
 }));
+export const mcpToolDefinitions = [...canonicalMcpToolDefinitions, paymentEscrowToolDefinition];
 
 const paidTools = {
   "workflow.audit_trajectory": {
@@ -4765,6 +4768,7 @@ function createBitcoinStratigraphyMcpServer(
   signResponse?: (name: string, result: CallToolResult) => CallToolResult,
   onToolResult?: (name: string, args: Record<string, unknown>, result: CallToolResult) => Promise<CallToolResult>,
   onGenesisResult?: (successful: boolean) => Promise<void>,
+  yieldEscrow?: YieldEscrow,
 ) {
   const server = new McpServer(
     { ...MCP_SERVER_INFO, description: ENGINE_DESCRIPTION },
@@ -4794,6 +4798,13 @@ function createBitcoinStratigraphyMcpServer(
     const name = canonicalToolName(request.params.name);
     if (!mcpToolDefinitions.some((tool) => tool.name === name)) {
       throw new McpError(ErrorCode.InvalidParams, "Unknown MCP tool");
+    }
+    if (name === "payment.get_escrow") {
+      if (!yieldEscrow || Object.keys(args).length) {
+        throw new McpError(ErrorCode.InvalidParams, "Authenticated staking escrow request required");
+      }
+      return { content: [{ type: "text", text: JSON.stringify(yieldEscrow) }],
+        structuredContent: { ...yieldEscrow } };
     }
     if (isPrimaryDataTool(name)) {
       const schema = name === "stratigraphy.list" ? stratigraphyCatalogInputSchema
@@ -5251,6 +5262,12 @@ function createBitcoinStratigraphyMcpServer(
     );
   };
   server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "payment.get_escrow") {
+      // Preserve the requested four-field private balance object. This
+      // authenticated utility is not a paid execution or Genesis Grant.
+      const result = await executeTool(request);
+      return signResponse ? signResponse(request.params.name, result) : result;
+    }
     try {
       let result = withStratigraphyMetadata(await executeTool(request));
       if (onToolResult) result = await onToolResult(request.params.name, request.params.arguments ?? {}, result);
@@ -5293,6 +5310,7 @@ function mcpServerFactory(
     locals.signToolResponse as ((name: string, result: CallToolResult) => CallToolResult) | undefined,
     locals.onToolResult as ((name: string, args: Record<string, unknown>, result: CallToolResult) => Promise<CallToolResult>) | undefined,
     (locals.genesisGrant as GenesisGrantReservation | undefined)?.complete,
+    locals.yieldEscrow as YieldEscrow | undefined,
   );
 }
 
@@ -5414,6 +5432,7 @@ export function registerMcpRoute(
     asyncTaskRunner?: McpAsyncTaskRunner;
     tasksExtension?: McpTasksExtension;
     pipelineReceiptStore?: PipelineReceiptStore;
+    yieldStaking?: YieldStaking;
   } = {},
 ): void {
   const primaryBackend = options.stratigraphyBackend ??
@@ -5821,6 +5840,7 @@ export function registerMcpRoute(
     // Selects the protocol era and validates 2026-07-28 metadata and routing
     // headers before any payment, delegation or tool work.
     negotiateMcpProtocol,
+    paymentEscrowAuthentication(options.yieldStaking),
     (req, res, next) => {
       if (!/^\/invoice\/request\/?$/i.test(req.path)) return next();
       // Invoice-only alias: it must never redeem a credential or execute tools.

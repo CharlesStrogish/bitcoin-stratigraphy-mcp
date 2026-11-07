@@ -30,7 +30,8 @@ const MACRO_BATCH_CALLS = 100;
 
 /** Descriptors mirror the live tools/list registry; they do not register tools. */
 const toolDescriptors = mcpToolDefinitions.map((tool) => {
-  const priceSats = mcpToolPrices[tool.name as keyof typeof mcpToolPrices];
+  const priceSats = tool.name === "payment.get_escrow" ? 0
+    : mcpToolPrices[tool.name as keyof typeof mcpToolPrices];
   return {
     name: tool.name,
     namespace: tool.name.split(".")[0]!,
@@ -38,6 +39,7 @@ const toolDescriptors = mcpToolDefinitions.map((tool) => {
     description: tool.description,
     price_sats: priceSats,
     payment_required: priceSats > 0,
+    ...(tool.name === "payment.get_escrow" ? { authentication_required: "NIP-98" } : {}),
     ...(priceSats > 0
       ? { batch: { max_calls: MACRO_BATCH_CALLS, header: "X-L402-Batch-Size" } }
       : {}),

@@ -25,7 +25,7 @@
 - [MCP optional response fields](mcp-optional-response-fields.md) — accept omitted JSON Schema required arrays and omitted isError on successful MCP results.
 - [MCP metadata fidelity](mcp-metadata-fidelity.md) — TDQS descriptions and schemas must match executable inputs, outputs, and side effects rather than generic rubric examples.
 - [Validation freshness](validation-freshness.md) — automatic green runs can predate final edits; confirm that changed regressions appear in the completed output.
-- [MCP catalog size](mcp-catalog-size.md) — 16 explicitly authorized tools: original 15 plus workflow.audit_trajectory; preserve all original contracts.
+- [MCP catalog size](mcp-catalog-size.md) — preserve 16 core contracts; the authorized authenticated escrow utility brings runtime discovery to 17.
 - [Enterprise pipeline models](enterprise-pipeline-models.md) — user-defined $10M price-multiple horizon, verbatim adjacent attribution, and assumed 15 J/TH network-power model.
 - [NIP-90 paid job lifecycle](nip90-paid-job-lifecycle.md) — bind DVM settlement to exact incoming invoices and preserve standard feedback/result semantics.
 - [Fixed-fee L402 attestations](fixed-fee-l402-attestations.md) — paid route macaroons are path-bound and single-use; signed attestations trust only the configured server issuer.
@@ -101,6 +101,7 @@
 - [Enterprise credit tabs](enterprise-credit-tabs.md) — authenticated paid-history threshold, shared debt cap, explicit session closing and exact-once whole-tab settlement.
 - [Glama ownership](glama-ownership.md) — ownership claims are exact provider-supplied documents; preserve legacy connector metadata and the MCP manifest.
 - [Mainnet Treasury safety](mainnet-treasury-safety.md) — outbound claims use NWC; schemas/state machine are frozen, unknown outcomes stay reserved and tests never spend real funds.
+- [Yield staking policy](yield-staking-policy.md) — preserve explicit withdrawals; staking and Treasury must reserve the same yield exclusively, without automatic payouts.
 - [Dependency release policy](dependency-release-policy.md) — require zero findings at every severity, including development and Python dependencies; never call an audit proof of security.
 - [SDK terminal output](sdk-terminal-output.md) — keep yield receipts on stderr to preserve MCP JSON-RPC integrity.
 - [Payload attestation trust](payload-attestation-trust.md) — independently pinned exact-byte verification; isolate signing identities and payment evidence.

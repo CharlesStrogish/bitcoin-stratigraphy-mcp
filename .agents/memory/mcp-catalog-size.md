@@ -3,9 +3,15 @@ name: MCP catalog size
 description: Discovery tool-count constraint and how to preserve behavior when consolidating MCP tools.
 ---
 
-Keep the advertised MCP catalog at exactly 16 registered tools: the original 15 plus the explicitly authorized `workflow.audit_trajectory`. Do not append, rename, wrap, or re-index existing tools during REST or frontend enhancements.
+Preserve the original 16 core tool contracts, including `workflow.audit_trajectory`.
+The user explicitly authorized the additional read-only payment utility
+`payment.get_escrow`; the total registered catalog is now 17. Do not append,
+rename, wrap, or re-index other tools during REST or frontend enhancements.
 
-**Why:** The user previously required exactly 15 tools, then explicitly authorized this single composite as the 16th. This supersedes the old count restriction, not the requirement to preserve all original contracts.
+**Why:** The user authorized the trajectory composite as the 16th core tool and
+subsequently requested staking balance lookup while expressly preserving all
+16 existing tools. A separate authenticated payment utility satisfies that
+request without changing the original data-tool contracts.
 
 **How to apply:** Keep REST-only and browser-only features outside MCP registration and preserve existing schemas and payment gates. Check the actual runtime tools/list count and description integrity signatures. Further catalog changes require new explicit user instruction; catalog size is not proof of an externally measured Glama score.
 

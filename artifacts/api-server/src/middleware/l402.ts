@@ -21,6 +21,7 @@ import {
   type AgentAuthentication,
 } from "../lib/agent-id-caveat";
 import { verifyRequestNip98Signer } from "../lib/nip98-request";
+import { YieldStakingError, type YieldStaking } from "../lib/yield-staking";
 import { verifySwarmReferralKey } from "../lib/swarm-referral";
 import type { SwarmRoyalties } from "../lib/swarm-royalties";
 import { assertEnterpriseVerificationTarget } from "../lib/enterprise-economics";
@@ -52,6 +53,7 @@ export type L402MiddlewareOptions = {
   maxChallengesPerMinute?: number;
   ledger?: RevenueLedger;
   swarmRoyalties?: SwarmRoyalties;
+  yieldStaking?: YieldStaking;
   revocationStore?: MacaroonRevocationStore;
   requestKind?: RevenueRequestKind;
   allowBatch?: boolean;
@@ -366,6 +368,13 @@ export function createL402Middleware(
       return;
     }
     const nip98Pubkey = signer.provided ? signer.pubkey ?? undefined : undefined;
+    const yieldMode = req.get("X-Yield-Mode");
+    if (yieldMode !== undefined && yieldMode !== "stake" && yieldMode !== "withdraw") {
+      res.status(400).json({ error: "X-Yield-Mode must be stake or withdraw" }); return;
+    }
+    if (yieldMode === "stake" && !nip98Pubkey) {
+      res.status(401).json({ error: "NIP98_AUTHENTICATION_REQUIRED_FOR_STAKING" }); return;
+    }
     if (
       nip98Pubkey !== undefined &&
       declaration.agentId !== undefined &&
@@ -547,6 +556,34 @@ export function createL402Middleware(
               res.status(503).json({ error: "Royalty accounting unavailable; no quota consumed" }); return;
             }
           }
+          if (yieldMode === "stake") {
+            // Staking is never inferred from a self-declared identity, a
+            // bearer-only invoice or a delegated signer different from its owner.
+            if (pass.agentAuthentication !== "nip98" || pass.agentId !== nip98Pubkey ||
+                preimageHash === null) {
+              res.status(403).json({ error: "STAKING_REQUIRES_OWNER_BOUND_INVOICE_AND_PREIMAGE" }); return;
+            }
+            try {
+              const staking: YieldStaking | undefined = options.yieldStaking ?? req.app.locals.yieldStaking;
+              if (!staking || !options.ledger) throw new Error("Staking unavailable");
+              await recordRevenueWithRetry(options.ledger, {
+                id: randomUUID(),
+                timestamp: new Date(verification.settledAt < 10_000_000_000
+                  ? verification.settledAt * 1000 : verification.settledAt).toISOString(),
+                channel: "L402", requestKind: options.requestKind ?? "stratigraphy",
+                satsReceived: Math.ceil(pass.amountMsats / 1000),
+                paymentHash: pass.paymentHash, preimage: authorization.preimage,
+                clientIdentifier: clientKey(req),
+              });
+              await staking.credit({ pubkey: nip98Pubkey!, paymentHash: pass.paymentHash,
+                provider: pass.paymentProvider!, amountMsats: pass.amountMsats });
+              res.setHeader("X-Yield-Mode", "stake");
+            } catch (error) {
+              res.status(error instanceof YieldStakingError ? error.status : 503).json({
+                error: error instanceof YieldStakingError ? error.code : "STAKING_LEDGER_UNAVAILABLE",
+              }); return;
+            }
+          }
           if (
             pass.maxRequests !== undefined &&
             !(await usageStore.consume(pass.requestLimits, pass.validUntil))
@@ -611,7 +648,7 @@ export function createL402Middleware(
         }
       }
     }
-    if (options.genesisGrantStore && nip98Pubkey && req.body?.method === "tools/call" &&
+    if (yieldMode !== "stake" && options.genesisGrantStore && nip98Pubkey && req.body?.method === "tools/call" &&
         !/^L402\b/i.test(req.get("Authorization") ?? "") &&
         !req.get("PAYMENT-SIGNATURE") && !req.get("X-Payment") &&
         !req.originalUrl.split("?")[0]!.match(/\/invoice\/request\/?$/i)) {
@@ -643,7 +680,7 @@ export function createL402Middleware(
         return;
       }
     }
-    if (options.creditTabs && nip98Pubkey && !authorization && !req.get("PAYMENT-SIGNATURE") &&
+    if (yieldMode !== "stake" && options.creditTabs && nip98Pubkey && !authorization && !req.get("PAYMENT-SIGNATURE") &&
         !(req.get("X-Requested-Budget") === undefined && !options.enforceCurrentAmount &&
           verifySwarmReferralKey(req.get("X-Swarm-Referral"), options.sessionSecret ?? process.env.SESSION_SECRET ?? "", now()))) {
       try {

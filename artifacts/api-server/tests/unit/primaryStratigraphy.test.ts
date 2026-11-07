@@ -52,7 +52,7 @@ test("composite audit validates both boundaries and executes once under a 250-sa
   };
   try {
     const listing = await request("tools/list");
-    assert.equal(listing.body.result.tools.length, 16);
+    assert.equal(listing.body.result.tools.length, 17);
     const tool = listing.body.result.tools.find((tool: { name: string }) => tool.name === "workflow.audit_trajectory");
     assert.equal(tool.description, AUDIT_TRAJECTORY_DESCRIPTION);
     assert.deepEqual(tool.inputSchema.required, ["fromTarget", "toTarget"]);
@@ -192,7 +192,7 @@ test("the canonical live route preserves L402, actual-height caveats and revocat
   }
   try {
     const list = await call("tools/list");
-    assert.equal(list.body.result.tools.length, 16);
+    assert.equal(list.body.result.tools.length, 17);
     const params = { name: "stratigraphy.get", arguments: {} };
     const challenge = await call("tools/call", params);
     assert.equal(challenge.response.status, 402);

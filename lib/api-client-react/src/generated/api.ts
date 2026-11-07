@@ -417,6 +417,7 @@ export const getClaimYieldUrl = () => {
  * Receipts must exist in the confirmed private revenue ledger; an issued unpaid
  * invoice, a forged token or a public payout record does not establish earnings.
  * Each payment hash can be consumed once across all descendant macaroons and workers.
+ * Yield reserved through X-Yield-Mode stake is excluded and returns YIELD_ALREADY_STAKED.
  * All receipts succeed together or none are consumed. Duplicate payment hashes within
  * one request are rejected. A durable pending claim reserves earnings BEFORE
  * pay_invoice over NWC using the server's NWC_URI secret.

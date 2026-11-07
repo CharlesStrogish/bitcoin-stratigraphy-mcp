@@ -271,7 +271,7 @@ test("stateless tools/list returns the cacheable catalog on any instance", async
   assert.equal(response.headers.get("mcp-session-id"), null);
   const result = body?.result;
   assert.ok(result);
-  assert.equal(result.tools.length, 16);
+  assert.equal(result.tools.length, 17);
   assert.equal(result.resultType, "complete");
   assert.equal(result.ttlMs, 300_000);
   assert.equal(result.cacheScope, "public");
@@ -557,7 +557,7 @@ test("handshake-era clients keep initialize and legacy payment framing", async (
     legacyHeaders,
   );
   assert.equal(list.response.status, 200);
-  assert.equal(list.body?.result?.tools.length, 16);
+  assert.equal(list.body?.result?.tools.length, 17);
   assert.equal(list.body?.result?.resultType, undefined);
 
   const unpaid = await post(
@@ -701,12 +701,12 @@ for (const version of [MODERN, LEGACY]) {
       assert.equal(content.mimeType, "application/json");
       const payload = JSON.parse(content.text);
       if (resource.uri.endsWith("/overview")) {
-        assert.equal(payload.toolCount, 16);
+        assert.equal(payload.toolCount, 17);
         assert.equal(payload.batchSettlement.requestHeader, "X-L402-Batch-Size");
         assert.deepEqual(payload.batchSettlement.supportedBatchSizes, [100]);
         assert.equal(payload.batchSettlement.invoiceGeneratedByDiscovery, false);
         assert.equal(Object.keys(payload.namespaces).length, 5);
-        assert.equal(Object.values(payload.namespaces).flat().length, 16);
+        assert.equal(Object.values(payload.namespaces).flat().length, 17);
         assert.ok(payload.dataset);
         assert.match(payload.l402.instructions, /402/);
         assert.match(payload.nip98.instructions, /27235/);
@@ -718,7 +718,7 @@ for (const version of [MODERN, LEGACY]) {
       } else {
         const manifest = await (await fetch(`${baseUrl}/.well-known/integrity.json`)).json();
         assert.deepEqual(payload, manifest);
-        assert.equal(payload.tools.length, 16);
+        assert.equal(payload.tools.length, 17);
         for (const tool of mcpToolDefinitions) {
           const signed = payload.tools.find((entry: { name: string }) => entry.name === tool.name);
           const digest = createHash("sha256").update(tool.description, "utf8").digest();
@@ -787,6 +787,6 @@ for (const version of [MODERN, LEGACY]) {
     }
     assert.equal(invoices.size, invoiceCount, "discovery must never issue invoices");
     const tools = await request("tools/list");
-    assert.equal(tools.body?.result?.tools.length, 16, "native discovery does not add tools");
+    assert.equal(tools.body?.result?.tools.length, 17, "native discovery does not add tools");
   });
 }

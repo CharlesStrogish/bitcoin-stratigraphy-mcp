@@ -143,11 +143,11 @@ export function createToolIntegrityManifest(
 ) {
   validateKey(privateKey);
   if (
-    tools.length !== 16 ||
-    new Set(tools.map((tool) => tool.name)).size !== 16
+    !(tools.length === 16 || tools.length === 17 && tools.some(tool => tool.name === "payment.get_escrow")) ||
+    new Set(tools.map((tool) => tool.name)).size !== tools.length
   ) {
     throw new Error(
-      "Tool integrity requires exactly 16 uniquely named MCP tools.",
+      "Tool integrity requires 16 uniquely named core MCP tools and optionally payment.get_escrow.",
     );
   }
   const entries = tools.map((tool) => {

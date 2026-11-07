@@ -72,6 +72,7 @@ x-mcp-tool-groups:
     description: "MCP price discovery and authenticated Lightning or configured Base USDC settlement checks."
     tools:
       - payment.get_info
+      - payment.get_escrow
 x-mcp-tools:
   workflow.audit_trajectory:
     description: "A deterministic composite workflow that executes a complete end-to-end thermodynamic audit between fromTarget and toTarget. It automatically calculates signed difficulty deltas, fetches compressed SHA-256 proof receipts, and returns a unified cryptographic report. Use this composite workflow to save LLM context tokens and eliminate multi-step agent orchestration when auditing historical divergence. Use individual stratigraphy or proof tools for single-purpose queries. Paid L402 call: on HTTP 402, pay the invoice and retry with Authorization: L402 <macaroon>:<preimage>."
@@ -200,6 +201,28 @@ x-mcp-tools:
     legacyNames: [proof.status]
     description: "Freely discover, filter, and paginate recent zk-proof attestation lifecycle summaries. Use limit (1-100), offset (0-1000), and optional status (verified, cached, pending, invalid). Returns bounded summaries, not full proofs or receipts. Alias: proof.status. No invoice is created."
     annotations: {"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false,"l402":{"amountSats":0}}
+  payment.get_escrow:
+    description: Read the fresh NIP-98 signer's private yield staking balance. Free authenticated utility alongside the unchanged 16 core tools; accepts no pubkey argument and never transfers funds.
+    annotations:
+      readOnlyHint: true
+      destructiveHint: false
+      idempotentHint: true
+      openWorldHint: false
+    inputSchema:
+      type: object
+      properties: {}
+      additionalProperties: false
+    outputSchema:
+      type: object
+      additionalProperties: false
+      required: [pubkey, staked_sats, vip_status, unlocked_features]
+      properties:
+        pubkey: { type: string, pattern: "^[0-9a-f]{64}$" }
+        staked_sats: { type: integer, minimum: 0 }
+        vip_status: { type: boolean, description: True strictly above 10000 whole sats }
+        unlocked_features:
+          type: array
+          items: { type: string, enum: [zero_latency_routing] }
   payment.get_info:
     legacyNames: [payment.info]
     description: "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted."
@@ -853,6 +876,7 @@ paths:
         Receipts must exist in the confirmed private revenue ledger; an issued unpaid
         invoice, a forged token or a public payout record does not establish earnings.
         Each payment hash can be consumed once across all descendant macaroons and workers.
+        Yield reserved through X-Yield-Mode stake is excluded and returns YIELD_ALREADY_STAKED.
         All receipts succeed together or none are consumed. Duplicate payment hashes within
         one request are rejected. A durable pending claim reserves earnings BEFORE
         pay_invoice over NWC using the server's NWC_URI secret.
@@ -3250,7 +3274,7 @@ components:
         tools:
           type: array
           minItems: 16
-          maxItems: 16
+          maxItems: 17
           items:
             $ref: "#/components/schemas/ToolIntegrityEntry"
     EscrowInput:
@@ -3641,8 +3665,8 @@ components:
           description: Canonical Streamable HTTP endpoint, https://bitcoinstratigraphy.com/mcp
         toolCount:
           type: integer
-          minimum: 16
-          maximum: 16
+          minimum: 17
+          maximum: 17
         capabilities:
           type: object
           additionalProperties: true
@@ -4042,8 +4066,8 @@ components:
               type: string
         tools:
           type: array
-          minItems: 16
-          maxItems: 16
+          minItems: 17
+          maxItems: 17
           description: Descriptors mirroring the live tools/list catalog; tools/list remains authoritative.
           items:
             type: object

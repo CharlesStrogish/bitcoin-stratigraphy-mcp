@@ -35,8 +35,8 @@ export interface McpDiscoveryManifest {
   npm: McpDiscoveryManifestNpm;
   /**
      * Descriptors mirroring the live tools/list catalog; tools/list remains authoritative.
-     * @minItems 16
-     * @maxItems 16
+     * @minItems 17
+     * @maxItems 17
      */
   tools: McpDiscoveryManifestToolsItem[];
   l402: McpDiscoveryManifestL402;

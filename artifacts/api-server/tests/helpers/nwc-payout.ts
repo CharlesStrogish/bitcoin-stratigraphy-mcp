@@ -51,4 +51,5 @@ export function mockNwcPayout() {
 }
 export async function migratePayoutFixture(client: { query(text: string): Promise<unknown> }) {
   await client.query(await readFile("../../scripts/sql/mainnet-yield-payouts.sql", "utf8"));
+  await client.query(await readFile("../../scripts/sql/yield-staking.sql", "utf8"));
 }

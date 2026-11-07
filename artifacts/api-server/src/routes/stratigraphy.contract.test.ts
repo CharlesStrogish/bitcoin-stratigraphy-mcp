@@ -767,7 +767,7 @@ test("retrieves indexed proof payloads and receipts, and reports MCP prices with
       name: string;
       inputSchema: { oneOf?: Array<Record<string, any>> };
     }>;
-    assert.equal(listedTools.length, 16);
+    assert.equal(listedTools.length, 17);
     const paymentTool = listedTools.find(
       ({ name }) => name === "payment.get_info",
     );
@@ -1726,7 +1726,7 @@ test("serves exact stratigraphy descriptions across tools/list and all discovery
     string,
     { description: string }
   >;
-  assert.equal(listed.result.tools.length, 16);
+  assert.equal(listed.result.tools.length, 17);
   for (const [name, expected] of Object.entries(STRATIGRAPHY_TOOL_DESCRIPTIONS)) {
     assert.equal(listed.result.tools.find((tool) => tool.name === name)?.description, expected, `${name} tools/list`);
     assert.equal(primaryStratigraphyContracts[name].description, expected, `${name} contract overlay`);
@@ -1938,6 +1938,7 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       "mesh.broadcast",
       "proof.notarize",
       "workflow.audit_trajectory",
+      "payment.get_escrow",
     ],
   );
   for (const unregisteredTool of [
@@ -2307,6 +2308,12 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
       openWorld: boolean;
     }
   > = {
+    "payment.get_escrow": {
+      keys: ["pubkey", "staked_sats", "vip_status", "unlocked_features"],
+      readOnly: true,
+      idempotent: true,
+      openWorld: false,
+    },
     "workflow.audit_trajectory": {
       keys: ["trajectory_deltas", "cryptographic_proofs"],
       readOnly: true,
@@ -2479,7 +2486,8 @@ test("exposes the stratigraphy MCP tool with structured quantitative data", asyn
         : expected.keys;
     assert.deepEqual(
       Object.keys(candidate.outputSchema.properties).sort(),
-      [...outputKeys, "_stratigraphy_metadata"].sort(),
+      (candidate.name === "payment.get_escrow"
+        ? outputKeys : [...outputKeys, "_stratigraphy_metadata"]).sort(),
       `${candidate.name} outputSchema must describe the returned JSON fields`,
     );
     const expectedRequired =
@@ -5123,7 +5131,7 @@ test("serves the CISO due-diligence brief publicly without creating invoices", a
 test("rejects malformed envelopes and unexpected arguments for all 16 tools without payment", async () => {
   const invoicesBefore = mcpInvoiceCount;
   const names = mcpServerCard.capabilities.tools.map((tool) => tool.name);
-  assert.equal(names.length, 16);
+  assert.equal(names.length, 17);
   const headers = {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -5218,16 +5226,16 @@ test("exactly two canonical sandbox tools and their aliases execute without invo
     name: string;
     annotations: { l402: { amountSats: number } };
   }>;
-  assert.equal(tools.length, 16);
+  assert.equal(tools.length, 17);
   assert.deepEqual(
     tools
-      .filter((tool) => tool.annotations.l402.amountSats === 0)
+      .filter((tool) => tool.annotations.l402?.amountSats === 0)
       .map((tool) => tool.name)
       .sort(),
     ["proof.list", "stratigraphy.list"],
   );
   assert.equal(
-    tools.filter((tool) => tool.annotations.l402.amountSats > 0).length,
+    tools.filter((tool) => tool.annotations.l402?.amountSats > 0).length,
     14,
   );
   for (const name of ["mesh.get_status", "payment.get_info"]) {
@@ -5271,7 +5279,7 @@ test("serves the public MCP server card without an L402 challenge", async () => 
   assert.deepEqual(card, registryServerCard);
   assert.equal(card.version, registryServerCard.version);
   assert.equal(card.serverInfo.version, card.version);
-  assert.equal(card.toolCount, 16);
+  assert.equal(card.toolCount, 17);
   assert.equal(card.capabilities.tools.length, card.toolCount);
   assert.ok(
     card.capabilities.tools.some(

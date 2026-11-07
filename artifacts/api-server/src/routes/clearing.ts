@@ -16,6 +16,11 @@ import type {
   ClearingContract,
   ClearingContracts,
 } from "../services/clearingContracts";
+import {
+  developmentClearingEnabled,
+  signDevelopmentClearingReceipt,
+  verifyClearingExecution,
+} from "../services/clearingExecution";
 
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
 const workerKey = hex32.refine((key) => {
@@ -40,7 +45,7 @@ const createInput = z
 const settleInput = z
   .object({
     escrow_id: z.string().uuid(),
-    // Opaque until a purpose-built circuit and trusted public-signal layout exist.
+    // JSON proof envelope; never send the private preimage to the server.
     execution_trace: z
       .string()
       .min(1)
@@ -52,7 +57,7 @@ export const clearingToolDefinitions = [
   {
     name: "clearing.create_contract",
     description:
-      "Scaffold: reserve a private A2A contract and issue its funding invoice. Buyer comes only from fresh NIP-98 authentication. Settlement is DISABLED: do not fund until a trusted execution circuit is deployed. An unpaid invoice is not locked funds.",
+      "Reserve a private A2A contract and issue its funding invoice. Buyer comes only from fresh NIP-98 authentication. Production settlement is DISABLED: do not fund. Local opt-in settlement verifies Poseidon preimage knowledge, not arbitrary task execution, and performs no payout. An unpaid invoice is not locked funds.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -77,7 +82,7 @@ export const clearingToolDefinitions = [
   {
     name: "clearing.settle_contract",
     description:
-      "Fail-closed A2A settlement scaffold. Authenticates the exact worker and reads its PostgreSQL contract, but NEVER marks it settled or issues a ZK-Indemnity Receipt: no trusted execution Groth16 circuit is configured.",
+      "Production settlement remains disabled. Explicit local development mode verifies the exact NIP-98 worker, a contract-bound Groth16 Poseidon preimage proof and merchant-confirmed funding before atomically recording settled status and a signed development receipt. No payout, arbitrary-execution guarantee, or legal indemnity.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -174,14 +179,115 @@ export function clearingController(options: {
           fail(403, "CLEARING_WORKER_NOT_AUTHORIZED");
           return;
         }
-        // No telemetry/drift proof, digest comparison, or mock verification can
-        // substitute for an execution circuit. No settlement writes or payout.
-        fail(503, "CLEARING_EXECUTION_VERIFIER_UNAVAILABLE", {
-          escrow_id: contract.escrow_id,
-          status: contract.status,
-          settlement_available: false,
-          zk_receipt_issued: false,
+        if (!developmentClearingEnabled()) {
+          fail(503, "CLEARING_EXECUTION_VERIFIER_UNAVAILABLE", {
+            escrow_id: contract.escrow_id,
+            status: contract.status,
+            settlement_available: false,
+            zk_receipt_issued: false,
+          });
+          return;
+        }
+        const proofDigest = await verifyClearingExecution(
+          contract,
+          input.execution_trace,
+        );
+        if (!proofDigest) {
+          fail(400, "CLEARING_INVALID_EXECUTION_PROOF");
+          return;
+        }
+        const sendReceipt = (stored: ClearingContract) => {
+          if (!stored.settlement_receipt)
+            throw new Error("Receipt unavailable");
+          const result = {
+            escrow_id: stored.escrow_id,
+            status: "settled",
+            development_only: true,
+            funding_verified: true,
+            receipt: JSON.parse(stored.settlement_receipt),
+          };
+          res.json({
+            jsonrpc: "2.0",
+            id: body.id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(result) }],
+              structuredContent: result,
+            },
+          });
+        };
+        if (contract.status === "settled") {
+          if (
+            contract.proof_digest !== proofDigest ||
+            !contract.settlement_receipt
+          ) {
+            fail(409, "CLEARING_SETTLEMENT_CONFLICT");
+            return;
+          }
+          sendReceipt(contract);
+          return;
+        }
+        if (
+          contract.status !== "pending" ||
+          !contract.invoice ||
+          !contract.payment_hash ||
+          !contract.provider ||
+          !contract.macaroon ||
+          !contract.expires_at
+        ) {
+          fail(409, "CLEARING_CONTRACT_NOT_FUNDABLE");
+          return;
+        }
+        const amountMsats = Number(contract.amount_sats) * 1000;
+        if (!Number.isSafeInteger(amountMsats) || amountMsats <= 0) {
+          fail(409, "CLEARING_INVALID_CONTRACT_AMOUNT");
+          return;
+        }
+        // Values come ONLY from the server's immutable invoice reservation,
+        // never a worker's payment assertion or a replacement invoice.
+        const funding = await options.settlementRouter.verifyPayment({
+          paymentHash: contract.payment_hash,
+          preimage: "",
+          verificationMode: "merchant-lookup",
+          expectedAmountMsats: amountMsats,
+          expectedDescription: `A2A clearing ${contract.escrow_id} task ${contract.task_hash}`,
+          expectedProvider: contract.provider,
+          asset: "btc-lightning",
         });
+        if (funding === "unavailable") {
+          fail(503, "CLEARING_FUNDING_VERIFICATION_UNAVAILABLE");
+          return;
+        }
+        if (
+          funding === "invalid" ||
+          funding.provider !== contract.provider ||
+          funding.asset !== "btc-lightning" ||
+          !Number.isSafeInteger(funding.settledAt) ||
+          funding.settledAt <= 0
+        ) {
+          fail(409, "CLEARING_FUNDING_NOT_CONFIRMED");
+          return;
+        }
+        const signed = signDevelopmentClearingReceipt(
+          contract,
+          proofDigest,
+          funding.settledAt,
+        );
+        // Recheck the gate immediately before the only settlement write.
+        if (!developmentClearingEnabled()) {
+          fail(503, "CLEARING_EXECUTION_VERIFIER_UNAVAILABLE");
+          return;
+        }
+        const settled = await options.store.settleDevelopment(
+          contract,
+          proofDigest,
+          signed.receipt,
+          signed.settledAt,
+        );
+        if (!settled) {
+          fail(409, "CLEARING_SETTLEMENT_CONFLICT");
+          return;
+        }
+        sendReceipt(settled);
         return;
       }
       if (
@@ -266,8 +372,10 @@ export function clearingController(options: {
         amount_sats: Number(contract.amount_sats),
         expires_at: contract.expires_at.toISOString(),
         funding_verified: false,
-        settlement_available: false,
-        warning: "Settlement is disabled. Do not fund this scaffold.",
+        settlement_available: developmentClearingEnabled(),
+        warning: developmentClearingEnabled()
+          ? "Local development only. Preimage knowledge is not arbitrary task execution. No payout is implemented. Do not fund with real sats."
+          : "Production settlement is disabled. Do not fund this scaffold.",
       };
       res.json({
         jsonrpc: "2.0",

@@ -19,8 +19,12 @@ CREATE TABLE IF NOT EXISTS clearing_contracts (
   macaroon text,
   expires_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  settled_at timestamptz
-)`;
+  settled_at timestamptz,
+  settlement_receipt text,
+  proof_digest varchar(64)
+);
+ALTER TABLE clearing_contracts ADD COLUMN IF NOT EXISTS settlement_receipt text;
+ALTER TABLE clearing_contracts ADD COLUMN IF NOT EXISTS proof_digest varchar(64)`;
 
 export type ClearingContract = {
   escrow_id: string;
@@ -35,6 +39,9 @@ export type ClearingContract = {
   provider: string | null;
   macaroon: string | null;
   expires_at: Date | null;
+  settled_at?: Date | null;
+  settlement_receipt?: string | null;
+  proof_digest?: string | null;
 };
 
 export class ClearingContracts {
@@ -118,5 +125,48 @@ export class ClearingContracts {
         [id],
       )
     ).rows[0];
+  }
+
+  /** Commit the receipt and status together, once. No payout or staking writes. */
+  async settleDevelopment(
+    contract: ClearingContract,
+    proofDigest: string,
+    receipt: string,
+    settledAt: Date,
+  ): Promise<ClearingContract | undefined> {
+    await this.initialize();
+    const result = await this.database.query<ClearingContract>(
+      `UPDATE clearing_contracts
+       SET status='settled', settled_at=$2, settlement_receipt=$3, proof_digest=$4
+       WHERE escrow_id=$1 AND status='pending'
+       AND worker_pubkey=$5 AND task_hash=$6 AND payment_hash=$7
+       AND provider=$8 AND amount_sats=$9 AND request_digest=$10
+       AND buyer_pubkey=$11 AND invoice=$12 AND macaroon=$13 AND expires_at=$14
+       RETURNING *`,
+      [
+        contract.escrow_id,
+        settledAt,
+        receipt,
+        proofDigest,
+        contract.worker_pubkey,
+        contract.task_hash,
+        contract.payment_hash,
+        contract.provider,
+        contract.amount_sats,
+        contract.request_digest,
+        contract.buyer_pubkey,
+        contract.invoice,
+        contract.macaroon,
+        contract.expires_at,
+      ],
+    );
+    if (result.rows[0]) return result.rows[0];
+    const existing = await this.get(contract.escrow_id);
+    return existing?.status === "settled" &&
+      existing.proof_digest === proofDigest &&
+      existing.worker_pubkey === contract.worker_pubkey &&
+      existing.settlement_receipt
+      ? existing
+      : undefined;
   }
 }

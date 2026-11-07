@@ -1,6 +1,6 @@
 ---
-name: A2A clearing scaffold scope
-description: User-approved fail-closed execution verification and protected core boundaries.
+name: A2A clearing trust boundaries
+description: Development-only preimage proofs, production fail-closed settlement and protected core boundaries.
 ---
 
 Keep the 16 Fiduciary data tools and v1.1.0 payment.get_escrow logic unchanged
@@ -15,14 +15,14 @@ the existing regression tests passing.
 Do not change canonical data-tool handlers or use clearing funding as a data-tool
 access pass.
 
-Settlement must fail closed until a trusted execution verifier exists. Do not
+Production settlement must fail closed until a trusted execution verifier exists. Do not
 reuse telemetry/drift circuits or label hashes as verified execution proofs.
 
 **Why:** After being told that there was no task-execution circuit or trusted
 verification key, the user explicitly chose “Fail-closed scaffold.”
 
 **How to apply:** Verify the worker's real NIP-98 signature and contract ownership,
-but never mark contracts settled, release money, or emit a ZK-Indemnity Receipt
+but never mark production contracts settled, release money, or emit a production ZK-Indemnity Receipt
 without a separately specified execution circuit, task binding, and funding
 verification. Make unavailable settlement and the instruction not to fund
 explicit in tool metadata and responses.
@@ -40,3 +40,19 @@ existing SDK data tools and payment.get_escrow.
 invoice/preimage and retry checks, describe the funding/disabled-settlement
 limitation, and never translate payment confirmation into settled escrow or
 a ZK-Indemnity Receipt.
+
+The user approved a local development Groth16 setup after being told that a
+hash-preimage circuit does not prove arbitrary task execution and a locally
+generated key is not an independently established production trust basis.
+Local development may record funded, authenticated preimage-proof settlement
+and a signed development receipt. Production remains disabled.
+
+**Why:** The user explicitly selected “Local development setup” rather than
+audited production activation.
+
+**How to apply:** Keep development keys and activation separate from production.
+Require the contract's worker identity, exact task/escrow proof binding and
+merchant funding confirmation. Describe receipts as preimage-knowledge evidence,
+not arbitrary execution, legal indemnity, payouts or fully trustless custody.
+Never run tests against the 16 core data tools for clearing work; preserve the
+existing regression assertions rather than weakening them.

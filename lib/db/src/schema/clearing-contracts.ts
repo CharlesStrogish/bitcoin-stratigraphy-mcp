@@ -21,6 +21,8 @@ export const clearingContractsTable = pgTable("clearing_contracts", {
     .notNull()
     .defaultNow(),
   settledAt: timestamp("settled_at", { withTimezone: true }),
+  settlementReceipt: text("settlement_receipt"),
+  proofDigest: varchar("proof_digest", { length: 64 }),
 });
 
 export const insertClearingContractSchema = createInsertSchema(

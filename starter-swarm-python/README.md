@@ -7,7 +7,10 @@
 The starter now includes an isolated clearing registry and NWC payer. See
 [CLEARING.md](CLEARING.md) for setup, exact tool names, payment limits, and
 retry behavior. **Contract creation automatically spends real sats while
-settlement remains unavailable.** No core data or staking lookup logic changes.
+production settlement remains unavailable.** A separately enabled
+[local development circuit](../circuits/README.md) can verify preimage knowledge
+and record settlement with a signed development receipt; it performs no payout
+and does not prove arbitrary execution. No core data or staking lookup logic changes.
 
 Give your first agent a real spending policy—not unlimited access to your wallet.
 This standalone Python template connects LangChain and OpenAI to Bitcoin

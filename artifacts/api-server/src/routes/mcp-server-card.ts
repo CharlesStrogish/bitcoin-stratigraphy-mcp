@@ -12,7 +12,7 @@ import { paymentEscrowToolDefinition } from "../lib/payment-escrow-tool";
 
 export const MCP_RELEASE_VERSION = RELEASE_VERSION;
 export const MCP_RELEASE_DESCRIPTION =
-  "OpenTimestamps AI Notary Hub: 16 L402-gated tools (14 paid, 2 free sandbox tools), " +
+  "OpenTimestamps AI Notary Hub: 19 Fiduciary-grade MCP Tools at full capacity across six namespaces, including payment.get_escrow and the host-enabled clearing.create_contract / clearing.settle_contract extension. Production clearing settlement and payouts remain disabled. Use tools/list for the host's enabled catalog. The original core has 14 paid L402 tools and 2 free sandbox tools. " +
   "LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and " +
   "Free Sandbox available through stratigraphy.list and proof.list.";
 

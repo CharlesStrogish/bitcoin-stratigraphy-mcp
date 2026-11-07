@@ -24,6 +24,7 @@ export * from "./revenue-ledger";
 export * from "./ots-provenance-anchors";
 export * from "./stratigraphy-provenance-strata";
 export * from "./escrow-ledger";
+export * from "./clearing-contracts";
 export * from "./mcp-extension-tasks";
 export * from "./invoice-pow-consumptions";
 export * from "./enterprise-credit-accounts";

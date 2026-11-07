@@ -16,6 +16,8 @@ import {
 } from "./routes/mcp";
 import { registerToolIntegrityRoute } from "./routes/tool-integrity";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
+import { pool as clearingPool } from "@workspace/db";
+import { ClearingContracts } from "./services/clearingContracts";
 import { logger } from "./lib/logger";
 import { createMcpAsyncTaskRunner } from "./lib/mcp-async-tasks";
 import { postgresPipelineReceiptStore } from "./lib/mcp-pipeline";
@@ -168,6 +170,7 @@ registerMcpServerCardRoute(app);
 // webhook callback, so receivers verify both with the same public key.
 const toolIntegrityKey = loadToolIntegrityKey();
 registerMcpRoute(app, {
+  clearing: new ClearingContracts(clearingPool),
   genesisGrantStore: createPostgresGenesisGrantStore(),
   pipelineReceiptStore: withPipelineReceiptBroadcast(postgresPipelineReceiptStore()),
   onPaidToolCompleted: (name, result, paymentHash) => receiptMesh.single(name, result, paymentHash),

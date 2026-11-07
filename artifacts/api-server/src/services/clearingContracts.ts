@@ -1,0 +1,122 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
+import { randomUUID } from "node:crypto";
+import type { pool } from "@workspace/db";
+
+// Additive, namespace-local bootstrap. No migrations of legacy escrow/staking.
+export const CLEARING_DDL = `
+CREATE TABLE IF NOT EXISTS clearing_contracts (
+  escrow_id text PRIMARY KEY,
+  request_digest varchar(64) NOT NULL UNIQUE,
+  buyer_pubkey varchar(64) NOT NULL,
+  worker_pubkey varchar(64) NOT NULL,
+  task_hash varchar(64) NOT NULL,
+  amount_sats bigint NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  invoice text,
+  payment_hash varchar(64) UNIQUE,
+  provider text,
+  macaroon text,
+  expires_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  settled_at timestamptz
+)`;
+
+export type ClearingContract = {
+  escrow_id: string;
+  request_digest: string;
+  buyer_pubkey: string;
+  worker_pubkey: string;
+  task_hash: string;
+  amount_sats: string;
+  status: string;
+  invoice: string | null;
+  payment_hash: string | null;
+  provider: string | null;
+  macaroon: string | null;
+  expires_at: Date | null;
+};
+
+export class ClearingContracts {
+  private ready?: Promise<unknown>;
+  constructor(private readonly database: Pick<typeof pool, "query">) {}
+
+  private async initialize() {
+    this.ready ??= this.database.query(CLEARING_DDL).catch((error) => {
+      this.ready = undefined;
+      throw error;
+    });
+    await this.ready;
+  }
+
+  async reserve(input: {
+    request_digest: string;
+    buyer_pubkey: string;
+    worker_pubkey: string;
+    task_hash: string;
+    amount_sats: number;
+  }): Promise<{ contract: ClearingContract; inserted: boolean }> {
+    await this.initialize();
+    const inserted = await this.database.query<ClearingContract>(
+      `INSERT INTO clearing_contracts
+       (escrow_id, request_digest, buyer_pubkey, worker_pubkey, task_hash, amount_sats)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (request_digest) DO NOTHING RETURNING *`,
+      [
+        randomUUID(),
+        input.request_digest,
+        input.buyer_pubkey,
+        input.worker_pubkey,
+        input.task_hash,
+        input.amount_sats,
+      ],
+    );
+    const contract =
+      inserted.rows[0] ??
+      (
+        await this.database.query<ClearingContract>(
+          "SELECT * FROM clearing_contracts WHERE request_digest=$1",
+          [input.request_digest],
+        )
+      ).rows[0];
+    if (!contract) throw new Error("Clearing reservation unavailable");
+    return { contract, inserted: inserted.rowCount === 1 };
+  }
+
+  async attachInvoice(
+    id: string,
+    invoice: {
+      invoice: string;
+      paymentHash: string;
+      provider: string;
+      macaroon: string;
+      expiresAt: Date;
+    },
+  ): Promise<ClearingContract> {
+    const result = await this.database.query<ClearingContract>(
+      `UPDATE clearing_contracts SET invoice=$2,payment_hash=$3,provider=$4,
+       macaroon=$5,expires_at=$6 WHERE escrow_id=$1 AND status='pending'
+       AND invoice IS NULL RETURNING *`,
+      [
+        id,
+        invoice.invoice,
+        invoice.paymentHash,
+        invoice.provider,
+        invoice.macaroon,
+        invoice.expiresAt,
+      ],
+    );
+    if (!result.rows[0]) throw new Error("Clearing invoice reservation lost");
+    return result.rows[0];
+  }
+
+  async get(id: string): Promise<ClearingContract | undefined> {
+    await this.initialize();
+    return (
+      await this.database.query<ClearingContract>(
+        "SELECT * FROM clearing_contracts WHERE escrow_id=$1",
+        [id],
+      )
+    ).rows[0];
+  }
+}

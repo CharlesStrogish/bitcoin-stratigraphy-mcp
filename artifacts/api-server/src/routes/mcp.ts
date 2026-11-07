@@ -95,6 +95,8 @@ import {
 } from "../services/epistemicDatasetReceipt";
 import { createL402Middleware } from "../middleware/l402";
 import { paymentEscrowAuthentication, paymentEscrowToolDefinition } from "../lib/payment-escrow-tool";
+import { clearingController } from "./clearing";
+import type { ClearingContracts } from "../services/clearingContracts";
 import type { YieldEscrow, YieldStaking } from "../lib/yield-staking";
 import {
   type GenesisGrantStore,
@@ -5433,6 +5435,8 @@ export function registerMcpRoute(
     tasksExtension?: McpTasksExtension;
     pipelineReceiptStore?: PipelineReceiptStore;
     yieldStaking?: YieldStaking;
+    /** Isolated host-mounted extension; the sealed 17-tool core is unchanged. */
+    clearing?: ClearingContracts;
   } = {},
 ): void {
   const primaryBackend = options.stratigraphyBackend ??
@@ -5840,6 +5844,11 @@ export function registerMcpRoute(
     // Selects the protocol era and validates 2026-07-28 metadata and routing
     // headers before any payment, delegation or tool work.
     negotiateMcpProtocol,
+    ...(options.clearing ? [clearingController({
+      store: options.clearing, settlementRouter,
+      secret: options.sessionSecret ?? process.env.SESSION_SECRET,
+      coreTools: mcpToolDefinitions,
+    })] : []),
     paymentEscrowAuthentication(options.yieldStaking),
     (req, res, next) => {
       if (!/^\/invoice\/request\/?$/i.test(req.path)) return next();

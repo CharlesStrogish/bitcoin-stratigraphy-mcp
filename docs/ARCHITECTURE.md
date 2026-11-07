@@ -6,7 +6,9 @@ Mermaid sequence and system diagrams for agent developers integrating with
 The public interface uses stateless **Streamable HTTP**, supports MCP
 **2026-07-28** (no initialize handshake or session; capabilities travel in each
 request's `_meta`) alongside handshake-era **2025-11-25** clients, and
-currently exposes **16 tools**. Discover the live catalog with `tools/list` and
+supports **19-tool full platform capacity**, including the host-enabled clearing
+extension. Production clearing settlement and payouts remain disabled.
+Discover the host's enabled catalog with `tools/list` and
 query `payment.get_info` for current prices rather than relying on static
 diagrams as a contract.
 
@@ -52,7 +54,7 @@ flowchart LR
     Payer["Agent-owned Lightning wallet<br/>NWC / LND / Core Lightning"]
     Gateway["Public MCP endpoint<br/>Streamable HTTP / JSON-RPC"]
     Gate["L402 enforcement<br/>Credential validation and scoped redemption"]
-    Tools["16 canonical MCP tools<br/>Five namespaces"]
+    Tools["19-tool capacity<br/>Six namespaces; clearing opt-in<br/>Production clearing payouts disabled"]
     Data[("Indexed historical strata<br/>Dataset provenance")]
     ZK["Groth16 prover and verifier<br/>Poseidon / BN254"]
     Notary["Signed receipt notary<br/>Bitcoin-tip context binding"]
@@ -251,7 +253,11 @@ sequenceDiagram
 
 ## 4. Complete MCP namespace map
 
-The endpoint exposes **5 stratigraphy + 7 proof + 2 mesh + 1 payment + 1 workflow = 16 tools**.
+Full platform capacity is **5 stratigraphy + 7 proof + 2 mesh + 2 payment + 1 workflow + 2 clearing = 19 tools**.
+The additional payment utility is `payment.get_escrow`. The clearing extension
+contains `clearing.create_contract` and `clearing.settle_contract` and must be
+explicitly mounted by a host. Production clearing settlement and payouts remain
+disabled; the diagram below focuses on the original core namespaces.
 Tool nodes link to public reference pages in Mermaid renderers that allow links.
 Names are canonical, case-sensitive MCP names, not Python method names.
 
@@ -353,7 +359,7 @@ not from these diagrams or a cached registry page.
 - [Claude Desktop setup](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/CLAUDE_DESKTOP_SETUP.md)
 - [LangChain and CrewAI Python integration](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/LANGCHAIN_CREWAI_GUIDE.md)
 - [Agent-owned L402 payments](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/L402_AGENT_PAYMENTS.md)
-- [Connection guide and 16-tool catalog](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md)
+- [Connection guide and 19-tool capacity](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md)
 - [MCP routing and tool implementation](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/routes/mcp.ts)
 - [Groth16 telemetry proof service](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/src/services/zkProofService.ts)
 - [Mermaid sequence diagram syntax](https://mermaid.js.org/syntax/sequenceDiagram.html)

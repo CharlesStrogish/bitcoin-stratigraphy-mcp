@@ -164,7 +164,12 @@ verify with their own Bitcoin mainnet node. Routine retries are debug-only logs.
 
 ### Agent retrieval
 
-The primary 16-tool `/mcp` catalog now obtains its stratigraphy responses
+The 19-tool capacity includes host-enabled clearing infrastructure, not
+production payout authorization. Production clearing settlement and payouts
+remain disabled.
+
+The primary `/mcp` catalog, within the platform's 19-tool full capacity,
+obtains its stratigraphy responses
 through an authenticated internal bridge to this licensed Python pipeline and
 the authoritative Object Storage archive. The free `stratigraphy.list` tool
 exposes only real archive bounds and live tip metadata. The four paid

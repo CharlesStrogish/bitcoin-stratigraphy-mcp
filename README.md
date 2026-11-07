@@ -1,5 +1,11 @@
 # Bitcoin Stratigraphy MCP Server
 
+**19 Fiduciary-grade MCP Tools across 6 namespaces — full platform capacity.**
+The catalog comprises the original 16 core tools, `payment.get_escrow`, and
+the host-enabled `clearing.create_contract` and `clearing.settle_contract`
+extension. Discover each host's enabled tools with `tools/list`; clearing is
+opt-in, and **production clearing settlement and payouts remain disabled**.
+
 **[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)**
 
 ## 1-Line Installation
@@ -27,12 +33,13 @@ See the [SDK setup and framework adapters](sdk/agent-yield/README.md).
 The package is built in this workspace; the command above becomes available
 after its separate npm registry release.
 
-## v2.1.3 — 16 Canonical Tools
+## v2.1.3 — 19 Fiduciary-grade MCP Tools
 
 **Institutional Bitcoin thermodynamic state-anchoring · L402 micropayments · EU AI Act Article 12 execution evidence**
 
 **[Bitcoin Stratigraphy](https://bitcoinstratigraphy.com)** serves enterprise
-autonomous swarms through 16 canonical MCP tools. The commercial deployment
+autonomous swarms with a capacity of 19 MCP tools, including the optional A2A
+clearing namespace. The commercial deployment
 path is the **$250,000/year Tier II Commercial Enterprise Exemption**, with
 Automated Compliance SLAs for signed revocation exports and receipt-key rotation.
 
@@ -119,7 +126,7 @@ separate domain from receipt signatures. Paste multiple PEM blocks or a JSON
 array of PEM strings into the offline verifier. Each artifact selects only an
 independently pinned matching fingerprint. Remove compromised issuer pins
 through your enterprise trust process; do not accept self-announced keys.
-This does not rotate or modify the 16 MCP tool signatures or descriptions.
+This does not rotate or modify the original core MCP tool signatures or descriptions.
 
 Receipt signatures, agent attribution, CRL state, Bitcoin anchoring and legal
 compliance are distinct checks. The verifier does not independently re-verify
@@ -150,11 +157,11 @@ Calendar acceptance is not Bitcoin confirmation; upgrade and independently
 verify `.ots` receipts later. Native clients require prepaid L402 headers or
 a trusted, budget-controlled wallet proxy; they do not pay automatically.
 
-[![Glama TDQS](https://img.shields.io/badge/Glama-Grade%20A%20%28All%2016%20Tools%29-10b981)](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
+[![Glama TDQS — core catalog](https://img.shields.io/badge/Glama-Grade%20A%20%28Core%20Catalog%29-10b981)](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2026--07--28-orange)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![L402 Enabled](https://img.shields.io/badge/Monetization-L402%20Lightning-yellow)](https://l402.org)
 
-Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines across **16 Canonical Tools**.
+Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, Groth16 ZK-SNARK verification, Nostr P2P mesh consensus, and agent context state grounding to autonomous AI swarms and LLM pipelines with **19 Fiduciary-grade MCP Tools** at full capacity, including host-enabled clearing infrastructure. Production clearing settlement and payouts remain disabled.
 
 ## Enterprise Architecture
 
@@ -162,7 +169,7 @@ Enterprise L402 data vending engine serving real-time thermodynamic Bitcoin tele
   bottlenecks so requests can be routed across horizontally scaled instances.
   Handshake-era clients remain supported. Transport is stateless; callback
   queues and some rate-limit state remain process-local.
-- **Cryptographic Tool Integrity:** All 16 canonical tool descriptions are
+- **Cryptographic Tool Integrity:** The core tool descriptions are
   SHA-256 hashed and their digests signed at boot with an Ed25519 keypair.
   The public key, hashes, and signatures are published at
   `/.well-known/integrity.json`. Clients that verify a trusted public-key pin
@@ -350,10 +357,10 @@ L402 gateway + scoped macaroons
 Pricing -> invoice -> payment proof
              |
              v
-16-tool router / 5 namespaces
+19-tool capacity / 6 namespaces (clearing is opt-in)
 stratigraphy (5) | proof (7)
-mesh (2)        | payment (1)
-workflow (1)
+mesh (2)        | payment (2)
+workflow (1)    | clearing (2, production payouts disabled)
              |
              v
 Telemetry / Groth16 / Nostr mesh
@@ -435,7 +442,7 @@ Machine-native conditional micro-settlement for autonomous agent-to-agent delega
   still requires organizational supervision and durable evidence retention; see
   [the compliance framework](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/ENTERPRISE_COMPLIANCE.md).
 
-The Glama badge reflects our static, flawless Grade A tool-definition quality score across all 16 canonical tools, alongside a 4.0/5.0 overall directory rating.
+The Glama badge refers to the previously evaluated core catalog, not a new grade for the expanded 19-tool capacity. The optional clearing extension has not been independently confirmed to have the same registry grade.
 Follow the Glama and mcpservers.org links for current directory results;
 directory badges are not independent security audits or blanket verification of data.
 Signed Bitcoin-tip receipts are attestations, not Groth16 proofs or Bitcoin
@@ -444,8 +451,10 @@ proof-of-work validity proofs.
 ## Tool Directory
 
 The directory uses bulleted definitions rather than multi-column tables so each
-tool description can wrap independently on mobile. These are the **16 canonical
-MCP names** returned by `tools/list`.
+tool description can wrap independently on mobile. These are the **19 MCP
+names at full platform capacity**: 5 stratigraphy, 7 proof, 2 mesh, 2 payment,
+1 workflow, and 2 host-enabled clearing tools. `tools/list` is authoritative
+for a particular host; production clearing settlement and payouts are disabled.
 
 ### `stratigraphy.*` — 5 tools
 
@@ -530,13 +539,16 @@ and callback shapes.
   - Access: paid; performs network side effects. Quorum results depend on the
     configured peer policy and availability.
 
-### `payment.*` — 1 tool
+### `payment.*` — 2 tools
 
 - **`payment.get_info`** — Discover current MCP pricing and settlement methods,
   or check authenticated settlement status.
   - Access: paid L402 call; `action: "query"` is the default and `action: "settle"`
     requires authenticated payment evidence. Neither mode mints a macaroon or
     creates an invoice. Free price quotes are available from `/api/v1/cost`.
+- **`payment.get_escrow`** — Retrieve the authenticated caller's escrow and
+  staking accounting. This separate payment utility does not alter the original
+  core data-tool contracts or enable clearing payouts.
 
 ### `workflow.*` — 1 tool
 
@@ -548,7 +560,26 @@ and callback shapes.
     fingerprints, and available OTS receipt references. Live boundaries have
     no archived OTS receipt; this does not create a new Bitcoin-confirmed proof.
 
-Most paid MCP calls currently cost **250 sats** without valid credentials.
+### `clearing.*` — 2 host-enabled A2A tools
+
+**Production clearing settlement and payouts remain disabled. Do not fund
+production clearing contracts.** These names expose the A2A Central Bank
+routing infrastructure when the host explicitly enables the extension; they
+are not evidence of live production payouts.
+
+- **`clearing.create_contract`** — Reserve an A2A task contract for a named worker
+  and task hash and issue its funding invoice. The buyer must authenticate with
+  NIP-98; an unpaid invoice does not lock funds.
+- **`clearing.settle_contract`** — Submit the worker's contract-bound Groth16
+  Poseidon preimage proof. Explicit local development mode can verify worker
+  identity and merchant-confirmed funding, record settlement, and issue a signed
+  development receipt; it does not pay funds or prove arbitrary task completion.
+  Worker-signed payout invoice requests remain unconditionally blocked.
+
+See [clearing integration](artifacts/api-server/CLEARING.md) and the
+[fee-capped LND payout scaffold](circuits/LND_PAYOUT_SCAFFOLD.md).
+
+Most paid core MCP calls currently cost **250 sats** without valid credentials.
 Check `payment.get_info` and the actual challenge for current terms; do not
 assume a static per-call price applies to every payment policy or asset.
 
@@ -588,8 +619,8 @@ does not enable x402 batching, and discovery itself never creates an invoice.
 
 ## Native MCP Resources & Prompts
 
-The endpoint exposes **3 public Resources and 3 public Prompts alongside the
-16 canonical tools**, on both stateless `2026-07-28` and legacy `2025-11-25`
+The endpoint exposes **3 public Resources and 3 public Prompts alongside its
+enabled tool catalog (19-tool full platform capacity)**, on both stateless `2026-07-28` and legacy `2025-11-25`
 transports. Discovery and prompt retrieval require no L402 payment; executing
 paid tools recommended by a prompt still requires settlement.
 
@@ -598,7 +629,7 @@ paid tools recommended by a prompt still requires settlement.
 Call `resources/list` for the catalog, then `resources/read` with a `uri`:
 
 - **`stratigraphy://catalog/overview`** — Bitcoin Stratigraphy Catalog & L402
-  Overview: indexed dataset boundaries, all 16 tools grouped by namespace,
+  Overview: indexed dataset boundaries, the core tools grouped by namespace,
   and L402 Lightning settlement and NIP-98 authentication instructions.
 - **`stratigraphy://compliance/eu-ai-act-article-12`** — EU AI Act Article 12 &
   Enterprise Licensing Matrix: structured logging-control mappings for RFC 6962
@@ -607,7 +638,7 @@ Call `resources/list` for the catalog, then `resources/read` with a `uri`:
   **licensing@bitcoinstratigraphy.com**.
 - **`stratigraphy://security/tool-integrity`** — Ed25519 Signed Tool Integrity
   Manifest: the identical startup payload served at
-  `/.well-known/integrity.json`, including all 16 description hashes and
+  `/.well-known/integrity.json`, including its published core description hashes and
   signatures. Verify with an independently trusted public-key pin.
 
 All three use `application/json`; parse `contents[0].text` as JSON. Unknown
@@ -903,4 +934,4 @@ state anchoring, data truth, absolute unforgeability or legal indemnification.
 
 See [enterprise protocol economics and verification](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/enterprise-protocol-economics.md)
 for canonical hashing, signed-token checks, rate/price limits and air-gap
-behavior. All 16 canonical MCP schemas and parameter structures are unchanged.
+behavior. All original core MCP schemas and parameter structures are unchanged.

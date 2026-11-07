@@ -1,6 +1,8 @@
 # Atomic tool composability: the MCP pipeline transport extension
 
-The catalog remains **16 Canonical Tools**. `tools/pipeline` and its alias
+The platform has **19-tool capacity**, including the host-enabled `clearing.*`
+extension; production clearing settlement and payouts remain disabled.
+`tools/pipeline` and its alias
 `tools/batch` are transport methods, not new tools. Single-tool calls and the
 existing `X-L402-Batch-Size: 100` same-tool passes retain their existing behavior.
 

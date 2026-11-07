@@ -1,9 +1,12 @@
 # Bitcoin Stratigraphy MCP client SDK
 
 Small, zero-required-dependency MCP clients with generic tool calls and typed
-convenience methods. The live server currently publishes 16 canonical tools;
-discover them with `listTools`/`list_tools` rather than treating this guide as
-the catalog. TypeScript uses built-in `fetch` and Web Crypto APIs (Node 18+).
+convenience methods. The platform supports 19 MCP tools at full capacity,
+including `payment.get_escrow` and the host-enabled `clearing.*` namespace;
+discover the connected host's enabled catalog with `listTools`/`list_tools`
+(`tools/list` on the wire) rather than treating this guide as the catalog.
+Production clearing settlement and payouts remain disabled.
+TypeScript uses built-in `fetch` and Web Crypto APIs (Node 18+).
 Python uses the standard library, or `urllib3` automatically if already
 installed. Free discovery needs no wallet. The L402 examples below use a
 Lightning wallet callback that **pays the challenged BOLT11 invoice and returns

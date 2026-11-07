@@ -14,10 +14,11 @@ The public endpoint is:
 
 **https://bitcoinstratigraphy.com/mcp**
 
-It exposes 16 canonical MCP tools over stateless Streamable HTTP, supports MCP
+It supports 19-tool full capacity over stateless Streamable HTTP, including
+host-enabled clearing infrastructure with production clearing payouts disabled, and supports MCP
 `2026-07-28` alongside handshake-era clients, and uses
 Lightning L402 plus conditional Base USDC x402 when that settlement path is
-configured. The catalog has a Glama
+configured. The previously evaluated core catalog has a Glama
 tool-definition quality rating of **A, 4.4/5.0**, checked September 30, 2026.
 That rating measures tool-definition quality; it is not a cryptographic
 security audit or a guarantee about every individual tool.
@@ -58,15 +59,17 @@ every source value true or every model interpretation correct.
 
 ### 1. The MCP execution surface
 
-The 16 canonical MCP tools are grouped into five namespaces:
+The 19-tool full platform capacity spans six namespaces. Actual discovery is
+host-dependent; production clearing settlement and payouts remain disabled.
 
 | Namespace | Tools | Purpose |
 | --- | --- | --- |
 | `stratigraphy.*` | `stratigraphy.list`, `stratigraphy.get`, `stratigraphy.get_digest`, `stratigraphy.get_diff`, `stratigraphy.get_range` | Discover coverage and retrieve indexed records, compact summaries, comparisons, or bounded ranges. |
 | `proof.*` | `proof.attenuate`, `proof.verify`, `proof.get_by_hash`, `proof.list`, `proof.submit`, `proof.ground`, `proof.notarize` | Restrict credentials, verify/register proofs, retrieve retained evidence, issue signed state receipts, and create OpenTimestamps receipts. |
 | `mesh.*` | `mesh.get_status`, `mesh.broadcast` | Inspect peer/quorum health or sign and distribute a stored telemetry snapshot to configured pinned peers. Quorum is not source truth. |
-| `payment.*` | `payment.get_info` | Discover current prices or use an authenticated payment-verification/settlement mode. |
+| `payment.*` | `payment.get_info`, `payment.get_escrow` | Discover current prices, use authenticated payment-verification/settlement modes, or inspect caller-scoped escrow accounting. |
 | `workflow.*` | `workflow.audit_trajectory` | Deterministic composite workflow executing end-to-end thermodynamic audits. Returns signed deltas and compressed proof receipts in a single payload to save LLM context tokens. |
+| `clearing.*` | `clearing.create_contract`, `clearing.settle_contract` | Host-enabled A2A contract and proof-submission infrastructure; production settlement and payouts are disabled. Local development settlement does not pay funds or prove arbitrary task completion. |
 
 The server does not advertise a `proof.generate` MCP tool. Generation is an
 internal capability behind supported proof-producing paths. It also does not

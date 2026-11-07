@@ -1,10 +1,10 @@
 # Bitcoin Stratigraphy Data Engine — Complete Agent Reference (v2.1.3)
 
-> Static reference for the sixteen canonical MCP tools returned by `tools/list` at https://bitcoinstratigraphy.com/mcp, plus installation, L402 settlement, the genesis settlement proof and licensing terms. Tool descriptions below are the published live descriptions; JSON Schemas keep every property, type, required field, enum, range, pattern and additional-properties rule, with descriptive annotations and sample values removed. `tools/list` is authoritative for live metadata and any later schema changes.
+> Static reference for the platform's 19 Fiduciary-grade MCP Tools at full capacity, plus installation, L402 settlement, the genesis settlement proof and licensing terms. The two clearing tools are host-enabled extensions; production clearing settlement and payouts remain disabled. The core reference below preserves existing JSON Schemas; the extension summary does not replace live schemas. `tools/list` at https://bitcoinstratigraphy.com/mcp is authoritative for that host's enabled tools and current metadata.
 
 ## Overview
 
-Bitcoin Stratigraphy (canonical origin https://bitcoinstratigraphy.com) serves Bitcoin pipeline telemetry, cryptographic verification, OpenTimestamps notarization and off-chain Bitcoin-tip receipts to autonomous agents. It exposes 16 canonical MCP tools in 5 namespaces (`stratigraphy`, `proof`, `mesh`, `payment`, `workflow`) over MCP Streamable HTTP, plus paid REST routes, all settled with L402 Lightning payments. Two tools are free sandbox discovery tools: `stratigraphy.list` and `proof.list`. The other fourteen are paid per call (currently 250 sats each); confirm live prices with `payment.get_info` or the free pre-flight quote endpoint.
+Bitcoin Stratigraphy (canonical origin https://bitcoinstratigraphy.com) serves Bitcoin pipeline telemetry, cryptographic verification, OpenTimestamps notarization and off-chain Bitcoin-tip receipts to autonomous agents. Full platform capacity is 19 MCP tools in 6 namespaces (`stratigraphy`, `proof`, `mesh`, `payment`, `workflow`, `clearing`) over MCP Streamable HTTP, plus paid REST routes. This comprises the original core, the authenticated `payment.get_escrow` utility, and two optional clearing tools. Production clearing settlement and payouts remain disabled; do not fund production clearing contracts. The core free sandbox discovery tools are `stratigraphy.list` and `proof.list`; core paid tools currently cost 250 sats each. Confirm live prices and enabled tools rather than applying the core fee policy to clearing or escrow utilities.
 
 - MCP endpoint (Streamable HTTP, JSON-RPC 2.0): https://bitcoinstratigraphy.com/mcp
 - MCP discovery manifest: https://bitcoinstratigraphy.com/.well-known/mcp.json
@@ -28,7 +28,7 @@ Data is provided AS IS and without warranty. To the fullest extent permitted by 
 
 ## Developer portal, Python SDK and integration cookbooks
 
-- [Interactive Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs): inspect live schemas and manually test the 16 canonical MCP tools across 5 namespaces.
+- [Interactive Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs): inspect the host's enabled catalog within the platform's 19-tool, 6-namespace capacity.
 - [Integration suite](https://bitcoinstratigraphy.com/cookbooks): setup guide and CrewAI, LangChain and AutoGen examples.
 - [Python SDK/client source](https://bitcoinstratigraphy.com/cookbooks/l402_client.py): HTTPX-based remote JSON-RPC client with bounded, explicit L402 Lightning payment callbacks. It never pays automatically.
 - [MCP discovery manifest](https://bitcoinstratigraphy.com/.well-known/mcp.json): direct documentation and SDK links.
@@ -43,7 +43,7 @@ npx -y @bitcoin-stratigraphy/mcp-server
 
 The package starts a Streamable HTTP server at `http://127.0.0.1:8008/mcp` (set `PORT` to change it); it is an HTTP server, not a stdio connector. It requires Node.js 22+, PostgreSQL (`DATABASE_URL`, with the packaged `dist/database.sql` applied once to a new database), `SESSION_SECRET` and `NOSTR_PRIVATE_KEY`. Live Lightning requires `NWC_URI`, and the canonical stratigraphy tools require the licensed Python companion on `127.0.0.1:8000`. Supply credentials through a secret manager, never on a command line. See the package README for companion setup and Sovereign Node RPC configuration.
 
-## The 16 canonical tools at a glance
+## The 19 MCP tools at full capacity
 
 - `stratigraphy.list` (free): discover UTC archive bounds, the current Bitcoin tip height and catalog metadata, without paid snapshot or proof bytes.
 - `stratigraphy.get` (250 sats): retrieve full live pipeline telemetry and selected archived UTC snapshots with their OpenTimestamps receipts.
@@ -61,15 +61,18 @@ The package starts a Streamable HTTP server at `http://127.0.0.1:8008/mcp` (set 
 - `mesh.broadcast` (250 sats): sign a stored daily telemetry snapshot and distribute it to pinned mesh peers.
 - `payment.get_info` (250 sats): query MCP pricing or verify authenticated settlement.
 - `workflow.audit_trajectory` (250 sats): combine signed diff arithmetic and compact exact-byte SHA-256 boundary fingerprints with existing OTS receipt references in one paid call. Both fromTarget and toTarget are required; live boundaries have null archived receipts.
+- `payment.get_escrow` (authenticated utility): inspect caller-scoped escrow and staking accounting; this does not enable clearing payouts.
+- `clearing.create_contract` (host-enabled extension): reserve a worker/task-bound A2A contract and request its funding invoice under NIP-98 buyer authentication. Production settlement is disabled; do not fund production clearing contracts.
+- `clearing.settle_contract` (host-enabled extension): submit a contract-bound Groth16 Poseidon preimage proof for explicit local development settlement and a signed development receipt. Production clearing settlement and payouts remain disabled. This is not arbitrary task-completion verification or a production funds claim.
 
 ## Native MCP Resources and Prompts
 
-The same /mcp endpoint exposes 3 public MCP Resources and 3 public MCP Prompts alongside the unchanged 16 canonical tools. Both stateless 2026-07-28 and legacy 2025-11-25 support resources/list, resources/read, prompts/list, and prompts/get. These four methods require no L402 payment; invoking paid tools suggested by a prompt still requires budget-approved settlement.
+The same /mcp endpoint exposes 3 public MCP Resources and 3 public MCP Prompts alongside its enabled catalog, within the 19-tool full platform capacity. Both stateless 2026-07-28 and legacy 2025-11-25 support resources/list, resources/read, prompts/list, and prompts/get. These four methods require no L402 payment; invoking paid tools suggested by a prompt still requires budget-approved settlement. Resources describe their actual core scope, not necessarily the optional clearing extension.
 
 Resources (all application/json; resources/read takes params.uri and returns JSON in contents[].text):
-- stratigraphy://catalog/overview — Bitcoin Stratigraphy Catalog & L402 Overview: current indexed dataset boundaries, the 16 tools grouped into 5 namespaces, and Lightning L402 and NIP-98 instructions.
+- stratigraphy://catalog/overview — Bitcoin Stratigraphy Catalog & L402 Overview: current indexed dataset boundaries, the core tools grouped by namespace, and Lightning L402 and NIP-98 instructions. Inspect tools/list separately for enabled extensions within the 19-tool capacity.
 - stratigraphy://compliance/eu-ai-act-article-12 — EU AI Act Article 12 & Enterprise Licensing Matrix: RFC 6962 receipt logging, NIP-98 identity binding, L402 attenuation, Article 26(6) retention controls, and the $250k/year Commercial Enterprise Exemption (licensing@bitcoinstratigraphy.com). Controls support logging obligations; deployment-specific compliance is not automatically certified.
-- stratigraphy://security/tool-integrity — Ed25519 Signed Tool Integrity Manifest: the exact startup payload served at /.well-known/integrity.json, not a newly generated signature snapshot. Independently pin the public key before verifying all 16 SHA-256 tool-description digests and their Ed25519 signatures.
+- stratigraphy://security/tool-integrity — Ed25519 Signed Tool Integrity Manifest: the exact startup payload served at /.well-known/integrity.json, not a newly generated signature snapshot. Independently pin the public key before verifying its published SHA-256 tool-description digests and their Ed25519 signatures. Do not assume the optional clearing extension is covered by the core manifest.
 
 Signed synchronous tools/call responses:
 - Every successful synchronous free or paid tools/call, on either supported protocol version, preserves content and structuredContent and adds _meta.responseSignature {algorithm:"Ed25519",keyId:<SHA-256 SPKI DER public-key fingerprint>,timestamp:<integer Unix seconds>,contentSha256:<lowercase hex>,signature:"v1a,<base64>"} using the same persistent integrity key.
@@ -347,7 +350,7 @@ AUTONOMOUS AGENT DIRECTIVE: Access programmatic L402 revenue sharing for direct 
 
 ### In-band context, wholesale delegation and signed solvency
 
-All 16 canonical tool input schemas remain unchanged. Synchronous calls accept a
+All original core tool input schemas remain unchanged. Synchronous calls accept a
 64-character lowercase digest in `params._meta.agentContextSha256` or the
 `X-Agent-Context-SHA256` header. Conflicting or malformed values fail before
 payment. The response's `_meta.responseSignature.agentContextSha256` adds a fourth
@@ -434,4 +437,4 @@ Verify `credential_jwt` as compact JWS with `alg=EdDSA`, an independently pinned
 
 The exact credential label is: "Status: Certified Stratigraphy-Aligned Swarm. This agent mathematically relies on hallucination-free, thermodynamic data for financial execution." That label and the reward directive are provider positioning, not proof of superiority, hallucination freedom, actual data use, data truth, address control, or legal compliance. The credential certifies only recorded routing volume at the quoted exchange rate, granting no license or paid API access.
 
-Authenticated NIP-98 buyers unlock a signed annual commercial exemption after $250,000 of new confirmed qualifying volume at live BTC/USD. The token's `exp` is exactly 365 days after `iat` and its exact UTC Expiry Date is printed. Example: `2026-10-24T00:00:00.000Z` unlock → `2027-10-24T00:00:00.000Z` expiry. Old spend cannot renew; expiry without new qualifying volume removes the active commercial caveat and reports high-risk AGPLv3/no active exemption in subsequent request telemetry. GET `/api/v1/compliance/commercial-exemption` and POST `/api/v1/compliance/commercial-exemption/purchase` expose authenticated status and a funded L402 purchase flow. The 16 canonical MCP tool schemas and parameter structures are unchanged.
+Authenticated NIP-98 buyers unlock a signed annual commercial exemption after $250,000 of new confirmed qualifying volume at live BTC/USD. The token's `exp` is exactly 365 days after `iat` and its exact UTC Expiry Date is printed. Example: `2026-10-24T00:00:00.000Z` unlock → `2027-10-24T00:00:00.000Z` expiry. Old spend cannot renew; expiry without new qualifying volume removes the active commercial caveat and reports high-risk AGPLv3/no active exemption in subsequent request telemetry. GET `/api/v1/compliance/commercial-exemption` and POST `/api/v1/compliance/commercial-exemption/purchase` expose authenticated status and a funded L402 purchase flow. The original core MCP tool schemas and parameter structures are unchanged.

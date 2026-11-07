@@ -1,7 +1,11 @@
 # @bitcoin-stratigraphy/mcp-server — 2.1.3
 
-Exactly 16 canonical MCP tools over **Streamable HTTP**, with two free sandbox
-discovery tools and unchanged paid-tool prices.
+**19 Fiduciary-grade MCP Tools at full platform capacity** over **Streamable HTTP**:
+the original core, `payment.get_escrow`, and the host-enabled
+`clearing.create_contract` / `clearing.settle_contract` extension. Two core
+sandbox discovery tools remain free and core paid-tool prices are unchanged.
+Discover the enabled catalog with `tools/list`; production clearing settlement
+and payouts remain disabled, and clearing may not be mounted by a given host.
 
 - Canonical site: https://bitcoinstratigraphy.com
 - Hosted MCP endpoint: https://bitcoinstratigraphy.com/mcp (connect any MCP

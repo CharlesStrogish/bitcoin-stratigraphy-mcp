@@ -2,7 +2,7 @@
 
 **System:** Bitcoin Stratigraphy Data Engine  
 **Review date:** September 30, 2026  
-**Scope:** The 16 canonical MCP tools, separately scoped REST payment/stream surfaces, cryptographic evidence, and enterprise auditor procedures.
+**Scope:** The original core MCP tools within the platform's 19-tool capacity, separately scoped REST payment/stream surfaces, cryptographic evidence, and enterprise auditor procedures. The host-enabled `clearing.*` extension does not expand these compliance findings; production clearing settlement and payouts remain disabled.
 
 > This is a control framework and implementation assessment, not a certification,
 > legal opinion, regulatory approval, or assertion that every enterprise obligation

@@ -16,7 +16,9 @@ all inherited attenuation limits. Settlement proof caching never bypasses
 expiry, revocation, agent binding or quotas. The 101st call returns HTTP 429
 without another invoice. Newly issued blocks have their own invoice scope;
 neither process restarts nor descendants reset an existing allowance.
-There are still exactly 16 canonical tools; no new auth tool is registered.
+Full platform capacity is 19 tools, including `payment.get_escrow` and the
+host-enabled `clearing.*` extension; no new auth tool is registered by this
+batch-payment feature. Production clearing settlement and payouts remain disabled.
 
 ## 2. Persistent NIP-98 kill switch
 

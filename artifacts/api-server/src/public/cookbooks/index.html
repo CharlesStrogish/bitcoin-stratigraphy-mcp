@@ -4,20 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bitcoin Stratigraphy | Python SDK &amp; Agent Cookbooks</title>
-  <meta name="description" content="Integrate 16 live MCP tools across 5 namespaces. Explore Python SDK examples and enterprise Stateless MCP 2026-07-28, NIP-98 identity and Ed25519 response integrity.">
+  <meta name="description" content="Explore 19 Fiduciary-grade MCP Tools at full capacity across 6 namespaces. Clearing is host-enabled; production clearing payouts remain disabled. Python SDK, Stateless MCP 2026-07-28, NIP-98 and Ed25519 response integrity.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://bitcoinstratigraphy.com/cookbooks">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":"Bitcoin Stratigraphy Agent Cookbooks","url":"https://bitcoinstratigraphy.com/cookbooks","author":{"@type":"Person","name":"Charles R. Strogish"},"license":"https://www.gnu.org/licenses/agpl-3.0.html"}</script>
   <link rel="alternate" type="application/json" title="MCP discovery manifest" href="https://bitcoinstratigraphy.com/.well-known/mcp.json">
   <meta property="og:title" content="Bitcoin Stratigraphy | Python SDK &amp; Agent Cookbooks">
-  <meta property="og:description" content="Python SDK and native agent quickstarts for 16 MCP tools across 5 namespaces, with L402 batches and enterprise Stateless MCP 2026-07-28, NIP-98 and Ed25519 security.">
+  <meta property="og:description" content="Python SDK and native agent quickstarts for 19-tool capacity across 6 namespaces, including host-enabled clearing infrastructure with production payouts disabled. L402 batches, Stateless MCP 2026-07-28, NIP-98 and Ed25519 security.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bitcoinstratigraphy.com/cookbooks">
   <meta property="og:image" content="https://bitcoinstratigraphy.com/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://bitcoinstratigraphy.com/cookbooks">
   <meta name="twitter:title" content="Bitcoin Stratigraphy | Python SDK &amp; Agent Cookbooks">
-  <meta name="twitter:description" content="16 MCP tools across 5 namespaces, Python SDK examples, L402 batch payments and enterprise Stateless MCP 2026-07-28, NIP-98 and Ed25519 security.">
+  <meta name="twitter:description" content="19 MCP tools at full capacity across 6 namespaces; clearing opt-in, production clearing payouts disabled. Python SDK, L402 batches, Stateless MCP 2026-07-28, NIP-98 and Ed25519 security.">
   <meta name="twitter:image" content="https://bitcoinstratigraphy.com/og-image.png">
   <link rel="stylesheet" href="/docs/assets/portal.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -40,9 +40,13 @@
     <header>
       <p class="eyebrow">BITCOIN STRATIGRAPHY / INTEGRATION SUITE</p>
       <h1>Python SDK &amp; Agent Cookbooks</h1>
-      <p>Integrate 16 live MCP tools across 5 namespaces with LangChain, LlamaIndex, CrewAI and AutoGen.
+      <p>Explore 19 Fiduciary-grade MCP Tools at full capacity across 6 namespaces with LangChain, LlamaIndex, CrewAI and AutoGen.
         The HTTPX-based Python SDK/client supports JSON-RPC discovery and explicit,
         bounded L402 Lightning payment callbacks. Download the source and examples below.</p>
+      <p>The capacity includes <code>payment.get_escrow</code> and the host-enabled
+        <code>clearing.create_contract</code> / <code>clearing.settle_contract</code> extension.
+        Discover this host's enabled tools with <code>tools/list</code>.
+        Production clearing settlement and payouts remain disabled; do not fund production clearing contracts.</p>
       <p>Our enterprise security architecture combines Stateless MCP 2026-07-28 transport,
         NIP-98 agent identity headers, and Ed25519 signed response verification to detect
         tampered tool responses and help defend against indirect prompt injection.</p>
@@ -56,7 +60,8 @@
     </header>
     <section aria-labelledby="frameworks">
       <h2 id="frameworks">Framework Integration: native MCP agents</h2>
-      <p>All 16 canonical tools plug into LangChain and LlamaIndex with L402 batch-payment support:
+      <p>Discover the enabled catalog within the platform's 19-tool capacity through LangChain and LlamaIndex.
+        Core paid tools support L402 batch payments:
         100 tool-scoped calls for 25,000 sats. Inject prepaid Macro-Macaroon headers or connect
         to a trusted local wallet proxy. Discovery is free; the adapters never pay automatically.</p>
       <ul>

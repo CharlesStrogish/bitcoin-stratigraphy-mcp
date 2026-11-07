@@ -24,7 +24,9 @@ asset selection nor its paid SSE feed is a capability of the MCP transport.
 The following catalog is transcribed from [`CONNECT.md`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md). Its
 prices are advertised sats from the server documentation, not a price
 guarantee; the live `payment.get_info` response is authoritative. The
-published MCP catalog currently contains 16 canonical tools.
+platform supports 19-tool full capacity; use `tools/list` for the connected
+host's enabled tools. The two `clearing.*` tools are host-enabled extensions,
+and production clearing settlement and payouts remain disabled.
 
 | Canonical MCP tool | Advertised sats | Use |
 | --- | ---: | --- |

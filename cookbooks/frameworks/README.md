@@ -1,8 +1,14 @@
 # Native framework agent quickstarts
 
-All **16 canonical tools** are discovered through Streamable HTTP MCP at:
+Discover the host's enabled tools within the platform's **19-tool capacity**
+through Streamable HTTP MCP at:
 
 `https://bitcoinstratigraphy.com/mcp`
+
+Full capacity includes the authenticated `payment.get_escrow` utility and
+host-enabled `clearing.create_contract` / `clearing.settle_contract` extension.
+Production clearing settlement and payouts remain disabled. The examples below
+use core tools and do not enable or fund clearing.
 
 The examples demonstrate native connections, without the older custom Python client:
 
@@ -63,7 +69,7 @@ The batch header requests a batch; it does not prove payment or replenish quota.
 
 Macro-Macaroons remain **tool-scoped**. A notarization credential cannot
 authorize other paid tools, bypass expiry/revocation, or erase inherited limits.
-Therefore both demos discover all 16 tools but give the agent only
+Therefore both demos discover the host's tool catalog but give the agent only
 `proof.notarize` and **free** `stratigraphy.list`. Expand that allowlist only
 after configuring valid per-tool credentials or a budget-controlled wallet proxy.
 

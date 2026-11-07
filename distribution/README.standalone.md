@@ -42,8 +42,11 @@ transport type in their own configuration format. The public
 [`/.well-known/mcp/server-card.json`](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
 provides remote discovery metadata, not a local-server launch recipe.
 
-The server advertises 16 canonical capabilities. `initialize` and `tools/list`
-are free protocol discovery operations. Exactly two tool executions are free:
+The platform has **19-tool capacity across 6 namespaces**, including
+`payment.get_escrow` and two host-enabled `clearing.*` tools. `initialize` and
+`tools/list` are free protocol discovery operations; use the returned catalog
+for this host rather than assuming every extension is enabled. Production
+clearing settlement and payouts remain disabled. The core free sandbox tools are:
 
 | Tool | Arguments | Purpose |
 | --- | --- | --- |

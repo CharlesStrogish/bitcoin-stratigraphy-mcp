@@ -69,7 +69,7 @@ Use a configured LangChain `model`. `L402` is a short local alias for the export
 ```python
 from bitcoin_stratigraphy_mcp_client import L402Nip98Transport as L402
 from langchain.agents import create_agent
-# Instantly equip your LangChain agent with 16 Canonical MCP tools
+# Discover the enabled MCP catalog (19-tool capacity; clearing is host-enabled)
 async with L402(private_key, wallet_handler).langchain_tools() as tools:
     agent = create_agent(model, tools=tools)
 ```

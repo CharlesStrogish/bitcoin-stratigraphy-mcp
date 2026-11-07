@@ -4,8 +4,12 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Run & Operate
 
-- Canonical MCP catalog: **16 tools across 5 namespaces** — 5 stratigraphy,
-  7 proof, 2 mesh, 1 payment, and 1 workflow. The 16th tool is
+- Full MCP capacity: **19 tools across 6 namespaces** — 5 stratigraphy,
+  7 proof, 2 mesh, 2 payment, 1 workflow, and 2 host-enabled clearing tools.
+  The original 16 core contracts remain protected; `payment.get_escrow` and
+  the optional clearing extension account for the additional capacity.
+  Use `tools/list` for the host's enabled catalog; production clearing
+  settlement and payouts remain disabled. The core workflow tool is
   `workflow.audit_trajectory`: Deterministic composite workflow executing
   end-to-end thermodynamic audits. Returns signed deltas and compressed proof
   receipts in a single payload to save LLM context tokens.

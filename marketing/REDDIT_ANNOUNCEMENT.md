@@ -12,7 +12,7 @@ A Bitcoin MCP for indexed daily telemetry, with explicit proof and data limits
 
 Disclosure: I’m the developer and maintainer of this service. I’m looking for technical feedback, not presenting it as a Bitcoin source of truth.
 
-It exposes historical Bitcoin telemetry through MCP at https://bitcoinstratigraphy.com/mcp. The historical data is a deterministic daily block index, not a live-tip feed. The catalog has 16 canonical MCP tools: 5 stratigraphy, 7 proof, 2 mesh, 1 payment, and 1 workflow.
+It exposes historical Bitcoin telemetry through MCP at https://bitcoinstratigraphy.com/mcp. The historical data is a deterministic daily block index, not a live-tip feed. Full capacity is 19 MCP tools: 5 stratigraphy, 7 proof, 2 mesh, 2 payment, 1 workflow, and 2 host-enabled clearing tools. Discover each host's enabled catalog with `tools/list`; production clearing settlement and payouts remain disabled.
 
 The Groth16/Poseidon BN254 path can prove a defined statement bound to the exact telemetry supplied for verification. That does not establish that the underlying source data is true, prove a model’s interpretation, or prevent every hallucination. `proof.ground` produces a Schnorr-signed, off-chain receipt tied to a Bitcoin-tip reference; it does not publish an on-chain transaction or prove Bitcoin proof-of-work validity. These cryptographic layers can help catch fabricated or mismatched data only when clients validate the proof and retain the original evidence.
 
@@ -28,7 +28,7 @@ Remote Bitcoin telemetry dataset over MCP for local-model agent experiments (no 
 
 Disclosure: I’m the developer and maintainer. This is a remote dataset/service for agents, not a locally hosted model, inference service, or bundled LLM.
 
-I’ve made an MCP endpoint for historical Bitcoin telemetry and proof-related tools available at https://bitcoinstratigraphy.com/mcp. It uses stateless Streamable HTTP and exposes 16 canonical MCP tools: 5 stratigraphy, 7 proof, 2 mesh, 1 payment, and 1 workflow. Historical strata are a deterministic daily block index, not live-tip data. The repository includes Python integration examples that wrap the tools using the standard MCP SDK and their published input schemas.
+I’ve made an MCP endpoint for historical Bitcoin telemetry and proof-related tools available at https://bitcoinstratigraphy.com/mcp. It uses stateless Streamable HTTP, with 19-tool full capacity: 5 stratigraphy, 7 proof, 2 mesh, 2 payment, 1 workflow, and 2 host-enabled clearing tools. `tools/list` is authoritative for the host; production clearing settlement and payouts remain disabled. Historical strata are a deterministic daily block index, not live-tip data. The repository includes Python integration examples that wrap the core tools using the standard MCP SDK and their published input schemas.
 
 I’m interested in evaluation rather than claiming proofs make model output true: Groth16/Poseidon BN254 verifies a defined statement bound to exact telemetry, but cannot establish the source data’s truth or the model’s interpretation, and does not eliminate all hallucinations. `proof.ground` is a Schnorr-signed off-chain Bitcoin-tip receipt, not an on-chain transaction or proof-of-work validity proof. These layers can reduce fabricated or mismatched data only if the client validates the evidence and keeps the original payloads.
 
@@ -40,7 +40,7 @@ What local-model task or evaluation would make this kind of tool-backed data use
 
 ### TITLE
 
-Remote Bitcoin telemetry MCP: stateless Streamable HTTP, 16 tools, and an explicit L402 payment flow
+Remote Bitcoin telemetry MCP: stateless Streamable HTTP, 19-tool capacity, and an explicit L402 payment flow
 
 ### BODY
 
@@ -48,7 +48,7 @@ Disclosure: I’m the developer and maintainer of this MCP server. I’d value i
 
 Endpoint: https://bitcoinstratigraphy.com/mcp<br>
 Transport: Streamable HTTP · MCP protocol: 2025-11-25<br>
-Catalog: 16 canonical MCP tools — 5 stratigraphy, 7 proof, 2 mesh, 1 payment, 1 workflow.
+Full capacity: 19 MCP tools — 5 stratigraphy, 7 proof, 2 mesh, 2 payment, 1 workflow, 2 clearing. Clearing is a host-enabled extension; production clearing settlement and payouts remain disabled. Check `tools/list` for enabled tools.
 
 The 16th tool, `workflow.audit_trajectory`: Deterministic composite workflow executing end-to-end thermodynamic audits. Returns signed deltas and compressed proof receipts in a single payload to save LLM context tokens.
 

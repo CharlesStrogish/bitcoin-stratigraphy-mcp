@@ -8,7 +8,7 @@ installing or changing the server.
 | Public MCP URL | `https://bitcoinstratigraphy.com/mcp` |
 | Remote transport | Streamable HTTP |
 | Supported protocol | MCP `2026-07-28` (stateless); handshake-era `2025-11-25` clients also supported |
-| Tool catalog | 16 tools; retrieve the current catalog from the server |
+| Tool catalog | 19-tool full capacity; retrieve this host's enabled catalog with `tools/list`. Clearing is opt-in and production clearing payouts are disabled. |
 | Connection-time wallet requirement | None |
 | Paid execution | Lightning L402; conditional Base USDC x402 only when configured, with a separate payment integration |
 
@@ -149,8 +149,10 @@ GUI does not inherit your shell's Node.js version-manager environment.
 4. Open the MCP/connector management area and find `bitcoin-stratigraphy`.
    Labels vary by desktop version; check **Developer** settings or the
    conversation's **Connectors / Manage connectors** menu.
-5. Inspect the available tools. The current server exposes 16 tools. A future
-   catalog change should be checked against the live server rather than hidden.
+5. Inspect the available tools. Full platform capacity is 19 tools, including
+   the optional `clearing.*` extension. Check the connected host's catalog
+   rather than assuming every extension is enabled. Production clearing
+   settlement and payouts remain disabled.
 
 ## 5. Verify with free, read-only requests
 

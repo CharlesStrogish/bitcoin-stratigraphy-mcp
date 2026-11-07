@@ -3,13 +3,14 @@
 One-call Python onboarding for Bitcoin Stratigraphy MCP tools: HTTPX discovery,
 automatic bounded L402 retries, durable spending reservations, and the same
 stderr terminal receipts as `@bitcoinstratigraphy/agent-yield`.
-Version **0.3.0** introduces server-signed payload enforcement.
-The previously published 0.2.0 package does not include it.
+Version **1.1.0** adds native opt-in yield staking and authenticated escrow lookup.
+It preserves the independently pinned Ed25519 payload enforcement introduced in
+0.3.0, legacy withdrawal behavior, durable payment limits and existing adapters.
 
 Install from PyPI:
 
 ```sh
-pip install bitcoinstratigraphy-agent-yield
+pip install --upgrade bitcoinstratigraphy-agent-yield==1.1.0
 ```
 
 For local development, install from this checkout:
@@ -17,6 +18,53 @@ For local development, install from this checkout:
 ```sh
 pip install ./packages/python-agent-yield
 ```
+
+## Native yield staking and escrow lookup
+
+Staking is opt-in. If `STRATIGRAPHY_YIELD_MODE` is omitted, the SDK retains
+`withdraw` and its existing eligible Lightning claim flow. To stake instead,
+set `STRATIGRAPHY_YIELD_MODE=stake` and provide your dedicated agent-owned
+`STRATIGRAPHY_NOSTR_PRIVATE_KEY` through your environment or secrets manager.
+Never reuse a wallet seed or the server's signing key.
+
+```python
+from pathlib import Path
+from bitcoinstratigraphy_agent_yield import FiduciaryClient, YieldSettings
+
+with FiduciaryClient(
+    yield_settings=YieldSettings.from_env(),
+    server_public_key=Path("server-public-key.pem").read_text(),
+    max_spend_sats=0,  # Lookup needs no wallet or payment authorization.
+) as client:
+    escrow = client.get_escrow()
+```
+
+`YieldStakingClient` is also exported as an explicit staking-capable client name.
+Both clients and `with_fiduciary_yield` load these settings by default. Explicit
+`YieldSettings(mode="withdraw")` ignores environment selection when an application
+needs a fixed legacy policy. Invalid settings fail before network or wallet use.
+Native identity signing cannot be combined with a second `identity_headers`
+callback; existing callback-only integrations still work in withdrawal mode.
+
+Every SDK request carries `X-Yield-Mode`, including admission and paid retries.
+Stake mode signs each MCP attempt using fresh NIP-98 BIP-340/Schnorr authentication
+and never creates a competing withdrawal claim. It refuses paid calls if the
+server does not advertise `payment.get_escrow`. Deploy the server's staking
+implementation and database migration before enabling staking.
+
+`client.get_escrow()` returns exactly `pubkey`, integer `staked_sats`,
+boolean `vip_status`, and `unlocked_features`. It uses an authenticated MCP
+**POST** with empty arguments, not a GET route. The equivalent generic call is
+`client.call_tool("payment.get_escrow", {}).payload`; async `acall_tool` and
+framework tools use the same implementation. Lookup verifies the server's
+Ed25519 payload signature and signer-bound result. It never pays an unexpected
+402 invoice and remains usable after exhausting the spending budget.
+
+VIP is true strictly above 10,000 whole staked sats. The current server returns
+`["zero_latency_routing"]` as an informational label even at zero balance; it
+does not enable priority routing, expanded context or a payment bypass.
+No transfer or unstaking operation is added. Switching modes affects future
+calls, not already staked capital.
 
 ## Two-line quick starts
 

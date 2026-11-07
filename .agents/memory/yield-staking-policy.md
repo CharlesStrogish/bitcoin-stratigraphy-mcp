@@ -29,5 +29,16 @@ compute. After these differences were explained, the user explicitly chose
 “Use existing protocol (recommended).”
 
 **How to apply:** Do not introduce a new GET route or incompatible identity
-signature to satisfy the old wording. The starter can extend the pinned public
-SDK locally without depending on an unpublished package version.
+signature to satisfy the old wording.
+
+Keep native staking behavior in the distributable Python SDK rather than only
+in the standalone starter. Preserve the starter's old import names as thin
+compatibility imports, not another implementation.
+
+**Why:** When requesting the PyPI release, the user explicitly approved preparing
+a native SDK release after the starter-only packaging difference was explained.
+A built wheel must actually contain the advertised feature.
+
+**How to apply:** Verify the wheel and rebuilt source distribution independently
+of checkout imports before publishing, and make the starter require the released
+SDK version. Keep legacy withdrawal defaults and the existing client/adapters.

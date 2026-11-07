@@ -25,6 +25,7 @@ from .receipts import terminal_receipt
 from .state import PaymentState
 from .armor import SpendCircuit, TruthReceipt
 from .provenance import verify_payload
+from .staking import ESCROW_TOOL, YieldSettings
 
 DEFAULT_MCP_URL = "https://bitcoinstratigraphy.com/mcp"
 
@@ -47,7 +48,13 @@ class FiduciaryClient:
         on_error: Callable | None = None,
         on_yield_claim: Callable | None = None,
         server_public_key: str | bytes | None = None,
+        yield_settings: YieldSettings | None = None,
     ):
+        self.yield_settings = yield_settings or YieldSettings.from_env()
+        if self.yield_settings.signer is not None:
+            if identity_headers is not None:
+                raise ValueError("Configure one NIP-98 identity signer, not two.")
+            identity_headers = self.yield_settings.signer.headers
         parts = urlsplit(mcp_url)
         if (
             parts.scheme != "https"
@@ -84,6 +91,7 @@ class FiduciaryClient:
         )
         self._identity = identity_headers
         self._headers = httpx.Headers(headers or {})
+        self._headers["X-Yield-Mode"] = self.yield_settings.mode
         self.on_error, self.on_yield_claim = on_error, on_yield_claim
         self._catalog = None
 
@@ -106,6 +114,9 @@ class FiduciaryClient:
         self.close()
 
     def _send(self, url, body, headers):
+        # Claims, discovery and every invoice/admission retry carry the mode.
+        headers = httpx.Headers(headers)
+        headers["X-Yield-Mode"] = self.yield_settings.mode
         deadline = time.monotonic() + self.timeout
         request_id = json.loads(body).get("id") if url == self.url else None
         try:
@@ -311,6 +322,10 @@ class FiduciaryClient:
 
     def list_tools(self):
         if self._catalog is not None:
+            if self.yield_settings.mode == "stake" and not any(
+                tool["name"] == ESCROW_TOOL for tool in self._catalog
+            ):
+                raise FiduciaryError("SERVER_DOES_NOT_SUPPORT_YIELD_STAKING")
             return [dict(tool) for tool in self._catalog]
         catalog, cursors, cursor = [], set(), None
         while True:
@@ -342,7 +357,76 @@ class FiduciaryClient:
         self._catalog = catalog
         return self.list_tools()
 
+    def get_escrow(self) -> dict:
+        """Authenticated MCP POST; never pays or consumes spending capacity."""
+        signer = self.yield_settings.signer
+        if signer is None:
+            raise ValueError("Set STRATIGRAPHY_NOSTR_PRIVATE_KEY for escrow lookup.")
+        request_id = uuid.uuid4().hex
+        body = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": "tools/call",
+                "params": {
+                    "name": ESCROW_TOOL,
+                    "arguments": {},
+                    "_meta": {
+                        "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
+                        "io.modelcontextprotocol/clientCapabilities": {},
+                    },
+                },
+            },
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode()
+        headers = httpx.Headers(self._headers)
+        for credential in (
+            "Authorization",
+            "X-Nostr-Authorization",
+            "PAYMENT-SIGNATURE",
+            "X-Payment",
+        ):
+            headers.pop(credential, None)
+        headers.update(
+            {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "MCP-Protocol-Version": PROTOCOL_VERSION,
+                "Mcp-Method": "tools/call",
+                "Mcp-Name": ESCROW_TOOL,
+            }
+        )
+        headers.update(signer.headers(self.url, "POST", body))
+        # Deliberately bypass _rpc's automatic L402 payment and spend admission.
+        response = self._send(self.url, body, headers)
+        if response.status_code == 402:
+            raise FiduciaryError("ESCROW_LOOKUP_MUST_NOT_REQUIRE_PAYMENT")
+        if not response.is_success:
+            raise FiduciaryError("ESCROW_LOOKUP_FAILED")
+        verify_payload(response, body, self.server_public_key)
+        result = read_rpc(response, request_id)
+        if not isinstance(result, dict) or result.get("isError"):
+            raise FiduciaryError("MCP_INVALID_ESCROW_RESULT")
+        data = result.get("structuredContent")
+        if (
+            not isinstance(data, dict)
+            or set(data) != {"pubkey", "staked_sats", "vip_status", "unlocked_features"}
+            or data["pubkey"] != signer.public_key
+            or type(data["staked_sats"]) is not int
+            or not 0 <= data["staked_sats"] <= 2**53 - 1
+            or type(data["vip_status"]) is not bool
+            or data["vip_status"] != (data["staked_sats"] > 10000)
+            or data["unlocked_features"] != ["zero_latency_routing"]
+        ):
+            raise FiduciaryError("MCP_INVALID_ESCROW_RESULT")
+        return {**data, "unlocked_features": list(data["unlocked_features"])}
+
     def call_tool(self, name: str, arguments: dict | None = None):
+        if name == ESCROW_TOOL:
+            if arguments is not None and (not isinstance(arguments, dict) or arguments):
+                raise FiduciaryError("ESCROW_ARGUMENTS_MUST_BE_EMPTY")
+            return TruthReceipt(self.get_escrow(), provenance_verified=True)
         if name not in {tool["name"] for tool in self.list_tools()}:
             raise FiduciaryError("MCP_UNKNOWN_TOOL")
         if arguments is not None and not isinstance(arguments, dict):
@@ -370,6 +454,8 @@ class FiduciaryClient:
         return await asyncio.to_thread(self.call_tool, name, arguments)
 
     def _claim(self, payment_hash):
+        if self.yield_settings.mode == "stake":
+            return  # The server reserves this yield; never request it a second time.
         if not callable(getattr(self.wallet, "make_invoice", None)):
             return
         record = self.state.begin_claim(payment_hash)
@@ -432,3 +518,7 @@ class FiduciaryClient:
                 json.loads(record["claim_body"]),
                 record["amount"] * 21 // 100,
             )
+
+
+class YieldStakingClient(FiduciaryClient):
+    """Explicit staking-capable name; FiduciaryClient has the same native support."""

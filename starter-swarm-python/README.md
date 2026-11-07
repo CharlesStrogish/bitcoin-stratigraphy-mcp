@@ -5,14 +5,14 @@
 Give your first agent a real spending policy—not unlimited access to your wallet.
 This standalone Python template connects LangChain and OpenAI to Bitcoin
 Stratigraphy's canonical `stratigraphy.get_digest` tool through the public
-`bitcoinstratigraphy-agent-yield==0.3.0` SDK.
+`bitcoinstratigraphy-agent-yield==1.1.0` SDK.
 
 One command starts the agent. One canonical query returns a verified receipt.
 A **hardcoded 1,000-sat Fiduciary Armor circuit breaker** shows how much spending
 capacity remains. Eligible paid calls also trigger the SDK's **21% yield claim**
 flow in withdrawal mode, with the actual claim status printed separately.
-The included client extension supports the v1.1.0 server staking architecture
-without requiring an unpublished SDK version.
+Yield staking and authenticated escrow lookup are native SDK features, including
+through `FiduciaryClient` and `with_fiduciary_yield` framework adapters.
 
 ## 1–2–3 Quickstart
 
@@ -55,7 +55,7 @@ Your node must be reachable and have outbound and inbound Lightning liquidity.
 Get the server public key from the operator through an independently trusted
 channel and save it as `server-public-key.pem`. The key is public, not a wallet
 credential. Do not automatically trust the API's discovery key: that defeats
-independent verification. SDK 0.3.0 also requires the hosted API to support signed
+independent verification. SDK 1.1.0 also requires the hosted API to support signed
 responses; an unsigned deployment fails closed rather than returning fake proof.
 
 Never commit `.env`, wallet macaroons, or the private payment ledger. Local ignore
@@ -153,9 +153,11 @@ with YieldStakingClient(
 When an agent identity is configured, the starter also exposes a narrow
 LangChain `get_escrow` tool alongside the existing digest tool. It never exposes
 wallet operations or arbitrary MCP calls to the language model. The base
-`bitcoinstratigraphy-agent-yield==0.3.0` dependency remains pinned; `staking.py`
-is shipped with this standalone starter and reuses its bounded transport,
-payment limits and independent Ed25519 receipt verification.
+`bitcoinstratigraphy-agent-yield==1.1.0` dependency contains the implementation.
+The local `staking.py` only preserves imports used by older starter code; new
+applications can import these names directly from `bitcoinstratigraphy_agent_yield`.
+The SDK preserves its bounded transport, payment limits and independently pinned
+Ed25519 receipt verification.
 
 ## What the armor protects
 
@@ -189,7 +191,7 @@ live chain tip and its record hash is not a per-record Bitcoin inclusion proof.
 - **Missing key/configuration:** fill every required `.env` field and check local
   certificate and public-key paths. Relative paths resolve inside this directory.
 - **Signature rejection:** confirm the independently trusted pin and that the
-  server has deployed SDK 0.3.0 payload-signing support. Never disable verification.
+  server has deployed payload-signing support. Never disable verification.
 - **Budget exhausted:** inspect your authorization and ledger before approving
   more spending. The demo deliberately does not silently increase its limits.
 - **Wallet timeout or uncertain payment:** stop and inspect the payment in LND.

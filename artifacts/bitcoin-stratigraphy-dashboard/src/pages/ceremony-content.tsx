@@ -49,13 +49,13 @@ export default function CeremonyContent({
             </figure>
             <div className="cr-hero-foot">
               <div>
-                <div className="section-kicker">Recruiting independent phase-two contributors</div>
+                <div className="section-kicker">Solo Founder Genesis Setup</div>
                 <h1 className="cr-title">{title}</h1>
               </div>
-              <ol className="cr-strata" aria-label="Contribution sequence">
-                {["0000", "0001", "0002", "0003"].map((n, idx) => (
+              <ol className="cr-strata" aria-label="Single-operator contribution sequence">
+                {["0000", "final"].map((n, idx) => (
                   <li key={n}>
-                    <span>{idx === 0 ? "start" : `P${idx}`}</span>
+                    <span>{idx === 0 ? "start" : "founder"}</span>
                     <code>circuit_{n}.zkey</code>
                   </li>
                 ))}

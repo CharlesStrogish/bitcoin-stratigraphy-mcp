@@ -1,0 +1,31 @@
+{
+  "schema": "clearing-solo-founder-genesis/v1",
+  "stage": "single-operator-setup-verified-not-installed",
+  "contribution_name": "Chuck Genesis Forge",
+  "contribution_count": 1,
+  "external_participants_required": false,
+  "production_keys_installed": false,
+  "vault_activated": false,
+  "payout_executed": false,
+  "phase1_validation": "published-blake2b512-pin-only",
+  "snarkjs_version": "0.7.6",
+  "public_signals": [
+    "task_hash",
+    "escrow_binding"
+  ],
+  "statement": "knowledge-of-Poseidon-preimage-and-escrow-binding; NOT arbitrary execution",
+  "checks": {
+    "zkey_r1cs_verification": true,
+    "fresh_synthetic_proof": true,
+    "changed_escrow_rejected": true,
+    "changed_task_rejected": true
+  },
+  "sha256": {
+    "circuits/clearing_execution.circom": "9f60aba75be0a17071eb33e2b4d993e3c1aa1aa6c15157b854a9ab100e190414",
+    "generated-artifacts/clearing-mpc/clearing_execution.r1cs": "b12a4e45f7c59902f2811c864efaabc8b361634822190dec0d280d8c18f63a99",
+    "generated-artifacts/clearing-mpc/powersOfTau28_hez_final_12.ptau": "dcf4ea473bf14b971ce5f7b7c1d6ce1c41a8ed042cdb75b65ca9178e3a3c7c17",
+    "generated-artifacts/solo-founder-genesis/circuit_0000.zkey": "db3468b355a6e07705afaa821a011f1a4fd5414237b729dfeb75a7d34e6fd4a5",
+    "generated-artifacts/solo-founder-genesis/circuit_final.zkey": "ad2c722746c675e7c563d7ad767fdd7b47cbffa026abafad2ebfaa4300d6f630",
+    "generated-artifacts/solo-founder-genesis/verification_key.json": "3f80938a62021acdf1344da24da4779f49a21f9ad3740bd6b96259ad106b30a7"
+  }
+}

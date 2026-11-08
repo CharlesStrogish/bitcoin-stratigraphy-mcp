@@ -1,7 +1,7 @@
 # Clearing execution circuit — LOCAL DEVELOPMENT ONLY
 
-For the separate independent-participant production ceremony requirements and
-starting-package tooling, see [MPC_CEREMONY.md](MPC_CEREMONY.md). Those tools do
+For the separate Solo Founder Genesis Setup and its production integration
+status, see [MPC_CEREMONY.md](MPC_CEREMONY.md). Generating those keys does
 not promote development keys or activate production settlement.
 
 This implements the approved **local development setup**, not production

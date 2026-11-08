@@ -2,7 +2,7 @@
 import { pageUrl } from "./site";
 
 export const CEREMONY_TITLE =
-  "Independent Groth16 Setup Ceremony | Bitcoin Stratigraphy";
+  "Solo Founder Genesis Setup | Bitcoin Stratigraphy";
 export const CEREMONY_DESCRIPTION =
-  "Bitcoin Stratigraphy is recruiting independent phase-two contributors for the clearing Groth16 MPC ceremony. Read the full handoff, verification and finalization procedure.";
+  "Read Bitcoin Stratigraphy's completed single-operator Groth16 Phase 2 setup, key verification results and production integration status.";
 export const CEREMONY_URL = pageUrl("/ceremony");

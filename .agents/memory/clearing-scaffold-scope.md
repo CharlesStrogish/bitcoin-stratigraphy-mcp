@@ -57,18 +57,17 @@ not arbitrary execution, legal indemnity, payouts or fully trustless custody.
 Never run tests against the 16 core data tools for clearing work; preserve the
 existing regression assertions rather than weakening them.
 
-For production activation, the user subsequently required independent
-participant contributions rather than a single-operator simulation. Use at
-least three actual independent phase-two contributors; different names or
-invocations by this agent are not substitutes.
+The user replaced the independent-participant ceremony policy with a
+“Solo Founder Genesis Setup.” Do not wait for external human participants or
+reimpose the previous three-contributor requirement.
 
-**Why:** After the distinction was explained, the user selected “Independent
-participant contributions.”
+**Why:** The user explicitly pivoted to eliminate external human dependencies
+and requested a single-operator Phase 2 setup.
 
-**How to apply:** Authenticate participants and their public handoffs outside
-the ceremony coordinator's own claims. Do not label an uncontributed initial
-key, simulated contributions or development keys as the accepted production
-ceremony. Require the real verified contribution chain before activation.
+**How to apply:** Describe the actual single-operator trust model, not a
+multiparty ceremony. Preserve the core 16 tools, L402 gates and settlement
+mechanics, which the user explicitly protected during this pivot. The launch
+objective does not make a generated key evidence of production integration.
 
 Production workers supply Lightning payout invoices in their NIP-98-signed
 settlement requests. Routing fees come from the escrow balance, not additional
@@ -95,14 +94,17 @@ explicit send-time fee limit for stale-estimate protection. Reserve principal
 plus the maximum fee durably before I/O. Never enable production payouts merely
 because keys or wallet credentials have been installed.
 
-The user subsequently selected “Keep payouts disabled.” Ceremony preparation
-or successful key verification is not permission to enable real-money routing.
+The user previously selected “Keep payouts disabled,” then requested vault
+activation with the Solo Founder pivot while still forbidding settlement
+mechanics changes.
 
-**Why:** The user explicitly chose to keep payouts disabled when asked which
-fee-capped payout backend to support.
+**Why:** The later launch goal supersedes the earlier product direction, but
+the simultaneous guardrails do not authorize bypassing existing settlement
+locks or fee-cap requirements.
 
-**How to apply:** Preserve the live payout lock while preparing public ceremony
-materials. Do not silently activate production or run real payment tests.
+**How to apply:** Explain the production integration conflict explicitly.
+Do not claim that key generation or documentation activates payouts, bypass
+the locks through development-mode settings, or run real payment tests.
 
 Distinguish an upstream-published phase-one checksum match from a completed
 local cryptographic transcript replay. Do not relabel one as the other.

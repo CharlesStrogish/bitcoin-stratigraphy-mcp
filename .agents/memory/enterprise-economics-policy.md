@@ -7,6 +7,21 @@ Standard non-verification invoices retain the existing ledger-only allocation:
 21 percent direct without a parent, or 14 percent direct and 7 percent parent.
 Optional destinations are LNURL/Lightning addresses; never send automatic payouts.
 
+The user clarified that the fail-closed orchestrator allocation is exactly
+`floor(gross_msats * 21 / 100)` on existing eligible L402 revenue only, never
+clearing escrow principal. Bind attribution to the incoming authenticated
+NIP-98 identity and abort settlement with HTTP 500 for allocation tampering.
+Floor the aggregate pool once; component splits must preserve that exact pool.
+Do not silently rewrite historical signed allocations or enable automatic payouts.
+
+**Why:** The user explicitly selected revenue-only eligibility and millisatoshi
+flooring, rather than a new deduction from escrowed funds.
+
+**How to apply:** Keep calculations integer-only and independently validate
+persisted allocations before crediting. A software invariant detects tampering
+within the running trusted implementation; it cannot prevent an operator from
+replacing that implementation.
+
 Public proof-of-yield feeds must not present settled incoming invoices or
 ledger allocations as completed outgoing yield disbursements. An empty
 confirmed-payout scaffold is intentional until a trusted outgoing settlement

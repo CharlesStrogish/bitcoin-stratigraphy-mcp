@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { pool } from "@workspace/db";
+import { agentYieldMsats, assertAgentYield } from "./agent-yield-invariant";
 
 export class YieldStakingError extends Error {
   constructor(public readonly status: number, public readonly code: string) { super(code); }
@@ -34,7 +35,8 @@ export function createYieldStaking(database = pool): YieldStaking {
         throw new YieldStakingError(400, "INVALID_STAKING_RECEIPT");
       }
       const gross = BigInt(receipt.amountMsats);
-      const earned = gross * 21n / 100n;
+      const earned = agentYieldMsats(gross);
+      assertAgentYield(gross, earned);
       const client = await database.connect();
       try {
         await client.query("BEGIN");
@@ -45,6 +47,7 @@ export function createYieldStaking(database = pool): YieldStaking {
         }>("SELECT * FROM yield_staking_receipts WHERE payment_hash=$1", [receipt.paymentHash]);
         const prior = existing.rows[0];
         if (prior) {
+          assertAgentYield(gross, BigInt(prior.earned_msats));
           if (prior.pubkey_hash !== owner || prior.provider !== receipt.provider ||
               BigInt(prior.gross_msats) !== gross || BigInt(prior.earned_msats) !== earned) {
             throw new YieldStakingError(409, "STAKING_RECEIPT_BINDING_MISMATCH");
@@ -78,6 +81,7 @@ export function createYieldStaking(database = pool): YieldStaking {
           `INSERT INTO yield_staking_receipts (payment_hash,pubkey_hash,provider,gross_msats,earned_msats)
            VALUES ($1,$2,$3,$4,$5)`,
           [receipt.paymentHash, owner, receipt.provider, gross.toString(), earned.toString()]);
+        assertAgentYield(gross, earned);
         await client.query("COMMIT");
       } catch (error) {
         await client.query("ROLLBACK").catch(() => {});

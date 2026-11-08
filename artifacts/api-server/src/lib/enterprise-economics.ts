@@ -1,10 +1,12 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey, verify } from "node:crypto";
+import { agentYieldMsats, assertAgentYield, AgentYieldInvariantError } from "./agent-yield-invariant";
 import {
   canonical,
   loadArticle12IssuerKey,
   signIssuerPayload,
+  issuerKeyId,
 } from "./article12-signature";
 import type { KeyObject } from "node:crypto";
 import type {
@@ -191,14 +193,18 @@ export class EnterpriseEconomics {
       throw new Error("Invalid enterprise invoice");
     }
     const verificationAllocation = context.verificationAllocation ? {...context.verificationAllocation} : undefined;
+    if ((context.payout || verificationAllocation) && !/^[0-9a-f]{64}$/.test(context.buyer ?? ""))
+      throw new AgentYieldInvariantError("Yield allocation requires an authenticated orchestrator");
+    if (verificationAllocation && verificationAllocation.caller_pubkey !== context.buyer)
+      throw new AgentYieldInvariantError("Verification allocation identity mismatch");
     const allocationPool = context.payout || verificationAllocation
-      ? ((BigInt(amount) * 21n) / 100n).toString()
+      ? agentYieldMsats(BigInt(amount)).toString()
       : "0";
-    // Legacy referrals floor each component independently. Verification invoices
-    // preserve the original pool and assign its remainder after the upstream floor.
+    // Floor the aggregate once. Keep the parent's 7% floor and give the direct
+    // orchestrator the remainder, avoiding a one-msat loss from double flooring.
     const directKickback = verificationAllocation
       ? (BigInt(allocationPool) - (BigInt(amount) * 15n) / 100n).toString() : context.parentPayout
-      ? ((BigInt(amount) * 14n) / 100n).toString()
+      ? (BigInt(allocationPool) - (BigInt(amount) * 7n) / 100n).toString()
       : allocationPool;
     const parentKickback = verificationAllocation ? "0" : context.parentPayout
       ? ((BigInt(amount) * 7n) / 100n).toString()
@@ -207,6 +213,8 @@ export class EnterpriseEconomics {
       BigInt(directKickback) + BigInt(parentKickback) +
       (verificationAllocation ? (BigInt(amount) * 15n) / 100n : 0n)
     ).toString();
+    if (context.payout || verificationAllocation)
+      assertAgentYield(BigInt(amount), BigInt(totalKickback));
     const allocation = signIssuerPayload(
       {
         receipt_type: "autonomous_routing_kickback",
@@ -281,6 +289,7 @@ export class EnterpriseEconomics {
         if (old && canonical(binding(old)) !== canonical(binding(record))) {
           throw new Error("Invoice economics already bound");
         }
+        if (old) this.assertRevenueAllocation(old, context.buyer);
         if (!old) await tx.putInvoice(record);
         return old ?? record;
       },
@@ -293,16 +302,23 @@ export class EnterpriseEconomics {
     hash: string,
     amount: number,
     provider: string,
+    expectedBuyer?: string,
+    requireInvoice = false,
   ): Promise<EnterpriseAccount | undefined> {
     return this.store.transaction("invoice:" + hash, async (tx) => {
       const invoice = await tx.invoice(hash);
-      if (!invoice) return undefined; // Historical invoices predate this accounting layer.
+      if (!invoice) {
+        if (requireInvoice) throw new AgentYieldInvariantError("Yield allocation invoice disappeared");
+        return undefined; // Historical invoices predate this accounting layer.
+      }
       if (
+        invoice.hash !== hash ||
         invoice.amount_msats !== String(amount) ||
         invoice.provider !== provider
       ) {
-        throw new Error("Settlement does not match registered invoice");
+        throw new AgentYieldInvariantError("Settlement does not match registered invoice");
       }
+      this.assertRevenueAllocation(invoice, expectedBuyer);
       const account = invoice.buyer
         ? await tx.account(invoice.buyer)
         : undefined;
@@ -326,6 +342,55 @@ export class EnterpriseEconomics {
     });
   }
 
+  /** Revalidate persisted columns AND issuer-signed attribution before credit. */
+  assertRevenueAllocation(invoice: RoutingInvoice, expectedBuyer?: string): void {
+    try {
+      const { issuer_attestation, ...claims } = invoice.allocation;
+      const attestation = issuer_attestation as Record<string, unknown> | undefined;
+      if (
+        attestation?.version !== "routing-kickback-ed25519-v1" ||
+        attestation.algorithm !== "Ed25519" ||
+        attestation.key_id !== issuerKeyId(this.loadKey()) ||
+        typeof attestation.signature !== "string" ||
+        !verify(null, Buffer.from("bitcoin-stratigraphy/routing-kickback/v1\n" + canonical(claims)),
+          createPublicKey(this.loadKey()), Buffer.from(attestation.signature, "base64")) ||
+        claims.payment_hash !== invoice.hash ||
+        claims.payment_provider !== invoice.provider ||
+        claims.payment_asset !== "btc-lightning" ||
+        claims.invoice_amount_msats !== invoice.amount_msats ||
+        claims.buyer_pubkey !== (invoice.buyer ?? null) ||
+        claims.payout_address !== (invoice.payout ?? null) ||
+        claims.kickback_msats !== invoice.kickback_msats ||
+        (claims.parent_payout_address ?? null) !== (invoice.parent_payout ?? null) ||
+        (claims.direct_kickback_msats ?? null) !== (invoice.direct_kickback_msats ?? null) ||
+        (claims.parent_kickback_msats ?? null) !== (invoice.parent_kickback_msats ?? null) ||
+        canonical(claims.verification_allocation ?? null) !== canonical(invoice.verification_allocation ?? null)
+      ) throw new AgentYieldInvariantError();
+      const eligible = Boolean(invoice.payout || invoice.verification_allocation);
+      if (eligible) {
+        if (!/^[0-9a-f]{64}$/.test(invoice.buyer ?? "") ||
+            (expectedBuyer !== undefined && invoice.buyer !== expectedBuyer) ||
+            (invoice.verification_allocation && invoice.verification_allocation.caller_pubkey !== invoice.buyer))
+          throw new AgentYieldInvariantError("Yield recipient identity mismatch");
+        const gross = BigInt(invoice.amount_msats);
+        assertAgentYield(gross, BigInt(invoice.kickback_msats));
+        if (invoice.parent_payout || invoice.verification_allocation) {
+          const upstream = invoice.verification_allocation
+            ? BigInt(String(claims.upstream_allocation_msats))
+            : BigInt(invoice.parent_kickback_msats!);
+          const direct = BigInt(invoice.direct_kickback_msats!);
+          if (direct < 0n || upstream < 0n) throw new AgentYieldInvariantError();
+          assertAgentYield(gross, direct + upstream);
+          if (upstream !== gross * (invoice.verification_allocation ? 15n : 7n) / 100n)
+            throw new AgentYieldInvariantError();
+        }
+      } else if (invoice.kickback_msats !== "0") throw new AgentYieldInvariantError();
+    } catch (error) {
+      if (error instanceof AgentYieldInvariantError) throw error;
+      throw new AgentYieldInvariantError();
+    }
+  }
+
   wrap(router: SettlementRouter): SettlementRouter {
     return {
       isConfigured: (asset) => router.isConfigured(asset),
@@ -346,6 +411,21 @@ export class EnterpriseEconomics {
         return invoice;
       },
       verifyPayment: async (request) => {
+        const context = enterpriseContext.getStore();
+        // Check before merchant lookup as well as under the final invoice lock.
+        const registered = (request.asset === undefined || request.asset === "btc-lightning") &&
+          await this.store.transaction("invoice:" + request.paymentHash, async (tx) => {
+          const invoice = await tx.invoice(request.paymentHash);
+          if (invoice) {
+            if (invoice.hash !== request.paymentHash) throw new AgentYieldInvariantError();
+            this.assertRevenueAllocation(invoice, context?.buyer);
+            if ((invoice.payout || invoice.verification_allocation) && !context?.buyer)
+              throw new AgentYieldInvariantError("Fresh NIP-98 orchestrator identity required");
+          } else if (context?.payout || context?.verificationAllocation) {
+            throw new AgentYieldInvariantError("Yield allocation invoice is missing");
+          }
+          return Boolean(invoice);
+        });
         const result = await router.verifyPayment(request);
         if (
           typeof result === "object" &&
@@ -356,8 +436,9 @@ export class EnterpriseEconomics {
             request.paymentHash,
             request.expectedAmountMsats,
             result.provider,
+            context?.buyer,
+            registered,
           );
-          const context = enterpriseContext.getStore();
           if (context && account?.buyer === context.buyer)
             context.account = account;
           context?.onSettlement?.();
@@ -461,4 +542,21 @@ export async function assertEnterpriseVerificationTarget(hash: string): Promise<
       (invoice.verification_allocation.proof_hash !== context.verificationAllocation?.proof_hash ||
        invoice.verification_allocation.origin_pubkey !== context.verificationAllocation?.origin_pubkey))
     throw new RangeError("Invoice is bound to a different upstream verification statement");
+}
+
+/** Also runs on cached L402 payment proofs; DB edits cannot bypass the check. */
+export async function assertEnterpriseRevenueAllocation(hash: string): Promise<void> {
+  if (!configuredService) return;
+  const context = enterpriseContext.getStore();
+  await configuredService.store.transaction("invoice:" + hash, async tx => {
+    const invoice = await tx.invoice(hash);
+    if (!invoice) {
+      if (context?.payout || context?.verificationAllocation) throw new AgentYieldInvariantError();
+      return;
+    }
+    if (invoice.hash !== hash) throw new AgentYieldInvariantError();
+    configuredService!.assertRevenueAllocation(invoice, context?.buyer);
+    if ((invoice.payout || invoice.verification_allocation) && !context?.buyer)
+      throw new AgentYieldInvariantError("Fresh NIP-98 orchestrator identity required");
+  });
 }

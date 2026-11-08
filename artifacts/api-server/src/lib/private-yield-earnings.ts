@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
 import type { YieldWithdrawalInvoice } from "./yield-withdrawal-invoice";
 import { createNwcPayout, type NwcPayout, type PayoutOutcome } from "./nwc-payout";
+import { agentYieldMsats, assertAgentYield } from "./agent-yield-invariant";
 
 export class YieldClaimError extends Error {
   constructor(public readonly status: number, public readonly code: string) { super(code); }
@@ -139,7 +140,8 @@ export function createPrivateYieldEarnings(
               gross !== BigInt(receipt.amountMsats)) {
             throw new YieldClaimError(403, "RECEIPT_AMOUNT_MISMATCH");
           }
-          const earned = gross * 21n / 100n;
+          const earned = agentYieldMsats(gross);
+          assertAgentYield(gross, earned);
           await client.query(
             `INSERT INTO private_yield_earnings
              (payment_hash, provider, gross_msats, earned_msats, balance_msats)
@@ -151,6 +153,7 @@ export function createPrivateYieldEarnings(
             balance_msats: string; claim_id: string | null;
           }>("SELECT * FROM private_yield_earnings WHERE payment_hash=$1 FOR UPDATE", [receipt.paymentHash]);
           const balance = record.rows[0];
+          if (balance) assertAgentYield(gross, BigInt(balance.earned_msats));
           if (!balance || balance.provider !== receipt.provider ||
               BigInt(balance.gross_msats) !== gross || BigInt(balance.earned_msats) !== earned) {
             throw new YieldClaimError(403, "EARNINGS_BINDING_MISMATCH");

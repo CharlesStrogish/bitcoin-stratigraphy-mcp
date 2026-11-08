@@ -5,6 +5,7 @@ import { z } from "zod";
 import { inspectSubscriptionMacaroon } from "../lib/subscription-pass";
 import { logger } from "../lib/logger";
 import { YieldClaimError, type PrivateYieldEarnings } from "../lib/private-yield-earnings";
+import { AgentYieldInvariantError } from "../lib/agent-yield-invariant";
 import { parseYieldWithdrawalInvoice } from "../lib/yield-withdrawal-invoice";
 import { verifyRequestNip98Signer } from "../lib/nip98-request";
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -87,6 +88,7 @@ export function registerClaimYieldRoute(
       });
       if (settled) scheduleYieldBroadcast(claim.totalMsats, options.broadcastYield);
     } catch (error) {
+      if (error instanceof AgentYieldInvariantError) { res.status(500).json({ error: error.code }); return; }
       if (error instanceof YieldClaimError) { res.status(error.status).json({ error: error.code }); return; }
       // Avoid database error details containing receipt identifiers or the request body.
       req.log?.error({ event: "yield_claim_storage_unavailable" }, "Private yield claim failed");
@@ -113,6 +115,7 @@ export function registerClaimYieldRoute(
         ...(claim.txid ? { coinos_txid: claim.txid } : {}), ...(claim.preimage ? { preimage: claim.preimage } : {}),
       });
     } catch (error) {
+      if (error instanceof AgentYieldInvariantError) { res.status(500).json({ error: error.code }); return; }
       if (error instanceof YieldClaimError) { res.status(error.status).json({ error: error.code }); return; }
       res.status(503).json({ error: "RECONCILIATION_UNAVAILABLE" });
     }

@@ -24,7 +24,8 @@ import { verifyRequestNip98Signer } from "../lib/nip98-request";
 import { YieldStakingError, type YieldStaking } from "../lib/yield-staking";
 import { verifySwarmReferralKey } from "../lib/swarm-referral";
 import type { SwarmRoyalties } from "../lib/swarm-royalties";
-import { assertEnterpriseVerificationTarget } from "../lib/enterprise-economics";
+import { assertEnterpriseVerificationTarget, assertEnterpriseRevenueAllocation } from "../lib/enterprise-economics";
+import { AgentYieldInvariantError } from "../lib/agent-yield-invariant";
 import {
   createMemoryMacaroonUsageStore,
   type MacaroonUsageStore,
@@ -399,8 +400,15 @@ export function createL402Middleware(
           ? authentic
           : null;
       if (pass) {
-        try { await assertEnterpriseVerificationTarget(pass.paymentHash); }
+        try {
+          await assertEnterpriseRevenueAllocation(pass.paymentHash);
+          await assertEnterpriseVerificationTarget(pass.paymentHash);
+        }
         catch (error) {
+          if (error instanceof AgentYieldInvariantError) {
+            res.status(500).json({ error: error.code });
+            return;
+          }
           res.status(error instanceof RangeError ? 403 : 503).json({error: error instanceof RangeError ? error.message : "Invoice allocation validation unavailable"});
           return;
         }
@@ -513,6 +521,10 @@ export function createL402Middleware(
           );
         } catch (error) {
           req.log?.error({ err: error }, "L402 payment verification failed");
+          if (error instanceof AgentYieldInvariantError) {
+            res.status(500).json({ error: error.code });
+            return;
+          }
           res.status(502).json({ error: "Unable to verify payment" });
           return;
         }
@@ -579,6 +591,10 @@ export function createL402Middleware(
                 provider: pass.paymentProvider!, amountMsats: pass.amountMsats });
               res.setHeader("X-Yield-Mode", "stake");
             } catch (error) {
+              if (error instanceof AgentYieldInvariantError) {
+                res.status(500).json({ error: error.code });
+                return;
+              }
               res.status(error instanceof YieldStakingError ? error.status : 503).json({
                 error: error instanceof YieldStakingError ? error.code : "STAKING_LEDGER_UNAVAILABLE",
               }); return;

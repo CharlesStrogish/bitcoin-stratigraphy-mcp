@@ -7,6 +7,7 @@ import {
 } from "../lib/enterprise-economics";
 import { verifyRequestNip98Signer } from "../lib/nip98-request";
 import type { SwarmProtocol } from "../lib/swarm-protocol";
+import { AgentYieldInvariantError } from "../lib/agent-yield-invariant";
 
 /** Validate an opaque LNURL without resolving it or making a payout/network call. */
 export function parseAgentPayout(
@@ -89,6 +90,10 @@ export function createEnterpriseEconomicsMiddleware(
         return;
       }
       const buyer = signer.provided ? signer.pubkey! : undefined;
+      if ((payout || parentPayout) && !buyer) {
+        res.status(401).json({ error: "NIP98_ORCHESTRATOR_AUTHENTICATION_REQUIRED" });
+        return;
+      }
       if (
         declared !== undefined &&
         (!/^[0-9a-fA-F]{64}$/.test(declared) ||
@@ -179,6 +184,10 @@ export function createEnterpriseEconomicsMiddleware(
       };
       enterpriseContext.run(context, next);
     } catch (error) {
+      if (error instanceof AgentYieldInvariantError) {
+        res.status(500).json({ error: error.code });
+        return;
+      }
       if (
         error instanceof RangeError || (error instanceof Error &&
         /payout header|X-Agent-/.test(error.message))

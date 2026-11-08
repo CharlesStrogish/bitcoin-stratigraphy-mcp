@@ -7,6 +7,7 @@ import {canonical, issuerKeyId} from "./article12-signature";
 import {loadToolIntegrityKey} from "./tool-integrity";
 import {sign} from "node:crypto";
 import {wholesaleSubVending} from "./wholesale-sub-vending";
+import {agentYieldMsats, assertAgentYield} from "./agent-yield-invariant";
 
 const HEX = /^[0-9a-f]{64}$/;
 const digest = (value: unknown) => createHash("sha256").update(canonical(value)).digest("hex");
@@ -106,6 +107,7 @@ export class SwarmProtocol {
       const allocation = invoice?.verification_allocation;
       if (!invoice?.settled_at || !allocation || (allocation.caller_pubkey !== caller && delegate !== caller) ||
           allocation.proof_hash !== proofHash) return;
+      this.service.assertRevenueAllocation(invoice, allocation.caller_pubkey);
       const origin = await tx.security("proof-origin:" + proofHash);
       if (origin?.origin_pubkey !== allocation.origin_pubkey ||
           await tx.isRevoked(allocation.origin_pubkey) || await tx.isRevoked(caller) ||
@@ -115,8 +117,8 @@ export class SwarmProtocol {
       const key = "verification-credit:" + invoiceHash;
       if (await tx.security(key)) return;
       const gross = BigInt(invoice.amount_msats);
-      const upstream = gross * 15n / 100n, direct = gross * 21n / 100n - upstream;
-      if (upstream + direct > gross * 21n / 100n) throw new Error("Allocation exceeds invoice pool");
+      const upstream = gross * 15n / 100n, direct = agentYieldMsats(gross) - upstream;
+      assertAgentYield(gross, upstream + direct);
       await tx.putSecurity(key, {invoice_hash: invoiceHash, ...allocation,
         upstream_msats: upstream.toString(), caller_msats: direct.toString(),
         gross_msats: gross.toString(), state: "pending", payout_mode: "ledger_only_no_automatic_disbursement"});

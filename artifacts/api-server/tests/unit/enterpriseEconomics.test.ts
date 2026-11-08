@@ -9,13 +9,15 @@ import test from "node:test";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
-import { canonical } from "../../src/lib/article12-signature";
+import { canonical, signIssuerPayload } from "../../src/lib/article12-signature";
+import { AGENT_YIELD_RATE, agentYieldMsats, assertAgentYield, AgentYieldInvariantError } from "../../src/lib/agent-yield-invariant";
 import { createMemoryEnterpriseEconomicsStore } from "../../src/lib/enterprise-economics-store";
 import {
   EnterpriseEconomics,
   EXEMPTION_SECONDS,
   enterpriseContext,
   enterpriseChallengeScope,
+  configureEnterpriseEconomics,
   type EnterpriseContext,
 } from "../../src/lib/enterprise-economics";
 import {
@@ -29,6 +31,7 @@ import {
   verifySubscriptionMacaroon,
 } from "../../src/lib/subscription-pass";
 import type { SettlementRouter } from "../../src/services/settlement";
+import { createL402Middleware } from "../../src/middleware/l402";
 
 const keys = generateKeyPairSync("ed25519");
 const buyer = "ab".repeat(32);
@@ -45,6 +48,7 @@ function setup(price: number | null = 10_000_000) {
     () => keys.privateKey,
     () => clock,
   );
+  configureEnterpriseEconomics(service);
   const context = (): EnterpriseContext => ({
     buyer,
     payout: "agent@example.com",
@@ -112,6 +116,124 @@ test("21% kickback is invoice-bound, signed, integer-msat rounded and requires v
     }),
     /already bound/,
   );
+});
+
+test("yield is exactly the floored integer 21% pool, including parent-split remainders", async () => {
+  assert.equal(AGENT_YIELD_RATE, 0.21);
+  for (const gross of [1n, 4n, 5n, 99n, 101n, 101_001n, BigInt(Number.MAX_SAFE_INTEGER)]) {
+    const earned = agentYieldMsats(gross);
+    assert.equal(earned, gross * 21n / 100n);
+    assert.doesNotThrow(() => assertAgentYield(gross, earned));
+    assert.throws(() => assertAgentYield(gross, earned + 1n), AgentYieldInvariantError);
+    if (earned > 0n) assert.throws(() => assertAgentYield(gross, earned - 1n), AgentYieldInvariantError);
+  }
+  const { service, context } = setup();
+  const invoice = await service.issue({ paymentHash: hash("parent-floor"), provider: "test" },
+    101, { ...context(), parentPayout: "parent@example.com" });
+  assert.equal(invoice.parent_kickback_msats, "7");
+  assert.equal(invoice.direct_kickback_msats, "14");
+  assert.equal(invoice.kickback_msats, "21");
+  service.assertRevenueAllocation(invoice, buyer);
+  // Independent component flooring loses a millisatoshi at a gross of 10.
+  const small = await service.issue({ paymentHash: hash("parent-remainder"), provider: "test" },
+    10, { ...context(), parentPayout: "parent@example.com" });
+  assert.equal(small.parent_kickback_msats, "0");
+  assert.equal(small.direct_kickback_msats, "2");
+  assert.equal(small.kickback_msats, "2");
+});
+
+test("persisted allocation or identity tampering aborts before settlement or buyer credit", async () => {
+  for (const mutation of ["pool", "recipient", "signed-math", "signed-parent"] as const) {
+    const { service, store, context } = setup();
+    const invoice = await service.issue(
+      { paymentHash: hash("tamper-" + mutation), provider: "test" }, 101_001,
+      { ...context(), ...(mutation === "signed-parent" ? { parentPayout: "parent@example.com" } : {}) });
+    await store.transaction("tamper", async tx => {
+      const row = (await tx.invoice(invoice.hash))!;
+      if (mutation === "recipient") row.buyer = "cd".repeat(32);
+      else row.kickback_msats = "1";
+      if (mutation.startsWith("signed")) {
+        const { issuer_attestation: _old, ...claims } = row.allocation;
+        claims.kickback_msats = row.kickback_msats;
+        row.allocation = signIssuerPayload(claims, keys.privateKey,
+          "routing-kickback-ed25519-v1", "bitcoin-stratigraphy/routing-kickback/v1\n");
+      }
+      await tx.putInvoice(row);
+    });
+    await assert.rejects(service.settle(invoice.hash, 101_001, "test", buyer),
+      (error: unknown) => error instanceof AgentYieldInvariantError && error.status === 500);
+    assert.equal((await service.status(buyer)).total_msats, "0");
+    assert.equal((await store.transaction("check", tx => tx.invoice(invoice.hash)))?.settled_at, undefined);
+  }
+});
+
+test("L402 returns 500 and never executes on allocation tampering during funding verification", async (t) => {
+  const { service, store } = setup();
+  const secretKey = generateSecretKey(), pubkey = getPublicKey(secretKey);
+  // The real L402 preimage hash must correspond to the presented 32 bytes.
+  const boundHash = createHash("sha256").update(Buffer.alloc(32)).digest("hex");
+  let executed = 0, verified = 0, tamper = false;
+  const router: SettlementRouter = {
+    isConfigured: () => true, activeProvider: () => "test", circuitState: () => "closed",
+    createInvoice: async () => ({ invoice: "lnbc-synthetic", paymentHash: boundHash, provider: "test" }),
+    verifyPayment: async () => {
+      verified++;
+      if (tamper) await store.transaction("tamper-before-finalize", async tx => {
+        const row = (await tx.invoice(boundHash))!;
+        row.kickback_msats = "0";
+        await tx.putInvoice(row);
+      });
+      return { provider: "test", settledAt: now, asset: "btc-lightning" };
+    },
+  };
+  const app = express();
+  app.use(createEnterpriseEconomicsMiddleware(service));
+  app.get("/paid", createL402Middleware({ amountSats: 101, description: "test",
+    settlementRouter: service.wrap(router), sessionSecret: "yield-test-only",
+    now: service.now }), (_req, res) => { executed++; res.json({ ok: true }); });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>(ok => server.once("listening", ok));
+  t.after(() => new Promise<void>(ok => server.close(() => ok())));
+  const address = server.address() as AddressInfo;
+  const url = `http://127.0.0.1:${address.port}/paid`;
+  const headers = () => ({
+    "X-Agent-Lightning-Address": "agent@example.com",
+    "X-Nostr-Authorization": "Nostr " + Buffer.from(JSON.stringify(finalizeEvent({
+      kind: 27235, created_at: Math.floor(now / 1000), content: "",
+      tags: [["u", url], ["method", "GET"]],
+    }, secretKey))).toString("base64"),
+  });
+  const unauthenticated = await fetch(url, { headers: { "X-Agent-Lightning-Address": "agent@example.com" } });
+  assert.equal(unauthenticated.status, 401);
+  const quote = await fetch(url, { headers: headers() });
+  assert.equal(quote.status, 402);
+  const challenge = await quote.json();
+  const row = await store.transaction("read", tx => tx.invoice(boundHash));
+  assert.equal(row?.buyer, pubkey);
+  tamper = true;
+  const response = await fetch(url, { headers: { ...headers(),
+    Authorization: `L402 ${challenge.macaroon}:${"00".repeat(32)}` } });
+  assert.equal(response.status, 500);
+  assert.equal((await response.json()).error, "AGENT_YIELD_INVARIANT_VIOLATION");
+  assert.equal(executed, 0);
+  assert.equal((await service.status(pubkey)).total_msats, "0");
+  assert.equal((await store.transaction("check", tx => tx.invoice(boundHash)))?.settled_at, undefined);
+  // A later DB edit must also fail when merchant verification is already cached.
+  tamper = false;
+  await store.transaction("restore", async tx => { await tx.putInvoice(row!); });
+  const paidHeaders = { ...headers(), Authorization: `L402 ${challenge.macaroon}:${"00".repeat(32)}` };
+  assert.equal((await fetch(url, { headers: paidHeaders })).status, 200);
+  assert.equal(executed, 1);
+  const lookups = verified;
+  await store.transaction("tamper-cached", async tx => {
+    const saved = (await tx.invoice(boundHash))!;
+    saved.kickback_msats = "0";
+    await tx.putInvoice(saved);
+  });
+  const cached = await fetch(url, { headers: paidHeaders });
+  assert.equal(cached.status, 500);
+  assert.equal(verified, lookups);
+  assert.equal(executed, 1);
 });
 
 test("concurrent repeated settlement credits one invoice once and grants an exact signed 365-day expiry", async () => {
@@ -325,14 +447,18 @@ test("settlement wrapper ignores invalid proofs and non-BTC rails; original buye
     expectedDescription: "test",
     preimage: "00".repeat(32),
   };
-  await wrapped.verifyPayment(proof);
+  await enterpriseContext.run(ctx, () => wrapped.verifyPayment(proof));
   assert.equal((await service.status(buyer)).total_msats, "0");
   result = { provider: "test", settledAt: now, asset: "l-btc" };
-  await wrapped.verifyPayment(proof);
+  await enterpriseContext.run(ctx, () => wrapped.verifyPayment(proof));
   assert.equal((await service.status(buyer)).total_msats, "0");
   result = { provider: "test", settledAt: now, asset: "btc-lightning" };
   const other = { ...context(), buyer: "cd".repeat(32) };
-  await enterpriseContext.run(other, () => wrapped.verifyPayment(proof));
+  await assert.rejects(
+    enterpriseContext.run(other, () => wrapped.verifyPayment(proof)),
+    AgentYieldInvariantError,
+  );
+  await enterpriseContext.run(ctx, () => wrapped.verifyPayment(proof));
   assert.equal(other.account, undefined);
   assert.equal((await service.status(other.buyer)).total_msats, "0");
   assert.equal(
@@ -437,7 +563,7 @@ test("REST audit receipt hashes exact canonical decision/data, rejects invalid i
   for (const method of ["GET", "POST"]) {
     const quote = await fetch(base + "/api/v1/cost", {
       method,
-      headers: { "X-Agent-Lightning-Address": "agent@example.com" },
+      headers: { ...headers("/api/v1/cost", method), "X-Agent-Lightning-Address": "agent@example.com" },
     });
     const quoted = await quote.json();
     assert.equal(quoted.enterprise_economics.routing_kickback_percent, 21);

@@ -14,6 +14,7 @@ import type { SettlementRouter } from "../services/settlement";
 import type { RevenueLedger } from "../services/ledger";
 import { requestNip98Authorization } from "../lib/nip98-request";
 import { GetFleetStatementResponse } from "@workspace/api-zod";
+import { AgentYieldInvariantError } from "../lib/agent-yield-invariant";
 
 export function registerEnterpriseCreditRoutes(
   app: Express,
@@ -111,6 +112,10 @@ export function registerEnterpriseCreditRoutes(
           );
         res.status("invoice" in invoice ? 402 : 200).json(invoice);
       } catch (error) {
+        if (error instanceof AgentYieldInvariantError) {
+          res.status(500).json({ error: error.code });
+          return;
+        }
         if (!(error instanceof CreditTabError))
           req.log?.error({ err: error }, "Credit tab operation failed");
         res.status(error instanceof CreditTabError ? error.status : 503).json({

@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import type { StratigraphyEntry } from "@workspace/api-client-react";
 import stratigraphyDataset from "../../api-server/data/stratigraphy.json";
-import { Check, Download, FileText, KeyRound, LayoutGrid, Play, ScrollText, ShieldCheck, Zap } from "lucide-react";
+import { Check, Download, FileText, KeyRound, LayoutGrid, Play, ScrollText, ShieldCheck, Terminal, Zap } from "lucide-react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,6 +28,7 @@ import ComplianceGuideLink from "@/components/compliance-guide-link";
 import { EscrowTerminal } from "@/simulator/components/EscrowTerminal";
 import { TrustBadges } from "@/components/trust-badges";
 import { PublicRouteHead } from "@/components/public-route-head";
+import { Article12Sandbox } from "@/components/article12-sandbox";
 import { CommandCenter } from "@/components/command-center/command-center";
 
 const queryClient = new QueryClient({
@@ -189,6 +190,13 @@ function Header({
           <WhitepaperLink />
           <a
             className="control-button"
+            href={`${import.meta.env.BASE_URL}#article12-sandbox`}
+            data-testid="link-article12-sandbox"
+          >
+            <Terminal size={14} aria-hidden="true" /> Art. 12 Sandbox
+          </a>
+          <a
+            className="control-button"
             href={`${import.meta.env.BASE_URL}manifesto`}
             data-testid="link-home-manifesto"
           >
@@ -307,6 +315,7 @@ function Home() {
           <ComplianceGuideLink />
           <EscrowTerminal />
         </section>
+        <Article12Sandbox />
         <main>
           <CommandCenter />
         </main>

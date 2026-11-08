@@ -28,8 +28,8 @@ test("homepage places the live escrow terminal above the command center", () => 
   assert.ok(commandCenter > terminal, "command center follows the terminal");
   assert.match(
     app.slice(terminal, commandCenter),
-    /<EscrowTerminal \/>\s*<\/section>\s*<main>\s*$/,
-    "the terminal and command center render whether or not the dataset loads",
+    /<EscrowTerminal \/>\s*<\/section>\s*<Article12Sandbox \/>\s*<main>\s*$/,
+    "the terminal, local sandbox and command center render whether or not the dataset loads",
   );
 });
 

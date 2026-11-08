@@ -42,6 +42,17 @@ requesting Markdown and import fixes.
 **How to apply:** Separate technical example corrections and Markdown formatting
 from edits to the approved SDK marketing language.
 
+The homepage Article 12 Vulnerability Scanner is an interactive enterprise
+lead-generation sandbox for CISOs, not a live compliance evaluation or receipt
+issuer. Its requested warning and pipeline text are marketing simulation copy.
+
+**Why:** The user explicitly requested a visual demonstration and prohibited
+backend, key and settlement changes.
+
+**How to apply:** Keep this demo distinct from the live escrow terminal and the
+existing compliance page. Preserve its supplied wording and local-simulation
+identity; connect its CTA to the existing enterprise licensing or sales flow.
+
 Keep the enterprise SEO manifesto separate from the Technical Whitepaper.
 
 **Why:** The user explicitly designated `/whitepaper` as the strict compliance

@@ -51,6 +51,7 @@ import { createSwarmRoyalties } from "./lib/swarm-royalties";
 import { createPrivateYieldEarnings } from "./lib/private-yield-earnings";
 import { createYieldStaking } from "./lib/yield-staking";
 import { registerPublicCors } from "./middleware/publicCors";
+import { registerMcpDirectoryRoutes } from "./routes/mcp-directory";
 import { redirectLegacyDomain } from "./middleware/canonicalDomain";
 import { registerAuditRoutes } from "./routes/audit";
 import { registerEscrowRoutes } from "./routes/escrow";
@@ -129,6 +130,8 @@ app.use(
 );
 registerPublicCors(app, createPublicWebRateLimitMiddleware(publicRateLimiter));
 registerMcpRequestGuard(app);
+// This host already mounts clearing below; metadata does not activate settlement.
+registerMcpDirectoryRoutes(app, true);
 const nip98Revocations = createPostgresNip98RevocationStore();
 const nip98RevocationGuard = createNip98RevocationGuard(nip98Revocations);
 registerAuditRoutes(app, undefined, nip98RevocationGuard);

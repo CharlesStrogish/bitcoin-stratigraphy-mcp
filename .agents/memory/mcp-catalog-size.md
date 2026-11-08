@@ -27,6 +27,17 @@ while protecting execution logic and retaining disabled production settlement.
 copy, list both clearing tools, and preserve the distinction between optional
 clearing infrastructure, the protected core, and independently evaluated grades.
 
+Public directory handshakes may advertise the full 19-tool capacity, but must
+identify unmounted extensions as disabled and distinguish enabled execution
+from capacity. Public discovery must never mount clearing or authorize a call.
+
+**Why:** The user requested unauthenticated directory indexing of all 19 tools
+while restricting changes to HTTP routing and preserving all execution gates.
+
+**How to apply:** Keep capacity metadata separate from the host's executable
+catalog. Preserve existing free sandbox and authenticated grant policies;
+making metadata public is not permission to change tool access rules.
+
 The license-gated Python enterprise interface has an independent MCP catalog.
 Do not add its tools to the original canonical catalog or remove original tools
 to make room for them. Its *data source* is shared by the canonical stratigraphy

@@ -17,10 +17,10 @@ import type {
   ClearingContracts,
 } from "../services/clearingContracts";
 import {
-  developmentClearingEnabled,
-  signDevelopmentClearingReceipt,
+  signClearingReceipt,
   verifyClearingExecution,
 } from "../services/clearingExecution";
+import { activeClearingKeys } from "../services/clearingKeys";
 import {
   CLEARING_PAYOUT_DISABLED,
   settleClearingContractPayout,
@@ -65,7 +65,7 @@ export const clearingToolDefinitions = [
   {
     name: "clearing.create_contract",
     description:
-      "Reserve a private A2A contract and issue its funding invoice. Buyer comes only from fresh NIP-98 authentication. Production settlement is DISABLED: do not fund. Local opt-in settlement verifies Poseidon preimage knowledge, not arbitrary task execution, and performs no payout. An unpaid invoice is not locked funds.",
+      "Reserve a private A2A contract and issue its funding invoice. Buyer comes only from fresh NIP-98 authentication. Production receipt settlement uses the Solo Founder Genesis Groth16 key and merchant-confirmed funding. This proves Poseidon preimage knowledge, not arbitrary task execution. No automated payout or refund is enabled; funding remains merchant-controlled. An unpaid invoice is not locked funds.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -90,7 +90,7 @@ export const clearingToolDefinitions = [
   {
     name: "clearing.settle_contract",
     description:
-      "Settles an escrow contract for Agent-to-Agent tasks (production settlement remains disabled). Use this tool after clearing.create_contract to submit the worker's proof for local development settlement and obtain a signed development receipt; no funds are paid out. Explicit local development mode verifies the exact NIP-98 worker, a contract-bound Groth16 Poseidon preimage proof and merchant-confirmed funding before atomically recording settled status and the receipt. The proof demonstrates preimage knowledge, not arbitrary task completion. No production payout, arbitrary-execution guarantee, or legal indemnity.",
+      "Record a funded escrow contract as settled with a signed Groth16 preimage receipt. Production uses the Solo Founder Genesis key; opted-in local development retains its separate key and receipt domain. Requires the exact NIP-98 worker, task/escrow-bound proof and merchant-confirmed invoice funding before an atomic, idempotent evidence commit. No automated payout, arbitrary-execution guarantee or legal indemnity. Funds remain merchant-controlled.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -99,21 +99,21 @@ export const clearingToolDefinitions = [
           type: "string",
           format: "uuid",
           description:
-            "The unique UUID string identifying the escrow contract to settle, returned by clearing.create_contract (e.g., '550e8400-e29b-41d4-a716-446655440000'). Merchant-confirmed funding is required for local development settlement; an unpaid contract is not funded escrow.",
+            "The escrow UUID returned by clearing.create_contract. Merchant-confirmed funding is required; an unpaid contract is not funded escrow.",
         },
         execution_trace: {
           type: "string",
           minLength: 1,
           maxLength: 65536,
           description:
-            "The worker-generated Groth16 Poseidon preimage proof envelope, provided as a JSON-encoded string containing scheme, proof, and publicSignals. Use scheme 'clearing-poseidon-preimage-development-v1' and two canonical decimal-string public signals binding the exact task hash and escrow UUID. This proves preimage knowledge, not arbitrary task completion. Serialize the envelope as a string, not a bare hex string or JSON object, and never include the private preimage.",
+            "JSON-encoded Groth16 proof envelope containing scheme, proof and publicSignals. Production scheme: 'clearing-poseidon-preimage-genesis-v1'; local development scheme: 'clearing-poseidon-preimage-development-v1'. Two canonical decimal public signals bind the exact Poseidon task hash and escrow UUID. Never include the private preimage. This proves preimage knowledge, not arbitrary task completion.",
         },
         payout_invoice: {
           type: "string",
           minLength: 1,
           maxLength: 4096,
           description:
-            "Worker-signed BOLT11 payout invoice. Payouts remain unconditionally disabled pending independent Phase 2 MPC setup and reviewed activation.",
+            "Worker-signed BOLT11 payout invoice. Automated payouts remain disabled pending separately reviewed fee-capped payout integration. Omit this field for proof receipt settlement.",
         },
       },
       required: ["escrow_id", "execution_trace"],
@@ -193,6 +193,7 @@ export function clearingController(options: {
       return;
     }
     try {
+      const keys = activeClearingKeys();
       if (await req.app.locals.swarmReferralRevoked?.(buyer)) {
         fail(403, "CLEARING_IDENTITY_REVOKED");
         return;
@@ -215,7 +216,7 @@ export function clearingController(options: {
           );
           return;
         }
-        if (!developmentClearingEnabled()) {
+        if (!keys) {
           fail(503, "CLEARING_EXECUTION_VERIFIER_UNAVAILABLE", {
             escrow_id: contract.escrow_id,
             status: contract.status,
@@ -227,6 +228,7 @@ export function clearingController(options: {
         const proofDigest = await verifyClearingExecution(
           contract,
           input.execution_trace,
+          keys,
         );
         if (!proofDigest) {
           fail(400, "CLEARING_INVALID_EXECUTION_PROOF");
@@ -238,7 +240,8 @@ export function clearingController(options: {
           const result = {
             escrow_id: stored.escrow_id,
             status: "settled",
-            development_only: true,
+            development_only: keys.developmentOnly,
+            payout_executed: false,
             funding_verified: true,
             receipt: JSON.parse(stored.settlement_receipt),
           };
@@ -303,17 +306,18 @@ export function clearingController(options: {
           fail(409, "CLEARING_FUNDING_NOT_CONFIRMED");
           return;
         }
-        const signed = signDevelopmentClearingReceipt(
+        const signed = signClearingReceipt(
           contract,
           proofDigest,
           funding.settledAt,
+          keys,
         );
         // Recheck the gate immediately before the only settlement write.
-        if (!developmentClearingEnabled()) {
+        if (activeClearingKeys() !== keys) {
           fail(503, "CLEARING_EXECUTION_VERIFIER_UNAVAILABLE");
           return;
         }
-        const settled = await options.store.settleDevelopment(
+        const settled = await options.store.settleVerified(
           contract,
           proofDigest,
           signed.receipt,
@@ -332,6 +336,15 @@ export function clearingController(options: {
       ) {
         fail(503, "CLEARING_FUNDING_UNAVAILABLE");
         return;
+      }
+      if (keys && !keys.developmentOnly) {
+        const task = createInput.parse(parsed.data).task_hash;
+        const scalarField =
+          21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+        if (BigInt(`0x${task}`) >= scalarField) {
+          fail(400, "CLEARING_UNSUPPORTED_TASK_HASH");
+          return;
+        }
       }
       const input = createInput.parse(parsed.data);
       const requestDigest = createHash("sha256")
@@ -408,10 +421,15 @@ export function clearingController(options: {
         amount_sats: Number(contract.amount_sats),
         expires_at: contract.expires_at.toISOString(),
         funding_verified: false,
-        settlement_available: developmentClearingEnabled(),
-        warning: developmentClearingEnabled()
-          ? "Local development only. Preimage knowledge is not arbitrary task execution. No payout is implemented. Do not fund with real sats."
-          : "Production settlement is disabled. Do not fund this scaffold.",
+        settlement_available: Boolean(keys),
+        execution_scheme: keys?.scheme ?? null,
+        verification_key_id: keys?.verificationKeyId ?? null,
+        payout_available: false,
+        warning: !keys
+          ? "Local settlement is disabled. Do not fund."
+          : keys.developmentOnly
+            ? "Local development only. Preimage knowledge is not arbitrary task execution. No payout is implemented. Do not fund with real sats."
+            : "Genesis proof receipt settlement is enabled. This proves preimage knowledge, not task completion. No automated payout or refund is enabled; funds remain merchant-controlled.",
       };
       res.json({
         jsonrpc: "2.0",

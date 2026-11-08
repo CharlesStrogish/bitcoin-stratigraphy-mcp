@@ -1,6 +1,7 @@
 # Fee-capped clearing payouts — disabled scaffold
 
-Production settlement and outbound clearing payouts remain disabled. The
+Production proof receipt settlement uses the Genesis key; outbound clearing
+payouts remain disabled. The
 authenticated `clearing.settle_contract` handler accepts an optional
 `payout_invoice`, covered by the worker's existing NIP-98 payload signature, but
 unconditionally rejects payout requests before wallet configuration or I/O.
@@ -66,7 +67,7 @@ wired behind that lock. `adapters/lnd.ts` implements the REST adapter.
 Neither the engine nor ledger initialization is invoked by today's route.
 
 Activation is intentionally **not** a one-flag operation. A separate reviewed
-change must accept the independent Phase 2 ceremony, establish the production
+change must use the accepted Genesis Phase 2 key, establish the production
 proof policy, verify exact contract/worker/invoice binding and merchant-confirmed
 funding, initialize the isolated ledger, and durably coordinate the payout result
 with production contract status and receipt issuance. Development preimage

@@ -454,7 +454,8 @@ The directory uses bulleted definitions rather than multi-column tables so each
 tool description can wrap independently on mobile. These are the **19 MCP
 names at full platform capacity**: 5 stratigraphy, 7 proof, 2 mesh, 2 payment,
 1 workflow, and 2 host-enabled clearing tools. `tools/list` is authoritative
-for a particular host; production clearing settlement and payouts are disabled.
+for a particular host; Genesis production proof receipt settlement is supported,
+while automated clearing payouts remain disabled.
 
 ### `stratigraphy.*` — 5 tools
 
@@ -562,8 +563,8 @@ and callback shapes.
 
 ### `clearing.*` — 2 host-enabled A2A tools
 
-**Production clearing settlement and payouts remain disabled. Do not fund
-production clearing contracts.** These names expose the A2A Central Bank
+**Genesis production proof receipt settlement is enabled; automated payouts
+and refunds remain disabled, and funds stay merchant-controlled.** These names expose the A2A Central Bank
 routing infrastructure when the host explicitly enables the extension; they
 are not evidence of live production payouts.
 
@@ -571,9 +572,10 @@ are not evidence of live production payouts.
   and task hash and issue its funding invoice. The buyer must authenticate with
   NIP-98; an unpaid invoice does not lock funds.
 - **`clearing.settle_contract`** — Submit the worker's contract-bound Groth16
-  Poseidon preimage proof. Explicit local development mode can verify worker
-  identity and merchant-confirmed funding, record settlement, and issue a signed
-  development receipt; it does not pay funds or prove arbitrary task completion.
+  Poseidon preimage proof. Production uses the distinct Solo Founder Genesis key
+  to verify worker identity and merchant-confirmed funding, atomically record
+  settlement, and issue a signed production receipt. Local development retains
+  its separate key. Neither mode pays funds or proves arbitrary task completion.
   Worker-signed payout invoice requests remain unconditionally blocked.
 
 See [clearing integration](artifacts/api-server/CLEARING.md) and the

@@ -8,6 +8,7 @@ import { startInvoicePowCleanup } from "./lib/postgres-invoice-pow-store";
 import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
 import { startNip90Dvm } from "./services/dvm";
 import { albySettlementMode } from "./services/settlement/alby";
+import { isProductionClearing, loadProductionClearingKeys } from "./services/clearingKeys";
 import {
   prewarmZkVerifier,
   shutdownZkVerifier,
@@ -47,6 +48,13 @@ export function startApplication({
   /** Milliseconds from process start until the port accepted connections. */
   portBoundMs: number;
 }): void {
+  if (isProductionClearing()) {
+    const keys = loadProductionClearingKeys();
+    logger.info(
+      { verificationKeyId: keys.verificationKeyId, scheme: keys.scheme, payoutAvailable: false },
+      "Genesis production clearing verifier ready",
+    );
+  }
   const applicationLoadedMs = performance.now();
   let stopping = false;
   let stopDvm: (() => Promise<void>) | undefined;

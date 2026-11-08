@@ -6,6 +6,7 @@ import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { cp, mkdir, readFile, rm } from "node:fs/promises";
 import { parse as parseYaml } from "yaml";
+import { execFileSync } from "node:child_process";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -33,6 +34,17 @@ const openApiAsJson = {
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
+  // Public proving binary lives in App Storage, not Git. Pin and install it
+  // during builds; deployment startup never depends on a storage request.
+  const genesisSource = path.resolve(artifactDir, "src/services/zk/clearing-production");
+  const genesisDist = path.resolve(distDir, "zk/clearing-production");
+  execFileSync("uv", [
+    "run", "--no-sync", "python",
+    path.resolve(artifactDir, "../../scripts/install-clearing-genesis.py"),
+    genesisSource, genesisDist,
+  ], { cwd: path.resolve(artifactDir, "../.."), stdio: "inherit", timeout: 60_000 });
+  await cp(path.resolve(genesisSource, "verification_key.json"),
+    path.resolve(genesisDist, "verification_key.json"));
   // Publish an isolated stdlib-only escrow worker; never copy custody DB files.
   for (const [folder, filenames] of [
     ["routers", ["__init__.py", "escrow_api.py", "escrow_worker.py"]],

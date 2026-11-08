@@ -1,4 +1,4 @@
-# Isolated A2A clearing scaffold
+# Isolated A2A clearing settlement
 
 The production host registers two additional tools at the existing `/mcp` POST
 endpoint: `clearing.create_contract` and `clearing.settle_contract`. Hosts and
@@ -38,7 +38,10 @@ storage. There is no separate SQLite contract store.
 
 The result includes `escrow_id`, `invoice`, `macaroon`, `payment_hash`,
 `amount_sats`, `expires_at`, `status`, `funding_verified: false`, and
-`settlement_available: false`. These funding macaroons use a domain-separated
+`settlement_available`, `execution_scheme`, `verification_key_id`, and
+`payout_available: false`. Production enables receipt settlement using the
+Genesis key; local development still requires its explicit opt-in.
+These funding macaroons use a domain-separated
 root key and an exact clearing RPC caveat; they cannot purchase core data tools.
 An invoice is **not proof of payment or locked funds**.
 
@@ -50,7 +53,7 @@ automatically. Operators must reconcile these reservations before any future
 funding/recovery integration; this scaffold includes no automatic recovery,
 refund, withdrawal, or payout.
 
-## Settlement is deliberately unavailable
+## Genesis production proof receipt settlement
 
 `clearing.settle_contract` takes exactly `escrow_id` and `execution_trace` (a
 nonempty UTF-8 string of at most 65,536 characters). It validates fresh NIP-98
@@ -58,20 +61,30 @@ authentication, reads the PostgreSQL contract, and compares the authenticated
 caller to the stored worker. Missing and foreign contracts both produce the
 same authorization refusal.
 
-The authenticated worker receives HTTP 503 with the JSON-RPC error
-`CLEARING_EXECUTION_VERIFIER_UNAVAILABLE`. **No contract is marked settled,
-no payment is sent, and no ZK-Indemnity Receipt is issued.**
+`NODE_ENV=production` or hosted `REPLIT_DEPLOYMENT` selects the installed Genesis
+key, never the development key. Missing or incorrect production key material
+fails closed. `execution_trace` is a JSON string containing `scheme`:
+`clearing-poseidon-preimage-genesis-v1`, the Groth16 `proof`, and two canonical
+decimal `publicSignals`: the Poseidon task hash and the unsigned UUID value.
+The circuit proves preimage knowledge, not arbitrary task completion.
 
-This is the explicitly selected fail-closed scaffold, not working trustless
-execution settlement. The existing telemetry and drift Groth16 circuits are
-not execution verifiers. A `verified` flag, trace hash, or proof from an arbitrary
-caller-supplied verification key is not accepted.
+The server checks the original invoice's exact provider, asset, hash, amount
+and description through merchant lookup. Unconfirmed or unavailable funding
+cannot settle. An atomic conditional PostgreSQL update stores status, proof
+digest, time and signed receipt together. Identical replay returns the stored
+receipt; conflicting proofs cannot overwrite it.
 
-**Do not fund this scaffold.** Before enabling settlement, a separate release
-must introduce a purpose-built execution circuit, independently pinned
-verification key, documented task-hash/public-signal binding, verified exact
-contract funding, atomic/replay-safe settlement, and authenticated receipts.
-Lightning custody and worker payout policy must also be specified explicitly.
+Production receipts use the `bitcoinstratigraphy/clearing-genesis-receipt/v1`
+signing domain followed by a newline, and bind the exact contract, funding,
+proof and verification-key fingerprint. They state `development_only: false`,
+`payout_executed: false`, and `legal_indemnity_granted: false`.
+Local opted-in development retains its distinct key and receipt scheme.
+
+**There is no automated payout or refund; funds remain merchant-controlled.**
+The optional worker-signed `payout_invoice` field is still rejected before wallet
+I/O. Do not describe a receipt as a payout, arbitrary-execution proof or legal
+indemnity. See [Genesis ceremony](../../circuits/MPC_CEREMONY.md) for key paths,
+checksums, distribution and the single-operator trust model.
 
 ## Verification
 
@@ -80,4 +93,8 @@ PostgreSQL rows owned by random test identities, real Schnorr NIP-98 signatures,
 and an exclusively mocked invoice provider. They never send mainnet payments.
 Tests cover catalog isolation, core pass-through, durable creation, concurrent
 invoice idempotency, identity forgery/body/URL/freshness failures, worker
-authorization, fail-closed settlement, and uncertain provider outcomes.
+authorization, fail-closed local defaults, and uncertain provider outcomes.
+The separate `node scripts/test-clearing-production.mjs` suite uses actual
+Genesis proofs and an isolated PostgreSQL schema to check production settlement,
+key separation, funding failures, receipt signatures, concurrent commits,
+replay and contract mutations. It never imports or exercises the core tools.

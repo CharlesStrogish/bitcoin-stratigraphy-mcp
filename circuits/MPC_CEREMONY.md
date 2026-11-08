@@ -4,15 +4,17 @@
 
 > The Genesis Keys were mathematically forged by the Founder via a Single-Operator Setup to eliminate external dependencies and initiate the mainnet launch.
 
-This declaration describes the founder's setup and launch objective, not evidence
-that mainnet settlement or payouts have been activated.
+The production integration uses these keys for authenticated proof-and-funding
+receipt settlement. Publishing this release is a separate step; automated
+Lightning payouts are not enabled by this integration.
 
 ## Status and scope
 
 The founder has selected a **single-operator Phase 2 setup**. External human
 participants are not a prerequisite under this ceremony policy. This replaces
-the previous independent-participant recruitment policy; it does not change
-backend authorization or settlement behavior.
+the previous independent-participant recruitment policy. The founder subsequently
+authorized scoped production key loading and settlement activation, preserving
+the core 16 tools, L402 gates and worker/funding authorization checks.
 
 One actual snarkjs contribution, named **Chuck Genesis Forge**, was generated
 locally and verified against the original R1CS and prepared Phase 1 parameters.
@@ -92,22 +94,39 @@ Setup logs and generated binaries remain outside Git and deployment images.
 
 ## Production integration boundary
 
-**Setup complete; production installation and vault activation not performed.**
+**Production key integration and receipt settlement are enabled in this release.**
+The running published service changes only after the owner uses Publish.
 
-There is currently no production clearing-key loader or configured production
-clearing-key destination. The backend imports only
-`artifacts/api-server/src/services/zk/clearing-development/verification_key.json`
-and explicitly disallows production settlement. The proving key is used by
-proof generators, not read by the settlement server.
+The exact exported verification key is installed at
+`artifacts/api-server/src/services/zk/clearing-production/verification_key.json`.
+The proving binary is retained durably in App Storage under its SHA-256 path.
+Builds install it at
+`artifacts/api-server/src/services/zk/clearing-production/circuit_final.zkey`
+and copy both keys to `artifacts/api-server/dist/zk/clearing-production/`.
+The installer verifies its pinned checksum; startup checks both installed keys
+and the embedded verification-key fingerprint. Missing or mismatched keys fail
+closed with no development-key fallback. Startup performs no storage download.
+Large proving binaries remain outside Git and are installed during builds.
 
-The newly exported public verification key is retained as
-`circuits/solo-founder-genesis/verification_key.json` for review. It is not wired
-into the backend. The active development verification key is unchanged so
-existing development proofs are not silently invalidated.
+`NODE_ENV=production` or a hosted `REPLIT_DEPLOYMENT` selects the Genesis key.
+The production envelope scheme is `clearing-poseidon-preimage-genesis-v1`;
+the receipt signing domain is `bitcoinstratigraphy/clearing-genesis-receipt/v1`.
+Creation returns the selected scheme, verification-key ID, settlement availability
+and `payout_available: false`. Workers must generate matching proofs with the
+final Genesis proving key and the original compiled circuit WASM.
 
-Copying a key into an arbitrary directory, changing this document, or publishing
-the ceremony page cannot activate the vault. The core 16 tools, L402 gates,
-settlement mechanics, staking balances and payout locks remain unchanged.
+Production settlement requires the authenticated contract worker, exact task and
+escrow public signals, and original-invoice merchant funding confirmation. A
+single atomic compare-and-set stores settled status and a signed receipt.
+Identical retries return the same receipt; conflicting proofs cannot overwrite it.
+Development proofs and keys cannot be substituted for production.
+
+The development key and opted-in local behavior remain separate and unchanged.
+The core 16 tools, L402 gates and staking balances are unchanged. Settlement here
+means a funded preimage-evidence commit, not a transfer of funds: receipts state
+`development_only: false`, `payout_executed: false` and
+`legal_indemnity_granted: false`. Funds remain merchant-controlled, with no
+automated payout or refund. The separate outbound payout lock remains in place.
 
 ## Live payout conditions
 
@@ -133,5 +152,6 @@ confirm its exact amount/hash and fee evidence, finalize the ledger atomically,
 and retain uncertain outcomes for read-only reconciliation without another
 `pay_invoice`. It must not reuse or alter the staking withdrawal ledger.
 
-Production settlement remains disabled. No mainnet payment is made by this
-ceremony or its cryptographic verification checks.
+Production proof receipt settlement is enabled; automated Lightning payouts
+remain disabled. No mainnet payment is made by this ceremony or its synthetic
+production-profile verification checks.

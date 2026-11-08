@@ -134,6 +134,16 @@ export class ClearingContracts {
     receipt: string,
     settledAt: Date,
   ): Promise<ClearingContract | undefined> {
+    return this.settleVerified(contract, proofDigest, receipt, settledAt);
+  }
+
+  /** Same atomic evidence commit for production and development. No wallet I/O. */
+  async settleVerified(
+    contract: ClearingContract,
+    proofDigest: string,
+    receipt: string,
+    settledAt: Date,
+  ): Promise<ClearingContract | undefined> {
     await this.initialize();
     const result = await this.database.query<ClearingContract>(
       `UPDATE clearing_contracts

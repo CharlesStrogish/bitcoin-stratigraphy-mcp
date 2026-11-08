@@ -1,7 +1,12 @@
-// Development-only hash-preimage evidence. NOT proof of arbitrary execution.
+// Contract-bound preimage evidence. NOT proof of arbitrary execution or payout.
 import { createHash, sign } from "node:crypto";
 import { z } from "zod";
-import verificationKey from "./zk/clearing-development/verification_key.json";
+import {
+  activeClearingKeys,
+  developmentClearingKeys,
+  type ClearingKeys,
+} from "./clearingKeys";
+export { developmentClearingEnabled } from "./clearingKeys";
 import { verifyGroth16OffThread } from "./zkVerifierWorker";
 import {
   loadPayloadSigningKey,
@@ -9,12 +14,10 @@ import {
 } from "../lib/payload-attestation";
 import type { ClearingContract } from "./clearingContracts";
 
-export const CLEARING_SCHEME = "clearing-poseidon-preimage-development-v1";
-export const CLEARING_RECEIPT_DOMAIN =
-  "bitcoinstratigraphy/clearing-development-receipt/v1\n";
-export const CLEARING_VERIFICATION_KEY_ID = createHash("sha256")
-  .update(JSON.stringify(verificationKey))
-  .digest("hex");
+// Legacy exports retain the development client/receipt contract.
+export const CLEARING_SCHEME = developmentClearingKeys.scheme;
+export const CLEARING_RECEIPT_DOMAIN = developmentClearingKeys.receiptDomain;
+export const CLEARING_VERIFICATION_KEY_ID = developmentClearingKeys.verificationKeyId;
 const scalarField =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 const baseField =
@@ -37,26 +40,19 @@ const proofSchema = z
   .strict();
 const traceSchema = z
   .object({
-    scheme: z.literal(CLEARING_SCHEME),
+    scheme: z.enum([CLEARING_SCHEME, "clearing-poseidon-preimage-genesis-v1"]),
     proof: proofSchema,
     publicSignals: z.tuple([decimal, decimal]),
   })
   .strict();
 let pending = 0;
 
-/** No request, option or locally generated key can override the production ban. */
-export function developmentClearingEnabled(env = process.env): boolean {
-  return (
-    ["development", "test"].includes(env.NODE_ENV ?? "") &&
-    !env.REPLIT_DEPLOYMENT &&
-    env.CLEARING_DEVELOPMENT_SETTLEMENT === "1"
-  );
-}
-
 export async function verifyClearingExecution(
   contract: ClearingContract,
   trace: string,
+  keys: ClearingKeys | undefined = activeClearingKeys(),
 ) {
+  if (!keys) return undefined;
   let raw: unknown;
   try {
     raw = JSON.parse(trace);
@@ -64,7 +60,7 @@ export async function verifyClearingExecution(
     return undefined;
   }
   const parsed = traceSchema.safeParse(raw);
-  if (!parsed.success) return undefined;
+  if (!parsed.success || parsed.data.scheme !== keys.scheme) return undefined;
   const task = BigInt(`0x${contract.task_hash}`);
   const escrow = BigInt(`0x${contract.escrow_id.replaceAll("-", "")}`);
   const { proof, publicSignals } = parsed.data;
@@ -76,10 +72,10 @@ export async function verifyClearingExecution(
     publicSignals[1] !== escrow.toString()
   )
     return undefined;
-  if (pending >= 4) throw new Error("Development verifier busy");
+  if (pending >= 4) throw new Error("Clearing verifier busy");
   pending++;
   try {
-    if (!(await verifyGroth16OffThread(verificationKey, publicSignals, proof)))
+    if (!(await verifyGroth16OffThread(keys.verificationKey, publicSignals, proof)))
       return undefined;
     return createHash("sha256")
       .update(JSON.stringify(parsed.data))
@@ -94,12 +90,22 @@ export function signDevelopmentClearingReceipt(
   proofDigest: string,
   fundingSettledAt: number,
 ) {
+  return signClearingReceipt(contract, proofDigest, fundingSettledAt, developmentClearingKeys);
+}
+
+export function signClearingReceipt(
+  contract: ClearingContract,
+  proofDigest: string,
+  fundingSettledAt: number,
+  keys: ClearingKeys,
+) {
   const key = loadPayloadSigningKey();
   const settledAt = new Date();
   const payload = JSON.stringify({
-    schema: CLEARING_SCHEME,
-    receipt_type: "ZK-Indemnity Receipt",
-    development_only: true,
+    schema: keys.scheme,
+    receipt_type: keys.developmentOnly ? "ZK-Indemnity Receipt" : "Groth16 preimage settlement receipt",
+    development_only: keys.developmentOnly,
+    setup_trust: keys.developmentOnly ? "local-development" : "single-operator-founder",
     guarantee: "knowledge-of-hash-preimage",
     legal_indemnity_granted: false,
     payout_executed: false,
@@ -114,14 +120,14 @@ export function signDevelopmentClearingReceipt(
     funding_verified: true,
     funding_settled_at: fundingSettledAt,
     proof_digest: proofDigest,
-    verification_key_id: CLEARING_VERIFICATION_KEY_ID,
+    verification_key_id: keys.verificationKeyId,
     settled_at: settledAt.toISOString(),
   });
   const receipt = {
     payload,
     signature: sign(
       null,
-      Buffer.from(CLEARING_RECEIPT_DOMAIN + payload),
+      Buffer.from(keys.receiptDomain + payload),
       key,
     ).toString("base64"),
     key_id: payloadPublicIdentity(key).keyId,

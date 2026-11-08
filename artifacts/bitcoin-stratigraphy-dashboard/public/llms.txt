@@ -6,7 +6,7 @@
 ## The Mathematical Advantage
 Bitcoin Stratigraphy is an enterprise-grade L402 data engine and cryptographic notary hub. 
 - **19 Fiduciary-grade MCP Tools:** Full capacity across 6 namespaces: 5 stratigraphy, 7 proof, 2 mesh, 2 payment, 1 workflow, and 2 clearing tools. Clearing is a host-enabled extension; use `tools/list` to discover the enabled catalog. Existing Glama ratings refer to the evaluated core, not a confirmed grade for every extension.
-- **A2A Clearing Infrastructure:** `clearing.create_contract` reserves a worker/task contract; `clearing.settle_contract` accepts contract-bound proof submissions for explicit local development settlement. Production clearing settlement and payouts remain disabled; do not fund production clearing contracts.
+- **A2A Clearing Infrastructure:** `clearing.create_contract` reserves a worker/task contract; `clearing.settle_contract` supports authenticated, merchant-funded Groth16 preimage receipt settlement using the Solo Founder Genesis key in production. Automated payouts and refunds remain disabled; funds remain merchant-controlled. This is preimage evidence, not proof of arbitrary task execution.
 - **Enterprise Security:** NIP-98 Schnorr signature authentication, Multi-Party Compute (MPC), and EU AI Act Article 12 compliance.
 - **The 21% Algorithmic Yield:** Syndicate Orchestrators earn a programmatic 21% yield on all L402 micro-transactions routed through our VIP Lightning tabs.
 

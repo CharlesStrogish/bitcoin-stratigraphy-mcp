@@ -15,17 +15,15 @@ the existing regression tests passing.
 Do not change canonical data-tool handlers or use clearing funding as a data-tool
 access pass.
 
-Production settlement must fail closed until a trusted execution verifier exists. Do not
-reuse telemetry/drift circuits or label hashes as verified execution proofs.
+Production proof settlement may use the founder-approved Genesis key. Do not
+reuse telemetry/drift circuits or label preimage knowledge as arbitrary execution.
 
-**Why:** After being told that there was no task-execution circuit or trusted
-verification key, the user explicitly chose “Fail-closed scaffold.”
+**Why:** The user superseded the initial fail-closed scaffold by explicitly
+authorizing scoped production key loading and removal of the settlement block.
 
-**How to apply:** Verify the worker's real NIP-98 signature and contract ownership,
-but never mark production contracts settled, release money, or emit a production ZK-Indemnity Receipt
-without a separately specified execution circuit, task binding, and funding
-verification. Make unavailable settlement and the instruction not to fund
-explicit in tool metadata and responses.
+**How to apply:** Preserve real NIP-98 worker ownership, exact task/escrow proof
+binding and original merchant funding checks. Production receipt settlement
+is not a Lightning payout, arbitrary-execution guarantee or legal indemnity.
 
 For the standalone Python starter, the user subsequently explicitly requested
 silent NWC funding of clearing contract creation despite fail-closed settlement.
@@ -45,7 +43,7 @@ The user approved a local development Groth16 setup after being told that a
 hash-preimage circuit does not prove arbitrary task execution and a locally
 generated key is not an independently established production trust basis.
 Local development may record funded, authenticated preimage-proof settlement
-and a signed development receipt. Production remains disabled.
+and a signed development receipt; it remains distinct from Genesis production.
 
 **Why:** The user explicitly selected “Local development setup” rather than
 audited production activation.
@@ -66,8 +64,8 @@ and requested a single-operator Phase 2 setup.
 
 **How to apply:** Describe the actual single-operator trust model, not a
 multiparty ceremony. Preserve the core 16 tools, L402 gates and settlement
-mechanics, which the user explicitly protected during this pivot. The launch
-objective does not make a generated key evidence of production integration.
+mechanics except for the later explicitly authorized production key/settlement
+integration. The launch objective alone is not evidence of a published release.
 
 Production workers supply Lightning payout invoices in their NIP-98-signed
 settlement requests. Routing fees come from the escrow balance, not additional
@@ -94,17 +92,18 @@ explicit send-time fee limit for stale-estimate protection. Reserve principal
 plus the maximum fee durably before I/O. Never enable production payouts merely
 because keys or wallet credentials have been installed.
 
-The user previously selected “Keep payouts disabled,” then requested vault
-activation with the Solo Founder pivot while still forbidding settlement
-mechanics changes.
+The user authorized modifying backend settlement mechanics strictly to wire the
+new production keys, remove the explicit production block and activate clearing
+settlement. The core 16 tools and L402 gates remain protected.
 
-**Why:** The later launch goal supersedes the earlier product direction, but
-the simultaneous guardrails do not authorize bypassing existing settlement
-locks or fee-cap requirements.
+**Why:** The user explicitly dropped the settlement-block guardrail and commanded
+scoped production integration after being told that key files alone cannot
+activate the existing backend.
 
-**How to apply:** Explain the production integration conflict explicitly.
-Do not claim that key generation or documentation activates payouts, bypass
-the locks through development-mode settings, or run real payment tests.
+**How to apply:** Enable authenticated, merchant-funded Genesis proof receipt
+settlement without bypassing checks through development-mode settings. Keep
+automated payout activation separate from the evidence commit and do not run
+real payment tests. A commit is not publishing; describe that distinction.
 
 Distinguish an upstream-published phase-one checksum match from a completed
 local cryptographic transcript replay. Do not relabel one as the other.

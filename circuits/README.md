@@ -1,8 +1,9 @@
 # Clearing execution circuit — LOCAL DEVELOPMENT ONLY
 
 For the separate Solo Founder Genesis Setup and its production integration
-status, see [MPC_CEREMONY.md](MPC_CEREMONY.md). Generating those keys does
-not promote development keys or activate production settlement.
+status, see [MPC_CEREMONY.md](MPC_CEREMONY.md). Production now uses its distinct
+Genesis key for proof receipt settlement; this guide describes local development
+only. Production activation does not rotate the development key or enable payouts.
 
 This implements the approved **local development setup**, not production
 activation. No existing data-tool handler, price, payment path, or Python SDK
@@ -158,8 +159,8 @@ these commands.
 
 ## Before any production activation
 
-Production remains fail-closed. A separate reviewed change must establish the
-actual execution predicate and task format, independently verified ceremony
-artifacts for that exact circuit, key lifecycle policy, custody and payout
-semantics, and production verification. Do not promote this local key, receipt
-label, or a passing development integration test as those guarantees.
+The separate Genesis integration enables production preimage-evidence settlement
+with its own key, scheme and receipt domain; see the ceremony document. It does
+not promote this development key or establish arbitrary execution, legal
+indemnity or automated payouts. Production integration is tested separately with
+`node scripts/test-clearing-production.mjs`, using only synthetic invoices.

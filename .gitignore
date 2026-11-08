@@ -62,6 +62,7 @@ __pycache__/
 
 # Runtime provenance archives and generated verification artifacts.
 /generated-artifacts/
+/artifacts/api-server/src/services/zk/clearing-production/*.zkey
 
 # Private tool-integrity signing keys (standalone deployments only).
 **/.keys/

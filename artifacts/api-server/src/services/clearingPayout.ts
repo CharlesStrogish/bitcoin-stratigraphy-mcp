@@ -11,7 +11,8 @@ export const CLEARING_PAYOUT_DISABLED = "CLEARING_PRODUCTION_PAYOUT_DISABLED";
 /**
  * Unconditional production lock. Neither an environment flag nor installed key
  * files authorize live payouts. Called by the authenticated settlement route.
- * Activation requires a separate reviewed change after independent Phase 2.
+ * Genesis proof receipt settlement does not authorize outbound funds movement.
+ * Activation requires a separate reviewed payout integration.
  */
 export function requireClearingPayoutActivation(): never {
   throw new LndPayoutError(CLEARING_PAYOUT_DISABLED);
@@ -58,7 +59,7 @@ export interface ClearingPayoutLedger {
 
 /**
  * Isolated execution scaffold, NOT connected to an enabled production route.
- * Future caller must first verify the independent MPC proof, exact contract
+ * Future caller must first verify the accepted Genesis proof, exact contract
  * binding, NIP-98 worker-signed invoice and merchant-confirmed funded balance.
  * Development receipt settlement must never invoke this engine.
  */

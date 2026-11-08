@@ -395,10 +395,10 @@ test("isolated local-development clearing settlement", async (t) => {
       process.env.NODE_ENV = "production";
       try {
         const result = await post("clearing.settle_contract", args);
-        assert.equal(result.status, 503);
+        assert.equal(result.status, 400);
         assert.equal(
           result.body.error.message,
-          "CLEARING_EXECUTION_VERIFIER_UNAVAILABLE",
+          "CLEARING_INVALID_EXECUTION_PROOF",
         );
       } finally {
         process.env.NODE_ENV = "test";

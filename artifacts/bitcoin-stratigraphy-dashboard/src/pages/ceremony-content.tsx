@@ -17,7 +17,7 @@ export default function CeremonyContent({
 }: { markdown: string; base?: string }) {
   const BASE = base.endsWith("/") ? base : `${base}/`;
   const blocks = parseMarkdown(markdown);
-  const title = blocks[0]?.kind === "heading" ? blocks[0].text : "";
+  const title = "The Genesis Ceremony: Securing the Autonomous Central Bank";
   const sections = blocks.flatMap((b) => (b.kind === "heading" && b.level === 2 ? [b.text] : []));
 
   return (
@@ -43,7 +43,7 @@ export default function CeremonyContent({
             </div>
             <figure className="cr-quote">
               <blockquote id="cr-ethos" data-testid="text-ethos">
-                <p>&ldquo;Alienate no one while upgrading everyone.&rdquo;</p>
+                <p>&ldquo;Deterministic data for AI swarms. Trustless clearing for autonomous capital.&rdquo;</p>
               </blockquote>
               <figcaption>Official ethos of the Fiduciary Central Bank</figcaption>
             </figure>

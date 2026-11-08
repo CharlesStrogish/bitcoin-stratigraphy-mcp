@@ -9,13 +9,14 @@ import {
 import {
   SECURITY_ARTICLE, SECURITY_DESCRIPTION, SECURITY_TITLE,
 } from "@/lib/security-seo";
+import { CEREMONY_DESCRIPTION, CEREMONY_TITLE } from "@/lib/ceremony-seo";
 
 /** Keep crawler-facing URLs and escrow attribution correct after SPA navigation. */
 export function PublicRouteHead() {
   const [location] = useLocation();
   useEffect(() => {
     const path = location.split("?")[0]!.replace(/\/$/, "") || "/";
-    const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance", "/manifesto", "/security"];
+    const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance", "/manifesto", "/security", "/ceremony"];
     if (!publicPaths.includes(path)) return;
     const url = path === "/" ? siteUrl("/") : pageUrl(path);
     document.querySelector('link[rel="canonical"]')?.setAttribute("href", url);
@@ -32,6 +33,31 @@ export function PublicRouteHead() {
       "@context": "https://schema.org",
       ...ESCROW_APPLICATION,
     });
+  }, [location]);
+  useEffect(() => {
+    const path = location.split("?")[0]!.replace(/\/$/, "");
+    if (path !== "/ceremony") return;
+    const previousTitle = document.title;
+    document.title = CEREMONY_TITLE;
+    const changes = [
+      ['meta[name="description"]', CEREMONY_DESCRIPTION],
+      ['meta[property="og:title"]', CEREMONY_TITLE],
+      ['meta[property="og:description"]', CEREMONY_DESCRIPTION],
+      ['meta[name="twitter:title"]', CEREMONY_TITLE],
+      ['meta[name="twitter:description"]', CEREMONY_DESCRIPTION],
+    ].map(([selector, value]) => {
+      const element = document.querySelector(selector!);
+      const previous = element?.getAttribute("content");
+      element?.setAttribute("content", value!);
+      return { element, previous };
+    });
+    return () => {
+      document.title = previousTitle;
+      for (const { element, previous } of changes) {
+        if (previous == null) element?.removeAttribute("content");
+        else element?.setAttribute("content", previous);
+      }
+    };
   }, [location]);
   useEffect(() => {
     const path = location.split("?")[0]!.replace(/\/$/, "");

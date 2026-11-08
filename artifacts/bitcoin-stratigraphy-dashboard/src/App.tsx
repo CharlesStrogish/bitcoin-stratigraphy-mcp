@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import type { StratigraphyEntry } from "@workspace/api-client-react";
 import stratigraphyDataset from "../../api-server/data/stratigraphy.json";
-import { Check, Download, FileText, LayoutGrid, Play, ScrollText, ShieldCheck, Zap } from "lucide-react";
+import { Check, Download, FileText, KeyRound, LayoutGrid, Play, ScrollText, ShieldCheck, Zap } from "lucide-react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +17,7 @@ import EnterpriseLicenseLink from "@/components/enterprise-license-link";
 import WhitepaperPage from "@/pages/whitepaper";
 import ManifestoPage from "@/pages/manifesto";
 import SecurityPage from "@/pages/security";
+import CeremonyPage from "@/pages/ceremony";
 import WhitepaperLink from "@/components/whitepaper-link";
 import SiteFooter from "@/components/site-footer";
 import Article12VerifierLink from "@/components/article12-verifier-link";
@@ -202,6 +203,13 @@ function Header({
           </a>
           <a
             className="control-button"
+            href={`${import.meta.env.BASE_URL}ceremony`}
+            data-testid="link-home-ceremony"
+          >
+            <KeyRound size={14} aria-hidden="true" /> Setup Ceremony
+          </a>
+          <a
+            className="control-button"
             href={`${import.meta.env.BASE_URL}docs`}
           >
             <FileText size={14} /> Developer docs
@@ -317,6 +325,7 @@ function Router() {
         <Route path="/whitepaper" component={WhitepaperPage} />
         <Route path="/manifesto" component={ManifestoPage} />
         <Route path="/security" component={SecurityPage} />
+        <Route path="/ceremony" component={CeremonyPage} />
         <Route path="/simulator" component={SimulatorPage} />
         <Route path="/compliance" component={CompliancePage} />
         <Route component={NotFound} />

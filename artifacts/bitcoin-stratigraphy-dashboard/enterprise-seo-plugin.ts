@@ -4,6 +4,11 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ManifestoContent from "./src/pages/manifesto-content";
 import SecurityContent from "./src/pages/security-content";
+import CeremonyContent from "./src/pages/ceremony-content";
+import { readFileSync } from "node:fs";
+import {
+  CEREMONY_DESCRIPTION, CEREMONY_TITLE, CEREMONY_URL,
+} from "./src/lib/ceremony-seo";
 import {
   SECURITY_ARTICLE, SECURITY_DESCRIPTION, SECURITY_TITLE, SECURITY_URL,
 } from "./src/lib/security-seo";
@@ -32,6 +37,12 @@ import {
 import { pageUrl } from "./src/lib/site";
 
 const routes = [
+  {
+    path: "ceremony",
+    title: CEREMONY_TITLE,
+    description: CEREMONY_DESCRIPTION,
+    url: CEREMONY_URL,
+  },
   {
     path: "security",
     title: SECURITY_TITLE,
@@ -116,6 +127,15 @@ function pageHead(html: string, page: (typeof routes)[number]): string {
       "</head>",
       `<script id="compliance-article-jsonld" type="application/ld+json">${article}</script>\n  </head>`,
     );
+  }
+  if (page.path === "ceremony") {
+    // Read-only: the same source document the page imports via ?raw.
+    const markdown = readFileSync(
+      new URL("../../circuits/MPC_CEREMONY.md", import.meta.url),
+      "utf8",
+    );
+    const content = renderToStaticMarkup(createElement(CeremonyContent, { markdown, base: "/" }));
+    result = result.replace('<div id="root"></div>', `<div id="root">${content}</div>`);
   }
   if (page.path === "manifesto" || page.path === "security") {
     const isSecurity = page.path === "security";

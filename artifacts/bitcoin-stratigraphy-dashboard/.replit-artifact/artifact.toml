@@ -84,6 +84,14 @@ from = "/security/"
 to = "/security/index.html"
 
 [[services.production.rewrites]]
+from = "/ceremony"
+to = "/ceremony/index.html"
+
+[[services.production.rewrites]]
+from = "/ceremony/"
+to = "/ceremony/index.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

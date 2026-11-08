@@ -1,0 +1,23 @@
+{
+  "name": "@bitcoinstratigraphy/fiduciary-swarm-template",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone LangChain agent with budgeted Zero-Trust L402 access to Bitcoin Stratigraphy",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22.9.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env index.js",
+    "check": "node --check index.js && node --check config.js && node --check model-tools.js",
+    "test": "node --test test/*.test.js",
+    "audit": "pnpm audit"
+  },
+  "dependencies": {
+    "@bitcoinstratigraphy/agent-yield": "0.3.0",
+    "@langchain/core": "1.3.5",
+    "@langchain/openai": "1.8.2",
+    "langchain": "1.6.3"
+  }
+}

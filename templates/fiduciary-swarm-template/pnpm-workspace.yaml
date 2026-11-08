@@ -1,0 +1,6 @@
+# A standalone installation boundary, even when this folder lives in a monorepo.
+packages:
+  - "."
+
+autoInstallPeers: false
+linkWorkspacePackages: false

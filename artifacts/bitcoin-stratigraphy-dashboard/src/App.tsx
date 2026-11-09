@@ -29,7 +29,11 @@ import { EscrowTerminal } from "@/simulator/components/EscrowTerminal";
 import { TrustBadges } from "@/components/trust-badges";
 import { PublicRouteHead } from "@/components/public-route-head";
 import { Article12Sandbox } from "@/components/article12-sandbox";
+import "@/pages/funnel.css";
 import { CommandCenter } from "@/components/command-center/command-center";
+import FunnelNavigation from "@/components/funnel-navigation";
+import DevelopersPage from "@/pages/developers";
+import AuditPage from "@/pages/audit";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -327,6 +331,7 @@ function Home() {
 function Router() {
   return (
     <ErrorBoundary>
+      <FunnelNavigation />
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/standard" component={StandardPage} />
@@ -337,6 +342,8 @@ function Router() {
         <Route path="/ceremony" component={CeremonyPage} />
         <Route path="/simulator" component={SimulatorPage} />
         <Route path="/compliance" component={CompliancePage} />
+        <Route path="/developers">{() => <DevelopersPage />}</Route>
+        <Route path="/audit">{() => <AuditPage />}</Route>
         <Route component={NotFound} />
       </Switch>
       <PublicRouteHead />

@@ -35,8 +35,12 @@ import {
   ESCROW_APPLICATION, SIMULATOR_DESCRIPTION, SIMULATOR_TITLE, SIMULATOR_URL,
 } from "./src/lib/escrow-seo";
 import { pageUrl } from "./src/lib/site";
+import { FUNNEL_PAGES } from "./src/lib/funnel-seo";
+import DevelopersPage from "./src/pages/developers";
+import AuditCrawlerContent from "./src/pages/audit-content";
 
 const routes = [
+  ...FUNNEL_PAGES,
   {
     path: "ceremony",
     title: CEREMONY_TITLE,
@@ -117,6 +121,23 @@ function pageHead(html: string, page: (typeof routes)[number]): string {
     /<link\b(?=[^>]*\brel="canonical")[^>]*>/,
     `<link rel="canonical" href="${page.url}" />`,
   );
+  if (page.path === "developers" || page.path === "audit") {
+    result = result.replace(
+      /<script\b(?=[^>]*\bid="escrow-application-jsonld")[^>]*>[\s\S]*?<\/script>/g, "",
+    );
+    const content = renderToStaticMarkup(page.path === "developers"
+      ? createElement(DevelopersPage, { base: "/" })
+      : createElement(AuditCrawlerContent));
+    result = result.replace('<div id="root"></div>', `<div id="root">${content}</div>`);
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: page.title,
+      description: page.description,
+      url: page.url,
+    };
+    result = result.replace("</head>", `<script type="application/ld+json">${JSON.stringify(schema).replace(/</g, "\\u003c")}</script>\n</head>`);
+  }
   if (page.path === "compliance") {
     result = result.replace(
       /<meta\b(?=[^>]*\bproperty="og:type")[^>]*>/,
@@ -174,7 +195,8 @@ export function enterpriseSeoPlugin(): Plugin {
           .split("?")[0]!
           .replace(/\/$/, "");
         const page = routes.find((page) => path.endsWith(`/${page.path}`));
-        return escrowHead(page ? pageHead(html, page) : html);
+        const rendered = page ? pageHead(html, page) : html;
+        return page?.path === "developers" || page?.path === "audit" ? rendered : escrowHead(rendered);
       },
     },
     generateBundle: {

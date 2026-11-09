@@ -9,6 +9,43 @@ import * as zod from 'zod';
 
 
 /**
+ * L402 protected. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Success consumes the single-use capability. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
+ * @summary Paid heuristic Article 12 prompt risk review
+ */
+export const ScanArticle12PromptHeader = zod.object({
+  "Authorization": zod.string().optional()
+})
+
+export const scanArticle12PromptBodyPromptMin = 20;
+export const scanArticle12PromptBodyPromptMax = 20000;
+
+
+
+export const ScanArticle12PromptBody = zod.object({
+  "prompt": zod.string().min(scanArticle12PromptBodyPromptMin).max(scanArticle12PromptBodyPromptMax)
+})
+
+export const scanArticle12PromptResponseComplianceHashRegExp = new RegExp('^[0-9a-f]{64}$');
+export const scanArticle12PromptResponsePromptSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const ScanArticle12PromptResponse = zod.object({
+  "schema": zod.enum(['article12-heuristic/v1']),
+  "overall_risk_level": zod.enum(['Low', 'Medium', 'High']),
+  "flagged_categories": zod.array(zod.object({
+  "category": zod.enum(['pii_biometric', 'financial_execution', 'autonomous_deployment']),
+  "label": zod.string(),
+  "risk_level": zod.enum(['High']),
+  "rationale": zod.string()
+})),
+  "compliance_hash": zod.string().regex(scanArticle12PromptResponseComplianceHashRegExp),
+  "prompt_sha256": zod.string().regex(scanArticle12PromptResponsePromptSha256RegExp),
+  "receipt_type": zod.enum(['simulated_zk_receipt']),
+  "limitations": zod.string()
+})
+
+
+/**
  * Public, read-only alias of /yield-metrics.json. No authentication or payment.
  * Scope is mainnet-outbound. Counts terminal mainnet claims (settled or failed)
  * and sums only settled amounts. Historical mock deductions, pending claims

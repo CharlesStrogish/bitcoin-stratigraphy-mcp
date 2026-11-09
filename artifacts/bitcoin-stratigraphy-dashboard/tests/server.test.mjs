@@ -10,7 +10,7 @@ import { createFrontendApp } from "../server.mjs";
 let server;
 let directory;
 let origin;
-const pages = ["enterprise", "whitepaper", "compliance", "simulator", "standard", "manifesto", "security", "ceremony"];
+const pages = ["enterprise", "whitepaper", "compliance", "simulator", "standard", "manifesto", "security", "ceremony", "developers", "audit"];
 before(async () => {
   directory = await mkdtemp(path.join(tmpdir(), "domain-routing-"));
   await writeFile(path.join(directory, "index.html"),

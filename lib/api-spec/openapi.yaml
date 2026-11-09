@@ -759,6 +759,54 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /scanner:
+    post:
+      operationId: scanArticle12Prompt
+      summary: Paid heuristic Article 12 prompt risk review
+      description: >-
+        L402 protected. First POST returns 402 and WWW-Authenticate.
+        Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP
+        to verify incoming merchant settlement; 409 means keep the original
+        invoice and poll again. Success consumes the single-use capability.
+        Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
+      parameters:
+        - in: header
+          name: Authorization
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScannerInput"
+      responses:
+        "200":
+          description: Paid heuristic report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerReport"
+        "400":
+          description: Invalid prompt or unsupported funding mode
+        "401":
+          description: Expired credential
+        "402":
+          description: Payment required; invoice and macaroon in WWW-Authenticate
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+        "403":
+          description: Invalid or wrong-prompt credential
+        "409":
+          description: Original invoice payment not confirmed; retry same credential
+        "429":
+          description: Rate limited
+        "502":
+          description: Merchant settlement verification unavailable
+        "503":
+          description: Scanner unavailable
   /api/yield-metrics:
     servers:
       - url: https://bitcoinstratigraphy.com
@@ -2895,6 +2943,56 @@ components:
                   items:
                     $ref: "#/components/schemas/GetPublicYieldProofs200Item"
   schemas:
+    ScannerInput:
+      type: object
+      additionalProperties: false
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          minLength: 20
+          maxLength: 20000
+    ScannerFlag:
+      type: object
+      additionalProperties: false
+      required: [category, label, risk_level, rationale]
+      properties:
+        category:
+          type: string
+          enum: [pii_biometric, financial_execution, autonomous_deployment]
+        label:
+          type: string
+        risk_level:
+          type: string
+          enum: [High]
+        rationale:
+          type: string
+    ScannerReport:
+      type: object
+      additionalProperties: false
+      required: [schema, overall_risk_level, flagged_categories, compliance_hash, prompt_sha256, receipt_type, limitations]
+      properties:
+        schema:
+          type: string
+          enum: [article12-heuristic/v1]
+        overall_risk_level:
+          type: string
+          enum: [Low, Medium, High]
+        flagged_categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScannerFlag"
+        compliance_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        prompt_sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        receipt_type:
+          type: string
+          enum: [simulated_zk_receipt]
+        limitations:
+          type: string
     PayloadSigningIdentity:
       type: object
       required: [algorithm, publicKey, keyId]

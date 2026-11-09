@@ -87,6 +87,8 @@ import type {
   RegisterEnterpriseFleet200,
   RegistryServerCard,
   RevokeNip98Key200,
+  ScannerInput,
+  ScannerReport,
   SettleEnterpriseCreditTab200,
   SettleEnterpriseCreditTab402,
   SettlementAssetSelectionError,
@@ -138,6 +140,78 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getScanArticle12PromptUrl = () => {
+
+
+
+
+  return `/api/scanner`
+}
+
+/**
+ * L402 protected. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Success consumes the single-use capability. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
+ * @summary Paid heuristic Article 12 prompt risk review
+ */
+export const scanArticle12Prompt = async (scannerInput: ScannerInput, options?: Parameters<typeof customFetch>[1]): Promise<ScannerReport> => {
+
+  return customFetch<ScannerReport>(getScanArticle12PromptUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(scannerInput)
+  }
+);}
+
+
+
+
+
+export const getScanArticle12PromptMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scanArticle12Prompt>>, TError,{data: BodyType<ScannerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof scanArticle12Prompt>>, TError,{data: BodyType<ScannerInput>}, TContext> => {
+
+const mutationKey = ['scanArticle12Prompt'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof scanArticle12Prompt>>, {data: BodyType<ScannerInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  scanArticle12Prompt(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ScanArticle12PromptMutationResult = NonNullable<Awaited<ReturnType<typeof scanArticle12Prompt>>>
+    export type ScanArticle12PromptMutationBody = BodyType<ScannerInput>
+    export type ScanArticle12PromptMutationError = ErrorType<void>
+
+    /**
+ * @summary Paid heuristic Article 12 prompt risk review
+ */
+export const useScanArticle12Prompt = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scanArticle12Prompt>>, TError,{data: BodyType<ScannerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof scanArticle12Prompt>>,
+        TError,
+        {data: BodyType<ScannerInput>},
+        TContext
+      > => {
+      return useMutation(getScanArticle12PromptMutationOptions(options));
+    }
 
 export const getGetYieldMetricsUrl = () => {
 

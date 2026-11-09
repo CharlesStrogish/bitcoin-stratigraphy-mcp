@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/scanner.test.js",
   "./dist/mcp-directory.test.js",
   "./dist/clearing.test.js",
   "./dist/yield-staking.test.js",
@@ -203,6 +204,7 @@ await build({
     "swarm-protocol.test": "./tests/unit/swarm-protocol.test.ts",
     "primaryStratigraphy.test": "./tests/unit/primaryStratigraphy.test.ts",
     "escrow.test": "./src/routes/escrow.test.ts",
+    "scanner.test": "./src/routes/scanner.test.ts",
     "escrowLedger.test": "./src/services/escrowLedger.test.ts",
     "escrowRecovery.test": "./tests/unit/escrowRecovery.test.ts",
     "startup-server.test": "./tests/unit/startup-server.test.ts",

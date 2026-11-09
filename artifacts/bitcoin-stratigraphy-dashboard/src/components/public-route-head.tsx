@@ -10,18 +10,23 @@ import {
   SECURITY_ARTICLE, SECURITY_DESCRIPTION, SECURITY_TITLE,
 } from "@/lib/security-seo";
 import { CEREMONY_DESCRIPTION, CEREMONY_TITLE } from "@/lib/ceremony-seo";
+import { FUNNEL_PAGES } from "@/lib/funnel-seo";
 
 /** Keep crawler-facing URLs and escrow attribution correct after SPA navigation. */
 export function PublicRouteHead() {
   const [location] = useLocation();
   useEffect(() => {
     const path = location.split("?")[0]!.replace(/\/$/, "") || "/";
-    const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance", "/manifesto", "/security", "/ceremony"];
+    const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance", "/manifesto", "/security", "/ceremony", "/developers", "/audit"];
     if (!publicPaths.includes(path)) return;
     const url = path === "/" ? siteUrl("/") : pageUrl(path);
     document.querySelector('link[rel="canonical"]')?.setAttribute("href", url);
     document.querySelector('meta[property="og:url"]')?.setAttribute("content", url);
     document.querySelector('meta[name="twitter:url"]')?.setAttribute("content", url);
+    if (path === "/developers" || path === "/audit") {
+      document.getElementById("escrow-application-jsonld")?.remove();
+      return;
+    }
     let script = document.getElementById("escrow-application-jsonld");
     if (!script) {
       script = document.createElement("script");
@@ -33,6 +38,33 @@ export function PublicRouteHead() {
       "@context": "https://schema.org",
       ...ESCROW_APPLICATION,
     });
+  }, [location]);
+  useEffect(() => {
+    const path = location.split("?")[0]!.replace(/\/$/, "");
+    const page = FUNNEL_PAGES.find((entry) => `/${entry.path}` === path);
+    if (!page) return;
+    const previousTitle = document.title;
+    document.title = page.title;
+    const changes = [
+      ['meta[name="description"]', page.description],
+      ['meta[property="og:title"]', page.title],
+      ['meta[property="og:description"]', page.description],
+      ['meta[property="og:type"]', "website"],
+      ['meta[name="twitter:title"]', page.title],
+      ['meta[name="twitter:description"]', page.description],
+    ].map(([selector, value]) => {
+      const element = document.querySelector(selector!);
+      const previous = element?.getAttribute("content");
+      element?.setAttribute("content", value!);
+      return { element, previous };
+    });
+    return () => {
+      document.title = previousTitle;
+      for (const { element, previous } of changes) {
+        if (previous == null) element?.removeAttribute("content");
+        else element?.setAttribute("content", previous);
+      }
+    };
   }, [location]);
   useEffect(() => {
     const path = location.split("?")[0]!.replace(/\/$/, "");

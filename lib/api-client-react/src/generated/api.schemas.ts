@@ -5,6 +5,72 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+export interface ScannerInput {
+  /**
+     * @minLength 20
+     * @maxLength 20000
+     */
+  prompt: string;
+}
+
+export type ScannerFlagCategory = typeof ScannerFlagCategory[keyof typeof ScannerFlagCategory];
+
+
+export const ScannerFlagCategory = {
+  pii_biometric: 'pii_biometric',
+  financial_execution: 'financial_execution',
+  autonomous_deployment: 'autonomous_deployment',
+} as const;
+
+export type ScannerFlagRiskLevel = typeof ScannerFlagRiskLevel[keyof typeof ScannerFlagRiskLevel];
+
+
+export const ScannerFlagRiskLevel = {
+  High: 'High',
+} as const;
+
+export interface ScannerFlag {
+  category: ScannerFlagCategory;
+  label: string;
+  risk_level: ScannerFlagRiskLevel;
+  rationale: string;
+}
+
+export type ScannerReportSchema = typeof ScannerReportSchema[keyof typeof ScannerReportSchema];
+
+
+export const ScannerReportSchema = {
+  'article12-heuristic/v1': 'article12-heuristic/v1',
+} as const;
+
+export type ScannerReportOverallRiskLevel = typeof ScannerReportOverallRiskLevel[keyof typeof ScannerReportOverallRiskLevel];
+
+
+export const ScannerReportOverallRiskLevel = {
+  Low: 'Low',
+  Medium: 'Medium',
+  High: 'High',
+} as const;
+
+export type ScannerReportReceiptType = typeof ScannerReportReceiptType[keyof typeof ScannerReportReceiptType];
+
+
+export const ScannerReportReceiptType = {
+  simulated_zk_receipt: 'simulated_zk_receipt',
+} as const;
+
+export interface ScannerReport {
+  schema: ScannerReportSchema;
+  overall_risk_level: ScannerReportOverallRiskLevel;
+  flagged_categories: ScannerFlag[];
+  /** @pattern ^[0-9a-f]{64}$ */
+  compliance_hash: string;
+  /** @pattern ^[0-9a-f]{64}$ */
+  prompt_sha256: string;
+  receipt_type: ScannerReportReceiptType;
+  limitations: string;
+}
+
 export type PayloadSigningIdentityAlgorithm = typeof PayloadSigningIdentityAlgorithm[keyof typeof PayloadSigningIdentityAlgorithm];
 
 

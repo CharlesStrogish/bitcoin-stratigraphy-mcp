@@ -59,6 +59,7 @@ import { registerEnterpriseRoutes } from "./routes/enterprise";
 import { createEscrowRecovery } from "./services/escrowRecovery";
 import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store";
 import { registerComplianceRoutes } from "./routes/compliance";
+import { registerScannerRoute } from "./routes/scanner";
 import { EnterpriseEconomics, configureEnterpriseEconomics } from "./lib/enterprise-economics";
 import { createPostgresEnterpriseEconomicsStore } from "./lib/enterprise-economics-store";
 import { createEnterpriseEconomicsMiddleware } from "./middleware/enterprise-economics";
@@ -165,6 +166,11 @@ registerNip98RevocationAdmin(app, nip98Revocations);
 registerComplianceRoutes(app, nip98Revocations);
 
 const macaroonUsageStore = createPostgresMacaroonUsageStore();
+registerScannerRoute(app, {
+  usageStore: macaroonUsageStore,
+  revocationStore: createPostgresMacaroonRevocationStore(),
+  ledger: revenueLedger,
+});
 
 registerOpenApiRoute(app);
 registerDocsRoutes(app);

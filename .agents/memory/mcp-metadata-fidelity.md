@@ -76,3 +76,15 @@ produce configuration that looks plausible but cannot configure a real client.
 **How to apply:** Point the plugin's OpenAPI URL at the actual schema and
 advertise MCP execution separately. Describe the live POST/GET behavior rather
 than adding an SSE endpoint or changing payment execution to match metadata.
+
+Document the deliberate clearing and mesh namespace omissions when maintaining
+tool completeness metadata; do not implement missing operations merely to
+satisfy a registry score.
+
+**Why:** The user explicitly defines clearing polling, listing, cancellations
+and automated refunds as intentionally disabled for manual payout verification
+and drain prevention, and mesh peer/subscription management as intentionally
+disabled in favor of startup-defined topology.
+
+**How to apply:** Preserve the requested explanatory notes in both tools of
+each namespace and distinguish metadata improvements from behavioral changes.

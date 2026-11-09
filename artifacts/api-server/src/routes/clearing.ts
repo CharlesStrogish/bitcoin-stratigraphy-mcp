@@ -65,7 +65,7 @@ export const clearingToolDefinitions = [
   {
     name: "clearing.create_contract",
     description:
-      "Reserve a private A2A contract and issue its funding invoice. Buyer comes only from fresh NIP-98 authentication. Production receipt settlement uses the Solo Founder Genesis Groth16 key and merchant-confirmed funding. This proves Poseidon preimage knowledge, not arbitrary task execution. No automated payout or refund is enabled; funding remains merchant-controlled. An unpaid invoice is not locked funds.",
+      "Reserve a private A2A contract and issue its funding invoice. Buyer comes only from fresh NIP-98 authentication. Production receipt settlement uses the Solo Founder Genesis Groth16 key and merchant-confirmed funding. This proves Poseidon preimage knowledge, not arbitrary task execution. No automated payout or refund is enabled; funding remains merchant-controlled. An unpaid invoice is not locked funds. Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -90,7 +90,7 @@ export const clearingToolDefinitions = [
   {
     name: "clearing.settle_contract",
     description:
-      "Record a funded escrow contract as settled with a signed Groth16 preimage receipt. Production uses the Solo Founder Genesis key; opted-in local development retains its separate key and receipt domain. Requires the exact NIP-98 worker, task/escrow-bound proof and merchant-confirmed invoice funding before an atomic, idempotent evidence commit. No automated payout, arbitrary-execution guarantee or legal indemnity. Funds remain merchant-controlled.",
+      "Record a funded escrow contract as settled with a signed Groth16 preimage receipt. Production uses the Solo Founder Genesis key; opted-in local development retains its separate key and receipt domain. Requires the exact NIP-98 worker, task/escrow-bound proof and merchant-confirmed invoice funding before an atomic, idempotent evidence commit. No automated payout, arbitrary-execution guarantee or legal indemnity. Funds remain merchant-controlled. Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
     inputSchema: {
       type: "object",
       additionalProperties: false,

@@ -3831,7 +3831,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.get_status",
     title: "Get Mesh Status",
     description:
-      "Inspect local mesh network topology, active peer connections, and relay synchronization state. Returns connected peer counts, latency figures, and gossip protocol health. Use this tool to check node network connectivity prior to broadcasting or querying distributed telemetry. Read-only and idempotent.",
+      "Inspect local mesh network topology, active peer connections, and relay synchronization state. Returns connected peer counts, latency figures, and gossip protocol health. Use this tool to check node network connectivity prior to broadcasting or querying distributed telemetry. Read-only and idempotent. Note: Dynamic peer discovery, peer add/remove, and subscription management are intentionally disabled in this namespace. Mesh topology is statically defined at startup for zero-trust security.",
     annotations: meshStatusToolAnnotations,
     inputSchema: {
       type: "object",
@@ -3865,7 +3865,7 @@ const baseMcpToolDefinitions = [
     name: "mesh.broadcast",
     title: "Broadcast Telemetry Snapshot to Mesh",
     description:
-      "Broadcast local telemetry snapshots and stratigraphy receipts to peer nodes across the Stratigraphy mesh network. Use this tool to propagate sovereign node state, sync multi-agent clusters, or announce new block validation events. Use mesh.get_status to inspect local peer connectivity before broadcasting. Requires network authorization or L402 settlement token.",
+      "Broadcast local telemetry snapshots and stratigraphy receipts to peer nodes across the Stratigraphy mesh network. Use this tool to propagate sovereign node state, sync multi-agent clusters, or announce new block validation events. Use mesh.get_status to inspect local peer connectivity before broadcasting. Requires network authorization or L402 settlement token. Note: Dynamic peer discovery, peer add/remove, and subscription management are intentionally disabled in this namespace. Mesh topology is statically defined at startup for zero-trust security.",
     annotations: submissionToolAnnotations,
     inputSchema: {
       type: "object",

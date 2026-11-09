@@ -13,3 +13,13 @@ The test runner can exclude that directory even for an explicitly supplied file.
 **How to apply:** Prefer an ignored package-local generated-output directory
 outside `node_modules`, retaining package dependency resolution. Do not rebuild
 the shared API distribution concurrently with the workspace test runner.
+
+For isolated API contract tests, preserve the existing bundler harness's YAML
+loader, external dependencies, and uniquely aliased banner imports.
+
+**Why:** Direct TypeScript execution cannot load the imported OpenAPI YAML;
+generic banner import names can collide with bundled application imports before
+any tests execute.
+
+**How to apply:** Reuse the established harness settings rather than assuming
+a direct TypeScript test command is equivalent.

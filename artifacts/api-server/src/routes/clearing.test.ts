@@ -204,6 +204,14 @@ test("clearing catalog and dispatch never replace any sealed core contract", asy
     clearingToolDefinitions.map((t) => t.name),
     ["clearing.create_contract", "clearing.settle_contract"],
   );
+  for (const name of ["clearing.create_contract", "clearing.settle_contract"]) {
+    assert.ok(
+      listed.body.result.tools.find((tool: { name: string }) => tool.name === name)
+        .description.includes(
+          "Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
+        ),
+    );
+  }
   const queries = statements.length,
     invoices = invoiceCalls;
   for (const tool of mcpToolDefinitions) {

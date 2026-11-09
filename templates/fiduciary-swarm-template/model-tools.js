@@ -27,12 +27,17 @@ export function modelReceipt(receipt) {
 }
 
 /** Retain the SDK's native LangChain adapters, adding a model-safe output boundary. */
-export function modelSafeTools(connected) {
+export function modelSafeTools(connected, { signal } = {}) {
   const allowed = new Set(connected.fiduciary.openAITools
     .filter((_, index) => READ_ONLY_TOOLS.has(connected.fiduciary.tools[index].name))
     .map((descriptor) => descriptor.function.name));
   const tools = connected.tools.filter((entry) => allowed.has(entry.name)).map((entry) =>
-    tool(async (args) => modelReceipt(await entry.invoke(args)), {
+    tool(async (args) => {
+      signal?.throwIfAborted();
+      const receipt = await entry.invoke(args);
+      signal?.throwIfAborted();
+      return modelReceipt(receipt);
+    }, {
       name: entry.name,
       description: entry.description,
       schema: entry.schema,

@@ -20,6 +20,13 @@ importers:
       langchain:
         specifier: 1.6.3
         version: 1.6.3(@langchain/core@1.3.5(openai@7.53.0(zod@4.6.7)))(openai@7.53.0(zod@4.6.7))
+    devDependencies:
+      '@noble/curves':
+        specifier: 2.0.1
+        version: 2.0.1
+      '@scure/base':
+        specifier: 2.0.0
+        version: 2.0.0
 
 packages:
 

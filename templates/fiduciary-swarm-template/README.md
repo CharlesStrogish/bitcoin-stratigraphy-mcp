@@ -105,10 +105,105 @@ stdout; the SDK's yield diagnostics remain on stderr.
   it to bypass a spend cap or retry an unknown payment outcome.
 - **No secret-bearing errors:** the CLI does not print raw provider exceptions,
   wallet URIs, authorization headers or payment proofs.
+- **Developer-defined risk gate:** prompts involving PII, financial execution or
+  code deployment stop before wallet connection, MCP discovery or model creation.
+  The message instructs the caller to request and settle a dynamic server-issued
+  L402 invoice via the approved MCP tool to clear the gate. This is an application
+  policy, not a statutory Article 12 payment requirement or a legal assessment.
+- **Paid, bounded delegation:** complex tasks may invoke
+  `spawn_fiduciary_sub_agent(sub_task)`. Every child requires a fresh paid admission,
+  shares the parent's SDK connection and cumulative Lightning limits, and receives
+  only read-only tools. Two sequential child attempts maximum; children cannot
+  spawn other children.
 
 The SDK supports the engine's conditional programmatic L402 revenue sharing.
 Allocations and successful outgoing withdrawals are different events; free
 discovery, unconfirmed payments and pending claims are not paid yield.
+
+## Risk Gate and Dynamic Paid Authorization
+
+For example, this prompt halts locally without requesting a model or payment:
+
+```sh
+pnpm start -- "Explain handling PII in a research workflow."
+```
+
+The halt message explicitly instructs the agent to **request a dynamic L402 invoice
+from the server via the approved MCP tool** and settle it through the shared SDK.
+An operator may authorize that step:
+
+```sh
+pnpm start -- --authorize-risk "Explain handling PII in a research workflow."
+```
+
+`--authorize-risk` is permission to attempt the paid step, **not** proof of payment
+and not a bypass. Before creating the model, the template calls the discovered
+native adapter for `stratigraphy.get` with `{ days: 1, limit: 1 }`. This is an
+existing paid grounding-data product: its HTTP 402 challenge supplies the actual
+invoice and price, and the unmodified SDK handles payment and the authenticated
+retry. The returned record becomes grounding data for the research task.
+
+The gate clears only if the SDK returns a verified response with fresh, positive
+settlement evidence and a valid payment-hash/preimage binding. A free response,
+replayed payment, failed signature, application error, invoice above the shared
+limits, or uncertain wallet result does not clear it. There is **no** fabricated
+50-sat tariff, special compliance invoice endpoint, ZK-indemnity receipt or
+government-issued approval. Payment never enables trading or code execution:
+the tool allowlist remains read-only.
+
+The existing **50-sat per-invoice and 250-sat cumulative caps remain unchanged**.
+These are authorization ceilings, not quoted prices. If the server's dynamic
+quote exceeds a cap, execution stops; the template never increases the cap or
+splits a charge to evade it. Do not automatically repay after an uncertain
+outcome. An already settled invoice is not automatically refunded if later
+verification, model execution or delegation fails.
+
+Risk screening uses conservative local keyword and identifier patterns. It may
+flag harmless educational questions and miss contextual or obfuscated risks; it
+is not exhaustive PII detection or a substitute for production policy controls.
+Do not send sensitive records to a model solely because this check passed.
+
+## Temporary Sub-Agents, Not Uncontrolled Replication
+
+For a complex task, the main agent can choose its registered
+`spawn_fiduciary_sub_agent` tool. A suitable request is:
+
+```sh
+pnpm start -- "Multi-step research: inspect the catalog, then compare available records, next check their provenance, finally summarize the evidence and its limitations."
+```
+
+The instance-scoped function is created by `createDelegationController` in
+`delegation.js`. Its sequence is:
+
+1. Require a nonempty subtask of at most 4,000 characters, a complex parent task,
+   and a shorter estimated input text. Apply the risk gate again; a model cannot
+   grant itself the operator's `--authorize-risk` permission.
+2. Reserve one of **two total child attempts** before any asynchronous work.
+   Parallel spawning is refused; failed attempts do not replenish the allowance.
+3. Request the same server-priced grounding product through the **same SDK
+   connection**, and require fresh settled payment evidence before constructing
+   a child model. The parent gate and all children share one admission authority:
+   one invoice cannot authorize two children or both a gate and a child.
+4. Run an in-process temporary LangChain agent with a 600-output-token ceiling,
+   six-step recursion limit and the parent's two-minute deadline. Child tools do
+   not include the spawning function, so maximum delegation depth is **one**.
+5. Return its answer, model-safe funding evidence and the cost estimate to the
+   parent. Never pass payment preimages, macaroons or raw wallet errors to a model.
+   Settlement or child-execution failure stops the run, rather than prompting an
+   automatic replacement payment.
+
+Normal single-step research does not acquire an extra admission invoice and does
+not expose the spawning tool. Children may make additional paid data requests,
+but those consume the same SDK spend circuit and durable total—not a fresh
+per-child budget. No daemon, file replication, process spawning or persistent
+sub-agent service is created.
+
+**Cost heuristic, not an optimality proof:** approximate input-text tokens as
+`ceil(character_count / 4)`. Delegation is eligible only when
+`estimated_parent_input_tokens - estimated_subtask_input_tokens > 0`. This estimate
+excludes system prompts, grounding records, outputs, network overhead, model fees
+and Lightning charges. It does not prove lower total compute or financial cost;
+the agent can solve the problem inline instead.
 
 ## Make It Your Swarm
 
@@ -127,6 +222,10 @@ pnpm audit
 
 Tests use synthetic data and a local model double. They do not contact the
 production MCP endpoint, a model provider or a live Lightning wallet.
+Paid-path tests exercise the published SDK's real 402 challenge/retry flow using
+locally signed synthetic BOLT11 invoices, an intercepted wallet and disposable
+in-memory server keys. They cover variable prices, shared limits, rejected proofs,
+tampered responses, cancellation, bounded spawning and the main/child LangChain loop.
 
 ## Evidence, Not Another Promise
 

@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env index.js",
-    "check": "node --check index.js && node --check config.js && node --check model-tools.js",
+    "check": "node --check index.js && node --check config.js && node --check model-tools.js && node --check risk-policy.js && node --check paid-admission.js && node --check delegation.js",
     "test": "node --test test/*.test.js",
     "audit": "pnpm audit"
   },
@@ -19,5 +19,9 @@
     "@langchain/core": "1.3.5",
     "@langchain/openai": "1.8.2",
     "langchain": "1.6.3"
+  },
+  "devDependencies": {
+    "@noble/curves": "2.0.1",
+    "@scure/base": "2.0.0"
   }
 }

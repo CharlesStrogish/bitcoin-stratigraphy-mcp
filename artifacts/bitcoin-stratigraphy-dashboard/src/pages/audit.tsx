@@ -132,22 +132,18 @@ export default function AuditPage({ base = import.meta.env.BASE_URL }: { base?: 
         <div aria-live="polite">
           {challenge && !report && (
             <section className="fn-pay fn-rise" aria-labelledby={`${id}-pay`} data-testid="panel-payment">
-              <div className="fn-pay-qr">
-                {phase === "expired" ? (
-                  <div className="fn-pay-void">Invoice expired</div>
-                ) : (
-                  <InvoiceQr invoice={challenge.invoice} />
-                )}
-              </div>
               <div className="fn-pay-body">
                 <p className="fn-kicker">Lightning payment</p>
                 <h2 id={`${id}-pay`} className="fn-amount" data-testid="text-amount">
                   {challenge.amountSats.toLocaleString("en-US")} <small>sats</small>
                 </h2>
                 {phase === "expired" ? (
-                  <p className="fn-msg fn-msg-error" role="alert" data-testid="status-expired">
-                    This invoice expired before payment was confirmed. Start over to request a new one.
-                  </p>
+                  <>
+                    <div className="fn-pay-void">Invoice expired</div>
+                    <p className="fn-msg fn-msg-error" role="alert" data-testid="status-expired">
+                      This invoice expired before payment was confirmed. Start over to request a new one.
+                    </p>
+                  </>
                 ) : (
                   <>
                     <p className="fn-status" role="status" data-testid="status-payment">
@@ -155,7 +151,10 @@ export default function AuditPage({ base = import.meta.env.BASE_URL }: { base?: 
                       {phase === "checking" ? "Checking payment" : "Waiting for payment"}
                       {countdown && <span className="fn-hint"> / expires in {countdown}</span>}
                     </p>
-                    <div className="fn-cta-row fn-cta-tight">
+                    <div className="fn-pay-qr">
+                      <InvoiceQr invoice={challenge.invoice} />
+                    </div>
+                    <div className="fn-pay-actions">
                       <a className="fn-btn fn-btn-primary" href={`lightning:${challenge.invoice}`} data-testid="link-wallet">
                         Open in wallet
                       </a>

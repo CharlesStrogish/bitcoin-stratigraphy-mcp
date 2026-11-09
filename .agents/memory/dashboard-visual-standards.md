@@ -18,7 +18,7 @@ hamburger or left-side content. Make Audit solid gold with dark text. Keep
 desktop branding and navigation unchanged, and fit the mobile header on one
 line without overlap down to 320px.
 
-**Why:** The user prioritized central thumb-zone access and prominent conversion buttons.
+**Why:** The user approved the central thumb-zone layout and prominent conversion buttons.
 
 **How to apply:** Preserve always-visible commercial links when changing mobile
 headers; apply the icon-free, centered CTA layout strictly below 768px.

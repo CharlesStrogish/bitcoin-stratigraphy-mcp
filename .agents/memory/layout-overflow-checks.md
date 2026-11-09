@@ -33,4 +33,9 @@ answer.
 - Clipboard reads and writes have separate browser permission and focus checks.
   Confirm copy-button success and the exact argument sent to the real write API;
   do not treat a denied diagnostic read as a failed application write.
+- Paid-state visual checks must confirm the exact synthetic invoice identity,
+  not merely the presence of a QR code.
+  **Why:** A missed mock can still render valid payment UI from a live quote.
+  **How to apply:** Intercept only the API endpoint, leaving Vite module requests
+  untouched, and assert the fixture invoice before trusting layout measurements.
   **Why:** Headless Chromium can permit writes while denying reads.

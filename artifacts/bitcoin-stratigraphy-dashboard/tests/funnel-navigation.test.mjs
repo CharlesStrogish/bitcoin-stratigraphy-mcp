@@ -26,11 +26,11 @@ const html = renderToStaticMarkup(
 );
 const css = await readFile(new URL("../src/pages/funnel.css", import.meta.url), "utf8");
 
-test("navigation preserves desktop branding and provides an accessible mobile home icon", () => {
+test("navigation preserves desktop branding without a mobile icon", () => {
   assert.match(html, /Bitcoin <em>Stratigraphy<\/em>/);
   assert.match(html, /aria-label="Bitcoin Stratigraphy home"/);
-  assert.match(html, /class="fn-nav-mark" aria-hidden="true">◆/);
-  assert.match(css, /\.fn-nav-mark, .fn-nav-mobile-label\s*\{\s*display:\s*none/);
+  assert.doesNotMatch(html, /fn-nav-mark|◆/);
+  assert.match(css, /\.fn-nav-mobile-label\s*\{\s*display:\s*none/);
   assert.match(css, /\.fn-nav-brand\s*\{[^}]*white-space:\s*nowrap/s);
 });
 
@@ -45,4 +45,15 @@ test("mobile revenue links are always inline with short copy and a primary Audit
   assert.match(css, /@media \(width < 768px\)/);
   assert.match(css, /\.fn-nav-choices\s*\{[^}]*flex-wrap:\s*nowrap/s);
   assert.match(css, /\.fn-nav-link.fn-nav-audit\s*\{[^}]*background:\s*hsl\(var\(--fn-amber\)\)/s);
+});
+
+test("mobile funnels are centered, equally prominent and never pushed right", () => {
+  const mobile = css.split("@media (width < 768px) {")[1].split("@media (max-width: 767px)")[0];
+  assert.match(mobile, /\.fn-nav\s*\{[^}]*justify-content:\s*center/s);
+  assert.match(mobile, /\.fn-nav-brand, .fn-nav-label, .fn-nav-hint\s*\{\s*display:\s*none/);
+  assert.match(mobile, /\.fn-nav-choices\s*\{[^}]*justify-content:\s*center;[^}]*margin:\s*0/s);
+  assert.match(mobile, /font-size:\s*18px/);
+  assert.match(mobile, /min-height:\s*56px/);
+  assert.match(mobile, /padding:\s*16px 24px/);
+  assert.doesNotMatch(mobile, /margin-left:\s*auto|justify-content:\s*(?:flex-end|end)/);
 });

@@ -11,7 +11,6 @@ export default function FunnelNavigation() {
   return (
     <nav className="fn-nav" aria-label="Primary">
       <Link href="/" className="fn-nav-brand" aria-label="Bitcoin Stratigraphy home" data-testid="link-nav-home">
-        <span className="fn-nav-mark" aria-hidden="true">◆</span>
         <span className="fn-nav-brand-text">Bitcoin <em>Stratigraphy</em></span>
       </Link>
       <div className="fn-nav-choices">

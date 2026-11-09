@@ -1,13 +1,17 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { after, test } from "node:test";
 import express from "express";
 import { registerScannerRoute } from "./scanner";
 import { analyzeScannerPrompt, scannerPromptHash } from "../lib/scanner";
 import type { SettlementRouter } from "../services/settlement";
+import { createMemoryMacaroonUsageStore } from "../lib/macaroon-usage-store";
+import { attenuateSubscriptionMacaroon, createSubscriptionMacaroon, inspectSubscriptionMacaroon } from "../lib/subscription-pass";
+import { createL402Middleware } from "../middleware/l402";
+import { SCANNER_CREDIT_DESCRIPTION } from "../lib/scanner-credits";
 
 const servers: ReturnType<ReturnType<typeof express>["listen"]>[] = [];
 after(async () => {
@@ -53,7 +57,7 @@ test("real L402 gate binds exact prompt, retains pending invoice, verifies merch
     circuitState: () => "closed",
     createInvoice: async (input) => {
       invoices++;
-      assert.ok(input.amountMsats >= 21000);
+      assert.equal(input.amountMsats, 5_000_000);
       assert.equal(input.expirySeconds, 900);
       return { invoice: "lnbc1syntheticinvoice", paymentHash, provider: "synthetic-scanner", asset: "btc-lightning" };
     },
@@ -62,7 +66,7 @@ test("real L402 gate binds exact prompt, retains pending invoice, verifies merch
       assert.equal(input.paymentHash, paymentHash);
       assert.equal(input.verificationMode, "merchant-lookup");
       assert.match(input.expectedDescription ?? "", /Article 12 heuristic/);
-      assert.ok((input.expectedAmountMsats ?? 0) >= 21000);
+      assert.equal(input.expectedAmountMsats, 5_000_000);
       return paid ? { settledAt: Math.floor(Date.now() / 1000), provider: "synthetic-scanner", asset: "btc-lightning" } : "invalid";
     },
   };
@@ -92,6 +96,7 @@ test("real L402 gate binds exact prompt, retains pending invoice, verifies merch
   assert.equal(challenge.headers.get("cache-control"), "no-store");
   assert.match(challenge.headers.get("www-authenticate")!, /^L402 macaroon="/);
   const quote = await challenge.json() as Record<string, unknown>;
+  assert.equal(quote.amount_sats, 5000);
   assert.equal("overall_risk_level" in quote, false);
   const authorization = `L402 ${quote.macaroon}:NWC_LOOKUP`;
   const pending = await post({ prompt }, authorization);
@@ -108,4 +113,132 @@ test("real L402 gate binds exact prompt, retains pending invoice, verifies merch
   assert.deepEqual(await result.json(), analyzeScannerPrompt(prompt));
   const reused = await post({ prompt }, authorization);
   assert.notEqual(reused.status, 200);
+});
+
+test("100000-sat prepaid grants retain pending invoices and share exactly 100 credits across workers and descendants", async () => {
+  const secret = "synthetic-scanner-credit-test-only";
+  const hash = createHash("sha256").update("credit-invoice").digest("hex");
+  let paid = false, invoices = 0, unavailable = false;
+  const revoked = new Set<string>();
+  const usageStore = createMemoryMacaroonUsageStore();
+  const revocationStore = {
+    isRevoked: async (id: string) => {
+      if (unavailable) throw new Error("synthetic revocation outage");
+      return revoked.has(id);
+    },
+    revoke: async (signatureId: string) => ({ signatureId, revokedAt: new Date() }),
+  };
+  const router: SettlementRouter = {
+    isConfigured: () => true, activeProvider: () => "synthetic-credit", circuitState: () => "closed",
+    createInvoice: async (input) => {
+      invoices++;
+      assert.equal(input.amountMsats, 100_000_000);
+      assert.equal(input.description, SCANNER_CREDIT_DESCRIPTION);
+      assert.equal(input.expirySeconds, 900);
+      return { invoice: "lnbc1syntheticcredits", paymentHash: hash, provider: "synthetic-credit", asset: "btc-lightning" };
+    },
+    verifyPayment: async (input) => {
+      assert.equal(input.paymentHash, hash);
+      assert.equal(input.expectedAmountMsats, 100_000_000);
+      assert.equal(input.expectedDescription, SCANNER_CREDIT_DESCRIPTION);
+      return paid ? { settledAt: Math.floor(Date.now() / 1000), provider: "synthetic-credit", asset: "btc-lightning" } : "invalid";
+    },
+  };
+  const bases: string[] = [];
+  for (let worker = 0; worker < 3; worker++) {
+    const app = express();
+    app.use(express.json());
+    registerScannerRoute(app, {
+      settlementRouter: router, sessionSecret: secret, revocationStore,
+      usageStore: worker === 2 ? { consume: async () => { throw new Error("synthetic quota outage"); } } : usageStore,
+    });
+    app.post("/other-paid-route", createL402Middleware({
+      amountSats: 100_000, description: "different product", settlementRouter: router, sessionSecret: secret,
+    }), (_req, res) => { res.json({ wrong: true }); });
+    const server = app.listen(0, "127.0.0.1");
+    servers.push(server);
+    await new Promise<void>(resolve => server.once("listening", resolve));
+    bases.push(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
+  }
+  const post = (path: string, body: unknown = {}, token?: string, worker = 0) =>
+    fetch(bases[worker] + path, {
+      method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `L402 ${token}:NWC_LOOKUP` } : {}) },
+      body: JSON.stringify(body),
+    });
+  assert.equal((await post("/api/mint-macaroon", { credits: 1000 })).status, 400);
+  const challenge = await post("/api/mint-macaroon");
+  assert.equal(challenge.status, 402);
+  const quote = await challenge.json() as { amount_sats: number; credits: number; macaroon: string };
+  assert.equal(quote.amount_sats, 100_000);
+  assert.equal(quote.credits, 100);
+  const token: string = quote.macaroon;
+  const pass = inspectSubscriptionMacaroon(token, secret)!;
+  assert.equal(pass.scannerCredits, 100);
+  assert.deepEqual(pass.allowedPaths, ["/api/scanner"]);
+  assert.equal(pass.requestLimits[0]?.maxRequests, 100);
+  assert.ok(pass.validUntil > Date.now() / 1000 + 29 * 86400);
+  assert.ok(JSON.parse(Buffer.from(token, "base64url").toString()).caveats.includes("credits=100"));
+  assert.equal((await post("/api/mint-macaroon", {}, token)).status, 409);
+  const prompt = { prompt: "Review this harmless synthetic agent log for an enterprise scanner test." };
+  assert.equal((await post("/api/scanner", prompt, token)).status, 409);
+  assert.equal(invoices, 1);
+  paid = true;
+  assert.equal((await post("/api/scanner", prompt, token, 2)).status, 503);
+  for (let worker = 0; worker < 2; worker++) {
+    const minted = await post("/api/mint-macaroon", {}, token, worker);
+    assert.equal(minted.status, 200);
+    assert.equal((await minted.json() as { macaroon: string }).macaroon, token);
+  }
+  assert.equal((await post("/api/scanner", { prompt: "short" }, token)).status, 400);
+  assert.equal((await post("/other-paid-route", {}, token)).status, 403);
+  const expired = attenuateSubscriptionMacaroon(token, ["time < 2000-01-01T00:00:00.000Z"])!;
+  assert.equal((await post("/api/scanner", prompt, expired)).status, 401);
+  const expiredRoot = attenuateSubscriptionMacaroon(createSubscriptionMacaroon({
+    secret, paymentHash: hash, tier: "1-day", validUntil: Math.floor(Date.now() / 1000) - 1,
+    amountMsats: 100_000_000, baseAmountMsats: 100_000_000, scannerCredits: 100,
+    paymentAsset: "btc-lightning", paymentProvider: "synthetic-credit",
+  }), ["allowed_path=/api/scanner"])!;
+  assert.equal((await post("/api/mint-macaroon", {}, expiredRoot)).status, 401);
+  assert.equal((await post("/api/scanner", prompt, expiredRoot)).status, 401);
+  assert.equal(invoices, 1);
+  const child = attenuateSubscriptionMacaroon(token, ["max_requests=1"])!;
+  assert.equal((await post("/api/scanner", prompt, child)).status, 200);
+  assert.equal((await post("/api/scanner", prompt, child, 1)).status, 429);
+  const results = await Promise.all(Array.from({ length: 110 }, async (_, i) =>
+    (await post("/api/scanner", { prompt: `${prompt.prompt} Record ${i}.` }, token, i % 2)).status));
+  assert.equal(results.filter(status => status === 200).length, 99);
+  assert.equal(results.filter(status => status === 429).length, 11);
+  assert.equal(invoices, 1);
+  // Confirmation retries are idempotent, never a quota reset.
+  assert.equal((await post("/api/mint-macaroon", {}, token)).status, 200);
+  assert.equal((await post("/api/scanner", prompt, token)).status, 429);
+  assert.equal(invoices, 1);
+  revoked.add(pass.tokenId);
+  assert.equal((await post("/api/scanner", prompt, child)).status, 401);
+  assert.equal((await post("/api/mint-macaroon", {}, token)).status, 401);
+  unavailable = true;
+  assert.equal((await post("/api/scanner", prompt, token)).status, 503);
+});
+
+test("credit caveats are issuer-only; appending a holder HMAC cannot upgrade another product", () => {
+  const secret = "synthetic-issuer-only-credit-test";
+  const ordinary = createSubscriptionMacaroon({
+    secret, paymentHash: "cd".repeat(32), tier: "1-day", validUntil: Math.floor(Date.now() / 1000) + 900,
+    amountMsats: 100_000_000, baseAmountMsats: 100_000_000,
+    paymentAsset: "btc-lightning", paymentProvider: "synthetic-credit",
+  });
+  const forge = (caveats: string[]) => {
+    const payload = JSON.parse(Buffer.from(ordinary, "base64url").toString());
+    let signature = Buffer.from(payload.signature, "hex");
+    for (const caveat of caveats) signature = createHmac("sha256", signature).update(caveat).digest();
+    return Buffer.from(JSON.stringify({ ...payload, caveats: [...payload.caveats, ...caveats], signature: signature.toString("hex") })).toString("base64url");
+  };
+  assert.equal(inspectSubscriptionMacaroon(forge(["credits=100"]), secret), null);
+  assert.equal(inspectSubscriptionMacaroon(forge(["credits=100", `scanner_credits_proof=${"00".repeat(32)}`]), secret), null);
+  assert.equal(attenuateSubscriptionMacaroon(ordinary, ["credits=100"]), null);
+  assert.throws(() => createSubscriptionMacaroon({
+    secret, paymentHash: "ef".repeat(32), tier: "1-day", validUntil: 9999999999,
+    amountMsats: 5_000_000, baseAmountMsats: 5_000_000, scannerCredits: 100,
+    paymentAsset: "btc-lightning", paymentProvider: "synthetic-credit",
+  }), /Invalid scanner credit funding/);
 });

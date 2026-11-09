@@ -9,6 +9,19 @@ Keep `/developers` focused on M2M integrations and `/audit` on the human enterpr
 
 **How to apply:** Reuse existing merchant-side settlement verification with the original invoice/capability; pending verification must never trigger replacement payment. Bind scanner capabilities to the exact submitted prompt. The Compliance Hash simulates a receipt using SHA-256; never describe it as a real ZK proof, Bitcoin timestamp or legal compliance certification.
 
+The retail scanner costs a fixed 5,000 sats. The Developer SaaS product costs
+100,000 sats for 100 scanner calls across different prompts, without a new
+invoice per call.
+
+**Why:** The user replaced testing fees with enterprise pricing and authorized
+prepaid credits without replacing the core L402 architecture.
+
+**How to apply:** Keep retail grants prompt-bound and single-use. Prepaid grants
+are scanner-scoped instead; enforce the immutable signed credit allocation with
+the shared atomic usage store. Mint confirmations return the original capability
+without renewing its expiry or replenishing credits. Credits currently last
+30 days from issuance, separately from the 15-minute funding invoice.
+
 Do not deploy financial architecture with failing legacy tests. Maintain a strictly green build pipeline.
 
 **Why:** The user explicitly required updating or removing obsolete architecture assertions and running the full suite before committing, pushing or publishing the approved funnels.

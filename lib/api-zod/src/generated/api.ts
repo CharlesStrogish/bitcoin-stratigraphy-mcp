@@ -9,7 +9,7 @@ import * as zod from 'zod';
 
 
 /**
- * L402 protected. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Success consumes the single-use capability. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
+ * Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Retail success consumes the prompt-bound single-use capability. A settled 100000-sat Developer SaaS macaroon from /api/mint-macaroon carries credits=100 and permits 100 valid scanner calls across different prompts. Each admitted scan atomically consumes one shared credit. Credit grants expire 30 days after issuance, and inherited descendant quotas and revocations remain enforced. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
  * @summary Paid heuristic Article 12 prompt risk review
  */
 export const ScanArticle12PromptHeader = zod.object({
@@ -42,6 +42,23 @@ export const ScanArticle12PromptResponse = zod.object({
   "prompt_sha256": zod.string().regex(scanArticle12PromptResponsePromptSha256RegExp),
   "receipt_type": zod.enum(['simulated_zk_receipt']),
   "limitations": zod.string()
+})
+
+
+/**
+ * First POST returns a fixed 100000-sat invoice and an unsettled credits=100 scanner-scoped macaroon in WWW-Authenticate. Pay that invoice once, then repeat with Authorization L402 <macaroon>:<preimage> or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement, returns the same funded macaroon without consuming any scanner credit. Funding confirmation is idempotent and never resets the 100-call budget. Invoice expiry is 900 seconds; credits expire 30 days after issuance. Use the same Authorization on /api/scanner for different valid prompts. No additional invoices are generated for funded calls or exhausted credits.
+ * @summary Buy 100 prepaid scanner credits for 100000 sats
+ */
+export const MintScannerMacaroonHeader = zod.object({
+  "Authorization": zod.string().optional()
+})
+
+export const MintScannerMacaroonResponse = zod.object({
+  "macaroon": zod.string(),
+  "credits": zod.literal(100).describe('Original allocation, not remaining balance; reminting never replenishes credits.'),
+  "amount_sats": zod.literal(100000),
+  "valid_until": zod.int().describe('Exclusive expiration in epoch seconds.'),
+  "scope": zod.enum(['/api/scanner'])
 })
 
 

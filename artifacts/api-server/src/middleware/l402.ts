@@ -35,6 +35,7 @@ import type { RevenueLedger, RevenueRequestKind } from "../services/ledger";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { paymentReference, recordRevenueWithRetry } from "../services/ledger";
 import { awaitingPaymentPreview, expectedRestOutputSchema, l402ChallengeGuidance } from "../lib/agent-conversion";
+import { SCANNER_CREDITS, SCANNER_CREDIT_SATS, SCANNER_CREDIT_SECONDS, SCANNER_CREDIT_DESCRIPTION } from "../lib/scanner-credits";
 
 export type L402Authorization = {
   macaroon: string;
@@ -58,6 +59,8 @@ export type L402MiddlewareOptions = {
   revocationStore?: MacaroonRevocationStore;
   requestKind?: RevenueRequestKind;
   allowBatch?: boolean;
+  /** Opt-in scanner funding/redemption only; existing gates remain unchanged. */
+  scannerCredits?: "mint" | "redeem";
   /** Enable only for new MCP invoices, never for settlement verification. */
   invoicePow?: ReturnType<typeof createInvoicePow>;
   /** MCP-only deferred billing; never enabled for unrelated paid HTTP routes. */
@@ -279,7 +282,9 @@ export function createL402Middleware(
         secret,
         paymentHash: invoice.paymentHash,
         tier: "1-day",
-        validUntil: Math.floor(now() / 1_000) + invoiceExpirySeconds,
+        validUntil: Math.floor(now() / 1_000) +
+          (options.scannerCredits === "mint" ? SCANNER_CREDIT_SECONDS : invoiceExpirySeconds),
+        ...(options.scannerCredits === "mint" ? { scannerCredits: SCANNER_CREDITS } : {}),
         amountMsats,
         baseAmountMsats: quote.baseAmountSats * 1_000,
         ...(referralOwner ? { swarmReferral: { owner: referralOwner, quotedAmountMsats: quote.amountSats * 1000 } } : {}),
@@ -297,7 +302,7 @@ export function createL402Middleware(
       });
       const macaroon = attenuateSubscriptionMacaroon(rootMacaroon, [
         `allowed_path=${resolveScope(req)}`,
-        `max_requests=${batchSize}`,
+        ...(options.scannerCredits === "mint" ? [] : [`max_requests=${batchSize}`]),
       ]);
       if (!macaroon) throw new Error("Unable to attenuate L402 macaroon");
       res.setHeader(
@@ -331,7 +336,8 @@ export function createL402Middleware(
           bulk_funding:
             "Optional Whale Protocol: send X-Requested-Budget: 5000 (integer sats, at most 1000000) on a fixed-base-price route to buy a High-Velocity Macaroon. The budget must exactly fund at least two calls at the base unit fee; do not combine it with X-L402-Batch-Size. Pay the returned invoice once, then omit the funding header and reuse Authorization: L402 <macaroon>:<preimage> for the same tool/route until its shared max_requests budget or expiry is reached. These prepaid calls incur no thermodynamic surge; 21% of the full settled invoice is the conditional simulated yield, not an automatic Lightning payout.",
         },
-        max_requests: batchSize,
+        max_requests: options.scannerCredits === "mint" ? SCANNER_CREDITS : batchSize,
+        ...(options.scannerCredits === "mint" ? { credits: SCANNER_CREDITS } : {}),
         ...(budgetSats === undefined ? {} : {
           payment_mode: "high-velocity", budget_sats: budgetSats,
           unit_fee_sats: resolveAmountSats(req), surge_immunity: true,
@@ -394,12 +400,23 @@ export function createL402Middleware(
         authorization.macaroon,
         secret,
       );
+      if (authentic?.scannerCredits !== undefined && authentic.validUntil * 1000 <= requestTime) {
+        res.status(401).json({ error: "Prepaid scanner credits have expired" });
+        return;
+      }
       // An expired root credential renews through a fresh 402 challenge.
       const pass =
         authentic && authentic.validUntil * 1_000 > requestTime
           ? authentic
           : null;
       if (pass) {
+        if ((pass.scannerCredits !== undefined &&
+              (!options.scannerCredits || pass.allowedPaths.length === 0 ||
+               !pass.allowedPaths.every(path => path === "/api/scanner"))) ||
+            (options.scannerCredits === "mint" && pass.scannerCredits === undefined)) {
+          res.status(403).json({ error: "Credential does not authorize this scanner credit route" });
+          return;
+        }
         try {
           await assertEnterpriseRevenueAllocation(pass.paymentHash);
           await assertEnterpriseVerificationTarget(pass.paymentHash);
@@ -438,7 +455,7 @@ export function createL402Middleware(
         }
         if (options.revocationStore) {
           try {
-            const ids = pass.highVelocityUnitMsats || pass.delegatePubkey || pass.requestLimits[0]?.maxRequests === 100
+            const ids = pass.scannerCredits || pass.highVelocityUnitMsats || pass.delegatePubkey || pass.requestLimits[0]?.maxRequests === 100
               ? [...(pass.ancestorTokenIds ?? []), pass.tokenId] : [pass.tokenId];
             let revoked = false;
             for (const id of ids) {
@@ -466,7 +483,9 @@ export function createL402Middleware(
         pass.amountMsats !== undefined &&
         pass.amountMsats > 0 &&
         (!pass.swarmReferral || !options.enforceCurrentAmount) &&
-        (pass.highVelocityUnitMsats !== undefined
+        (pass.scannerCredits !== undefined
+          ? (options.scannerCredits !== undefined && pass.amountMsats === SCANNER_CREDIT_SATS * 1000)
+          : pass.highVelocityUnitMsats !== undefined
           ? (!options.enforceCurrentAmount && typeof options.amountSats === "number" &&
               pass.highVelocityUnitMsats === resolveAmountSats(req) * 1_000)
           : (typeof options.amountSats !== "number" && !options.enforceCurrentAmount ||
@@ -482,14 +501,14 @@ export function createL402Middleware(
         pass.paymentProvider &&
         pass.allowedPaths.length > 0 &&
         pass.allowedPaths.every(
-          (path) => path === resolveScope(req),
+          (path) => path === (pass.scannerCredits ? "/api/scanner" : resolveScope(req)),
         )
       ) {
         let verification;
         try {
           const batch =
             !pass.highVelocityUnitMsats && options.allowBatch && pass.requestLimits[0]?.maxRequests === 100;
-          const description = (pass.highVelocityUnitMsats
+          const description = (pass.scannerCredits ? SCANNER_CREDIT_DESCRIPTION : pass.highVelocityUnitMsats
             ? `${options.description} (High-Velocity ${pass.amountMsats / 1000}-sat budget)`
             : batch
             ? `${options.description} (100-call batch)`
@@ -600,10 +619,20 @@ export function createL402Middleware(
               }); return;
             }
           }
-          if (
-            pass.maxRequests !== undefined &&
-            !(await usageStore.consume(pass.requestLimits, pass.validUntil))
-          ) {
+          let quotaAllowed: boolean;
+          try {
+            const limits = options.scannerCredits === "mint" && pass.scannerCredits
+              ? pass.requestLimits.filter(limit => limit.tokenId !== pass.scannerCreditScope)
+              : pass.requestLimits;
+            quotaAllowed = limits.length === 0 || await usageStore.consume(limits, pass.validUntil);
+          } catch (error) {
+            // Preserve existing MCP/REST error handling outside prepaid credits.
+            if (pass.scannerCredits === undefined) throw error;
+            req.log?.error({ err: error }, "L402 usage accounting unavailable");
+            res.status(503).json({ error: "Usage accounting unavailable; access refused" });
+            return;
+          }
+          if (!quotaAllowed) {
             res
               .status(429)
               .json({ error: "L402 macaroon has already been used" });
@@ -638,6 +667,7 @@ export function createL402Middleware(
             }
           }
           res.locals.l402 = {
+            ...(pass.scannerCredits ? { credits: pass.scannerCredits, validUntil: pass.validUntil } : {}),
             ...(pass.delegatePubkey ? {delegatePubkey: pass.delegatePubkey} : {}),
             paymentHash: pass.paymentHash,
             settledAt: verification.settledAt,

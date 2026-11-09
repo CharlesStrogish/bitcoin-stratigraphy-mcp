@@ -23,6 +23,7 @@ import { equivalentToolNames } from "./mcp-pricing";
 import { enterpriseContext, enterpriseMacaroonFields } from "./enterprise-economics";
 import { LIABILITY_CAVEAT } from "../middleware/liability-notice";
 import { parseReferralInvoice, referralInvoiceProof, type SwarmReferral } from "./swarm-referral";
+import { scannerCreditProof, SCANNER_CREDITS, SCANNER_CREDIT_SATS } from "./scanner-credits";
 
 const ENTERPRISE_KEYS = ["enterprise_buyer", "routing_kickback", "commercial_exemption", "commercial_exemption_exp"];
 function economicsProof(secret: string, paymentHash: string, fields: Map<string, string>): string {
@@ -76,6 +77,8 @@ export type VerifiedSubscriptionMacaroon = {
   amountMsats?: number;
   baseAmountMsats?: number;
   highVelocityUnitMsats?: number;
+  scannerCredits?: number;
+  scannerCreditScope?: string;
   swarmReferral?: SwarmReferral;
   agentPubkey?: string;
   agentTier?: AgentTier;
@@ -155,6 +158,7 @@ export function createSubscriptionMacaroon(input: {
   amountMsats?: number;
   baseAmountMsats?: number;
   highVelocityUnitMsats?: number;
+  scannerCredits?: number;
   swarmReferral?: SwarmReferral;
   agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
   /** Sub-agent attribution; every use must declare the same ID. */
@@ -184,6 +188,12 @@ export function createSubscriptionMacaroon(input: {
     );
   }
   const identifier = "bitcoin-stratigraphy-subscription-v1";
+  if (input.scannerCredits !== undefined &&
+      (input.scannerCredits !== SCANNER_CREDITS || input.amountMsats !== SCANNER_CREDIT_SATS * 1000 ||
+       input.baseAmountMsats !== input.amountMsats || !input.paymentProvider ||
+       input.highVelocityUnitMsats !== undefined || input.swarmReferral !== undefined)) {
+    throw new RangeError("Invalid scanner credit funding");
+  }
   if (input.swarmReferral && (input.highVelocityUnitMsats !== undefined ||
       !parseReferralInvoice(`${input.swarmReferral.owner}:${input.swarmReferral.quotedAmountMsats}:${
         referralInvoiceProof(input.secret, input.paymentHash, input.amountMsats!, input.baseAmountMsats!, input.swarmReferral)}`,
@@ -210,6 +220,10 @@ export function createSubscriptionMacaroon(input: {
       : [`base_amount_msats=${input.baseAmountMsats}`]),
     ...(input.highVelocityUnitMsats === undefined ? [] : [
       `high_velocity=${input.highVelocityUnitMsats}:${highVelocityProof(input.secret, input.paymentHash, input.amountMsats!, input.highVelocityUnitMsats)}`,
+    ]),
+    ...(input.scannerCredits === undefined ? [] : [
+      `credits=${input.scannerCredits}`,
+      `scanner_credits_proof=${scannerCreditProof(input.secret, input.paymentHash, input.paymentProvider!, input.validUntil)}`,
     ]),
     ...(input.swarmReferral === undefined ? [] : [
       `swarm_referral=${input.swarmReferral.owner}:${input.swarmReferral.quotedAmountMsats}:${
@@ -246,6 +260,8 @@ const ROOT_CAVEAT_KEYS = new Set([
   "amount_msats",
   "base_amount_msats",
   "high_velocity",
+  "credits",
+  "scanner_credits_proof",
   "swarm_referral",
   "agent_pubkey",
   "agent_tier",
@@ -387,6 +403,23 @@ export function inspectSubscriptionMacaroon(
     const swarmReferral = referralValue === undefined ? undefined :
       parseReferralInvoice(referralValue, secret, paymentHash, amountMsats, baseAmountMsats);
     if (swarmReferral === null || (swarmReferral && rootValues.has("high_velocity"))) return null;
+    const creditsValue = rootValues.get("credits");
+    const creditProof = rootValues.get("scanner_credits_proof");
+    let scannerCredits: number | undefined;
+    let scannerCreditScope: string | undefined;
+    if (creditsValue !== undefined || creditProof !== undefined) {
+      const provider = rootValues.get("payment_provider");
+      if (creditsValue !== String(SCANNER_CREDITS) || !provider ||
+          amountMsats !== SCANNER_CREDIT_SATS * 1000 || baseAmountMsats !== amountMsats ||
+          rootValues.has("high_velocity") || swarmReferral ||
+          !creditProof || !/^[0-9a-f]{64}$/.test(creditProof) ||
+          !timingSafeEqual(Buffer.from(creditProof, "hex"),
+            Buffer.from(scannerCreditProof(secret, paymentHash, provider, validUntil), "hex"))) return null;
+      scannerCredits = SCANNER_CREDITS;
+      scannerCreditScope = `scanner-credits:${creditProof}`;
+      requestLimits.push(scannerCredits);
+      meteredScopes.unshift({ tokenId: scannerCreditScope, maxRequests: scannerCredits });
+    }
     const velocity = rootValues.get("high_velocity");
     let highVelocityUnitMsats: number | undefined;
     if (velocity !== undefined) {
@@ -432,6 +465,7 @@ export function inspectSubscriptionMacaroon(
           (amountMsatsValue === undefined ? 0 : 1) +
           (baseAmountMsatsValue === undefined ? 0 : 1) +
           (velocity === undefined ? 0 : 1) +
+          (scannerCredits === undefined ? 0 : 2) +
           (swarmReferral === undefined ? 0 : 1) +
           (paymentAssetCaveat === undefined ? 0 : 1) +
           (paymentProviderCaveat === undefined ? 0 : 1) +
@@ -456,6 +490,7 @@ export function inspectSubscriptionMacaroon(
       tokenId: token.signature,
       amountMsats,
       baseAmountMsats,
+      ...(scannerCredits === undefined ? {} : { scannerCredits, scannerCreditScope }),
       ...(highVelocityUnitMsats === undefined ? {} : { highVelocityUnitMsats }),
       ...(swarmReferral === undefined ? {} : { swarmReferral }),
       agentPubkey: agentCaveats?.agentPubkey,

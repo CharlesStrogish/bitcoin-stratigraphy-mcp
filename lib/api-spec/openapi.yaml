@@ -764,10 +764,14 @@ paths:
       operationId: scanArticle12Prompt
       summary: Paid heuristic Article 12 prompt risk review
       description: >-
-        L402 protected. First POST returns 402 and WWW-Authenticate.
+        Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate.
         Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP
         to verify incoming merchant settlement; 409 means keep the original
-        invoice and poll again. Success consumes the single-use capability.
+        invoice and poll again. Retail success consumes the prompt-bound single-use capability.
+        A settled 100000-sat Developer SaaS macaroon from /api/mint-macaroon
+        carries credits=100 and permits 100 valid scanner calls across different prompts.
+        Each admitted scan atomically consumes one shared credit. Credit grants expire
+        30 days after issuance, and inherited descendant quotas and revocations remain enforced.
         Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
       parameters:
         - in: header
@@ -802,11 +806,57 @@ paths:
         "409":
           description: Original invoice payment not confirmed; retry same credential
         "429":
-          description: Rate limited
+          description: Rate limited or prepaid credits exhausted; no replacement invoice
         "502":
           description: Merchant settlement verification unavailable
         "503":
           description: Scanner unavailable
+  /mint-macaroon:
+    post:
+      operationId: mintScannerMacaroon
+      summary: Buy 100 prepaid scanner credits for 100000 sats
+      description: >-
+        First POST returns a fixed 100000-sat invoice and an unsettled
+        credits=100 scanner-scoped macaroon in WWW-Authenticate. Pay that
+        invoice once, then repeat with Authorization L402 <macaroon>:<preimage>
+        or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement,
+        returns the same funded macaroon without consuming any scanner credit.
+        Funding confirmation is idempotent and never resets the 100-call budget.
+        Invoice expiry is 900 seconds; credits expire 30 days after issuance.
+        Use the same Authorization on /api/scanner for different valid prompts.
+        No additional invoices are generated for funded calls or exhausted credits.
+      parameters:
+        - in: header
+          name: Authorization
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Settled prepaid scanner capability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerCreditGrant"
+        "400":
+          description: Body and alternate funding modes are not supported
+        "401":
+          description: Expired or revoked credential
+        "402":
+          description: Fixed 100000-sat invoice and unsettled capability
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+        "403":
+          description: Wrong product or scope
+        "409":
+          description: Payment pending; retain original invoice
+        "429":
+          description: Rate limited or inherited quota exhausted
+        "502":
+          description: Settlement provider unavailable
+        "503":
+          description: Revocation or usage accounting unavailable
   /api/yield-metrics:
     servers:
       - url: https://bitcoinstratigraphy.com
@@ -2943,6 +2993,25 @@ components:
                   items:
                     $ref: "#/components/schemas/GetPublicYieldProofs200Item"
   schemas:
+    ScannerCreditGrant:
+      type: object
+      required: [macaroon, credits, amount_sats, valid_until, scope]
+      properties:
+        macaroon:
+          type: string
+        credits:
+          type: integer
+          enum: [100]
+          description: Original allocation, not remaining balance; reminting never replenishes credits.
+        amount_sats:
+          type: integer
+          enum: [100000]
+        valid_until:
+          type: integer
+          description: Exclusive expiration in epoch seconds.
+        scope:
+          type: string
+          enum: ["/api/scanner"]
     ScannerInput:
       type: object
       additionalProperties: false

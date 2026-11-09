@@ -31,3 +31,9 @@ test("wallet actions follow the QR in one centered, uniform-width stack", () => 
   assert.match(rule(".fn-pay-actions .fn-btn"), /width: 100%/);
   assert.match(rule(".fn-pay-actions .fn-btn"), /min-height: 48px/);
 });
+
+test("retail fee is disclosed before submission and the quoted amount precedes the QR", () => {
+  assert.match(page, /Fixed fee: 5,000 sats per scan/);
+  assert.ok(page.indexOf('data-testid="text-scan-price"') < page.indexOf('data-testid="button-run-scan"'));
+  assert.ok(page.indexOf("challenge.amountSats.toLocaleString") < page.indexOf('<InvoiceQr invoice='));
+});

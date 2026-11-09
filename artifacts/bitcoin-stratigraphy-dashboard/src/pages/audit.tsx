@@ -80,6 +80,9 @@ export default function AuditPage({ base = import.meta.env.BASE_URL }: { base?: 
         <form className="fn-kiosk fn-rise" onSubmit={onSubmit} noValidate aria-labelledby={`${id}-h`}>
           <h2 id={`${id}-h`} className="fn-sr">Compliance scan input</h2>
           <label htmlFor={`${id}-prompt`} className="fn-label">Prompt or agent log</label>
+          <p className="fn-hint" data-testid="text-scan-price">
+            Fixed fee: 5,000 sats per scan. Review the Lightning quote before payment.
+          </p>
           <textarea
             id={`${id}-prompt`}
             className="fn-textarea"

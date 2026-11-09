@@ -87,6 +87,7 @@ import type {
   RegisterEnterpriseFleet200,
   RegistryServerCard,
   RevokeNip98Key200,
+  ScannerCreditGrant,
   ScannerInput,
   ScannerReport,
   SettleEnterpriseCreditTab200,
@@ -150,7 +151,7 @@ export const getScanArticle12PromptUrl = () => {
 }
 
 /**
- * L402 protected. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Success consumes the single-use capability. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
+ * Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Retail success consumes the prompt-bound single-use capability. A settled 100000-sat Developer SaaS macaroon from /api/mint-macaroon carries credits=100 and permits 100 valid scanner calls across different prompts. Each admitted scan atomically consumes one shared credit. Credit grants expire 30 days after issuance, and inherited descendant quotas and revocations remain enforced. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
  * @summary Paid heuristic Article 12 prompt risk review
  */
 export const scanArticle12Prompt = async (scannerInput: ScannerInput, options?: Parameters<typeof customFetch>[1]): Promise<ScannerReport> => {
@@ -211,6 +212,78 @@ export const useScanArticle12Prompt = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getScanArticle12PromptMutationOptions(options));
+    }
+
+export const getMintScannerMacaroonUrl = () => {
+
+
+
+
+  return `/api/mint-macaroon`
+}
+
+/**
+ * First POST returns a fixed 100000-sat invoice and an unsettled credits=100 scanner-scoped macaroon in WWW-Authenticate. Pay that invoice once, then repeat with Authorization L402 <macaroon>:<preimage> or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement, returns the same funded macaroon without consuming any scanner credit. Funding confirmation is idempotent and never resets the 100-call budget. Invoice expiry is 900 seconds; credits expire 30 days after issuance. Use the same Authorization on /api/scanner for different valid prompts. No additional invoices are generated for funded calls or exhausted credits.
+ * @summary Buy 100 prepaid scanner credits for 100000 sats
+ */
+export const mintScannerMacaroon = async ( options?: Parameters<typeof customFetch>[1]): Promise<ScannerCreditGrant> => {
+
+  return customFetch<ScannerCreditGrant>(getMintScannerMacaroonUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMintScannerMacaroonMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,void, TContext> => {
+
+const mutationKey = ['mintScannerMacaroon'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mintScannerMacaroon>>, void> = () => {
+
+
+          return  mintScannerMacaroon(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MintScannerMacaroonMutationResult = NonNullable<Awaited<ReturnType<typeof mintScannerMacaroon>>>
+
+    export type MintScannerMacaroonMutationError = ErrorType<void>
+
+    /**
+ * @summary Buy 100 prepaid scanner credits for 100000 sats
+ */
+export const useMintScannerMacaroon = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mintScannerMacaroon>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getMintScannerMacaroonMutationOptions(options));
     }
 
 export const getGetYieldMetricsUrl = () => {

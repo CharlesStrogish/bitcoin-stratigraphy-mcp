@@ -1,80 +1,33 @@
-import { useEffect, useRef, useState } from "react";
-import { Menu, X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import "@/pages/funnel.css";
 
 const CHOICES = [
-  { href: "/developers", label: "Developers", hint: "MCP integration" },
-  { href: "/audit", label: "Enterprise Audit", hint: "Article 12 scan" },
+  { href: "/developers", label: "Developers", mobileLabel: "API", hint: "MCP integration" },
+  { href: "/audit", label: "Enterprise Audit", mobileLabel: "Audit", hint: "Article 12 scan" },
 ] as const;
 
 export default function FunnelNavigation() {
   const [location] = useLocation();
-  const [open, setOpen] = useState(false);
-  const nav = useRef<HTMLElement>(null);
-  const toggle = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 769px)");
-    const close = () => setOpen(false);
-    const onPointerDown = (event: PointerEvent) => {
-      if (!nav.current?.contains(event.target as Node)) close();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && nav.current?.contains(document.activeElement)) {
-        close();
-        toggle.current?.focus();
-      }
-    };
-    desktop.addEventListener("change", close);
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      desktop.removeEventListener("change", close);
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, []);
-
-  useEffect(() => setOpen(false), [location]);
-
   return (
-    <nav
-      ref={nav}
-      className="fn-nav"
-      aria-label="Primary"
-      onBlur={(event) => {
-        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-    >
-      <Link href="/" className="fn-nav-brand" data-testid="link-nav-home">
-        Bitcoin <em>Stratigraphy</em>
+    <nav className="fn-nav" aria-label="Primary">
+      <Link href="/" className="fn-nav-brand" aria-label="Bitcoin Stratigraphy home" data-testid="link-nav-home">
+        <span className="fn-nav-mark" aria-hidden="true">◆</span>
+        <span className="fn-nav-brand-text">Bitcoin <em>Stratigraphy</em></span>
       </Link>
-      <button
-        ref={toggle}
-        type="button"
-        className="fn-nav-toggle"
-        aria-label={open ? "Close main menu" : "Open main menu"}
-        aria-expanded={open}
-        aria-controls="primary-navigation-links"
-        onClick={() => setOpen((value) => !value)}
-        data-testid="button-nav-menu"
-      >
-        {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
-      </button>
-      <div id="primary-navigation-links" className={`fn-nav-choices${open ? " is-open" : ""}`}>
+      <div className="fn-nav-choices">
         {CHOICES.map((c) => {
           const active = location === c.href || location.startsWith(`${c.href}/`);
           return (
             <Link
               key={c.href}
               href={c.href}
-              className={`fn-nav-link${active ? " is-active" : ""}`}
+              className={`fn-nav-link${c.href === "/audit" ? " fn-nav-audit" : ""}${active ? " is-active" : ""}`}
+              aria-label={c.label}
               aria-current={active ? "page" : undefined}
-              onClick={() => setOpen(false)}
               data-testid={`link-nav-${c.href.slice(1)}`}
             >
               <span className="fn-nav-label">{c.label}</span>
+              <span className="fn-nav-mobile-label" aria-hidden="true">{c.mobileLabel}</span>
               <span className="fn-nav-hint">{c.hint}</span>
             </Link>
           );

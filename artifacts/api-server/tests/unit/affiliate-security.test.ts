@@ -52,6 +52,7 @@ function setup() {
   });
   const issue = (id: string, amount = 10_000_000_000) =>
     service.issue({ paymentHash: hash(id), provider: "test" }, amount, {
+      buyer: pubkey,
       payout: agent,
       parentPayout: parent,
       invoices: new Map(),
@@ -70,15 +71,15 @@ function setup() {
 test("21-cap rounding and pending/payable are separate from invoice settlement, independent per recipient", async () => {
   const { service, issue, provider, advance } = setup();
   const invoice = await issue("balance", 1_999);
-  assert.equal(invoice.direct_kickback_msats, "279");
+  assert.equal(invoice.direct_kickback_msats, "280");
   assert.equal(invoice.parent_kickback_msats, "139");
-  assert.equal(invoice.kickback_msats, "418");
+  assert.equal(invoice.kickback_msats, "419");
   assert.equal((await affiliateBalance(service, agent)).payable_msats, "0");
   await service.settle(invoice.hash, 1_999, "test");
-  assert.equal((await affiliateBalance(service, agent)).pending_msats, "279");
+  assert.equal((await affiliateBalance(service, agent)).pending_msats, "280");
   assert.equal((await affiliateBalance(service, parent)).pending_msats, "139");
   await verifyAffiliate(service, agent, pubkey, hash("proof-agent"), provider);
-  assert.equal((await affiliateBalance(service, agent)).payable_msats, "279");
+  assert.equal((await affiliateBalance(service, agent)).payable_msats, "280");
   assert.equal((await affiliateBalance(service, parent)).payable_msats, "0");
   await verifyAffiliate(
     service,
@@ -94,10 +95,10 @@ test("21-cap rounding and pending/payable are separate from invoice settlement, 
     service.settle(unpaid.hash, 1_000, "test"),
     service.settle(unpaid.hash, 1_000, "test"),
   ]);
-  assert.equal((await affiliateBalance(service, agent)).payable_msats, "419");
+  assert.equal((await affiliateBalance(service, agent)).payable_msats, "420");
   advance(AFFILIATE_VERIFICATION_MS);
   assert.equal((await affiliateBalance(service, agent)).payable_msats, "0");
-  assert.equal((await affiliateBalance(service, agent)).pending_msats, "419");
+  assert.equal((await affiliateBalance(service, agent)).pending_msats, "420");
 });
 
 test("unknown keys, provider keys without per-address authority, replay and revoked agents cannot unlock balances", async () => {
@@ -219,7 +220,7 @@ test("HTTPS reader pins lookup, rejects redirects and caps provider bodies", asy
   }
 });
 
-test("old invoice amounts/signatures survive reward upgrades while new challenge scopes change", async () => {
+test("unsigned legacy allocations remain unchanged but cannot bypass authenticated yield validation", async () => {
   const { service, store } = setup();
   const old = {
     hash: hash("old"),
@@ -230,20 +231,22 @@ test("old invoice amounts/signatures survive reward upgrades while new challenge
     allocation: { historic: true },
   };
   await store.transaction("old", (tx) => tx.putInvoice(old));
-  const ctx = { payout: agent, invoices: new Map() };
-  assert.deepEqual(
-    await service.issue(
+  const ctx = { buyer: pubkey, payout: agent, invoices: new Map() };
+  await assert.rejects(
+    service.issue(
       { paymentHash: old.hash, provider: "test" },
       100_000,
       ctx,
     ),
-    old,
+    /already bound/,
   );
   assert.ok(
     enterpriseContext.run(ctx, enterpriseChallengeScope).endsWith(":21-cap-v1"),
   );
-  await service.settle(old.hash, 100_000, "test");
+  await assert.rejects(service.settle(old.hash, 100_000, "test"), /Yield|allocation|signature/i);
+  assert.deepEqual(await store.transaction("read-old", (tx) => tx.invoice(old.hash)), old);
   assert.equal((await affiliateBalance(service, agent)).pending_msats, "5000");
+  assert.equal((await affiliateBalance(service, agent)).payable_msats, "0");
 });
 
 test("REST verification binds signature to URL, method, exact body and provider key; CRL blocks issuance immediately", async (t) => {

@@ -156,6 +156,27 @@ test("direct compliance HTML includes exact crawler metadata and author JSON-LD"
   assert.ok(html.includes('property="og:type" content="article"'));
 });
 
+test("dual funnels prerender exact SEO metadata and keep scanner and escrow identities separate", () => {
+  const plugin = enterpriseSeoPlugin();
+  const input = read("index.html");
+  for (const [route, title, description] of [
+    ["developers", "BitcoinStratigraphy MCP Server | L402 Agentic Payments",
+      "Integrate autonomous Lightning Network micropayments and Article 12 compliance into your AI swarms via our open-source MCP server."],
+    ["audit", "AI Article 12 Compliance Audit | ZK-Indemnity",
+      "Run an instant, cryptographically verified EU AI Act compliance scan on your enterprise AI prompts using Lightning Network settlement."],
+  ]) {
+    for (const suffix of ["", "/"]) {
+      const html = plugin.transformIndexHtml.handler(input, { path: `/${route}${suffix}` });
+      assert.ok(html.includes(`<title>${title}</title>`));
+      for (const key of ["description", "og:description", "twitter:description"])
+        assert.ok(html.includes(`="${key}" content="${description}"`), `${route} ${key}`);
+      assert.ok(html.includes(`rel="canonical" href="https://bitcoinstratigraphy.com/${route}/"`));
+      assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
+      assert.doesNotMatch(html, /id="escrow-application-jsonld"/);
+    }
+  }
+});
+
 test("homepage metadata stays unchanged and dedicated static pages remain emitted", () => {
   const plugin = enterpriseSeoPlugin();
   const input = read("index.html");
@@ -179,7 +200,7 @@ test("homepage metadata stays unchanged and dedicated static pages remain emitte
   );
   assert.deepEqual(
     emitted.map((asset) => asset.fileName),
-    ["security/index.html", "manifesto/index.html", "simulator/index.html", "standard/index.html", "enterprise/index.html",
+    ["developers/index.html", "audit/index.html", "ceremony/index.html", "security/index.html", "manifesto/index.html", "simulator/index.html", "standard/index.html", "enterprise/index.html",
       "whitepaper/index.html", "compliance/index.html"],
   );
   for (const asset of emitted) {

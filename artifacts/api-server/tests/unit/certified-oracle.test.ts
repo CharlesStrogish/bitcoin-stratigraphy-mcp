@@ -3,6 +3,7 @@ import { createHash, generateKeyPairSync, verify } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 import express from "express";
+import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import { canonical } from "../../src/lib/article12-signature";
 import {
   EnterpriseEconomics,
@@ -27,6 +28,8 @@ import { registerCertifiedOracleRoutes } from "../../src/routes/certified-oracle
 const keys = generateKeyPairSync("ed25519");
 const now = Date.parse("2026-10-24T00:00:00Z");
 const hash = (id: string) => createHash("sha256").update(id).digest("hex");
+const buyerSecret = generateSecretKey();
+const buyer = getPublicKey(buyerSecret);
 const payout = "agent@example.com";
 const parent = "parent@example.com";
 const threshold = 10_000_000_000;
@@ -39,6 +42,7 @@ function setup(price: number | null = 10_000_000) {
     () => now,
   );
   const context = (parentPayout?: string): EnterpriseContext => ({
+    buyer,
     payout,
     parentPayout,
     invoices: new Map(),
@@ -50,14 +54,14 @@ function setup(price: number | null = 10_000_000) {
   return { store, service, context, issue, volume };
 }
 
-test("multi-tier allocations floor 14%/7%, use 21% without a parent and remain signed ledger entries", async () => {
+test("multi-tier allocations conserve the 21% pool, floor the parent's 7%, and remain signed ledger entries", async () => {
   const { service, context, issue, volume, store } = setup();
   let confirmed = 0;
   for (const amount of [1, 19, 20, 99, 100, 1_999, 101_001]) {
     const invoice = await issue(String(amount), amount);
     assert.equal(
       invoice.direct_kickback_msats,
-      String(Math.floor((amount * 14) / 100)),
+      String((BigInt(amount) * 21n) / 100n - (BigInt(amount) * 7n) / 100n),
     );
     assert.equal(
       invoice.parent_kickback_msats,
@@ -122,7 +126,7 @@ test("invoice/cache identity binds the parent without changing legacy scopes", a
     enterpriseContext.run(ctx, enterpriseChallengeScope);
   assert.notEqual(scope(one), scope(two));
   const legacyScope =
-    ":economics:" + hash(JSON.stringify([undefined, payout, null]));
+    ":economics:" + hash(JSON.stringify([buyer, payout, null]));
   assert.equal(scope(context()), legacyScope + ":21-cap-v1");
   const invoice = await issue("bound", 100_000, one);
   assert.deepEqual(await issue("bound", 100_000, one), invoice);
@@ -275,11 +279,19 @@ test("REST quotes accept parent headers and credentials return 400/404/200/503 w
   });
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   for (const method of ["GET", "POST"]) {
+    const url = base + "/api/v1/cost";
+    assert.equal((await fetch(url, { method, headers: {
+      "X-Agent-LNURL": payout, "X-Parent-Agent-LNURL": parent,
+    } })).status, 401);
     const res = await fetch(base + "/api/v1/cost", {
       method,
       headers: {
         "X-Agent-LNURL": "agent@EXAMPLE.COM",
         "X-Parent-Agent-LNURL": parent,
+        "X-Nostr-Authorization": "Nostr " + Buffer.from(JSON.stringify(finalizeEvent({
+          kind: 27235, created_at: Math.floor(now / 1000), content: "",
+          tags: [["u", url], ["method", method]],
+        }, buyerSecret))).toString("base64"),
       },
     });
     assert.equal(res.status, 200);

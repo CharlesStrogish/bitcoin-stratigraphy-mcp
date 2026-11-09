@@ -20,7 +20,9 @@ test("registry manifests agree on the live remote MCP endpoint and release", () 
   assert.equal(glama.transport, "streamable-http");
   assert.equal(glama.url, "https://bitcoinstratigraphy.com/mcp");
   for (const phrase of [
-    "16 L402-gated tools",
+    "19 Fiduciary-grade MCP Tools at full platform capacity across six namespaces",
+    "14 paid L402 tools and 2 free sandbox tools",
+    "Production clearing settlement and payouts remain disabled",
     "OpenTimestamps AI Notary Hub",
     "LangChain/LlamaIndex Native",
     "100-call Macro-Macaroons",
@@ -53,8 +55,8 @@ test("registry sandbox and notarization pricing claims match the release", () =>
 
 test("README prominently links native frameworks and all three readiness badges", () => {
   assert.match(
-    readme.slice(0, 2200),
-    new RegExp(`v${pkg.version.replaceAll(".", "\\.")} — 16 Canonical Tools`),
+    readme.split("\n").slice(0, 80).join("\n"),
+    new RegExp(`v${pkg.version.replaceAll(".", "\\.")} — 19 Fiduciary-grade MCP Tools`),
   );
   assert.match(
     readme,

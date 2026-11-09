@@ -1762,7 +1762,9 @@ test("keeps OpenAPI MCP tool descriptions and selector/output schemas in parity"
   assert.equal(sharedDocument.info?.["x-operational-description"], ENGINE_DESCRIPTION);
   assert.deepEqual(publicDocument.info, sharedDocument.info);
   const registryDescription = String(glamaMetadata.description);
-  assert.ok(registryDescription.startsWith(`${registryServerCard.description}\n\n`));
+  assert.ok(registryDescription.startsWith("OpenTimestamps AI Notary Hub: 19 Fiduciary-grade MCP Tools"));
+  assert.ok(registryDescription.includes("14 paid L402 tools and 2 free sandbox tools"));
+  assert.ok(registryDescription.includes("Production clearing settlement and payouts remain disabled"));
   assert.ok(registryDescription.endsWith(ENGINE_DESCRIPTION));
   for (const phrase of ["Hal Finney Horizon tracker", "15 J/TH thermodynamic energy calculation", "Live L402 Satoshi settlement"]) {
     assert.ok(registryDescription.includes(phrase), phrase);

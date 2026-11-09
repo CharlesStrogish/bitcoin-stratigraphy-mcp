@@ -9,7 +9,9 @@ const html = readFileSync(
 
 test("cookbook directory advertises the current catalog and enterprise security", () => {
   const text = html.replace(/\s+/g, " ");
-  assert.match(text, /Integrate 16 live MCP tools across 5 namespaces/);
+  assert.match(text, /Explore 19 Fiduciary-grade MCP Tools at full capacity across 6 namespaces/);
+  assert.match(text, /Production clearing settlement and payouts remain disabled/);
+  assert.match(text, /tools\/list/);
   assert.doesNotMatch(text, /15 (?:live )?MCP tools|4 namespaces/);
   for (const feature of [
     "Stateless MCP 2026-07-28 transport",

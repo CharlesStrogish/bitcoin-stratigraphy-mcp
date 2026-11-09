@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 import type { Express, RequestHandler } from "express";
 import { ScanArticle12PromptBody, ScanArticle12PromptResponse } from "@workspace/api-zod";
 import { analyzeScannerPrompt, scannerPromptHash } from "../lib/scanner";

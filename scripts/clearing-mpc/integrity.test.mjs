@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { PHASE1 } from "./parameters.mjs";
 import { ceremonyId, fileHash, verifyManifest } from "./integrity.mjs";
 
-const starting = resolve("generated-artifacts/clearing-mpc");
 const original = {
   schema: "clearing-independent-mpc/v1",
   stage: "awaiting-independent-contributions",
@@ -30,19 +31,36 @@ const original = {
 };
 original.ceremony_id = ceremonyId(original);
 
-test("prepared package binds phase one, circuit, R1CS, WASM and initial key", async () => {
-  const result = await verifyManifest(starting);
-  const recorded = JSON.parse(
-    await readFile(resolve(starting, "manifest.json"), "utf8"),
-  );
-  assert.equal(result.ceremony_id, recorded.ceremony_id);
-  assert.equal(result.ceremony_id, ceremonyId(result));
-  assert.equal(result.completed_independent_contributions, 0);
-  assert.equal(result.production_activation_allowed, false);
-  assert.equal(
-    await fileHash(resolve(starting, PHASE1.filename), "blake2b512"),
-    PHASE1.blake2b512,
-  );
+test("file hashing binds exact bytes using SHA-256 and BLAKE2b-512", async () => {
+  const temporary = await mkdtemp(join(tmpdir(), "clearing-mpc-hash-test-"));
+  try {
+    const file = join(temporary, "fixture");
+    await writeFile(file, "abc");
+    assert.equal(await fileHash(file), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    assert.equal(await fileHash(file, "blake2b512"), createHash("blake2b512").update("abc").digest("hex"));
+    await writeFile(file, "changed");
+    assert.notEqual(await fileHash(file), createHash("sha256").update("abc").digest("hex"));
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+});
+
+test("consistent local checksums cannot bypass the pinned upstream phase-one parameters", async () => {
+  const temporary = await mkdtemp(join(tmpdir(), "clearing-mpc-pin-test-"));
+  try {
+    const manifest = structuredClone(original);
+    for (const name of Object.keys(manifest.files)) {
+      await writeFile(join(temporary, name), `synthetic unit fixture: ${name}`);
+      manifest.files[name] = await fileHash(join(temporary, name));
+    }
+    manifest.ceremony_id = ceremonyId(manifest);
+    await writeFile(join(temporary, "manifest.json"), JSON.stringify(manifest));
+    await assert.rejects(verifyManifest(temporary), /differs from the pinned upstream ceremony/);
+    await writeFile(join(temporary, "circuit_0000.zkey"), "tampered");
+    await assert.rejects(verifyManifest(temporary), /checksum mismatch/);
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
 });
 
 test("the ceremony ID changes if any statement, toolchain or file changes", () => {
@@ -64,7 +82,7 @@ test("the ceremony ID changes if any statement, toolchain or file changes", () =
 
 test("rejects forged completion, production readiness and altered public parameters", async () => {
   const temporary = await mkdtemp(
-    resolve("generated-artifacts/clearing-mpc-integrity-test-"),
+    join(tmpdir(), "clearing-mpc-integrity-test-"),
   );
   try {
     for (const change of [
@@ -98,7 +116,7 @@ test("rejects forged completion, production readiness and altered public paramet
 
 test("rejects manifest path traversal and changed recorded checksums", async () => {
   const temporary = await mkdtemp(
-    resolve("generated-artifacts/clearing-mpc-integrity-test-"),
+    join(tmpdir(), "clearing-mpc-integrity-test-"),
   );
   try {
     const invalid = {

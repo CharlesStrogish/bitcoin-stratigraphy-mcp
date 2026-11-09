@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 // Real Groth16 and PostgreSQL; synthetic identities/invoices, NO wallet/network
 // providers and NO imports, dispatch or tests of the 16 Fiduciary data tools.
 import assert from "node:assert/strict";

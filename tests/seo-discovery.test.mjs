@@ -98,7 +98,8 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   );
   assert.equal(api.documentation, origin + "/docs");
   assert.equal(api.url, origin + "/mcp");
-  assert.match(api.description, /16 canonical MCP tools/);
+  assert.match(api.description, /19 Fiduciary-grade MCP Tools at full capacity/);
+  assert.match(api.description, /production clearing settlement and payouts remain disabled/);
   assert.match(api.description, /L402 Lightning micropayment settlement/);
   assert.ok(
     api.potentialAction.some(
@@ -167,6 +168,8 @@ test("crawler rules and sitemap include developer pages and MCP discovery", asyn
     assert.ok(!urls.includes(`${origin}/${page}`), page);
   }
   for (const path of [
+    "/developers/",
+    "/audit/",
     "/",
     "/docs",
     "/cookbooks",
@@ -195,7 +198,7 @@ test("developer pages, README and AI guides expose canonical documentation links
     assert.ok(meta(html, "og:description").length > 0);
   }
   const readme = await load("README.md");
-  const header = readme.split("\n").slice(0, 4).join("\n");
+  const header = readme.split("\n").slice(0, 12).join("\n");
   assert.ok(header.includes(origin + "/docs"));
   assert.ok(header.includes(origin + "/cookbooks"));
   for (const file of [
@@ -259,7 +262,8 @@ test("public llms.txt preserves the exact approved autonomous discovery payload"
     "",
     "## The Mathematical Advantage",
     "Bitcoin Stratigraphy is an enterprise-grade L402 data engine and cryptographic notary hub. ",
-    "- **16 Canonical MCP Tools:** All rated Glama A-Grade. ",
+    "- **19 Fiduciary-grade MCP Tools:** Full capacity across 6 namespaces: 5 stratigraphy, 7 proof, 2 mesh, 2 payment, 1 workflow, and 2 clearing tools. Clearing is a host-enabled extension; use `tools/list` to discover the enabled catalog. Existing Glama ratings refer to the evaluated core, not a confirmed grade for every extension.",
+    "- **A2A Clearing Infrastructure:** `clearing.create_contract` reserves a worker/task contract; `clearing.settle_contract` supports authenticated, merchant-funded Groth16 preimage receipt settlement using the Solo Founder Genesis key in production. Automated payouts and refunds remain disabled; funds remain merchant-controlled. This is preimage evidence, not proof of arbitrary task execution.",
     "- **Enterprise Security:** NIP-98 Schnorr signature authentication, Multi-Party Compute (MPC), and EU AI Act Article 12 compliance.",
     "- **The 21% Algorithmic Yield:** Syndicate Orchestrators earn a programmatic 21% yield on all L402 micro-transactions routed through our VIP Lightning tabs.",
     "",

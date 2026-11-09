@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
+// Dual-licensed under AGPLv3 and Commercial terms.
 // Real Genesis proofs, NIP-98 and isolated PostgreSQL. Synthetic invoices ONLY.
 import assert from "node:assert/strict";
 import { test } from "node:test";

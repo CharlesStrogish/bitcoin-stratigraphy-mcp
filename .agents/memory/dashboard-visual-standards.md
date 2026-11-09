@@ -12,6 +12,16 @@ and interactive simulator elements reachable on small mobile viewports.
 paint. Wrap flex/grid contents and long text; use bounded internal scrolling
 for tables and proof data rather than clipping content at the page boundary.
 
+Keep the full “Bitcoin Stratigraphy” brand on one line in every global header,
+without the yellow diamond. At 768px and below, replace the Developers and
+Enterprise Audit tabs with a gold/orange hamburger dropdown. The brand and menu
+must fit without overlap down to 320px.
+
+**Why:** The user explicitly prioritized the complete brand over mobile navigation tabs.
+
+**How to apply:** Preserve these priorities in future header or navigation changes;
+never hide “Stratigraphy” to make the links fit.
+
 Trust badges must not imply provider-issued verification without an authentic
 asset or documented source. The mcpservers.org listing's “official” designation
 is not by itself proof of an embeddable “verified” seal.

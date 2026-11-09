@@ -4,5 +4,6 @@ node_modules/
 !.env.example
 .fiduciary-state/
 .agent-yield-state/
+.l402-plumbing/
 coverage/
 *.log

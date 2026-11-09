@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env index.js",
-    "check": "node --check index.js && node --check config.js && node --check model-tools.js && node --check risk-policy.js && node --check paid-admission.js && node --check delegation.js",
+    "check": "node --check index.js && node --check config.js && node --check model-tools.js && node --check risk-policy.js && node --check paid-admission.js && node --check delegation.js && node --check test_l402_plumbing.js",
     "test": "node --test test/*.test.js",
     "audit": "pnpm audit"
   },

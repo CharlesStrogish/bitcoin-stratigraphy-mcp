@@ -207,6 +207,33 @@ the agent can solve the problem inline instead.
 
 ## Make It Your Swarm
 
+### Manual L402 Plumbing Diagnostic
+
+Run the dependency-free diagnostic without model or wallet credentials:
+
+```sh
+node test_l402_plumbing.js
+```
+
+It makes a direct unauthenticated HTTP GET to the protected REST counterpart
+`/api/v1/stratigraphy/l402?days=1` (MCP `tools/call` itself requires POST).
+It prints the actual HTTP 402 response headers and raw BOLT11 invoice, and saves
+that original challenge in a unique owner-only file under ignored
+`.l402-plumbing/`. It never pays an invoice or connects a wallet.
+
+After independently checking the invoice amount, recipient and expiry and paying
+manually, run the printed `--redeem CHALLENGE_FILE` command in an interactive
+terminal. Paste the **payment preimage**, not the payment hash, at the hidden
+prompt. The script retries the exact URL with
+`Authorization: L402 <original-macaroon>:<preimage>` and prints whether the server
+returned HTTP 200 and the unlocked payload. Do not paste the preimage in chat,
+source code or command-line arguments. It is neither logged nor saved.
+
+The exported `requestChallenge()` and `verifyPayment(challenge, preimage)`
+functions also work programmatically with only Node.js built-ins. Redirects are
+refused; rejection does not trigger payment, a replacement challenge or a retry.
+HTTP 200 confirms server-side access, not independent payload attestation.
+
 Change `SYSTEM_PROMPT`, the default research request or your model selection.
 Expand the explicit tool allowlist only after reviewing a tool's side effects
 and input schema. The starter deliberately does not turn a model into a trader,

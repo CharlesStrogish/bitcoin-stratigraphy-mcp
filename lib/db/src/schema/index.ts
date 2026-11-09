@@ -20,6 +20,7 @@ export * from "./genesis-grants";
 
 export * from "./payment-challenges";
 export * from "./revoked-macaroons";
+export * from "./macaroon-request-usage";
 export * from "./revenue-ledger";
 export * from "./ots-provenance-anchors";
 export * from "./stratigraphy-provenance-strata";

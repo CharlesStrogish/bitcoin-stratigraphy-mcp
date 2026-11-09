@@ -22,6 +22,19 @@ the shared atomic usage store. Mint confirmations return the original capability
 without renewing its expiry or replenishing credits. Credits currently last
 30 days from issuance, separately from the 15-minute funding invoice.
 
+Keep the existing `macaroon_request_usage` table and its data intact; implement
+scanner credits using its existing schema, never a drop-and-recreate migration.
+
+**Why:** The user explicitly prohibited dropping this production table. A
+missing development copy caused Publish to propose `DROP TABLE ... CASCADE`
+even though no destructive migration file existed in the repository.
+
+**How to apply:** Keep shared quota tables represented in the schema source and
+development database. Inspect the actual development-to-production schema diff
+before declaring a migration safe; preserving source code alone is insufficient.
+Never approve a table drop, reset existing quota rows, or bypass managed
+production migrations to introduce scanner credits.
+
 Do not deploy financial architecture with failing legacy tests. Maintain a strictly green build pipeline.
 
 **Why:** The user explicitly required updating or removing obsolete architecture assertions and running the full suite before committing, pushing or publishing the approved funnels.

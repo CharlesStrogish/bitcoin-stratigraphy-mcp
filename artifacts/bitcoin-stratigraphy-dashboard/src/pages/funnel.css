@@ -37,6 +37,7 @@
   font-size: 15px;
 }
 .fn-nav-brand em { font-style: normal; color: hsl(var(--fn-amber)); }
+.fn-nav-mark { display: none; }
 .fn-nav-mobile-label { display: none; }
 .fn-nav-choices { display: flex; gap: 6px; }
 .fn-nav-link {
@@ -185,8 +186,20 @@
 }
 
 @media (width < 768px) {
-  .fn-nav { justify-content: center; gap: 0; padding: 12px; flex-wrap: nowrap; }
-  .fn-nav-brand, .fn-nav-label, .fn-nav-hint { display: none; }
+  .fn-nav { justify-content: center; gap: 0; padding: 12px 52px; flex-wrap: nowrap; }
+  .fn-nav-brand {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+  }
+  .fn-nav-brand-text, .fn-nav-label, .fn-nav-hint { display: none; }
+  .fn-nav-mark { display: block; }
   .fn-nav-mobile-label { display: inline; font-size: 18px; font-weight: 600; line-height: 1; }
   .fn-nav-choices {
     gap: 8px;

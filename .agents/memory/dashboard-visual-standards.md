@@ -12,16 +12,18 @@ and interactive simulator elements reachable on small mobile viewports.
 paint. Wrap flex/grid contents and long text; use bounded internal scrolling
 for tables and proof data rather than clipping content at the page boundary.
 
-Below 768px, show only large, always-visible API and Audit buttons grouped in
-the exact horizontal center of the navigation bar. No diamond, brand text,
-hamburger or left-side content. Make Audit solid gold with dark text. Keep
-desktop branding and navigation unchanged, and fit the mobile header on one
-line without overlap down to 320px.
+Below 768px, keep large, always-visible API and Audit buttons grouped in
+the exact horizontal center of the navigation bar. Show a minimalist
+homepage-linked icon at the left, but no brand text or hamburger. Make Audit
+solid gold with dark text. Keep desktop branding and navigation unchanged,
+and fit the mobile header on one line without overlap down to 320px.
 
-**Why:** The user approved the central thumb-zone layout and prominent conversion buttons.
+**Why:** The user approved the centered prominent conversion buttons, then
+explicitly requested a clickable mobile icon to eliminate the navigation trap.
 
-**How to apply:** Preserve always-visible commercial links when changing mobile
-headers; apply the icon-free, centered CTA layout strictly below 768px.
+**How to apply:** Preserve always-visible centered commercial links when
+changing mobile headers. Both desktop brand text and mobile icon must use a
+native homepage anchor without altering desktop typography or alignment.
 
 Trust badges must not imply provider-issued verification without an authentic
 asset or documented source. The mcpservers.org listing's “official” designation

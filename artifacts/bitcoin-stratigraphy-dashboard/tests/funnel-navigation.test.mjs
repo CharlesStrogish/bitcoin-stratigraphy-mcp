@@ -26,10 +26,11 @@ const html = renderToStaticMarkup(
 );
 const css = await readFile(new URL("../src/pages/funnel.css", import.meta.url), "utf8");
 
-test("navigation preserves desktop branding without a mobile icon", () => {
+test("navigation preserves desktop branding and exposes a mobile home icon", () => {
   assert.match(html, /Bitcoin <em>Stratigraphy<\/em>/);
   assert.match(html, /aria-label="Bitcoin Stratigraphy home"/);
-  assert.doesNotMatch(html, /fn-nav-mark|◆/);
+  assert.match(html, /<a href="\/" class="fn-nav-brand"[^>]*>.*fn-nav-brand-text.*fn-nav-mark.*<\/a>/);
+  assert.match(css, /\.fn-nav-mark\s*\{\s*display:\s*none/);
   assert.match(css, /\.fn-nav-mobile-label\s*\{\s*display:\s*none/);
   assert.match(css, /\.fn-nav-brand\s*\{[^}]*white-space:\s*nowrap/s);
 });
@@ -50,10 +51,24 @@ test("mobile revenue links are always inline with short copy and a primary Audit
 test("mobile funnels are centered, equally prominent and never pushed right", () => {
   const mobile = css.split("@media (width < 768px) {")[1].split("@media (max-width: 767px)")[0];
   assert.match(mobile, /\.fn-nav\s*\{[^}]*justify-content:\s*center/s);
-  assert.match(mobile, /\.fn-nav-brand, .fn-nav-label, .fn-nav-hint\s*\{\s*display:\s*none/);
+  assert.match(mobile, /\.fn-nav-brand-text, .fn-nav-label, .fn-nav-hint\s*\{\s*display:\s*none/);
+  assert.match(mobile, /\.fn-nav-mark\s*\{\s*display:\s*block/);
+  assert.match(mobile, /\.fn-nav-brand\s*\{[^}]*position:\s*absolute/s);
   assert.match(mobile, /\.fn-nav-choices\s*\{[^}]*justify-content:\s*center;[^}]*margin:\s*0/s);
   assert.match(mobile, /font-size:\s*18px/);
   assert.match(mobile, /min-height:\s*56px/);
   assert.match(mobile, /padding:\s*16px 24px/);
   assert.doesNotMatch(mobile, /margin-left:\s*auto|justify-content:\s*(?:flex-end|end)/);
+});
+
+test("every route keeps a native homepage anchor without client-side interception", () => {
+  for (const route of ["/", "/developers", "/audit", "/security", "/compliance", "/whitepaper"]) {
+    const markup = renderToStaticMarkup(
+      createElement(Router, { ssrPath: route }, createElement(compiled.exports.default)),
+    );
+    assert.match(markup, /<a href="\/" class="fn-nav-brand" aria-label="Bitcoin Stratigraphy home"/);
+  }
+  assert.match(source, /<a href="\/" className="fn-nav-brand"/);
+  assert.doesNotMatch(source, /<Link href="\/"|preventDefault|onClick/);
+  assert.match(css, /\.fn-nav-brand\s*\{[^}]*color:\s*inherit;[^}]*text-decoration:\s*none;[^}]*font-size:\s*15px/s);
 });

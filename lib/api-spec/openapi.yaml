@@ -823,7 +823,11 @@ paths:
         returns the same funded macaroon without consuming any scanner credit.
         Funding confirmation is idempotent and never resets the 100-call budget.
         Invoice expiry is 900 seconds; credits expire 30 days after issuance.
-        Use the same Authorization on /api/scanner for different valid prompts.
+        The B2B portal confirms settlement with Authorization Macaroon <token>.
+        This shorthand is accepted only for issuer-authorized prepaid scanner
+        credits and uses the same merchant-side verification as L402 NWC_LOOKUP.
+        Use Authorization Macaroon <token> or the original L402 Authorization
+        on /api/scanner for different valid prompts.
         No additional invoices are generated for funded calls or exhausted credits.
       parameters:
         - in: header

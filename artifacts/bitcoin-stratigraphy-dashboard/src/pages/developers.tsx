@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type ReactNode } from "react";
 
 const REPO_URL = "https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp";
 const MCP_ENDPOINT = "https://bitcoinstratigraphy.com/mcp";
@@ -38,7 +38,8 @@ function Code({ label, children, id }: { label: string; children: string; id: st
   );
 }
 
-export default function DevelopersPage({ base = import.meta.env.BASE_URL }: { base?: string }) {
+/** `prepaidAccess` is a client-only slot: the SEO prerender omits it so static HTML stays payment-client-free. */
+export default function DevelopersPage({ base = import.meta.env.BASE_URL, prepaidAccess }: { base?: string; prepaidAccess?: ReactNode }) {
   return (
     <div className="fn-page">
       <div className="fn-shell">
@@ -133,6 +134,26 @@ npx bitcoin-stratigraphy-mcp-server --help`}</Code>
             <code>clearing.settle_contract</code> verifies Groth16 preimage receipts. It is preimage
             evidence, not proof of arbitrary task execution. Automated payouts and refunds are disabled.
           </p>
+        </section>
+
+        <section className="fn-rise fn-prepaid-section" aria-labelledby="dev-prepaid" data-testid="section-prepaid">
+          <p className="fn-step">05</p>
+          <h2 id="dev-prepaid" className="fn-h2">Prepaid API Access (B2B)</h2>
+          <dl className="fn-facts fn-prepaid-scope" data-testid="text-prepaid-scope">
+            <div><dt>Grants</dt><dd>100 calls to <code>POST /api/scanner</code></dd></div>
+            <div><dt>Validity</dt><dd>Credits expire 30 days after issuance.</dd></div>
+            <div><dt>Not included</dt><dd>Does not fund unrelated MCP tools; those settle per call over L402.</dd></div>
+          </dl>
+          {prepaidAccess ?? (
+            <div className="fn-prepaid" data-testid="panel-prepaid-static">
+              <div className="fn-prepaid-mint">
+                <button type="button" className="fn-btn fn-btn-primary fn-btn-lg" disabled data-testid="button-mint-credits-static">
+                  Mint 100 API Credits (100,000 sats)
+                </button>
+                <p className="fn-hint">The Lightning checkout loads in your browser.</p>
+              </div>
+            </div>
+          )}
         </section>
 
         <aside className="fn-switch fn-rise">

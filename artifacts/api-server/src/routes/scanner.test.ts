@@ -160,9 +160,11 @@ test("100000-sat prepaid grants retain pending invoices and share exactly 100 cr
     await new Promise<void>(resolve => server.once("listening", resolve));
     bases.push(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
   }
-  const post = (path: string, body: unknown = {}, token?: string, worker = 0) =>
+  const post = (path: string, body: unknown = {}, token?: string, worker = 0, scheme = "L402") =>
     fetch(bases[worker] + path, {
-      method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `L402 ${token}:NWC_LOOKUP` } : {}) },
+      method: "POST", headers: { "Content-Type": "application/json", ...(token ? {
+        Authorization: scheme === "Macaroon" ? `Macaroon ${token}` : `L402 ${token}:NWC_LOOKUP`,
+      } : {}) },
       body: JSON.stringify(body),
     });
   assert.equal((await post("/api/mint-macaroon", { credits: 1000 })).status, 400);
@@ -179,13 +181,21 @@ test("100000-sat prepaid grants retain pending invoices and share exactly 100 cr
   assert.ok(pass.validUntil > Date.now() / 1000 + 29 * 86400);
   assert.ok(JSON.parse(Buffer.from(token, "base64url").toString()).caveats.includes("credits=100"));
   assert.equal((await post("/api/mint-macaroon", {}, token)).status, 409);
+  assert.equal((await post("/api/mint-macaroon", {}, token, 0, "Macaroon")).status, 409);
+  assert.equal((await post("/api/scanner", { prompt: "Review this synthetic header validation test." }, "invalid-token", 0, "Macaroon")).status, 401);
+  const ordinaryToken = createSubscriptionMacaroon({
+    secret, paymentHash: hash, tier: "1-day", validUntil: Math.floor(Date.now() / 1000) + 900,
+    amountMsats: 100_000_000, baseAmountMsats: 100_000_000,
+    paymentAsset: "btc-lightning", paymentProvider: "synthetic-credit",
+  });
+  assert.equal((await post("/api/mint-macaroon", {}, ordinaryToken, 0, "Macaroon")).status, 401);
   const prompt = { prompt: "Review this harmless synthetic agent log for an enterprise scanner test." };
   assert.equal((await post("/api/scanner", prompt, token)).status, 409);
   assert.equal(invoices, 1);
   paid = true;
   assert.equal((await post("/api/scanner", prompt, token, 2)).status, 503);
   for (let worker = 0; worker < 2; worker++) {
-    const minted = await post("/api/mint-macaroon", {}, token, worker);
+    const minted = await post("/api/mint-macaroon", {}, token, worker, "Macaroon");
     assert.equal(minted.status, 200);
     assert.equal((await minted.json() as { macaroon: string }).macaroon, token);
   }
@@ -202,7 +212,7 @@ test("100000-sat prepaid grants retain pending invoices and share exactly 100 cr
   assert.equal((await post("/api/scanner", prompt, expiredRoot)).status, 401);
   assert.equal(invoices, 1);
   const child = attenuateSubscriptionMacaroon(token, ["max_requests=1"])!;
-  assert.equal((await post("/api/scanner", prompt, child)).status, 200);
+  assert.equal((await post("/api/scanner", prompt, child, 0, "Macaroon")).status, 200);
   assert.equal((await post("/api/scanner", prompt, child, 1)).status, 429);
   const results = await Promise.all(Array.from({ length: 110 }, async (_, i) =>
     (await post("/api/scanner", { prompt: `${prompt.prompt} Record ${i}.` }, token, i % 2)).status));

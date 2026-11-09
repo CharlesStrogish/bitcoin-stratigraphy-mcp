@@ -78,7 +78,10 @@ export type L402MiddlewareOptions = {
 
 export function parseL402Header(
   value: string | undefined,
+  allowScannerMacaroon = false,
 ): L402Authorization | null {
+  const credit = allowScannerMacaroon && /^Macaroon\s+([^:\s]+)$/i.exec(value?.trim() ?? "");
+  if (credit) return { macaroon: credit[1]!, preimage: "nwc_lookup" };
   const match =
     /^L402\s+([^:\s]+)(?::([0-9a-fA-F]{64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|NWC_LOOKUP)?)?$/i.exec(
       value?.trim() ?? "",
@@ -393,13 +396,23 @@ export function createL402Middleware(
       return;
     }
     const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
-    const authorization = parseL402Header(req.header("Authorization"));
+    const creditHeader = Boolean(options.scannerCredits) &&
+      /^Macaroon(?:\s|$)/i.test(req.header("Authorization")?.trim() ?? "");
+    const authorization = parseL402Header(req.header("Authorization"), Boolean(options.scannerCredits));
+    if (creditHeader && !authorization) {
+      res.status(401).json({ error: "Invalid prepaid scanner credential" });
+      return;
+    }
     if (secret && authorization) {
       const requestTime = now();
       const authentic = credentialCache.inspectAuthenticity(
         authorization.macaroon,
         secret,
       );
+      if (creditHeader && authentic?.scannerCredits === undefined) {
+        res.status(401).json({ error: "Invalid prepaid scanner credential" });
+        return;
+      }
       if (authentic?.scannerCredits !== undefined && authentic.validUntil * 1000 <= requestTime) {
         res.status(401).json({ error: "Prepaid scanner credits have expired" });
         return;

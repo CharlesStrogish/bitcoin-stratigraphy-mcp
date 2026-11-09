@@ -81,7 +81,7 @@ export function registerScannerRoute(app: Express, options: {
     }
     next();
   }, mintGate, (req, res): void => {
-    const credential = parseL402Header(req.header("Authorization"))!;
+    const credential = parseL402Header(req.header("Authorization"), true)!;
     res.json(MintScannerMacaroonResponse.parse({
       macaroon: credential.macaroon,
       credits: res.locals.l402.credits,

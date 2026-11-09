@@ -267,3 +267,25 @@
 .fn-facts code { overflow-wrap: anywhere; font-size: 12px !important; }
 @media (prefers-reduced-motion: reduce) { .fn-pulse { animation: none; } .fn-steps li::before { transition: none; } }
 @media (max-width: 767px) { .fn-cta-tight .fn-btn { flex: 1 1 100%; } }
+
+/* Developers: prepaid B2B credits */
+.fn-prepaid-section { display: grid; gap: 20px; }
+.fn-prepaid-section .fn-h2 { margin-bottom: 0; }
+.fn-prepaid-scope { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; }
+.fn-prepaid { display: grid; gap: 20px; max-width: 760px; width: 100%; margin-inline: auto; min-width: 0; }
+.fn-prepaid-mint { display: grid; gap: 10px; justify-items: center; text-align: center; }
+.fn-prepaid-mint .fn-btn { max-width: 100%; white-space: normal; text-align: center; }
+.fn-prepaid-pay, .fn-prepaid-done { animation: fn-in 0.45s var(--fn-ease) both; min-width: 0; }
+.fn-prepaid-done { display: grid; gap: 14px; border-color: hsl(var(--fn-amber) / 0.55); }
+.fn-prepaid-seal { width: 36px; height: 3px; background: hsl(var(--fn-amber)); }
+.fn-prepaid-title { margin: 0; }
+.fn-prepaid-title:focus { outline: none; }
+.fn-prepaid-warn code { background: hsl(var(--fn-ink)); padding: 1px 6px; border: 1px solid hsl(var(--fn-line)); white-space: nowrap; }
+.fn-prepaid-token { min-height: 0; resize: none; overflow-wrap: anywhere; word-break: break-all; font-size: 12px; }
+.fn-prepaid-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.fn-prepaid-confirm { display: grid; gap: 10px; }
+@media (max-width: 767px) {
+  .fn-prepaid-scope { grid-template-columns: 1fr; }
+  .fn-prepaid-mint .fn-btn, .fn-prepaid-actions .fn-btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .fn-prepaid-pay, .fn-prepaid-done { animation: none; } }

@@ -34,6 +34,7 @@ import { CommandCenter } from "@/components/command-center/command-center";
 import FunnelNavigation from "@/components/funnel-navigation";
 import DevelopersPage from "@/pages/developers";
 import AuditPage from "@/pages/audit";
+import PrepaidApiAccess from "@/components/prepaid-api-access";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -342,7 +343,7 @@ function Router() {
         <Route path="/ceremony" component={CeremonyPage} />
         <Route path="/simulator" component={SimulatorPage} />
         <Route path="/compliance" component={CompliancePage} />
-        <Route path="/developers">{() => <DevelopersPage />}</Route>
+        <Route path="/developers">{() => <DevelopersPage prepaidAccess={<PrepaidApiAccess />} />}</Route>
         <Route path="/audit">{() => <AuditPage />}</Route>
         <Route component={NotFound} />
       </Switch>

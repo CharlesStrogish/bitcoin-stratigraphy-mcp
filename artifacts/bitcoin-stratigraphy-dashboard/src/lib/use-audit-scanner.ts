@@ -2,16 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { scanArticle12Prompt, type ScannerReport } from "@workspace/api-client-react";
 
 type Phase = "idle" | "quoting" | "awaiting_payment" | "checking" | "complete" | "error" | "expired";
-type Challenge = { invoice: string; macaroon: string; amountSats: number; expiresAt: number };
+export type Challenge = { invoice: string; macaroon: string; amountSats: number; expiresAt: number };
 type HttpFailure = { status: number; headers: Headers; data: unknown };
 
-function isHttpFailure(error: unknown): error is HttpFailure {
+export function isHttpFailure(error: unknown): error is HttpFailure {
   return typeof error === "object" && error !== null &&
     "status" in error && typeof error.status === "number" &&
     "headers" in error && error.headers instanceof Headers && "data" in error;
 }
 
-function parseChallenge(error: HttpFailure): Challenge {
+export function parseChallenge(error: HttpFailure): Challenge {
   const header = error.headers.get("www-authenticate") ?? "";
   if (header.length > 32768 || /[\x00-\x1f\x7f]/.test(header)) throw new Error("Invalid challenge");
   const scheme = /^L402\s+(.+)$/i.exec(header);

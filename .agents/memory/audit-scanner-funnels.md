@@ -35,6 +35,18 @@ before declaring a migration safe; preserving source code alone is insufficient.
 Never approve a table drop, reset existing quota rows, or bypass managed
 production migrations to introduce scanner credits.
 
+The `/developers` B2B portal reveals the funded Macaroon only in the current
+page's success state, with the user's explicit one-time-copy warning.
+
+**Why:** The user requires one-time credential disclosure after settlement,
+not stored credentials or a second invoice for an interrupted purchase.
+
+**How to apply:** Never put capabilities in browser storage, analytics or URLs.
+Retain the original invoice on verification errors, allow explicit payment
+recovery after automatic polling pauses, and discard the display on leaving.
+The advertised `Macaroon <token>` syntax is a prepaid-scanner-only alias for
+the existing merchant-verified L402 flow, not authorization for other MCP tools.
+
 Do not deploy financial architecture with failing legacy tests. Maintain a strictly green build pipeline.
 
 **Why:** The user explicitly required updating or removing obsolete architecture assertions and running the full suite before committing, pushing or publishing the approved funnels.

@@ -46,7 +46,7 @@ export const ScanArticle12PromptResponse = zod.object({
 
 
 /**
- * First POST returns a fixed 100000-sat invoice and an unsettled credits=100 scanner-scoped macaroon in WWW-Authenticate. Pay that invoice once, then repeat with Authorization L402 <macaroon>:<preimage> or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement, returns the same funded macaroon without consuming any scanner credit. Funding confirmation is idempotent and never resets the 100-call budget. Invoice expiry is 900 seconds; credits expire 30 days after issuance. Use the same Authorization on /api/scanner for different valid prompts. No additional invoices are generated for funded calls or exhausted credits.
+ * First POST returns a fixed 100000-sat invoice and an unsettled credits=100 scanner-scoped macaroon in WWW-Authenticate. Pay that invoice once, then repeat with Authorization L402 <macaroon>:<preimage> or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement, returns the same funded macaroon without consuming any scanner credit. Funding confirmation is idempotent and never resets the 100-call budget. Invoice expiry is 900 seconds; credits expire 30 days after issuance. The B2B portal confirms settlement with Authorization Macaroon <token>. This shorthand is accepted only for issuer-authorized prepaid scanner credits and uses the same merchant-side verification as L402 NWC_LOOKUP. Use Authorization Macaroon <token> or the original L402 Authorization on /api/scanner for different valid prompts. No additional invoices are generated for funded calls or exhausted credits.
  * @summary Buy 100 prepaid scanner credits for 100000 sats
  */
 export const MintScannerMacaroonHeader = zod.object({

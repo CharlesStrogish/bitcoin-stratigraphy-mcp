@@ -7,12 +7,16 @@ import esbuildPluginPino from "esbuild-plugin-pino";
 import { cp, mkdir, readFile, rm } from "node:fs/promises";
 import { parse as parseYaml } from "yaml";
 import { execFileSync } from "node:child_process";
+import { copyStripeSyncMigrations } from "./stripe-sync-assets.mjs";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
-const openApiSpec = path.resolve(artifactDir, "../../lib/api-spec/openapi.yaml");
+const openApiSpec = path.resolve(
+  artifactDir,
+  "../../lib/api-spec/openapi.yaml",
+);
 
 // The contract stays authored in YAML, but parsing it at startup costs hundreds
 // of milliseconds before the application can serve. Embed the equivalent JSON
@@ -24,8 +28,11 @@ const openApiAsJson = {
       if (path.resolve(args.path) !== openApiSpec) return undefined;
       const document = parseYaml(await readFile(args.path, "utf8"));
       const json = JSON.stringify(document);
-      assert.deepStrictEqual(JSON.parse(json), document,
-        "openapi.yaml must contain only JSON-compatible values");
+      assert.deepStrictEqual(
+        JSON.parse(json),
+        document,
+        "openapi.yaml must contain only JSON-compatible values",
+      );
       return { contents: json, loader: "text" };
     });
   },
@@ -36,26 +43,50 @@ async function buildAll() {
   await rm(distDir, { recursive: true, force: true });
   // Public proving binary lives in App Storage, not Git. Pin and install it
   // during builds; deployment startup never depends on a storage request.
-  const genesisSource = path.resolve(artifactDir, "src/services/zk/clearing-production");
+  const genesisSource = path.resolve(
+    artifactDir,
+    "src/services/zk/clearing-production",
+  );
   const genesisDist = path.resolve(distDir, "zk/clearing-production");
-  execFileSync("uv", [
-    "run", "--no-sync", "python",
-    path.resolve(artifactDir, "../../scripts/install-clearing-genesis.py"),
-    genesisSource, genesisDist,
-  ], { cwd: path.resolve(artifactDir, "../.."), stdio: "inherit", timeout: 60_000 });
-  await cp(path.resolve(genesisSource, "verification_key.json"),
-    path.resolve(genesisDist, "verification_key.json"));
+  execFileSync(
+    "uv",
+    [
+      "run",
+      "--no-sync",
+      "python",
+      path.resolve(artifactDir, "../../scripts/install-clearing-genesis.py"),
+      genesisSource,
+      genesisDist,
+    ],
+    {
+      cwd: path.resolve(artifactDir, "../.."),
+      stdio: "inherit",
+      timeout: 60_000,
+    },
+  );
+  await cp(
+    path.resolve(genesisSource, "verification_key.json"),
+    path.resolve(genesisDist, "verification_key.json"),
+  );
   // Publish an isolated stdlib-only escrow worker; never copy custody DB files.
   for (const [folder, filenames] of [
     ["routers", ["__init__.py", "escrow_api.py", "escrow_worker.py"]],
-    ["services", ["__init__.py", "escrow_db.py", "escrow_engine.py", "escrow_pricing.py"]],
-    ["sdk/python/bitcoin_stratigraphy_enterprise", ["__init__.py", "swarm_merkle.py"]],
+    [
+      "services",
+      ["__init__.py", "escrow_db.py", "escrow_engine.py", "escrow_pricing.py"],
+    ],
+    [
+      "sdk/python/bitcoin_stratigraphy_enterprise",
+      ["__init__.py", "swarm_merkle.py"],
+    ],
   ]) {
     const destination = path.resolve(distDir, "escrow-worker", folder);
     await mkdir(destination, { recursive: true });
     for (const filename of filenames) {
-      await cp(path.resolve(artifactDir, "../..", folder, filename),
-        path.resolve(destination, filename));
+      await cp(
+        path.resolve(artifactDir, "../..", folder, filename),
+        path.resolve(destination, filename),
+      );
     }
   }
   await cp(
@@ -274,6 +305,9 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+  // esbuild cannot include SQL files discovered dynamically by the native runner.
+  // Missing assets otherwise cause runMigrations() to silently skip its work.
+  await copyStripeSyncMigrations(distDir);
 }
 
 buildAll().catch((err) => {

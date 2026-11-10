@@ -41,12 +41,12 @@ export default function FiatMintCheckout({
     signal: AbortSignal.timeout(25_000),
   });
 
-  async function refresh() {
+  async function refresh({ preserveError = false } = {}) {
     try {
       const response = await getFiatMintStatus(options());
       if (alive.current) {
         setStatus(response.status);
-        setError("");
+        if (!preserveError) setError("");
       }
     } catch {
       if (alive.current) {
@@ -90,8 +90,9 @@ export default function FiatMintCheckout({
       setError(
         "Checkout could not be opened. Check the original purchase before trying again.",
       );
-      setBusy(false);
-      void refresh();
+      void refresh({ preserveError: true });
+    } finally {
+      if (alive.current) setBusy(false);
     }
   }
   async function claim() {

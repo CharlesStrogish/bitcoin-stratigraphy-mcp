@@ -14,6 +14,7 @@ import {
   ClaimFiatMintMacaroonResponse,
 } from "@workspace/api-zod";
 import type { FiatMint } from "../services/fiatMint";
+import { fiatErrorDiagnostics } from "../services/fiatDiagnostics";
 
 const COOKIE = "__Secure-fiat-mint-owner";
 function owner(req: Request) {
@@ -99,7 +100,11 @@ export function registerFiatMintRoutes(
           url: await mint.checkout(token),
         }),
       );
-    } catch {
+    } catch (error) {
+      req.log?.error(
+        fiatErrorDiagnostics(error, "checkout"),
+        "Fiat Checkout request failed",
+      );
       res.status(503).json({
         error:
           "Checkout unavailable. Recover an existing purchase before buying again.",

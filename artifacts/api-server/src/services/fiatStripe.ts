@@ -6,6 +6,7 @@ import { pinVerifiedSslMode } from "@workspace/db/connection-string";
 import { logger } from "../lib/logger";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { fiatStripeKeyLivemode } from "./fiatStripeMode";
+import { fiatErrorDiagnostics, fiatSyncStage } from "./fiatDiagnostics";
 
 /** Official SDK over the managed connector; raw provider credentials never leave the proxy. */
 export function createFiatStripeClient(key = process.env.STRIPE_SECRET_KEY): {
@@ -91,11 +92,17 @@ export function getFiatStripe(): Promise<FiatStripeRuntime> {
       // Library exceptions can include Stripe request details: log fixed text only.
       logger: {
         info() {},
-        warn() {
-          logger.warn("Fiat Stripe synchronization warning");
+        warn(error: unknown, description?: unknown) {
+          logger.warn(
+            fiatErrorDiagnostics(error, fiatSyncStage(description)),
+            "Fiat Stripe synchronization warning",
+          );
         },
-        error() {
-          logger.error("Fiat Stripe synchronization failure");
+        error(error: unknown, description?: unknown) {
+          logger.error(
+            fiatErrorDiagnostics(error, fiatSyncStage(description)),
+            "Fiat Stripe synchronization failure",
+          );
         },
       },
     });
@@ -124,6 +131,7 @@ export function getFiatStripe(): Promise<FiatStripeRuntime> {
     initialization = undefined;
     // Do not log Stripe SDK errors: they can contain request/credential data.
     logger.warn(
+      fiatErrorDiagnostics(error, "initialization"),
       "Fiat mint Stripe initialization unavailable; check server configuration",
     );
     throw error;

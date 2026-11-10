@@ -25,6 +25,47 @@ import {
   fiatTreasuryPolicy,
 } from "../services/fiatStripeMode";
 import { processFiatWebhook } from "../services/fiatWebhook";
+import {
+  fiatErrorDiagnostics,
+  fiatSyncStage,
+} from "../services/fiatDiagnostics";
+
+test("checkout diagnostics preserve useful error codes without credential-bearing SDK details", () => {
+  const error = {
+    name: "StripePermissionError",
+    type: "StripePermissionError",
+    code: "permission_missing",
+    statusCode: 403,
+    requestId: "req_synthetic",
+    message: "rk_live_synthetic_never_a_real_key",
+    raw: { secret: "synthetic" },
+    headers: { authorization: "synthetic" },
+  };
+  const result = fiatErrorDiagnostics(error, "checkout");
+  assert.equal(result.errorCode, "permission_missing");
+  assert.equal(result.httpStatus, 403);
+  assert.equal(result.stripeRequestId, "req_synthetic");
+  assert.ok(!JSON.stringify(result).includes("rk_live_"));
+  assert.ok(
+    !("message" in result) && !("raw" in result) && !("headers" in result),
+  );
+  assert.equal(
+    fiatErrorDiagnostics({ code: "42P01" }, "stripe_account_upsert").errorCode,
+    "42P01",
+  );
+  assert.equal(
+    fiatErrorDiagnostics({ code: "rk_live_synthetic" }, "sync").errorCode,
+    undefined,
+  );
+  assert.equal(
+    fiatSyncStage("Failed to upsert account to database"),
+    "stripe_account_upsert",
+  );
+  assert.equal(
+    fiatSyncStage("Failed to retrieve account from Stripe API"),
+    "stripe_account_read",
+  );
+});
 
 const session = (id: string, sessionId: string) =>
   ({

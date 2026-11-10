@@ -37,6 +37,7 @@ Never put them in frontend environment variables, source code, URLs or chat.
 | `FIAT_MINT_WEBHOOK_ORIGIN`            | Public, published HTTPS origin for `/api/stripe/webhook`; not a private preview URL                                                                             |
 | `FIAT_MINT_ALLOW_TREASURY`            | Must explicitly equal `true` to authorize real Lightning spending after **live** card payments. Defaults off. |
 | `FIAT_MINT_TREASURY_BUDGET_SATS`      | Live-mode lifetime reservation cap in sats. Defaults `0`. One purchase reserves 100,000 sats; prior reservations across both modes count toward the cap. |
+| `FIAT_MINT_BUDGET_TREASURY_SATS`      | Compatible alternate name for the live-mode cap. If both budget names are configured, their numeric values must match; otherwise admission and funding fail closed. |
 | `FIAT_MINT_ALLOW_TEST_TREASURY`       | Separate test-mode opt-in for real Lightning spending after test card charges. Does **not** authorize live-mode spending. |
 | `FIAT_MINT_TEST_TREASURY_BUDGET_SATS` | Test-mode lifetime reservation cap. Defaults `0`; prior reservations across both modes count toward the cap. |
 | `FIAT_MINT_PAYER_NWC_URI`             | **Secret:** separately budgeted outbound payer wallet                                                                                                           |

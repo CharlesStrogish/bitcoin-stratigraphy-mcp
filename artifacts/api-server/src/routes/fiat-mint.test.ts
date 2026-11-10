@@ -103,6 +103,33 @@ test("live and test full/restricted keys initialize without balance-read permiss
     }),
     { allowed: true, budgetSats: 200000 },
   );
+  assert.deepEqual(
+    fiatTreasuryPolicy(true, {
+      FIAT_MINT_ALLOW_TREASURY: "true",
+      FIAT_MINT_BUDGET_TREASURY_SATS: "200000",
+    }),
+    { allowed: true, budgetSats: 200000 },
+  );
+  assert.equal(
+    fiatTreasuryPolicy(true, {
+      FIAT_MINT_TREASURY_BUDGET_SATS: "200000",
+      FIAT_MINT_BUDGET_TREASURY_SATS: "200000",
+    }).budgetSats,
+    200000,
+  );
+  assert.ok(
+    Number.isNaN(
+      fiatTreasuryPolicy(true, {
+        FIAT_MINT_TREASURY_BUDGET_SATS: "200000",
+        FIAT_MINT_BUDGET_TREASURY_SATS: "300000",
+      }).budgetSats,
+    ),
+  );
+  assert.equal(
+    fiatTreasuryPolicy(false, { FIAT_MINT_BUDGET_TREASURY_SATS: "200000" })
+      .budgetSats,
+    0,
+  );
 });
 
 test("signed live/test webhooks require matching event and session modes before side effects", async () => {

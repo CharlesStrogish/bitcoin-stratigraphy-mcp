@@ -52,7 +52,7 @@ export default function FiatMintCheckout({
       if (alive.current) {
         setStatus((s) => (s === "loading" ? "none" : s));
         setError(
-          "Stripe test Checkout is not configured or purchase recovery is unavailable. No new payment has been started.",
+          "Stripe Checkout is not configured or purchase recovery is unavailable. No new payment has been started.",
         );
       }
     }
@@ -123,12 +123,11 @@ export default function FiatMintCheckout({
         Buy with Credit Card
       </h3>
       <p className="fn-hint">
-        $500 Enterprise API Block · Stripe test mode · 100 scanner calls for 30
-        days.
+        $500 Enterprise API Block · 100 scanner calls for 30 days.
       </p>
       <p className="fn-note">
-        No Lightning wallet required. Test charges move no fiat. Scanner credits
-        are issued only after operator-enabled treasury funding is verified.
+        No Lightning wallet required. Scanner credits are issued only after
+        operator-enabled treasury funding is verified.
       </p>
       {!grant && (status === "none" || status === "checkout") && (
         <button
@@ -142,7 +141,7 @@ export default function FiatMintCheckout({
             ? "Opening Stripe…"
             : status === "checkout"
               ? "Resume Stripe Checkout"
-              : "Buy with Credit Card — Test"}
+              : "Buy with Credit Card"}
         </button>
       )}
       {lightningPending && (
@@ -153,8 +152,7 @@ export default function FiatMintCheckout({
       )}
       {(status === "paid" || status === "paying") && (
         <p className="fn-status" role="status">
-          Card test payment confirmed. Treasury funding is pending. Do not pay
-          again.
+          Card payment confirmed. Treasury funding is pending. Do not pay again.
         </p>
       )}
       {status === "ready" && (

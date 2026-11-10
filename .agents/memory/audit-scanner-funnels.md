@@ -5,11 +5,11 @@ description: Separate developer and enterprise funnels and the paid heuristic sc
 
 Keep `/developers` focused on M2M integrations and `/audit` on the human enterprise kiosk. Preserve the existing L402 core payment flow when extending either funnel.
 
-The credit-card bridge must use real Stripe test Checkout, not a fake mock UI.
+The credit-card bridge must use real Stripe-hosted Checkout, not a fake mock UI. The user has moved from the initial test-mode request to production-facing checkout with live Stripe credentials.
 
-**Why:** The user explicitly said, “Build the real Stripe test Checkout integration. Do not use a fake mock UI.”
+**Why:** The user initially required genuine test Checkout, then reported configuring live keys and requested removing frontend test-mode labels.
 
-**How to apply:** Preserve genuine provider-hosted checkout and verified server-side payment evidence. Test charges transfer no fiat; never infer authorization to enable mainnet treasury spending merely from connecting Stripe.
+**How to apply:** Preserve genuine provider-hosted checkout and verified server-side payment evidence. Configuring live credentials alone does not prove that checkout and fulfillment support live payments. Test charges transfer no fiat; never infer authorization to enable mainnet treasury spending merely from connecting Stripe.
 
 **Why:** The user explicitly requested isolated SEO funnels and authorized a new paid heuristic scanner service, not changes to core payment logic.
 

@@ -9,6 +9,45 @@ import * as zod from 'zod';
 
 
 /**
+ * Requires server-configured Stripe test keys and a fixed USD 500 price. Owner recovery uses an HttpOnly cookie, never credentials in URLs.
+ * @summary Create a real Stripe test Checkout for 100 scanner credits
+ */
+export const CreateFiatMintCheckoutBody = zod.object({
+  "package": zod.enum(['enterprise-api-block']).optional()
+})
+
+export const CreateFiatMintCheckoutResponse = zod.object({
+  "url": zod.string()
+})
+
+
+/**
+ * @summary Read the current browser-owned purchase state
+ */
+export const GetFiatMintStatusResponse = zod.object({
+  "status": zod.enum(['none', 'checkout', 'paid', 'paying', 'ready', 'delivered', 'failed'])
+})
+
+
+/**
+ * @summary Reveal the funded scanner macaroon once to the checkout owner
+ */
+export const ClaimFiatMintMacaroonResponse = zod.object({
+  "macaroon": zod.string(),
+  "credits": zod.literal(100).describe('Original allocation, not remaining balance; reminting never replenishes credits.'),
+  "amount_sats": zod.literal(100000),
+  "valid_until": zod.int().describe('Exclusive expiration in epoch seconds.'),
+  "scope": zod.enum(['/api/scanner'])
+})
+
+
+/**
+ * @summary Verify raw Stripe webhook signatures and queue durable fiat fulfillment
+ */
+export const ReceiveFiatStripeWebhookResponse = zod.unknown()
+
+
+/**
  * Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Retail success consumes the prompt-bound single-use capability. A settled 100000-sat Developer SaaS macaroon from /api/mint-macaroon carries credits=100 and permits 100 valid scanner calls across different prompts. Each admitted scan atomically consumes one shared credit. Credit grants expire 30 days after issuance, and inherited descendant quotas and revocations remain enforced. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
  * @summary Paid heuristic Article 12 prompt risk review
  */

@@ -5,6 +5,17 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+export type FiatMintCheckoutRequestPackage = typeof FiatMintCheckoutRequestPackage[keyof typeof FiatMintCheckoutRequestPackage];
+
+
+export const FiatMintCheckoutRequestPackage = {
+  'enterprise-api-block': 'enterprise-api-block',
+} as const;
+
+export interface FiatMintCheckoutRequest {
+  package?: FiatMintCheckoutRequestPackage;
+}
+
 /**
  * Original allocation, not remaining balance; reminting never replenishes credits.
  */
@@ -2862,6 +2873,27 @@ export type PublicMetadataResponse = PublicMetadata;
  * Empty, finite successful preflight
  */
 export type PublicPreflightResponse = void;
+
+export type CreateFiatMintCheckout200 = {
+  url: string;
+};
+
+export type GetFiatMintStatus200Status = typeof GetFiatMintStatus200Status[keyof typeof GetFiatMintStatus200Status];
+
+
+export const GetFiatMintStatus200Status = {
+  none: 'none',
+  checkout: 'checkout',
+  paid: 'paid',
+  paying: 'paying',
+  ready: 'ready',
+  delivered: 'delivered',
+  failed: 'failed',
+} as const;
+
+export type GetFiatMintStatus200 = {
+  status: GetFiatMintStatus200Status;
+};
 
 export type RegisterEnterpriseFleet200MaximumUnpaidSats = typeof RegisterEnterpriseFleet200MaximumUnpaidSats[keyof typeof RegisterEnterpriseFleet200MaximumUnpaidSats];
 

@@ -61,6 +61,10 @@ import { createEscrowRecovery } from "./services/escrowRecovery";
 import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store";
 import { registerComplianceRoutes } from "./routes/compliance";
 import { registerScannerRoute } from "./routes/scanner";
+import { registerFiatMintRoutes, registerFiatWebhook } from "./routes/fiat-mint";
+import { fiatMint } from "./services/fiatMintRuntime";
+import { fiatPublicOrigin } from "./services/fiatStripe";
+import { FiatWebhookHandlers } from "./services/fiatWebhook";
 import { EnterpriseEconomics, configureEnterpriseEconomics } from "./lib/enterprise-economics";
 import { createPostgresEnterpriseEconomicsStore } from "./lib/enterprise-economics-store";
 import { createEnterpriseEconomicsMiddleware } from "./middleware/enterprise-economics";
@@ -137,6 +141,7 @@ registerMcpDirectoryRoutes(app, true);
 const nip98Revocations = createPostgresNip98RevocationStore();
 const nip98RevocationGuard = createNip98RevocationGuard(nip98Revocations);
 registerAuditRoutes(app, undefined, nip98RevocationGuard);
+registerFiatWebhook(app, (body, signature) => FiatWebhookHandlers.processWebhook(body, signature));
 app.use(
   express.json({
     limit: "1mb",
@@ -168,6 +173,7 @@ registerNip98RevocationAdmin(app, nip98Revocations);
 registerComplianceRoutes(app, nip98Revocations);
 
 const macaroonUsageStore = createPostgresMacaroonUsageStore();
+registerFiatMintRoutes(app, fiatMint, fiatPublicOrigin);
 registerScannerRoute(app, {
   usageStore: macaroonUsageStore,
   revocationStore: createPostgresMacaroonRevocationStore(),

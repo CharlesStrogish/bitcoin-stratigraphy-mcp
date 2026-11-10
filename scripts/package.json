@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "stripe": "^23.1.0",
     "nostr-tools": "2.25.2"
   },
   "devDependencies": {

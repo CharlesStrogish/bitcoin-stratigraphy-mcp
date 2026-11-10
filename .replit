@@ -75,3 +75,15 @@ externalPort = 80
 [[ports]]
 localPort = 20948
 externalPort = 3000
+
+[userenv]
+
+[userenv.development]
+FIAT_MINT_PUBLIC_ORIGIN = "https://0dee9e2c-20d4-4b54-9d7a-4035b113f10f-00-34ffazbgk98cr.reed.replit.dev"
+FIAT_MINT_STRIPE_PRICE_ID = "price_1Ua6EzBoEnKnBElMkG0uP6jl"
+FIAT_MINT_WEBHOOK_ORIGIN = "https://bitcoinstratigraphy.com"
+
+[userenv.production]
+FIAT_MINT_PUBLIC_ORIGIN = "https://bitcoinstratigraphy.com"
+FIAT_MINT_STRIPE_PRICE_ID = "price_1Ua6EzBoEnKnBElMkG0uP6jl"
+FIAT_MINT_WEBHOOK_ORIGIN = "https://bitcoinstratigraphy.com"

@@ -759,6 +759,67 @@ x-mcp-tools:
 security:
   - L402: []
 paths:
+  /fiat-mint:
+    post:
+      operationId: createFiatMintCheckout
+      summary: Create a real Stripe test Checkout for 100 scanner credits
+      description: Requires server-configured Stripe test keys and a fixed USD 500 price. Owner recovery uses an HttpOnly cookie, never credentials in URLs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FiatMintCheckoutRequest"
+      responses:
+        "200":
+          description: Stripe-hosted Checkout
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string }
+        "409": { description: Existing purchase must be recovered first }
+        "503": { description: Stripe test configuration unavailable }
+  /fiat-mint/status:
+    post:
+      operationId: getFiatMintStatus
+      summary: Read the current browser-owned purchase state
+      responses:
+        "200":
+          description: No credential is disclosed by status polling
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [none, checkout, paid, paying, ready, delivered, failed]
+        "503": { description: Purchase storage unavailable }
+  /fiat-mint/claim:
+    post:
+      operationId: claimFiatMintMacaroon
+      summary: Reveal the funded scanner macaroon once to the checkout owner
+      responses:
+        "200":
+          description: Merchant-verified Lightning funding and 100 scanner credits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerCreditGrant"
+        "409": { description: Not ready or already disclosed }
+        "503": { description: Funding evidence or purchase storage unavailable }
+  /stripe/webhook:
+    post:
+      operationId: receiveFiatStripeWebhook
+      summary: Verify raw Stripe webhook signatures and queue durable fiat fulfillment
+      responses:
+        "200": { description: Verified event accepted }
+        "400": { description: Invalid signature or body }
+        "503": { description: Stripe configuration or durable processing unavailable }
   /scanner:
     post:
       operationId: scanArticle12Prompt
@@ -2997,6 +3058,13 @@ components:
                   items:
                     $ref: "#/components/schemas/GetPublicYieldProofs200Item"
   schemas:
+    FiatMintCheckoutRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        package:
+          type: string
+          enum: [enterprise-api-block]
     ScannerCreditGrant:
       type: object
       required: [macaroon, credits, amount_sats, valid_until, scope]

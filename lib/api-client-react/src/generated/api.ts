@@ -25,6 +25,7 @@ import type {
   AuditSubmission,
   CloseEnterpriseCreditTab200,
   CloseEnterpriseCreditTab402,
+  CreateFiatMintCheckout200,
   CryptographicAuditEnvelope,
   CryptographicAuditInput,
   DatasetHealthStatus,
@@ -40,9 +41,11 @@ import type {
   EscrowSettlement,
   EscrowTollQuote,
   ExportHuggingFaceDatasetParams,
+  FiatMintCheckoutRequest,
   FleetRegistration,
   FleetStatement,
   GetEnterpriseCreditTab200,
+  GetFiatMintStatus200,
   GetNip05IdentityParams,
   GetPaidStratigraphyParams,
   GetPublicYieldProofs200Item,
@@ -141,6 +144,291 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getCreateFiatMintCheckoutUrl = () => {
+
+
+
+
+  return `/api/fiat-mint`
+}
+
+/**
+ * Requires server-configured Stripe test keys and a fixed USD 500 price. Owner recovery uses an HttpOnly cookie, never credentials in URLs.
+ * @summary Create a real Stripe test Checkout for 100 scanner credits
+ */
+export const createFiatMintCheckout = async (fiatMintCheckoutRequest: FiatMintCheckoutRequest, options?: Parameters<typeof customFetch>[1]): Promise<CreateFiatMintCheckout200> => {
+
+  return customFetch<CreateFiatMintCheckout200>(getCreateFiatMintCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(fiatMintCheckoutRequest)
+  }
+);}
+
+
+
+
+
+export const getCreateFiatMintCheckoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFiatMintCheckout>>, TError,{data: BodyType<FiatMintCheckoutRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFiatMintCheckout>>, TError,{data: BodyType<FiatMintCheckoutRequest>}, TContext> => {
+
+const mutationKey = ['createFiatMintCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFiatMintCheckout>>, {data: BodyType<FiatMintCheckoutRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFiatMintCheckout(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFiatMintCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createFiatMintCheckout>>>
+    export type CreateFiatMintCheckoutMutationBody = BodyType<FiatMintCheckoutRequest>
+    export type CreateFiatMintCheckoutMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a real Stripe test Checkout for 100 scanner credits
+ */
+export const useCreateFiatMintCheckout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFiatMintCheckout>>, TError,{data: BodyType<FiatMintCheckoutRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFiatMintCheckout>>,
+        TError,
+        {data: BodyType<FiatMintCheckoutRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateFiatMintCheckoutMutationOptions(options));
+    }
+
+export const getGetFiatMintStatusUrl = () => {
+
+
+
+
+  return `/api/fiat-mint/status`
+}
+
+/**
+ * @summary Read the current browser-owned purchase state
+ */
+export const getFiatMintStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetFiatMintStatus200> => {
+
+  return customFetch<GetFiatMintStatus200>(getGetFiatMintStatusUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFiatMintStatusMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getFiatMintStatus>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof getFiatMintStatus>>, TError,void, TContext> => {
+
+const mutationKey = ['getFiatMintStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getFiatMintStatus>>, void> = () => {
+
+
+          return  getFiatMintStatus(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetFiatMintStatusMutationResult = NonNullable<Awaited<ReturnType<typeof getFiatMintStatus>>>
+
+    export type GetFiatMintStatusMutationError = ErrorType<void>
+
+    /**
+ * @summary Read the current browser-owned purchase state
+ */
+export const useGetFiatMintStatus = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getFiatMintStatus>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof getFiatMintStatus>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getGetFiatMintStatusMutationOptions(options));
+    }
+
+export const getClaimFiatMintMacaroonUrl = () => {
+
+
+
+
+  return `/api/fiat-mint/claim`
+}
+
+/**
+ * @summary Reveal the funded scanner macaroon once to the checkout owner
+ */
+export const claimFiatMintMacaroon = async ( options?: Parameters<typeof customFetch>[1]): Promise<ScannerCreditGrant> => {
+
+  return customFetch<ScannerCreditGrant>(getClaimFiatMintMacaroonUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getClaimFiatMintMacaroonMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimFiatMintMacaroon>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimFiatMintMacaroon>>, TError,void, TContext> => {
+
+const mutationKey = ['claimFiatMintMacaroon'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimFiatMintMacaroon>>, void> = () => {
+
+
+          return  claimFiatMintMacaroon(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimFiatMintMacaroonMutationResult = NonNullable<Awaited<ReturnType<typeof claimFiatMintMacaroon>>>
+
+    export type ClaimFiatMintMacaroonMutationError = ErrorType<void>
+
+    /**
+ * @summary Reveal the funded scanner macaroon once to the checkout owner
+ */
+export const useClaimFiatMintMacaroon = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimFiatMintMacaroon>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimFiatMintMacaroon>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClaimFiatMintMacaroonMutationOptions(options));
+    }
+
+export const getReceiveFiatStripeWebhookUrl = () => {
+
+
+
+
+  return `/api/stripe/webhook`
+}
+
+/**
+ * @summary Verify raw Stripe webhook signatures and queue durable fiat fulfillment
+ */
+export const receiveFiatStripeWebhook = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getReceiveFiatStripeWebhookUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReceiveFiatStripeWebhookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveFiatStripeWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof receiveFiatStripeWebhook>>, TError,void, TContext> => {
+
+const mutationKey = ['receiveFiatStripeWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof receiveFiatStripeWebhook>>, void> = () => {
+
+
+          return  receiveFiatStripeWebhook(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReceiveFiatStripeWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof receiveFiatStripeWebhook>>>
+
+    export type ReceiveFiatStripeWebhookMutationError = ErrorType<void>
+
+    /**
+ * @summary Verify raw Stripe webhook signatures and queue durable fiat fulfillment
+ */
+export const useReceiveFiatStripeWebhook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveFiatStripeWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof receiveFiatStripeWebhook>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReceiveFiatStripeWebhookMutationOptions(options));
+    }
 
 export const getScanArticle12PromptUrl = () => {
 

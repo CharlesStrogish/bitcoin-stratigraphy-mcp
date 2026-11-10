@@ -5,6 +5,12 @@ description: Separate developer and enterprise funnels and the paid heuristic sc
 
 Keep `/developers` focused on M2M integrations and `/audit` on the human enterprise kiosk. Preserve the existing L402 core payment flow when extending either funnel.
 
+The credit-card bridge must use real Stripe test Checkout, not a fake mock UI.
+
+**Why:** The user explicitly said, “Build the real Stripe test Checkout integration. Do not use a fake mock UI.”
+
+**How to apply:** Preserve genuine provider-hosted checkout and verified server-side payment evidence. Test charges transfer no fiat; never infer authorization to enable mainnet treasury spending merely from connecting Stripe.
+
 **Why:** The user explicitly requested isolated SEO funnels and authorized a new paid heuristic scanner service, not changes to core payment logic.
 
 **How to apply:** Reuse existing merchant-side settlement verification with the original invoice/capability; pending verification must never trigger replacement payment. Bind scanner capabilities to the exact submitted prompt. The Compliance Hash simulates a receipt using SHA-256; never describe it as a real ZK proof, Bitcoin timestamp or legal compliance certification.

@@ -5,6 +5,7 @@ import type { StartupServer } from "./lib/startup-server";
 import app, { escrowRecovery, provenanceAnchoring } from "./app";
 import { logger } from "./lib/logger";
 import { startInvoicePowCleanup } from "./lib/postgres-invoice-pow-store";
+import { startFiatMintWorker } from "./services/fiatMintRuntime";
 import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
 import { startNip90Dvm } from "./services/dvm";
 import { albySettlementMode } from "./services/settlement/alby";
@@ -62,6 +63,7 @@ export function startApplication({
   let stopAnchoring: (() => void) | undefined;
   let zkWarmupTimer: NodeJS.Timeout | undefined;
   const stopInvoicePowCleanup = startInvoicePowCleanup();
+  const stopFiatMintWorker = startFiatMintWorker();
 
   // Escrow routes wait on this gate and answer 503 until the durable ledger
   // has been recovered; every other route is served as soon as it attaches.
@@ -153,6 +155,7 @@ export function startApplication({
     stopAnchoring?.();
     clearTimeout(zkWarmupTimer);
     await stopInvoicePowCleanup();
+    stopFiatMintWorker();
     await Promise.all([dvmStartup, heartbeatStartup]);
     await stopHeartbeat?.();
     await stopDvm?.();

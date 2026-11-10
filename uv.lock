@@ -8,7 +8,9 @@ members = [
     "repl-nix-workspace",
 ]
 constraints = [
+    { name = "anyio", specifier = ">=4.14.2" },
     { name = "gitpython", specifier = ">=3.2.1" },
+    { name = "idna", specifier = ">=3.15" },
     { name = "langgraph-sdk", specifier = ">=0.4.6" },
     { name = "opentelemetry-api", specifier = ">=1.45.1" },
     { name = "pyasn1", specifier = ">=0.6.5" },

@@ -85,5 +85,5 @@ FIAT_MINT_WEBHOOK_ORIGIN = "https://bitcoinstratigraphy.com"
 
 [userenv.production]
 FIAT_MINT_PUBLIC_ORIGIN = "https://bitcoinstratigraphy.com"
-FIAT_MINT_STRIPE_PRICE_ID = "price_1Ua6EzBoEnKnBElMkG0uP6jl"
+FIAT_MINT_STRIPE_PRICE_ID = "price_1Ua6bWBpxRsmnukUUbIyNwoA"
 FIAT_MINT_WEBHOOK_ORIGIN = "https://bitcoinstratigraphy.com"

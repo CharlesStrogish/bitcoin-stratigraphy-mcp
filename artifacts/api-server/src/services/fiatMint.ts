@@ -37,9 +37,10 @@ export const fiatOwnerHash = (owner: string) =>
 export function validFiatSession(
   session: Stripe.Checkout.Session,
   order: Pick<Order, "id" | "session_id">,
+  livemode: boolean,
 ) {
   return (
-    !session.livemode &&
+    session.livemode === livemode &&
     session.id === order.session_id &&
     session.mode === "payment" &&
     session.status === "complete" &&
@@ -57,29 +58,50 @@ export class FiatMint {
       pool: typeof databasePool;
       merchant: SettlementProvider;
       payer: NwcPayout;
-      stripe: () => Promise<Stripe>;
+      stripe: () => Promise<{ stripe: Stripe; livemode: boolean }>;
       priceId: () => string | undefined;
       origin: () => string;
       secret: () => string | undefined;
-      allowTreasury: () => boolean;
-      budgetSats: () => number;
+      allowTreasury: (livemode: boolean) => boolean;
+      budgetSats: (livemode: boolean) => number;
     },
   ) {}
 
   async checkout(owner: string): Promise<string> {
-    const stripe = await this.options.stripe();
+    const { stripe, livemode } = await this.options.stripe();
     const priceId = this.options.priceId();
     if (!priceId || !this.options.secret())
       throw new Error("Fiat mint configuration unavailable");
     const price = await stripe.prices.retrieve(priceId);
     if (
-      price.livemode ||
+      price.livemode !== livemode ||
       !price.active ||
       price.type !== "one_time" ||
       price.currency !== "usd" ||
       price.unit_amount !== 50_000
     )
-      throw new Error("Expected fixed USD 500 test price");
+      throw new Error(
+        "Expected an active fixed USD 500 price in the configured Stripe mode",
+      );
+    if (livemode) {
+      // Do not collect real card payments when fulfillment is known to be disabled.
+      const budget = this.options.budgetSats(true);
+      if (
+        !this.options.allowTreasury(true) ||
+        !this.options.payer.configured() ||
+        !this.options.merchant.isConfigured() ||
+        !Number.isSafeInteger(budget) ||
+        budget < SCANNER_CREDIT_SATS
+      )
+        throw new Error("Live checkout funding is not configured");
+      const {
+        rows: [reservation],
+      } = await this.options.pool.query<{ total: string }>(
+        "SELECT COALESCE(SUM(reserved_sats),0)::text AS total FROM fiat_mint_orders",
+      );
+      if (Number(reservation!.total) + SCANNER_CREDIT_SATS > budget)
+        throw new Error("Live checkout funding cap is exhausted");
+    }
     const hash = fiatOwnerHash(owner);
     await this.options.pool.query(
       "INSERT INTO fiat_mint_orders(id,owner_hash) VALUES($1,$2) ON CONFLICT(owner_hash) DO NOTHING",
@@ -118,7 +140,7 @@ export class FiatMint {
           { idempotencyKey: `fiat-mint-checkout-${order.id}` },
         );
     if (
-      session.livemode ||
+      session.livemode !== livemode ||
       !session.url?.startsWith("https://checkout.stripe.com/")
     )
       throw new Error(
@@ -133,7 +155,7 @@ export class FiatMint {
 
   /** Webhook hints never authorize funding: re-read the exact session from Stripe. */
   async acceptSession(sessionId: string) {
-    const stripe = await this.options.stripe();
+    const { stripe, livemode } = await this.options.stripe();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     const id = session.metadata?.fiat_order_id;
     if (!id) return;
@@ -146,7 +168,7 @@ export class FiatMint {
     );
     if (!order || order.status !== "checkout") return;
     order.session_id ??= sessionId;
-    if (!validFiatSession(session, order)) return;
+    if (!validFiatSession(session, order, livemode)) return;
     const items = await stripe.checkout.sessions.listLineItems(sessionId, {
       limit: 2,
     });
@@ -154,7 +176,8 @@ export class FiatMint {
       items.has_more ||
       items.data.length !== 1 ||
       items.data[0]?.quantity !== 1 ||
-      items.data[0]?.price?.id !== this.options.priceId()
+      items.data[0]?.price?.id !== this.options.priceId() ||
+      items.data[0]?.price?.livemode !== livemode
     )
       return;
     await this.options.pool.query(
@@ -187,11 +210,12 @@ export class FiatMint {
   /** Durable reservation precedes every irreversible wallet operation. No automatic re-pay. */
   async fulfill(id: string) {
     if (
-      !this.options.allowTreasury() ||
       !this.options.payer.configured() ||
       !this.options.merchant.isConfigured()
     )
       return;
+    const { stripe, livemode } = await this.options.stripe();
+    if (!this.options.allowTreasury(livemode)) return;
     const secret = this.options.secret();
     if (!secret) return;
     const client = await this.options.pool.connect();
@@ -212,6 +236,31 @@ export class FiatMint {
       ).rows[0];
       if (!order || !["paid", "paying"].includes(order.status)) return;
       if (order.status === "paid") {
+        // Revalidate before any irreversible funding, including historical paid
+        // rows after a mode/key change. A test purchase must never spend a live budget.
+        if (!order.session_id) return;
+        let session: Stripe.Checkout.Session;
+        try {
+          session = await stripe.checkout.sessions.retrieve(order.session_id);
+        } catch (error) {
+          if ((error as { code?: string }).code === "resource_missing") return;
+          throw error;
+        }
+        if (!validFiatSession(session, order, livemode)) return;
+        const items = await stripe.checkout.sessions.listLineItems(
+          order.session_id,
+          {
+            limit: 2,
+          },
+        );
+        if (
+          items.has_more ||
+          items.data.length !== 1 ||
+          items.data[0]?.quantity !== 1 ||
+          items.data[0]?.price?.id !== this.options.priceId() ||
+          items.data[0]?.price?.livemode !== livemode
+        )
+          return;
         // Global lifetime cap includes ambiguous and failed attempts. Never release automatically.
         await client.query("BEGIN");
         try {
@@ -225,7 +274,7 @@ export class FiatMint {
               )
             ).rows[0]!.total,
           );
-          const budget = this.options.budgetSats();
+          const budget = this.options.budgetSats(livemode);
           if (
             !Number.isSafeInteger(budget) ||
             total + (order.reserved_sats ? 0 : SCANNER_CREDIT_SATS) > budget

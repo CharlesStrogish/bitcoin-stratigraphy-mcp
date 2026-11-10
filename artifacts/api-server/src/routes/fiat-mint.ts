@@ -75,7 +75,7 @@ export function registerFiatMintRoutes(
         return;
       }
     } catch {
-      res.status(503).json({ error: "Stripe test Checkout is not configured" });
+      res.status(503).json({ error: "Stripe Checkout is not configured" });
       return;
     }
     next();
@@ -100,12 +100,10 @@ export function registerFiatMintRoutes(
         }),
       );
     } catch {
-      res
-        .status(503)
-        .json({
-          error:
-            "Checkout unavailable. Recover an existing purchase before buying again.",
-        });
+      res.status(503).json({
+        error:
+          "Checkout unavailable. Recover an existing purchase before buying again.",
+      });
     }
   });
   app.post("/api/fiat-mint/status", guard, async (req, res): Promise<void> => {
@@ -138,12 +136,10 @@ export function registerFiatMintRoutes(
       }
       res.json(ClaimFiatMintMacaroonResponse.parse(grant));
     } catch {
-      res
-        .status(503)
-        .json({
-          error:
-            "Credential delivery interrupted; contact the operator before purchasing again",
-        });
+      res.status(503).json({
+        error:
+          "Credential delivery interrupted; contact the operator before purchasing again",
+      });
     }
   });
 }

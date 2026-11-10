@@ -5,11 +5,17 @@ description: Separate developer and enterprise funnels and the paid heuristic sc
 
 Keep `/developers` focused on M2M integrations and `/audit` on the human enterprise kiosk. Preserve the existing L402 core payment flow when extending either funnel.
 
-The credit-card bridge must use real Stripe-hosted Checkout, not a fake mock UI. The user has moved from the initial test-mode request to production-facing checkout with live Stripe credentials.
+The credit-card bridge must use real Stripe-hosted Checkout, not a fake mock UI. The user has moved from the initial test-mode request to production-facing checkout with live Stripe credentials and explicitly authorized backend live-mode support.
 
 **Why:** The user initially required genuine test Checkout, then reported configuring live keys and requested removing frontend test-mode labels.
 
 **How to apply:** Preserve genuine provider-hosted checkout and verified server-side payment evidence. Configuring live credentials alone does not prove that checkout and fulfillment support live payments. Test charges transfer no fiat; never infer authorization to enable mainnet treasury spending merely from connecting Stripe.
+
+Changing Stripe mode must not grant wallet-spending authority or let historical test purchases consume a live funding budget. Live spending requires separate explicit approval and a capped budget; new live Checkouts must refuse known-disabled funding.
+
+**Why:** Authorization for a test-funded bridge does not authorize taking live customer payments or reusing its mainnet spending allowance for a different operating mode.
+
+**How to apply:** Preserve exact purchase verification before initial funding and lookup-only recovery after an ambiguous wallet submission. Keep prices, payment evidence and funding approval mode-aligned without resetting historical reservations.
 
 **Why:** The user explicitly requested isolated SEO funnels and authorized a new paid heuristic scanner service, not changes to core payment logic.
 

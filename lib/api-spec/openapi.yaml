@@ -762,8 +762,8 @@ paths:
   /fiat-mint:
     post:
       operationId: createFiatMintCheckout
-      summary: Create a real Stripe test Checkout for 100 scanner credits
-      description: Requires server-configured Stripe test keys and a fixed USD 500 price. Owner recovery uses an HttpOnly cookie, never credentials in URLs.
+      summary: Create a Stripe-hosted Checkout for 100 scanner credits
+      description: Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped.
       requestBody:
         required: true
         content:
@@ -781,7 +781,7 @@ paths:
                 properties:
                   url: { type: string }
         "409": { description: Existing purchase must be recovered first }
-        "503": { description: Stripe test configuration unavailable }
+        "503": { description: Stripe configuration unavailable }
   /fiat-mint/status:
     post:
       operationId: getFiatMintStatus

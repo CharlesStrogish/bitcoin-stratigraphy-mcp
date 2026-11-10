@@ -154,8 +154,8 @@ export const getCreateFiatMintCheckoutUrl = () => {
 }
 
 /**
- * Requires server-configured Stripe test keys and a fixed USD 500 price. Owner recovery uses an HttpOnly cookie, never credentials in URLs.
- * @summary Create a real Stripe test Checkout for 100 scanner credits
+ * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped.
+ * @summary Create a Stripe-hosted Checkout for 100 scanner credits
  */
 export const createFiatMintCheckout = async (fiatMintCheckoutRequest: FiatMintCheckoutRequest, options?: Parameters<typeof customFetch>[1]): Promise<CreateFiatMintCheckout200> => {
 
@@ -204,7 +204,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateFiatMintCheckoutMutationError = ErrorType<void>
 
     /**
- * @summary Create a real Stripe test Checkout for 100 scanner credits
+ * @summary Create a Stripe-hosted Checkout for 100 scanner credits
  */
 export const useCreateFiatMintCheckout = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFiatMintCheckout>>, TError,{data: BodyType<FiatMintCheckoutRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}

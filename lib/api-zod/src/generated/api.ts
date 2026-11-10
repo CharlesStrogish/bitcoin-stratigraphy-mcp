@@ -9,8 +9,8 @@ import * as zod from 'zod';
 
 
 /**
- * Requires server-configured Stripe test keys and a fixed USD 500 price. Owner recovery uses an HttpOnly cookie, never credentials in URLs.
- * @summary Create a real Stripe test Checkout for 100 scanner credits
+ * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped.
+ * @summary Create a Stripe-hosted Checkout for 100 scanner credits
  */
 export const CreateFiatMintCheckoutBody = zod.object({
   "package": zod.enum(['enterprise-api-block']).optional()

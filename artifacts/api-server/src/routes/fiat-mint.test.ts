@@ -19,6 +19,12 @@ import type { SettlementProvider } from "../services/settlement/types";
 import type { NwcPayout } from "../lib/nwc-payout";
 import { inspectSubscriptionMacaroon } from "../lib/subscription-pass";
 import { registerFiatMintRoutes, registerFiatWebhook } from "./fiat-mint";
+import { createFiatStripeClient } from "../services/fiatStripe";
+import {
+  fiatStripeKeyLivemode,
+  fiatTreasuryPolicy,
+} from "../services/fiatStripeMode";
+import { processFiatWebhook } from "../services/fiatWebhook";
 
 const session = (id: string, sessionId: string) =>
   ({
@@ -33,24 +39,128 @@ const session = (id: string, sessionId: string) =>
     url: "https://checkout.stripe.com/c/pay/synthetic",
   }) as unknown as Stripe.Checkout.Session;
 
-test("fiat settlement accepts only the exact paid test session and product", () => {
-  const order = { id: "synthetic", session_id: "cs_test_synthetic" };
-  const good = session(order.id, order.session_id);
-  assert.equal(validFiatSession(good, order), true);
-  for (const patch of [
-    { livemode: true },
-    { amount_total: 49999 },
-    { currency: "eur" },
-    { payment_status: "unpaid" },
-    { status: "open" },
-    { mode: "subscription" },
-    { id: "different" },
-    { metadata: { fiat_order_id: "other", fiat_product: "scanner-100-v1" } },
+test("fiat settlement accepts exact paid sessions only in the configured mode", () => {
+  for (const livemode of [false, true]) {
+    const order = { id: "synthetic", session_id: "cs_test_synthetic" };
+    const good = { ...session(order.id, order.session_id), livemode };
+    assert.equal(validFiatSession(good, order, livemode), true);
+    for (const patch of [
+      { livemode: !livemode },
+      { livemode: undefined },
+      { amount_total: 49999 },
+      { currency: "eur" },
+      { payment_status: "unpaid" },
+      { status: "open" },
+      { mode: "subscription" },
+      { id: "different" },
+      { metadata: { fiat_order_id: "other", fiat_product: "scanner-100-v1" } },
+    ]) {
+      assert.equal(
+        validFiatSession(
+          { ...good, ...patch } as Stripe.Checkout.Session,
+          order,
+          livemode,
+        ),
+        false,
+      );
+    }
+  }
+});
+
+test("live and test full/restricted keys initialize without balance-read permission", () => {
+  for (const prefix of ["sk_test_", "sk_live_", "rk_test_", "rk_live_"]) {
+    const key = `${prefix}synthetic_never_a_real_key`;
+    const expected = prefix.includes("_live_");
+    assert.equal(fiatStripeKeyLivemode(key), expected);
+    assert.equal(createFiatStripeClient(key).livemode, expected);
+  }
+  for (const key of [
+    "",
+    "pk_live_synthetic",
+    "sk_live_",
+    "sk_live_bad key",
+    "arbitrary",
   ]) {
-    assert.equal(
-      validFiatSession({ ...good, ...patch } as Stripe.Checkout.Session, order),
-      false,
-    );
+    assert.throws(() => fiatStripeKeyLivemode(key), /Expected a Stripe/);
+  }
+  const legacy = {
+    FIAT_MINT_ALLOW_TEST_TREASURY: "true",
+    FIAT_MINT_TEST_TREASURY_BUDGET_SATS: "100000",
+  };
+  assert.deepEqual(fiatTreasuryPolicy(false, legacy), {
+    allowed: true,
+    budgetSats: 100000,
+  });
+  assert.deepEqual(fiatTreasuryPolicy(true, legacy), {
+    allowed: false,
+    budgetSats: 0,
+  });
+  assert.deepEqual(
+    fiatTreasuryPolicy(true, {
+      ...legacy,
+      FIAT_MINT_ALLOW_TREASURY: "true",
+      FIAT_MINT_TREASURY_BUDGET_SATS: "200000",
+    }),
+    { allowed: true, budgetSats: 200000 },
+  );
+});
+
+test("signed live/test webhooks require matching event and session modes before side effects", async () => {
+  const stripe = new Stripe("sk_test_synthetic_never_a_real_key");
+  const webhookSecret = "whsec_synthetic_never_a_real_secret";
+  for (const livemode of [false, true]) {
+    for (const type of [
+      "checkout.session.completed",
+      "checkout.session.async_payment_succeeded",
+    ]) {
+      let synced = 0,
+        accepted = 0;
+      const runtime = {
+        stripe,
+        webhookSecret,
+        livemode,
+        sync: {
+          processWebhook: async () => {
+            synced++;
+          },
+        },
+      };
+      const accept = async (id: string) => {
+        assert.equal(id, "cs_synthetic");
+        accepted++;
+      };
+      const send = async (
+        mode: boolean | undefined,
+        objectMode = livemode,
+        tamper = false,
+      ) => {
+        const payload = JSON.stringify({
+          id: "evt_synthetic",
+          type,
+          livemode: mode,
+          data: { object: { id: "cs_synthetic", livemode: objectMode } },
+        });
+        const signature = stripe.webhooks.generateTestHeaderString({
+          payload,
+          secret: webhookSecret,
+        });
+        return processFiatWebhook(
+          Buffer.from(payload + (tamper ? " " : "")),
+          signature,
+          runtime,
+          accept,
+        );
+      };
+      await send(livemode);
+      assert.equal(synced, 1);
+      assert.equal(accepted, 1);
+      await assert.rejects(send(!livemode), /event mode/);
+      await assert.rejects(send(undefined), /event mode/);
+      await assert.rejects(send(livemode, !livemode), /session mode/);
+      await assert.rejects(send(livemode, livemode, true), /signature/i);
+      assert.equal(synced, 1);
+      assert.equal(accepted, 1);
+    }
   }
 });
 
@@ -225,12 +335,54 @@ test("PostgreSQL fiat fulfillment is crash-safe, capped, owner-bound and never r
   };
   const secret = "synthetic-fiat-issuer-only-secret";
   let stripeSession: Stripe.Checkout.Session | undefined;
+  let livemode = false;
+  let priceMode: boolean | undefined;
+  let checkoutMode: boolean | undefined;
+  let itemMode: boolean | undefined;
+  let checkoutCreates = 0;
+  const sessions = new Map<string, Stripe.Checkout.Session>();
+  const priceId = () =>
+    livemode ? "price_live_synthetic" : "price_test_synthetic";
   const stripe = {
+    prices: {
+      retrieve: async () => ({
+        id: priceId(),
+        livemode: priceMode ?? livemode,
+        active: true,
+        type: "one_time",
+        currency: "usd",
+        unit_amount: 50_000,
+      }),
+    },
     checkout: {
       sessions: {
-        retrieve: async () => stripeSession,
+        create: async (params: Stripe.Checkout.SessionCreateParams) => {
+          checkoutCreates++;
+          const id = params.metadata!.fiat_order_id as string;
+          const value = {
+            ...session(id, `cs_synthetic_${id}`),
+            livemode: checkoutMode ?? livemode,
+            status: "open",
+            payment_status: "unpaid",
+          } as Stripe.Checkout.Session;
+          sessions.set(value.id, value);
+          return value;
+        },
+        retrieve: async (id: string) => {
+          const value = sessions.get(id);
+          if (!value)
+            throw Object.assign(new Error("Synthetic missing session"), {
+              code: "resource_missing",
+            });
+          return value;
+        },
         listLineItems: async () => ({
-          data: [{ quantity: 1, price: { id: "price_test_synthetic" } }],
+          data: [
+            {
+              quantity: 1,
+              price: { id: priceId(), livemode: itemMode ?? livemode },
+            },
+          ],
           has_more: false,
         }),
       },
@@ -240,8 +392,8 @@ test("PostgreSQL fiat fulfillment is crash-safe, capped, owner-bound and never r
     pool,
     merchant,
     payer,
-    stripe: async () => stripe,
-    priceId: () => "price_test_synthetic",
+    stripe: async () => ({ stripe, livemode }),
+    priceId,
     origin: () => "https://example.test",
     secret: () => secret,
     allowTreasury: () => enabled,
@@ -254,6 +406,10 @@ test("PostgreSQL fiat fulfillment is crash-safe, capped, owner-bound and never r
       "INSERT INTO fiat_mint_orders(id,owner_hash,status,session_id) VALUES($1,$2,$3,$4)",
       [id, fiatOwnerHash(owner), status, `cs_test_${id}`],
     );
+    sessions.set(`cs_test_${id}`, {
+      ...session(id, `cs_test_${id}`),
+      livemode,
+    });
     return { owner, id };
   }
   try {
@@ -280,7 +436,7 @@ test("PostgreSQL fiat fulfillment is crash-safe, capped, owner-bound and never r
       "paid test session recovery and repeated webhook events do not mint twice",
       async () => {
         const row = await order("checkout");
-        stripeSession = session(row.id, `cs_test_${row.id}`);
+        stripeSession = sessions.get(`cs_test_${row.id}`)!;
         stripeSession.payment_status = "unpaid";
         await mint.acceptSession(stripeSession.id);
         assert.equal(
@@ -369,6 +525,126 @@ test("PostgreSQL fiat fulfillment is crash-safe, capped, owner-bound and never r
         await mint.fulfill(row.id);
         assert.equal(await mint.status(row.owner), "ready");
         assert.equal(pays, before + 1);
+      },
+    );
+    await t.test(
+      "live checkout, webhook recovery and fulfillment preserve one-time delivery",
+      async () => {
+        livemode = true;
+        const owner = randomBytes(32).toString("hex");
+        const url = await mint.checkout(owner);
+        assert.ok(url.startsWith("https://checkout.stripe.com/"));
+        assert.equal(await mint.checkout(owner), url);
+        const row = (
+          await pool.query(
+            "SELECT * FROM fiat_mint_orders WHERE owner_hash=$1",
+            [fiatOwnerHash(owner)],
+          )
+        ).rows[0];
+        const value = sessions.get(row.session_id)!;
+        assert.equal(value.livemode, true);
+        assert.equal(await mint.status(owner), "checkout");
+        value.status = "complete";
+        value.payment_status = "paid";
+        await Promise.all([
+          mint.acceptSession(value.id),
+          mint.acceptSession(value.id),
+        ]);
+        assert.equal(await mint.status(owner), "paid");
+        const before = pays;
+        await Promise.all([mint.fulfill(row.id), mint.fulfill(row.id)]);
+        assert.equal(pays, before + 1);
+        assert.equal(await mint.status(owner), "ready");
+        const grants = await Promise.all([
+          mint.claim(owner),
+          mint.claim(owner),
+        ]);
+        assert.equal(grants.filter(Boolean).length, 1);
+        assert.equal(grants.find(Boolean)!.credits, 100);
+      },
+    );
+    await t.test(
+      "live checkout cannot collect payments while funding is disabled or exhausted",
+      async () => {
+        livemode = true;
+        const before = checkoutCreates;
+        const owner = () => randomBytes(32).toString("hex");
+        enabled = false;
+        await assert.rejects(
+          mint.checkout(owner()),
+          /funding is not configured/,
+        );
+        enabled = true;
+        budget = 0;
+        await assert.rejects(
+          mint.checkout(owner()),
+          /funding is not configured/,
+        );
+        budget = 100_000;
+        await assert.rejects(mint.checkout(owner()), /cap is exhausted/);
+        budget = 2_000_000;
+        assert.equal(checkoutCreates, before);
+      },
+    );
+    await t.test(
+      "cross-mode prices, checkout sessions and line items fail closed",
+      async () => {
+        for (const mode of [false, true]) {
+          livemode = mode;
+          const before = checkoutCreates;
+          priceMode = !mode;
+          await assert.rejects(
+            mint.checkout(randomBytes(32).toString("hex")),
+            /configured Stripe mode/,
+          );
+          assert.equal(checkoutCreates, before);
+          priceMode = undefined;
+          checkoutMode = !mode;
+          await assert.rejects(
+            mint.checkout(randomBytes(32).toString("hex")),
+            /recover the original/,
+          );
+          checkoutMode = undefined;
+          const row = await order("checkout");
+          itemMode = !mode;
+          await mint.acceptSession(`cs_test_${row.id}`);
+          assert.equal(await mint.status(row.owner), "checkout");
+          const paid = await order();
+          const beforePays = pays,
+            beforeInvoices = invoices;
+          await mint.fulfill(paid.id);
+          assert.equal(pays, beforePays);
+          assert.equal(invoices, beforeInvoices);
+          itemMode = undefined;
+        }
+      },
+    );
+    await t.test(
+      "historical test payments cannot consume a live treasury budget",
+      async () => {
+        livemode = false;
+        const row = await order();
+        const pending = await order("checkout");
+        livemode = true;
+        const beforePays = pays,
+          beforeInvoices = invoices;
+        await mint.acceptSession(`cs_test_${pending.id}`);
+        assert.equal(await mint.status(pending.owner), "checkout");
+        await mint.fulfill(row.id);
+        assert.equal(pays, beforePays);
+        assert.equal(invoices, beforeInvoices);
+        assert.equal(
+          (
+            await pool.query(
+              "SELECT reserved_sats FROM fiat_mint_orders WHERE id=$1",
+              [row.id],
+            )
+          ).rows[0].reserved_sats,
+          0,
+        );
+        sessions.delete(`cs_test_${row.id}`);
+        await mint.fulfill(row.id);
+        assert.equal(pays, beforePays);
       },
     );
   } finally {

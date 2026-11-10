@@ -5,19 +5,20 @@ import { runMigrations, StripeSync } from "stripe-replit-sync";
 import { pinVerifiedSslMode } from "@workspace/db/connection-string";
 import { logger } from "../lib/logger";
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { fiatStripeKeyLivemode } from "./fiatStripeMode";
 
 /** Official SDK over the managed connector; raw provider credentials never leave the proxy. */
-export function createFiatStripeClient(): {
+export function createFiatStripeClient(key = process.env.STRIPE_SECRET_KEY): {
   stripe: Stripe;
   syncIdentity: string;
+  livemode?: boolean;
 } {
-  const key = process.env.STRIPE_SECRET_KEY;
   if (key) {
-    if (!key.startsWith("sk_test_"))
-      throw new Error("Fiat mint accepts Stripe test keys only");
+    const livemode = fiatStripeKeyLivemode(key);
     return {
       stripe: new Stripe(key, { timeout: 15_000, maxNetworkRetries: 1 }),
       syncIdentity: key,
+      livemode,
     };
   }
   const connectors = new ReplitConnectors();
@@ -47,6 +48,7 @@ export type FiatStripeRuntime = {
   stripe: Stripe;
   sync: StripeSync;
   webhookSecret: string;
+  livemode: boolean;
 };
 let initialization: Promise<FiatStripeRuntime> | undefined;
 
@@ -71,9 +73,12 @@ export function fiatPublicOrigin(): string {
 /** Lazy, fail-closed setup: missing Stripe configuration never stops existing L402. */
 export function getFiatStripe(): Promise<FiatStripeRuntime> {
   initialization ??= (async () => {
-    const { stripe, syncIdentity } = createFiatStripeClient();
-    if ((await stripe.balance.retrieve()).livemode)
-      throw new Error("Connected Stripe account must use test mode");
+    const client = createFiatStripeClient();
+    const { stripe, syncIdentity } = client;
+    const livemode =
+      client.livemode ?? (await stripe.balance.retrieve()).livemode;
+    if (typeof livemode !== "boolean")
+      throw new Error("Stripe account mode unavailable");
     const webhook = process.env.STRIPE_WEBHOOK_SECRET;
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) throw new Error("PostgreSQL required");
@@ -110,7 +115,7 @@ export function getFiatStripe(): Promise<FiatStripeRuntime> {
       if (!webhookSecret)
         throw new Error("STRIPE_WEBHOOK_SECRET required for existing webhook");
       await sync.syncBackfill({ object: "all" });
-      return { stripe, sync, webhookSecret };
+      return { stripe, sync, webhookSecret, livemode };
     } catch (error) {
       await sync.postgresClient.pool.end();
       throw error;

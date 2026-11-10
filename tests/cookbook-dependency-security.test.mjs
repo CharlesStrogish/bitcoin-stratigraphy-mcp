@@ -3,6 +3,27 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { parse } from "@iarna/toml";
 
+function atLeast(actual, minimum) {
+  if (!/^\d+(?:\.\d+)*$/.test(actual)) return false;
+  const left = actual.split(".").map(Number);
+  const right = minimum.split(".").map(Number);
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    if ((left[i] ?? 0) !== (right[i] ?? 0))
+      return (left[i] ?? 0) > (right[i] ?? 0);
+  }
+  return true;
+}
+
+function hasSecurityFloor(requirements, name, minimum) {
+  return requirements.some((requirement) => {
+    const prefix = `${name}>=`;
+    return (
+      requirement.startsWith(prefix) &&
+      atLeast(requirement.slice(prefix.length), minimum)
+    );
+  });
+}
+
 test("HTTP/TLS security floors prevent vulnerable Python dependency resolution", () => {
   const project = parse(
     readFileSync(new URL("../pyproject.toml", import.meta.url), "utf8"),
@@ -29,13 +50,23 @@ test("HTTP/TLS security floors prevent vulnerable Python dependency resolution",
       name === "certifi"
         ? project.project.dependencies
         : project.tool.uv["constraint-dependencies"];
-    assert.ok(requirements.includes(requirement), `Missing ${requirement}`);
-    assert.ok(starter.includes(requirement), `Starter missing ${requirement}`);
+    assert.ok(
+      hasSecurityFloor(requirements, name, minimum),
+      `Missing ${requirement} or stronger floor`,
+    );
+    assert.ok(
+      hasSecurityFloor(starter, name, minimum),
+      `Starter missing ${requirement} or stronger floor`,
+    );
 
     if (name !== "certifi") {
       assert.ok(
-        lock.manifest.constraints.some(
-          (entry) => entry.name === name && entry.specifier === `>=${minimum}`,
+        hasSecurityFloor(
+          lock.manifest.constraints.map(
+            (entry) => `${entry.name}${entry.specifier}`,
+          ),
+          name,
+          minimum,
         ),
         `Lockfile constraint missing ${requirement}`,
       );
@@ -45,19 +76,22 @@ test("HTTP/TLS security floors prevent vulnerable Python dependency resolution",
     assert.ok(locked.length > 0, `${name} must remain locked`);
     for (const entry of locked) {
       assert.match(entry.version, /^\d+(?:\.\d+)*$/);
-      const actual = entry.version.split(".").map(Number);
-      const floor = minimum.split(".").map(Number);
-      let comparison = 0;
-      for (let i = 0; i < Math.max(actual.length, floor.length); i++) {
-        comparison = (actual[i] ?? 0) - (floor[i] ?? 0);
-        if (comparison !== 0) break;
-      }
       assert.ok(
-        comparison >= 0,
+        atLeast(entry.version, minimum),
         `Expected ${requirement}, locked ${entry.version}`,
       );
     }
   }
+});
+
+test("security floor checks accept stronger floors and reject weaker or unconstrained ranges", () => {
+  assert.equal(hasSecurityFloor(["anyio>=4.16.0"], "anyio", "4.14.2"), true);
+  assert.equal(hasSecurityFloor(["anyio>=4.14.2"], "anyio", "4.14.2"), true);
+  assert.equal(hasSecurityFloor(["anyio>=4.13.0"], "anyio", "4.14.2"), false);
+  assert.equal(
+    hasSecurityFloor(["anyio", "anyio>=4.14.2rc1"], "anyio", "4.14.2"),
+    false,
+  );
 });
 
 test("MCP requirements and lockfile exclude GHSA-84m7-p3x7-pcfv", () => {

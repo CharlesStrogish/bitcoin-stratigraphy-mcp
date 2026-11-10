@@ -6,23 +6,33 @@ import { createCoinosSettlementProvider } from "./settlement/coinos";
 import { createNwcPayout } from "../lib/nwc-payout";
 import { getFiatStripe, fiatPublicOrigin } from "./fiatStripe";
 import { logger } from "../lib/logger";
+import { fiatTreasuryPolicy } from "./fiatStripeMode";
 
 export const fiatMint = new FiatMint({
   pool,
   merchant: createCoinosSettlementProvider(),
   // A separately budgeted payer must never draw from the existing staking treasury.
   payer: createNwcPayout({ uri: () => process.env.FIAT_MINT_PAYER_NWC_URI }),
-  stripe: async () => (await getFiatStripe()).stripe,
+  stripe: async () => {
+    const { stripe, livemode } = await getFiatStripe();
+    return { stripe, livemode };
+  },
   priceId: () => process.env.FIAT_MINT_STRIPE_PRICE_ID,
   origin: fiatPublicOrigin,
   secret: () => process.env.SESSION_SECRET,
-  allowTreasury: () => process.env.FIAT_MINT_ALLOW_TEST_TREASURY === "true",
-  budgetSats: () =>
-    Number(process.env.FIAT_MINT_TEST_TREASURY_BUDGET_SATS ?? 0),
+  // Historical test authorization never grants permission for live spending.
+  allowTreasury: (livemode) =>
+    fiatTreasuryPolicy(livemode, process.env).allowed,
+  budgetSats: (livemode) =>
+    fiatTreasuryPolicy(livemode, process.env).budgetSats,
 });
 
 export function startFiatMintWorker() {
-  if (process.env.FIAT_MINT_ALLOW_TEST_TREASURY !== "true") return () => {};
+  if (
+    process.env.FIAT_MINT_ALLOW_TEST_TREASURY !== "true" &&
+    process.env.FIAT_MINT_ALLOW_TREASURY !== "true"
+  )
+    return () => {};
   let running = false;
   const tick = async () => {
     if (running) return;

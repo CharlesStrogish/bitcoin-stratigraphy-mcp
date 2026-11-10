@@ -38,6 +38,7 @@ import { pageUrl } from "./src/lib/site";
 import { FUNNEL_PAGES } from "./src/lib/funnel-seo";
 import DevelopersPage from "./src/pages/developers";
 import AuditCrawlerContent from "./src/pages/audit-content";
+import { AGENT_STRUCTURED_DATA, AgentDiscoveryContent } from "./src/lib/agent-seo";
 
 const routes = [
   ...FUNNEL_PAGES,
@@ -183,6 +184,18 @@ function escrowHead(html: string): string {
     `</script>\n<script id="escrow-application-jsonld" type="application/ld+json">${schema}</script>`);
 }
 
+function agentDiscoveryHtml(html: string): string {
+  let result = html;
+  if (!result.includes('id="agent-discovery-jsonld"')) {
+    const schema = JSON.stringify(AGENT_STRUCTURED_DATA).replace(/</g, "\\u003c");
+    result = result.replace("</head>", `<script id="agent-discovery-jsonld" type="application/ld+json">${schema}</script>\n</head>`);
+  }
+  if (!result.includes('id="agent-discovery-catalog"')) {
+    result = result.replace("</body>", `${renderToStaticMarkup(createElement(AgentDiscoveryContent))}\n</body>`);
+  }
+  return result;
+}
+
 /** Social crawlers receive route metadata without having to execute React. */
 export function enterpriseSeoPlugin(): Plugin {
   return {
@@ -196,7 +209,7 @@ export function enterpriseSeoPlugin(): Plugin {
           .replace(/\/$/, "");
         const page = routes.find((page) => path.endsWith(`/${page.path}`));
         const rendered = page ? pageHead(html, page) : html;
-        return page?.path === "developers" || page?.path === "audit" ? rendered : escrowHead(rendered);
+        return agentDiscoveryHtml(page?.path === "developers" || page?.path === "audit" ? rendered : escrowHead(rendered));
       },
     },
     generateBundle: {
@@ -209,7 +222,7 @@ export function enterpriseSeoPlugin(): Plugin {
           this.emitFile({
             type: "asset",
             fileName: `${page.path}/index.html`,
-            source: pageHead(String(index.source), page),
+            source: agentDiscoveryHtml(pageHead(String(index.source), page)),
           });
         }
       },

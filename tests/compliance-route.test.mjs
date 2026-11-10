@@ -177,12 +177,18 @@ test("dual funnels prerender exact SEO metadata and keep scanner and escrow iden
   }
 });
 
-test("homepage metadata stays unchanged and dedicated static pages remain emitted", () => {
+test("agent SEO is additive and all dedicated pages emit initial HTML discovery", () => {
   const plugin = enterpriseSeoPlugin();
   const input = read("index.html");
   const home = plugin.transformIndexHtml.handler(input, { path: "/" });
   assert.equal(home.replace(
     /<script id="escrow-application-jsonld" type="application\/ld\+json">[^<]+<\/script>\n/,
+    "",
+  ).replace(
+    /<script id="agent-discovery-jsonld" type="application\/ld\+json">[^<]+<\/script>\n/,
+    "",
+  ).replace(
+    /<section id="agent-discovery-catalog"[\s\S]*?<\/section>\n/,
     "",
   ), input);
   const emitted = [];
@@ -204,6 +210,22 @@ test("homepage metadata stays unchanged and dedicated static pages remain emitte
       "whitepaper/index.html", "compliance/index.html"],
   );
   for (const asset of emitted) {
+    const head = asset.source.split("</head>")[0];
+    const structured = head.match(
+      /<script id="agent-discovery-jsonld" type="application\/ld\+json">([^<]+)<\/script>/,
+    );
+    assert.ok(structured, `${asset.fileName} has agent JSON-LD in its initial head`);
+    const graph = JSON.parse(structured[1])["@graph"];
+    const software = graph.find((entry) => entry["@type"] === "SoftwareApplication");
+    const product = graph.find((entry) => entry["@type"] === "Product");
+    assert.equal(software.featureList.length, 19);
+    assert.equal(product.name, "$500 Enterprise API Block");
+    assert.equal(product.offers[0].price, "500.00");
+    for (const name of software.featureList) {
+      assert.ok(asset.source.includes(`<dt>${name}</dt>`), `${asset.fileName}: ${name} is plain HTML`);
+    }
+    assert.ok(asset.source.includes("$500 USD"), `${asset.fileName}: fiat price is plain HTML`);
+    assert.ok(asset.source.includes("250 sats/call"), `${asset.fileName}: MCP price is plain HTML`);
     assert.ok(
       asset.source.includes('<link rel="icon" type="image/png" href="/favicon.png" />'),
       `${asset.fileName} preserves the public PNG favicon`,

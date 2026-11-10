@@ -32,3 +32,46 @@ with CrewAISwarmTools(private_key=key, wallet_handler=wallet) as tools:
 
 ## Commercial Exemption
 The core engine operates strictly under **AGPLv3**. Proprietary, air-gapped enterprise swarms MUST secure a $250,000/year Commercial Enterprise Exemption to avoid open-source IP contamination. Contact us at bitcoinstratigraphy.com.
+
+## Agent discovery, pricing and funding
+
+- API base URL: https://bitcoinstratigraphy.com
+- REST API base: https://bitcoinstratigraphy.com/api
+- MCP endpoint: https://bitcoinstratigraphy.com/mcp
+- OpenAPI: https://bitcoinstratigraphy.com/openapi.json
+- Structured discovery: https://bitcoinstratigraphy.com/.well-known/ai-plugin.json
+- Payment instructions: https://bitcoinstratigraphy.com/.well-known/llms.txt
+- Free current quotes: GET or POST https://bitcoinstratigraphy.com/api/v1/cost (no invoice creation).
+- Runtime catalog: JSON-RPC `tools/list` at the MCP endpoint. The 19-tool capacity includes host-enabled clearing; use the returned schemas and availability.
+
+### Lightning L402: standard 250 sats/call
+
+Fourteen paid core MCP tools require standard 250 sats/call Lightning L402 authorization. `stratigraphy.list` and `proof.list` are free. Grants, discounts and batches use current quotes. `payment.get_escrow` is an authenticated lookup, and clearing uses separate contract funding, not a blanket 250-sat execution fee.
+
+On HTTP 402, read `WWW-Authenticate: L402 macaroon="<macaroon>", invoice="<BOLT11>"`. With the caller's authorized wallet budget, pay the exact invoice once and retry the original request with `Authorization: L402 <macaroon>:<preimage>`. If the wallet does not reveal preimages, use the supported `Authorization: L402 <macaroon>:NWC_LOOKUP` merchant-confirmation path. Pending confirmation is not permission to pay again. Never disclose bearer credentials.
+
+### $500 Enterprise API Block
+
+Credit card via genuine Stripe-hosted Checkout: **$500 USD for 100 prepaid heuristic scanner calls, valid 30 days from issuance**. Start at https://bitcoinstratigraphy.com/developers/#dev-prepaid with the payer's approval. A Lightning alternative costs **100,000 sats** for the same scanner allocation. Credits apply only to `POST /api/scanner`; they do not fund unrelated MCP calls. Issuance requires verified payment and configured treasury funding. The block is not a commercial software license, legal indemnity or a guarantee of a Groth16 proof.
+
+### Explicit 19-tool catalog
+
+- `stratigraphy.get` — retrieve indexed telemetry; standard paid L402.
+- `stratigraphy.get_digest` — compact telemetry digest; standard paid L402.
+- `stratigraphy.get_diff` — compare snapshots; standard paid L402.
+- `stratigraphy.get_range` — bounded snapshot range; standard paid L402.
+- `stratigraphy.list` — discover available data; free.
+- `proof.attenuate` — restrict authorization; standard paid L402.
+- `proof.verify` — verify supported proofs; standard paid L402.
+- `proof.get_by_hash` — retained proof or receipt lookup; standard paid L402.
+- `proof.list` — discover proof lifecycle records; free.
+- `proof.submit` — submit proof evidence; standard paid L402.
+- `proof.ground` — signed Bitcoin-tip context; standard paid L402.
+- `payment.get_info` — MCP payment terms or authenticated settlement verification; standard paid L402.
+- `mesh.get_status` — configured peer status; standard paid L402.
+- `mesh.broadcast` — distribute a signed stored snapshot; standard paid L402.
+- `proof.notarize` — detached OpenTimestamps receipt request; standard paid L402.
+- `workflow.audit_trajectory` — record an authenticated batch of agent decisions; standard paid L402.
+- `payment.get_escrow` — authorized escrow lookup, not flat-fee MCP access.
+- `clearing.create_contract` — host-enabled contract and Lightning invoice for the requested funding amount.
+- `clearing.settle_contract` — authenticated funded-contract proof settlement when enabled; no automated payout or refund.

@@ -15,5 +15,8 @@ The user intentionally deprecated the old public guide heading and enumerated
 **Why:** The user explicitly authorized changing the frontend-content regression
 to match the new payload rather than retaining the old guide for test compatibility.
 
-**How to apply:** Preserve the approved payload verbatim; do not restore the
-deprecated catalog or add qualifications without a new user request.
+**How to apply:** Preserve the approved introduction verbatim. The user's later
+Agentic SEO request explicitly authorized adding the current 19-tool catalog,
+Lightning pricing and fiat-block discovery. Keep those additions accurate and
+scope scanner credits separately from MCP access; do not restore the deprecated
+catalog or assume that a capacity listing enables every extension.

@@ -4,11 +4,37 @@
 
 ## Public discovery
 
-- [MCP catalog and transport](/mcp): use JSON-RPC 2.0 initialize and tools/list without payment.
-- [OpenAPI](/openapi.json): REST contracts and the fifteen canonical MCP tools.
+- [MCP catalog and transport](/mcp): use JSON-RPC 2.0 tools/list without payment, with the protocol-specific request envelope below.
+- [OpenAPI](/openapi.json): REST contracts and MCP discovery; full capacity is 19 tools including host-enabled clearing.
 - [Price quotes](/api/v1/cost): public HTTP GET/POST quotes; quotes do not create invoices.
 - [Server card](/.well-known/mcp/server-card.json): public machine discovery.
 - [Dataset export](/api/export/huggingface): public training records, separate from paid interactive queries.
+
+## MCP request envelope
+
+For stateless MCP 2026-07-28, send these headers on a POST to /mcp:
+`Content-Type: application/json`, `Accept: application/json, text/event-stream`,
+`MCP-Protocol-Version: 2026-07-28`, and `Mcp-Method: tools/list`.
+There is no initialize handshake in this protocol version. Example discovery body:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "discover",
+  "method": "tools/list",
+  "params": {
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {}
+    }
+  }
+}
+```
+
+Include this metadata on every stateless request. For tools/call, also send
+`Mcp-Method: tools/call` and `Mcp-Name` matching params.name. Older supported
+MCP clients use their initialize/session handshake instead. SDK wrappers
+handle these transport details; do not mix the two protocol envelopes.
 
 ## Mandatory agent payment instructions
 
@@ -42,9 +68,53 @@ Exactly two canonical tools execute without payment or invoice creation:
 - `stratigraphy.list` (alias `stratigraphy.latest`): discover indexed height and UTC date bounds. The daily block index is not a live Bitcoin tip.
 - `proof.list` (alias `proof.status`): discover proof lifecycle states and retained attestation metadata; status is not a proof archive or cryptographic verification.
 
-The remaining thirteen canonical tools require L402 authorization, including
+Fourteen core tools require standard 250 sats/call L402 authorization, including
 `payment.get_info`, `mesh.get_status`, and `proof.attenuate`.
 Use public HTTP price quotes and tools/list to bootstrap payment.
+Grants, discounts and batches use current quotes. Authenticated escrow lookup
+and clearing contract funding have separate rules, not a blanket per-call fee.
+
+## API base and dual payment methods
+
+- API base URL: https://bitcoinstratigraphy.com
+- REST API base: https://bitcoinstratigraphy.com/api
+- MCP endpoint: https://bitcoinstratigraphy.com/mcp
+- Structured catalog: https://bitcoinstratigraphy.com/.well-known/ai-plugin.json
+- Standard paid MCP access: 250 sats/call via Bitcoin Lightning L402.
+- $500 Enterprise API Block: $500 USD by credit card via Stripe-hosted Checkout
+  for 100 prepaid heuristic scanner calls, valid 30 days from issuance.
+- Lightning scanner-block alternative: 100,000 sats for the same 100 calls.
+- Start card or scanner-block checkout at
+  https://bitcoinstratigraphy.com/developers/#dev-prepaid with the payer's approval.
+- Credits apply only to POST /api/scanner, not unrelated MCP tools. Issuance
+  requires verified payment and configured treasury funding. Never submit card
+  details via MCP, and never spend beyond the caller's authorized wallet budget.
+
+## Explicit 19-tool catalog
+
+The host's tools/list response is authoritative for enabled tools and schemas.
+Clearing is a host-enabled extension; funding a contract is separate from MCP
+access fees and does not enable automated payouts or refunds.
+
+- `stratigraphy.get` — retrieve indexed telemetry; standard paid L402.
+- `stratigraphy.get_digest` — compact telemetry digest; standard paid L402.
+- `stratigraphy.get_diff` — compare snapshots; standard paid L402.
+- `stratigraphy.get_range` — bounded snapshot range; standard paid L402.
+- `stratigraphy.list` — discover available data; free.
+- `proof.attenuate` — restrict authorization; standard paid L402.
+- `proof.verify` — verify supported proofs; standard paid L402.
+- `proof.get_by_hash` — retained proof or receipt lookup; standard paid L402.
+- `proof.list` — discover proof lifecycle records; free.
+- `proof.submit` — submit proof evidence; standard paid L402.
+- `proof.ground` — signed Bitcoin-tip context; standard paid L402.
+- `payment.get_info` — payment terms or settlement verification; standard paid L402.
+- `mesh.get_status` — configured peer status; standard paid L402.
+- `mesh.broadcast` — distribute a signed stored snapshot; standard paid L402.
+- `proof.notarize` — detached OpenTimestamps receipt request; standard paid L402.
+- `workflow.audit_trajectory` — record an authenticated decision batch; standard paid L402.
+- `payment.get_escrow` — authenticated escrow lookup; not a flat 250-sat call.
+- `clearing.create_contract` — create a contract and its Lightning funding invoice.
+- `clearing.settle_contract` — authenticated funded-contract proof settlement when enabled.
 
 ## AI notary
 

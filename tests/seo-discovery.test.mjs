@@ -124,7 +124,8 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   assert.equal(software.softwareVersion, pkg.version);
   const offers = new Map(software.offers.map((offer) => [offer["@id"], offer]));
   const l402 = offers.get(origin + "/#l402-access");
-  assert.equal(l402.price, "0.00000024");
+  assert.equal(l402.price, "0.00000250");
+  assert.match(l402.description, /250 sats\/call/);
   assert.equal(l402.priceCurrency, "BTC");
   assert.match(l402.description, /<macaroon>:<preimage>/);
   assert.match(l402.description, /<macaroon>:NWC_LOOKUP/);
@@ -291,5 +292,6 @@ test("public llms.txt preserves the exact approved autonomous discovery payload"
     "The core engine operates strictly under **AGPLv3**. Proprietary, air-gapped enterprise swarms MUST secure a $250,000/year Commercial Enterprise Exemption to avoid open-source IP contamination. Contact us at bitcoinstratigraphy.com.",
     "",
   ].join("\n");
-  assert.equal(guide, expected);
+  // Preserve the approved introduction verbatim while permitting requested discovery enrichment.
+  assert.ok(guide.startsWith(expected));
 });

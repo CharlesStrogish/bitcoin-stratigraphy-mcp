@@ -106,16 +106,16 @@
         "mesh.get_status: Inspect peer counts, topology health, cross-validation rate, latency and quorum",
         "mesh.broadcast: Sign a stored daily telemetry snapshot and distribute it to pinned mesh peers",
         "payment.get_info: Query MCP pricing or verify authenticated settlement",
-        "L402 24-sat access: Lightning invoices with Path A (preimage) and Path B (NWC_LOOKUP) settlement proofs",
+        "L402 standard paid MCP calls: 250 sats/call with Path A (preimage) and Path B (NWC_LOOKUP) settlement proofs; free discovery and separately funded clearing remain distinct",
         "Commercial Enterprise License (Starting at $250k/Annual) for AGPLv3-exempt air-gapped deployment"
       ],
       "offers": [
         {
           "@type": "Offer",
           "@id": "https://bitcoinstratigraphy.com/#l402-access",
-          "name": "L402 24-sat access",
-          "description": "Pay-per-use Lightning access without accounts. The USD-normalized escrow settlement toll is indicatively 24 sats (~$0.02) and the server quotes the live amount; paid MCP tool prices are quoted without invoices at GET or POST /api/v1/cost. Retry with Authorization: L402 <macaroon>:<preimage> (Path A) or Authorization: L402 <macaroon>:NWC_LOOKUP (Path B).",
-          "price": "0.00000024",
+          "name": "Standard paid MCP call — 250 sats",
+          "description": "Standard paid core MCP access costs 250 sats/call via Lightning L402. Two discovery tools are free; grants, discounts and batches use live quotes at GET or POST /api/v1/cost. Escrow settlement tolls and clearing contract funding are separate. Retry the original invoice with Authorization: L402 <macaroon>:<preimage> (Path A) or Authorization: L402 <macaroon>:NWC_LOOKUP (Path B).",
+          "price": "0.00000250",
           "priceCurrency": "BTC",
           "url": "https://bitcoinstratigraphy.com/mcp"
         },
@@ -142,7 +142,7 @@
       "@type": "WebAPI",
       "@id": "https://bitcoinstratigraphy.com/#mcp-api",
       "name": "Bitcoin Stratigraphy Enterprise MCP & REST API",
-      "description": "Provides enterprise AI swarms with a cryptographic chain-of-custody for regulatory audits. Features 19 Fiduciary-grade MCP Tools at full capacity, including host-enabled A2A clearing infrastructure; production clearing settlement and payouts remain disabled. Includes L402 Lightning micropayment settlement and verifiable Merkle telemetry anchoring to the Bitcoin base layer. Access uses L402 24-sat Lightning settlement (Path A preimage or Path B NWC_LOOKUP); a Commercial Enterprise License (Starting at $250k/Annual) is available from licensing@bitcoinstratigraphy.com.",
+      "description": "Provides enterprise AI swarms with a cryptographic chain-of-custody for regulatory audits. Features 19 Fiduciary-grade MCP Tools at full capacity, including host-enabled A2A clearing infrastructure; production clearing settlement and payouts remain disabled. Includes L402 Lightning micropayment settlement and verifiable Merkle telemetry anchoring to the Bitcoin base layer. Standard paid core MCP access requires 250 sats/call via Lightning L402 (Path A preimage or Path B NWC_LOOKUP); two discovery tools are free, and escrow and clearing funding remain separate. The $500 Enterprise API Block provides 100 scanner-only calls for 30 days via credit card. A Commercial Enterprise License (Starting at $250k/Annual) is available separately from licensing@bitcoinstratigraphy.com.",
       "url": "https://bitcoinstratigraphy.com/mcp",
       "documentation": "https://bitcoinstratigraphy.com/docs",
       "provider": {

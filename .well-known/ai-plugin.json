@@ -7,7 +7,7 @@
   "schema_version": "v1",
   "name_for_human": "Bitcoin Stratigraphy Data Engine",
   "name_for_model": "bitcoin_stratigraphy",
-  "description_for_human": "19 Fiduciary-grade MCP Tools at full capacity across six namespaces for Bitcoin telemetry, L402 data access, and cryptographic audit receipts. Includes host-enabled A2A clearing infrastructure; production clearing settlement and payouts remain disabled.",
+  "description_for_human": "19 Fiduciary-grade MCP Tools at full capacity across six namespaces for Bitcoin telemetry, L402 data access, and cryptographic audit receipts. Standard paid core calls cost 250 sats/call via Lightning L402. The $500 Enterprise API Block buys 100 scanner-only calls for 30 days via credit card. Includes host-enabled A2A clearing infrastructure; production clearing settlement and payouts remain disabled.",
   "description_for_model": "Discover the Bitcoin Stratigraphy Data Engine: 19 Fiduciary-grade MCP Tools at full platform capacity across six namespaces for indexed Bitcoin stratigraphy, thermodynamic telemetry, Groth16 verification, OpenTimestamps notarization, signed Bitcoin-tip context receipts, and pinned-peer mesh operations. This includes the authenticated payment.get_escrow utility and the host-enabled clearing.create_contract and clearing.settle_contract extension. Production clearing settlement and payouts remain disabled; do not fund production clearing contracts. Discover each host's enabled catalog through tools/list rather than assuming all extensions are mounted. Execute JSON-RPC over HTTP POST at https://bitcoinstratigraphy.com/mcp; configure from https://bitcoinstratigraphy.com/.well-known/mcp-configuration.json. The original core has two free sandbox tools and fourteen paid tools requiring verified L402 settlement; do not apply this fee policy to every extension. Paid requests use Authorization: L402 <macaroon>:<preimage>; never spend without a caller-authorized wallet budget. The 21% algorithmic yield is conditional programmatic L402 revenue sharing from settled routing invoices, recorded in a ledger with no automatic disbursement, not a guaranteed investment return. EU AI Act Article 12 compliance support consists of cryptographic logging and audit evidence; it is not regulatory certification or proof of legal compliance. Signed receipts bind submitted evidence, not actual agent reasoning; calendar acceptance is not Bitcoin confirmation.",
   "auth": {
     "type": "none"
@@ -22,5 +22,136 @@
   "legal_info_url": "https://bitcoinstratigraphy.com/LICENSE.md",
   "x-mcp-url": "https://bitcoinstratigraphy.com/mcp",
   "x-mcp-configuration-url": "https://bitcoinstratigraphy.com/.well-known/mcp-configuration.json",
+  "x-agent-discovery": {
+    "api_base_url": "https://bitcoinstratigraphy.com",
+    "rest_base_url": "https://bitcoinstratigraphy.com/api",
+    "mcp_url": "https://bitcoinstratigraphy.com/mcp",
+    "openapi_url": "https://bitcoinstratigraphy.com/openapi.json",
+    "llms_url": "https://bitcoinstratigraphy.com/.well-known/llms.txt",
+    "tool_count": 19,
+    "catalog_scope": "Full capacity; call tools/list to discover host-enabled tools and current schemas.",
+    "payments": {
+      "l402": {
+        "method": "Bitcoin Lightning L402",
+        "standard_sats_per_paid_call": 250,
+        "quote_url": "https://bitcoinstratigraphy.com/api/v1/cost",
+        "free_tools": ["stratigraphy.list", "proof.list"],
+        "challenge": "HTTP 402 WWW-Authenticate: L402 macaroon=\"<macaroon>\", invoice=\"<BOLT11>\"",
+        "authorization": "Authorization: L402 <macaroon>:<preimage>",
+        "custodial_authorization": "Authorization: L402 <macaroon>:NWC_LOOKUP",
+        "retry_policy": "Pay the exact invoice once, then retry the original request. Pending merchant confirmation is not authorization to pay again.",
+        "scope": "Fourteen paid core tools use the standard 250 sats/call rate. Grants, discounts and batches require current quotes. Escrow lookup and clearing extensions have separate authentication and funding rules."
+      },
+      "enterprise_block": {
+        "name": "$500 Enterprise API Block",
+        "price": "500.00",
+        "currency": "USD",
+        "payment_method": "Credit card via Stripe-hosted Checkout",
+        "checkout_url": "https://bitcoinstratigraphy.com/developers/#dev-prepaid",
+        "scanner_calls": 100,
+        "validity_days": 30,
+        "scope": "POST /api/scanner only; these credits do not authorize unrelated MCP tools.",
+        "lightning_alternative_sats": 100000,
+        "fulfillment": "Credits are issued only after verified payment and configured treasury funding. Card checkout requires the payer's approval; never submit card details through MCP."
+      }
+    },
+    "tools": [
+      {
+        "name": "stratigraphy.get",
+        "description": "Retrieve one indexed Bitcoin telemetry snapshot.",
+        "access": "l402"
+      },
+      {
+        "name": "stratigraphy.get_digest",
+        "description": "Retrieve a compact telemetry digest.",
+        "access": "l402"
+      },
+      {
+        "name": "stratigraphy.get_diff",
+        "description": "Compare indexed telemetry snapshots.",
+        "access": "l402"
+      },
+      {
+        "name": "stratigraphy.get_range",
+        "description": "Retrieve a bounded range of indexed snapshots.",
+        "access": "l402"
+      },
+      {
+        "name": "stratigraphy.list",
+        "description": "Discover available indexed heights and dates.",
+        "access": "free"
+      },
+      {
+        "name": "proof.attenuate",
+        "description": "Restrict an existing authorization capability.",
+        "access": "l402"
+      },
+      {
+        "name": "proof.verify",
+        "description": "Verify supported cryptographic proof inputs.",
+        "access": "l402"
+      },
+      {
+        "name": "proof.get_by_hash",
+        "description": "Look up retained proof payloads, receipts or lifecycle status.",
+        "access": "l402"
+      },
+      {
+        "name": "proof.list",
+        "description": "Discover indexed proof lifecycle records.",
+        "access": "free"
+      },
+      {
+        "name": "proof.submit",
+        "description": "Submit evidence to the supported proof lifecycle.",
+        "access": "l402"
+      },
+      {
+        "name": "proof.ground",
+        "description": "Obtain signed Bitcoin-tip context for a payload.",
+        "access": "l402"
+      },
+      {
+        "name": "payment.get_info",
+        "description": "Inspect MCP payment terms or verify authenticated settlement.",
+        "access": "l402"
+      },
+      {
+        "name": "mesh.get_status",
+        "description": "Inspect configured mesh peer status.",
+        "access": "l402"
+      },
+      {
+        "name": "mesh.broadcast",
+        "description": "Broadcast a signed stored telemetry snapshot to pinned peers.",
+        "access": "l402"
+      },
+      {
+        "name": "proof.notarize",
+        "description": "Request a detached OpenTimestamps receipt for a SHA256 digest.",
+        "access": "l402"
+      },
+      {
+        "name": "workflow.audit_trajectory",
+        "description": "Record an authenticated, Bitcoin-anchored batch of agent decisions; not a reasoning or correctness proof.",
+        "access": "l402"
+      },
+      {
+        "name": "payment.get_escrow",
+        "description": "Look up escrow state with the required caller authorization.",
+        "access": "authenticated_lookup"
+      },
+      {
+        "name": "clearing.create_contract",
+        "description": "Create a worker contract and its Lightning funding invoice; host-enabled and funded at the requested contract amount, not a flat MCP call fee.",
+        "access": "contract_funding"
+      },
+      {
+        "name": "clearing.settle_contract",
+        "description": "Record authenticated funded-contract proof settlement when the host enables it; automated payouts and refunds remain disabled.",
+        "access": "authenticated_settlement"
+      }
+    ]
+  },
   "x-authentication-scope": "Discovery requires no authentication. This manifest does not grant paid API access; paid MCP execution retains its existing L402 authorization requirements."
 }

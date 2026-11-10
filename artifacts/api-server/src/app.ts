@@ -1,4 +1,5 @@
 import express, { type Express, type Request } from "express";
+import { computeRequestContext } from "./lib/compute-context";
 import pinoHttp from "pino-http";
 import { createClientChainCheck } from "./lib/client-address";
 import { requestLogHooks } from "./lib/request-log";
@@ -149,6 +150,7 @@ registerClaimYieldRoute(app, createPrivateYieldEarnings());
 app.locals.yieldStaking = createYieldStaking();
 
 app.use(nip98RevocationGuard);
+app.use(computeRequestContext);
 const swarmRoyalties = createSwarmRoyalties();
 app.locals.swarmRoyalties = swarmRoyalties;
 app.locals.swarmReferralRevoked = (key: string) => nip98Revocations.isRevoked(key);

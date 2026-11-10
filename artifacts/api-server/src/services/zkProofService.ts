@@ -6,6 +6,7 @@ import { loadPoseidon, loadSnarkjs } from "./zkLibraries";
 import {
   terminateZkVerifierWorker,
   verifyGroth16OffThread,
+  ZkVerifierBusyError,
 } from "./zkVerifierWorker";
 
 export type ZkPublicInputs = {
@@ -135,7 +136,6 @@ const proofLanes = {
   stream: { queued: 0, tail: Promise.resolve() as Promise<void>, max: 8 },
 };
 let queuedVerifications = 0;
-let verifierTail: Promise<void> = Promise.resolve();
 const MAX_QUEUED_VERIFICATIONS = 32;
 
 export class ZkVerifierOverloadedError extends Error {
@@ -465,15 +465,15 @@ async function verifyCryptographically(
     throw new ZkVerifierOverloadedError();
   }
   queuedVerifications += 1;
-  const run = verifierTail.then(async () =>
-    verifyGroth16OffThread(await verificationKey(), publicSignals, proof),
-  );
-  verifierTail = run.then(
-    () => undefined,
-    () => undefined,
-  );
   try {
-    return await run;
+    // The worker scheduler owns serialization and identity fairness. A second
+    // FIFO here would hide queued callers from its admission limits.
+    return await verifyGroth16OffThread(await verificationKey(), publicSignals, proof);
+  } catch (error) {
+    // Capacity rejection is not an invalid proof. Preserve the HTTP route's
+    // existing overload response rather than caching/reporting cryptographic failure.
+    if (error instanceof ZkVerifierBusyError) throw new ZkVerifierOverloadedError();
+    throw error;
   } finally {
     queuedVerifications -= 1;
   }

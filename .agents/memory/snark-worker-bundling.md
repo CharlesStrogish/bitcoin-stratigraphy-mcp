@@ -14,3 +14,9 @@ Keep libraries that discover worker entrypoints from their own module filenames 
 - The `web-worker` package runs its own worker shim whenever it is imported off the main thread, and loads `workerData.mod`. Pass `{ type: "module", mod: "data:text/javascript," }` as workerData so that shim loads an empty module.
 - Unref the idle worker so it never keeps the process alive, and terminate it on shutdown.
 - Measured locally: cold pass 1.3 s, warm 25–37 ms, worst main-loop delay 14 ms. The old main-thread path took about 100 ms per warm verification and 6–7 s cold on the production VM.
+
+Keep waiting verifications outside the CPU worker and schedule across authenticated identities; do not restore a second caller-side FIFO or post every pending proof into the worker.
+
+**Why:** A worker-wide timeout previously discarded unrelated callers. One active proof lets termination isolate a stalled job while preserving other identities' queued work, without violating the single-worker requirement.
+
+**How to apply:** Preserve verified NIP-98 identities, server-confirmed L402 fallback buckets and deferred-task context. Scheduling metadata must never grant authorization or replace existing NIP-98/L402 gates.

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. Dual-licensed AGPLv3 / Commercial.
 import { randomUUID, sign, type KeyObject } from "node:crypto";
+import { AsyncResource } from "node:async_hooks";
 import { lookup } from "node:dns/promises";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
@@ -610,7 +611,7 @@ export function createMcpAsyncTaskRunner(
         webhook: new URL(webhookUrl),
         requestId: requestId ?? null,
         createdAt: now(),
-        execute: work,
+        execute: AsyncResource.bind(work),
       };
       pending += 1;
       queue.push(task);

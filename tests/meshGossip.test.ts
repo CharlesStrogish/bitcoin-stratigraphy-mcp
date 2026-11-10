@@ -13,9 +13,94 @@ import {
   verifyAgentSessionEvent,
 } from "../artifacts/api-server/src/services/nostrWebOfTrust";
 import { createHash } from "node:crypto";
+import { setImmediate as meshTurn } from "node:timers/promises";
 
 const localKey = "01".padStart(64, "0");
 const peerKey = "02".padStart(64, "0");
+
+function boundedMesh(fetcher: typeof fetch, timeoutMs = 30) {
+  return new MeshGossipService({
+    privateKey: localKey,
+    peers: [{ url: "https://peer.example", pubkey: getPublicKey(Buffer.from(peerKey, "hex")) }],
+    timeoutMs, fetch: fetcher,
+  });
+}
+
+test("mesh deadline remains active after headers arrive and cancels a stalled body", async () => {
+  let cancelled = false;
+  let signal: AbortSignal | undefined;
+  const mesh = boundedMesh((async (_url, init) => {
+    signal = init?.signal as AbortSignal;
+    return new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode('{"nodePubkey":')); },
+      cancel() { cancelled = true; },
+    }));
+  }) as typeof fetch);
+  assert.deepEqual(await mesh.discoverPeers(), []);
+  assert.equal(signal?.aborted, true);
+  assert.equal(cancelled, true);
+});
+
+test("mesh caps both declared and streamed response bytes and cancels rejected bodies", async () => {
+  for (const declared of [false, true]) {
+    let cancelled = false;
+    const mesh = boundedMesh((async () => new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new Uint8Array(256 * 1024 + 1)); },
+      cancel() { cancelled = true; },
+    }), { headers: declared ? { "Content-Length": String(256 * 1024 + 1) } : {} })) as typeof fetch);
+    assert.deepEqual(await mesh.discoverPeers(), []);
+    assert.equal(cancelled, true);
+  }
+});
+
+test("mesh attestation body stalls fail closed instead of hanging consensus", async () => {
+  let cancelled = false;
+  const mesh = boundedMesh((async url => {
+    if (String(url).endsWith("/status"))
+      return Response.json({ nodePubkey: getPublicKey(Buffer.from(peerKey, "hex")) });
+    return new Response(new ReadableStream({ cancel() { cancelled = true; } }));
+  }) as typeof fetch);
+  await assert.rejects(mesh.createConsensus(createNostrAttestor(localKey)({ height: 920_000 })), MeshQuorumError);
+  assert.equal(cancelled, true);
+});
+
+test("origin cancellation aborts every outstanding peer request and body", async () => {
+  const peer2Key = "03".padStart(64, "0");
+  const signals: AbortSignal[] = [];
+  let cancelled = 0;
+  const mesh = new MeshGossipService({
+    privateKey: localKey, timeoutMs: 10_000,
+    peers: [
+      { url: "https://peer.example", pubkey: getPublicKey(Buffer.from(peerKey, "hex")) },
+      { url: "https://peer2.example", pubkey: getPublicKey(Buffer.from(peer2Key, "hex")) },
+    ],
+    fetch: (async (_url, init) => {
+      signals.push(init?.signal as AbortSignal);
+      return new Response(new ReadableStream({ cancel() { cancelled++; } }));
+    }) as typeof fetch,
+  });
+  const controller = new AbortController();
+  const rejected = assert.rejects(mesh.createConsensus({ height: 920_000 }, undefined, controller.signal), /abort/i);
+  await meshTurn();
+  controller.abort();
+  await rejected;
+  assert.equal(signals.length, 2);
+  assert.ok(signals.every(signal => signal.aborted));
+  assert.equal(cancelled, 2);
+});
+
+test("mesh cancels a late body even when a custom fetch ignores abort", async () => {
+  let finishFetch!: (response: Response) => void;
+  let cancelled = false;
+  const controller = new AbortController();
+  const mesh = boundedMesh((() => new Promise<Response>(resolve => { finishFetch = resolve; })) as typeof fetch, 10_000);
+  const discovery = mesh.discoverPeers(controller.signal);
+  controller.abort();
+  assert.deepEqual(await discovery, []);
+  finishFetch(new Response(new ReadableStream({ cancel() { cancelled = true; } })));
+  await meshTurn();
+  assert.equal(cancelled, true);
+});
 
 function peerFetch(
   peer: MeshGossipService,

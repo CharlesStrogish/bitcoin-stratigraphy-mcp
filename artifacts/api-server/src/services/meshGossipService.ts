@@ -1,3 +1,4 @@
+import { computeContext } from "../lib/compute-context";
 import { createHash } from "node:crypto";
 import {
   finalizeEvent,
@@ -433,18 +434,17 @@ export class MeshGossipService {
     return this.signDigest(input.snapshotDigest);
   }
 
-  async discoverPeers(): Promise<Array<{ url: string; pubkey: string }>> {
+  async discoverPeers(signal?: AbortSignal): Promise<Array<{ url: string; pubkey: string }>> {
     const discovered = await Promise.all(
       this.peers.map(async (peer) => {
         try {
-          const response = await this.fetchWithTimeout(
+          const body = await this.fetchJsonWithTimeout(
             `${peer.url}/api/v1/mesh/status`,
             { headers: { Accept: "application/json" } },
-          );
-          if (!response.ok) return undefined;
-          const body = (await response.json()) as { nodePubkey?: unknown };
+            signal,
+          ) as { nodePubkey?: unknown } | null;
           if (
-            body.nodePubkey !== peer.pubkey ||
+            body?.nodePubkey !== peer.pubkey ||
             peer.pubkey === this.nodePubkey
           ) {
             return undefined;
@@ -463,7 +463,26 @@ export class MeshGossipService {
   async createConsensus(
     snapshot: unknown,
     agentSession?: { event: Event; date?: string },
+    signal: AbortSignal | undefined = computeContext()?.signal,
   ): Promise<MeshConsensus> {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+    try {
+      return await this.buildConsensus(snapshot, agentSession, controller.signal);
+    } finally {
+      signal?.removeEventListener("abort", abort);
+      controller.abort();
+    }
+  }
+
+  private async buildConsensus(
+    snapshot: unknown,
+    agentSession: { event: Event; date?: string } | undefined,
+    signal: AbortSignal,
+  ): Promise<MeshConsensus> {
+    signal.throwIfAborted();
     const snapshotDigest = digestJson(snapshot);
     const agentIdentity = agentSession
       ? await this.validateAgentSession(agentSession, snapshotDigest)
@@ -478,13 +497,14 @@ export class MeshGossipService {
         roundTripLatencyMs: 0,
       },
     ];
-    const discovered = await this.discoverPeers();
+    const discovered = await this.discoverPeers(signal);
+    signal.throwIfAborted();
     this.validationAttempts += this.peers.length;
     const peerResults = await Promise.all(
       discovered.map(async (peer) => {
         const startedAt = this.now();
         try {
-          const response = await this.fetchWithTimeout(
+          const body = await this.fetchJsonWithTimeout(
             `${peer.url}/api/v1/mesh/attest`,
             {
               method: "POST",
@@ -497,11 +517,10 @@ export class MeshGossipService {
                 ...(agentSession ? { agentSession } : {}),
               }),
             },
-          );
-          if (!response.ok) return undefined;
-          const body = (await response.json()) as { event?: Event };
+            signal,
+          ) as { event?: Event } | null;
           if (
-            !body.event ||
+            !body?.event ||
             !verifyMeshAttestationEvent(
               body.event,
               snapshotDigest,
@@ -535,6 +554,7 @@ export class MeshGossipService {
         }
       }),
     );
+    signal.throwIfAborted();
     for (const result of peerResults) {
       if (
         result &&
@@ -596,20 +616,64 @@ export class MeshGossipService {
     };
   }
 
-  private async fetchWithTimeout(
+  private async fetchJsonWithTimeout(
     input: string,
     init: RequestInit,
-  ): Promise<Response> {
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    // Bound decoded body bytes, not just Content-Length (which peers may omit
+    // or falsify). The deadline includes fetch, streaming reads and JSON decode.
+    const maxBytes = 256 * 1024;
     const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    let response: Response | undefined;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let rejectAbort: (() => void) | undefined;
+    const aborted = new Promise<never>((_resolve, reject) => {
+      rejectAbort = () => {
+        // Some custom transports do not reject pending reads on fetch abort.
+        void reader?.cancel().catch(() => undefined);
+        reject(new Error("Mesh peer request aborted or deadline exceeded"));
+      };
+      controller.signal.addEventListener("abort", rejectAbort, { once: true });
+      if (controller.signal.aborted) rejectAbort();
+    });
     try {
-      return await this.fetcher(input, {
-        ...init,
-        signal: controller.signal,
-        redirect: "error",
-      });
+      return await Promise.race([aborted, (async () => {
+        controller.signal.throwIfAborted();
+        response = await this.fetcher(input, { ...init, signal: controller.signal, redirect: "error" });
+        if (controller.signal.aborted) {
+          void response.body?.cancel().catch(() => undefined);
+          controller.signal.throwIfAborted();
+        }
+        if (!response.ok || Number(response.headers.get("content-length")) > maxBytes)
+          throw new Error("Mesh peer response rejected");
+        if (!response.body) throw new Error("Mesh peer response has no body");
+        reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let bytes = 0;
+        while (true) {
+          const part = await reader.read();
+          controller.signal.throwIfAborted();
+          if (part.done) break;
+          bytes += part.value.byteLength;
+          if (bytes > maxBytes) throw new Error("Mesh peer response exceeds byte limit");
+          chunks.push(part.value);
+        }
+        const body = JSON.parse(Buffer.concat(chunks, bytes).toString("utf8")) as unknown;
+        controller.signal.throwIfAborted();
+        return body;
+      })()]);
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      if (rejectAbort) controller.signal.removeEventListener("abort", rejectAbort);
+      controller.abort();
+      if (reader) void reader.cancel().catch(() => undefined);
+      else if (response) void response.body?.cancel().catch(() => undefined);
     }
   }
 }

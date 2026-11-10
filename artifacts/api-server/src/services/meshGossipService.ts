@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import {
   finalizeEvent,
   getPublicKey,
-  nip19,
   verifyEvent,
   type Event,
   type EventTemplate,
@@ -13,6 +12,7 @@ import {
   type AgentIdentity,
   type IdentityInput,
 } from "./nostrWebOfTrust";
+import { parsePrivateKey } from "../lib/nostr-private-key";
 
 const HEX_32 = /^[0-9a-f]{64}$/;
 const DEFAULT_TIMEOUT_MS = 1_500;
@@ -66,18 +66,6 @@ export type MeshGossipServiceOptions = {
   networkId?: string;
   identityService?: NostrWebOfTrust;
 };
-
-function parsePrivateKey(value: string): Uint8Array {
-  const trimmed = value.trim();
-  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
-    return Uint8Array.from(Buffer.from(trimmed, "hex"));
-  }
-  if (trimmed.startsWith("nsec1")) {
-    const decoded = nip19.decode(trimmed);
-    if (decoded.type === "nsec") return decoded.data;
-  }
-  throw new Error("NOSTR_PRIVATE_KEY must be a 64-character hex key or nsec");
-}
 
 function normalizePeerUrl(value: string): string {
   const url = new URL(value.trim());

@@ -2,7 +2,6 @@ import {
   finalizeEvent,
   generateSecretKey,
   getPublicKey,
-  nip19,
   SimplePool,
   type Event,
   type EventTemplate,
@@ -13,6 +12,7 @@ import { createHash } from "node:crypto";
 import { readDataset, refreshDataset } from "../routes/stratigraphy";
 import { logger } from "./logger";
 import { CANONICAL_ORIGIN } from "./public-site";
+import { parsePrivateKey as parseSecret } from "./nostr-private-key";
 
 const RELAYS = [
   "wss://relay.damus.io",
@@ -44,17 +44,6 @@ const status: NostrHeartbeatStatus = {
 
 export function getNostrHeartbeatStatus(): NostrHeartbeatStatus {
   return structuredClone(status);
-}
-
-function parseSecret(value: string): Uint8Array {
-  if (/^[0-9a-fA-F]{64}$/.test(value)) {
-    return Uint8Array.from(Buffer.from(value, "hex"));
-  }
-  if (value.startsWith("nsec1")) {
-    const decoded = nip19.decode(value);
-    if (decoded.type === "nsec") return decoded.data;
-  }
-  throw new Error("NOSTR_PRIVATE_KEY must be a 64-character hex key or nsec");
 }
 
 async function secretKey(): Promise<Uint8Array> {

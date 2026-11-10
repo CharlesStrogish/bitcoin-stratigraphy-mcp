@@ -10,6 +10,9 @@ import { registerStratigraphyRoutes } from "../../src/routes/stratigraphy";
 import { calculateTierCost } from "../../src/services/pricing";
 import { albySettlementMode } from "../../src/services/settlement/alby";
 import { createCoinosSettlementProvider } from "../../src/services/settlement/coinos";
+import { createNwcSettlementProvider, normalizeNwcUri } from "../../src/services/settlement/nwc-provider";
+import { nwcErrorReason } from "../../src/services/settlement/nwc-diagnostics";
+import { generateSecretKey, nip19 } from "nostr-tools";
 import {
   createDefaultSettlementRouter,
   createSettlementRouter,
@@ -24,6 +27,71 @@ const invoice = (provider: string, sequence = 1) => ({
     .update(`${provider}:${sequence}`)
     .digest("hex"),
   provider,
+});
+
+test("NWC converts bech32 connection secrets to hex without replacing relay or wallet identity", () => {
+  const key = generateSecretKey();
+  const uri = new URL(`nostr+walletconnect://${"a".repeat(64)}`);
+  uri.searchParams.append("relay", "wss://relay.example.com");
+  uri.searchParams.append("relay", "wss://backup.example.com");
+  uri.searchParams.set("secret", nip19.nsecEncode(key));
+  uri.searchParams.set("lud16", "merchant@example.com");
+  const normalized = new URL(normalizeNwcUri(uri.toString()));
+  assert.equal(normalized.searchParams.get("secret"), Buffer.from(key).toString("hex"));
+  assert.equal(normalized.host, uri.host);
+  assert.deepEqual(normalized.searchParams.getAll("relay"), uri.searchParams.getAll("relay"));
+  assert.equal(normalized.searchParams.get("lud16"), "merchant@example.com");
+  assert.equal(normalizeNwcUri(normalized.toString()), normalized.toString());
+  assert.throws(() => normalizeNwcUri("invalid"), /Invalid NWC URI/);
+});
+
+test("NWC constructor and wallet failures log actionable reasons without exposing credentials", async () => {
+  const key = generateSecretKey();
+  const secret = nip19.nsecEncode(key);
+  const uri = `nostr+walletconnect://${"a".repeat(64)}?relay=wss://relay.example.com&secret=${secret}`;
+  for (const constructionFails of [true, false]) {
+    const logs: unknown[][] = [];
+    let closed = 0;
+    const failure = Object.assign(new Error(`Wallet rejected make_invoice: ${uri}`), { code: "UNAUTHORIZED" });
+    const provider = createNwcSettlementProvider({
+      name: "coinos",
+      uri: () => uri,
+      logger: { error: (...args: unknown[]) => { logs.push(args); } },
+      clientFactory: () => {
+        if (constructionFails) throw failure;
+        return {
+          makeInvoice: async () => { throw failure; },
+          lookupInvoice: async () => { throw new Error("unused"); },
+          close: () => { closed++; },
+        };
+      },
+    });
+    await assert.rejects(provider.createInvoice({
+      amountMsats: 5_000_000, description: "Audit regression", expirySeconds: 900,
+    }), (error: SettlementProviderError) => {
+      assert.equal(error.retryable, false);
+      const serialized = JSON.stringify({ message: error.message, cause: String(error.cause), logs });
+      assert.match(serialized, /UNAUTHORIZED/);
+      assert.match(serialized, /Wallet rejected make_invoice/);
+      assert.match(serialized, /make_invoice/);
+      assert.ok(!serialized.includes(uri));
+      assert.ok(!serialized.includes(secret));
+      return true;
+    });
+    assert.equal(logs.length, 1);
+    assert.equal(closed, constructionFails ? 0 : 1);
+  }
+});
+
+test("NWC diagnostics preserve nested timeout codes and redact string/object errors", () => {
+  const hex = "b".repeat(64);
+  const nested = new Error("Relay connection timed out", { cause: Object.assign(new Error("socket closed"), { code: "ETIMEDOUT" }) });
+  assert.match(nwcErrorReason(nested), /Relay connection timed out.*ETIMEDOUT.*socket closed/);
+  const reason = nwcErrorReason({ code: "INVALID_SECRET", message: `secret=${hex} token=private-token` });
+  assert.match(reason, /INVALID_SECRET/);
+  assert.ok(!reason.includes(hex));
+  assert.ok(!reason.includes("private-token"));
+  assert.equal(nwcErrorReason(`nsec1${"q".repeat(58)}`), "[REDACTED_KEY]");
 });
 
 test("keeps Alby optional in standby while Coinos remains operational", async () => {

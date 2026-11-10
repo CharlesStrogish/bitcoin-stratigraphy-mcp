@@ -28,7 +28,12 @@ after(async () => { await pool.end(); });
 test("all original 16 MCP definitions retain their exact pre-staking contracts", () => {
   const core = mcpToolDefinitions.filter(tool => tool.name !== "payment.get_escrow");
   assert.equal(core.length, 16);
-  assert.equal(createHash("sha256").update(JSON.stringify(core)).digest("hex"),
+  // The approved mesh completeness note is documentation-only. Keep the
+  // original sealed baseline for every other byte, including all schemas.
+  const meshNote = " Note: Dynamic peer discovery, peer add/remove, and subscription management are intentionally disabled in this namespace. Mesh topology is statically defined at startup for zero-trust security.";
+  const baseline = core.map(tool => tool.name === "mesh.broadcast" || tool.name === "mesh.get_status"
+    ? { ...tool, description: tool.description.replace(meshNote, "") } : tool);
+  assert.equal(createHash("sha256").update(JSON.stringify(baseline)).digest("hex"),
     "56a85799a9933a62485b1fd17c35bc1af6550e7a49717794fbe3c033a32a2e12");
 });
 

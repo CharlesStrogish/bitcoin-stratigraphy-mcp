@@ -14,3 +14,15 @@ When invoice creation fails over after a cache scope was predicted, persist the 
 **Why:** Concurrent cross-instance requests can retain a stale primary scope while waiting on the shared caller lock; without an alias they create duplicate fallback invoices and consume quota.
 
 **How to apply:** Resolve the final scope from the returned invoice provider and atomically store predicted and final aliases for the same challenge.
+
+Log the sanitized primary invoice failure before fallback selection; an
+unconfigured optional fallback is not evidence that the primary wallet needs
+another environment variable.
+
+**Why:** A wallet's `UNAUTHORIZED: unknown connection` rejection was obscured
+by the final optional-Alby configuration error. Nostr signing-key format and
+wallet-connect authorization are separate concerns.
+
+**How to apply:** Retain provider error codes and nested reasons, never raw
+connection URIs or signing secrets. Confirm the primary connection with an
+unpaid invoice request; never send a payment as a readiness check.

@@ -12,6 +12,7 @@ import {
   createCachedNostrAttestor,
   createNostrAttestor,
   signTelemetryPayload,
+  parsePrivateKey,
 } from "../artifacts/api-server/src/services/nostrAttestation";
 
 const privateKey = generateSecretKey();
@@ -20,6 +21,23 @@ const payload = {
   observed_at: "2026-09-17T12:00:00.000Z",
   block: { height: 920_000 },
 };
+
+test("normalizes padded nsec and uppercase hex to identical signing bytes", () => {
+  assert.deepEqual(parsePrivateKey(`  ${nip19.nsecEncode(privateKey)}\n`), privateKey);
+  assert.deepEqual(parsePrivateKey(privateKeyHex.toUpperCase()), privateKey);
+});
+
+test("malformed bech32 and public keys fail without exposing supplied input", () => {
+  const valid = nip19.nsecEncode(privateKey);
+  const invalid = `${valid.slice(0, -1)}${valid.endsWith("q") ? "p" : "q"}`;
+  for (const value of [invalid, nip19.npubEncode(getPublicKey(privateKey)), "not-a-key"]) {
+    assert.throws(() => parsePrivateKey(value), (error: Error) => {
+      assert.match(error.message, /valid 64-character hex key or nsec1/);
+      assert.ok(!error.message.includes(value));
+      return true;
+    });
+  }
+});
 
 test("creates a valid NIP-01 signed NIP-78 telemetry attestation", () => {
   const attestation = signTelemetryPayload(payload, {

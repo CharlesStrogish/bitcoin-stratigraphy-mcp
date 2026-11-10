@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import {
   finalizeEvent,
-  nip19,
   SimplePool,
   type Event,
   type EventTemplate,
 } from "nostr-tools";
+import { parsePrivateKey } from "../lib/nostr-private-key";
+export { parsePrivateKey } from "../lib/nostr-private-key";
 
 export const DEFAULT_NOSTR_RELAYS = [
   "wss://relay.damus.io",
@@ -25,18 +26,6 @@ export type NostrAttestor = <T extends object>(
   payload: T,
   createdAt?: number,
 ) => T & { attestation: NostrAttestation };
-
-export function parsePrivateKey(value: string): Uint8Array {
-  const trimmed = value.trim();
-  if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
-    return Uint8Array.from(Buffer.from(trimmed, "hex"));
-  }
-  if (trimmed.startsWith("nsec1")) {
-    const decoded = nip19.decode(trimmed);
-    if (decoded.type === "nsec") return decoded.data;
-  }
-  throw new Error("NOSTR_PRIVATE_KEY must be a 64-character hex key or nsec");
-}
 
 export function signTelemetryPayload(
   payload: unknown,

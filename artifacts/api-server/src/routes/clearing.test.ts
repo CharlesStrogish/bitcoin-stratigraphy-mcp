@@ -205,9 +205,13 @@ test("clearing catalog and dispatch never replace any sealed core contract", asy
     ["clearing.create_contract", "clearing.settle_contract"],
   );
   for (const name of ["clearing.create_contract", "clearing.settle_contract"]) {
+    const tool = listed.body.result.tools.find(
+      (tool: { name: string }) => tool.name === name,
+    ) as { description?: unknown } | undefined;
+    const description = tool?.description;
+    assert.equal(typeof description, "string");
     assert.ok(
-      listed.body.result.tools.find((tool: { name: string }) => tool.name === name)
-        .description.includes(
+      String(description).includes(
           "Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
         ),
     );

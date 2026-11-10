@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 import { NWCClient } from "@getalby/sdk";
+import { privateKeyHex } from "../../lib/nostr-private-key";
+import { logger } from "../../lib/logger";
+import { nwcErrorReason } from "./nwc-diagnostics";
 import {
   SettlementProviderError,
   type SettlementInvoiceInput,
@@ -21,9 +24,21 @@ const silentNwcLogger = {
   error() {},
 };
 
+export function normalizeNwcUri(nwcUri: string): string {
+  let url: URL;
+  try { url = new URL(nwcUri.trim()); }
+  catch { throw new Error("Invalid NWC URI: expected a wallet-connect URL"); }
+  const secret = url.searchParams.get("secret");
+  if (secret && /^nsec1/i.test(secret.trim())) {
+    url.searchParams.set("secret", privateKeyHex(secret));
+    return url.toString();
+  }
+  return nwcUri.trim();
+}
+
 export const createNwcClient: NwcClientFactory = (nwcUri) =>
   new NWCClient({
-    nostrWalletConnectUrl: nwcUri,
+    nostrWalletConnectUrl: normalizeNwcUri(nwcUri),
     logger: silentNwcLogger,
   });
 
@@ -63,6 +78,7 @@ export function createNwcSettlementProvider(input: {
   uri: () => string | undefined;
   payerUri?: () => string | undefined;
   clientFactory?: NwcClientFactory;
+  logger?: Pick<typeof logger, "error">;
 }): SettlementProvider {
   const clientFactory = input.clientFactory ?? createNwcClient;
   const configuredUri = () => input.uri()?.trim() || undefined;
@@ -92,12 +108,12 @@ export function createNwcSettlementProvider(input: {
           true,
         );
       }
-      const client = clientFactory(uri);
+      let client: NwcClient | undefined;
       let closed = false;
       const close = () => {
         if (closed) return;
         closed = true;
-        client.close();
+        client?.close();
       };
       const abort = () => close();
       request.signal?.addEventListener("abort", abort, { once: true });
@@ -108,6 +124,7 @@ export function createNwcSettlementProvider(input: {
             true,
           );
         }
+        client = clientFactory(uri);
         const transaction = await client.makeInvoice({
           amount: request.amountMsats,
           description: request.description,
@@ -129,11 +146,17 @@ export function createNwcSettlementProvider(input: {
           asset: "btc-lightning",
         };
       } catch (error) {
-        if (error instanceof SettlementProviderError) throw error;
+        const reason = nwcErrorReason(error, uri);
+        (input.logger ?? logger).error({
+          provider: input.name,
+          operation: "make_invoice",
+          amount_msats: request.amountMsats,
+          reason,
+        }, `NWC invoice generation failed (${input.name}): ${reason}`);
         throw new SettlementProviderError(
-          `${input.name} invoice generation failed`,
-          retryableProviderError(error),
-          { cause: error },
+          `${input.name} invoice generation failed: ${reason}`,
+          error instanceof SettlementProviderError ? error.retryable : retryableProviderError(error),
+          { cause: new Error(reason) },
         );
       } finally {
         request.signal?.removeEventListener("abort", abort);

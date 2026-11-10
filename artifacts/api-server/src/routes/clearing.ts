@@ -65,17 +65,36 @@ export const clearingToolDefinitions = [
   {
     name: "clearing.create_contract",
     description:
-      "Reserve a private A2A contract and issue its funding invoice. Buyer comes only from fresh NIP-98 authentication. Production receipt settlement uses the Solo Founder Genesis Groth16 key and merchant-confirmed funding. This proves Poseidon preimage knowledge, not arbitrary task execution. No automated payout or refund is enabled; funding remains merchant-controlled. An unpaid invoice is not locked funds. Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
+      "Create a worker contract; return its contract ID (escrow_id) and Lightning funding invoice (invoice). Requires fresh buyer NIP-98 authentication. New request IDs create separate contracts even for the same task_hash; byte-identical retries by the same buyer reuse the contract and its unexpired invoice. Funds remain merchant-controlled; an unpaid invoice is not funding. No automated payouts. Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
-        worker_pubkey: { type: "string", pattern: "^[0-9a-f]{64}$" },
-        task_hash: { type: "string", pattern: "^[0-9a-f]{64}$" },
+        worker_pubkey: {
+          type: "string",
+          pattern: "^[0-9a-f]{64}$",
+          description:
+            "Worker's Nostr public key: exactly 64 lowercase hexadecimal characters (32-byte x-only secp256k1 key), without a 0x prefix. Must represent a valid curve point.",
+          examples: [
+            "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          ],
+        },
+        task_hash: {
+          type: "string",
+          pattern: "^[0-9a-f]{64}$",
+          description:
+            "Task commitment as exactly 64 lowercase hexadecimal characters (32 bytes), without a 0x prefix. When production settlement is enabled, its numeric value must be less than 21888242871839275222246405745257275088548364400416034343698204186575808495617.",
+          examples: [
+            "0101010101010101010101010101010101010101010101010101010101010101",
+          ],
+        },
         amount_sats: {
           type: "integer",
           minimum: 1,
           maximum: Math.floor(Number.MAX_SAFE_INTEGER / 1000),
+          description:
+            "Contract funding amount in whole satoshis: an integer from 1 through 9007199254740 inclusive. Fractional satoshis are not accepted.",
+          examples: [123],
         },
       },
       required: ["worker_pubkey", "task_hash", "amount_sats"],

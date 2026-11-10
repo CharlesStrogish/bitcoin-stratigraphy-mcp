@@ -88,3 +88,14 @@ disabled in favor of startup-defined topology.
 
 **How to apply:** Preserve the requested explanatory notes in both tools of
 each namespace and distinguish metadata improvements from behavioral changes.
+
+Distinguish a new operation from exact-request recovery when documenting retry
+semantics, even when a tool advertises `idempotentHint: false`.
+
+**Why:** Blanket claims that repeating an input always creates a new resource
+can contradict existing retry recovery and lead agents to create duplicate
+funding obligations. Audit suggestions must not override actual behavior.
+
+**How to apply:** Verify both a new request identifier and an identical
+authenticated request body; describe each outcome without changing execution
+or payment semantics just to simplify metadata.

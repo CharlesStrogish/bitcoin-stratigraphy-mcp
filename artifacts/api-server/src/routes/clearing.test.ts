@@ -212,8 +212,8 @@ test("clearing catalog and dispatch never replace any sealed core contract", asy
     assert.equal(typeof description, "string");
     assert.ok(
       String(description).includes(
-          "Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
-        ),
+        "Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
+      ),
     );
   }
   const queries = statements.length,
@@ -234,6 +234,91 @@ test("clearing catalog and dispatch never replace any sealed core contract", asy
     }),
     before,
   );
+});
+
+test("clearing.create_contract discovery documents every input, return fields and safe retries", async () => {
+  const f = await fixture();
+  const listed = await post(
+    f.url,
+    { jsonrpc: "2.0", id: "create-contract-metadata", method: "tools/list" },
+    null,
+  );
+  assert.equal(listed.status, 200);
+  const tool = listed.body.result.tools.find(
+    (entry: { name: string }) => entry.name === "clearing.create_contract",
+  ) as
+    | {
+        description: string;
+        annotations: { idempotentHint: boolean };
+        inputSchema: {
+          properties: Record<
+            string,
+            {
+              description: string;
+              examples: (string | number)[];
+              pattern: string;
+              type: string;
+              minimum?: number;
+              maximum?: number;
+            }
+          >;
+        };
+      }
+    | undefined;
+  assert.ok(tool);
+  assert.match(tool.description, /^Create a worker contract;/);
+  assert.match(tool.description, /contract ID \(escrow_id\)/);
+  assert.match(tool.description, /Lightning funding invoice \(invoice\)/);
+  assert.match(
+    tool.description,
+    /New request IDs create separate contracts even for the same task_hash/,
+  );
+  assert.match(
+    tool.description,
+    /byte-identical retries by the same buyer reuse/,
+  );
+  assert.doesNotMatch(
+    tool.description,
+    /Solo Founder Genesis Groth16 key|Poseidon preimage knowledge/,
+  );
+  assert.equal(tool.annotations.idempotentHint, false);
+  const properties = tool.inputSchema.properties;
+  for (const field of ["task_hash", "amount_sats", "worker_pubkey"]) {
+    assert.equal(typeof properties[field].description, "string");
+    assert.ok(properties[field].description.length > 0);
+    assert.ok(properties[field].examples.length > 0);
+  }
+  for (const field of ["task_hash", "worker_pubkey"]) {
+    assert.equal(properties[field].pattern, "^[0-9a-f]{64}$");
+    assert.match(properties[field].description, /64 lowercase hexadecimal/);
+    assert.match(properties[field].description, /without a 0x prefix/);
+    assert.match(
+      String(properties[field].examples[0]),
+      new RegExp(properties[field].pattern),
+    );
+  }
+  assert.equal(properties.amount_sats.type, "integer");
+  assert.equal(properties.amount_sats.minimum, 1);
+  assert.equal(properties.amount_sats.maximum, 9007199254740);
+  assert.match(
+    properties.amount_sats.description,
+    /1 through 9007199254740 inclusive/,
+  );
+});
+
+test("a new request ID creates a separate contract for the same task hash", async () => {
+  const f = await fixture();
+  const request = envelope("clearing.create_contract", createArgs());
+  const before = invoiceCalls;
+  const first = await post(f.url, request);
+  const second = await post(f.url, { ...request, id: randomUUID() });
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.notEqual(
+    first.body.result.structuredContent.escrow_id,
+    second.body.result.structuredContent.escrow_id,
+  );
+  assert.equal(invoiceCalls - before, 2);
 });
 
 test("real PostgreSQL create/read preserves buyer identity and exact-request invoice retries", async () => {

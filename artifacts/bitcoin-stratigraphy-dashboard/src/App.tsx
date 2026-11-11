@@ -229,6 +229,13 @@ function Header({
           </a>
           <a
             className="control-button"
+            href={`${import.meta.env.BASE_URL}blog/`}
+            data-testid="link-home-blog"
+          >
+            <FileText size={14} aria-hidden="true" /> Engineering blog
+          </a>
+          <a
+            className="control-button"
             href={`${import.meta.env.BASE_URL}standard`}
             data-testid="link-standard"
           >

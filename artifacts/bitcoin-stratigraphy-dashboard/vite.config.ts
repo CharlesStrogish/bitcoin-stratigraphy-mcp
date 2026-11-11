@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import { enterpriseSeoPlugin } from "./enterprise-seo-plugin";
+import { blogPlugin } from "./blog-plugin";
 import { redirectLegacyDomain } from "./domain-redirect.mjs";
 
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
@@ -63,6 +64,7 @@ export default defineConfig(({ command }) => {
       runtimeErrorOverlay(),
       ...replitPlugins,
       enterpriseSeoPlugin(),
+      blogPlugin(),
     ],
     resolve: {
       alias: {

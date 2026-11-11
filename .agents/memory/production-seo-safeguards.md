@@ -16,3 +16,14 @@ Preserve registry compatibility when adding publisher attribution: supplement th
 **Why:** The user explicitly selected preservation of registry compatibility during the system audit.
 
 **How to apply:** Add attribution without dropping existing metadata. Distinguish defunct application domains from external registry identifiers: verify directory links before rewriting a legacy-looking identifier, since an apparently cleaner replacement can return 404.
+
+Blog content must remain readable without client-side JavaScript, with article
+metadata and `BlogPosting` JSON-LD already present in the initial head.
+
+**Why:** The user explicitly requires these properties to drive organic
+enterprise traffic without affecting the existing dashboard or payment flows.
+
+**How to apply:** Preserve the no-JavaScript publication boundary when extending
+the blog. Do not replace static article documents with a client-fetched Markdown
+view or let the dashboard SPA overwrite them after load. Keep future authoring
+changes compatible with the local Markdown/frontmatter workflow.

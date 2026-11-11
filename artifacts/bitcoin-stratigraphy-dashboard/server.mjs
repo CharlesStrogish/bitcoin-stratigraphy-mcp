@@ -37,6 +37,11 @@ export function createFrontendApp({
     }
     next();
   });
+  // Static publication owns its subtree, including directory redirects and real
+  // 404s. Future Markdown posts never need per-slug rewrites or SPA changes.
+  app.use("/blog", express.static(path.join(publicDirectory, "blog"), {
+    dotfiles: "deny", fallthrough: false,
+  }));
   // Keep dedicated-page metadata ahead of both static directory handling and the SPA.
   app.use((req, res, next) => {
     const rewrite = (production.rewrites ?? []).find(({ from }) => from === req.path);

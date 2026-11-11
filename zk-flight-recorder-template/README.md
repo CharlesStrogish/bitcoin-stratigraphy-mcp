@@ -1,71 +1,166 @@
-# ZK Flight Recorder — LangChain Template
+# Enterprise Zero-Knowledge Flight Recorder | MCP Boilerplate
 
-An installable Python execution recorder for LangChain agents, using Bitcoin
-Stratigraphy's prepaid L402 scanner. It records chain, model, chat and tool
-start/end events and execution errors. Runs and parents are correlated by ID.
+**An audit-ready starting point for enterprise AI agents—not another logging dashboard.**
 
-## Cryptographic Indemnity for EU AI Act Compliance
+Drop-in Python and LangChain boilerplate for enterprise developers building
+auditable autonomous AI agents and **EU AI Act compliance** workflows. Add a
+callback, capture correlated execution events, and connect directly to the
+[Bitcoin Stratigraphy L402 data engine](https://bitcoinstratigraphy.com/developers/)
+for prepaid heuristic scanning and locally verified receipt commitments.
 
-**This is a positioning concept, not a legal or cryptographic guarantee.**
-This template does not provide indemnification, insurance, a compliance
-certification, or legal advice. EU AI Act Article 12 concerns automatic event
-recording for applicable high-risk systems; a callback plus a paid API is not,
-by itself, sufficient to establish compliance. Your legal and compliance teams
-must assess applicability, logging completeness, retention, access, oversight
-and the deployment as a whole. Contractual indemnity requires a separate,
-explicit agreement.
+Keep your existing agent. Add durable evidence collection, explicit payment
+boundaries, and a documented path toward stronger cryptographic verification.
 
-### What the live endpoint actually returns
+**[Start integrating](#quick-start)** ·
+**[Get scanner credits](https://bitcoinstratigraphy.com/developers/)** ·
+**[Explore MCP capabilities](https://bitcoinstratigraphy.com/llms.txt)** ·
+**[Review enterprise access](https://bitcoinstratigraphy.com/standard/)**
 
-`POST https://bitcoinstratigraphy.com/api/scanner` currently returns
-`article12-heuristic/v1`: keyword-based risk screening, `prompt_sha256` and
-`compliance_hash`, with `receipt_type: simulated_zk_receipt`.
+## Why enterprise teams use a flight recorder
 
-**These are SHA-256 commitments, not Groth16 proofs, signed attestations,
-Bitcoin timestamps, or proof that an AI execution actually happened.**
-Anyone can compute the hashes; checking them detects mismatches with the
-submitted bytes but does not authenticate an issuer. The recorder checks both
-commitments and retains the exact submitted prompt and response locally.
-It cannot turn a hash into a zero-knowledge proof. Existing Groth16
-preimage-verification tools prove a different statement and are not substitutes
-for arbitrary execution-log proofs.
+An autonomous agent can complete a task without leaving enough evidence to
+explain what happened. Application logs alone often omit run relationships,
+external screening results, or ambiguous failures.
 
-If real Groth16 evidence is mandatory, set
-`FLIGHT_RECORDER_REQUIRE_GROTH16=true`: the recorder fails closed before making
-a paid request. A suitable circuit, proving service and independently pinned
-verification key are required before that mode can operate.
+This template gives engineering, security, and compliance teams a shared
+starting point:
+
+| Enterprise requirement | Included implementation |
+| --- | --- |
+| Correlate agent activity | Chain, chat, model, tool, and error events linked by run and parent IDs |
+| Preserve events before external submission | SQLite journal committed before the scanner request |
+| Connect to paid screening infrastructure | Default HTTPS connection to `bitcoinstratigraphy.com/api/scanner` |
+| Check returned receipt commitments | Verification of the submitted prompt hash and returned report hash |
+| Limit accidental disclosure | Summary-only capture by default; opt-in redacted content capture |
+| Make failures visible | Explicit errors and locally preserved unresolved events |
+| Control expenditure | Pre-funded scanner credentials; no automatic wallet payments or retries |
+
+Use it as the evidence-collection layer in a legally compliant, auditable
+enterprise deployment. The software supports that work; legal compliance
+depends on your system's classification, controls, policies, and operation.
+
+## Architecture: from agent execution to retained evidence
+
+```text
+Your LangChain agent
+        |
+        v
+Flight Recorder callback
+        |
+        +--> Local SQLite journal: pending event
+        |
+        v
+Bitcoin Stratigraphy HTTPS scanner
+        |  prepaid scanner-scoped L402 capability
+        v
+Heuristic report + SHA-256 commitments
+        |
+        v
+Local commitment verification
+        |
+        +--> recorded: exact event JSON + scanner report
+        +--> unknown: event retained for operator reconciliation
+```
+
+The recorder connects out of the box to the hosted **L402 data engine** at
+**[bitcoinstratigraphy.com](https://bitcoinstratigraphy.com)**. You do not need
+to deploy a scanner or change your agent framework. Supply a funded scanner
+credential and attach the callback.
+
+### Heuristic scanning, MCP, and proof generation
+
+The same engine exposes the **Model Context Protocol (MCP)** for its broader
+data, verification, and notarization capabilities. That makes this starter
+an on-ramp to an MCP-based enterprise evidence architecture, not a replacement
+for your existing orchestration stack.
+
+| Interface | Role | Template integration |
+| --- | --- | --- |
+| [`POST /api/scanner`](https://bitcoinstratigraphy.com/openapi.json) | Heuristic screening and receipt-commitment generation | Included; configured by default |
+| [`/mcp`](https://bitcoinstratigraphy.com/mcp) | Discover enabled data, proof-verification, and notarization tools | Separate MCP client integration |
+| [`/llms.txt`](https://bitcoinstratigraphy.com/llms.txt) | Tool catalog, payment instructions, and evidence semantics | Public integration reference |
+
+**Groth16 cryptographic receipts require a real proof-generation pipeline.**
+The included scanner returns `article12-heuristic/v1` reports marked
+`simulated_zk_receipt`: these are SHA-256 commitments, not Groth16 proofs.
+For a stronger proof-generation integration, supply an appropriate circuit,
+prover, and independently pinned verification key. The engine's Groth16
+preimage-verification capabilities prove their specific circuit statement,
+not arbitrary agent execution.
+
+The repository's “Zero-Knowledge” name describes its intended integration
+direction. Setting `FLIGHT_RECORDER_REQUIRE_GROTH16=true` currently fails
+closed **before a paid scanner request**; it does not enable a hidden prover.
 
 ## Quick start
 
-Requires Python 3.11+ and an already-funded **scanner-scoped** Macaroon.
+### 1. Clone and install
 
-A `uv.lock` is included for reproducible CI dependency resolution. The simple
-pip installation below resolves the compatible range in `pyproject.toml`;
-use the lockfile with your CI's uv tooling when exact versions are required.
+Prerequisites: Git, Python **3.11+**, and pip. This is a Python project;
+`npm install` is not required.
 
 ```bash
+git clone https://github.com/CharlesStrogish/zk-flight-recorder-template.git
+cd zk-flight-recorder-template
 python -m pip install .
 cp .env.example .env
-# Fill .env locally. Never paste real credentials into source, logs or prompts.
-# Load only your trusted local configuration:
+```
+
+Use a Python environment appropriate to your workstation. The included
+`uv.lock` also supports reproducible dependency resolution with uv:
+
+```bash
+uv sync --frozen
+uv run python -m unittest discover -s tests -v
+```
+
+### 2. Run the offline tests
+
+For the pip installation:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Tests use synthetic scanner responses and temporary local journals. They do
+not contact the production scanner, require wallet credentials, or spend sats.
+
+### 3. Configure your funded scanner credential
+
+Open `.env` locally and set `L402_MACAROON` to your funded, scanner-scoped
+prepaid token, **without** the `Macaroon ` header prefix. Obtain credits through
+the [developer portal](https://bitcoinstratigraphy.com/developers/).
+Do not commit the token, paste it into prompts, or print it in logs.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `L402_MACAROON` | Required | Funded prepaid scanner credential |
+| `SCANNER_URL` | `https://bitcoinstratigraphy.com/api/scanner` | HTTPS scanner endpoint; redirects and query strings are refused |
+| `FLIGHT_RECORDER_DB` | `./private/flight-recorder.sqlite3` | Durable local event and receipt journal |
+| `FLIGHT_RECORDER_CAPTURE_CONTENT` | `false` | Opt in to transmitting redacted inputs and outputs |
+| `FLIGHT_RECORDER_REQUIRE_GROTH16` | `false` | Reject the current non-Groth16 scanner contract when enabled |
+
+### 4. Run the live example
+
+**This step consumes prepaid scanner credits.** The example uses a local
+`RunnableLambda`, so no external model API key is needed. Its callback events
+still make live, paid scanner requests. Each submitted event consumes one
+credit; one agent invocation can produce multiple events.
+
+Load only a trusted local `.env` file:
+
+```bash
 set -a
 . ./.env
 set +a
 python example.py
 ```
 
-The example uses `RunnableLambda`, not an external LLM, but its scanner calls
-are **live paid calls**. Each callback event consumes one scanner credit.
-Nested chains and tools can generate many events. The existing product grants
-100 calls for 100,000 sats, valid for 30 days. Other MCP capabilities and
-unfunded L402 challenges are not interchangeable with these prepaid credits.
-Acquire the credential through the developer portal's Lightning purchase
-or a fully configured, operator-funded card bridge.
+If you installed with uv, use `uv run python example.py` for the final command.
 
-The bridge's Stripe test charge alone does not fund a Macaroon. Never use an
-unsettled challenge token or assume a test credit-card payment transferred fiat.
+## Drop into your existing LangChain agent
 
-## Attach to your agent
+Attach the callback where you invoke your existing agent:
 
 ```python
 from flight_recorder import DurableRecorder, langchain_callback
@@ -76,90 +171,122 @@ with DurableRecorder.from_env() as recorder:
         {"messages": [{"role": "user", "content": "Your task"}]},
         config={"callbacks": [callback]},
     )
-    # For async agents, await agent.ainvoke(..., config={"callbacks": [callback]}).
 ```
 
-Callbacks run inline and propagate errors. A start-event recording failure
-can prevent the agent operation. An end-event failure **cannot undo** an
-already-executed tool or external side effect. LangChain can invoke error
-callbacks after a callback failure, causing additional recording attempts;
-do not interpret those as a transaction rollback.
+For asynchronous agents, use
+`await agent.ainvoke(..., config={"callbacks": [callback]})`.
+`example.py` contains a complete runnable example.
 
-Streaming tokens are not submitted individually. The final model output is
-recorded on `on_llm_end`. This template does not intercept processes or tools
-that do not participate in your agent's LangChain callback lifecycle.
+Callbacks run inline and propagate recording failures. A failed start callback
+can prevent execution; a failed end callback cannot undo a completed tool call
+or external side effect. LangChain may invoke error callbacks after failures,
+producing additional recording attempts. This is evidence collection, not a
+distributed transaction or rollback mechanism.
 
-## Configuration
+Final model outputs are captured on `on_llm_end`; streaming tokens are not
+submitted individually. Activity outside LangChain's callback lifecycle is
+not automatically intercepted.
 
-| Variable | Required/default | Purpose |
+## L402 micropayments and Stripe to Lightning B2B
+
+**L402 micropayments** separate machine access from traditional account-based
+billing. This recorder uses an already-funded, scanner-scoped Macaroon and
+sends it in an authorization header. It does not expose a wallet to your agent.
+
+For enterprise procurement, the developer portal offers **Stripe to Lightning
+B2B** funding through Stripe-hosted Checkout, with scanner credits issued only
+after the configured, operator-authorized treasury funding is verified.
+The template consumes the resulting credential; it does not implement the
+card bridge or initiate treasury spending.
+
+| Access product | Published terms | Scope |
 | --- | --- | --- |
-| `L402_MACAROON` | Required | Funded prepaid token, without `Macaroon ` prefix |
-| `SCANNER_URL` | Canonical HTTPS endpoint | Must be HTTPS `/api/scanner`, no query or redirects |
-| `FLIGHT_RECORDER_DB` | `./private/flight-recorder.sqlite3` | Durable local event/receipt journal |
-| `FLIGHT_RECORDER_CAPTURE_CONTENT` | `false` | Opt-in to external transmission of redacted inputs/outputs |
-| `FLIGHT_RECORDER_REQUIRE_GROTH16` | `false` | Reject current simulated receipt contract if true |
+| Enterprise API Block | **$500 USD** by card, or **100,000 sats** via Lightning | 100 prepaid scanner calls, valid 30 days from issuance |
+| Standard paid core MCP calls | **250 sats/call** at the standard tier; consult current quotes | Separate tool access; scanner credits do not authorize these calls |
 
-## Privacy and retention
+Purchase availability depends on the portal's live configuration. A Stripe
+test charge does not transfer fiat or fund a live capability. Neither an
+unsettled L402 challenge nor an unrelated MCP token substitutes for funded
+scanner credits. There are no automatic top-ups, invoice payments, or retries
+inside this recorder.
 
-Default logging captures event type, event ID, UTC timestamp, run ID and parent
-run ID, **not inputs or outputs**. This is safer but not a full execution trace.
-Enable content capture only after reviewing data-processing agreements,
-personal-data handling, trade-secret exposure and your retention policy.
-The supplied redactor covers common credential keys, authorization strings,
-Stripe keys and email addresses; it is not a universal PII detector.
-Inject an application-specific `redactor` into `DurableRecorder` as needed.
+## EU AI Act compliance: build the evidence layer correctly
 
-The token is sent only as an authorization header to the configured HTTPS
-endpoint. Redirects are refused. No authorization is written to the journal.
-The scanner states that it does not retain prompts and reports; **your
-application must retain evidence itself**.
+EU AI Act Article 12 addresses automatic event recording for applicable
+high-risk AI systems. A practical compliance program needs more than logs:
+it needs appropriate retention, access controls, oversight, documentation,
+and a deployment-specific legal assessment.
 
-The local SQLite file is created with mode `0600`. Use an encrypted, backed-up
-persistent volume and a dedicated service account; secure its parent directory.
-Set backup, deletion and retention policies for both the prompts and responses.
-The journal is not append-only, independently timestamped, or tamper-proof.
-An administrator can rewrite it and recompute the unsigned hashes.
+This boilerplate helps you implement and inspect an execution-recording
+workflow. It does not certify compliance, provide contractual indemnity, or
+prove the truth of an agent's reasoning.
 
-## Failure and recovery
+### What your retained evidence establishes
 
-1. A complete event is committed locally as `pending` before submission.
-2. The scanner receives `{"prompt": "<exact event JSON>"}` with
-   `Authorization: Macaroon <token>`.
-3. Both returned commitments are checked against the exact submitted bytes.
-4. Successful reports are saved as `recorded`. A failed or ambiguous call is
-   saved as `unknown`, and an exception propagates.
+- **Run correlation:** which recorded events share a run or parent run.
+- **Submitted-byte consistency:** whether returned scanner commitments match
+  the exact submitted event JSON and the report fields.
+- **Operational status:** which events were recorded successfully and which
+  require reconciliation.
 
-No retries or wallet payments happen automatically. The scanner has no
-idempotency/retrieval contract for a timed-out scan; resubmitting can consume
-another credit. Do not hide failures with synthetic receipts.
+Unsigned hashes do not independently authenticate an issuer. The journal is
+not append-only or tamper-proof; an administrator can rewrite it and recompute
+hashes. Scanner commitments are not signed attestations, Bitcoin timestamps,
+or proof that an execution actually occurred.
 
-Inspect unresolved events using your SQLite tooling:
+## Privacy, failure handling, and production readiness
+
+Content capture is **off by default**: event metadata is recorded, but inputs
+and outputs are not. Enable content capture only after reviewing external
+data transmission, personal data, trade secrets, and retention requirements.
+The bundled redactor covers common credential patterns and email addresses;
+it is not a universal PII filter. Supply an application-specific `redactor`
+to `DurableRecorder` where needed.
+
+The SQLite file is created with `0600` permissions. Use an encrypted,
+backed-up persistent volume, secure the parent directory, and monitor disk
+capacity. Retain the exact submitted events and responses yourself; do not
+rely on the scanner as an evidence archive.
+
+Failed or ambiguous submissions are retained as `unknown` and raise an error.
+A timeout can have an unknown paid outcome, and the scanner has no
+idempotency/retrieval contract for timed-out scans. Resubmitting may consume
+another credit.
+
+Inspect unresolved events with your SQLite tooling:
 
 ```sql
-SELECT id, state, created_at FROM events WHERE state != 'recorded';
+SELECT id, state, created_at
+FROM events
+WHERE state != 'recorded';
 ```
 
-Review and reconcile with the operator. If a new paid scan is explicitly
-approved, submit the stored `prompt` bytes through `ScannerClient.scan` and
-retain the resulting report with a separately documented recovery record.
-Do not silently overwrite an ambiguous attempt. Oversized events fail rather
-than truncate: split them in your application before recording.
+Reconcile with the operator before approving a new paid submission. Preserve
+the original event and document recovery separately rather than silently
+overwriting an ambiguous attempt. Oversized events fail explicitly; split
+them deliberately instead of truncating evidence.
 
-HTTP errors, exhausted credits and expired/revoked tokens fail explicitly.
-Timeouts have unknown paid outcomes. SQLite disk errors are fatal; do not run
-an unattended agent without storage monitoring.
+Before production:
 
-## Tests and deployment checklist
+- Run the offline suite and a deliberately budgeted staging integration.
+- Verify callback coverage for your actual agent and tool lifecycle.
+- Set retention, backup, deletion, and access policies for local evidence.
+- Monitor storage failures, unresolved events, credit exhaustion, and expiry.
+- Review applicable privacy, contractual, and EU AI Act obligations.
+- Require genuine circuit-bound proof generation if your use case needs
+  Groth16 evidence rather than heuristic commitments.
 
-```bash
-python -m unittest discover -s tests -v
-```
+## Start with one agent. Keep your architecture.
 
-Tests use synthetic scanner responses and a temporary journal; they neither
-spend sats nor call production. Before deploying, run your own staging
-LangChain integration with a deliberately budgeted funded token, verify the
-callback lifecycle, configure encrypted storage and monitoring, and review
-retention, privacy, model/tool side effects and contractual obligations.
+Clone the template, run the offline tests, obtain a funded scanner credential,
+and attach the callback to one staging agent. Expand only after validating
+event coverage, privacy controls, and per-run credit consumption.
 
-The template directory's historical “ZK” name describes the intended future
-proof integration, not the evidence returned by the current scanner.
+**[Get the enterprise developer setup →](https://bitcoinstratigraphy.com/developers/)**
+
+For integration contracts, use the
+[OpenAPI specification](https://bitcoinstratigraphy.com/openapi.json) and
+[agent discovery guide](https://bitcoinstratigraphy.com/llms.txt).
+Contributions should include reproducible tests and preserve explicit payment,
+privacy, and evidence boundaries. Never include live credentials or customer
+execution data in an issue or pull request.

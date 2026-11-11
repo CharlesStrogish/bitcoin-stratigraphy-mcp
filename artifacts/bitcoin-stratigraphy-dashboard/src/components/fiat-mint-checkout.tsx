@@ -27,14 +27,21 @@ export default function FiatMintCheckout({
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const checkingRef = useRef(false);
+  const statusRequest = useRef<ReturnType<typeof getFiatMintStatus> | null>(
+    null,
+  );
   const [grant, setGrant] = useState<ScannerCreditGrant | null>(null);
   const [copied, setCopied] = useState(false);
   const alive = useRef(true);
   useEffect(() => {
     onPendingChange?.(
-      busy || ["checkout", "paid", "paying", "ready"].includes(status),
+      busy ||
+        checking ||
+        ["checkout", "paid", "paying", "ready"].includes(status),
     );
-  }, [busy, status, onPendingChange]);
+  }, [busy, checking, status, onPendingChange]);
   const options = () => ({
     credentials: "same-origin" as const,
     cache: "no-store" as const,
@@ -42,12 +49,17 @@ export default function FiatMintCheckout({
   });
 
   async function refresh({ preserveError = false } = {}) {
+    let request: ReturnType<typeof getFiatMintStatus> | null = null;
     try {
-      const response = await getFiatMintStatus(options());
+      request = statusRequest.current ?? getFiatMintStatus(options());
+      statusRequest.current = request;
+      const response = await request;
       if (alive.current) {
         setStatus(response.status);
-        if (!preserveError) setError("");
+        if (!preserveError || !["none", "checkout"].includes(response.status))
+          setError("");
       }
+      return response.status;
     } catch {
       if (alive.current) {
         setStatus((s) => (s === "loading" ? "none" : s));
@@ -55,6 +67,9 @@ export default function FiatMintCheckout({
           "Stripe Checkout is not configured or purchase recovery is unavailable. No new payment has been started.",
         );
       }
+      return null;
+    } finally {
+      if (statusRequest.current === request) statusRequest.current = null;
     }
   }
   useEffect(() => {
@@ -72,13 +87,36 @@ export default function FiatMintCheckout({
         clearInterval(timer);
         return;
       }
-      void refresh();
+      if (!checkingRef.current) void refresh({ preserveError: true });
     }, 15_000);
     return () => clearInterval(timer);
   }, [status]);
 
+  async function checkOriginalPurchase() {
+    if (busy || checkingRef.current) return;
+    checkingRef.current = true;
+    setChecking(true);
+    setError("");
+    try {
+      const next = await refresh();
+      if (!alive.current) return;
+      if (next === "checkout") {
+        setError(
+          "The original Stripe Checkout is still unpaid. Resume Stripe Checkout to complete it; no new purchase has been created.",
+        );
+      } else if (next === "none") {
+        setError(
+          "No original purchase was found in this browser. Use the browser where you started checkout, or contact the operator before paying again.",
+        );
+      }
+    } finally {
+      checkingRef.current = false;
+      if (alive.current) setChecking(false);
+    }
+  }
+
   async function checkout() {
-    if (busy) return;
+    if (busy || checkingRef.current) return;
     setBusy(true);
     setError("");
     try {
@@ -96,7 +134,7 @@ export default function FiatMintCheckout({
     }
   }
   async function claim() {
-    if (busy) return;
+    if (busy || checkingRef.current) return;
     setBusy(true);
     setError("");
     try {
@@ -134,7 +172,7 @@ export default function FiatMintCheckout({
         <button
           type="button"
           className="fn-btn"
-          disabled={busy || lightningPending}
+          disabled={busy || checking || lightningPending}
           onClick={() => void checkout()}
           data-testid="button-card-checkout"
         >
@@ -165,7 +203,7 @@ export default function FiatMintCheckout({
           <button
             type="button"
             className="fn-btn fn-btn-primary"
-            disabled={busy}
+            disabled={busy || checking}
             onClick={() => void claim()}
           >
             Reveal funded Macaroon once
@@ -236,10 +274,12 @@ export default function FiatMintCheckout({
         <button
           type="button"
           className="fn-btn fn-btn-quiet"
-          disabled={busy}
-          onClick={() => void refresh()}
+          disabled={busy || checking}
+          aria-busy={checking}
+          onClick={() => void checkOriginalPurchase()}
+          data-testid="button-card-check-original"
         >
-          Check original purchase
+          {checking ? "Checking original purchase…" : "Check original purchase"}
         </button>
       )}
       {error && (

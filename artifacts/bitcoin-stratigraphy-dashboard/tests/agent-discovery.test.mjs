@@ -71,11 +71,31 @@ test("SoftwareApplication and Product JSON-LD separate MCP access from scanner c
   assert.equal(product.offers[0].price, "500.00");
   assert.equal(product.offers[0].priceCurrency, "USD");
   assert.match(product.offers[0].acceptedPaymentMethod, /Credit card.*Stripe/);
-  assert.equal(product.offers[1].price, "0.00100000");
-  assert.match(product.offers[1].acceptedPaymentMethod, /Lightning L402/);
+  assert.equal(product.offers.length, 1);
+  for (const offer of product.offers) assert.equal(offer.priceCurrency, "USD");
   assert.match(product.description, /100 prepaid heuristic scanner calls/);
   assert.match(product.description, /30 days/);
   assert.match(product.description, /do not authorize unrelated MCP tools/);
+});
+
+test("Product declares a real image and digital service without invented reviews or shipping", async () => {
+  const product = AGENT_STRUCTURED_DATA["@graph"].find(
+    (entry) => entry["@type"] === "Product",
+  );
+  assert.equal(product.image, "https://bitcoinstratigraphy.com/og-image.png");
+  const image = await readFile(new URL("../public/og-image.png", import.meta.url));
+  assert.equal(image.subarray(1, 4).toString(), "PNG");
+  assert.equal(product.additionalType, "https://schema.org/Service");
+  assert.match(product.category, /Digital service/);
+  const check = (value) => {
+    if (!value || typeof value !== "object") return;
+    for (const [key, child] of Object.entries(value)) {
+      assert.ok(!["review", "aggregateRating", "shippingDetails", "hasMerchantReturnPolicy"].includes(key), key);
+      check(child);
+    }
+  };
+  check(product);
+  assert.deepEqual(JSON.parse(JSON.stringify(AGENT_STRUCTURED_DATA)), AGENT_STRUCTURED_DATA);
 });
 
 test("all tools and prices are plain initial HTML, accessible without changing layout", () => {

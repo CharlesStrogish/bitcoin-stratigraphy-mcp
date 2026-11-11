@@ -27,3 +27,14 @@ enterprise traffic without affecting the existing dashboard or payment flows.
 the blog. Do not replace static article documents with a client-fetched Markdown
 view or let the dashboard SPA overwrite them after load. Keep future authoring
 changes compatible with the local Markdown/frontmatter workflow.
+
+Keep the B2B Product's structured offers USD-only; retain Lightning pricing in
+the separate MCP software schema and public payment instructions.
+
+**Why:** The user requires strictly USD Product offers for Google structured
+data. Re-labeling a BTC amount as USD would misrepresent pricing.
+
+**How to apply:** Preserve both payment rails operationally. Describe scanner
+credits as a digital service without inventing reviews, shipping, or return
+policies; digital classification alone does not guarantee Google suppresses
+optional merchant warnings.

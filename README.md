@@ -157,7 +157,7 @@ Calendar acceptance is not Bitcoin confirmation; upgrade and independently
 verify `.ots` receipts later. Native clients require prepaid L402 headers or
 a trusted, budget-controlled wallet proxy; they do not pay automatically.
 
-[![Glama TDQS — core catalog](https://img.shields.io/badge/Glama-Grade%20A%20%28Core%20Catalog%29-10b981)](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
+[![Bitcoin Stratigraphy Enterprise Data Engine & Agent Notary Hub MCP connector – tool definition quality and endpoint health on Glama](https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/badges/score.svg)](https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub)
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2026--07--28-orange)](https://modelcontextprotocol.io/specification/2026-07-28)
 [![L402 Enabled](https://img.shields.io/badge/Monetization-L402%20Lightning-yellow)](https://l402.org)
 
@@ -893,7 +893,7 @@ strip script elements; crawlers can inspect the raw README source.
 
 ## Ecosystem Registry Discovery
 
-- [Glama listing and live score](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
+- [Glama listing and live score](https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub)
   · root metadata: [`glama.json`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/glama.json).
 - [Public MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
   · [Agent discovery guide](https://bitcoinstratigraphy.com/llms.txt).

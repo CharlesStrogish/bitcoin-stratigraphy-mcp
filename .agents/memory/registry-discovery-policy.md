@@ -7,6 +7,16 @@ The product has migrated fully to Glama and mcpservers.org. Do not reintroduce
 other directory-specific badges, verification endpoints, dependencies, or
 publication configurations.
 
+The user confirmed the Glama listing has migrated to the enterprise
+`com.bitcoinstratigraphy` domain. Use the supplied enterprise listing and its
+dynamic score badge for current public profile links, not the former
+Replit-based listing.
+
+**Why:** The user confirmed the enterprise listing is active.
+
+**How to apply:** Preserve ownership documents and historical audit evidence;
+update current marketing links when touched.
+
 **Why:** The user explicitly deprecated the former directory integration and
 requested removal across the repository, including old documentation.
 

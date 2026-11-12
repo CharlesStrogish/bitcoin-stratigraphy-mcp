@@ -282,7 +282,7 @@ Public references:
   — use an MCP client; this is not a conventional HTML landing page.
 - [Server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json)
 - [Agent discovery guide](https://bitcoinstratigraphy.com/llms.txt)
-- [Glama tool catalog and current rating](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
+- [Glama tool catalog and current rating](https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub)
 
 I'd welcome technical feedback on the payment/proof trust boundaries:
 **what evidence would you require an autonomous client to retain before

@@ -316,20 +316,20 @@ flowchart TB
     class s_get,s_digest,s_diff,s_range,p_verify,p_get,p_submit,p_notarize,p_ground,m_status,m_broadcast,pay_info,audit paid;
     class p_attenuate credential;
 
-    click s_list href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/stratigraphy.list" "Dataset discovery reference" _blank
-    click s_get href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/stratigraphy.get" "Indexed telemetry reference" _blank
-    click s_digest href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/stratigraphy.get_digest" "Compact digest reference" _blank
-    click s_diff href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/stratigraphy.get_diff" "Stratum comparison reference" _blank
-    click s_range href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/stratigraphy.get_range" "Bounded range reference" _blank
-    click p_attenuate href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/proof.attenuate" "Macaroon attenuation reference" _blank
-    click p_verify href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/proof.verify" "Proof verification reference" _blank
-    click p_get href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/proof.get_by_hash" "Proof and receipt lookup reference" _blank
-    click p_list href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/proof.list" "Attestation catalog reference" _blank
-    click p_submit href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/proof.submit" "Proof registration reference" _blank
-    click p_ground href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/proof.ground" "Signed state anchor reference" _blank
-    click m_status href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/mesh.get_status" "Mesh status reference" _blank
-    click m_broadcast href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/mesh.broadcast" "Outbound snapshot broadcast reference" _blank
-    click pay_info href "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy/tools/payment.get_info" "Live pricing and payment reference" _blank
+    click s_list href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/stratigraphy.list" "Dataset discovery reference" _blank
+    click s_get href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/stratigraphy.get" "Indexed telemetry reference" _blank
+    click s_digest href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/stratigraphy.get_digest" "Compact digest reference" _blank
+    click s_diff href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/stratigraphy.get_diff" "Stratum comparison reference" _blank
+    click s_range href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/stratigraphy.get_range" "Bounded range reference" _blank
+    click p_attenuate href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/proof.attenuate" "Macaroon attenuation reference" _blank
+    click p_verify href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/proof.verify" "Proof verification reference" _blank
+    click p_get href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/proof.get_by_hash" "Proof and receipt lookup reference" _blank
+    click p_list href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/proof.list" "Attestation catalog reference" _blank
+    click p_submit href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/proof.submit" "Proof registration reference" _blank
+    click p_ground href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/proof.ground" "Signed state anchor reference" _blank
+    click m_status href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/mesh.get_status" "Mesh status reference" _blank
+    click m_broadcast href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/mesh.broadcast" "Outbound snapshot broadcast reference" _blank
+    click pay_info href "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub/tools/payment.get_info" "Live pricing and payment reference" _blank
 ```
 
 **Legend:** green = free discovery/query operations; orange = paid execution;
@@ -349,7 +349,7 @@ Always check current payment availability and prices at runtime.
 | `payment.*` | `get_info` | Discover payment terms or use the authenticated settlement mode. Price queries do not create invoices or authorize spending. |
 
 All tool-reference links are also available from the
-[Glama tool catalog](https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy)
+[Glama tool catalog](https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub)
 and [public MCP server card](https://bitcoinstratigraphy.com/.well-known/mcp/server-card.json).
 The definitive callable schemas come from the live MCP `tools/list` response,
 not from these diagrams or a cached registry page.

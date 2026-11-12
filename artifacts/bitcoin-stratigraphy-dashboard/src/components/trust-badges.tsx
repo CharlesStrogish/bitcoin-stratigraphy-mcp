@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 const GLAMA_URL =
-  "https://glama.ai/mcp/connectors/app.replit.bitcoin-stratigraphy-dashboard--charlesstrogish/bitcoin-stratigraphy";
+  "https://glama.ai/mcp/connectors/com.bitcoinstratigraphy/bitcoin-stratigraphy-enterprise-data-engine-and-agent-notary-hub";
 const MCPSERVERS_URL =
   "https://mcpservers.org/servers/charlesstrogish/bitcoin-stratigraphy-mcp";
 
@@ -23,7 +23,7 @@ export function TrustBadges({ extra }: { extra?: ReactNode }) {
         >
           <img
             src={`${GLAMA_URL}/badges/score.svg`}
-            alt="Glama Score Badge"
+            alt="Bitcoin Stratigraphy Enterprise Data Engine & Agent Notary Hub MCP connector – tool definition quality and endpoint health on Glama"
             loading="lazy"
           />
         </a>

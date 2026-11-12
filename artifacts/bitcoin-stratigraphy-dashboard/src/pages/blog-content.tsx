@@ -170,7 +170,7 @@ export default function BlogContent({
         )}
       </main>
       <footer className="blog-foot">
-        <span>Bitcoin Stratigraphy</span>
+        <a href={BASE}>Bitcoin Stratigraphy</a>
         <a href={`${BASE}blog/`}>Blog index</a>
       </footer>
     </div>

@@ -157,6 +157,21 @@ test("index has a Blog schema, native article links and prefixed asset/navigatio
   assert.match(html, /href="\/preview\/developers"/);
 });
 
+test("blog footer has crawlable home and index anchors on index and article pages", () => {
+  const posts = [parseBlogPost(fixture())];
+  for (const base of ["/", "/preview/"]) {
+    for (const post of [undefined, posts[0]]) {
+      const html = renderBlogDocument(posts, post, base);
+      const footer = html.match(/<footer class="blog-foot">([\s\S]*?)<\/footer>/);
+      assert.ok(footer, "shared blog footer is rendered in initial HTML");
+      assert.equal(
+        footer[1],
+        `<a href="${base}">Bitcoin Stratigraphy</a><a href="${base}blog/">Blog index</a>`,
+      );
+    }
+  }
+});
+
 test("build emits all blog documents and extends, rather than replaces, the sitemap", async () => {
   const emitted = [];
   blogPlugin().generateBundle.call({

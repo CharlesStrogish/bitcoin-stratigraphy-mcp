@@ -115,10 +115,10 @@ export default function BlogContent({
           <>
             <header className="blog-index-head">
               <p className="blog-kicker">
-                <span className="blog-rule" aria-hidden="true" /> Field notes
+                <span className="blog-rule" aria-hidden="true" /> ENTERPRISE AI COMPLIANCE
               </p>
               <h1 className="blog-title">
-                Engineering <span>Blog</span>
+                The Zero-Knowledge <span>Log</span>
               </h1>
               <p className="blog-count" data-testid="text-post-count">
                 {posts.length} {posts.length === 1 ? "entry" : "entries"}

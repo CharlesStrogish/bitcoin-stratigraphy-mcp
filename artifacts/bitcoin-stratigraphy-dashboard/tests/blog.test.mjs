@@ -151,7 +151,8 @@ test("index has a Blog schema, native article links and prefixed asset/navigatio
   const html = renderBlogDocument(posts, undefined, "/preview/");
   assert.equal(blogSchema()["@type"], "Blog");
   assert.match(html, /<main/);
-  assert.match(html, /<h1/);
+  assert.match(html, /<h1 class="blog-title">The Zero-Knowledge <span>Log<\/span><\/h1>/);
+  assert.match(html, /<p class="blog-kicker">.*ENTERPRISE AI COMPLIANCE<\/p>/);
   assert.ok(html.includes(`href="/preview/blog/${posts[0].slug}/"`));
   assert.match(html, /href="\/preview\/favicon.png"/);
   assert.match(html, /href="\/preview\/developers"/);

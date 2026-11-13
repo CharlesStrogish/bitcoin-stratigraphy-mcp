@@ -5,30 +5,6 @@ slug: "langchain-crewai-eu-ai-act-compliance"
 description: "How enterprise engineering teams are using L402 micropayments, NIP-98 kill switches, and a Zero-Knowledge flight recorder to secure autonomous AI swarms against regulatory failure."
 ---
 
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "BlogPosting",
-  "mainEntityOfPage": {
-    "@type": "WebPage",
-    "@id": "https://bitcoinstratigraphy.com/blog/langchain-crewai-eu-ai-act-compliance"
-  },
-  "headline": "Securing LangChain & CrewAI Swarms: Drop-In EU AI Act Compliance via Zero-Knowledge MCPs",
-  "description": "How enterprise engineering teams are using L402 micropayments, NIP-98 kill switches, and a Zero-Knowledge flight recorder to secure autonomous AI swarms against regulatory failure.",
-  "author": {
-    "@type": "Person",
-    "name": "Charles R. Strogish",
-    "url": "https://bitcoinstratigraphy.com"
-  },  
-  "publisher": {
-    "@type": "Organization",
-    "name": "Bitcoin Stratigraphy"
-  },
-  "datePublished": "2026-11-14",
-  "dateModified": "2026-11-14"
-}
-</script>
-
 As enterprise engineering teams scale autonomous AI swarms using orchestration frameworks like LangChain, AutoGPT, and CrewAI, a massive structural vulnerability is emerging in production environments: **liability without traceability.**
 
 Deploying a multi-agent swarm to autonomously execute tasks, query proprietary corporate databases, and trigger external APIs without a mathematically verifiable chain-of-custody is a direct violation of emerging global regulatory standards, most notably Article 12 of the EU AI Act. 

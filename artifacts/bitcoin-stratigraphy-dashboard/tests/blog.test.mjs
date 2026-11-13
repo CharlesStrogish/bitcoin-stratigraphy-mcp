@@ -158,6 +158,22 @@ test("index has a Blog schema, native article links and prefixed asset/navigatio
   assert.match(html, /href="\/preview\/developers"/);
 });
 
+test("the completed LangChain and CrewAI article leads the blog index", () => {
+  const posts = readBlogPosts();
+  const post = posts[0];
+  assert.equal(post.slug, "langchain-crewai-eu-ai-act-compliance");
+  const index = renderBlogDocument(posts);
+  const cards = [...index.matchAll(/data-testid="card-post-([^"]+)"/g)];
+  assert.equal(cards[0][1], post.slug);
+  assert.ok(index.includes(`href="/blog/${post.slug}/"`));
+  const article = renderBlogDocument(posts, post);
+  assert.match(article, /The Emerging Threat: Liability Without Traceability/);
+  assert.match(article, /Enter the Zero-Knowledge Flight Recorder/);
+  assert.match(article, /class="language-python"/);
+  assert.match(article, /Scale Safely with Bitcoin Stratigraphy/);
+  assert.match(article, /href="https:\/\/github\.com\/CharlesStrogish\/zk-flight-recorder-template"/);
+});
+
 test("blog footer has crawlable home and index anchors on index and article pages", () => {
   const posts = [parseBlogPost(fixture())];
   for (const base of ["/", "/preview/"]) {

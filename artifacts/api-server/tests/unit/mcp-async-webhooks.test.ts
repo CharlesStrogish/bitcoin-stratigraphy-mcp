@@ -120,6 +120,88 @@ type Delivery = {
   raw: Buffer;
   body: McpTaskWebhookPayload;
 };
+
+test("unserializable task results deliver a signed standard failure and release capacity", { timeout: 5_000 }, async () => {
+  const cyclic: Record<string, unknown> = {};
+  cyclic.self = cyclic;
+  for (const result of [
+    { value: 1n },
+    cyclic,
+    { toJSON() { throw new Error("private tool output"); } },
+  ]) {
+    const deliveries: Array<{ body: string; headers: Record<string, string> }> = [];
+    const signingKey = generateKeyPairSync("ed25519").privateKey;
+    const runner = testRunner({
+      signingKey,
+      maxPending: 1,
+      transport: async ({ body, headers }) => {
+        deliveries.push({ body, headers });
+        return 200;
+      },
+    });
+    const accepted = runner.accept({
+      tool: "proof.submit",
+      webhookUrl: "https://agent.example.com/private?secret=hidden",
+      requestId: 42,
+      execute: async () => ({ result }),
+    });
+    assert.equal(runner.hasCapacity(), false);
+    await runner.drain();
+    assert.equal(runner.hasCapacity(), true);
+    assert.equal(deliveries.length, 1);
+    const { body, headers } = deliveries[0]!;
+    const payload = JSON.parse(body);
+    assert.equal(payload.task_id, accepted.task_id);
+    assert.equal(payload.request_id, 42);
+    assert.equal(payload.status, "failed");
+    assert.equal(payload.result, undefined);
+    assert.deepEqual(payload.error, {
+      code: -32603,
+      message: "Asynchronous task result serialization failed",
+    });
+    assert.equal(verify(
+      null,
+      Buffer.from(`${accepted.task_id}.${headers["Webhook-Timestamp"]}.${body}`),
+      createPublicKey(signingKey),
+      Buffer.from(headers["Webhook-Signature"]!.split(",")[1]!, "base64"),
+    ), true);
+  }
+});
+
+test("unexpected background delivery rejection is contained and later tasks still run", { timeout: 5_000 }, async () => {
+  const recorded: unknown[] = [];
+  let failClock = true;
+  let clockCalls = 0;
+  let deliveries = 0;
+  const runner = testRunner({
+    maxPending: 1,
+    now: () => {
+      // Accept succeeds, but completion fails before serialization/retries.
+      if (++clockCalls > 1 && failClock) throw new Error("clock failed");
+      return Date.now();
+    },
+    transport: async () => { deliveries += 1; return 200; },
+    logger: {
+      ...testLogger,
+      error: (fields: unknown) => { recorded.push(fields); },
+    } as NonNullable<McpAsyncTaskRunnerOptions["logger"]>,
+  });
+  const accept = () => runner.accept({
+    tool: "proof.submit",
+    webhookUrl: "https://agent.example.com/callback",
+    execute: async () => ({ result: { content: [] } }),
+  });
+  accept();
+  await runner.drain();
+  assert.equal(runner.hasCapacity(), true);
+  assert.equal(deliveries, 0);
+  assert.equal(recorded.length, 1);
+  failClock = false;
+  accept();
+  await runner.drain();
+  assert.equal(deliveries, 1);
+  assert.equal(runner.hasCapacity(), true);
+});
 const deliveries: Delivery[] = [];
 const receiverStatuses: number[] = [];
 const receiver = http.createServer((req, res) => {

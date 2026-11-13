@@ -10,12 +10,17 @@ import {
  * identity. The signed `u` tag must equal NIP98_PUBLIC_ORIGIN (or the proxied
  * request origin) joined with req.originalUrl, the URL the client requested.
  */
-export function requestNip98Url(req: Request): string {
-  const configuredOrigin = process.env.NIP98_PUBLIC_ORIGIN;
-  const origin = configuredOrigin
-    ? new URL(configuredOrigin).origin
-    : `${req.protocol}://${req.get("host")}`;
-  return new URL(req.originalUrl, `${origin}/`).toString();
+export function requestNip98Url(req: Request): string | null {
+  try {
+    const configuredOrigin = process.env.NIP98_PUBLIC_ORIGIN;
+    const origin = configuredOrigin
+      ? new URL(configuredOrigin).origin
+      : `${req.protocol}://${req.get("host")}`;
+    return new URL(req.originalUrl, `${origin}/`).toString();
+  } catch {
+    // An unusable origin is invalid authentication, never a server error.
+    return null;
+  }
 }
 
 /**
@@ -50,10 +55,12 @@ export function verifyRequestAgent(
 ): { provided: boolean; identity?: AgentIdentity } {
   const authorization = requestNip98Authorization(req);
   if (!authorization) return { provided: false };
+  const url = requestNip98Url(req);
+  if (url === null) return { provided: true };
   const identity = reputation.verifyNip98Authorization({
     authorization,
     method: req.method,
-    url: requestNip98Url(req),
+    url,
     nowSeconds: Math.floor(nowMs / 1_000),
     payload,
   });
@@ -70,12 +77,14 @@ export function verifyRequestNip98Signer(
 ): { provided: false } | { provided: true; pubkey: string | null } {
   const authorization = requestNip98Authorization(req);
   if (!authorization) return { provided: false };
+  const url = requestNip98Url(req);
+  if (url === null) return { provided: true, pubkey: null };
   return {
     provided: true,
     pubkey: verifyNip98Signer({
       authorization,
       method: req.method,
-      url: requestNip98Url(req),
+      url,
       nowSeconds: Math.floor(nowMs / 1_000),
       payload: requestNip98Payload(req),
     }),

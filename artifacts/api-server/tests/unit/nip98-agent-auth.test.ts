@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, createHmac } from "node:crypto";
 import { once } from "node:events";
+import { request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 import express from "express";
@@ -17,6 +18,12 @@ import {
 } from "../../src/lib/subscription-pass";
 import { createL402Middleware } from "../../src/middleware/l402";
 import type { SettlementRouter } from "../../src/services/settlement";
+import {
+  requestNip98Url,
+  verifyRequestAgent,
+  verifyRequestNip98Signer,
+} from "../../src/lib/nip98-request";
+import type { AgentReputationService } from "../../src/services/agentReputation";
 
 const sha256Hex = (value: string | Uint8Array) =>
   createHash("sha256").update(value).digest("hex");
@@ -192,6 +199,80 @@ async function startGatedServer(options: { captureRawBody?: boolean } = {}) {
     },
   };
 }
+
+test("malformed NIP-98 origins fail closed in both helpers and return 401 before payment", async () => {
+  const previousOrigin = process.env.NIP98_PUBLIC_ORIGIN;
+  const server = await startGatedServer();
+  try {
+    delete process.env.NIP98_PUBLIC_ORIGIN;
+    const authorization = signNip98({ url: server.url, payload: BODY });
+    const req = {
+      protocol: "http",
+      originalUrl: ROUTE,
+      method: "POST",
+      get: () => "[",
+      header: () => authorization,
+    } as unknown as express.Request;
+    const reputation = {
+      verifyNip98Authorization() {
+        assert.fail("an invalid origin must never reach signature verification");
+      },
+    } as unknown as AgentReputationService;
+    for (const configuredOrigin of [undefined, "http://["]) {
+      if (configuredOrigin === undefined) delete process.env.NIP98_PUBLIC_ORIGIN;
+      else process.env.NIP98_PUBLIC_ORIGIN = configuredOrigin;
+      assert.equal(requestNip98Url(req), null);
+      assert.deepEqual(verifyRequestAgent(req, reputation, ISSUED_AT), {
+        provided: true,
+      });
+      assert.deepEqual(verifyRequestNip98Signer(req, ISSUED_AT), {
+        provided: true,
+        pubkey: null,
+      });
+      for (const placement of ["authorization", "nostr"] as const) {
+        // Use node:http: fetch can ignore Host overrides, testing a valid
+        // origin instead of the malformed bytes that triggered the audit.
+        const response = await new Promise<{
+          status: number | undefined;
+          body: unknown;
+          challenged: boolean;
+        }>((resolve, reject) => {
+          const request = httpRequest(server.url, {
+            method: "POST",
+            headers: {
+              Host: "[",
+              "Content-Type": "application/json",
+              [placement === "authorization" ? "Authorization" : "X-Nostr-Authorization"]: authorization,
+            },
+          }, (response) => {
+            const chunks: Buffer[] = [];
+            response.on("data", (chunk: Buffer) => chunks.push(chunk));
+            response.on("error", reject);
+            response.on("end", () => resolve({
+              status: response.statusCode,
+              body: JSON.parse(Buffer.concat(chunks).toString("utf8")),
+              challenged: response.headers["www-authenticate"] !== undefined,
+            }));
+          });
+          request.on("error", reject);
+          request.end(BODY);
+        });
+        assert.equal(response.status, 401, `${configuredOrigin} ${placement}`);
+        assert.deepEqual(response.body, INVALID);
+        assert.equal(response.challenged, false);
+      }
+    }
+    assert.deepEqual(server.calls, {
+      invoices: 0,
+      verifications: 0,
+      executions: 0,
+    });
+  } finally {
+    if (previousOrigin === undefined) delete process.env.NIP98_PUBLIC_ORIGIN;
+    else process.env.NIP98_PUBLIC_ORIGIN = previousOrigin;
+    await server.close();
+  }
+});
 
 test("a valid NIP-98 signature binds its pubkey as the authenticated agent_id on every use", async () => {
   const server = await startGatedServer();

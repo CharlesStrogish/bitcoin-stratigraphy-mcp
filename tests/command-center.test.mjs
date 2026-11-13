@@ -188,17 +188,26 @@ test("static enterprise licensing replaces the removed telemetry module", () => 
   }
 });
 
-test("homepage keeps CSV and PDF together in a balanced responsive action grid", () => {
-  assert.match(app, /className="header-actions homepage-actions"/);
-  const exports = app.match(
-    /<div\s+className="header-exports"\s+role="group"\s+aria-label="Export options"\s*>([\s\S]*?)<\/div>/,
+test("homepage keeps approved navigation in a balanced responsive action grid", () => {
+  const actions = app.match(
+    /<div className="header-actions homepage-actions">([\s\S]*?)<\/div>/,
   );
-  assert.ok(exports, "exports share one grid cell");
-  assert.match(exports[1], /onClick=\{onExport\}/);
-  assert.match(exports[1], /onClick=\{\(\) => window\.print\(\)\}/);
-  assert.match(exports[1], /> CSV/);
-  assert.match(exports[1], /> PDF/);
-  assert.equal(exports[1].match(/<button/g)?.length, 2);
+  assert.ok(actions, "homepage navigation shares the responsive action grid");
+  assert.match(actions[1], /href=\{LIVE_ESCROW_HASH\}\s+onClick=\{jumpToLiveEscrowTerminal\}/);
+  for (const component of [
+    "EnterpriseLicenseLink",
+    "Article12VerifierLink",
+    "WhitepaperLink",
+  ]) assert.ok(actions[1].includes(`<${component} />`), component);
+  for (const route of [
+    "#article12-sandbox", "manifesto", "security", "ceremony",
+    "docs", "blog/", "standard", "simulator",
+  ]) assert.ok(
+    actions[1].includes('href={`${import.meta.env.BASE_URL}' + route + '`}'),
+    `navigation preserves ${route}`,
+  );
+  assert.match(actions[1], /href="#mcp-tools"/);
+  assert.doesNotMatch(actions[1], /<button|onExport|window\.print|header-exports/);
   assert.match(
     css,
     /\.header-actions\.homepage-actions\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/,
@@ -207,7 +216,6 @@ test("homepage keeps CSV and PDF together in a balanced responsive action grid",
     css,
     /@media \(max-width: 767px\)\s*\{\s*\.header-actions\.homepage-actions\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
   );
-  assert.match(css, /\.header-exports\s*\{[^}]*grid-column: span 2;/);
   assert.match(
     css,
     /\.live-escrow-section > \[data-testid="link-compliance-guide"\]\s*\{[^}]*margin: 20px 0 16px/,
@@ -216,7 +224,7 @@ test("homepage keeps CSV and PDF together in a balanced responsive action grid",
 
 test("homepage action grid links to the Manifesto and Security Audit", () => {
   const actions = app.split('className="header-actions homepage-actions"')[1]
-    .split('className="header-exports"')[0];
+    .split("</div>")[0];
   assert.match(actions, /href=\{`\$\{import\.meta\.env\.BASE_URL\}manifesto`\}[\s\S]*?<ScrollText[^>]*\/> Manifesto/);
   assert.match(actions, /href=\{`\$\{import\.meta\.env\.BASE_URL\}security`\}[\s\S]*?<ShieldCheck[^>]*\/> Security Audit/);
   const manifestoCss = read(`${dashboard}/src/pages/manifesto.css`);

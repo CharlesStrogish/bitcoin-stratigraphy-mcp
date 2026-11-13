@@ -493,7 +493,7 @@ export function createMcpAsyncTaskRunner(
 
   async function deliver(task: QueuedTask, outcome: McpTaskOutcome) {
     const failed = "error" in outcome;
-    const payload: McpTaskWebhookPayload = {
+    let payload: McpTaskWebhookPayload = {
       task_id: task.id,
       status: failed ? "failed" : "completed",
       tool: task.tool,
@@ -502,7 +502,30 @@ export function createMcpAsyncTaskRunner(
       completed_at: new Date(now()).toISOString(),
       ...(failed ? { error: outcome.error } : { result: outcome.result }),
     };
-    const body = JSON.stringify(payload);
+    let body: string;
+    try {
+      body = JSON.stringify(payload);
+    } catch {
+      // Tool output may contain BigInt, cycles or throwing toJSON hooks.
+      // Send a normal signed failure, never retry an unserializable result.
+      log.error(
+        { taskId: task.id, tool: task.tool, reason: "serialization failed" },
+        "MCP async task execution failed",
+      );
+      payload = {
+        task_id: task.id,
+        status: "failed",
+        tool: task.tool,
+        request_id: task.requestId,
+        created_at: payload.created_at,
+        completed_at: payload.completed_at,
+        error: {
+          code: ErrorCode.InternalError,
+          message: "Asynchronous task result serialization failed",
+        },
+      };
+      body = JSON.stringify(payload);
+    }
     // Never log the callback path or query string: either may carry secrets.
     const context = {
       taskId: task.id,
@@ -584,9 +607,17 @@ export function createMcpAsyncTaskRunner(
     while (running < maxConcurrent && queue.length > 0) {
       const task = queue.shift()!;
       running += 1;
-      const work: Promise<void> = run(task).finally(() => {
-        inflight.delete(work);
-      });
+      const work: Promise<void> = run(task)
+        .finally(() => {
+          inflight.delete(work);
+        })
+        .catch((error: unknown) => {
+          // Last-resort containment for failures outside transport retries.
+          log.error(
+            { taskId: task.id, tool: task.tool, reason: errorReason(error) },
+            "MCP async task background delivery failed",
+          );
+        });
       inflight.add(work);
     }
   }

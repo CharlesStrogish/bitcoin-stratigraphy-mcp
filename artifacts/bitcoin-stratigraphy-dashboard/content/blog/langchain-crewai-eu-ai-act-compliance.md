@@ -1,6 +1,7 @@
 ---
 title: "Securing LangChain & CrewAI Swarms: Drop-In EU AI Act Compliance via Zero-Knowledge MCPs"
 date: "2026-11-14"
+slug: "langchain-crewai-eu-ai-act-compliance"
 description: "How enterprise engineering teams are using L402 micropayments, NIP-98 kill switches, and a Zero-Knowledge flight recorder to secure autonomous AI swarms against regulatory failure."
 ---
 

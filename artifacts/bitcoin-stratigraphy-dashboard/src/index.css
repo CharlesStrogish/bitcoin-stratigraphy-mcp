@@ -1698,7 +1698,7 @@ h1,
 .header-actions {
   flex-wrap: wrap;
 }
-/* Balance the odd navigation count before the separate export row. */
+/* Keep the final navigation link balanced without a separate export row. */
 .homepage-header-main {
   flex-direction: column;
   align-items: stretch;
@@ -1725,18 +1725,8 @@ h1,
 .live-escrow-section > [data-testid="link-compliance-guide"] svg {
   flex-shrink: 0;
 }
-.homepage-actions > .control-button:nth-last-child(2):nth-child(odd) {
-  grid-column: span 2;
-}
-.homepage-actions > .header-exports {
+.homepage-actions > .control-button:last-child:nth-child(odd) {
   grid-column: 1 / -1;
-}
-.header-exports {
-  display: grid;
-  grid-column: span 2;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  min-width: 0;
 }
 @media (max-width: 767px) {
   .header-actions.homepage-actions {

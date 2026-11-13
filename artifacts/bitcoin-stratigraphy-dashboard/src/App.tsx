@@ -2,11 +2,8 @@ import { type MouseEvent, useEffect } from "react";
 import {
   QueryClient,
   QueryClientProvider,
-  useQuery,
 } from "@tanstack/react-query";
-import type { StratigraphyEntry } from "@workspace/api-client-react";
-import stratigraphyDataset from "../../api-server/data/stratigraphy.json";
-import { Check, Download, FileText, KeyRound, LayoutGrid, Play, ScrollText, ShieldCheck, Terminal, Zap } from "lucide-react";
+import { Check, FileText, KeyRound, LayoutGrid, Play, ScrollText, ShieldCheck, Terminal, Zap } from "lucide-react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -42,7 +39,6 @@ const queryClient = new QueryClient({
   },
 });
 
-const EXPECTED_DATASET_LENGTH = 422;
 const LIVE_ESCROW_TERMINAL_ID = "live-escrow-terminal";
 const LIVE_ESCROW_HASH = `#${LIVE_ESCROW_TERMINAL_ID}`;
 
@@ -77,90 +73,7 @@ function jumpToLiveEscrowTerminal(event: MouseEvent<HTMLAnchorElement>) {
   revealLiveEscrowTerminal();
 }
 
-type RawStratigraphyEntry = Omit<StratigraphyEntry, "quantitative_alpha"> & {
-  quantitative_alpha?: Partial<StratigraphyEntry["quantitative_alpha"]>;
-};
-
-function supplyQuantitativeAlpha(
-  entry: RawStratigraphyEntry,
-  previousMultiplier: number,
-): StratigraphyEntry {
-  const match = /(\d+(?:\.\d+)?)\s*[x×]\s*away/i.exec(entry.title);
-  const derivedMultiplier = match ? Number(match[1]) : 0;
-  const multiplier =
-    typeof entry.quantitative_alpha?.target_multiplier === "number"
-      ? entry.quantitative_alpha.target_multiplier
-      : derivedMultiplier || previousMultiplier;
-
-  return {
-    ...entry,
-    quantitative_alpha: {
-      target_multiplier: multiplier,
-      difficulty_epoch_progress:
-        entry.quantitative_alpha?.difficulty_epoch_progress ??
-        `${(((((entry.day - 1) % 14) + 1) / 14) * 100).toFixed(2)}%`,
-      thermodynamic_signal:
-        entry.quantitative_alpha?.thermodynamic_signal ??
-        (multiplier >= 120
-          ? "extended-target-distance"
-          : multiplier >= 100
-            ? "elevated-target-distance"
-            : multiplier > 0
-              ? "compressed-target-distance"
-              : "signal-unavailable"),
-    },
-  };
-}
-
-let previousMultiplier = 0;
-const completeDataset = (stratigraphyDataset as RawStratigraphyEntry[]).map(
-  (entry) => {
-    const suppliedEntry = supplyQuantitativeAlpha(entry, previousMultiplier);
-    previousMultiplier = suppliedEntry.quantitative_alpha.target_multiplier;
-    return suppliedEntry;
-  },
-);
-
-async function loadCompleteDataset() {
-  if (
-    completeDataset.length !== EXPECTED_DATASET_LENGTH ||
-    completeDataset[0]?.day !== 1 ||
-    completeDataset.at(-1)?.day !== EXPECTED_DATASET_LENGTH
-  ) {
-    throw new Error("The primary stratigraphy dataset is incomplete");
-  }
-  return completeDataset;
-}
-
-function csvCell(value: unknown) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
-}
-
-function downloadCsv(rows: StratigraphyEntry[]) {
-  const header = ["day", "title", "video_id", "transcript_summary"];
-  const body = rows.map((row) =>
-    [row.day, row.title, row.video_id, row.transcript_summary]
-      .map(csvCell)
-      .join(","),
-  );
-  const blob = new Blob([[header.join(","), ...body].join("\n")], {
-    type: "text/csv;charset=utf-8",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "bitcoin-stratigraphy.csv";
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
-function Header({
-  onExport,
-  rowCount,
-}: {
-  onExport: () => void;
-  rowCount: number;
-}) {
+function Header() {
   return (
     <header className="topbar">
       <div className="eyebrow">
@@ -255,28 +168,6 @@ function Header({
           >
             <LayoutGrid size={14} aria-hidden="true" /> 19-Tool Capacity
           </a>
-          <div
-            className="header-exports"
-            role="group"
-            aria-label="Export options"
-          >
-            <button
-              className="control-button"
-              onClick={onExport}
-              disabled={!rowCount}
-            >
-              <Download size={14} /> CSV
-            </button>
-            <button
-              className="control-button"
-              onClick={() => window.print()}
-              aria-label="Export as PDF"
-              title="Export as PDF"
-              disabled={!rowCount}
-            >
-              <FileText size={14} /> PDF
-            </button>
-          </div>
         </div>
       </div>
     </header>
@@ -284,12 +175,6 @@ function Header({
 }
 
 function Home() {
-  const query = useQuery({
-    queryKey: ["stratigraphy", "complete-primary-dataset"],
-    queryFn: loadCompleteDataset,
-    staleTime: Infinity,
-  });
-  const allRows = query.data || [];
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
@@ -314,10 +199,7 @@ function Home() {
     <div className="app-shell">
       <div className="grain" />
       <div className="shell-inner">
-        <Header
-          onExport={() => downloadCsv(allRows)}
-          rowCount={allRows.length}
-        />
+        <Header />
         <section
           id={LIVE_ESCROW_TERMINAL_ID}
           className="live-escrow-section"

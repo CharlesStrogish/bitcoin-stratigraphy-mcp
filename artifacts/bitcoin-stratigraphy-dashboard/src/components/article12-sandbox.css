@@ -195,6 +195,11 @@
   font-size: 10px;
   color: hsl(var(--muted-foreground));
 }
+.a12s-term-out .a12s-success {
+  margin-top: 12px;
+  color: hsl(var(--a12s-green));
+  font-weight: 600;
+}
 .a12s-cta {
   display: flex;
   align-items: center;
@@ -211,6 +216,13 @@
   text-align: center;
   text-decoration: none;
   animation: a12s-in 0.4s ease both;
+}
+.a12s-cta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.a12s-cta svg {
+  flex-shrink: 0;
 }
 .a12s-cta:hover {
   filter: brightness(1.08);

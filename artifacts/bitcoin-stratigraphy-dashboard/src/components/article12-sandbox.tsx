@@ -216,24 +216,28 @@ export function Article12Sandbox() {
               </ol>
             )}
             {phase === "secured" && (
-              <p className="a12s-note" data-testid="text-simulation-note">
-                Visual demonstration only. No digest, anchor, proof, or receipt was produced.
-              </p>
+              <>
+                <p className="a12s-success" data-testid="text-simulation-success">
+                  ✓ L402 ZK-Proof Generated. Simulation Complete.
+                </p>
+                <p className="a12s-note" data-testid="text-simulation-note">
+                  Visual demonstration only. No digest, anchor, proof, or receipt was produced.
+                </p>
+              </>
             )}
           </div>
         </div>
       </div>
 
-      {phase === "secured" && (
-        <a
-          className="a12s-cta"
-          href={`${import.meta.env.BASE_URL}enterprise`}
-          data-testid="link-sandbox-cta"
-        >
-          Deploy Fiduciary Flight Recorders to your swarm today.
-          <ArrowRight size={16} aria-hidden="true" />
-        </a>
-      )}
+      {/* Replace this placeholder with the permanent Stripe checkout link. */}
+      <a
+        className="a12s-cta"
+        href="#stripe-checkout"
+        data-testid="link-sandbox-cta"
+      >
+        <span>Deploy to Production: Secure $500 Enterprise API Block</span>
+        <ArrowRight size={16} aria-hidden="true" />
+      </a>
     </section>
   );
 }

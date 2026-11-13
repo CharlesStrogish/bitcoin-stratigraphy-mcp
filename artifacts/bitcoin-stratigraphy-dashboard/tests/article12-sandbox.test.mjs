@@ -18,7 +18,8 @@ test("the homepage sandbox preserves the requested log, audit, warning and pipel
     "[x] Constructing RFC 6962 Merkle Flight Record...",
     "[x] Anchoring to OpenTimestamps...",
     "[x] Zero-Knowledge Indemnity Receipt Forged.",
-    "Deploy Fiduciary Flight Recorders to your swarm today.",
+    "✓ L402 ZK-Proof Generated. Simulation Complete.",
+    "Deploy to Production: Secure $500 Enterprise API Block",
   ]) assert.ok(source.includes(copy), `required copy: ${copy}`);
   assert.match(source, /agent: "gpt-4", action: "execute_trade", timestamp: "2026-11-08"/);
 });
@@ -55,15 +56,19 @@ test("the terminal is accessible, responsive and respects reduced motion", () =>
   assert.match(css, /a12s-pulse 1\.4s/);
 });
 
-test("the sandbox preserves live-terminal priority and links to the enterprise flow", () => {
+test("the sandbox preserves live-terminal priority and exposes the checkout CTA", () => {
   const terminal = app.indexOf("<EscrowTerminal />");
   const sandbox = app.indexOf("<Article12Sandbox />");
   const commands = app.indexOf("<CommandCenter />");
   assert.ok(terminal >= 0 && sandbox > terminal && commands > sandbox);
   assert.ok(app.includes('data-testid="link-article12-sandbox"'));
   assert.ok(app.includes('href={`${import.meta.env.BASE_URL}#article12-sandbox`}'));
-  assert.ok(source.includes('href={`${import.meta.env.BASE_URL}enterprise`}'));
+  assert.ok(source.includes('href="#stripe-checkout"'));
+  assert.ok(source.includes("Replace this placeholder with the permanent Stripe checkout link."));
   assert.ok(source.includes('window.location.hash !== `#${ARTICLE12_SANDBOX_ID}`'));
   assert.match(source, /section\.current\?\.scrollIntoView/);
-  assert.match(source, /phase === "secured" && \(\s*<a/);
+  assert.match(source, /phase === "secured" && \(\s*<>\s*<p className="a12s-success"/);
+  assert.match(source, /<\/div>\s*{\/\* Replace this placeholder[^]*?<a\s+className="a12s-cta"/);
+  assert.match(css, /\.a12s-cta\s*\{[^}]*background: hsl\(var\(--primary\)\);[^}]*color: hsl\(var\(--primary-foreground\)\)/s);
+  assert.match(css, /\.a12s-cta svg\s*\{\s*flex-shrink: 0;/);
 });

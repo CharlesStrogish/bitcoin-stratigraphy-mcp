@@ -133,6 +133,18 @@ test("article initial head includes frontmatter metadata, canonical, social tags
   assert.doesNotMatch(html, /type="module"|src="[^"]+\.js"|id="root"/);
 });
 
+test("individual posts use log branding without changing navigation or styling hooks", () => {
+  const posts = [parseBlogPost(fixture())];
+  for (const base of ["/", "/preview/"]) {
+    const html = renderBlogDocument(posts, posts[0], base);
+    assert.ok(html.includes(`class="blog-back" href="${base}blog/" data-testid="link-blog-back"`));
+    assert.match(html, /<span aria-hidden="true">←<\/span> All log entries<\/a>/);
+    assert.match(html, /<p class="blog-kicker"><span class="blog-rule" aria-hidden="true"><\/span> ZERO-KNOWLEDGE LOG/);
+    assert.match(html, /<span class="blog-dot" aria-hidden="true">\/<\/span><time/);
+    assert.doesNotMatch(html, /All field notes|Engineering\s*log/);
+  }
+});
+
 test("frontmatter is escaped in head HTML and cannot close the JSON-LD script", () => {
   const post = parseBlogPost(
     fixture({ title: '</title></script><script>alert("x")</script>' }),

@@ -69,12 +69,11 @@ export default function BlogContent({
               href={`${BASE}blog/`}
               data-testid="link-blog-back"
             >
-              <span aria-hidden="true">&larr;</span> All field notes
+              <span aria-hidden="true">&larr;</span> All log entries
             </a>
             <header className="blog-article-head">
               <p className="blog-kicker">
-                <span className="blog-rule" aria-hidden="true" /> Engineering
-                log
+                <span className="blog-rule" aria-hidden="true" /> ZERO-KNOWLEDGE LOG
                 <span className="blog-dot" aria-hidden="true">
                   /
                 </span>

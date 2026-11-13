@@ -229,10 +229,9 @@ export function Article12Sandbox() {
         </div>
       </div>
 
-      {/* Replace this placeholder with the permanent Stripe checkout link. */}
       <a
         className="a12s-cta"
-        href="#stripe-checkout"
+        href="https://buy.stripe.com/8x228q0IE9A40uHehz7ss00"
         data-testid="link-sandbox-cta"
       >
         <span>Deploy to Production: Secure $500 Enterprise API Block</span>

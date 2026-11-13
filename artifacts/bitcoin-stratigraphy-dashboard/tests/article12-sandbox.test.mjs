@@ -63,12 +63,12 @@ test("the sandbox preserves live-terminal priority and exposes the checkout CTA"
   assert.ok(terminal >= 0 && sandbox > terminal && commands > sandbox);
   assert.ok(app.includes('data-testid="link-article12-sandbox"'));
   assert.ok(app.includes('href={`${import.meta.env.BASE_URL}#article12-sandbox`}'));
-  assert.ok(source.includes('href="#stripe-checkout"'));
-  assert.ok(source.includes("Replace this placeholder with the permanent Stripe checkout link."));
+  assert.ok(source.includes('href="https://buy.stripe.com/8x228q0IE9A40uHehz7ss00"'));
+  assert.doesNotMatch(source, /#stripe-checkout|Replace this placeholder/);
   assert.ok(source.includes('window.location.hash !== `#${ARTICLE12_SANDBOX_ID}`'));
   assert.match(source, /section\.current\?\.scrollIntoView/);
   assert.match(source, /phase === "secured" && \(\s*<>\s*<p className="a12s-success"/);
-  assert.match(source, /<\/div>\s*{\/\* Replace this placeholder[^]*?<a\s+className="a12s-cta"/);
+  assert.match(source, /<\/div>\s*<a\s+className="a12s-cta"/);
   assert.match(css, /\.a12s-cta\s*\{[^}]*background: hsl\(var\(--primary\)\);[^}]*color: hsl\(var\(--primary-foreground\)\)/s);
   assert.match(css, /\.a12s-cta svg\s*\{\s*flex-shrink: 0;/);
 });

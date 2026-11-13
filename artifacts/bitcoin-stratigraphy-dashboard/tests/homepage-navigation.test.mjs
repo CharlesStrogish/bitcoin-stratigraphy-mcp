@@ -14,6 +14,12 @@ test("homepage navigation removes legacy exports and retains the tool capacity l
   assert.doesNotMatch(css, /\.header-exports/);
 });
 
+test("homepage blog navigation uses enterprise branding and preserves its link and icon", () => {
+  const header = app.slice(app.indexOf("function Header("), app.indexOf("function Home("));
+  assert.match(header, /className="control-button"\s+href=\{`\$\{import\.meta\.env\.BASE_URL\}blog\/`\}\s+data-testid="link-home-blog"\s*>\s*<FileText size=\{14\} aria-hidden="true" \/> Zero-Knowledge Log\s*<\/a>/);
+  assert.doesNotMatch(header, /Engineering blog/);
+});
+
 test("the final odd navigation item stays centered across the desktop and mobile grid", () => {
   assert.match(css, /\.header-actions\.homepage-actions\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/s);
   assert.match(css, /\.homepage-actions > \.control-button:last-child:nth-child\(odd\)\s*\{\s*grid-column:\s*1 \/ -1;/);

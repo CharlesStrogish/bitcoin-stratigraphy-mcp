@@ -145,7 +145,7 @@ function Header() {
             href={`${import.meta.env.BASE_URL}blog/`}
             data-testid="link-home-blog"
           >
-            <FileText size={14} aria-hidden="true" /> Engineering blog
+            <FileText size={14} aria-hidden="true" /> Zero-Knowledge Log
           </a>
           <a
             className="control-button"

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/flight-recorder-viewer/"
+title = "Article 12 Flight Recorder"
+description = "A standalone local-first command center for enterprise swarm execution records, proof activity, and L402 settlement visibility. Includes a clearly labeled demonstration and secure server-side credential status."
+version = "1.0.0"
+id = "artifacts/flight-recorder-viewer"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/flight-recorder-viewer/" ]
+localPort = 19572
+
+[services.development]
+run = "pnpm --filter @workspace/flight-recorder-viewer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/flight-recorder-viewer", "run", "build" ]
+
+[services.production.run]
+args = [ "node", "artifacts/flight-recorder-viewer/server.mjs" ]
+
+[services.production.run.env]
+HOST = "0.0.0.0"
+
+[services.env]
+PORT = "19572"
+BASE_PATH = "/flight-recorder-viewer/"

@@ -1,0 +1,35 @@
+{
+  "name": "@workspace/flight-recorder-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first Article 12 Flight Recorder command center for Bitcoin Stratigraphy",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": { "node": ">=22.16.0" },
+  "packageManager": "pnpm@10.26.1",
+  "scripts": {
+    "dev": "vite --config vite.config.ts --host 0.0.0.0",
+    "build": "vite build --config vite.config.ts",
+    "start": "node server.mjs",
+    "serve": "node server.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "lucide-react": "0.545.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "0.5.20",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "25.9.5",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "5.2.0",
+    "tailwindcss": "4.3.3",
+    "tw-animate-css": "1.4.0",
+    "typescript": "~5.9.3",
+    "vite": "7.3.7"
+  }
+}

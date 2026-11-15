@@ -110,3 +110,4 @@
 - [Audit scanner funnels](audit-scanner-funnels.md) — separate M2M and human funnels; paid heuristic hashes are simulated receipts, and crawler rendering stays payment-client-free.
 - [Stripe bundle assets](stripe-bundle-assets.md) — native SQL files must accompany bundled servers; source-mode success can hide the migration runner's silent skip.
 - [Flight recorder viewer scope](flight-recorder-viewer-scope.md) — free local open-source viewer with a paid enterprise gate; Phase 1 telemetry is explicitly mock.
+- [Interceptor distribution scope](interceptor-distribution-scope.md) — Phase 2 is a developer-installed human procurement hook; HTTP authorization failures are not legal or ZK findings.

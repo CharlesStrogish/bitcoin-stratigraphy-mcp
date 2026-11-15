@@ -14,3 +14,9 @@ The user required exact transactional email copy, including wording about automa
 **Why:** The current distribution deliberately halts on authorization failure and distinguishes viewer scanner credentials from paid MCP authorization.
 
 **How to apply:** Keep implementation and operational documentation accurate about manual credential configuration and restart. Do not represent the requested email wording as proof that automatic resume or regulatory compliance has been implemented.
+
+Managed Brevo delivery must work without a raw `BREVO_API_KEY`. Keep direct-key support for explicit deployments, but use the authenticated connector proxy for the connected-account path.
+
+**Why:** Managed credentials remain behind the proxy. Gating the webhook on a raw-key environment variable silently skipped the connected integration.
+
+**How to apply:** Keep the official Brevo SDK with authentication disabled only inside the constrained proxy transport; the proxy supplies authentication. Brevo proxy paths are relative to its `/v3` base. Never retry an uncertain credential-email submission through another transport.

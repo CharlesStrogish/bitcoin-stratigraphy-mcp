@@ -40,8 +40,6 @@ export class FiatWebhookHandlers {
     await processFiatWebhook(payload, signature, runtime, (id) =>
       fiatMint.acceptSession(id),
     );
-    if (process.env.BREVO_API_KEY) {
-      await fulfillEnterpriseEvent(payload, signature, runtime);
-    }
+    await fulfillEnterpriseEvent(payload, signature, runtime);
   }
 }

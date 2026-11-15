@@ -9,8 +9,8 @@ Verification uses the official Stripe SDK and `STRIPE_WEBHOOK_SECRET`, before
 Stripe API requests or database work. HTTPS and secure handling of the endpoint
 secret remain necessary; signature checking is not an absolute security guarantee.
 
-The existing `/api/stripe/webhook` sync endpoint remains intact. Once Brevo is
-configured, it also invokes the completion-only fulfillment service. Prefer that
+The existing `/api/stripe/webhook` sync endpoint remains intact. It also invokes
+the completion-only fulfillment service for supported purchases. Prefer that
 already-registered endpoint when it is receiving your real events. This avoids
 creating an additional Stripe endpoint with a different signing secret.
 
@@ -50,8 +50,11 @@ The existing mint revalidates this order using its unchanged checks.
 - `STRIPE_WEBHOOK_SECRET` for the receiving endpoint.
 - `FIAT_MINT_STRIPE_PRICE_ID` matching the existing advertised link's actual price.
 - Existing `FIAT_MINT_PUBLIC_ORIGIN` and `FIAT_MINT_WEBHOOK_ORIGIN` configuration.
-- `BREVO_API_KEY` available server-side, and **licensing@bitcoinstratigraphy.com**
-  authenticated/verified as an allowed sender in the Brevo account.
+- A connected Brevo integration, or an explicit server-side `BREVO_API_KEY`.
+  The connected path uses Replit's authenticated proxy with the official Brevo
+  SDK; no raw key is copied into the application. An explicit key takes precedence
+  when provided. **licensing@bitcoinstratigraphy.com** must also be authenticated/
+  verified as an allowed sender in that Brevo account.
 - The existing dedicated fiat payer, merchant connection, mode-specific Treasury
   authorization and funding budget required by the current `FiatMint` flow.
 

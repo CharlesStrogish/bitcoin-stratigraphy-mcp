@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. AGPL-3.0-only / Commercial.
 import { pool } from "@workspace/db";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import { EnterpriseFulfillment } from "./enterpriseFulfillment";
 import { createEnterpriseMailer } from "./enterpriseEmail";
 import { fiatMint } from "./fiatMintRuntime";
@@ -10,8 +11,14 @@ const fulfillment = new EnterpriseFulfillment({
   pool,
   mint: fiatMint,
   priceId: () => process.env.FIAT_MINT_STRIPE_PRICE_ID,
-  mailer: () =>
-    createEnterpriseMailer({ apiKey: process.env.BREVO_API_KEY ?? "" }),
+  mailer: () => {
+    if (process.env.BREVO_API_KEY)
+      return createEnterpriseMailer({ apiKey: process.env.BREVO_API_KEY });
+    const connectors = new ReplitConnectors();
+    return createEnterpriseMailer({
+      proxy: (path, options) => connectors.proxy("brevo", path, options),
+    });
+  },
 });
 
 export async function fulfillEnterpriseEvent(

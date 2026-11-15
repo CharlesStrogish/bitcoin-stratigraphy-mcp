@@ -15,17 +15,62 @@ export type EnterpriseMailer = (
   deliveryId: string,
 ) => Promise<string>;
 
+export type BrevoProxy = (
+  path: string,
+  options: { method: string; headers: Record<string, string>; body: string },
+) => Promise<Response>;
+
 /** No SDK retries: a lost send response must be reconciled, not blindly resent. */
 export function createEnterpriseMailer(options: {
-  apiKey: string;
+  apiKey?: string;
   fetcher?: typeof fetch;
+  proxy?: BrevoProxy;
 }): EnterpriseMailer {
-  if (!options.apiKey) throw new Error("Brevo configuration unavailable");
+  if (!options.apiKey && !options.proxy)
+    throw new Error("Brevo configuration unavailable");
+  const managedFetch: typeof fetch = async (input, init) => {
+    const url = new URL(String(input));
+    if (
+      url.origin !== "https://api.brevo.com" ||
+      url.pathname !== "/v3/smtp/email" ||
+      url.search ||
+      init?.method?.toUpperCase() !== "POST" ||
+      typeof init.body !== "string"
+    ) {
+      throw new Error("Unexpected Brevo request");
+    }
+    // The connector base already includes /v3. Never forward SDK credentials.
+    // Its proxy cannot cancel an accepted send: bound our wait and retain the
+    // existing durable 'sending' state on an uncertain outcome.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        options.proxy!("/smtp/email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: init.body,
+        }),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("Brevo delivery outcome unknown")),
+            10_000,
+          );
+          timer.unref();
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
   const brevo = new BrevoClient({
-    apiKey: options.apiKey,
     timeoutInSeconds: 10,
     maxRetries: 0,
-    ...(options.fetcher ? { fetch: options.fetcher } : {}),
+    ...(options.proxy
+      ? { auth: false, fetch: managedFetch }
+      : {
+          apiKey: options.apiKey,
+          ...(options.fetcher ? { fetch: options.fetcher } : {}),
+        }),
   });
   return async (recipient, macaroon, deliveryId) => {
     const response = await brevo.transactionalEmails.sendTransacEmail({

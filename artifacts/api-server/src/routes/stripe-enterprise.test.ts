@@ -115,6 +115,63 @@ test("Brevo official SDK sends the exact requested sender, subject, body and rep
   );
 });
 
+test("connected Brevo uses the authenticated proxy without raw API keys or duplicate /v3", async () => {
+  let calls = 0;
+  const send = createEnterpriseMailer({
+    proxy: async (path, options) => {
+      calls++;
+      assert.equal(path, "/smtp/email");
+      assert.equal(options.method, "POST");
+      assert.deepEqual(options.headers, { "Content-Type": "application/json" });
+      const email = JSON.parse(options.body);
+      assert.equal(email.sender.email, ENTERPRISE_SENDER);
+      assert.equal(email.textContent, enterpriseEmailBody("managed-test-key"));
+      return new Response(
+        JSON.stringify({ messageId: "managed-test-message" }),
+        {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    },
+  });
+  assert.equal(
+    await send(
+      "buyer@example.test",
+      "managed-test-key",
+      "managed-test-delivery",
+    ),
+    "managed-test-message",
+  );
+  assert.equal(calls, 1);
+});
+
+test("Brevo proxy denial fails without a direct-API fallback or automatic retry", async () => {
+  let calls = 0;
+  let directCalls = 0;
+  const send = createEnterpriseMailer({
+    proxy: async () => {
+      calls++;
+      return new Response(
+        JSON.stringify({ code: "unauthorized", message: "Test denial" }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    },
+    fetcher: async () => {
+      directCalls++;
+      throw new Error("No fallback permitted");
+    },
+  });
+  await assert.rejects(
+    send("buyer@example.test", "managed-test-key", "managed-test-denial"),
+  );
+  assert.equal(calls, 1);
+  assert.equal(directCalls, 0);
+});
+
 test("raw enterprise endpoint rejects spoofed signatures before fulfillment", async () => {
   const app = express();
   let calls = 0;

@@ -59,6 +59,11 @@ The existing mint revalidates this order using its unchanged checks.
   authorization and funding budget required by the current `FiatMint` flow.
 
 Do not place any of these secrets in source, browser variables, URLs or logs.
+The connected Brevo key intentionally has **Send Only (Transactional Email)**
+permissions. The account owner has confirmed that the required licensing sender
+is authorized and fully verified. A 403 from the sender-list API is expected for
+this key and is not a delivery blocker; do not add read permissions or require a
+successful sender-list lookup before fulfillment.
 Grant Stripe permission to read sessions/line items/Payment Links and update
 session metadata, in addition to existing sync permissions. No real API key or
 wallet payment is needed for the automated local tests.

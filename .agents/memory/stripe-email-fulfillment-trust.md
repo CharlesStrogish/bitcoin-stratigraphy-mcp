@@ -20,3 +20,9 @@ Managed Brevo delivery must work without a raw `BREVO_API_KEY`. Keep direct-key 
 **Why:** Managed credentials remain behind the proxy. Gating the webhook on a raw-key environment variable silently skipped the connected integration.
 
 **How to apply:** Keep the official Brevo SDK with authentication disabled only inside the constrained proxy transport; the proxy supplies authentication. Brevo proxy paths are relative to its `/v3` base. Never retry an uncertain credential-email submission through another transport.
+
+The Brevo API key is intentionally restricted to "Send Only" (Transactional Email). HTTP 403 on sender-list requests is expected. The user manually confirmed that `licensing@bitcoinstratigraphy.com` is an authorized, fully verified sender on this account.
+
+**Why:** The user requires least-privilege enterprise security and explicitly overrode the sender-list verification blocker.
+
+**How to apply:** Do not broaden permissions, repeat sender-list checks, or treat lack of sender-list read access as an email-delivery blocker. Preserve Send Only access and the confirmed sender.

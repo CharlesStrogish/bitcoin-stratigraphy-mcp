@@ -2,6 +2,7 @@
 // Dual-licensed under AGPLv3 and Commercial terms.
 import { getFiatStripe, type FiatStripeRuntime } from "./fiatStripe";
 import { fiatMint } from "./fiatMintRuntime";
+import { fulfillEnterpriseEvent } from "./enterpriseFulfillmentRuntime";
 
 export async function processFiatWebhook(
   payload: Buffer,
@@ -39,5 +40,8 @@ export class FiatWebhookHandlers {
     await processFiatWebhook(payload, signature, runtime, (id) =>
       fiatMint.acceptSession(id),
     );
+    if (process.env.BREVO_API_KEY) {
+      await fulfillEnterpriseEvent(payload, signature, runtime);
+    }
   }
 }

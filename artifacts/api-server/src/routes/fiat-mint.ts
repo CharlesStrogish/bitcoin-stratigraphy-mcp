@@ -29,9 +29,10 @@ function owner(req: Request) {
 export function registerFiatWebhook(
   app: Express,
   processWebhook: (body: Buffer, signature: string) => Promise<void>,
+  webhookPath = "/api/stripe/webhook",
 ) {
   app.post(
-    "/api/stripe/webhook",
+    webhookPath,
     express.raw({ type: "application/json", limit: "256kb" }),
     async (req, res): Promise<void> => {
       res.set("Cache-Control", "no-store");

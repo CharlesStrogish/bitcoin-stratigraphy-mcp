@@ -48,6 +48,13 @@ export const ReceiveFiatStripeWebhookResponse = zod.unknown()
 
 
 /**
+ * Raw-body Stripe signature verification using STRIPE_WEBHOOK_SECRET. Only checkout.session.completed is fulfilled. Other signed event types are acknowledged without fulfillment. Fixed USD 500 purchases must match the existing configured scanner price and approved product identity. No credential is returned in this response. Pending funding and ambiguous email delivery return 503 for recovery without duplicate funding.
+ * @summary Verify completed Stripe checkouts and deliver funded enterprise credentials
+ */
+export const ReceiveEnterpriseStripeWebhookResponse = zod.unknown()
+
+
+/**
  * Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Retail success consumes the prompt-bound single-use capability. A settled 100000-sat Developer SaaS macaroon from /api/mint-macaroon carries credits=100 and permits 100 valid scanner calls across different prompts. Each admitted scan atomically consumes one shared credit. Credit grants expire 30 days after issuance, and inherited descendant quotas and revocations remain enforced. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
  * @summary Paid heuristic Article 12 prompt risk review
  */

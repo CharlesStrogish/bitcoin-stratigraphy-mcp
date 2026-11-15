@@ -430,6 +430,78 @@ export const useReceiveFiatStripeWebhook = <TError = ErrorType<void>,
       return useMutation(getReceiveFiatStripeWebhookMutationOptions(options));
     }
 
+export const getReceiveEnterpriseStripeWebhookUrl = () => {
+
+
+
+
+  return `/api/webhook/stripe`
+}
+
+/**
+ * Raw-body Stripe signature verification using STRIPE_WEBHOOK_SECRET. Only checkout.session.completed is fulfilled. Other signed event types are acknowledged without fulfillment. Fixed USD 500 purchases must match the existing configured scanner price and approved product identity. No credential is returned in this response. Pending funding and ambiguous email delivery return 503 for recovery without duplicate funding.
+ * @summary Verify completed Stripe checkouts and deliver funded enterprise credentials
+ */
+export const receiveEnterpriseStripeWebhook = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getReceiveEnterpriseStripeWebhookUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReceiveEnterpriseStripeWebhookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveEnterpriseStripeWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof receiveEnterpriseStripeWebhook>>, TError,void, TContext> => {
+
+const mutationKey = ['receiveEnterpriseStripeWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof receiveEnterpriseStripeWebhook>>, void> = () => {
+
+
+          return  receiveEnterpriseStripeWebhook(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReceiveEnterpriseStripeWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof receiveEnterpriseStripeWebhook>>>
+
+    export type ReceiveEnterpriseStripeWebhookMutationError = ErrorType<void>
+
+    /**
+ * @summary Verify completed Stripe checkouts and deliver funded enterprise credentials
+ */
+export const useReceiveEnterpriseStripeWebhook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveEnterpriseStripeWebhook>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof receiveEnterpriseStripeWebhook>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReceiveEnterpriseStripeWebhookMutationOptions(options));
+    }
+
 export const getScanArticle12PromptUrl = () => {
 
 

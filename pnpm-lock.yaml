@@ -142,6 +142,9 @@ importers:
       '@getalby/sdk':
         specifier: 8.0.3
         version: 8.0.3(typescript@5.9.3)
+      '@getbrevo/brevo':
+        specifier: 6.2.0
+        version: 6.2.0
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(@cfworker/json-schema@4.1.6)(zod@4.6.7)
@@ -1185,6 +1188,10 @@ packages:
   '@getalby/sdk@8.0.3':
     resolution: {integrity: sha512-vPEogAWwLHbL55COeXrRN7yRBXMDGDxX1M2A+o3Lqw60FFng6fa9FK9sw8ptdILMD1dQZq8FzPXuabQ7seoDBA==}
     engines: {node: '>=22'}
+
+  '@getbrevo/brevo@6.2.0':
+    resolution: {integrity: sha512-k+7w3Desc+bVF+LpJ+1/4wfiopaJDl4ky7jJMQbtjT3loVpS8b1xuFBTfdzZnAyYSmL8Rov2n8GeRxGt2p0oRA==}
+    engines: {node: '>=18.0.0'}
 
   '@hono/node-server@2.1.3':
     resolution: {integrity: sha512-TA//nWMqPhbfdfneACk6t5a9eqbS9lABEPyKn0/xZTah3H3U2XaVg85rJFl0/Fyit0I552YDHgXGVSf3GwqbUw==}
@@ -5248,6 +5255,8 @@ snapshots:
       nostr-tools: 2.25.2(typescript@5.9.3)
     transitivePeerDependencies:
       - typescript
+
+  '@getbrevo/brevo@6.2.0': {}
 
   '@hono/node-server@2.1.3(hono@4.13.11)':
     dependencies:

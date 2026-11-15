@@ -820,6 +820,21 @@ paths:
         "200": { description: Verified event accepted }
         "400": { description: Invalid signature or body }
         "503": { description: Stripe configuration or durable processing unavailable }
+  /webhook/stripe:
+    post:
+      operationId: receiveEnterpriseStripeWebhook
+      summary: Verify completed Stripe checkouts and deliver funded enterprise credentials
+      description: >-
+        Raw-body Stripe signature verification using STRIPE_WEBHOOK_SECRET.
+        Only checkout.session.completed is fulfilled. Other signed event types
+        are acknowledged without fulfillment. Fixed USD 500 purchases must match
+        the existing configured scanner price and approved product identity.
+        No credential is returned in this response. Pending funding and ambiguous
+        email delivery return 503 for recovery without duplicate funding.
+      responses:
+        "200": { description: Verified event processed or ignored }
+        "400": { description: Invalid signature or body }
+        "503": { description: "Configuration, funding or delivery requires retry or reconciliation" }
   /scanner:
     post:
       operationId: scanArticle12Prompt

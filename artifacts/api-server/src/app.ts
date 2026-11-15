@@ -62,6 +62,7 @@ import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store
 import { registerComplianceRoutes } from "./routes/compliance";
 import { registerScannerRoute } from "./routes/scanner";
 import { registerFiatMintRoutes, registerFiatWebhook } from "./routes/fiat-mint";
+import { fulfillEnterpriseEvent } from "./services/enterpriseFulfillmentRuntime";
 import { fiatMint } from "./services/fiatMintRuntime";
 import { fiatPublicOrigin } from "./services/fiatStripe";
 import { FiatWebhookHandlers } from "./services/fiatWebhook";
@@ -142,6 +143,7 @@ const nip98Revocations = createPostgresNip98RevocationStore();
 const nip98RevocationGuard = createNip98RevocationGuard(nip98Revocations);
 registerAuditRoutes(app, undefined, nip98RevocationGuard);
 registerFiatWebhook(app, (body, signature) => FiatWebhookHandlers.processWebhook(body, signature));
+registerFiatWebhook(app, fulfillEnterpriseEvent, "/api/webhook/stripe");
 app.use(
   express.json({
     limit: "1mb",

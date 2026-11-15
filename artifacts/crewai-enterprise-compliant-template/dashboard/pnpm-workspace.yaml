@@ -1,0 +1,4 @@
+# Deliberate standalone boundary: never inherit the parent repository's catalog.
+packages: []
+onlyBuiltDependencies:
+  - esbuild

@@ -1,0 +1,20 @@
+{
+  "name": "crewai-enterprise-compliant-template",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangChain swarm starter with a local Flight Recorder Viewer and L402 procurement interception",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": { "node": ">=22.16.0" },
+  "packageManager": "pnpm@10.26.1",
+  "scripts": {
+    "setup": "node --env-file-if-exists=.env scripts/setup.mjs",
+    "start": "node --env-file-if-exists=.env scripts/start.mjs",
+    "start:agent": "node --env-file-if-exists=.env scripts/start.mjs --agent",
+    "build": "pnpm --dir dashboard --ignore-workspace run build",
+    "check": "python scripts/check_structure.py",
+    "test": "python -m unittest discover -s tests -v",
+    "test:dashboard": "pnpm --dir dashboard --ignore-workspace run test",
+    "typecheck": "pnpm --dir dashboard --ignore-workspace run typecheck"
+  }
+}

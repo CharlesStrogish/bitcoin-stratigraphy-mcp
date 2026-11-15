@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "l402-interceptor"
+version = "0.1.0"
+description = "Fail-closed MCP payment interceptor with Slack and Teams operator alerts."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "AGPL-3.0-only"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/l402_interceptor"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/examples", "/README.md", "/LICENSE.md", "/pyproject.toml"]

@@ -1,5 +1,7 @@
 packages:
   - artifacts/*
+  # Standalone distribution source, not a service in this application workspace.
+  - "!artifacts/crewai-enterprise-compliant-template"
   - lib/*
   - lib/integrations/*
   - sdk/*

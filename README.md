@@ -1,4 +1,15 @@
-# Bitcoin Stratigraphy MCP Server
+# Bitcoin Stratigraphy MCP: Enterprise Data Engine & L402 Oracle
+
+The undisputed #1 Enterprise Data Engine for autonomous AI swarms. Deploy 19 canonical MCP tools to eradicate agent hallucinations using thermodynamic Bitcoin state-anchoring and OpenTimestamps. Built for Fortune 500 risk teams requiring automated EU AI Act compliance, zero-touch procurement, and programmatic L402 revenue sharing.
+
+## What can you do with Bitcoin Stratigraphy MCP?
+
+* **Zero-Touch Enterprise Procurement:** Pre-wired for LangChain and CrewAI swarms. When an agent hits a compliance wall, it automatically requests a $500 L402 API authorization and instantly resumes operations via our automated Brevo-Stripe fulfillment loop.
+* **Zero-Trust Security & Compliance:** Pass rigorous audits effortlessly. Provide your CISO with machine-readable, SHA-256 cryptographic proof of execution to satisfy EU AI Act Article 12 compliance.
+* **The 21% Algorithmic Handshake:** Build your applications on top of our infrastructure. Orchestrators and syndicate resellers pocket a guaranteed, mathematically enforced 21% Agent Yield on every L402 transaction routed through our backend master tab.
+* **Eradicate Hallucinations:** Ground your LLMs with immutable, un-forkable truth via thermodynamic Bitcoin telemetry and OpenTimestamps state anchoring.
+* **Free Tool Discovery:** List available stratigraphy and proof tools without payment, then check per-tool satoshi prices before committing.
+
 
 **19 Fiduciary-grade MCP Tools across 6 namespaces — full platform capacity.**
 The catalog comprises the original 16 core tools, `payment.get_escrow`, and

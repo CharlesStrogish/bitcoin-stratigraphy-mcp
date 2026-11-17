@@ -62,3 +62,14 @@ long-form SEO article.
 **How to apply:** Maintain the manifesto as a separate landing page. Preserve its
 supplied copy while linking compliance, Truth Receipts, and circuit-breaker
 mentions to the unchanged technical specification.
+
+For `/security`, preserve the user's supplied audit statements and enterprise
+deployment CTA verbatim. Read back the actual rendering source and verify the
+served Preview content before reporting that an update is complete.
+
+**Why:** The user repeated the exact-copy requirement after reporting older
+wording in Preview and specifically required saved-file verification.
+
+**How to apply:** Check both the shared page renderer and the served page, not
+only an edit confirmation. Keep marketing text updates separate from changes to
+the downloadable audit evidence.

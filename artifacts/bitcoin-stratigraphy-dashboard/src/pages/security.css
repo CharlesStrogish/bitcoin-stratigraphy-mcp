@@ -89,6 +89,26 @@
   display: block;
   margin-top: 8px;
 }
+.sec-page .sec-deployment {
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid rgba(240, 180, 40, 0.65);
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(240, 180, 40, 0.12), #151a24 75%);
+  box-shadow: 0 0 28px rgba(240, 180, 40, 0.06);
+}
+.sec-deployment h2 {
+  color: hsl(var(--primary));
+}
+.sec-deployment p {
+  max-width: 60ch;
+  color: #f1f3f9;
+  line-height: 1.75;
+}
+.sec-deployment .mf-cta {
+  min-height: 48px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 @media (prefers-reduced-motion: reduce) {
   .sec-block {
     transition: none;

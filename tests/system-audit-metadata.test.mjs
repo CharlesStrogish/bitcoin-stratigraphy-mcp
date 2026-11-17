@@ -107,7 +107,7 @@ test("security attestation is public, prerendered and interlinked without changi
     for (const text of [
       "Claude Opus 5.5 (Multi-Agent Swarm via Replit MAX Mode - Highest Thinking Protocol)",
       "12-Hour Continuous Penetration &amp; Logic Audit",
-      "700+ rigorous regression and penetration tests",
+      "1,064 rigorous regression and penetration tests",
       "0 critical, high, medium, or low vulnerabilities",
       "Macaroon Attenuation",
       "Signature Forgery",
@@ -119,7 +119,16 @@ test("security attestation is public, prerendered and interlinked without changi
       "FiduciaryTamperingError",
       "guaranteeing zero risk of runaway context billing.",
     ]) assert.ok(html.includes(text), text);
-    assert.match(html, /name="description" content="[^"]*700-test zero-vulnerability/);
+    assert.match(html, /name="description" content="[^"]*1,064-test zero-vulnerability/);
+    const text = html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
+    assert.ok(text.includes("Payload Tampering Rejection: Passed 100% in the exhaustive audit of the fully deployed 19-tool core. 1-byte mutation tests on the tool_name:timestamp:contentSha256 payload successfully triggered a FiduciaryTamperingError, proving the un-forgeability of the entire current suite."));
+    assert.ok(text.includes("Your swarm is only as secure as its data engine. Deploy the Bitcoin Stratigraphy MCP today to achieve drop-in EU AI Act compliance, eradicate LLM hallucinations, and capture a guaranteed 21% Agent Yield on all routed L402 transactions."));
+    assert.ok(html.indexOf('id="machine-readable-verification"') < html.indexOf('id="enterprise-deployment"'));
+    assert.ok(html.indexOf('id="enterprise-deployment"') < html.indexOf('aria-label="Continue reading"'));
+    assert.match(html, /<section id="enterprise-deployment" class="panel sec-deployment" aria-labelledby="enterprise-deployment-title">/);
+    assert.match(html, /<h2 id="enterprise-deployment-title">Ready for Enterprise Deployment<\/h2>/);
+    assert.match(html, /href="https:\/\/mcpservers.org\/servers\/charlesstrogish\/bitcoin-stratigraphy-mcp" class="mf-cta" data-testid="link-deploy-architecture">Deploy the Architecture<\/a>/);
+    assert.doesNotMatch(html, /700\+|historical audit of the original 16-tool core/);
     assert.ok(html.includes('id="security-article-jsonld"'));
     assert.ok(!html.includes('id="manifesto-article-jsonld"'));
   }

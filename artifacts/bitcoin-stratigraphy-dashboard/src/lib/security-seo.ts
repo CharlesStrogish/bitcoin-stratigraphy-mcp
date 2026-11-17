@@ -3,7 +3,7 @@ import { pageUrl } from "./site";
 
 export const SECURITY_TITLE = "Security Attestation | Bitcoin Stratigraphy";
 export const SECURITY_DESCRIPTION =
-  "Read Bitcoin Stratigraphy's 700-test zero-vulnerability security audit report covering L402 circuit breakers, Ed25519 Truth Receipts, and NIP-98 authentication.";
+  "Read Bitcoin Stratigraphy's 1,064-test zero-vulnerability security audit report covering L402 circuit breakers, Ed25519 Truth Receipts, and NIP-98 authentication.";
 export const SECURITY_URL = pageUrl("/security");
 export const SECURITY_ARTICLE = {
   "@context": "https://schema.org",

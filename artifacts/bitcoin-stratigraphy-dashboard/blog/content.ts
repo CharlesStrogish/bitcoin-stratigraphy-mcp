@@ -53,12 +53,59 @@ export function parseBlogPost(
   if (metadata.draft !== undefined && typeof metadata.draft !== "boolean")
     return invalid("draft must be true or false");
   if (!frontmatter[2]!.trim()) return invalid("Article body is required");
+  for (const field of [
+    "authorName",
+    "authorUrl",
+    "dateModified",
+    "publisherLogo",
+  ]) {
+    if (
+      metadata[field] !== undefined &&
+      (typeof metadata[field] !== "string" || !metadata[field].trim())
+    )
+      return invalid(`Nonempty ${field} is required when provided`);
+  }
+  for (const field of ["authorUrl", "publisherLogo"]) {
+    if (metadata[field] !== undefined) {
+      try {
+        if (new URL(metadata[field] as string).protocol !== "https:")
+          throw new Error();
+      } catch {
+        return invalid(`${field} must be an absolute HTTPS URL`);
+      }
+    }
+  }
+  if (metadata.authorUrl && !metadata.authorName)
+    return invalid("authorUrl requires authorName");
+  if (metadata.dateModified !== undefined) {
+    const modified = metadata.dateModified as string;
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(modified) ||
+      !Number.isFinite(Date.parse(`${modified}T00:00:00Z`)) ||
+      new Date(`${modified}T00:00:00Z`).toISOString().slice(0, 10) !==
+        modified ||
+      modified < date!
+    )
+      return invalid(
+        "dateModified must be a valid date on or after publication",
+      );
+  }
   return {
     title: title!.trim(),
     date: date!,
     description: description!.trim(),
     slug: slug!,
     html: markdown.render(frontmatter[2]!),
+    ...(metadata.authorName
+      ? { authorName: metadata.authorName as string }
+      : {}),
+    ...(metadata.authorUrl ? { authorUrl: metadata.authorUrl as string } : {}),
+    ...(metadata.dateModified
+      ? { dateModified: metadata.dateModified as string }
+      : {}),
+    ...(metadata.publisherLogo
+      ? { publisherLogo: metadata.publisherLogo as string }
+      : {}),
     draft: metadata.draft === true,
   };
 }

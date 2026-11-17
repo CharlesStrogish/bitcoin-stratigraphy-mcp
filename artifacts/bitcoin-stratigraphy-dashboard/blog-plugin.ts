@@ -46,13 +46,27 @@ export function blogSchema(post?: BlogPost) {
     headline: post.title,
     description: post.description,
     datePublished: `${post.date}T00:00:00Z`,
+    ...(post.dateModified
+      ? { dateModified: `${post.dateModified}T00:00:00Z` }
+      : {}),
     mainEntityOfPage: {
       "@type": "WebPage",
       "@id": pageUrl(`/blog/${post.slug}`),
     },
     url: pageUrl(`/blog/${post.slug}`),
-    author: publisher,
-    publisher,
+    author: post.authorName
+      ? {
+          "@type": "Person",
+          name: post.authorName,
+          ...(post.authorUrl ? { url: post.authorUrl } : {}),
+        }
+      : publisher,
+    publisher: {
+      ...publisher,
+      ...(post.publisherLogo
+        ? { logo: { "@type": "ImageObject", url: post.publisherLogo } }
+        : {}),
+    },
     inLanguage: "en",
     isPartOf: { "@type": "Blog", "@id": pageUrl("/blog") },
   };

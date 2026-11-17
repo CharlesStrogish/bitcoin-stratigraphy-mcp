@@ -76,6 +76,12 @@ for (const [label, source] of [
   ["path traversal slug", fixture({ slug: "../private" })],
   ["duplicate YAML keys", fixture({ extra: 'title: "Duplicate"\n' })],
   ["invalid draft flag", fixture({ extra: 'draft: "false"\n' })],
+  ["invalid author name", fixture({ extra: "authorName: false\n" })],
+  ["author URL without a name", fixture({ extra: 'authorUrl: "https://example.test"\n' })],
+  ["unsafe author URL", fixture({ extra: 'authorName: "Author"\nauthorUrl: "javascript:alert(1)"\n' })],
+  ["unsafe publisher logo", fixture({ extra: 'publisherLogo: "http://example.test/logo.png"\n' })],
+  ["invalid modification date", fixture({ extra: 'dateModified: "2026-02-31"\n' })],
+  ["modification before publication", fixture({ extra: 'dateModified: "2026-01-01"\n' })],
   ["empty body", fixture({ body: "" })],
 ]) {
   test(`publication rejects ${label}`, () => {
@@ -133,6 +139,42 @@ test("article initial head includes frontmatter metadata, canonical, social tags
   assert.doesNotMatch(html, /type="module"|src="[^"]+\.js"|id="root"/);
 });
 
+test("third article shares the existing index and article styling with complete initial JSON-LD", () => {
+  const posts = readBlogPosts();
+  const slug = "eradicating-ai-hallucinations-bitcoin-telemetry";
+  const post = posts.find((entry) => entry.slug === slug);
+  assert.ok(post);
+  assert.ok(posts.length >= 3);
+  assert.equal(posts[0].slug, slug);
+  assert.equal(post.date, "2026-11-17");
+  const html = renderBlogDocument(posts, post);
+  const index = renderBlogDocument(posts);
+  const previous = renderBlogDocument(posts, posts.find((entry) => entry.slug !== slug));
+  const style = (document) => document.match(/<style[^>]*>([\s\S]*?)<\/style>/)[1];
+  assert.equal(style(html), style(previous));
+  assert.equal(style(index), style(previous));
+  assert.equal((index.match(/class="blog-card"/g) ?? []).length, posts.length);
+  assert.ok(index.includes(`href="/blog/${slug}/"`));
+  assert.match(index, /<time dateTime="2026-11-17">Nov 17, 2026<\/time>/i);
+  assert.match(html, /class="language-python"/);
+  assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /&lt;script type=&quot;application\/ld\+json/);
+  const head = html.split("</head>")[0];
+  const scripts = [...head.matchAll(/<script id="blog-jsonld" type="application\/ld\+json">([^<]+)<\/script>/g)];
+  assert.equal(scripts.length, 1);
+  const schema = JSON.parse(scripts[0][1]);
+  assert.equal(schema["@type"], "BlogPosting");
+  assert.equal(schema.headline, post.title);
+  assert.equal(schema.description, post.description);
+  assert.deepEqual(schema.author, { "@type": "Person", name: "Charles Strogish", url: origin });
+  assert.equal(schema.publisher.logo["@type"], "ImageObject");
+  assert.equal(schema.publisher.logo.url, `${origin}/static/bitcoin-stratigraphy-mcp-logo.jpeg`);
+  assert.equal(schema.datePublished, "2026-11-17T00:00:00Z");
+  assert.equal(schema.dateModified, schema.datePublished);
+  assert.equal(schema.mainEntityOfPage["@id"], `${origin}/blog/${slug}/`);
+  assert.ok(blogSitemap(posts).includes(`<loc>${origin}/blog/${slug}/</loc>`));
+});
+
 test("individual posts use log branding without changing navigation or styling hooks", () => {
   const posts = [parseBlogPost(fixture())];
   for (const base of ["/", "/preview/"]) {
@@ -170,13 +212,13 @@ test("index has a Blog schema, native article links and prefixed asset/navigatio
   assert.match(html, /href="\/preview\/developers"/);
 });
 
-test("the completed LangChain and CrewAI article leads the blog index", () => {
+test("the completed LangChain and CrewAI article remains on the blog index", () => {
   const posts = readBlogPosts();
-  const post = posts[0];
-  assert.equal(post.slug, "langchain-crewai-eu-ai-act-compliance");
+  const post = posts.find((entry) => entry.slug === "langchain-crewai-eu-ai-act-compliance");
+  assert.ok(post);
   const index = renderBlogDocument(posts);
   const cards = [...index.matchAll(/data-testid="card-post-([^"]+)"/g)];
-  assert.equal(cards[0][1], post.slug);
+  assert.ok(cards.some((card) => card[1] === post.slug));
   assert.ok(index.includes(`href="/blog/${post.slug}/"`));
   const article = renderBlogDocument(posts, post);
   assert.match(article, /The Emerging Threat: Liability Without Traceability/);

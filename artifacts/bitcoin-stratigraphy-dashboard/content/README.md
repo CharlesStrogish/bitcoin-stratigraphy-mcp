@@ -17,6 +17,11 @@ the renderer supplies the article's single `<h1>` from `title`. Paragraphs,
 lists, links, images, quotes, fenced code and tables are supported. Put image
 files under `public/` and link to their public paths. Raw HTML is escaped.
 
+Optional `authorName` and `authorUrl` identify a person in the page's JSON-LD
+(otherwise the publisher remains the author). Optional `dateModified` must be a
+valid date on or after publication. Optional `publisherLogo` must reference an
+existing public image. Both URL fields require absolute HTTPS URLs.
+
 Files are published by default. Add `draft: true` to omit a file from the index,
 generated routes and sitemap. Invalid metadata, impossible dates and duplicate
 slugs fail the build explicitly. Dates use `YYYY-MM-DD`; the index sorts newest

@@ -6,6 +6,10 @@ export interface BlogPost {
   description: string;
   slug: string;
   html: string;
+  authorName?: string;
+  authorUrl?: string;
+  dateModified?: string;
+  publisherLogo?: string;
 }
 
 function formatDate(date: string) {

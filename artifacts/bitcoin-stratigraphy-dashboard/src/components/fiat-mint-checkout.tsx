@@ -20,9 +20,11 @@ type Status =
 export default function FiatMintCheckout({
   lightningPending = false,
   onPendingChange,
+  onContinuity,
 }: {
   lightningPending?: boolean;
   onPendingChange?: (pending: boolean) => void;
+  onContinuity?: (failure: unknown) => boolean;
 }) {
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState("");
@@ -124,7 +126,13 @@ export default function FiatMintCheckout({
       if (!session.url.startsWith("https://checkout.stripe.com/"))
         throw new Error("Unexpected checkout URL");
       window.location.assign(session.url);
-    } catch {
+    } catch (failure) {
+      if (onContinuity?.(failure)) {
+        setError(
+          "Fiat gateway offline — native Lightning is active below. This does not cancel an existing card purchase. Pay only if you have not paid by card.",
+        );
+        return;
+      }
       setError(
         "Checkout could not be opened. Check the original purchase before trying again.",
       );

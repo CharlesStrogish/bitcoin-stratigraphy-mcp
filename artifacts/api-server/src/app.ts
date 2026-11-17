@@ -60,7 +60,7 @@ import { registerEnterpriseRoutes } from "./routes/enterprise";
 import { createEscrowRecovery } from "./services/escrowRecovery";
 import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store";
 import { registerComplianceRoutes } from "./routes/compliance";
-import { registerScannerRoute } from "./routes/scanner";
+import { registerScannerRoute, createScannerMintHandler } from "./routes/scanner";
 import { registerFiatMintRoutes, registerFiatWebhook } from "./routes/fiat-mint";
 import { fulfillEnterpriseEvent } from "./services/enterpriseFulfillmentRuntime";
 import { fiatMint } from "./services/fiatMintRuntime";
@@ -175,7 +175,13 @@ registerNip98RevocationAdmin(app, nip98Revocations);
 registerComplianceRoutes(app, nip98Revocations);
 
 const macaroonUsageStore = createPostgresMacaroonUsageStore();
-registerFiatMintRoutes(app, fiatMint, fiatPublicOrigin);
+registerFiatMintRoutes(app, fiatMint, fiatPublicOrigin, {
+  nativeLightning: createScannerMintHandler({
+    usageStore: macaroonUsageStore,
+    revocationStore: createPostgresMacaroonRevocationStore(),
+    ledger: revenueLedger,
+  }, true),
+});
 registerScannerRoute(app, {
   usageStore: macaroonUsageStore,
   revocationStore: createPostgresMacaroonRevocationStore(),

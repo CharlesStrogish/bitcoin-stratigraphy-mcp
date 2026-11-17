@@ -156,6 +156,46 @@ npx bitcoin-stratigraphy-mcp-server --help`}</Code>
           )}
         </section>
 
+        <section className="fn-rise" aria-labelledby="swarm-continuity" data-testid="section-swarm-continuity">
+          <p className="fn-step">06</p>
+          <h2 id="swarm-continuity" className="fn-h2">Swarm Continuity &amp; Disaster Recovery</h2>
+          <p className="fn-lede">
+            A Global Disaster Recovery Hub for enterprise AI swarms: native Lightning
+            keeps a payment path available when legacy fiat APIs fail. Enterprise
+            architects evaluating AI failover protocols and LLM disaster recovery
+            can integrate machine-readable L402 continuity without replacing the
+            existing Stripe/Brevo fulfillment loop.
+          </p>
+          <p className="fn-note">
+            The fiat-to-Lightning scanner gateway preserves successful Stripe checkout.
+            A five-second deadline, upstream timeout or Stripe 5xx response activates a
+            native 100,000-sat invoice for 100 scanner calls, valid for 30 days after
+            issuance. Existing payable or paid card sessions must be recovered first.
+            No payment is sent automatically, and scanner credits do not authorize
+            unrelated MCP tools.
+          </p>
+          <Code label="HTTP 402 · native Lightning continuity" id="continuity">{`WWW-Authenticate: L402 macaroon="<token>", invoice="<BOLT11>",
+  error="fiat_gateway_offline", fallback="native_lightning_active"
+
+POST /api/mint-macaroon
+Authorization: L402 <token>:<payment-preimage>`}</Code>
+          <p className="fn-note">
+            For zero-friction swarm execution, preconfigure an authorized Lightning wallet
+            and spending limits. Validate the quote, pay the invoice once, then redeem
+            the same challenge at the returned payment endpoint. A 402 is not proof of
+            payment. Signature checks, expiry, revocation, exact payment verification
+            and shared credit limits remain enforced on both rails.
+          </p>
+          <p className="fn-note">
+            The 19-tool platform already settles MCP access natively over L402; this
+            wrapper protects the fiat scanner procurement path. Continuity during global
+            fiat API outages still requires a working Lightning wallet, network and
+            server. If Lightning is unavailable too, the gateway fails closed rather
+            than granting unpaid access. An uncertain Stripe session stays recoverable
+            through the original browser; never pay twice.
+          </p>
+        </section>
+
         <aside className="fn-switch fn-rise">
           <span>Evaluating for an organization instead?</span>
           <a href={join(base, "audit")} data-testid="link-to-audit">Go to Enterprise Audit</a>

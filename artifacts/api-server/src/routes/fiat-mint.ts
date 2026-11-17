@@ -15,6 +15,10 @@ import {
 } from "@workspace/api-zod";
 import type { FiatMint } from "../services/fiatMint";
 import { fiatErrorDiagnostics } from "../services/fiatDiagnostics";
+import {
+  isFiatGatewayOffline,
+  withFiatGatewayDeadline,
+} from "../services/fiatContinuity";
 
 const COOKIE = "__Secure-fiat-mint-owner";
 function owner(req: Request) {
@@ -65,6 +69,7 @@ export function registerFiatMintRoutes(
   app: Express,
   mint: FiatMint,
   origin: () => string,
+  continuity?: { nativeLightning: RequestHandler; timeoutMs?: number },
 ) {
   const guard: RequestHandler = (req, res, next) => {
     res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
@@ -82,7 +87,7 @@ export function registerFiatMintRoutes(
     }
     next();
   };
-  app.post("/api/fiat-mint", guard, async (req, res): Promise<void> => {
+  app.post("/api/fiat-mint", guard, async (req, res, next): Promise<void> => {
     if (!CreateFiatMintCheckoutBody.strict().safeParse(req.body).success) {
       res.status(400).json({ error: "Checkout requires an empty JSON object" });
       return;
@@ -98,10 +103,36 @@ export function registerFiatMintRoutes(
     try {
       res.json(
         CreateFiatMintCheckoutResponse.parse({
-          url: await mint.checkout(token),
+          url: continuity
+            ? await withFiatGatewayDeadline(
+                () => mint.checkout(token), continuity.timeoutMs,
+              )
+            : await mint.checkout(token),
         }),
       );
     } catch (error) {
+      if (continuity && isFiatGatewayOffline(error)) {
+        // Do not offer a second purchase when a checkout could already be paid.
+        // Failure of this local ownership lookup also fails closed.
+        let eligible = false;
+        try {
+          eligible = await mint.canOfferNativeFallback(token);
+        } catch {
+          res.status(503).json({ error: "Purchase recovery unavailable; do not pay again" });
+          return;
+        }
+        if (!eligible) {
+          res.status(503).json({ error: "Recover the existing purchase before choosing another payment rail" });
+          return;
+        }
+        req.log?.warn(
+          fiatErrorDiagnostics(error, "checkout_continuity"),
+          "Fiat gateway unavailable; offering native Lightning",
+        );
+        // No payment is sent, no order is changed, no credential bypass is granted.
+        await continuity.nativeLightning(req, res, next);
+        return;
+      }
       req.log?.error(
         fiatErrorDiagnostics(error, "checkout"),
         "Fiat Checkout request failed",

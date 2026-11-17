@@ -26,6 +26,7 @@ import type {
   CloseEnterpriseCreditTab200,
   CloseEnterpriseCreditTab402,
   CreateFiatMintCheckout200,
+  CreateFiatMintCheckout402,
   CryptographicAuditEnvelope,
   CryptographicAuditInput,
   DatasetHealthStatus,
@@ -154,7 +155,7 @@ export const getCreateFiatMintCheckoutUrl = () => {
 }
 
 /**
- * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped.
+ * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers the existing native 100000-sat scanner product via HTTP 402 without sending any payment or changing fulfillment. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
  * @summary Create a Stripe-hosted Checkout for 100 scanner credits
  */
 export const createFiatMintCheckout = async (fiatMintCheckoutRequest: FiatMintCheckoutRequest, options?: Parameters<typeof customFetch>[1]): Promise<CreateFiatMintCheckout200> => {
@@ -172,7 +173,7 @@ export const createFiatMintCheckout = async (fiatMintCheckoutRequest: FiatMintCh
 
 
 
-export const getCreateFiatMintCheckoutMutationOptions = <TError = ErrorType<void>,
+export const getCreateFiatMintCheckoutMutationOptions = <TError = ErrorType<CreateFiatMintCheckout402 | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFiatMintCheckout>>, TError,{data: BodyType<FiatMintCheckoutRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createFiatMintCheckout>>, TError,{data: BodyType<FiatMintCheckoutRequest>}, TContext> => {
 
@@ -201,12 +202,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateFiatMintCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createFiatMintCheckout>>>
     export type CreateFiatMintCheckoutMutationBody = BodyType<FiatMintCheckoutRequest>
-    export type CreateFiatMintCheckoutMutationError = ErrorType<void>
+    export type CreateFiatMintCheckoutMutationError = ErrorType<CreateFiatMintCheckout402 | void>
 
     /**
  * @summary Create a Stripe-hosted Checkout for 100 scanner credits
  */
-export const useCreateFiatMintCheckout = <TError = ErrorType<void>,
+export const useCreateFiatMintCheckout = <TError = ErrorType<CreateFiatMintCheckout402 | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFiatMintCheckout>>, TError,{data: BodyType<FiatMintCheckoutRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createFiatMintCheckout>>,

@@ -130,6 +130,27 @@ export function usePrepaidCredits() {
     }
   }, [grant, request]);
 
+  /** Adopt the exact server outage challenge; never create a replacement invoice. */
+  const acceptContinuity = useCallback((failure: unknown): boolean => {
+    if (!alive.current || active.current || current.current || grant ||
+        !isHttpFailure(failure) || failure.status !== 402) return false;
+    try {
+      const body = failure.data as Record<string, unknown>;
+      const quote = parseChallenge(failure);
+      if (body.error !== "fiat_gateway_offline" ||
+          body.fallback !== "native_lightning_active" ||
+          body.payment_endpoint !== "/api/mint-macaroon" ||
+          quote.amountSats !== 100_000 || body.credits !== 100)
+        throw new Error("Wrong continuity product");
+      current.current = quote;
+      setChallenge(quote); setError(""); setPhase("awaiting_payment");
+      return true;
+    } catch {
+      setPhase("error"); setError("Invalid continuity invoice. Do not pay.");
+      return false;
+    }
+  }, [grant]);
+
   const clear = useCallback(() => {
     if ((challenge || grant) && !window.confirm(grant
       ? "Have you copied your Macaroon? It cannot be displayed again after you discard it."
@@ -137,5 +158,5 @@ export function usePrepaidCredits() {
     erase();
   }, [challenge, grant, erase]);
 
-  return { phase, challenge, grant, error, run, checkNow, clear };
+  return { phase, challenge, grant, error, run, checkNow, clear, acceptContinuity };
 }

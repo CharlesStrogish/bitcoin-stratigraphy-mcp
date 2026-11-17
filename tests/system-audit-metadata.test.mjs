@@ -194,3 +194,23 @@ test("documentation structured data and sitemap dates use the production domain"
     assert.equal(new URL(entry.match(/<loc>([^<]+)<\/loc>/)[1]).origin, origin);
   }
 });
+
+test("developers continuity guide is prerendered with honest failover scope and searchable metadata", () => {
+  const plugin = enterpriseSeoPlugin();
+  const template = load("artifacts/bitcoin-stratigraphy-dashboard/index.html");
+  for (const path of ["/developers", "/developers/"]) {
+    const html = plugin.transformIndexHtml.handler(template, { path });
+    assert.ok(html.includes('id="swarm-continuity"'));
+    for (const text of [
+      "Swarm Continuity &amp; Disaster Recovery", "Global Disaster Recovery Hub",
+      "AI failover protocols", "LLM disaster recovery",
+      "fiat_gateway_offline", "native_lightning_active",
+      "No payment is sent automatically", "fails closed",
+    ]) assert.ok(html.includes(text), text);
+    assert.match(html, /name="description" content="[^"]*AI failover protocols/);
+    assert.ok(!html.includes('data-testid="fiat-mint-checkout"'));
+  }
+  const readme = load("README.md");
+  assert.ok(readme.includes("## Swarm Continuity & Disaster Recovery"));
+  assert.equal((readme.match(/## 1-Line Installation/g) ?? []).length, 1);
+});

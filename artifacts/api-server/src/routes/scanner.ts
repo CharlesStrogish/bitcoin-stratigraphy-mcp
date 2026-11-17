@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
-import type { Express, RequestHandler } from "express";
+import { Router, type Express, type RequestHandler } from "express";
 import { ScanArticle12PromptBody, ScanArticle12PromptResponse, MintScannerMacaroonResponse } from "@workspace/api-zod";
 import { analyzeScannerPrompt, scannerPromptHash } from "../lib/scanner";
 import { createL402Middleware, parseL402Header } from "../middleware/l402";
@@ -12,14 +12,16 @@ import type { RevenueLedger } from "../services/ledger";
 import { createMemoryMacaroonUsageStore } from "../lib/macaroon-usage-store";
 import { SCANNER_RETAIL_SATS, SCANNER_CREDIT_SATS, SCANNER_CREDIT_DESCRIPTION } from "../lib/scanner-credits";
 
-export function registerScannerRoute(app: Express, options: {
+export type ScannerRouteOptions = {
   settlementRouter?: SettlementRouter;
   sessionSecret?: string;
   usageStore?: MacaroonUsageStore;
   revocationStore?: MacaroonRevocationStore;
   ledger?: RevenueLedger;
-} = {}): void {
-  const shared = {
+};
+
+function scannerPaymentOptions(options: ScannerRouteOptions) {
+  return {
     settlementRouter: options.settlementRouter ?? createDefaultMultiSettlementRouter(),
     sessionSecret: options.sessionSecret,
     usageStore: options.usageStore ?? createMemoryMacaroonUsageStore(),
@@ -28,6 +30,10 @@ export function registerScannerRoute(app: Express, options: {
     invoiceExpirySeconds: 900,
     enforceCurrentAmount: true,
   };
+}
+
+export function registerScannerRoute(app: Express, options: ScannerRouteOptions = {}): void {
+  const shared = scannerPaymentOptions(options);
   const gate = createL402Middleware({
     ...shared,
     amountSats: SCANNER_RETAIL_SATS,
@@ -63,14 +69,24 @@ export function registerScannerRoute(app: Express, options: {
     res.json(ScanArticle12PromptResponse.parse(analyzeScannerPrompt(req.body.prompt)));
   });
 
+  app.post("/api/mint-macaroon", createScannerMintHandler(shared));
+}
+
+/** Same product, scope, price and verifier on normal and disaster-recovery rails. */
+export function createScannerMintHandler(
+  options: ScannerRouteOptions = {},
+  fiatContinuity = false,
+): RequestHandler {
   const mintGate = createL402Middleware({
-    ...shared,
+    ...scannerPaymentOptions(options),
+    fiatContinuity,
     amountSats: SCANNER_CREDIT_SATS,
     description: SCANNER_CREDIT_DESCRIPTION,
     scopePath: "/api/scanner",
     scannerCredits: "mint",
   });
-  app.post("/api/mint-macaroon", (req, res, next): void => {
+  const router = Router();
+  router.use((req, res, next): void => {
     res.set("Cache-Control", "no-store");
     if ((req.body !== undefined && (typeof req.body !== "object" || req.body === null ||
         Array.isArray(req.body) || Object.keys(req.body).length !== 0)) ||
@@ -90,4 +106,5 @@ export function registerScannerRoute(app: Express, options: {
       scope: "/api/scanner",
     }));
   });
+  return router;
 }

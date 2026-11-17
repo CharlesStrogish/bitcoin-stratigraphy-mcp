@@ -5,7 +5,7 @@ export const FUNNEL_PAGES = [
     path: "developers",
     title: "BitcoinStratigraphy MCP Server | L402 Agentic Payments",
     description:
-      "Integrate autonomous Lightning Network micropayments and Article 12 compliance into your AI swarms via our open-source MCP server.",
+      "AI failover protocols and LLM disaster recovery for enterprise swarms: integrate native Lightning continuity, L402 payments and 19 MCP tools with Bitcoin Stratigraphy.",
     url: pageUrl("/developers"),
   },
   {

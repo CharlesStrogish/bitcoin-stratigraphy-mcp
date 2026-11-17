@@ -481,6 +481,17 @@ test("PostgreSQL fiat fulfillment is crash-safe, capped, owner-bound and never r
     return { owner, id };
   }
   try {
+    await t.test("continuity eligibility is local-only and blocks known payable or paid sessions", async () => {
+      const fresh = randomBytes(32).toString("hex");
+      assert.equal(await mint.canOfferNativeFallback(fresh), true);
+      for (const status of ["checkout", "paid", "paying", "ready", "delivered", "failed"]) {
+        const row = await order(status);
+        assert.equal(await mint.canOfferNativeFallback(row.owner), false);
+      }
+      const row = await order("checkout");
+      await pool.query("UPDATE fiat_mint_orders SET session_id=NULL WHERE id=$1", [row.id]);
+      assert.equal(await mint.canOfferNativeFallback(row.owner), true);
+    });
     await t.test(
       "test charges alone never spend while the treasury opt-in is off",
       async () => {

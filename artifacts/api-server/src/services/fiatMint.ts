@@ -153,6 +153,15 @@ export class FiatMint {
     return session.url;
   }
 
+  /** Local-only safety check; an existing payable/paid session must be recovered. */
+  async canOfferNativeFallback(owner: string): Promise<boolean> {
+    const { rows: [order] } = await this.options.pool.query<Order>(
+      "SELECT * FROM fiat_mint_orders WHERE owner_hash=$1",
+      [fiatOwnerHash(owner)],
+    );
+    return !order || (order.status === "checkout" && !order.session_id);
+  }
+
   /** Webhook hints never authorize funding: re-read the exact session from Stripe. */
   async acceptSession(sessionId: string) {
     const { stripe, livemode } = await this.options.stripe();

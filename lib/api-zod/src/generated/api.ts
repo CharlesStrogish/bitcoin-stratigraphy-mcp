@@ -9,7 +9,7 @@ import * as zod from 'zod';
 
 
 /**
- * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped.
+ * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers the existing native 100000-sat scanner product via HTTP 402 without sending any payment or changing fulfillment. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
  * @summary Create a Stripe-hosted Checkout for 100 scanner credits
  */
 export const CreateFiatMintCheckoutBody = zod.object({

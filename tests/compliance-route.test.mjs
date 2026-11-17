@@ -161,7 +161,7 @@ test("dual funnels prerender exact SEO metadata and keep scanner and escrow iden
   const input = read("index.html");
   for (const [route, title, description] of [
     ["developers", "BitcoinStratigraphy MCP Server | L402 Agentic Payments",
-      "Integrate autonomous Lightning Network micropayments and Article 12 compliance into your AI swarms via our open-source MCP server."],
+      "AI failover protocols and LLM disaster recovery for enterprise swarms: integrate native Lightning continuity, L402 payments and 19 MCP tools with Bitcoin Stratigraphy."],
     ["audit", "AI Article 12 Compliance Audit | ZK-Indemnity",
       "Run an instant, cryptographically verified EU AI Act compliance scan on your enterprise AI prompts using Lightning Network settlement."],
   ]) {

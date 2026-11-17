@@ -763,7 +763,7 @@ paths:
     post:
       operationId: createFiatMintCheckout
       summary: Create a Stripe-hosted Checkout for 100 scanner credits
-      description: Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped.
+      description: Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers the existing native 100000-sat scanner product via HTTP 402 without sending any payment or changing fulfillment. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
       requestBody:
         required: true
         content:
@@ -780,7 +780,30 @@ paths:
                 required: [url]
                 properties:
                   url: { type: string }
+        "402":
+          description: Native Lightning continuity invoice for 100 scanner calls. Requires a funded Lightning wallet; never grants unrelated MCP access.
+          headers:
+            WWW-Authenticate:
+              schema: { type: string }
+              description: 'L402 macaroon and invoice plus error="fiat_gateway_offline", fallback="native_lightning_active".'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, fallback, macaroon, invoice, payment_hash, amount_sats, credits, payment_endpoint, purchase_recovery]
+                properties:
+                  error: { type: string, enum: [fiat_gateway_offline] }
+                  fallback: { type: string, enum: [native_lightning_active] }
+                  macaroon: { type: string }
+                  invoice: { type: string }
+                  payment_hash: { type: string }
+                  amount_sats: { type: integer, enum: [100000] }
+                  credits: { type: integer, enum: [100] }
+                  payment_endpoint: { type: string, enum: [/api/mint-macaroon] }
+                  purchase_recovery: { type: string, enum: [/api/fiat-mint/status] }
+                  continuity_note: { type: string }
         "409": { description: Existing purchase must be recovered first }
+        "502": { description: Native Lightning invoice creation also unavailable; no payment or authorization bypass }
         "503": { description: Stripe configuration unavailable }
   /fiat-mint/status:
     post:

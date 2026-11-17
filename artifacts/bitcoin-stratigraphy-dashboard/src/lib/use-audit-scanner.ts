@@ -19,7 +19,7 @@ export function parseChallenge(error: HttpFailure): Challenge {
   let rest = scheme[1]!;
   const fields: Record<string, string> = {};
   while (rest) {
-    const match = /^\s*(macaroon|invoice)\s*=\s*"([^"\\]+)"\s*(,|$)/i.exec(rest);
+    const match = /^\s*(macaroon|invoice|error|fallback)\s*=\s*"([^"\\]+)"\s*(,|$)/i.exec(rest);
     if (!match || fields[match[1]!.toLowerCase()]) throw new Error("Ambiguous challenge");
     fields[match[1]!.toLowerCase()] = match[2]!;
     rest = rest.slice(match[0].length);
@@ -28,6 +28,11 @@ export function parseChallenge(error: HttpFailure): Challenge {
   if (!fields.macaroon || !/^[^\s:"\\]{1,24000}$/.test(fields.macaroon) ||
       !/^ln(?:bc|tb|bcrt)[a-z0-9]+$/i.test(fields.invoice ?? "")) throw new Error("Invalid challenge");
   const body = error.data as Record<string, unknown> | null;
+  if ((fields.error || fields.fallback) &&
+      (fields.error !== "fiat_gateway_offline" ||
+       fields.fallback !== "native_lightning_active" ||
+       body?.error !== fields.error || body?.fallback !== fields.fallback))
+    throw new Error("Inconsistent continuity metadata");
   if (!body || typeof body !== "object" ||
       body.invoice !== fields.invoice || body.macaroon !== fields.macaroon ||
       typeof body.amount_sats !== "number" || !Number.isFinite(body.amount_sats) ||

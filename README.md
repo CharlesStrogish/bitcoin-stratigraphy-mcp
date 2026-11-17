@@ -19,6 +19,54 @@ opt-in, and **production clearing settlement and payouts remain disabled**.
 
 **[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)**
 
+## Swarm Continuity & Disaster Recovery
+
+Bitcoin Stratigraphy is a **Global Disaster Recovery Hub** for enterprise AI
+swarms. For architects evaluating **AI failover protocols** and **LLM disaster
+recovery**, its native Lightning payment path reduces dependence on legacy fiat
+APIs during global banking or payment-provider outages.
+
+The protective wrapper is additive: successful fiat-to-Lightning checkout
+continues through the existing Stripe/Brevo L402 fulfillment loop unchanged.
+When `POST /api/fiat-mint` exceeds its **five-second checkout deadline**, encounters
+an upstream timeout, or receives a Stripe **5xx**, it offers the existing native
+Lightning product: **100,000 sats for 100 scanner calls**, with credits expiring
+30 days after issuance. Authentication, configuration and validation failures
+are not treated as outages. Existing payable or paid Stripe sessions must be
+recovered first; no fallback invoice is offered when ownership recovery is
+unavailable.
+
+```http
+HTTP/1.1 402 Payment Required
+WWW-Authenticate: L402 macaroon="<token>", invoice="<BOLT11>", error="fiat_gateway_offline", fallback="native_lightning_active"
+Cache-Control: no-store
+```
+
+The JSON body repeats `error` and `fallback` alongside `invoice`, `macaroon`,
+`payment_hash`, `amount_sats`, `credits`, and
+`payment_endpoint: "/api/mint-macaroon"`. An agent validates the exact quote,
+pays the native invoice once using its authorized wallet, then sends an empty
+`POST /api/mint-macaroon` with
+`Authorization: L402 <token>:<payment-preimage>` to redeem the **same** challenge.
+The browser displays that same invoice in its existing Lightning checkout.
+No new invoice is needed for verification.
+
+**Zero-friction swarm execution requires a preconfigured, funded Lightning
+wallet and explicit spending limits.** This is payment-path continuity, not a
+guarantee of uninterrupted global infrastructure. The 19-tool platform's MCP
+payments already use native L402; scanner credits do not grant unrelated MCP
+access. Both rails retain payment verification, expiry, revocation and shared
+credit limits. If native Lightning is also unavailable, access fails closed.
+
+The wrapper never sends a payment, cancels an order, retries an uncertain
+charge or bypasses Treasury controls. A timed-out Checkout creation may finish
+late, but creating a Checkout Session cannot itself charge a card. Preserve
+the original browser's HttpOnly ownership cookie and recover status at
+`POST /api/fiat-mint/status`; do not pay again if a card purchase already
+completed. Stripe webhook processing and Brevo delivery are unchanged.
+
+See the [developer continuity guide](https://bitcoinstratigraphy.com/developers/#swarm-continuity).
+
 ## 1-Line Installation
 
 ```sh

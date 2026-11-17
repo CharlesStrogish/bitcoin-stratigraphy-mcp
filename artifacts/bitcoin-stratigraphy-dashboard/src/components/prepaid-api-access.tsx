@@ -76,6 +76,7 @@ export default function PrepaidApiAccess() {
         <FiatMintCheckout
           lightningPending={invoiceRetained || pending}
           onPendingChange={setCardPending}
+          onContinuity={p.acceptContinuity}
         />
       )}
       {!complete && (

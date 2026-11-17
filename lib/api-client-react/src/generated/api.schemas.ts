@@ -2878,6 +2878,61 @@ export type CreateFiatMintCheckout200 = {
   url: string;
 };
 
+export type CreateFiatMintCheckout402Error = typeof CreateFiatMintCheckout402Error[keyof typeof CreateFiatMintCheckout402Error];
+
+
+export const CreateFiatMintCheckout402Error = {
+  fiat_gateway_offline: 'fiat_gateway_offline',
+} as const;
+
+export type CreateFiatMintCheckout402Fallback = typeof CreateFiatMintCheckout402Fallback[keyof typeof CreateFiatMintCheckout402Fallback];
+
+
+export const CreateFiatMintCheckout402Fallback = {
+  native_lightning_active: 'native_lightning_active',
+} as const;
+
+export type CreateFiatMintCheckout402AmountSats = typeof CreateFiatMintCheckout402AmountSats[keyof typeof CreateFiatMintCheckout402AmountSats];
+
+
+export const CreateFiatMintCheckout402AmountSats = {
+  NUMBER_100000: 100000,
+} as const;
+
+export type CreateFiatMintCheckout402Credits = typeof CreateFiatMintCheckout402Credits[keyof typeof CreateFiatMintCheckout402Credits];
+
+
+export const CreateFiatMintCheckout402Credits = {
+  NUMBER_100: 100,
+} as const;
+
+export type CreateFiatMintCheckout402PaymentEndpoint = typeof CreateFiatMintCheckout402PaymentEndpoint[keyof typeof CreateFiatMintCheckout402PaymentEndpoint];
+
+
+export const CreateFiatMintCheckout402PaymentEndpoint = {
+  '/api/mint-macaroon': '/api/mint-macaroon',
+} as const;
+
+export type CreateFiatMintCheckout402PurchaseRecovery = typeof CreateFiatMintCheckout402PurchaseRecovery[keyof typeof CreateFiatMintCheckout402PurchaseRecovery];
+
+
+export const CreateFiatMintCheckout402PurchaseRecovery = {
+  '/api/fiat-mint/status': '/api/fiat-mint/status',
+} as const;
+
+export type CreateFiatMintCheckout402 = {
+  error: CreateFiatMintCheckout402Error;
+  fallback: CreateFiatMintCheckout402Fallback;
+  macaroon: string;
+  invoice: string;
+  payment_hash: string;
+  amount_sats: CreateFiatMintCheckout402AmountSats;
+  credits: CreateFiatMintCheckout402Credits;
+  payment_endpoint: CreateFiatMintCheckout402PaymentEndpoint;
+  purchase_recovery: CreateFiatMintCheckout402PurchaseRecovery;
+  continuity_note?: string;
+};
+
 export type GetFiatMintStatus200Status = typeof GetFiatMintStatus200Status[keyof typeof GetFiatMintStatus200Status];
 
 

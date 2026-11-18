@@ -63,6 +63,9 @@ export default function DevelopersPage({ base = import.meta.env.BASE_URL, prepai
             <a className="fn-btn fn-btn-quiet" href={join(base, "docs")} data-testid="link-docs">
               Developer docs
             </a>
+            <a className="fn-btn fn-btn-quiet" href={join(base, "blog/enterprise-troubleshooting/")} data-testid="link-enterprise-troubleshooting">
+              Enterprise troubleshooting
+            </a>
           </div>
         </header>
 
@@ -159,6 +162,12 @@ npx bitcoin-stratigraphy-mcp-server --help`}</Code>
         <section className="fn-rise" aria-labelledby="swarm-continuity" data-testid="section-swarm-continuity">
           <p className="fn-step">06</p>
           <h2 id="swarm-continuity" className="fn-h2">Swarm Continuity &amp; Disaster Recovery</h2>
+          <p className="fn-note">
+            Troubleshooting a crashed swarm? Follow the{" "}
+            <a href={join(base, "blog/enterprise-troubleshooting/")}>enterprise disaster-recovery guide</a>{" "}
+            for LangChain and CrewAI hallucination errors, Stripe 5xx timeouts,
+            and Article 12 audit evidence blockers.
+          </p>
           <p className="fn-lede">
             A Global Disaster Recovery Hub for enterprise AI swarms: native Lightning
             keeps a payment path available when legacy fiat APIs fail. Enterprise

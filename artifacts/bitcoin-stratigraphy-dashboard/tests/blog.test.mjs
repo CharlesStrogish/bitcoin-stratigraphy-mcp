@@ -145,7 +145,7 @@ test("third article shares the existing index and article styling with complete 
   const post = posts.find((entry) => entry.slug === slug);
   assert.ok(post);
   assert.ok(posts.length >= 3);
-  assert.equal(posts[0].slug, slug);
+  assert.equal(posts[0].date, post.date);
   assert.equal(post.date, "2026-11-17");
   const html = renderBlogDocument(posts, post);
   const index = renderBlogDocument(posts);
@@ -173,6 +173,33 @@ test("third article shares the existing index and article styling with complete 
   assert.equal(schema.dateModified, schema.datePublished);
   assert.equal(schema.mainEntityOfPage["@id"], `${origin}/blog/${slug}/`);
   assert.ok(blogSitemap(posts).includes(`<loc>${origin}/blog/${slug}/</loc>`));
+});
+
+test("enterprise troubleshooting publishes the requested recovery sections and SDK entry points", async () => {
+  const posts = readBlogPosts();
+  const post = posts.find((entry) => entry.slug === "enterprise-troubleshooting");
+  assert.ok(post);
+  const headings = [
+    "Resolving LangChain & CrewAI Hallucination Errors",
+    "Bypassing Stripe & Fiat API 5xx Timeouts in Autonomous Swarms",
+    "Clearing EU AI Act Article 12 Compliance Blockers",
+  ];
+  const source = await readFile(new URL("../content/blog/enterprise-troubleshooting.md", import.meta.url), "utf8");
+  const runbook = await readFile(new URL("../../../docs/developers/enterprise-troubleshooting.md", import.meta.url), "utf8");
+  for (const content of [source, runbook]) {
+    for (const heading of headings) assert.ok(content.includes(`## ${heading}`));
+    assert.equal((content.match(/npm install @bitcoinstratigraphy\/agent-yield/g) ?? []).length >= 3, true);
+    assert.equal((content.match(/await withFiduciaryYield\(/g) ?? []).length, 3);
+  }
+  const html = renderBlogDocument(posts, post);
+  assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
+  assert.equal((html.match(/<h2\b/g) ?? []).length, 3);
+  assert.match(html, /rel="canonical" href="https:\/\/bitcoinstratigraphy.com\/blog\/enterprise-troubleshooting\/"/);
+  assert.doesNotMatch(html, /type="module"|id="root"/);
+  assert.ok(blogSitemap(posts).includes("/blog/enterprise-troubleshooting/"));
+  const developers = await readFile(new URL("../src/pages/developers.tsx", import.meta.url), "utf8");
+  assert.ok(developers.includes('data-testid="link-enterprise-troubleshooting"'));
+  assert.ok(developers.includes('join(base, "blog/enterprise-troubleshooting/")'));
 });
 
 test("individual posts use log branding without changing navigation or styling hooks", () => {

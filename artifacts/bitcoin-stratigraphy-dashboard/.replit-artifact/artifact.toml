@@ -108,6 +108,14 @@ from = "/audit/"
 to = "/audit/index.html"
 
 [[services.production.rewrites]]
+from = "/developers/enterprise-troubleshooting"
+to = "/blog/enterprise-troubleshooting/index.html"
+
+[[services.production.rewrites]]
+from = "/developers/enterprise-troubleshooting/"
+to = "/blog/enterprise-troubleshooting/index.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

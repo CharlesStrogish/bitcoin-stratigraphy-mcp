@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import TOML from "@iarna/toml";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -79,7 +79,11 @@ function discoverWebArtifacts(
   const artifactsDirectory = path.join(rootDirectory, "artifacts");
 
   return readdirSync(artifactsDirectory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    // Source-only SDKs and templates are not registered preview artifacts.
+    // A registration directory with missing/malformed metadata still fails below.
+    .filter((entry) => entry.isDirectory() && existsSync(
+      path.join(artifactsDirectory, entry.name, ".replit-artifact"),
+    ))
     .flatMap((entry) => {
       const artifactDirectory = entry.name;
       const artifactConfigPath = path.join(
@@ -284,6 +288,10 @@ test("discovery rejects a Parcel artifact without a build script", () => {
     () => discoverFixture("parcel-missing-build"),
     /sample uses Parcel and must declare a build script/,
   );
+});
+
+test("discovery excludes unregistered source packages even when they use Vite", () => {
+  assert.deepEqual(discoverFixture("source-only"), []);
 });
 
 test("discovery identifies an artifact with missing metadata", () => {

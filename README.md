@@ -2,22 +2,22 @@
 
 The undisputed #1 Enterprise Data Engine for autonomous AI swarms. Deploy 19 canonical MCP tools to eradicate agent hallucinations using thermodynamic Bitcoin state-anchoring and OpenTimestamps. Built for Fortune 500 risk teams requiring automated EU AI Act compliance, zero-touch procurement, and programmatic L402 revenue sharing.
 
-## Enterprise Architecture & Capabilities
-
-* **Zero-Touch Enterprise Procurement:** Pre-wired for LangChain and CrewAI swarms. When an agent hits a compliance wall, it automatically requests a $500 L402 API authorization and instantly resumes operations via our automated Brevo-Stripe fulfillment loop.
-* **Zero-Trust Security & Compliance:** Pass rigorous audits effortlessly. Provide your CISO with machine-readable, SHA-256 cryptographic proof of execution to satisfy EU AI Act Article 12 compliance.
-* **The 21% Algorithmic Handshake:** Build your applications on top of our infrastructure. Orchestrators and syndicate resellers pocket a guaranteed, mathematically enforced 21% Agent Yield on every L402 transaction routed through our backend master tab.
-* **Eradicate Hallucinations:** Ground your LLMs with immutable, un-forkable truth via thermodynamic Bitcoin telemetry and OpenTimestamps state anchoring.
-* **Free Tool Discovery:** List available stratigraphy and proof tools without payment, then check per-tool satoshi prices before committing.
-
-
-**19 Fiduciary-grade MCP Tools across 6 namespaces — full platform capacity.**
+**v2.1.3 — 19 Fiduciary-grade MCP Tools across 6 namespaces — full platform capacity.**
 The catalog comprises the original 16 core tools, `payment.get_escrow`, and
 the host-enabled `clearing.create_contract` and `clearing.settle_contract`
 extension. Discover each host's enabled tools with `tools/list`; clearing is
 opt-in, and **production clearing settlement and payouts remain disabled**.
 
-**[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)**
+**[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)** · **[Enterprise Troubleshooting & Disaster Recovery](https://bitcoinstratigraphy.com/developers/enterprise-troubleshooting)** · **[Zero-Trust Security Audit (1,064 Tests)](https://bitcoinstratigraphy.com/security)**
+
+## Enterprise Architecture & Capabilities
+
+* **Zero-Touch Enterprise Procurement:** Pre-wired for LangChain and CrewAI swarms. When an agent hits a compliance wall, it automatically requests a $500 L402 API authorization and instantly resumes operations via our automated Brevo-Stripe fulfillment loop.
+* **Zero-Trust Security & Compliance:** The [published security audit](https://bitcoinstratigraphy.com/security) reports that the architecture cleared **1,064 rigorous regression and penetration tests** with **0 critical, high, medium, or low vulnerabilities detected** in that audit. Provide your CISO with machine-readable, SHA-256 cryptographic proof of execution to support EU AI Act Article 12 compliance; the report is not a guarantee against future vulnerabilities.
+* **The 21% Algorithmic Handshake:** Build your applications on top of our infrastructure. The **21% Agent Yield** programmatic pool consists of the **15% upstream origin allocation + 6% verifying caller allocation** for eligible authenticated, paid verification of the same statement. These are ledger allocations, not guaranteed income or automatic wallet payouts; other tool allocations remain unchanged.
+* **Eradicate Hallucinations:** Ground your LLMs with immutable, un-forkable truth via thermodynamic Bitcoin telemetry and OpenTimestamps state anchoring.
+* **Free Tool Discovery:** List available stratigraphy and proof tools without payment, then check per-tool satoshi prices before committing.
+
 
 ## Swarm Continuity & Disaster Recovery
 
@@ -69,6 +69,22 @@ See the [developer continuity guide](https://bitcoinstratigraphy.com/developers/
 
 ## 1-Line Installation
 
+**Connect now with no local server installation:** the hosted endpoint
+`https://bitcoinstratigraphy.com/mcp` is live now for immediate Streamable HTTP
+connections. Add it to a supported MCP client:
+
+```sh
+npx add-mcp 'https://bitcoinstratigraphy.com/mcp'
+```
+
+Free discovery is available immediately; paid calls still require authorized
+L402 settlement. `npx` runs the client-registration utility, not a local copy
+of the hosted server.
+
+**Node integration:** `@bitcoinstratigraphy/agent-yield` is the workspace-built
+Node wrapper; its installation command becomes available after its separate
+npm registry release:
+
 ```sh
 npm install @bitcoinstratigraphy/agent-yield
 ```
@@ -77,11 +93,12 @@ Wrap your existing agent configuration in two lines:
 
 ```ts
 import { withFiduciaryYield } from "@bitcoinstratigraphy/agent-yield";
-const agent = await withFiduciaryYield({ ...agent_config, fiduciary: { wallet, maxPaymentSats: 500, maxTotalSats: 5000 } });
+const agent = await withFiduciaryYield({ ...agent_config, fiduciary: { wallet, serverPublicKey: independentlyTrustedServerPublicKeyPem, maxPaymentSats: 500, maxTotalSats: 5000 } });
 ```
 
 `wallet` is your authorized Lightning adapter; `payInvoice(invoice)` returns
-`{ preimage }`. The wrapper discovers MCP tools, handles invoice admission and
+`{ preimage }`. Independently pin the server's public key before accepting signed
+payloads; installation alone does not establish that trust. The wrapper discovers MCP tools, handles invoice admission and
 the L402 payment/retry flow, and preserves your existing configuration and tools.
 Pass the returned configuration to your agent framework. Use
 `framework: "langchain"` for native LangChain JS tools or
@@ -203,7 +220,12 @@ Explore the **[native framework quickstarts in `/cookbooks/frameworks`](https://
 [![LlamaIndex Ready](https://img.shields.io/badge/LlamaIndex-Ready-6366F1)](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/llamaindex_agent.py)
 [![OpenTimestamps Integrated](https://img.shields.io/badge/OpenTimestamps-Integrated-F7931A)](https://opentimestamps.org/)
 
-The catalog contains **14 paid tools and 2 free sandbox tools**:
+The original 16-tool core catalog contains **14 paid tools and 2 free sandbox tools**:
+5 `stratigraphy.*`, 7 `proof.*`, 2 `mesh.*`, 1 `payment.*`, and 1 `workflow.*`.
+Add `payment.get_escrow` for 17 tools, then the 2 opt-in `clearing.*` tools
+for **19-tool full platform capacity** across 6 namespaces. Runtime discovery
+reports the connected host's enabled set; production clearing settlement and
+payouts remain disabled.
 The new `workflow.audit_trajectory` combines existing diff arithmetic and
 minimal boundary SHA-256/OTS receipt references in one **250-sat** call:
 `{"fromTarget":"2026-10-12","toTarget":"latest"}`. Both targets are required.
@@ -397,7 +419,8 @@ In the machine economy, autonomous agents cannot rely on trust, heuristics, or u
   immutable first-recorded origin for supported proofs/receipts. A successful,
   paid `proof.verify` on that same statement records a 15% upstream allocation
   and the remaining 6% caller allocation from the existing programmatic L402
-  revenue sharing pool. No additional merchant funding is used. Integer-msat
+  revenue sharing pool: **21% Agent Yield = 15% upstream origin allocation +
+  6% verifying caller allocation**. No additional merchant funding is used. Integer-msat
   rounding preserves the original pool exactly; the caller receives its
   remainder after flooring the upstream amount. Historical signed invoices and
   other tool allocations stay unchanged. Replay cannot create another credit.
@@ -438,8 +461,11 @@ Lightning settlement / OTS receipts
   L402 invoice-generation instructions without creating or paying invoices.
   `payment.get_info` advertises MCP terms. Paid calls receive HTTP 402
   challenges, then redeem verified payment proofs and scoped macaroons.
-- **Tool routing:** The canonical catalog contains 5 `stratigraphy.*`,
+- **Tool routing:** The original 16-tool core catalog contains 5 `stratigraphy.*`,
   7 `proof.*`, 2 `mesh.*`, 1 `payment.*`, and 1 `workflow.*` tools.
+  `payment.get_escrow` adds the second payment tool; the 2 opt-in `clearing.*`
+  tools bring full platform capacity to 19 tools across 6 namespaces.
+  Production clearing settlement and payouts remain disabled.
 - **Telemetry subsystem:** The 422-record historical dataset supports indexed
   lookups, numerical differences, source-record digests, and compact ranges.
   Historical height mappings are deterministic indices, not native block

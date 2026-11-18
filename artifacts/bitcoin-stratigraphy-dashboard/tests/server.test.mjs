@@ -18,6 +18,9 @@ before(async () => {
   await writeFile(path.join(directory, "llms.txt"), "agent discovery");
   await writeFile(path.join(directory, "llms-full.txt"), "full discovery");
   await writeFile(path.join(directory, "asset.js"), "console.log('asset')");
+  await mkdir(path.join(directory, "blog", "enterprise-troubleshooting"), { recursive: true });
+  await writeFile(path.join(directory, "blog", "enterprise-troubleshooting", "index.html"),
+    '<link rel="canonical" href="https://bitcoinstratigraphy.com/blog/enterprise-troubleshooting/" /><h1>Enterprise troubleshooting</h1>');
   for (const page of pages) {
     await mkdir(path.join(directory, page));
     await writeFile(path.join(directory, page, "index.html"),
@@ -50,6 +53,19 @@ const request = (url, host, options = {}) => new Promise((resolve, reject) => {
   });
   req.on("error", reject);
   req.end();
+});
+
+test("README troubleshooting aliases serve the existing article instead of the homepage", async () => {
+  for (const route of ["/developers/enterprise-troubleshooting", "/developers/enterprise-troubleshooting/"]) {
+    const result = await request(route, "bitcoinstratigraphy.com");
+    assert.equal(result.status, 200);
+    const html = await result.text();
+    assert.ok(html.includes("<h1>Enterprise troubleshooting</h1>"));
+    assert.ok(html.includes('rel="canonical" href="https://bitcoinstratigraphy.com/blog/enterprise-troubleshooting/"'));
+    const head = await request(route, "bitcoinstratigraphy.com", { method: "HEAD" });
+    assert.equal(head.status, 200);
+    assert.equal(await head.text(), "");
+  }
 });
 
 test("legacy hosts permanently redirect with the exact path and query before file serving", async () => {

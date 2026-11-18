@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import { HEALTH_CHECK_RESPONSE } from "../lib/api-zod/health-check-contract.mjs";
@@ -22,6 +25,23 @@ test("discovers registered web artifacts with production services", () => {
     !artifacts.some((artifact) => artifact.directory === "mockup-sandbox"),
     "development-only artifacts must not be checked as published routes",
   );
+});
+
+test("publication discovery ignores source-only directories but rejects incomplete registrations", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "publication-discovery-"));
+  try {
+    mkdirSync(path.join(root, "artifacts", "source-only"), { recursive: true });
+    writeFileSync(path.join(root, "artifacts", "source-only", "package.json"), '{"name":"source-only"}');
+    for (const discover of [discoverPublishedWebArtifacts, discoverPublishedApiArtifacts]) {
+      assert.deepEqual(discover(root), []);
+    }
+    mkdirSync(path.join(root, "artifacts", "registered", ".replit-artifact"), { recursive: true });
+    for (const discover of [discoverPublishedWebArtifacts, discoverPublishedApiArtifacts]) {
+      assert.throws(() => discover(root), /ENOENT/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("discovers API artifacts with published liveness endpoints", () => {

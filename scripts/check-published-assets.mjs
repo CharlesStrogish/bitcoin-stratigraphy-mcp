@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,7 +25,9 @@ export function discoverPublishedWebArtifacts(root = workspaceRoot) {
   const artifactsDirectory = path.join(root, "artifacts");
 
   return readdirSync(artifactsDirectory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && existsSync(
+      path.join(artifactsDirectory, entry.name, ".replit-artifact"),
+    ))
     .flatMap((entry) => {
       const configPath = path.join(
         artifactsDirectory,
@@ -58,7 +60,9 @@ export function discoverPublishedApiArtifacts(root = workspaceRoot) {
   const artifactsDirectory = path.join(root, "artifacts");
 
   return readdirSync(artifactsDirectory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && existsSync(
+      path.join(artifactsDirectory, entry.name, ".replit-artifact"),
+    ))
     .flatMap((entry) => {
       const configPath = path.join(
         artifactsDirectory,

@@ -27,3 +27,13 @@ and caused the newly tracked workflows to fail or silently choose a different po
 
 **How to apply:** Identify the processes holding the configured ports, stop only
 confirmed stale instances, then restart the existing managed workflows once.
+
+Check installed runtimes before interpreting a shell's `command not found` as a
+missing dependency.
+
+**Why:** Workspace shell calls can omit installed Node.js and pnpm from `PATH`
+even though the existing workflows use them. Reinstalling would change the
+toolchain unnecessarily.
+
+**How to apply:** Locate the existing Nix runtime binaries and supply a
+command-local `PATH`; do not hardcode an installation hash into project scripts.

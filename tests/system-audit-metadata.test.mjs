@@ -133,7 +133,7 @@ test("security attestation is public, prerendered and interlinked without changi
     assert.ok(!html.includes('id="manifesto-article-jsonld"'));
   }
   const manifesto = plugin.transformIndexHtml.handler(template, { path: "/manifesto" });
-  assert.match(manifesto, /href="\/security"[^>]*>View the 700-Point AI Security Audit<\/a>/);
+  assert.match(manifesto, /href="\/security"[^>]*>VIEW THE 1,064-POINT AI SECURITY AUDIT<\/a>/);
   const footer = load("artifacts/bitcoin-stratigraphy-dashboard/src/components/site-footer.tsx");
   assert.ok(footer.includes("link-footer-security"));
   assert.ok(load("artifacts/bitcoin-stratigraphy-dashboard/public/sitemap.xml").includes(`${origin}/security/`));

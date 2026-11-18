@@ -2,7 +2,7 @@
 
 The undisputed #1 Enterprise Data Engine for autonomous AI swarms. Deploy 19 canonical MCP tools to eradicate agent hallucinations using thermodynamic Bitcoin state-anchoring and OpenTimestamps. Built for Fortune 500 risk teams requiring automated EU AI Act compliance, zero-touch procurement, and programmatic L402 revenue sharing.
 
-## What can you do with Bitcoin Stratigraphy MCP?
+## Enterprise Architecture & Capabilities
 
 * **Zero-Touch Enterprise Procurement:** Pre-wired for LangChain and CrewAI swarms. When an agent hits a compliance wall, it automatically requests a $500 L402 API authorization and instantly resumes operations via our automated Brevo-Stripe fulfillment loop.
 * **Zero-Trust Security & Compliance:** Pass rigorous audits effortlessly. Provide your CISO with machine-readable, SHA-256 cryptographic proof of execution to satisfy EU AI Act Article 12 compliance.

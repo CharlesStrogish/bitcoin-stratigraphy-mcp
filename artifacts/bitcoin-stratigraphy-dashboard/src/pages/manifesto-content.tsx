@@ -496,7 +496,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                     className="mf-cta mf-cta-alt"
                     data-testid="link-security-audit"
                   >
-                    View the 700-Point AI Security Audit
+                    VIEW THE 1,064-POINT AI SECURITY AUDIT
                   </a>
                 </p>
                 <a href="#top" className="mf-top">

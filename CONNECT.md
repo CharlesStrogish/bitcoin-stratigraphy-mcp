@@ -356,6 +356,6 @@ as the `send` helper above.
 ## Configuration references
 
 - [Cursor MCP integrations](https://cursor.com/help/customization/mcp)
-- [Goose extensions and native configuration](https://block.github.io/goose/docs/getting-started/using-extensions)
+- [Goose extensions and native configuration](https://goose-docs.ai/docs/getting-started/using-extensions/)
 - [ElizaOS MCP plugin character configuration](https://docs.elizaos.ai/runtime/services)
 - [`mcp-remote` stdio bridge](https://www.npmjs.com/package/mcp-remote)

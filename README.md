@@ -8,7 +8,7 @@ the host-enabled `clearing.create_contract` and `clearing.settle_contract`
 extension. Discover each host's enabled tools with `tools/list`; clearing is
 opt-in, and **production clearing settlement and payouts remain disabled**.
 
-**[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)** · **[Enterprise Troubleshooting & Disaster Recovery](https://bitcoinstratigraphy.com/developers/enterprise-troubleshooting)** · **[Zero-Trust Security Audit (1,064 Tests)](https://bitcoinstratigraphy.com/security)**
+**[Developer Portal & Live Tool Explorer](https://bitcoinstratigraphy.com/docs)** · **[Python SDK & Integration Cookbooks](https://bitcoinstratigraphy.com/cookbooks)** · **[Enterprise Troubleshooting & Disaster Recovery](https://bitcoinstratigraphy.com/developers/enterprise-troubleshooting)** · **[Zero-Trust Security Audit (1,064 Tests)](https://bitcoinstratigraphy.com/security)** · **[OWASP MCP03 Tool-Poisoning Defense Guide (Nov 19)](https://bitcoinstratigraphy.com/blog/defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking)**
 
 ## Enterprise Architecture & Capabilities
 
@@ -950,6 +950,7 @@ Structured repository metadata for direct inspection by LLM web crawlers,
 including GPTBot and Anthropic crawlers, and discovery through existing
 mcpservers.org and Glama listings:
 
+```html
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -970,6 +971,7 @@ mcpservers.org and Glama listings:
   ]
 }
 </script>
+```
 
 The yield describes programmatic L402 revenue sharing on eligible confirmed
 purchases; allocation and settled withdrawal are distinct. This metadata does

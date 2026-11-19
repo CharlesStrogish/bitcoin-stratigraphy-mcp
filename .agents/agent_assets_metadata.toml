@@ -98,3 +98,17 @@ mtime_ms = 1795100259208
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/802870e4-2c0a-4653-a35b-45ae81db9a5b/b6ad1afb-0a62-4b98-800e-817ac57564e4"
 storage_version_token = "1795100304675254"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "0KBsZB2aFjrxNLTQAvctw"
+uri = "file://docs/github-conversion-audit.md"
+type = "text"
+title = "Two-repository GitHub conversion and boilerplate audit"
+description = "Three primary-documentation fixes, six read-only companion findings, a 53-target external-link register, and all requested verification results."
+logical_id = "22af6e95-fa74-4849-9f8d-449733b962c5"
+content_hash = "sha256:90edff5dae7f8c74f4de17ad35f881d9098d489f2641cfdd0ca88180b61f9fef"
+size = 16199
+mtime_ms = 1795102643683
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/22af6e95-fa74-4849-9f8d-449733b962c5/5bdea4bb-25d3-45a7-a3cb-2249fc35f010"
+storage_version_token = "1795102686771314"
+content_type = "text/markdown"

@@ -38,3 +38,15 @@ data. Re-labeling a BTC amount as USD would misrepresent pricing.
 credits as a digital service without inventing reviews, shipping, or return
 policies; digital classification alone does not guarantee Google suppresses
 optional merchant warnings.
+
+Check GitHub's actual rendered README before assuming raw JSON-LD script tags
+are hidden or removed. A read-only GET of the repository's `readme` API endpoint
+with `Accept: application/vnd.github.html` exposes the rendered result.
+
+**Why:** GitHub displayed escaped script tags and unformatted JSON-LD as ordinary
+text during the public-documentation audit. A labeled HTML fence preserved the
+exact raw metadata while giving readers a properly formatted example.
+
+**How to apply:** Preserve the JSON-LD payload, source tags, and surrounding
+disclosures byte-for-byte when changing its Markdown presentation. Keep
+repository metadata assertions and the documentation-integrity guard passing.

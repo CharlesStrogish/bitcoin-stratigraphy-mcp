@@ -23,10 +23,10 @@ const schemaKeywords = [
   "NIP-98 kill switch", "OpenTimestamps",
 ];
 
-test("swarm defense article preserves the supplied body byte-for-byte", () => {
+test("swarm defense article preserves the approved body with URL and heading corrections", () => {
   const body = source.split("\n---\n")[1];
   assert.equal(createHash("sha256").update(body).digest("hex"),
-    "9f90174291dadd89e749cdb5e82dd705bca193bd654615154d5b75238cb4ce32");
+    "0f449dead580fdaf598b012b313a381559728215f76f0bfbbfd5fcbd636158ac");
   assert.equal(post.title, "Defending Autonomous AI Swarms Against Hijacking, MCP Tool Poisoning, and Drain Attacks");
   assert.equal(post.description, "Stop OWASP MCP03 tool poisoning, prompt-injection hijacking, and wallet drain attacks in LangChain, CrewAI, and AutoGPT swarms with Ed25519 hash pinning, L402 macaroon attenuation, and NIP-98 kill switches.");
   assert.equal(post.date, "2026-11-19");
@@ -34,6 +34,25 @@ test("swarm defense article preserves the supplied body byte-for-byte", () => {
   assert.equal(post.authorName, "Charles R. Strogish");
   assert.deepEqual(post.keywords, primaryKeywords);
   assert.deepEqual(post.schemaKeywords, schemaKeywords);
+});
+
+test("swarm defense code examples and JSON-LD contain only unmangled URLs and no duplicate body title", () => {
+  const html = renderBlogDocument(posts, post);
+  const blocks = [
+    ...html.matchAll(/<(code|pre)\b[^>]*>[\s\S]*?<\/\1>/g),
+    ...html.matchAll(/<script\b[^>]*type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/g),
+  ];
+  assert.ok(blocks.length > 4, "code examples and JSON-LD were inspected");
+  for (const block of blocks) assert.doesNotMatch(block[0], /\[https:\/\//);
+  assert.doesNotMatch(source.split("\n---\n")[0], /\[https:\/\//);
+  assert.match(post.html, /^<p><strong>Published:<\/strong> November 19, 2026/);
+  assert.doesNotMatch(post.html, /<h[12][^>]*>Defending Autonomous AI Swarms/);
+  assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
+  assert.equal((post.html.match(/<h2\b/g) ?? []).length, 4);
+  assert.match(post.html, /<code class="language-bash">npx add-mcp 'https:\/\/bitcoinstratigraphy\.com\/mcp'\n<\/code>/);
+  assert.ok(post.html.includes('fetch(&quot;https://bitcoinstratigraphy.com/.well-known/integrity.json&quot;)'));
+  assert.ok(post.html.includes('&quot;https://bitcoinstratigraphy.com/api/v1/compliance/revocation-snapshot&quot;'));
+  assert.ok(post.html.includes('endpoint=&quot;https://bitcoinstratigraphy.com/mcp&quot;'));
 });
 
 test("swarm defense initial head publishes exact canonical, social metadata and valid BlogPosting", () => {

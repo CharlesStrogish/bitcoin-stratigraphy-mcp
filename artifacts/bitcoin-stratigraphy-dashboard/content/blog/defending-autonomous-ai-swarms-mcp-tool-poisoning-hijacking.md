@@ -26,8 +26,6 @@ schemaKeywords:
   - "NIP-98 kill switch"
   - "OpenTimestamps"
 ---
-# Defending Autonomous AI Swarms Against Hijacking, MCP Tool Poisoning, and Drain Attacks
-
 **Published:** November 19, 2026 | **Author:** Charles R. Strogish, Architect of Bitcoin Stratigraphy  
 **Reading Time:** 8 Minutes | **Audit Baseline:** 1,064 Security Checks Passed · 1,002 Node Tests · 280 Python Tests · 100% Pipeline Coverage
 
@@ -56,7 +54,7 @@ Bitcoin Stratigraphy SHA-256 hashes its core tool descriptions and signs those d
 import crypto from "node:crypto";
 
 async function verifyStratigraphyIntegrity(pinnedPublicKeyPem: string) {
-  const res = await fetch("[https://bitcoinstratigraphy.com/.well-known/integrity.json](https://bitcoinstratigraphy.com/.well-known/integrity.json)");
+  const res = await fetch("https://bitcoinstratigraphy.com/.well-known/integrity.json");
   if (!res.ok) throw new Error(`Integrity manifest unavailable: HTTP ${res.status}`);
   const manifest = await res.json();
 
@@ -120,7 +118,7 @@ from bitcoin_stratigraphy_enterprise import SwarmFlightRecorder, Article12Notary
 
 # 1. Pre-flight check against signed revocation registry before swarm execution
 crl_response = requests.get(
-    "[https://bitcoinstratigraphy.com/api/v1/compliance/revocation-snapshot](https://bitcoinstratigraphy.com/api/v1/compliance/revocation-snapshot)",
+    "https://bitcoinstratigraphy.com/api/v1/compliance/revocation-snapshot",
     timeout=5,
 )
 crl_response.raise_for_status()
@@ -130,7 +128,7 @@ assert "as_of" in crl_snapshot and "next_update" in crl_snapshot
 
 # 2. Attach Zero-Knowledge Flight Recorder callbacks to LangChain / CrewAI agents
 flight_recorder = SwarmFlightRecorder(
-    endpoint="[https://bitcoinstratigraphy.com/mcp](https://bitcoinstratigraphy.com/mcp)",
+    endpoint="https://bitcoinstratigraphy.com/mcp",
     enforce_nip98=True,
 )
 notary_callback = Article12NotaryCallback(recorder=flight_recorder)
@@ -146,7 +144,7 @@ Bitcoin Stratigraphy is engineered for zero-friction onboarding across both auto
 
 * **Instant Zero-Install MCP Connection (Agents & Developers):** Connect Claude Code, Cursor, Codex, ElizaOS, or any Streamable HTTP orchestrator directly to our live stateless MCP 2026-07-28 server right now—and query `stratigraphy.list`, `proof.list`, or `POST /api/v1/cost` for free before spending a single satoshi:
   ```bash
-  npx add-mcp '[https://bitcoinstratigraphy.com/mcp](https://bitcoinstratigraphy.com/mcp)'
+  npx add-mcp 'https://bitcoinstratigraphy.com/mcp'
   ```
 * **$500 Enterprise Fiat-to-Lightning Bridge + Unstoppable Failover Protocol:** Risk teams can authorize a $500 L402 bridge granting **100 heuristic scanner calls for 30 days** through our Zero-Knowledge flight recorder via automated Stripe/Brevo fulfillment. If centralized banking rails or Stripe APIs suffer a 5xx outage or breach our five-second checkout deadline, our additive failover wrapper automatically emits `HTTP 402` with `error="fiat_gateway_offline"` and `fallback="native_lightning_active"`, offering the native 100,000-sat Lightning invoice so mission-critical swarms never stall.
 * **The 21% Programmatic Agent Yield:** Security integrators, syndicate resellers, and multi-agent orchestrators routing verified L402 traffic earn from our mathematically enforced **21% programmatic yield pool** (**15% upstream origin allocation + 6% verifying caller allocation** on eligible confirmed `proof.verify` settlements).

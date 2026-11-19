@@ -145,7 +145,7 @@ test("third article shares the existing index and article styling with complete 
   const post = posts.find((entry) => entry.slug === slug);
   assert.ok(post);
   assert.ok(posts.length >= 3);
-  assert.equal(posts[0].date, post.date);
+  assert.equal(posts[0].slug, "defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking");
   assert.equal(post.date, "2026-11-17");
   const html = renderBlogDocument(posts, post);
   const index = renderBlogDocument(posts);
@@ -298,7 +298,7 @@ test("build emits all blog documents and extends, rather than replaces, the site
     assert.ok(sitemap.includes(location));
   assert.ok(sitemap.includes(`<loc>${origin}/blog/</loc>`));
   for (const post of readBlogPosts())
-    assert.ok(sitemap.includes(`<loc>${origin}/blog/${post.slug}/</loc>`));
+    assert.ok(sitemap.includes(`<loc>${post.canonicalUrl ?? `${origin}/blog/${post.slug}/`}</loc>`));
 });
 
 test("production serves blog index and arbitrary generated slugs before the SPA, with real 404s", async (t) => {

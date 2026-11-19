@@ -10,6 +10,9 @@ export interface BlogPost {
   authorUrl?: string;
   dateModified?: string;
   publisherLogo?: string;
+  canonicalUrl?: string;
+  keywords?: string[];
+  schemaKeywords?: string[];
 }
 
 function formatDate(date: string) {

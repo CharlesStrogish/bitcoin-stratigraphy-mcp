@@ -453,6 +453,25 @@ body.blog-document *::after {
   background: hsl(var(--b-ink-2));
 }
 
+/* Keep this article's four-column threat matrix within narrow viewports. */
+[data-testid="article-defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking"] .blog-prose table {
+  display: table;
+  table-layout: fixed;
+  width: 100%;
+}
+[data-testid="article-defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking"] .blog-prose th,
+[data-testid="article-defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking"] .blog-prose td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  [data-testid="article-defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking"] .blog-prose th,
+  [data-testid="article-defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking"] .blog-prose td {
+    padding: 8px 5px;
+    font-size: 12px;
+  }
+}
+
 .blog-article-foot {
   display: flex;
   flex-wrap: wrap;

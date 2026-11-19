@@ -51,9 +51,10 @@ export function blogSchema(post?: BlogPost) {
       : {}),
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": pageUrl(`/blog/${post.slug}`),
+      "@id": post.canonicalUrl ?? pageUrl(`/blog/${post.slug}`),
     },
-    url: pageUrl(`/blog/${post.slug}`),
+    url: post.canonicalUrl ?? pageUrl(`/blog/${post.slug}`),
+    ...(post.schemaKeywords ? { keywords: post.schemaKeywords } : {}),
     author: post.authorName
       ? {
           "@type": "Person",
@@ -81,7 +82,8 @@ export function renderBlogDocument(
   const prefix = base.endsWith("/") ? base : `${base}/`;
   const title = post?.title ?? BLOG_TITLE;
   const description = post?.description ?? BLOG_DESCRIPTION;
-  const canonical = pageUrl(post ? `/blog/${post.slug}` : "/blog");
+  const canonical =
+    post?.canonicalUrl ?? pageUrl(post ? `/blog/${post.slug}` : "/blog");
   const css = readFileSync(
     new URL("./src/pages/blog.css", import.meta.url),
     "utf8",
@@ -93,6 +95,7 @@ export function renderBlogDocument(
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
+${post?.keywords ? `<meta name="keywords" content="${escapeHtml(post.keywords.join(", "))}">` : ""}
 <link rel="canonical" href="${canonical}">
 <link rel="icon" type="image/png" href="${prefix}favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -110,6 +113,7 @@ export function renderBlogDocument(
 <meta name="twitter:url" content="${canonical}">
 <meta name="twitter:image" content="${image}">
 ${post ? `<meta property="article:published_time" content="${post.date}T00:00:00Z">` : ""}
+${post?.dateModified ? `<meta property="article:modified_time" content="${post.dateModified}T00:00:00Z">` : ""}
 <script id="blog-jsonld" type="application/ld+json">${json}</script>
 <style>${css}</style></head>
 <body class="blog-document">${renderToStaticMarkup(createElement(BlogContent, { posts, post, base: prefix }))}</body></html>`;
@@ -124,7 +128,7 @@ export function blogSitemap(posts: BlogPost[]) {
     `<url><loc>${pageUrl("/blog")}</loc></url>`,
     ...posts.map(
       (post) =>
-        `<url><loc>${pageUrl(`/blog/${post.slug}`)}</loc><lastmod>${post.date}</lastmod></url>`,
+        `<url><loc>${post.canonicalUrl ?? pageUrl(`/blog/${post.slug}`)}</loc><lastmod>${post.dateModified ?? post.date}</lastmod></url>`,
     ),
   ].join("\n");
   return original.replace("</urlset>", `${entries}\n</urlset>`);

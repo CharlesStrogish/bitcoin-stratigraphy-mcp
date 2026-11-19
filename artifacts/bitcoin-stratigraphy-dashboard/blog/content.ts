@@ -4,6 +4,7 @@ import path from "node:path";
 import MarkdownIt from "markdown-it";
 import { parseDocument } from "yaml";
 import type { BlogPost } from "../src/pages/blog-content";
+import { siteUrl } from "../src/lib/site";
 
 export const CONTENT_DIRECTORY = fileURLToPath(
   new URL("../content/blog/", import.meta.url),
@@ -58,6 +59,7 @@ export function parseBlogPost(
     "authorUrl",
     "dateModified",
     "publisherLogo",
+    "canonicalUrl",
   ]) {
     if (
       metadata[field] !== undefined &&
@@ -77,6 +79,21 @@ export function parseBlogPost(
   }
   if (metadata.authorUrl && !metadata.authorName)
     return invalid("authorUrl requires authorName");
+  if (
+    metadata.canonicalUrl !== undefined &&
+    metadata.canonicalUrl !== siteUrl(`/blog/${slug}`)
+  )
+    return invalid("canonicalUrl must be the exact same-site article URL");
+  for (const field of ["keywords", "schemaKeywords"]) {
+    const values = metadata[field];
+    if (
+      values !== undefined &&
+      (!Array.isArray(values) ||
+        values.length === 0 ||
+        values.some((value) => typeof value !== "string" || !value.trim()))
+    )
+      return invalid(`${field} must be a nonempty list of nonempty strings`);
+  }
   if (metadata.dateModified !== undefined) {
     const modified = metadata.dateModified as string;
     if (
@@ -96,6 +113,13 @@ export function parseBlogPost(
     description: description!.trim(),
     slug: slug!,
     html: markdown.render(frontmatter[2]!),
+    ...(metadata.canonicalUrl
+      ? { canonicalUrl: metadata.canonicalUrl as string }
+      : {}),
+    ...(metadata.keywords ? { keywords: metadata.keywords as string[] } : {}),
+    ...(metadata.schemaKeywords
+      ? { schemaKeywords: metadata.schemaKeywords as string[] }
+      : {}),
     ...(metadata.authorName
       ? { authorName: metadata.authorName as string }
       : {}),

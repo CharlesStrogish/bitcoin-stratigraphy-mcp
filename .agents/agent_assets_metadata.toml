@@ -84,3 +84,17 @@ mtime_ms = 1794069220646
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/8f7a22bb-aba7-493b-a3e6-fd94c6debd01/cecc1a9a-fda3-472e-97cd-ba515f924e7c"
 storage_version_token = "1794069226000284"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "dx3snlT5P9QiR05S2yeX4"
+uri = "file://docs/site-integrity-audit.md"
+type = "text"
+title = "Site-wide copy-paste and markup audit"
+description = "Itemized fixes, audit coverage, regression guard, verification results, and safety boundaries."
+logical_id = "802870e4-2c0a-4653-a35b-45ae81db9a5b"
+content_hash = "sha256:1b8247abfafd7d8c89ceb05cc7cbf4a2883ee2660de74794178259d393eca202"
+size = 6172
+mtime_ms = 1795100259208
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/802870e4-2c0a-4653-a35b-45ae81db9a5b/b6ad1afb-0a62-4b98-800e-817ac57564e4"
+storage_version_token = "1795100304675254"
+content_type = "text/markdown"

@@ -38,4 +38,13 @@ answer.
   **Why:** A missed mock can still render valid payment UI from a live quote.
   **How to apply:** Intercept only the API endpoint, leaving Vite module requests
   untouched, and assert the fixture invoice before trusting layout measurements.
+
+- Source-copy buttons may fetch their payload asynchronously, and result-copy
+  buttons intentionally have nothing to copy until a result exists.
+  **Why:** A click followed by one microtask can falsely report a broken copy
+  action; merely opening explorer tabs does not populate their results.
+  **How to apply:** Await the actual write callback and provide inert, local
+  fixtures for data-dependent views. Never run a paid action just to audit its
+  clipboard formatting. Distinguish intentional Markdown/data payloads from
+  executable snippets.
   **Why:** Headless Chromium can permit writes while denying reads.

@@ -1,6 +1,6 @@
 # Enterprise Swarm Starter
 
-### Drop-in EU AI Act Compliance
+## Drop-in EU AI Act Compliance
 **Give your AI swarm a visible authorization boundary—and a human who can unblock it.**
 
 Start with a premium local command center, a working LangChain task, and a

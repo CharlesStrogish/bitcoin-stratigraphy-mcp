@@ -23,6 +23,7 @@
     "test": "node --test tests/*.test.mjs && pnpm -r --if-present run test",
     "test:python": "bash scripts/test-python.sh",
     "test:pipeline": "bash scripts/test-stratigraphy-coverage.sh",
+    "test:site-integrity": "node --test tests/site-integrity.test.mjs",
     "test:e2e": "tsx scripts/test-e2e-master.ts",
     "test:l402": "pnpm exec tsx scripts/test-l402.ts",
     "test:dvm": "tsx scripts/test-dvm-client.ts",

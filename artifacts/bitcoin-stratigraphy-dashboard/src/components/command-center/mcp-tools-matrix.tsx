@@ -216,12 +216,10 @@ export function McpToolsMatrix() {
           <span className="cc-install-label">
             <Package size={13} aria-hidden="true" /> npm
           </span>
-          <code data-testid="text-npx-command">
-            <span className="cc-prompt" aria-hidden="true">
-              ${" "}
-            </span>
-            {NPX_INSTALL_COMMAND}
-          </code>
+          <span className="cc-prompt" aria-hidden="true">
+            ${" "}
+          </span>
+          <code data-testid="text-npx-command">{NPX_INSTALL_COMMAND}</code>
         </div>
         <CopyTextButton
           variant="primary"

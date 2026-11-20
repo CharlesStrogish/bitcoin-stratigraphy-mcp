@@ -80,8 +80,9 @@ and MCP session open for tool execution.
 ## Enterprise Commercial Exemptions
 
 The core engine is licensed strictly under **AGPLv3**. Fortune 500 risk teams and
-CISOs deploying proprietary, air-gapped AI swarms must secure a Commercial
-Enterprise Exemption to avoid open-source IP contamination.
+Proprietary swarms that cannot meet AGPLv3 Section 13 obligations can buy a self-serve AGPLv3 Commercial Copyright Waiver at
+https://bitcoinstratigraphy.com/#enterprise-licensing (swarm_monthly $2,500/30 days,
+swarm_annual $25,000/365 days, global_monthly $25,000/30 days, global_annual
+$250,000/365 days, quoted in BTC at spot).
 
-Contact us directly at <https://bitcoinstratigraphy.com> to secure your
-$250,000/year Enterprise License.
+All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.

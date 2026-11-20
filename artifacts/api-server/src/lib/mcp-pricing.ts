@@ -124,7 +124,8 @@ export function quoteMcpTools(tools: string[]) {
       batch: {
         request_header: "X-L402-Batch-Size",
         header_value: "100",
-        max_requests: 100,
+        supported_batch_sizes: [1, 100, 1000, 10000],
+        max_requests: 10000,
         price_multiplier: 100,
         credential_scope: "exact MCP tool path",
       },

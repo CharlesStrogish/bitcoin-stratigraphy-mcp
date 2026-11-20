@@ -116,7 +116,8 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   assert.equal(software["@id"], origin + "/#software");
   assert.equal(software.name, "Bitcoin Stratigraphy MCP Server & L402 Oracle");
   assert.match(software.description, /EU AI Act Article 12/);
-  assert.match(software.description, /Automated Compliance SLAs/);
+  assert.match(software.description, /zero-SLA AGPLv3 Section 13 Commercial Copyright Waivers/);
+  assert.doesNotMatch(software.description, /Automated Compliance SLAs|\$250,000 USD\/year/);
   assert.equal(software.url, origin + "/");
   assert.equal(software.author["@id"], person["@id"]);
   assert.match(software.description, /npx -y @bitcoin-stratigraphy\/mcp-server/);
@@ -130,8 +131,9 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   assert.match(l402.description, /<macaroon>:<preimage>/);
   assert.match(l402.description, /<macaroon>:NWC_LOOKUP/);
   const license = offers.get(origin + "/#commercial-license");
-  assert.equal(license.name, "Commercial Enterprise License (Starting at $250k/Annual)");
-  assert.match(license.description, /licensing@bitcoinstratigraphy\.com/);
+  assert.equal(license.name, "AGPLv3 Commercial Copyright Waiver (from $2,500/30 days in BTC)");
+  assert.match(license.description, /^All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS\./);
+  assert.doesNotMatch(license.description, /Automated Compliance SLAs|licensing@/);
   assert.deepEqual(
     api.offers.map((offer) => offer["@id"]).sort(),
     [...offers.keys()].sort(),
@@ -218,8 +220,8 @@ test("developer pages, README and AI guides expose canonical documentation links
       origin + "/api/v1/escrow/genesis-receipt",
       "ba4f25dd-7f16-420c-9264-a16f102fd5a6",
       "AGPL",
-      "Starting at $250k/Annual",
-      "licensing@bitcoinstratigraphy.com",
+      "AGPLv3 Commercial Copyright Waiver",
+      "STRICTLY AS-IS, WITH ALL FAULTS",
     ]) {
       assert.ok(guide.includes(term), `${file}: ${term}`);
     }
@@ -289,7 +291,7 @@ test("public llms.txt preserves the exact approved autonomous discovery payload"
     '    agent = Agent(role="Treasury auditor", tools=tools)',
     "",
     "## Commercial Exemption",
-    "The core engine operates strictly under **AGPLv3**. Proprietary, air-gapped enterprise swarms MUST secure a $250,000/year Commercial Enterprise Exemption to avoid open-source IP contamination. Contact us at bitcoinstratigraphy.com.",
+    "The core engine operates under **AGPLv3**. Proprietary swarms that cannot meet Section 13 network source-disclosure can buy a self-serve AGPLv3 Commercial Copyright Waiver: swarm_monthly $2,500/30 days, swarm_annual $25,000/365 days, global_monthly $25,000/30 days, global_annual $250,000/365 days (each quoted in BTC at spot, locked 30 minutes, settled on-chain via POST /api/v1/waivers/quote and POST /api/v1/waivers/claim, which returns an Ed25519-signed certificate verifiable offline at /static/verify.html). All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.",
     "",
   ].join("\n");
   // Preserve the approved introduction verbatim while permitting requested discovery enrichment.

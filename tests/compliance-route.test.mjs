@@ -79,14 +79,17 @@ test("compliance marketing copy preserves approved text with live escrow pricing
       blocks.push(text(node).replace(/\s+/gu, " ").trim());
     }
   });
-  assert.equal(blocks.length, 23);
+  assert.equal(blocks.length, 24);
+  // Superseded licensing offer replaced by the self-serve AS-IS waiver disclosure.
+  assert.ok(blocks.includes("All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction."));
+  assert.doesNotMatch(blocks.join("\n"), /\$250k|Automated Compliance SLAs/);
   assert.equal(
     createHash("sha256").update(blocks.join("\n")).digest("hex"),
-    "3b0906dcaf6d28771ba3735c0938b2410a03c5b3d644b419b7ccb03fcc1d1474",
+    "d88d8fbcc663aaca9d117497fc4c2da6a60f57ef5df0e8ccea0b924e3d978499",
   );
 });
 
-test("compliance CTA opens the homepage live escrow terminal and licensing contact uses the CISO intake mailto", () => {
+test("compliance CTA opens the homepage live escrow terminal and licensing routes to the self-serve waiver", () => {
   const links = [];
   const intakeActions = [];
   walk(renderPage(), (node) => {
@@ -101,14 +104,15 @@ test("compliance CTA opens the homepage live escrow terminal and licensing conta
   const href = links.find(
     (node) => node.props["data-testid"] === "link-contact-licensing",
   )?.props.href;
-  assert.equal(href, cisoIntake.CISO_MAILTO_HREF);
+  assert.equal(href, "/#enterprise-licensing");
+  assert.notEqual(href, cisoIntake.CISO_MAILTO_HREF);
   const contact = links.find((node) => node.props["data-testid"] === "link-contact-licensing");
-  assert.equal(text(contact).trim(), "licensing@bitcoinstratigraphy.com");
+  assert.equal(text(contact).trim(), "Buy a waiver at /#enterprise-licensing");
   assert.equal(contact.props.className, "cmp-mail");
   assert.doesNotMatch(text(renderPage()), /\[Contact licensing@bitcoinstratigraphy\.com for Enterprise Licensing\]/);
   assert.match(read("src/pages/compliance.css"), /\.cmp-page \.cmp-mail \{ color: #e8b04a;/);
-  const mailto = new URL(href);
-  assert.equal(mailto.pathname, "licensing@bitcoinstratigraphy.com");
+  // The CISO worksheet stays available through the intake actions.
+  const mailto = new URL(cisoIntake.CISO_MAILTO_HREF);
   assert.equal(mailto.searchParams.get("subject"), cisoIntake.CISO_INTAKE_SUBJECT);
   assert.equal(
     mailto.searchParams.get("body"),

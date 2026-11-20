@@ -35,7 +35,7 @@ import type { RevenueLedger, RevenueRequestKind } from "../services/ledger";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import { paymentReference, recordRevenueWithRetry } from "../services/ledger";
 import { awaitingPaymentPreview, expectedRestOutputSchema, l402ChallengeGuidance } from "../lib/agent-conversion";
-import { SCANNER_CREDITS, SCANNER_CREDIT_SATS, SCANNER_CREDIT_SECONDS, SCANNER_CREDIT_DESCRIPTION } from "../lib/scanner-credits";
+import { SCANNER_CREDITS, SCANNER_CREDIT_SECONDS, scannerDescription } from "../lib/scanner-credits";
 
 export type L402Authorization = {
   macaroon: string;
@@ -59,8 +59,11 @@ export type L402MiddlewareOptions = {
   revocationStore?: MacaroonRevocationStore;
   requestKind?: RevenueRequestKind;
   allowBatch?: boolean;
+  /** MCP base tariffs remain fixed; unrelated REST admission pricing is unchanged. */
+  fixedUnitPrice?: boolean;
   /** Opt-in scanner funding/redemption only; existing gates remain unchanged. */
   scannerCredits?: "mint" | "redeem";
+  scannerPack?: { credits: number; seconds: number };
   /** Server-only opt-in on the fiat outage scanner mint, never caller-controlled. */
   fiatContinuity?: boolean;
   /** Enable only for new MCP invoices, never for settlement verification. */
@@ -189,8 +192,8 @@ export function createL402Middleware(
       }
       budgetRequests = budgetSats / unitFee;
     }
-    if (requestedBatch && (!options.allowBatch || requestedBatch !== "100")) {
-      res.status(400).json({error: "X-L402-Batch-Size must be 100 on a batch-capable route"});
+    if (requestedBatch !== undefined && (!options.allowBatch || !["1","100","1000","10000"].includes(requestedBatch))) {
+      res.status(400).json({error: "X-L402-Batch-Size must be 1, 100, 1000 or 10000 on a batch-capable route"});
       return;
     }
     if (options.invoicePow) {
@@ -244,15 +247,15 @@ export function createL402Middleware(
     }
     try {
       const requestedBatch = req.get("X-L402-Batch-Size");
-      if (requestedBatch && (!options.allowBatch || requestedBatch !== "100")) {
+      if (requestedBatch !== undefined && (!options.allowBatch || !["1","100","1000","10000"].includes(requestedBatch))) {
         res.status(400).json({
-          error: "X-L402-Batch-Size must be 100 on a batch-capable route",
+          error: "X-L402-Batch-Size must be 1, 100, 1000 or 10000 on a batch-capable route",
         });
         return;
       }
-      const batchSize = budgetRequests ?? (requestedBatch ? 100 : 1);
+      const batchSize = budgetRequests ?? (requestedBatch ? Number(requestedBatch) : 1);
       const quote = budgetSats === undefined ? thermodynamicQuote(
-        resolveAmountSats(req), batchSize, options.enforceCurrentAmount === true,
+        resolveAmountSats(req), batchSize, options.enforceCurrentAmount === true || options.fixedUnitPrice === true || requestedBatch !== undefined,
       ) : {
         baseAmountSats: budgetSats, amountSats: budgetSats, multiplier: 1,
         yieldGuaranteeSats: (budgetSats * 21) / 100,
@@ -269,8 +272,8 @@ export function createL402Middleware(
         description:
           (budgetSats !== undefined
             ? `${options.description} (High-Velocity ${budgetSats}-sat budget)`
-            : batchSize === 100
-            ? `${options.description} (100-call batch)`
+            : batchSize > 1
+            ? `${options.description} (${batchSize}-call batch)`
             : options.description) + (referralOwner ? ` (Swarm referral ${referralOwner})` : ""),
         expirySeconds: invoiceExpirySeconds,
         asset: "btc-lightning",
@@ -288,8 +291,8 @@ export function createL402Middleware(
         paymentHash: invoice.paymentHash,
         tier: "1-day",
         validUntil: Math.floor(now() / 1_000) +
-          (options.scannerCredits === "mint" ? SCANNER_CREDIT_SECONDS : invoiceExpirySeconds),
-        ...(options.scannerCredits === "mint" ? { scannerCredits: SCANNER_CREDITS } : {}),
+          (options.scannerCredits === "mint" ? options.scannerPack?.seconds ?? SCANNER_CREDIT_SECONDS : invoiceExpirySeconds),
+        ...(options.scannerCredits === "mint" ? { scannerCredits: options.scannerPack?.credits ?? SCANNER_CREDITS, scannerDynamic: !!options.scannerPack } : {}),
         amountMsats,
         baseAmountMsats: quote.baseAmountSats * 1_000,
         ...(referralOwner ? { swarmReferral: { owner: referralOwner, quotedAmountMsats: quote.amountSats * 1000 } } : {}),
@@ -351,8 +354,9 @@ export function createL402Middleware(
           bulk_funding:
             "Optional Whale Protocol: send X-Requested-Budget: 5000 (integer sats, at most 1000000) on a fixed-base-price route to buy a High-Velocity Macaroon. The budget must exactly fund at least two calls at the base unit fee; do not combine it with X-L402-Batch-Size. Pay the returned invoice once, then omit the funding header and reuse Authorization: L402 <macaroon>:<preimage> for the same tool/route until its shared max_requests budget or expiry is reached. These prepaid calls incur no thermodynamic surge; 21% of the full settled invoice is the conditional simulated yield, not an automatic Lightning payout.",
         },
-        max_requests: options.scannerCredits === "mint" ? SCANNER_CREDITS : batchSize,
-        ...(options.scannerCredits === "mint" ? { credits: SCANNER_CREDITS } : {}),
+        max_requests: options.scannerCredits === "mint" ? options.scannerPack?.credits ?? SCANNER_CREDITS : batchSize,
+        ...(options.scannerCredits === "mint" ? { credits: options.scannerPack?.credits ?? SCANNER_CREDITS,
+          quote_expires_at: new Date(now() + invoiceExpirySeconds * 1000).toISOString() } : {}),
         ...(budgetSats === undefined ? {} : {
           payment_mode: "high-velocity", budget_sats: budgetSats,
           unit_fee_sats: resolveAmountSats(req), surge_immunity: true,
@@ -373,6 +377,10 @@ export function createL402Middleware(
   };
 
   return async (req, res, next) => {
+    const batchHeader = req.get("X-L402-Batch-Size");
+    if (batchHeader !== undefined && (!options.allowBatch || !["1","100","1000","10000"].includes(batchHeader))) {
+      res.status(400).json({ error: "X-L402-Batch-Size must be 1, 100, 1000 or 10000 on a batch-capable route" }); return;
+    }
     // Optional sub-agent attribution (X-Agent-Id or body agent_id). Malformed
     // or conflicting declarations never reach a challenge or the wallet.
     const declaration = declaredAgentId(req);
@@ -480,7 +488,7 @@ export function createL402Middleware(
         }
         if (options.revocationStore) {
           try {
-            const ids = pass.scannerCredits || pass.highVelocityUnitMsats || pass.delegatePubkey || pass.requestLimits[0]?.maxRequests === 100
+            const ids = pass.scannerCredits || pass.highVelocityUnitMsats || pass.delegatePubkey || (pass.requestLimits[0]?.maxRequests ?? 1) > 1
               ? [...(pass.ancestorTokenIds ?? []), pass.tokenId] : [pass.tokenId];
             let revoked = false;
             for (const id of ids) {
@@ -509,7 +517,7 @@ export function createL402Middleware(
         pass.amountMsats > 0 &&
         (!pass.swarmReferral || !options.enforceCurrentAmount) &&
         (pass.scannerCredits !== undefined
-          ? (options.scannerCredits !== undefined && pass.amountMsats === SCANNER_CREDIT_SATS * 1000)
+          ? (options.scannerCredits !== undefined && (!options.scannerPack || pass.scannerCredits === options.scannerPack.credits))
           : pass.highVelocityUnitMsats !== undefined
           ? (!options.enforceCurrentAmount && typeof options.amountSats === "number" &&
               pass.highVelocityUnitMsats === resolveAmountSats(req) * 1_000)
@@ -519,8 +527,8 @@ export function createL402Middleware(
             : pass.baseAmountMsats ?? pass.amountMsats) ===
             resolveAmountSats(req) *
               1_000 *
-              (options.allowBatch && pass.requestLimits[0]?.maxRequests === 100
-                ? 100
+              (options.allowBatch && [100,1000,10000].includes(pass.requestLimits[0]?.maxRequests ?? 0)
+                ? pass.requestLimits[0]!.maxRequests
                 : 1))) &&
         pass.paymentAsset === "btc-lightning" &&
         pass.paymentProvider &&
@@ -532,11 +540,11 @@ export function createL402Middleware(
         let verification;
         try {
           const batch =
-            !pass.highVelocityUnitMsats && options.allowBatch && pass.requestLimits[0]?.maxRequests === 100;
-          const description = (pass.scannerCredits ? SCANNER_CREDIT_DESCRIPTION : pass.highVelocityUnitMsats
+            !pass.highVelocityUnitMsats && options.allowBatch && [100,1000,10000].includes(pass.requestLimits[0]?.maxRequests ?? 0);
+          const description = (pass.scannerCredits ? scannerDescription(pass.scannerCredits) : pass.highVelocityUnitMsats
             ? `${options.description} (High-Velocity ${pass.amountMsats / 1000}-sat budget)`
             : batch
-            ? `${options.description} (100-call batch)`
+            ? `${options.description} (${pass.requestLimits[0]!.maxRequests}-call batch)`
             : options.description) + (pass.swarmReferral ? ` (Swarm referral ${pass.swarmReferral.owner})` : "");
           const expectedAmountMsats = pass.amountMsats;
           const settlementKey = L402EdgeCache.key(

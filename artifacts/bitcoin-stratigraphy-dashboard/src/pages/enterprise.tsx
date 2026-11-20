@@ -4,12 +4,11 @@ import {
   ENTERPRISE_TITLE as TITLE,
   ENTERPRISE_DESCRIPTION as DESC,
 } from "@/lib/enterprise-seo";
-import { CISO_MAILTO_HREF } from "@/lib/ciso-intake";
 import { CisoIntakeActions } from "@/components/ciso-intake-actions";
 import "./enterprise.css";
 
 const BASE = import.meta.env.BASE_URL;
-const MAIL = CISO_MAILTO_HREF;
+const MAIL = `${BASE}#enterprise-licensing`;
 
 const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],
@@ -30,9 +29,10 @@ const SECTIONS: {
     kicker: "01 / Licensing and IP",
     title: "Run the engine behind your own firewall",
     body: [
-      "The public API and open-source option are governed by AGPLv3. For covered deployments that cannot meet AGPL source-disclosure obligations, an executed Commercial License provides a commercial exemption for the covered software, so you can operate it on private infrastructure without being required to release it under AGPL terms.",
-      "AGPLv3 does not automatically force all independent code or model weights to be open-sourced. Your proprietary agent code and model weights stay private, and the Commercial License removes the compliance question for the covered engine itself.",
-      "The exemption comes only from an executed commercial agreement. Public API fees and payment credentials do not purchase a software license. Third-party code and data keep their own terms.",
+      "The public API and open-source option are governed by AGPLv3. For covered deployments that cannot meet AGPL source-disclosure obligations, a self-serve AGPLv3 Commercial Copyright Waiver, paid in Bitcoin, waives Section 13 network source-disclosure for the covered software for a fixed 30- or 365-day term, so you can operate it on private infrastructure without being required to release it under AGPL terms.",
+      "AGPLv3 does not automatically force all independent code or model weights to be open-sourced. Your proprietary agent code and model weights stay private, and the waiver addresses Section 13 for the covered engine itself during its term.",
+      "The waiver comes only from a server-validated, Ed25519-signed Waiver Certificate tied to a confirmed Bitcoin transaction. Scanner credits and L402 payment credentials do not purchase a waiver. Third-party code and data keep their own terms.",
+      "All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.",
     ],
   },
   {
@@ -131,7 +131,7 @@ export default function EnterprisePage() {
             </p>
             <div className="ent-cta-row">
               <a href={MAIL} className="ent-cta" data-testid="link-contact-sales">
-                Contact Sales for Enterprise Sizing
+                Buy a self-serve AGPLv3 waiver in BTC
               </a>
               <CisoIntakeActions testIdPrefix="hero" />
             </div>
@@ -164,15 +164,15 @@ export default function EnterprisePage() {
 
           <section id="settlement" className="panel ent-sec ent-final">
             <div className="section-kicker">05 / Settlement model</div>
-            <h2>Priced to your swarm, settled in one transaction</h2>
+            <h2>Four fixed tiers, settled in one transaction</h2>
             <p>
-              Enterprise pricing is customized by swarm size and deployment
-              needs, settled securely via a single Bitcoin transaction paid in
-              full at the time of execution.
+              Single-Swarm waivers cost $2,500 per 30 days or $25,000 per 365
+              days; Global Organization waivers cost $25,000 per 30 days or
+              $250,000 per 365 days. Each is quoted in BTC at spot, locked for
+              30 minutes and settled on-chain in a single transaction.
             </p>
             <p>
-              Scope, support and deployment rights must be agreed in
-              writing. This page is not itself a grant of commercial rights and
+              {"All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction."} This page is not itself a grant of rights and
               makes no certification claims.
             </p>
             <div className="ent-cta-row">
@@ -181,7 +181,7 @@ export default function EnterprisePage() {
                 className="ent-cta"
                 data-testid="link-contact-sales-bottom"
               >
-                Contact Sales for Enterprise Sizing
+                Buy a self-serve AGPLv3 waiver in BTC
               </a>
               <CisoIntakeActions testIdPrefix="bottom" />
             </div>

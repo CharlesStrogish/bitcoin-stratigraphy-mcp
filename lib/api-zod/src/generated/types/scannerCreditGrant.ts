@@ -5,7 +5,6 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
-import type { ScannerCreditGrantAmountSats } from './scannerCreditGrantAmountSats';
 import type { ScannerCreditGrantCredits } from './scannerCreditGrantCredits';
 import type { ScannerCreditGrantScope } from './scannerCreditGrantScope';
 
@@ -13,7 +12,8 @@ export interface ScannerCreditGrant {
   macaroon: string;
   /** Original allocation, not remaining balance; reminting never replenishes credits. */
   credits: ScannerCreditGrantCredits;
-  amount_sats: ScannerCreditGrantAmountSats;
+  /** @minimum 1 */
+  amount_sats: number;
   /** Exclusive expiration in epoch seconds. */
   valid_until: number;
   scope: ScannerCreditGrantScope;

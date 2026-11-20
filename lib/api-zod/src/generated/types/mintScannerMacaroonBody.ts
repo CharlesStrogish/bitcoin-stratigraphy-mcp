@@ -5,10 +5,8 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+import type { MintScannerMacaroonBodyPack } from './mintScannerMacaroonBodyPack';
 
-export type ScannerCreditGrantAmountSats = typeof ScannerCreditGrantAmountSats[keyof typeof ScannerCreditGrantAmountSats];
-
-
-export const ScannerCreditGrantAmountSats = {
-  NUMBER_100000: 100000,
-} as const;
+export type MintScannerMacaroonBody = {
+  pack?: MintScannerMacaroonBodyPack;
+};

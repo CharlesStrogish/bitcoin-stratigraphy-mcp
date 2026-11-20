@@ -126,6 +126,9 @@ terms. See LICENSE for the full text and commercial licensing rider.
 AGPLv3 is a network copyleft license: if you modify the engine and users interact
 with your modified version over a network, Section 13 requires offering them its
 complete Corresponding Source. Organizations that cannot meet those obligations
-can request a Commercial Enterprise Exemption License (Starting at $250k/Annual;
-"AS IS" self-hosted, air-gapped delivery; zero SLAs) from
-licensing@bitcoinstratigraphy.com.
+can buy a self-serve AGPLv3 Commercial Copyright Waiver at
+https://bitcoinstratigraphy.com/#enterprise-licensing (swarm_monthly $2,500/30 days,
+swarm_annual $25,000/365 days, global_monthly $25,000/30 days, global_annual
+$250,000/365 days, quoted in BTC at spot).
+
+All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.

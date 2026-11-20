@@ -4,28 +4,44 @@ import { isHttpFailure, parseChallenge, type Challenge } from "./use-audit-scann
 
 type Phase = "idle" | "quoting" | "awaiting_payment" | "checking" | "complete" | "error" | "expired" | "cleared";
 
-function validGrant(value: ScannerCreditGrant, quote: Challenge): boolean {
-  return value?.macaroon === quote.macaroon && value.credits === 100 &&
-    value.amount_sats === 100_000 && value.scope === "/api/scanner" &&
+export type ScannerPack = "standard" | "heavy_swarm_1000";
+export const PACKS: Record<ScannerPack, { credits: number; usd: number; days: number; label: string }> = {
+  standard: { credits: 100, usd: 450, days: 30, label: "Scanner Block" },
+  heavy_swarm_1000: { credits: 1000, usd: 4000, days: 90, label: "Heavy Swarm Pack" },
+};
+type PricedChallenge = Challenge & { pack: ScannerPack; credits: number };
+
+function validGrant(value: ScannerCreditGrant, quote: PricedChallenge): boolean {
+  return value?.macaroon === quote.macaroon && value.credits === quote.credits &&
+    value.amount_sats === quote.amountSats && value.scope === "/api/scanner" &&
     Number.isSafeInteger(value.valid_until) && value.valid_until > Date.now() / 1000;
+}
+
+function quoteExpiry(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return fallback;
+  const ms = value > 1e12 ? value : value * 1000;
+  // Stop automatic polling slightly before the server-locked quote expires.
+  return Math.min(fallback, ms - 30_000);
 }
 
 /** Credentials stay in this mounted component only, never in storage or logs. */
 export function usePrepaidCredits() {
   const [phase, setPhase] = useState<Phase>("idle");
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [challenge, setChallenge] = useState<PricedChallenge | null>(null);
+  const [pack, setPack] = useState<ScannerPack>("standard");
   const [grant, setGrant] = useState<ScannerCreditGrant | null>(null);
   const [error, setError] = useState("");
-  const current = useRef<Challenge | null>(null);
+  const current = useRef<PricedChallenge | null>(null);
   const active = useRef(false);
   const generation = useRef(0);
   const controller = useRef<AbortController | null>(null);
   const alive = useRef(true);
 
-  const request = useCallback((authorization?: string) => {
+  const request = useCallback((selected: ScannerPack, authorization?: string) => {
     const abort = new AbortController();
     controller.current = abort;
-    return mintScannerMacaroon({
+    // Redemption must repeat the exact pack body used for the quote.
+    return mintScannerMacaroon(selected === "standard" ? {} : { pack: selected }, {
       credentials: "omit", redirect: "error", cache: "no-store",
       headers: authorization ? { Authorization: authorization } : {},
       signal: AbortSignal.any([abort.signal, AbortSignal.timeout(35_000)]),
@@ -61,7 +77,7 @@ export function usePrepaidCredits() {
     const version = generation.current;
     active.current = true; setPhase("checking"); setError("");
     try {
-      const result = await request(`Macaroon ${quote.macaroon}`);
+      const result = await request(quote.pack, `Macaroon ${quote.macaroon}`);
       if (!alive.current || version !== generation.current) return;
       if (!validGrant(result, quote)) throw new Error("Invalid grant");
       // Remove the unpaid challenge and stop polling before revealing the grant.
@@ -104,10 +120,12 @@ export function usePrepaidCredits() {
 
   const run = useCallback(async () => {
     if (active.current || current.current || grant) return;
+    const selected = pack;
+    const product = PACKS[selected];
     const version = generation.current;
     active.current = true; setPhase("quoting"); setError("");
     try {
-      await request();
+      await request(selected);
       if (!alive.current || version !== generation.current) return;
       // A new purchase must begin with a validated 402, never an unbound 200.
       throw new Error("Missing funding challenge");
@@ -116,19 +134,22 @@ export function usePrepaidCredits() {
       if (isHttpFailure(failure) && failure.status === 402) {
         try {
           const quote = parseChallenge(failure);
-          if (quote.amountSats !== 100_000 ||
-              (failure.data as { credits?: unknown }).credits !== 100) throw new Error("Wrong product");
-          current.current = quote; setChallenge(quote); setPhase("awaiting_payment");
+          const body = failure.data as { credits?: unknown; quote_expires_at?: unknown };
+          if (!Number.isSafeInteger(quote.amountSats) || body.credits !== product.credits) throw new Error("Wrong product");
+          const priced: PricedChallenge = { ...quote, pack: selected, credits: product.credits, expiresAt: quoteExpiry(body.quote_expires_at, quote.expiresAt) };
+          current.current = priced; setChallenge(priced); setPhase("awaiting_payment");
         } catch {
-          setPhase("error"); setError("Invalid 100,000-sat payment quote. Do not pay this invoice.");
+          setPhase("error"); setError("Invalid payment quote for the selected pack. Do not pay this invoice.");
         }
+      } else if (isHttpFailure(failure) && failure.status === 503) {
+        setPhase("error"); setError("The BTC/USD spot oracle is unavailable, so no quote was issued. No payment was initiated; try again shortly.");
       } else {
         setPhase("error"); setError("Unable to request prepaid access. No payment was initiated.");
       }
     } finally {
       if (version === generation.current) active.current = false;
     }
-  }, [grant, request]);
+  }, [grant, pack, request]);
 
   /** Adopt the exact server outage challenge; never create a replacement invoice. */
   const acceptContinuity = useCallback((failure: unknown): boolean => {
@@ -140,10 +161,11 @@ export function usePrepaidCredits() {
       if (body.error !== "fiat_gateway_offline" ||
           body.fallback !== "native_lightning_active" ||
           body.payment_endpoint !== "/api/mint-macaroon" ||
-          quote.amountSats !== 100_000 || body.credits !== 100)
+          !Number.isSafeInteger(quote.amountSats) || body.credits !== 100)
         throw new Error("Wrong continuity product");
-      current.current = quote;
-      setChallenge(quote); setError(""); setPhase("awaiting_payment");
+      const priced: PricedChallenge = { ...quote, pack: "standard", credits: 100, expiresAt: quoteExpiry(body.quote_expires_at, quote.expiresAt) };
+      current.current = priced;
+      setChallenge(priced); setError(""); setPhase("awaiting_payment");
       return true;
     } catch {
       setPhase("error"); setError("Invalid continuity invoice. Do not pay.");
@@ -158,5 +180,5 @@ export function usePrepaidCredits() {
     erase();
   }, [challenge, grant, erase]);
 
-  return { phase, challenge, grant, error, run, checkNow, clear, acceptContinuity };
+  return { phase, challenge, grant, error, pack, setPack, run, checkNow, clear, acceptContinuity };
 }

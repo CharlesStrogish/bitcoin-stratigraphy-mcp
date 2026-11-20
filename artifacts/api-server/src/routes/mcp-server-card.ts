@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import type { Express } from "express";
+import { licensingCompliance } from "../lib/licensing-compliance";
 import { mcpToolPrices } from "../lib/mcp-pricing";
 import { ENGINE_DESCRIPTION, MCP_TOOL_GROUPS } from "../lib/engine-metadata";
 import { mcpDiscoveryManifest } from "../lib/mcp-discovery-manifest";
@@ -13,7 +14,7 @@ import { paymentEscrowToolDefinition } from "../lib/payment-escrow-tool";
 export const MCP_RELEASE_VERSION = RELEASE_VERSION;
 export const MCP_RELEASE_DESCRIPTION =
   "OpenTimestamps AI Notary Hub: 19 Fiduciary-grade MCP Tools at full capacity across six namespaces, including payment.get_escrow and the host-enabled clearing.create_contract / clearing.settle_contract extension. Production clearing settlement and payouts remain disabled. Use tools/list for the host's enabled catalog. The original core has 14 paid L402 tools and 2 free sandbox tools. " +
-  "LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons, and " +
+  "LangChain/LlamaIndex Native integrations, 100-call Macro-Macaroons plus 1/1000/10000-call tiers, and " +
   "Free Sandbox available through stratigraphy.list and proof.list.";
 
 const baseServerCard = {
@@ -234,6 +235,7 @@ export const mcpServerCard = {
 
 /** Static registry discovery never opens an MCP session or executes tools. */
 export const registryServerCard = {
+  licensing_compliance: licensingCompliance,
   name: "bitcoin-stratigraphy-mcp",
   homepage: CANONICAL_ORIGIN,
   origin: CANONICAL_ORIGIN,

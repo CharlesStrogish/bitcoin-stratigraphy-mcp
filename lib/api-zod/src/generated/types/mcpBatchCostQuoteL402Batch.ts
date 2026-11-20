@@ -5,11 +5,13 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+import type { McpBatchCostQuoteL402BatchSupportedBatchSizesItem } from './mcpBatchCostQuoteL402BatchSupportedBatchSizesItem';
 
 export type McpBatchCostQuoteL402Batch = {
   request_header: 'X-L402-Batch-Size';
   header_value: '100';
-  max_requests: 100;
+  max_requests: 10000;
+  supported_batch_sizes?: McpBatchCostQuoteL402BatchSupportedBatchSizesItem[];
   price_multiplier: 100;
   credential_scope: 'exact MCP tool path';
 };

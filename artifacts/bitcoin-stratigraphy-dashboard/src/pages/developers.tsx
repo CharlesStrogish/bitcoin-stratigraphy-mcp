@@ -143,15 +143,15 @@ npx bitcoin-stratigraphy-mcp-server --help`}</Code>
           <p className="fn-step">05</p>
           <h2 id="dev-prepaid" className="fn-h2">Prepaid API Access (B2B)</h2>
           <dl className="fn-facts fn-prepaid-scope" data-testid="text-prepaid-scope">
-            <div><dt>Grants</dt><dd>100 calls to <code>POST /api/scanner</code></dd></div>
-            <div><dt>Validity</dt><dd>Credits expire 30 days after issuance.</dd></div>
+            <div><dt>Grants</dt><dd>100 calls to <code>POST /api/scanner</code> ($500 card or $450 BTC spot quote), or 1,000 calls in the Bitcoin-only Heavy Swarm Pack ($4,000 BTC spot quote)</dd></div>
+            <div><dt>Validity</dt><dd>100-call credits expire 30 days after issuance; Heavy Swarm Pack credits expire after 90 days.</dd></div>
             <div><dt>Not included</dt><dd>Does not fund unrelated MCP tools; those settle per call over L402.</dd></div>
           </dl>
           {prepaidAccess ?? (
             <div className="fn-prepaid" data-testid="panel-prepaid-static">
               <div className="fn-prepaid-mint">
                 <button type="button" className="fn-btn fn-btn-primary fn-btn-lg" disabled data-testid="button-mint-credits-static">
-                  Mint 100 API Credits (100,000 sats)
+                  Mint 100 API Credits ($450 in BTC)
                 </button>
                 <p className="fn-hint">The Lightning checkout loads in your browser.</p>
               </div>
@@ -178,7 +178,7 @@ npx bitcoin-stratigraphy-mcp-server --help`}</Code>
           <p className="fn-note">
             The fiat-to-Lightning scanner gateway preserves successful Stripe checkout.
             A five-second deadline, upstream timeout or Stripe 5xx response activates a
-            native 100,000-sat invoice for 100 scanner calls, valid for 30 days after
+            native Lightning invoice for 100 scanner calls, priced as a $450 BTC/USD spot quote locked for 15 minutes,, valid for 30 days after
             issuance. Existing payable or paid card sessions must be recovered first.
             No payment is sent automatically, and scanner credits do not authorize
             unrelated MCP tools.

@@ -1,11 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import "./enterprise-licensing-matrix.css";
-import { CopyTextButton } from "./copy-text-button";
-
-const LICENSING_EMAIL = "licensing@bitcoinstratigraphy.com";
-const INTAKE_HREF =
-  "mailto:licensing@bitcoinstratigraphy.com?subject=" +
-  encodeURIComponent("CISO Enterprise Licensing Intake");
+import { WaiverPurchase, WAIVER_DISCLOSURE } from "./waiver-purchase";
 
 const COMMUNITY = [
   "AGPLv3 License",
@@ -14,12 +9,12 @@ const COMMUNITY = [
 ];
 
 const ENTERPRISE = [
-  "Proprietary IP Shield / No Viral Copyleft",
-  "Air-Gapped / VPC Deployment",
+  "Time-Locked AGPLv3 Section 13 Waiver",
+  "Self-Hosted Air-Gapped / VPC Deployment",
   "EU AI Act Article 12 & 26(6) Tamper-Evident Flight Recorders",
   "L402 Runaway Swarm Circuit Breakers",
   "Cryptographically Signed Tool Integrity",
-  "Automated Compliance SLAs Available",
+  "Ed25519-Signed Waiver Certificate, Verifiable Offline",
 ];
 
 export function EnterpriseLicensingMatrix() {
@@ -60,42 +55,19 @@ export function EnterpriseLicensingMatrix() {
           aria-labelledby="elm-tier-enterprise"
           data-testid="card-tier-enterprise"
         >
-          <p className="elm-tier-label">Tier II</p>
-          <h4 id="elm-tier-enterprise">Commercial Enterprise Exemption</h4>
+          <p className="elm-tier-label">Self-serve Bitcoin waiver</p>
+          <h4 id="elm-tier-enterprise">AGPLv3 Commercial Copyright Waiver</h4>
           <p className="elm-price" data-testid="text-enterprise-price">
-            <span className="elm-price-from">Starting at</span>
-            <span className="elm-price-amount">$250k</span>
-            <span className="elm-price-term">/Annual</span>
+            <span className="elm-price-from">From</span>
+            <span className="elm-price-amount">$2,500</span>
+            <span className="elm-price-term">/30 days in BTC</span>
           </p>
           <ul className="elm-list">
             {ENTERPRISE.map((f) => (
               <li key={f}>{f}</li>
             ))}
           </ul>
-          <a
-            className="elm-cta"
-            href={INTAKE_HREF}
-            data-testid="link-enterprise-licensing-intake"
-          >
-            Request enterprise licensing
-            <span aria-hidden="true" className="elm-cta-arrow">
-              →
-            </span>
-          </a>
-          <div className="elm-direct-inquiry">
-            <span>
-              Direct inquiry:{" "}
-              <span className="elm-email">{LICENSING_EMAIL}</span>
-            </span>
-            <CopyTextButton
-              text={LICENSING_EMAIL}
-              label="Copy"
-              context="licensing email address"
-              description="Copy licensing email address"
-              testId="button-copy-licensing-email"
-              variant="compact"
-            />
-          </div>
+          <WaiverPurchase />
         </article>
         <details
           className="elm-risk-brief"
@@ -103,33 +75,30 @@ export function EnterpriseLicensingMatrix() {
         >
           <summary>CISO Vendor Risk &amp; AGPLv3 Copyleft Brief</summary>
           <div className="elm-risk-content">
-            <h5>Protect proprietary swarm IP with Tier II</h5>
+            <h5>What the waiver covers</h5>
             <p>
-              The $250,000/year Commercial Enterprise Exemption licenses the
-              engine under commercial terms for private VPC and air-gapped
-              deployments. Keep proprietary multi-agent weights and enterprise
-              logic under your commercial agreement, rather than relying on the
-              engine&apos;s AGPLv3 license.
+              A confirmed Bitcoin payment against a locked quote mints an
+              Ed25519-signed certificate waiving AGPLv3 Section 13 network
+              source-disclosure requirements for the purchased term. Single-Swarm
+              tiers cover one swarm; Global Organization tiers cover the
+              licensee organization.
             </p>
             <p>
               AGPLv3 Section 13 requires corresponding source access for covered
               modified software used over a network. It does not automatically
               make independent model weights or unrelated applications subject
-              to disclosure. Tier II defines the commercial rights for your
-              deployment.
+              to disclosure.
             </p>
-            <h5>Automated Compliance SLAs</h5>
+            <h5>AS-IS protocol terms</h5>
+            <p data-testid="text-risk-brief-disclosure">{WAIVER_DISCLOSURE}</p>
+            <h5>Offline evidence</h5>
             <p>
-              Export signed NIP-98 registry snapshots automatically from{" "}
+              Export signed NIP-98 registry snapshots from{" "}
               <code>/api/v1/compliance/revocation-snapshot</code>. Verify issuer
               signatures, snapshot freshness and agent non-revocation at the
-              signed timestamp without a network connection.
-            </p>
-            <p>
-              Receipt issuer-key rotation supports independently pinned current
-              and historical public keys. The Zero-Trust Article 12 Verifier
-              keeps execution evidence inspectable after rotation. Service
-              commitments are defined by the signed commercial agreement.
+              signed timestamp without a network connection. Receipt issuer-key
+              rotation supports independently pinned current and historical
+              public keys.
             </p>
           </div>
         </details>

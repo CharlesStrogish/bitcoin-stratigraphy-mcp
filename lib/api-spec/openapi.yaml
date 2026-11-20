@@ -22,6 +22,8 @@ info:
     - MCP uses Streamable HTTP at /mcp. The paid REST SSE feed at /api/v1/stratigraphy/stream is separate, refreshes snapshots on a 30-second cadence, and supports the three configured L402 router assets, not a promised Base USDC SSE payment path. Historical strata remain indexed daily data, not native block provenance.
     - Grounding receipts are off-chain, Schnorr-signed Bitcoin-tip attestations, not on-chain transactions, Groth16 proofs, or Bitcoin proof-of-work validity proofs. Groth16 verifies a defined statement bound to exact evidence; OTS verification requires an actual receipt and matching target digest, with Bitcoin attestation checked separately from calendar acceptance.
     - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
+
+    All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.
 servers:
   - url: https://bitcoinstratigraphy.com/api
     description: Canonical production API
@@ -763,7 +765,7 @@ paths:
     post:
       operationId: createFiatMintCheckout
       summary: Create a Stripe-hosted Checkout for 100 scanner credits
-      description: Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers the existing native 100000-sat scanner product via HTTP 402 without sending any payment or changing fulfillment. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
+      description: Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers a USD 450 spot-quoted native scanner product via HTTP 402 without sending any payment or changing fulfillment. Oracle failure returns 503, never a static fallback. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
       requestBody:
         required: true
         content:
@@ -797,7 +799,7 @@ paths:
                   macaroon: { type: string }
                   invoice: { type: string }
                   payment_hash: { type: string }
-                  amount_sats: { type: integer, enum: [100000] }
+                  amount_sats: { type: integer, minimum: 1 }
                   credits: { type: integer, enum: [100] }
                   payment_endpoint: { type: string, enum: [/api/mint-macaroon] }
                   purchase_recovery: { type: string, enum: [/api/fiat-mint/status] }
@@ -867,7 +869,7 @@ paths:
         Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP
         to verify incoming merchant settlement; 409 means keep the original
         invoice and poll again. Retail success consumes the prompt-bound single-use capability.
-        A settled 100000-sat Developer SaaS macaroon from /api/mint-macaroon
+        A settled issuer-bound Scanner Pack macaroon from /api/mint-macaroon
         carries credits=100 and permits 100 valid scanner calls across different prompts.
         Each admitted scan atomically consumes one shared credit. Credit grants expire
         30 days after issuance, and inherited descendant quotas and revocations remain enforced.
@@ -913,15 +915,16 @@ paths:
   /mint-macaroon:
     post:
       operationId: mintScannerMacaroon
-      summary: Buy 100 prepaid scanner credits for 100000 sats
+      summary: Buy a USD-pegged Bitcoin scanner pack
       description: >-
-        First POST returns a fixed 100000-sat invoice and an unsettled
-        credits=100 scanner-scoped macaroon in WWW-Authenticate. Pay that
+        First POST returns a 15-minute BTC spot quote at USD 450 for 100 calls
+        valid 30 days, or USD 4000 for heavy_swarm_1000 (1000 calls, 90 days), and an unsettled
+        credits=100 or credits=1000 scanner-scoped macaroon in WWW-Authenticate. Pay that
         invoice once, then repeat with Authorization L402 <macaroon>:<preimage>
         or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement,
         returns the same funded macaroon without consuming any scanner credit.
-        Funding confirmation is idempotent and never resets the 100-call budget.
-        Invoice expiry is 900 seconds; credits expire 30 days after issuance.
+        Funding confirmation is idempotent and never resets the 100- or 1000-call budget.
+        Invoice expiry is 900 seconds; credits expire 30 or 90 days after issuance.
         The B2B portal confirms settlement with Authorization Macaroon <token>.
         This shorthand is accepted only for issuer-authorized prepaid scanner
         credits and uses the same merchant-side verification as L402 NWC_LOOKUP.
@@ -933,6 +936,16 @@ paths:
           name: Authorization
           schema:
             type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                pack:
+                  type: string
+                  enum: [heavy_swarm_1000]
       responses:
         "200":
           description: Settled prepaid scanner capability
@@ -945,7 +958,7 @@ paths:
         "401":
           description: Expired or revoked credential
         "402":
-          description: Fixed 100000-sat invoice and unsettled capability
+          description: Dynamic BTC invoice and unsettled capability
           headers:
             WWW-Authenticate:
               schema:
@@ -3015,6 +3028,87 @@ paths:
           description: Malformed snapshot digest
         "422":
           description: Snapshot digest, source signatures, freshness, or mesh network binding failed validation
+  /v1/waivers/quote:
+    post:
+      operationId: createAgplWaiverQuote
+      summary: Lock a self-serve Bitcoin copyright waiver quote for 30 minutes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [tier, licensee_name, licensee_identifier, terms_accepted]
+              properties:
+                tier: { type: string, enum: [swarm_monthly, swarm_annual, global_monthly, global_annual] }
+                licensee_name: { type: string, minLength: 1, maxLength: 200 }
+                licensee_identifier: { type: string, minLength: 1, maxLength: 200 }
+                terms_accepted: { type: boolean, enum: [true] }
+      responses:
+        "200":
+          description: Unpaid locked quote; never a certificate or payment proof
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [quote_id, tier, usd_basis, quoted_sats, btc_spot_usd, settlement_address, min_confirmations, expires_at, terms_sha256]
+                properties:
+                  quote_id: { type: string }
+                  tier: { type: string }
+                  usd_basis: { type: integer }
+                  quoted_sats: { type: integer }
+                  btc_spot_usd: { type: number }
+                  settlement_address: { type: string }
+                  min_confirmations: { type: integer }
+                  expires_at: { type: string }
+                  terms_sha256: { type: string }
+        "400": { description: Invalid fields or missing explicit terms acceptance }
+        "503": { description: "Spot oracle, address, signing configuration or storage unavailable" }
+  /v1/waivers/claim:
+    post:
+      operationId: claimAgplWaiver
+      summary: Claim a signed waiver after verified confirmed Bitcoin settlement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [quote_id, txid]
+              properties:
+                quote_id: { type: string }
+                txid: { type: string, pattern: "^[0-9a-fA-F]{64}$" }
+      responses:
+        "200":
+          description: Ed25519 certificate, idempotent only for the same quote and transaction
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                required: [waiver_id, tier, licensee_name, licensee_identifier, txid, vout, sats_paid, usd_basis, issued_at, expires_at, terms_sha256, scope, issuer_key_id, signature]
+                properties:
+                  waiver_id: { type: string }
+                  tier: { type: string }
+                  licensee_name: { type: string }
+                  licensee_identifier: { type: string }
+                  txid: { type: string }
+                  vout: { type: integer }
+                  sats_paid: { type: integer }
+                  usd_basis: { type: integer }
+                  issued_at: { type: string }
+                  expires_at: { type: string }
+                  terms_sha256: { type: string }
+                  scope: { type: string }
+                  issuer_key_id: { type: string }
+                  signature: { type: string }
+        "400": { description: Invalid claim input }
+        "404": { description: Unknown quote }
+        "409": { description: "Unconfirmed, historical, underpaid or previously claimed transaction output" }
+        "410": { description: Transaction confirmed outside the quote price-lock window }
+        "503": { description: "Chain verification, signing or storage unavailable" }
 components:
   headers:
     PublicCorsOrigin:
@@ -3111,11 +3205,11 @@ components:
           type: string
         credits:
           type: integer
-          enum: [100]
+          enum: [100, 1000]
           description: Original allocation, not remaining balance; reminting never replenishes credits.
         amount_sats:
           type: integer
-          enum: [100000]
+          minimum: 1
         valid_until:
           type: integer
           description: Exclusive expiration in epoch seconds.
@@ -4061,7 +4155,7 @@ components:
     BatchSettlementDiscovery:
       type: object
       additionalProperties: false
-      description: Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.
+      description: Lightning-only exact-tool prepaid macro-macaroons for 1, 100, 1000 or 10000 calls at 250 sats per call. This is not a multi-tool aggregate invoice.
       required: [protocol, settlementAsset, requestHeader, supportedBatchSizes, exampleHeaderValue, maxCalls, priceMultiplier, credentialScope, invoiceGeneratedByDiscovery, instructions]
       properties:
         protocol: { type: string, const: L402 }
@@ -4069,11 +4163,11 @@ components:
         requestHeader: { type: string, const: X-L402-Batch-Size }
         supportedBatchSizes:
           type: array
-          items: { type: integer, const: 100 }
-          minItems: 1
-          maxItems: 1
+          items: { type: integer, enum: [1, 100, 1000, 10000] }
+          minItems: 4
+          maxItems: 4
         exampleHeaderValue: { type: string, const: "100" }
-        maxCalls: { type: integer, const: 100 }
+        maxCalls: { type: integer, const: 10000 }
         priceMultiplier: { type: integer, const: 100 }
         credentialScope: { type: string, const: exact MCP tool path }
         invoiceGeneratedByDiscovery: { type: boolean, const: false }
@@ -4086,6 +4180,15 @@ components:
           type: string
         commercial_exemption:
           type: string
+        terms:
+          type: string
+        waiver_quote_endpoint:
+          type: string
+        waiver_claim_endpoint:
+          type: string
+        waiver_usd_basis:
+          type: object
+          additionalProperties: { type: integer }
         procurement_url:
           type: string
     CryptographicAuditInput:
@@ -4242,7 +4345,10 @@ components:
               properties:
                 request_header: { type: string, const: X-L402-Batch-Size }
                 header_value: { type: string, const: "100" }
-                max_requests: { type: integer, const: 100 }
+                max_requests: { type: integer, const: 10000 }
+                supported_batch_sizes:
+                  type: array
+                  items: { type: integer, enum: [1, 100, 1000, 10000] }
                 price_multiplier: { type: integer, const: 100 }
                 credential_scope: { type: string, const: exact MCP tool path }
     McpDiscoveryManifest:
@@ -5966,7 +6072,7 @@ components:
                   type: string
                 contact:
                   type: string
-                  format: email
+                  format: uri
               required: [name, price, grant, delivery, service_levels, technical_stewardship, settlement, contact]
           required: [spdx, agpl_copyleft_scope, commercial_exemption]
         architecture:

@@ -251,3 +251,48 @@
     break-inside: avoid;
   }
 }
+/* Self-serve waiver purchase */
+.wv { display: grid; gap: 12px; margin-top: 4px; min-width: 0; }
+.wv-form, .wv-claim { display: grid; gap: 12px; }
+.wv-tiers { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wv-tiers legend { font: 9px var(--app-font-mono); letter-spacing: .1em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 8px; }
+.wv-tier { position: relative; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid hsl(var(--border)); cursor: pointer; transition: border-color .15s, transform .15s; }
+.wv-tier:hover { transform: translateY(-1px); border-color: hsl(var(--primary) / .6); }
+.wv-tier.is-on { border-color: hsl(var(--primary)); background: hsl(var(--primary) / .08); }
+.wv-tier input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.wv-tier:focus-within { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.wv-tier-scope { font: 10px var(--app-font-mono); letter-spacing: .06em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.wv-tier-price { font-size: 20px; font-weight: 600; letter-spacing: -.04em; color: hsl(var(--primary)); }
+.wv-tier-term { font-size: 11px; color: hsl(var(--muted-foreground)); }
+.wv-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wv-field { display: grid; gap: 5px; font: 10px var(--app-font-mono); color: hsl(var(--muted-foreground)); min-width: 0; }
+.wv-field input { min-width: 0; height: 36px; padding: 0 10px; border: 1px solid hsl(var(--input)); background: hsl(var(--background)); color: hsl(var(--foreground)); font: 12px var(--app-font-mono); }
+.wv-field input:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+.wv-disclosure { margin: 0; padding: 10px 12px; border-left: 2px solid hsl(var(--accent)); background: hsl(var(--accent) / .07); font-size: 11.5px; line-height: 1.65; color: hsl(var(--muted-foreground)); }
+.wv-ack { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; line-height: 1.5; }
+.wv-ack input { margin-top: 3px; accent-color: hsl(var(--primary)); }
+.wv-submit { border: 0; justify-self: start; max-width: 100%; white-space: normal; text-align: left; }
+.wv-submit:disabled { opacity: .45; }
+.wv-quote { display: grid; gap: 10px; padding: 14px; border: 1px solid hsl(var(--primary) / .5); background: hsl(var(--background) / .5); min-width: 0; }
+.wv-quote h5 { margin: 0; font-size: 16px; }
+.wv-amount { font-size: clamp(24px, 3.4vw, 34px) !important; letter-spacing: -.05em; font-weight: 600; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.wv-amount small { font: 12px var(--app-font-mono); color: hsl(var(--muted-foreground)); }
+.wv-btc { font: 12px var(--app-font-mono); letter-spacing: 0; color: hsl(var(--primary)); }
+.wv-facts { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.wv-facts > div { min-width: 0; border-top: 1px solid hsl(var(--border)); padding-top: 6px; }
+.wv-facts dt { font: 9px var(--app-font-mono); text-transform: uppercase; letter-spacing: .08em; color: hsl(var(--muted-foreground)); }
+.wv-facts dd { margin: 3px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+.wv-facts code { color: hsl(var(--foreground)); font-size: 11px; overflow-wrap: anywhere; }
+.wv-wide { grid-column: 1 / -1; }
+.wv-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.wv-status { margin: 0; font-size: 12px; line-height: 1.55; color: hsl(var(--muted-foreground)); }
+.wv-status.is-bad { color: hsl(var(--destructive)); }
+.wv-quiet { display: inline-flex; align-items: center; min-height: 34px; padding: 0 12px; border: 1px solid hsl(var(--border)); background: transparent; color: hsl(var(--foreground)); font-size: 12px; text-decoration: none; }
+.wv-quiet:hover { border-color: hsl(var(--primary)); }
+.wv-cert { border-color: hsl(var(--chart-3)); }
+.wv-cert-text { width: 100%; padding: 10px; border: 1px solid hsl(var(--input)); background: hsl(var(--background)); color: hsl(var(--foreground)); font: 11px/1.5 var(--app-font-mono); resize: vertical; }
+@media (max-width: 640px) {
+  .wv-tiers, .wv-fields { grid-template-columns: 1fr; }
+  .wv-facts { grid-template-columns: 1fr 1fr; }
+  .wv-submit { width: 100%; justify-content: center; }
+}

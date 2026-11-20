@@ -4,9 +4,9 @@ export const batchSettlement = Object.freeze({
   protocol: "L402",
   settlementAsset: "btc-lightning",
   requestHeader: "X-L402-Batch-Size",
-  supportedBatchSizes: [100],
+  supportedBatchSizes: [1, 100, 1000, 10000],
   exampleHeaderValue: "100",
-  maxCalls: 100,
+  maxCalls: 10000,
   priceMultiplier: 100,
   credentialScope: "exact MCP tool path",
   invoiceGeneratedByDiscovery: false,
@@ -23,5 +23,5 @@ export const batchSettlement = Object.freeze({
     receipt: "one signed Article 12 record-keeping receipt, persisted in PostgreSQL",
   },
   instructions:
-    "For a 100-call same-tool pass, POST tools/call with X-L402-Batch-Size: 100 and pay its 100-times-price invoice once. For an ordered cross-tool pipeline, POST tools/pipeline with params.calls (or a legacy JSON-RPC tools/call array), without X-L402-Batch-Size. Pay the exact summed-price invoice once and retry the identical body with Authorization: L402 <macaroon>:<preimage>. Earlier results may be referenced with $ref. Each pipeline invoice executes at most once; expiry, revocation, identity, exact request scope and inherited quotas remain enforced. Discovery never creates an invoice.",
+    "For a same-tool pass, POST tools/call with X-L402-Batch-Size set to exactly 1, 100, 1000 or 10000 and pay its 250-sats-per-call invoice once. Unsupported values return 400. For an ordered cross-tool pipeline, POST tools/pipeline with params.calls (or a legacy JSON-RPC tools/call array), without X-L402-Batch-Size. Pay the exact summed-price invoice once and retry the identical body with Authorization: L402 <macaroon>:<preimage>. Earlier results may be referenced with $ref. Each pipeline invoice executes at most once; expiry, revocation, identity, exact request scope and inherited quotas remain enforced. Discovery never creates an invoice.",
 });

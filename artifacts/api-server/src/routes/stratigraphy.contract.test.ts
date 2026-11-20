@@ -5092,7 +5092,7 @@ test("serves the CISO due-diligence brief publicly without creating invoices", a
   assert.equal(brief.release_version, RELEASE_VERSION);
   assert.equal(brief.canonical_url, CANONICAL_ORIGIN);
   assert.equal(brief.brief_url, `${CANONICAL_ORIGIN}${DUE_DILIGENCE_BRIEF_PATH}`);
-  assert.equal(brief.licensing.commercial_exemption.price, "Starting at $250k/Annual");
+  assert.equal(brief.licensing.commercial_exemption.price, "Self-serve Bitcoin waivers from $2,500/30 days");
   assert.match(brief.licensing.commercial_exemption.delivery, /"AS IS"/);
   assert.match(brief.licensing.commercial_exemption.service_levels, /Zero external SLAs/);
   assert.match(brief.licensing.agpl_copyleft_scope.network_use, /Section 13/);
@@ -5368,7 +5368,7 @@ test("quotes batch MCP costs with itemized invoice details and wildcard CORS wit
   const quote = QuoteMcpToolCostsResponse.parse(await response.json());
   assert.equal(quote.protocol, "L402");
   assert.equal(quote.licensing_compliance?.open_source_license, "AGPLv3 (Viral Network Copyleft under Section 13)");
-  assert.equal(quote.licensing_compliance?.commercial_exemption, "Required for closed-source model weights, private VPC swarms, and proprietary enterprise logic ($250,000/yr Tier II Commercial Enterprise Exemption)");
+  assert.equal(quote.licensing_compliance?.commercial_exemption, "Self-serve, time-locked AGPLv3 Section 13 Commercial Copyright Waivers; AS-IS, zero SLAs");
   assert.equal(quote.licensing_compliance?.procurement_url, "https://bitcoinstratigraphy.com/#enterprise-licensing");
   assert.equal(quote.currency, "sats");
   assert.deepEqual(quote.perToolSats, {
@@ -5395,8 +5395,8 @@ test("quotes batch MCP costs with itemized invoice details and wildcard CORS wit
   }
   assert.equal(quote.l402.invoice_generated, false);
   assert.equal(quote.batchSettlement.requestHeader, "X-L402-Batch-Size");
-  assert.deepEqual(quote.batchSettlement.supportedBatchSizes, [100]);
-  assert.equal(quote.batchSettlement.maxCalls, 100);
+  assert.deepEqual(quote.batchSettlement.supportedBatchSizes, [1, 100, 1000, 10000]);
+  assert.equal(quote.batchSettlement.maxCalls, 10000);
   assert.equal(quote.batchSettlement.invoiceGeneratedByDiscovery, false);
   assert.equal(quote.l402.aggregate_invoice_supported, true);
   assert.equal(quote.l402.challenge_status, 402);
@@ -5527,8 +5527,8 @@ test("serves public pre-flight cost and schema metadata", async () => {
     response_schema: { type: string };
   };
   assert.equal(body.batchSettlement.requestHeader, "X-L402-Batch-Size");
-  assert.deepEqual(body.batchSettlement.supportedBatchSizes, [100]);
-  assert.equal(body.batchSettlement.maxCalls, 100);
+  assert.deepEqual(body.batchSettlement.supportedBatchSizes, [1, 100, 1000, 10000]);
+  assert.equal(body.batchSettlement.maxCalls, 10000);
   assert.equal(body.batchSettlement.invoiceGeneratedByDiscovery, false);
   assert.deepEqual(
     body.access_tiers.map(({ id, price_sats }) => ({ id, price_sats })),

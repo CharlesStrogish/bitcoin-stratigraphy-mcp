@@ -96,3 +96,5 @@ before testing if scope or authorization is unclear.
 Reporting a vulnerability does not transfer ownership of a researcher's work
 or grant a commercial software license. See [LICENSE.md](https://bitcoinstratigraphy.com/LICENSE.md) for the
 AGPLv3/Commercial licensing framework.
+
+All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.

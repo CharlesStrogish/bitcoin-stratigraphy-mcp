@@ -21,3 +21,15 @@ OpenAPI routing contract failed because the alias rewriter left it unchanged.
 rewrite contract and actual requests through the alias middleware. Preserve
 the original request URL and exact path boundaries; do not weaken payment
 checks or broaden the rewriter to arbitrary API paths.
+
+The development hostname can redirect to the unchanged production site under
+the existing canonical-domain policy. Inspect redirects before testing an
+unpublished route; use the local preview proxy at `http://127.0.0.1:80` when
+that hostname redirects.
+
+**Why:** Following a development-host 301 reached the older production bundle
+and produced a misleading 404 for a working unpublished route.
+
+**How to apply:** Do not follow cross-host redirects during state-changing
+development checks. Verify through the local shared preview proxy, not just
+the API service port, and leave production untouched.

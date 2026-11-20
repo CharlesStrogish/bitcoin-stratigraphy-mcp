@@ -703,7 +703,7 @@ for (const version of [MODERN, LEGACY]) {
       if (resource.uri.endsWith("/overview")) {
         assert.equal(payload.toolCount, 17);
         assert.equal(payload.batchSettlement.requestHeader, "X-L402-Batch-Size");
-        assert.deepEqual(payload.batchSettlement.supportedBatchSizes, [100]);
+        assert.deepEqual(payload.batchSettlement.supportedBatchSizes, [1, 100, 1000, 10000]);
         assert.equal(payload.batchSettlement.invoiceGeneratedByDiscovery, false);
         assert.equal(Object.keys(payload.namespaces).length, 5);
         assert.equal(Object.values(payload.namespaces).flat().length, 17);

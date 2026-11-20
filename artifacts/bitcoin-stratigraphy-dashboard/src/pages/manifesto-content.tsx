@@ -401,19 +401,15 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 </p>
                 <p>
                   {L(
-                    "Bitcoin Stratigraphy offers a $250,000/year Tier II Commercial Enterprise Exemption designed specifically for institutional scale.",
+                    "Bitcoin Stratigraphy offers self-serve AGPLv3 Commercial Copyright Waivers in four fixed tiers: Single-Swarm at $2,500/30 days or $25,000/365 days, and Global Organization at $25,000/30 days or $250,000/365 days, each quoted in BTC at spot.",
                   )}
                 </p>
                 <p>
                   {L(
-                    "This Commercial Exemption bypasses per-request L402 micro-transactions by issuing a signed Tier II token, bound via NIP-98 authentication to your Buyer-Pubkey, unlocking unrestricted access for exactly 365 days. It includes:",
+                    "A confirmed on-chain payment mints an Ed25519-signed Waiver Certificate that anyone can verify offline. High-volume swarms reduce per-call friction with prepaid Macro-Macaroons of 1, 100, 1,000 or 10,000 calls at 250 sats each. Related protocol features:",
                   )}
                 </p>
                 <ul>
-                  <Item
-                    label="Automated Compliance SLAs"
-                    text="Guaranteed uptime and localized support."
-                  />
                   <Item
                     label="Non-Blocking Asynchronous Webhooks"
                     text="Pipe real-time yield data directly into corporate Datadog/Splunk environments."
@@ -429,7 +425,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 </ul>
                 <p>
                   {L(
-                    "To bypass per-call friction and secure an Enterprise Commercial License Exemption, Enterprise CISOs and Procurement Officers must contact the Central Bank directly at:",
+                    "All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction. Purchase a waiver at /#enterprise-licensing. Licensing correspondence address:",
                   )}
                 </p>
                 <a

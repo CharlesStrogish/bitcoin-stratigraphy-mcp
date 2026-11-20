@@ -7,12 +7,11 @@ import {
   COMPLIANCE_URL,
   COMPLIANCE_ARTICLE,
 } from "@/lib/compliance-seo";
-import { CISO_MAILTO_HREF } from "@/lib/ciso-intake";
 import { CisoIntakeActions } from "@/components/ciso-intake-actions";
 import "./compliance.css";
 
 const BASE = import.meta.env.BASE_URL;
-const MAIL = CISO_MAILTO_HREF;
+const MAIL = `${BASE}#enterprise-licensing`;
 
 const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],
@@ -166,22 +165,21 @@ export default function CompliancePage() {
           <section id="licensing" className="panel cmp-sec">
             <h2>4. Enterprise Air-Gapped Licensing</h2>
             <p>
-              The public Bitcoin Stratigraphy network operates under the AGPLv3 Open-Source License. If you connect your proprietary internal AI swarms to the public network, the AGPLv3 legally mandates that you open-source your entire proprietary AI codebase and model weights to the public. For massive technology corporations that cannot expose proprietary agent logic, we provide a <strong>Commercial Enterprise License (Starting at $250k/Annual)</strong>.
+              The public Bitcoin Stratigraphy network operates under the AGPLv3 Open-Source License. If you connect your proprietary internal AI swarms to the public network, the AGPLv3 legally mandates that you open-source your entire proprietary AI codebase and model weights to the public. For massive technology corporations that cannot expose proprietary agent logic, we provide self-serve <strong>AGPLv3 Commercial Copyright Waivers</strong>: $2,500/30 days or $25,000/365 days per swarm, and $25,000/30 days or $250,000/365 days for a global organization, quoted in BTC at spot.
             </p>
-            <p>The Enterprise Exemption grants:</p>
+            <p>A confirmed waiver supports:</p>
             <ul>
-              <li>Complete IP Protection: A full exemption from all AGPLv3 open-source requirements.</li>
+              <li>Complete IP Protection: A time-locked waiver from AGPLv3 Section 13 network source-disclosure requirements for the purchased term.</li>
               <li>Air-Gapped Deployment: The legal right to deploy the Notary Hub and Escrow Oracle entirely on-premises or within isolated internal networks.</li>
               <li>Zero-Telemetry Sovereign Guarantee: 100% offline, self-contained execution with zero vendor backdoors, network phone-home pings, or third-party dependencies.</li>
               <li><strong>Cryptographic Tool Integrity:</strong> Defeats LLM tool-poisoning attacks by hashing and signing all MCP tool descriptions via an immutable Ed25519 public manifest.</li>
               <li><strong>Stateless Horizontal Scaling:</strong> Upgraded to the stateless MCP 2026-07-28 transport, completely removing session bottlenecks for high-concurrency agent swarms.</li>
             </ul>
+            <p>{"All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction."}</p>
             <p>
-              Contact{" "}
               <a href={MAIL} className="cmp-mail" data-testid="link-contact-licensing">
-                licensing@bitcoinstratigraphy.com
+                Buy a waiver at /#enterprise-licensing
               </a>
-              {" "}for Enterprise Licensing
             </p>
             <CisoIntakeActions testIdPrefix="compliance" />
             <div className="cmp-actions">

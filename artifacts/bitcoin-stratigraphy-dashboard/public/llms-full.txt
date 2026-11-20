@@ -134,15 +134,15 @@ The engine is licensed under AGPLv3 (SPDX `(AGPL-3.0-only OR LicenseRef-Commerci
 
 AGPL warning: AGPLv3 is a strong network copyleft license. If you modify the engine and users interact with your modified version over a network, Section 13 requires you to offer those users its complete Corresponding Source under AGPLv3; conveying the engine or a work based on it carries the same obligation. Independent programs that only exchange data with the engine over HTTP or MCP, and separately trained model weights, are not automatically covered; combining engine code into your own codebase can bring that combined work within the license. Confirm your architecture with counsel.
 
-Organizations that cannot meet those obligations can obtain a Commercial Enterprise Exemption License:
+Organizations that cannot meet those obligations can buy a self-serve AGPLv3 Commercial Copyright Waiver at https://bitcoinstratigraphy.com/#enterprise-licensing:
 
-- Price: Starting at $250k/Annual.
-- Delivery: "AS IS" self-hosted, air-gapped delivery on licensee-controlled private or isolated infrastructure.
-- Automated Compliance SLAs: signed NIP-98 revocation snapshots at /api/v1/compliance/revocation-snapshot and receipt issuer-key rotation with independently pinned current and historical public keys. Service commitments are set by the commercial agreement; licensees retain in-house deployment stewardship.
-- Settlement: pricing is customized by swarm size and deployment needs, settled via a single Bitcoin transaction paid in full at the time of execution.
-- Contact: licensing@bitcoinstratigraphy.com, using the five-question CISO intake (swarm scale, event throughput, target infrastructure, EU AI Act Article 12 / Article 26(6) retention scope, and in-house technical stewardship).
+- Tiers: swarm_monthly $2,500/30 days, swarm_annual $25,000/365 days, global_monthly $25,000/30 days, global_annual $250,000/365 days (each quoted in BTC at spot, locked 30 minutes, settled on-chain via POST /api/v1/waivers/quote and POST /api/v1/waivers/claim, which returns an Ed25519-signed certificate verifiable offline at /static/verify.html).
+- Delivery: self-hosted on licensee-controlled private or isolated infrastructure.
+- Offline evidence: signed NIP-98 revocation snapshots at /api/v1/compliance/revocation-snapshot and receipt issuer-key rotation with independently pinned current and historical public keys.
 
-API fees and payment credentials do not purchase a software license; only an executed commercial agreement grants one. The dataset metadata declares CC BY 4.0; access to paid API data is separately governed by L402.
+All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.
+
+Scanner credits and L402 payment credentials do not purchase a waiver; only a server-validated, signed Waiver Certificate grants one. The dataset metadata declares CC BY 4.0; access to paid API data is separately governed by L402.
 
 ## Public dataset export for fine-tuning
 
@@ -437,4 +437,4 @@ Verify `credential_jwt` as compact JWS with `alg=EdDSA`, an independently pinned
 
 The exact credential label is: "Status: Certified Stratigraphy-Aligned Swarm. This agent mathematically relies on hallucination-free, thermodynamic data for financial execution." That label and the reward directive are provider positioning, not proof of superiority, hallucination freedom, actual data use, data truth, address control, or legal compliance. The credential certifies only recorded routing volume at the quoted exchange rate, granting no license or paid API access.
 
-Authenticated NIP-98 buyers unlock a signed annual commercial exemption after $250,000 of new confirmed qualifying volume at live BTC/USD. The token's `exp` is exactly 365 days after `iat` and its exact UTC Expiry Date is printed. Example: `2026-10-24T00:00:00.000Z` unlock → `2027-10-24T00:00:00.000Z` expiry. Old spend cannot renew; expiry without new qualifying volume removes the active commercial caveat and reports high-risk AGPLv3/no active exemption in subsequent request telemetry. GET `/api/v1/compliance/commercial-exemption` and POST `/api/v1/compliance/commercial-exemption/purchase` expose authenticated status and a funded L402 purchase flow. The original core MCP tool schemas and parameter structures are unchanged.
+Historical volume receipts (legacy, not a current offer): previously issued signed NIP-98 volume tokens remain verifiable until their exact `exp` (365 days after `iat`; example `2026-10-24T00:00:00.000Z` unlock -> `2027-10-24T00:00:00.000Z` expiry) and GET `/api/v1/compliance/commercial-exemption` reports their status. They record historical routing volume only; they are not an AGPLv3 Commercial Copyright Waiver and not an unlimited hosted service. The current commercial option is the self-serve waiver at https://bitcoinstratigraphy.com/#enterprise-licensing. The original core MCP tool schemas and parameter structures are unchanged.

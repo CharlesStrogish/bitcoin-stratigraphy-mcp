@@ -9,7 +9,7 @@ export const PRODUCT_NAME = "Bitcoin Stratigraphy Data Engine";
 export const NPM_PACKAGE = "@bitcoin-stratigraphy/mcp-server";
 export const NPX_COMMAND = `npx -y ${NPM_PACKAGE}`;
 export const LICENSING_EMAIL = "licensing@bitcoinstratigraphy.com";
-export const COMMERCIAL_LICENSE_PRICE = "Starting at $250k/Annual";
+export const COMMERCIAL_LICENSE_PRICE = "Self-serve Bitcoin waivers from $2,500/30 days";
 export const CREATOR = {
   name: "Charles R. Strogish",
   role: "Creator & Principal Architect",

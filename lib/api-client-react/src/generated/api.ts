@@ -23,8 +23,12 @@ import type {
   AiPluginManifest,
   AuditReport,
   AuditSubmission,
+  ClaimAgplWaiver200,
+  ClaimAgplWaiverBody,
   CloseEnterpriseCreditTab200,
   CloseEnterpriseCreditTab402,
+  CreateAgplWaiverQuote200,
+  CreateAgplWaiverQuoteBody,
   CreateFiatMintCheckout200,
   CreateFiatMintCheckout402,
   CryptographicAuditEnvelope,
@@ -73,6 +77,7 @@ import type {
   MeshAttestRequest,
   MeshAttestResponse,
   MeshStatus,
+  MintScannerMacaroonBody,
   Nip98KeyRevocationInput,
   NostrAgentIdentity,
   NostrHeartbeatStatus,
@@ -155,7 +160,7 @@ export const getCreateFiatMintCheckoutUrl = () => {
 }
 
 /**
- * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers the existing native 100000-sat scanner product via HTTP 402 without sending any payment or changing fulfillment. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
+ * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers a USD 450 spot-quoted native scanner product via HTTP 402 without sending any payment or changing fulfillment. Oracle failure returns 503, never a static fallback. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
  * @summary Create a Stripe-hosted Checkout for 100 scanner credits
  */
 export const createFiatMintCheckout = async (fiatMintCheckoutRequest: FiatMintCheckoutRequest, options?: Parameters<typeof customFetch>[1]): Promise<CreateFiatMintCheckout200> => {
@@ -512,7 +517,7 @@ export const getScanArticle12PromptUrl = () => {
 }
 
 /**
- * Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Retail success consumes the prompt-bound single-use capability. A settled 100000-sat Developer SaaS macaroon from /api/mint-macaroon carries credits=100 and permits 100 valid scanner calls across different prompts. Each admitted scan atomically consumes one shared credit. Credit grants expire 30 days after issuance, and inherited descendant quotas and revocations remain enforced. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
+ * Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Retail success consumes the prompt-bound single-use capability. A settled issuer-bound Scanner Pack macaroon from /api/mint-macaroon carries credits=100 and permits 100 valid scanner calls across different prompts. Each admitted scan atomically consumes one shared credit. Credit grants expire 30 days after issuance, and inherited descendant quotas and revocations remain enforced. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
  * @summary Paid heuristic Article 12 prompt risk review
  */
 export const scanArticle12Prompt = async (scannerInput: ScannerInput, options?: Parameters<typeof customFetch>[1]): Promise<ScannerReport> => {
@@ -584,17 +589,17 @@ export const getMintScannerMacaroonUrl = () => {
 }
 
 /**
- * First POST returns a fixed 100000-sat invoice and an unsettled credits=100 scanner-scoped macaroon in WWW-Authenticate. Pay that invoice once, then repeat with Authorization L402 <macaroon>:<preimage> or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement, returns the same funded macaroon without consuming any scanner credit. Funding confirmation is idempotent and never resets the 100-call budget. Invoice expiry is 900 seconds; credits expire 30 days after issuance. The B2B portal confirms settlement with Authorization Macaroon <token>. This shorthand is accepted only for issuer-authorized prepaid scanner credits and uses the same merchant-side verification as L402 NWC_LOOKUP. Use Authorization Macaroon <token> or the original L402 Authorization on /api/scanner for different valid prompts. No additional invoices are generated for funded calls or exhausted credits.
- * @summary Buy 100 prepaid scanner credits for 100000 sats
+ * First POST returns a 15-minute BTC spot quote at USD 450 for 100 calls valid 30 days, or USD 4000 for heavy_swarm_1000 (1000 calls, 90 days), and an unsettled credits=100 or credits=1000 scanner-scoped macaroon in WWW-Authenticate. Pay that invoice once, then repeat with Authorization L402 <macaroon>:<preimage> or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement, returns the same funded macaroon without consuming any scanner credit. Funding confirmation is idempotent and never resets the 100- or 1000-call budget. Invoice expiry is 900 seconds; credits expire 30 or 90 days after issuance. The B2B portal confirms settlement with Authorization Macaroon <token>. This shorthand is accepted only for issuer-authorized prepaid scanner credits and uses the same merchant-side verification as L402 NWC_LOOKUP. Use Authorization Macaroon <token> or the original L402 Authorization on /api/scanner for different valid prompts. No additional invoices are generated for funded calls or exhausted credits.
+ * @summary Buy a USD-pegged Bitcoin scanner pack
  */
-export const mintScannerMacaroon = async ( options?: Parameters<typeof customFetch>[1]): Promise<ScannerCreditGrant> => {
+export const mintScannerMacaroon = async (mintScannerMacaroonBody?: MintScannerMacaroonBody, options?: Parameters<typeof customFetch>[1]): Promise<ScannerCreditGrant> => {
 
   return customFetch<ScannerCreditGrant>(getMintScannerMacaroonUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mintScannerMacaroonBody)
   }
 );}
 
@@ -603,8 +608,8 @@ export const mintScannerMacaroon = async ( options?: Parameters<typeof customFet
 
 
 export const getMintScannerMacaroonMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,{data?: BodyType<MintScannerMacaroonBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,{data?: BodyType<MintScannerMacaroonBody>}, TContext> => {
 
 const mutationKey = ['mintScannerMacaroon'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -616,10 +621,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mintScannerMacaroon>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mintScannerMacaroon>>, {data?: BodyType<MintScannerMacaroonBody>}> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  mintScannerMacaroon(requestOptions)
+          return  mintScannerMacaroon(data,requestOptions)
         }
 
 
@@ -630,18 +635,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type MintScannerMacaroonMutationResult = NonNullable<Awaited<ReturnType<typeof mintScannerMacaroon>>>
-
+    export type MintScannerMacaroonMutationBody = BodyType<MintScannerMacaroonBody> | undefined
     export type MintScannerMacaroonMutationError = ErrorType<void>
 
     /**
- * @summary Buy 100 prepaid scanner credits for 100000 sats
+ * @summary Buy a USD-pegged Bitcoin scanner pack
  */
 export const useMintScannerMacaroon = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mintScannerMacaroon>>, TError,{data?: BodyType<MintScannerMacaroonBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof mintScannerMacaroon>>,
         TError,
-        void,
+        {data?: BodyType<MintScannerMacaroonBody>},
         TContext
       > => {
       return useMutation(getMintScannerMacaroonMutationOptions(options));
@@ -5825,5 +5830,147 @@ export const useAttestMeshSnapshot = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getAttestMeshSnapshotMutationOptions(options));
+    }
+
+export const getCreateAgplWaiverQuoteUrl = () => {
+
+
+
+
+  return `/api/v1/waivers/quote`
+}
+
+/**
+ * @summary Lock a self-serve Bitcoin copyright waiver quote for 30 minutes
+ */
+export const createAgplWaiverQuote = async (createAgplWaiverQuoteBody: CreateAgplWaiverQuoteBody, options?: Parameters<typeof customFetch>[1]): Promise<CreateAgplWaiverQuote200> => {
+
+  return customFetch<CreateAgplWaiverQuote200>(getCreateAgplWaiverQuoteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createAgplWaiverQuoteBody)
+  }
+);}
+
+
+
+
+
+export const getCreateAgplWaiverQuoteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgplWaiverQuote>>, TError,{data: BodyType<CreateAgplWaiverQuoteBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAgplWaiverQuote>>, TError,{data: BodyType<CreateAgplWaiverQuoteBody>}, TContext> => {
+
+const mutationKey = ['createAgplWaiverQuote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAgplWaiverQuote>>, {data: BodyType<CreateAgplWaiverQuoteBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAgplWaiverQuote(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAgplWaiverQuoteMutationResult = NonNullable<Awaited<ReturnType<typeof createAgplWaiverQuote>>>
+    export type CreateAgplWaiverQuoteMutationBody = BodyType<CreateAgplWaiverQuoteBody>
+    export type CreateAgplWaiverQuoteMutationError = ErrorType<void>
+
+    /**
+ * @summary Lock a self-serve Bitcoin copyright waiver quote for 30 minutes
+ */
+export const useCreateAgplWaiverQuote = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgplWaiverQuote>>, TError,{data: BodyType<CreateAgplWaiverQuoteBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAgplWaiverQuote>>,
+        TError,
+        {data: BodyType<CreateAgplWaiverQuoteBody>},
+        TContext
+      > => {
+      return useMutation(getCreateAgplWaiverQuoteMutationOptions(options));
+    }
+
+export const getClaimAgplWaiverUrl = () => {
+
+
+
+
+  return `/api/v1/waivers/claim`
+}
+
+/**
+ * @summary Claim a signed waiver after verified confirmed Bitcoin settlement
+ */
+export const claimAgplWaiver = async (claimAgplWaiverBody: ClaimAgplWaiverBody, options?: Parameters<typeof customFetch>[1]): Promise<ClaimAgplWaiver200> => {
+
+  return customFetch<ClaimAgplWaiver200>(getClaimAgplWaiverUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(claimAgplWaiverBody)
+  }
+);}
+
+
+
+
+
+export const getClaimAgplWaiverMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimAgplWaiver>>, TError,{data: BodyType<ClaimAgplWaiverBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimAgplWaiver>>, TError,{data: BodyType<ClaimAgplWaiverBody>}, TContext> => {
+
+const mutationKey = ['claimAgplWaiver'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimAgplWaiver>>, {data: BodyType<ClaimAgplWaiverBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  claimAgplWaiver(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimAgplWaiverMutationResult = NonNullable<Awaited<ReturnType<typeof claimAgplWaiver>>>
+    export type ClaimAgplWaiverMutationBody = BodyType<ClaimAgplWaiverBody>
+    export type ClaimAgplWaiverMutationError = ErrorType<void>
+
+    /**
+ * @summary Claim a signed waiver after verified confirmed Bitcoin settlement
+ */
+export const useClaimAgplWaiver = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimAgplWaiver>>, TError,{data: BodyType<ClaimAgplWaiverBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimAgplWaiver>>,
+        TError,
+        {data: BodyType<ClaimAgplWaiverBody>},
+        TContext
+      > => {
+      return useMutation(getClaimAgplWaiverMutationOptions(options));
     }
 

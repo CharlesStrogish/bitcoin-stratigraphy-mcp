@@ -5,7 +5,6 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
-import type { CreateFiatMintCheckout402AmountSats } from './createFiatMintCheckout402AmountSats';
 import type { CreateFiatMintCheckout402Credits } from './createFiatMintCheckout402Credits';
 import type { CreateFiatMintCheckout402Error } from './createFiatMintCheckout402Error';
 import type { CreateFiatMintCheckout402Fallback } from './createFiatMintCheckout402Fallback';
@@ -18,7 +17,8 @@ export type CreateFiatMintCheckout402 = {
   macaroon: string;
   invoice: string;
   payment_hash: string;
-  amount_sats: CreateFiatMintCheckout402AmountSats;
+  /** @minimum 1 */
+  amount_sats: number;
   credits: CreateFiatMintCheckout402Credits;
   payment_endpoint: CreateFiatMintCheckout402PaymentEndpoint;
   purchase_recovery: CreateFiatMintCheckout402PurchaseRecovery;

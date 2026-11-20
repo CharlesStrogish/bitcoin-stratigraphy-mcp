@@ -112,3 +112,17 @@ mtime_ms = 1795102643683
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/22af6e95-fa74-4849-9f8d-449733b962c5/5bdea4bb-25d3-45a7-a3cb-2249fc35f010"
 storage_version_token = "1795102686771314"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "6wrmb2b1Yy1SK6OHTeER4"
+uri = "file://.local/reports/pricing-waiver-verification.md"
+type = "text"
+title = "Local pricing and waiver verification report"
+description = "Complete test results, every affected path, required settings, protected areas and the pre-publication payer-binding risk."
+logical_id = "7913dd8c-2e1f-42e3-869f-d5609df5579b"
+content_hash = "sha256:1cb0f717f5edb40d7ac0c1668604dd1d7314375d03dc98430da4c978434def84"
+size = 12890
+mtime_ms = 1795134037759
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/7913dd8c-2e1f-42e3-869f-d5609df5579b/14f97dc4-6039-4b5f-bd89-46ddaa0c9960"
+storage_version_token = "1795134164702360"
+content_type = "text/markdown"

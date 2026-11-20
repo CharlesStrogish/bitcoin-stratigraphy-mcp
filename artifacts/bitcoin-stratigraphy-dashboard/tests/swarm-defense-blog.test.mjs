@@ -26,7 +26,9 @@ const schemaKeywords = [
 test("swarm defense article preserves the approved body with URL and heading corrections", () => {
   const body = source.split("\n---\n")[1];
   assert.equal(createHash("sha256").update(body).digest("hex"),
-    "0f449dead580fdaf598b012b313a381559728215f76f0bfbbfd5fcbd636158ac");
+    "e534bfecbdfd4eacd85ff672394c8efecff192035a466272946b15b4daea7f5a");
+  assert.doesNotMatch(body, /Automated Compliance SLAs|100,000-sat Lightning invoice|Tier II Commercial Enterprise Exemption/);
+  assert.match(body, /STRICTLY AS-IS, WITH ALL FAULTS/);
   assert.equal(post.title, "Defending Autonomous AI Swarms Against Hijacking, MCP Tool Poisoning, and Drain Attacks");
   assert.equal(post.description, "Stop OWASP MCP03 tool poisoning, prompt-injection hijacking, and wallet drain attacks in LangChain, CrewAI, and AutoGPT swarms with Ed25519 hash pinning, L402 macaroon attenuation, and NIP-98 kill switches.");
   assert.equal(post.date, "2026-11-19");

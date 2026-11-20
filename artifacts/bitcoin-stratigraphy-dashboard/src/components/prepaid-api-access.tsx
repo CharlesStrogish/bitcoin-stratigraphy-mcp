@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { usePrepaidCredits } from "../lib/use-prepaid-credits";
+import { PACKS, usePrepaidCredits, type ScannerPack } from "../lib/use-prepaid-credits";
 import InvoiceQr from "./invoice-qr";
 import FiatMintCheckout from "./fiat-mint-checkout";
 
@@ -81,6 +81,27 @@ export default function PrepaidApiAccess() {
       )}
       {!complete && (
         <div className="fn-prepaid-mint">
+          <fieldset className="fn-pack-select" disabled={!canMint} data-testid="fieldset-scanner-pack">
+            <legend className="fn-label">Lightning pack (dynamic BTC spot quote)</legend>
+            {(Object.keys(PACKS) as ScannerPack[]).map((key) => (
+              <label key={key} className="fn-pack-option" data-testid={`option-pack-${key}`}>
+                <input
+                  type="radio"
+                  name={`${id}-pack`}
+                  value={key}
+                  checked={p.pack === key}
+                  onChange={() => p.setPack(key)}
+                  data-testid={`radio-pack-${key}`}
+                />
+                <span>
+                  <strong>{PACKS[key].label}</strong>{" "}
+                  ${PACKS[key].usd.toLocaleString("en-US")} spot quote /{" "}
+                  {PACKS[key].credits.toLocaleString("en-US")} calls /{" "}
+                  {PACKS[key].days} days
+                </span>
+              </label>
+            ))}
+          </fieldset>
           <button
             type="button"
             className="fn-btn fn-btn-primary fn-btn-lg"
@@ -98,7 +119,7 @@ export default function PrepaidApiAccess() {
                 <span className="fn-dots" aria-hidden="true" />
               </>
             ) : (
-              "Mint 100 API Credits (100,000 sats)"
+              `Mint ${PACKS[p.pack].credits.toLocaleString("en-US")} API Credits ($${PACKS[p.pack].usd.toLocaleString("en-US")} in BTC)`
             )}
           </button>
           {phase === "cleared" && (
@@ -127,7 +148,7 @@ export default function PrepaidApiAccess() {
           >
             <div className="fn-pay-body">
               <p className="fn-kicker">
-                Lightning payment / 100 scanner credits
+                Lightning payment / {challenge.credits.toLocaleString("en-US")} scanner credits / quote locked by server
               </p>
               <h3
                 id={`${id}-pay`}
@@ -274,7 +295,7 @@ export default function PrepaidApiAccess() {
               role="alert"
               data-testid="text-macaroon-warning"
             >
-              Copy this Macaroon immediately. It grants 100 API calls and will not be displayed again. Pass this in your
+              Copy this Macaroon immediately. It grants {grant.credits.toLocaleString("en-US")} API calls and will not be displayed again. Pass this in your
               Authorization header as: <code>Macaroon &lt;token&gt;</code>.
             </p>
             <label className="fn-label" htmlFor={`${id}-tok`}>
@@ -355,8 +376,8 @@ export default function PrepaidApiAccess() {
               >
                 <strong id={`${id}-dc`}>Discard this Macaroon?</strong>
                 <p>
-                  It cannot be shown again. If you have not saved it, the 100
-                  credits become unreachable.
+                  It cannot be shown again. If you have not saved it, the{" "}
+                  {grant.credits.toLocaleString("en-US")} credits become unreachable.
                 </p>
                 <div className="fn-prepaid-actions">
                   <button

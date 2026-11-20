@@ -227,8 +227,59 @@ footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:
  </ul>
 </section>
 
+<section class="panel proto" aria-labelledby="waiver-h">
+ <div class="ph"><h2 id="waiver-h">AGPLv3 waiver certificate</h2><span class="kicker">Offline Ed25519 · AS-IS · Zero SLA</span></div>
+ <form id="waiver-form" class="pb">
+  <label for="waiver-json">Waiver certificate JSON</label>
+  <textarea id="waiver-json" rows="8" spellcheck="false" required></textarea>
+  <label for="waiver-pem">Independently pinned Ed25519 SPKI public key</label>
+  <textarea id="waiver-pem" rows="4" spellcheck="false" required></textarea>
+  <button class="primary" type="submit">Verify waiver offline</button>
+  <p id="waiver-status" role="status" aria-live="polite"></p>
+  <p class="hint">This verifies signed terms and expiration using your clock. It does not independently verify the Bitcoin transaction, copyright ownership, current key revocation, or legal enforceability. Never trust a key supplied only by the certificate.</p>
+ </form>
+</section>
 <footer><span>Bitcoin Stratigraphy · Article 12 verifier · article12-ed25519-v1</span><span>Self-contained · works from file://</span></footer>
 </div>
+<script>
+/* Offline waiver verifier: exported pure logic is shared with deterministic tests. */
+globalThis.AgplWaiverVerifier = (() => {
+  const terms = "All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.";
+  const tiers = {swarm_monthly:[2500,30],swarm_annual:[25000,365],global_monthly:[25000,30],global_annual:[250000,365]};
+  const canonical = value => Array.isArray(value) ? "[" + value.map(canonical).join(",") + "]" :
+    value !== null && typeof value === "object" ? "{" + Object.keys(value).sort().map(key => JSON.stringify(key)+":"+canonical(value[key])).join(",") + "}" : JSON.stringify(value);
+  const enc = new TextEncoder();
+  const hex = bytes => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2,"0")).join("");
+  const decode = text => Uint8Array.from(atob(text), c => c.charCodeAt(0));
+  async function verify(certificate, publicKeyPem, now = Date.now()) {
+    if (!crypto.subtle) throw new Error("WebCrypto unavailable; verification was not performed");
+    if (!certificate || typeof certificate !== "object" || Array.isArray(certificate)) throw new Error("Invalid certificate");
+    const c = certificate, tier = Object.hasOwn(tiers,c.tier) ? tiers[c.tier] : null;
+    if (!tier || c.scope !== "AGPLV3_SECTION_13_COMMERCIAL_WAIVER_AS_IS_NO_SLA" ||
+        !/^[0-9a-f]{64}$/.test(c.txid) || !Number.isSafeInteger(c.vout) || c.vout < 0 ||
+        !Number.isSafeInteger(c.sats_paid) || c.sats_paid <= 0 || c.usd_basis !== tier[0] ||
+        ![c.waiver_id,c.licensee_name,c.licensee_identifier].every(x=>typeof x==="string"&&x.trim().length>0))
+      throw new Error("Invalid waiver fields");
+    const issued = Date.parse(c.issued_at), expires = Date.parse(c.expires_at);
+    if (!Number.isFinite(issued) || !Number.isFinite(expires) || expires-issued !== tier[1]*86400000 || issued>now)
+      throw new Error("Invalid waiver validity period");
+    const expectedTerms = hex(await crypto.subtle.digest("SHA-256",enc.encode(terms)));
+    if (c.terms_sha256 !== expectedTerms) throw new Error("Waiver terms hash does not match the verbatim AS-IS terms");
+    const pem = /^\s*-----BEGIN PUBLIC KEY-----\s*([A-Za-z0-9+/=\s]+)-----END PUBLIC KEY-----\s*$/.exec(publicKeyPem);
+    if (!pem) throw new Error("One independently pinned SPKI public key is required");
+    const der = decode(pem[1].replace(/\s/g,""));
+    const keyId = hex(await crypto.subtle.digest("SHA-256",der));
+    if (keyId !== c.issuer_key_id) throw new Error("Pinned key fingerprint mismatch");
+    const key = await crypto.subtle.importKey("spki",der,{name:"Ed25519"},false,["verify"]);
+    if (typeof c.signature !== "string" || !/^[A-Za-z0-9+/]{86}==$/.test(c.signature)) throw new Error("Invalid signature encoding");
+    const {signature,...payload} = c;
+    if (!await crypto.subtle.verify("Ed25519",key,decode(signature),enc.encode("bitcoin-stratigraphy:agpl-waiver:v1"+canonical(payload))))
+      throw new Error("Invalid Ed25519 signature");
+    return {verified:true,termsVerified:true,expired:expires<=now,expiresAt:c.expires_at,keyId};
+  }
+  return Object.freeze({verify,canonical,terms});
+})();
+</script>
 <script>
 /* Offline Article 12 verifier. No network, storage, dependencies or backend trust. */
 globalThis.Article12Verifier = (() => {
@@ -722,6 +773,20 @@ globalThis.StratigraphyProtocolVerifier = (() => {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
 })();
+</script>
+<script>
+document.getElementById("waiver-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const output = document.getElementById("waiver-status");
+    output.textContent = "Verifying locally…";
+  try {
+    const result = await globalThis.AgplWaiverVerifier.verify(
+      JSON.parse(document.getElementById("waiver-json").value),
+      document.getElementById("waiver-pem").value);
+    output.textContent = result.expired ? "Signature and terms verified. Certificate EXPIRED." :
+      "Signature and verbatim terms verified. Valid until " + result.expiresAt + ".";
+  } catch (error) { output.textContent = "NOT VERIFIED: " + error.message; }
+});
 </script>
 </body>
 </html>

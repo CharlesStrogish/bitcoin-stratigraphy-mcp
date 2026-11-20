@@ -150,6 +150,7 @@ test("100000-sat prepaid grants retain pending invoices and share exactly 100 cr
     app.use(express.json());
     registerScannerRoute(app, {
       settlementRouter: router, sessionSecret: secret, revocationStore,
+      spotOracle: { quote: async () => ({ btcUsd: 450000, observedAt: Date.now() }) },
       usageStore: worker === 2 ? { consume: async () => { throw new Error("synthetic quota outage"); } } : usageStore,
     });
     app.post("/other-paid-route", createL402Middleware({

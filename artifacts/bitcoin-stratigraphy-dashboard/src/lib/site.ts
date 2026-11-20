@@ -5,7 +5,7 @@
  */
 export const SITE_ORIGIN = "https://bitcoinstratigraphy.com";
 export const LICENSING_EMAIL = "licensing@bitcoinstratigraphy.com";
-export const COMMERCIAL_LICENSE_PRICE = "Starting at $250k/Annual";
+export const COMMERCIAL_LICENSE_PRICE = "From $2,500/30 days in BTC (self-serve AGPLv3 waiver)";
 
 /** Absolute URL for a root-relative path such as "/llms.txt". */
 export function siteUrl(path = "/"): string {

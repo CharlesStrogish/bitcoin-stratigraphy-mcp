@@ -64,6 +64,7 @@ async function fixture(options: {
   } as unknown as FiatMint;
   const paymentOptions = {
     settlementRouter: router,
+    spotOracle: { quote: async () => ({ btcUsd: 450000, observedAt: Date.now() }) },
     sessionSecret: "synthetic-continuity-secret-never-a-real-credential",
     usageStore: createMemoryMacaroonUsageStore(),
   };

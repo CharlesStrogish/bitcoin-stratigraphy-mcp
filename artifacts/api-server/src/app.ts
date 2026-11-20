@@ -61,6 +61,7 @@ import { createEscrowRecovery } from "./services/escrowRecovery";
 import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store";
 import { registerComplianceRoutes } from "./routes/compliance";
 import { registerScannerRoute, createScannerMintHandler } from "./routes/scanner";
+import { registerAgplWaiverRoutes } from "./routes/agpl-waivers";
 import { registerFiatMintRoutes, registerFiatWebhook } from "./routes/fiat-mint";
 import { fulfillEnterpriseEvent } from "./services/enterpriseFulfillmentRuntime";
 import { fiatMint } from "./services/fiatMintRuntime";
@@ -187,6 +188,7 @@ registerScannerRoute(app, {
   revocationStore: createPostgresMacaroonRevocationStore(),
   ledger: revenueLedger,
 });
+registerAgplWaiverRoutes(app);
 
 registerOpenApiRoute(app);
 registerDocsRoutes(app);

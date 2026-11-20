@@ -606,10 +606,10 @@ export default function StandardPage() {
             />
             <a
               className="sa-license-cta"
-              href="mailto:licensing@bitcoinstratigraphy.com"
+              href={`${BASE}#enterprise-licensing`}
               data-testid="link-msa-commercial-license"
             >
-              Request Enterprise Commercial License
+              Buy a self-serve AGPLv3 waiver
             </a>
           </section>
           <section id="badge" className="panel sa-sec">
@@ -669,7 +669,7 @@ export default function StandardPage() {
             <p>
               Covered first-party software is dual-licensed under GNU Affero
               General Public License version 3 (AGPLv3) or Enterprise Commercial
-              terms.
+              terms, including self-serve AGPLv3 Commercial Copyright Waivers.
             </p>
             <dl className="sa-dl">
               <div>
@@ -684,18 +684,16 @@ export default function StandardPage() {
               <div>
                 <dt>Enterprise · Commercial</dt>
                 <dd>
-                  For proprietary, closed-source enterprise swarm deployments or
-                  multi-tenant hosting without the source disclosure required by
-                  AGPL, a Commercial License from Charles R. Strogish is
-                  required. Deployment rights, pricing and support
-                  require a separate written agreement. Contact{" "}
+                  For proprietary, closed-source enterprise swarm deployments
+                  without the network source disclosure required by AGPL
+                  Section 13, purchase a self-serve waiver at{" "}
                   <a
-                    href="mailto:licensing@bitcoinstratigraphy.com"
+                    href={`${BASE}#enterprise-licensing`}
                     data-testid="link-enterprise-licensing-email"
                   >
-                    licensing@bitcoinstratigraphy.com
+                    /#enterprise-licensing
                   </a>{" "}
-                  to arrange commercial terms before such deployment.
+                  before such deployment. {"All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction."}
                 </dd>
               </div>
             </dl>

@@ -33,7 +33,7 @@ test("dashboard CISO intake retains the published brief's subject, link, and que
   assert.deepEqual(intake.questionnaire, frontend.CISO_INTAKE_QUESTIONNAIRE);
 });
 
-test("CISO mailto and clipboard contain the exact enterprise SLA intake template", () => {
+test("CISO mailto and clipboard contain the exact self-serve waiver worksheet", () => {
   const mailto = new URL(frontend.CISO_MAILTO_HREF);
   assert.equal(mailto.protocol, "mailto:");
   assert.equal(mailto.pathname, "licensing@bitcoinstratigraphy.com");
@@ -47,7 +47,7 @@ test("CISO mailto and clipboard contain the exact enterprise SLA intake template
     "Free, centralized APIs carry maximum cross-vendor liability.",
     "The only engine providing mathematically non-repudiable Article 12 Flight Recorders, shifting liability off the enterprise.",
     "",
-    "To request a custom Tier II Commercial Enterprise Exemption quote, please complete the following and email to: licensing@bitcoinstratigraphy.com",
+    "Internal due-diligence worksheet only. AGPLv3 Commercial Copyright Waivers are purchased self-serve at https://bitcoinstratigraphy.com/#enterprise-licensing; no custom quote or negotiation is offered.",
     "",
     "Enterprise / Organization Name:",
     "",
@@ -57,9 +57,9 @@ test("CISO mailto and clipboard contain the exact enterprise SLA intake template
     "",
     "What specific regulatory frameworks (e.g., EU AI Act Article 12, SOC 2 Type II, FINRA) govern your internal AI swarm's telemetry and data retention requirements?",
     "",
-    "Do you require standard self-managed cryptographic audits, or are you inquiring about our Automated Compliance SLAs for continuous, machine-generated audit reporting?",
+    "Selected waiver tier (swarm_monthly $2,500 / swarm_annual $25,000 / global_monthly $25,000 / global_annual $250,000, quoted in BTC):",
     "",
-    "[ ] We acknowledge the base Tier II Commercial Enterprise Exemption starts at $250k/annual, with Automated Compliance SLAs scoped separately based on regulatory requirements.",
+    "[ ] All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.",
   ];
   assert.equal(body, expected.join("\r\n"));
   assert.equal(frontend.cisoIntakeTemplate("\r\n"), body);
@@ -81,6 +81,11 @@ test("CISO mailto and clipboard contain the exact enterprise SLA intake template
     ],
   );
   assert.doesNotMatch(body, /Due-diligence brief:|Answer:|Event Throughput:/);
+  assert.equal(
+    frontend.CISO_INTAKE_QUESTIONNAIRE[4].question,
+    "Which independently verifiable receipt exports and issuer-key rotation controls will your organization operate in-house?",
+  );
+  assert.doesNotMatch(body, /Automated Compliance SLAs|Tier II|\$250k/);
 });
 
 test("enterprise liability copy is concise and high-contrast without changing the hero layout", () => {
@@ -93,7 +98,7 @@ test("enterprise liability copy is concise and high-contrast without changing th
   assert.match(source, /className="ent-cta-row"/);
 });
 
-test("Enterprise and Compliance pages share the CISO mailto and intake actions", () => {
+test("Enterprise and Compliance pages route licensing to the self-serve waiver and keep intake actions", () => {
   for (const [page, prefixes] of [
     ["enterprise", ["hero", "bottom"]],
     ["compliance", ["compliance"]],
@@ -101,12 +106,8 @@ test("Enterprise and Compliance pages share the CISO mailto and intake actions",
     const source = read(
       `artifacts/bitcoin-stratigraphy-dashboard/src/pages/${page}.tsx`,
     );
-    assert.match(
-      source,
-      /import \{ CISO_MAILTO_HREF \} from "@\/lib\/ciso-intake";/,
-      page,
-    );
-    assert.match(source, /const MAIL = CISO_MAILTO_HREF;/, page);
+    assert.doesNotMatch(source, /CISO_MAILTO_HREF/, page);
+    assert.match(source, /const MAIL = `\$\{BASE\}#enterprise-licensing`;/, page);
     assert.doesNotMatch(source, /["'`]mailto:/, page);
     assert.deepEqual(
       [

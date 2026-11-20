@@ -114,7 +114,7 @@ For the separate fiat scanner fallback, inspect both `WWW-Authenticate` and JSON
 for `error="fiat_gateway_offline"` and `fallback="native_lightning_active"`.
 Preserve that exact invoice and macaroon, validate the quote, pay once, and
 redeem at `POST /api/mint-macaroon`. The existing fallback buys **100 scanner
-calls for 100,000 sats**, expiring 30 days after issuance; it does not authorize
+calls for a $450 BTC/USD spot quote** (locked 15 minutes), expiring 30 days after issuance; the Heavy Swarm Pack buys 1,000 calls for a $4,000 spot quote, valid 90 days; it does not authorize
 unrelated MCP tools. The example MCP budget above deliberately does not authorize
 that separate scanner purchase.
 

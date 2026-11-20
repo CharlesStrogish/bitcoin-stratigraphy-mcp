@@ -5,21 +5,22 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+import type { BatchSettlementDiscoverySupportedBatchSizesItem } from './batchSettlementDiscoverySupportedBatchSizesItem';
 
 /**
- * Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.
+ * Lightning-only exact-tool prepaid macro-macaroons for 1, 100, 1000 or 10000 calls at 250 sats per call. This is not a multi-tool aggregate invoice.
  */
 export interface BatchSettlementDiscovery {
   protocol: 'L402';
   settlementAsset: 'btc-lightning';
   requestHeader: 'X-L402-Batch-Size';
   /**
-     * @minItems 1
-     * @maxItems 1
+     * @minItems 4
+     * @maxItems 4
      */
-  supportedBatchSizes: 100[];
+  supportedBatchSizes: BatchSettlementDiscoverySupportedBatchSizesItem[];
   exampleHeaderValue: '100';
-  maxCalls: 100;
+  maxCalls: 10000;
   priceMultiplier: 100;
   credentialScope: 'exact MCP tool path';
   invoiceGeneratedByDiscovery: false;

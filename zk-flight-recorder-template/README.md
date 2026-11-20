@@ -201,8 +201,11 @@ card bridge or initiate treasury spending.
 
 | Access product | Published terms | Scope |
 | --- | --- | --- |
-| Enterprise API Block | **$500 USD** by card, or **100,000 sats** via Lightning | 100 prepaid scanner calls, valid 30 days from issuance |
+| Enterprise API Block | **$500 USD** by card, or a **$450 BTC/USD spot quote** via Lightning | 100 prepaid scanner calls, valid 30 days from issuance |
+| Heavy Swarm Pack | **$4,000 BTC/USD spot quote** via Lightning only | 1,000 prepaid scanner calls, valid 90 days from issuance |
 | Standard paid core MCP calls | **250 sats/call** at the standard tier; consult current quotes | Separate tool access; scanner credits do not authorize these calls |
+
+All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.
 
 Purchase availability depends on the portal's live configuration. A Stripe
 test charge does not transfer fiat or fund a live capability. Neither an

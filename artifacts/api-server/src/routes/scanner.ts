@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
-import { Router, type Express, type RequestHandler } from "express";
+import { type Express, type RequestHandler } from "express";
 import { ScanArticle12PromptBody, ScanArticle12PromptResponse, MintScannerMacaroonResponse } from "@workspace/api-zod";
 import { analyzeScannerPrompt, scannerPromptHash } from "../lib/scanner";
 import { createL402Middleware, parseL402Header } from "../middleware/l402";
@@ -10,7 +10,9 @@ import type { MacaroonUsageStore } from "../lib/macaroon-usage-store";
 import type { MacaroonRevocationStore } from "../lib/macaroon-revocation-store";
 import type { RevenueLedger } from "../services/ledger";
 import { createMemoryMacaroonUsageStore } from "../lib/macaroon-usage-store";
-import { SCANNER_RETAIL_SATS, SCANNER_CREDIT_SATS, SCANNER_CREDIT_DESCRIPTION } from "../lib/scanner-credits";
+import { SCANNER_RETAIL_SATS, scannerDescription } from "../lib/scanner-credits";
+import { btcSpotOracle, usdToSats, type SpotOracle } from "../services/btcSpotOracle";
+import { inspectSubscriptionMacaroon } from "../lib/subscription-pass";
 
 export type ScannerRouteOptions = {
   settlementRouter?: SettlementRouter;
@@ -18,6 +20,7 @@ export type ScannerRouteOptions = {
   usageStore?: MacaroonUsageStore;
   revocationStore?: MacaroonRevocationStore;
   ledger?: RevenueLedger;
+  spotOracle?: SpotOracle;
 };
 
 function scannerPaymentOptions(options: ScannerRouteOptions) {
@@ -69,7 +72,7 @@ export function registerScannerRoute(app: Express, options: ScannerRouteOptions 
     res.json(ScanArticle12PromptResponse.parse(analyzeScannerPrompt(req.body.prompt)));
   });
 
-  app.post("/api/mint-macaroon", createScannerMintHandler(shared));
+  app.post("/api/mint-macaroon", createScannerMintHandler({ ...shared, spotOracle: options.spotOracle }));
 }
 
 /** Same product, scope, price and verifier on normal and disaster-recovery rails. */
@@ -77,34 +80,46 @@ export function createScannerMintHandler(
   options: ScannerRouteOptions = {},
   fiatContinuity = false,
 ): RequestHandler {
-  const mintGate = createL402Middleware({
-    ...scannerPaymentOptions(options),
-    fiatContinuity,
-    amountSats: SCANNER_CREDIT_SATS,
-    description: SCANNER_CREDIT_DESCRIPTION,
-    scopePath: "/api/scanner",
-    scannerCredits: "mint",
-  });
-  const router = Router();
-  router.use((req, res, next): void => {
+  const shared = scannerPaymentOptions(options);
+  const gates = new Map<string, RequestHandler>();
+  return async (req, res, next) => {
     res.set("Cache-Control", "no-store");
     if ((req.body !== undefined && (typeof req.body !== "object" || req.body === null ||
-        Array.isArray(req.body) || Object.keys(req.body).length !== 0)) ||
+        Array.isArray(req.body) || Object.keys(req.body).some(key => key !== "pack") ||
+        (req.body.pack !== undefined && req.body.pack !== "heavy_swarm_1000"))) ||
         req.get("X-Requested-Budget") || req.get("X-L402-Batch-Size") ||
         req.get("X-Swarm-Referral")) {
-      res.status(400).json({ error: "This product requires an empty body and fixed 100000-sat funding" });
+      res.status(400).json({ error: "Provide an empty object or pack: heavy_swarm_1000; batch, budget and referral headers are not supported" });
       return;
     }
-    next();
-  }, mintGate, (req, res): void => {
-    const credential = parseL402Header(req.header("Authorization"), true)!;
-    res.json(MintScannerMacaroonResponse.parse({
-      macaroon: credential.macaroon,
-      credits: res.locals.l402.credits,
-      amount_sats: SCANNER_CREDIT_SATS,
-      valid_until: res.locals.l402.validUntil,
-      scope: "/api/scanner",
-    }));
-  });
-  return router;
+    const credits = req.body?.pack === "heavy_swarm_1000" ? 1000 : 100;
+    const credential = parseL402Header(req.header("Authorization"), true);
+    const secret = options.sessionSecret ?? process.env.SESSION_SECRET;
+    const pass = credential && secret ? inspectSubscriptionMacaroon(credential.macaroon, secret) : null;
+    if (req.get("Authorization") && (!pass?.scannerCredits || pass.scannerCredits !== credits)) {
+      res.status(401).json({ error: "Invalid scanner pack credential" }); return;
+    }
+    try {
+      // Paid credentials use their issuer-bound price, never today's spot quote.
+      const amount = pass ? pass.amountMsats! / 1000 :
+        usdToSats(credits === 1000 ? 4000 : 450, (await (options.spotOracle ?? btcSpotOracle).quote()).btcUsd);
+      const key = `${credits}:${amount}`;
+      let gate = gates.get(key);
+      if (!gate) {
+        gate = createL402Middleware({ ...shared, fiatContinuity, amountSats: amount,
+          description: scannerDescription(credits), scopePath: "/api/scanner", scannerCredits: "mint",
+          scannerPack: { credits, seconds: (credits === 1000 ? 90 : 30) * 86400 } });
+        if (gates.size >= 256) gates.delete(gates.keys().next().value!);
+        gates.set(key, gate);
+      }
+      await gate(req, res, (error?: unknown) => {
+        if (error) { next(error); return; }
+        res.json(MintScannerMacaroonResponse.parse({ macaroon: credential!.macaroon,
+          credits: res.locals.l402.credits, amount_sats: pass!.amountMsats! / 1000,
+          valid_until: res.locals.l402.validUntil, scope: "/api/scanner" }));
+      });
+    } catch {
+      if (!res.headersSent) res.status(503).json({ error: "btc_spot_oracle_unavailable" });
+    }
+  };
 }

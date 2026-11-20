@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/dynamic-pricing.test.js",
   "./dist/fiat-continuity.test.js",
   "./dist/stripe-enterprise.test.js",
   "./dist/fiat-mint.test.js",
@@ -176,6 +177,7 @@ await build({
 
 await build({
   entryPoints: {
+    "dynamic-pricing.test": "./tests/unit/dynamic-pricing.test.ts",
     "fiat-continuity.test": "./src/routes/fiat-continuity.test.ts",
     "stripe-enterprise.test": "./src/routes/stripe-enterprise.test.ts",
     "fiat-mint.test": "./src/routes/fiat-mint.test.ts",

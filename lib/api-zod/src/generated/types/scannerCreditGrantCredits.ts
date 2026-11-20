@@ -14,4 +14,5 @@ export type ScannerCreditGrantCredits = typeof ScannerCreditGrantCredits[keyof t
 
 export const ScannerCreditGrantCredits = {
   NUMBER_100: 100,
+  NUMBER_1000: 1000,
 } as const;

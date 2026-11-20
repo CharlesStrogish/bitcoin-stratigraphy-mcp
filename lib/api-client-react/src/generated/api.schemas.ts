@@ -24,13 +24,7 @@ export type ScannerCreditGrantCredits = typeof ScannerCreditGrantCredits[keyof t
 
 export const ScannerCreditGrantCredits = {
   NUMBER_100: 100,
-} as const;
-
-export type ScannerCreditGrantAmountSats = typeof ScannerCreditGrantAmountSats[keyof typeof ScannerCreditGrantAmountSats];
-
-
-export const ScannerCreditGrantAmountSats = {
-  NUMBER_100000: 100000,
+  NUMBER_1000: 1000,
 } as const;
 
 export type ScannerCreditGrantScope = typeof ScannerCreditGrantScope[keyof typeof ScannerCreditGrantScope];
@@ -44,7 +38,8 @@ export interface ScannerCreditGrant {
   macaroon: string;
   /** Original allocation, not remaining balance; reminting never replenishes credits. */
   credits: ScannerCreditGrantCredits;
-  amount_sats: ScannerCreditGrantAmountSats;
+  /** @minimum 1 */
+  amount_sats: number;
   /** Exclusive expiration in epoch seconds. */
   valid_until: number;
   scope: ScannerCreditGrantScope;
@@ -641,9 +636,15 @@ export type EscrowGenesisReceiptCreateResponse = {
   toll_fee_sats: number;
 };
 
+export type LicensingComplianceWaiverUsdBasis = {[key: string]: number};
+
 export interface LicensingCompliance {
   open_source_license: string;
   commercial_exemption: string;
+  terms?: string;
+  waiver_quote_endpoint?: string;
+  waiver_claim_endpoint?: string;
+  waiver_usd_basis?: LicensingComplianceWaiverUsdBasis;
   procurement_url: string;
 }
 
@@ -1031,20 +1032,30 @@ export interface McpToolCostItem {
   invoice_generation: McpInvoiceGeneration | null;
 }
 
+export type BatchSettlementDiscoverySupportedBatchSizesItem = typeof BatchSettlementDiscoverySupportedBatchSizesItem[keyof typeof BatchSettlementDiscoverySupportedBatchSizesItem];
+
+
+export const BatchSettlementDiscoverySupportedBatchSizesItem = {
+  NUMBER_1: 1,
+  NUMBER_100: 100,
+  NUMBER_1000: 1000,
+  NUMBER_10000: 10000,
+} as const;
+
 /**
- * Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.
+ * Lightning-only exact-tool prepaid macro-macaroons for 1, 100, 1000 or 10000 calls at 250 sats per call. This is not a multi-tool aggregate invoice.
  */
 export interface BatchSettlementDiscovery {
   protocol: 'L402';
   settlementAsset: 'btc-lightning';
   requestHeader: 'X-L402-Batch-Size';
   /**
-     * @minItems 1
-     * @maxItems 1
+     * @minItems 4
+     * @maxItems 4
      */
-  supportedBatchSizes: 100[];
+  supportedBatchSizes: BatchSettlementDiscoverySupportedBatchSizesItem[];
   exampleHeaderValue: '100';
-  maxCalls: 100;
+  maxCalls: 10000;
   priceMultiplier: 100;
   credentialScope: 'exact MCP tool path';
   invoiceGeneratedByDiscovery: false;
@@ -1122,10 +1133,21 @@ export interface SignedRevocationSnapshot {
 
 export type McpBatchCostQuotePerToolSats = {[key: string]: number};
 
+export type McpBatchCostQuoteL402BatchSupportedBatchSizesItem = typeof McpBatchCostQuoteL402BatchSupportedBatchSizesItem[keyof typeof McpBatchCostQuoteL402BatchSupportedBatchSizesItem];
+
+
+export const McpBatchCostQuoteL402BatchSupportedBatchSizesItem = {
+  NUMBER_1: 1,
+  NUMBER_100: 100,
+  NUMBER_1000: 1000,
+  NUMBER_10000: 10000,
+} as const;
+
 export type McpBatchCostQuoteL402Batch = {
   request_header: 'X-L402-Batch-Size';
   header_value: '100';
-  max_requests: 100;
+  max_requests: 10000;
+  supported_batch_sizes?: McpBatchCostQuoteL402BatchSupportedBatchSizesItem[];
   price_multiplier: 100;
   credential_scope: 'exact MCP tool path';
 };
@@ -2892,13 +2914,6 @@ export const CreateFiatMintCheckout402Fallback = {
   native_lightning_active: 'native_lightning_active',
 } as const;
 
-export type CreateFiatMintCheckout402AmountSats = typeof CreateFiatMintCheckout402AmountSats[keyof typeof CreateFiatMintCheckout402AmountSats];
-
-
-export const CreateFiatMintCheckout402AmountSats = {
-  NUMBER_100000: 100000,
-} as const;
-
 export type CreateFiatMintCheckout402Credits = typeof CreateFiatMintCheckout402Credits[keyof typeof CreateFiatMintCheckout402Credits];
 
 
@@ -2926,7 +2941,8 @@ export type CreateFiatMintCheckout402 = {
   macaroon: string;
   invoice: string;
   payment_hash: string;
-  amount_sats: CreateFiatMintCheckout402AmountSats;
+  /** @minimum 1 */
+  amount_sats: number;
   credits: CreateFiatMintCheckout402Credits;
   payment_endpoint: CreateFiatMintCheckout402PaymentEndpoint;
   purchase_recovery: CreateFiatMintCheckout402PurchaseRecovery;
@@ -2948,6 +2964,17 @@ export const GetFiatMintStatus200Status = {
 
 export type GetFiatMintStatus200 = {
   status: GetFiatMintStatus200Status;
+};
+
+export type MintScannerMacaroonBodyPack = typeof MintScannerMacaroonBodyPack[keyof typeof MintScannerMacaroonBodyPack];
+
+
+export const MintScannerMacaroonBodyPack = {
+  heavy_swarm_1000: 'heavy_swarm_1000',
+} as const;
+
+export type MintScannerMacaroonBody = {
+  pack?: MintScannerMacaroonBodyPack;
 };
 
 export type RegisterEnterpriseFleet200MaximumUnpaidSats = typeof RegisterEnterpriseFleet200MaximumUnpaidSats[keyof typeof RegisterEnterpriseFleet200MaximumUnpaidSats];
@@ -3060,4 +3087,65 @@ export type VerifyZkProof503 = {
 export type GroundEpistemicContext200 = {
   receipt: EpistemicAnchorReceipt;
 };
+
+export type CreateAgplWaiverQuoteBodyTier = typeof CreateAgplWaiverQuoteBodyTier[keyof typeof CreateAgplWaiverQuoteBodyTier];
+
+
+export const CreateAgplWaiverQuoteBodyTier = {
+  swarm_monthly: 'swarm_monthly',
+  swarm_annual: 'swarm_annual',
+  global_monthly: 'global_monthly',
+  global_annual: 'global_annual',
+} as const;
+
+export type CreateAgplWaiverQuoteBody = {
+  tier: CreateAgplWaiverQuoteBodyTier;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  licensee_name: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  licensee_identifier: string;
+  terms_accepted: true;
+};
+
+export type CreateAgplWaiverQuote200 = {
+  quote_id: string;
+  tier: string;
+  usd_basis: number;
+  quoted_sats: number;
+  btc_spot_usd: number;
+  settlement_address: string;
+  min_confirmations: number;
+  expires_at: string;
+  terms_sha256: string;
+};
+
+export type ClaimAgplWaiverBody = {
+  quote_id: string;
+  /** @pattern ^[0-9a-fA-F]{64}$ */
+  txid: string;
+};
+
+export type ClaimAgplWaiver200 = {
+  waiver_id: string;
+  tier: string;
+  licensee_name: string;
+  licensee_identifier: string;
+  txid: string;
+  vout: number;
+  sats_paid: number;
+  usd_basis: number;
+  issued_at: string;
+  expires_at: string;
+  terms_sha256: string;
+  scope: string;
+  issuer_key_id: string;
+  signature: string;
+  [key: string]: unknown;
+ };
 

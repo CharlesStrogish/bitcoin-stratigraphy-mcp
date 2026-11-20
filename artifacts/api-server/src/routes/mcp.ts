@@ -5641,6 +5641,7 @@ export function registerMcpRoute(
           expectedOutputSchema: mcpToolDefinitions.find((tool) =>
             tool.name === canonicalToolName(name))?.outputSchema,
           allowBatch: true,
+          fixedUnitPrice: true,
           invoiceExpirySeconds: MCP_INVOICE_EXPIRY_SECONDS,
           description: `Bitcoin Stratigraphy MCP ${name} execution`,
           settlementRouter,
@@ -6199,7 +6200,7 @@ export function registerMcpRoute(
           (pass.baseAmountMsats ?? pass.amountMsats) !==
             paidTools[originalTool as keyof typeof paidTools].amountSats *
               1_000 *
-              (pass.requestLimits[0]?.maxRequests === 100 ? 100 : 1)
+              ([100,1000,10000].includes(pass.requestLimits[0]?.maxRequests ?? 0) ? pass.requestLimits[0]!.maxRequests : 1)
         ) {
           next();
           return;
@@ -6213,7 +6214,7 @@ export function registerMcpRoute(
             paymentHash,
             ...paymentVerificationProof(authorization.preimage),
             expectedAmountMsats: pass.amountMsats,
-            expectedDescription: `Bitcoin Stratigraphy MCP ${originalTool} execution${pass.requestLimits[0]?.maxRequests === 100 ? " (100-call batch)" : ""}`,
+            expectedDescription: `Bitcoin Stratigraphy MCP ${originalTool} execution${[100,1000,10000].includes(pass.requestLimits[0]?.maxRequests ?? 0) ? ` (${pass.requestLimits[0]!.maxRequests}-call batch)` : ""}`,
             expectedProvider: pass.paymentProvider,
             asset: "btc-lightning",
           });

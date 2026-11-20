@@ -9,7 +9,7 @@ import * as zod from 'zod';
 
 
 /**
- * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers the existing native 100000-sat scanner product via HTTP 402 without sending any payment or changing fulfillment. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
+ * Requires server-configured Stripe credentials and a fixed USD 500 price in the same live or test mode. Owner recovery uses an HttpOnly cookie, never credentials in URLs. Lightning funding remains separately opt-in and budget-capped. On a five-second checkout deadline or upstream Stripe timeout/5xx, offers a USD 450 spot-quoted native scanner product via HTTP 402 without sending any payment or changing fulfillment. Oracle failure returns 503, never a static fallback. Recover uncertain card purchases before paying again; redeem the native challenge at POST /api/mint-macaroon.
  * @summary Create a Stripe-hosted Checkout for 100 scanner credits
  */
 export const CreateFiatMintCheckoutBody = zod.object({
@@ -32,10 +32,13 @@ export const GetFiatMintStatusResponse = zod.object({
 /**
  * @summary Reveal the funded scanner macaroon once to the checkout owner
  */
+
+
+
 export const ClaimFiatMintMacaroonResponse = zod.object({
   "macaroon": zod.string(),
-  "credits": zod.literal(100).describe('Original allocation, not remaining balance; reminting never replenishes credits.'),
-  "amount_sats": zod.literal(100000),
+  "credits": zod.union([zod.literal(100),zod.literal(1000)]).describe('Original allocation, not remaining balance; reminting never replenishes credits.'),
+  "amount_sats": zod.int().min(1),
   "valid_until": zod.int().describe('Exclusive expiration in epoch seconds.'),
   "scope": zod.enum(['/api/scanner'])
 })
@@ -55,7 +58,7 @@ export const ReceiveEnterpriseStripeWebhookResponse = zod.unknown()
 
 
 /**
- * Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Retail success consumes the prompt-bound single-use capability. A settled 100000-sat Developer SaaS macaroon from /api/mint-macaroon carries credits=100 and permits 100 valid scanner calls across different prompts. Each admitted scan atomically consumes one shared credit. Credit grants expire 30 days after issuance, and inherited descendant quotas and revocations remain enforced. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
+ * Fixed 5000-sat retail L402 fee. First POST returns 402 and WWW-Authenticate. Repeat the exact prompt with Authorization L402 <macaroon>:NWC_LOOKUP to verify incoming merchant settlement; 409 means keep the original invoice and poll again. Retail success consumes the prompt-bound single-use capability. A settled issuer-bound Scanner Pack macaroon from /api/mint-macaroon carries credits=100 and permits 100 valid scanner calls across different prompts. Each admitted scan atomically consumes one shared credit. Credit grants expire 30 days after issuance, and inherited descendant quotas and revocations remain enforced. Compliance hash is a SHA-256 commitment, not a ZK proof or legal certification.
  * @summary Paid heuristic Article 12 prompt risk review
  */
 export const ScanArticle12PromptHeader = zod.object({
@@ -92,17 +95,24 @@ export const ScanArticle12PromptResponse = zod.object({
 
 
 /**
- * First POST returns a fixed 100000-sat invoice and an unsettled credits=100 scanner-scoped macaroon in WWW-Authenticate. Pay that invoice once, then repeat with Authorization L402 <macaroon>:<preimage> or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement, returns the same funded macaroon without consuming any scanner credit. Funding confirmation is idempotent and never resets the 100-call budget. Invoice expiry is 900 seconds; credits expire 30 days after issuance. The B2B portal confirms settlement with Authorization Macaroon <token>. This shorthand is accepted only for issuer-authorized prepaid scanner credits and uses the same merchant-side verification as L402 NWC_LOOKUP. Use Authorization Macaroon <token> or the original L402 Authorization on /api/scanner for different valid prompts. No additional invoices are generated for funded calls or exhausted credits.
- * @summary Buy 100 prepaid scanner credits for 100000 sats
+ * First POST returns a 15-minute BTC spot quote at USD 450 for 100 calls valid 30 days, or USD 4000 for heavy_swarm_1000 (1000 calls, 90 days), and an unsettled credits=100 or credits=1000 scanner-scoped macaroon in WWW-Authenticate. Pay that invoice once, then repeat with Authorization L402 <macaroon>:<preimage> or L402 <macaroon>:NWC_LOOKUP. After verified merchant settlement, returns the same funded macaroon without consuming any scanner credit. Funding confirmation is idempotent and never resets the 100- or 1000-call budget. Invoice expiry is 900 seconds; credits expire 30 or 90 days after issuance. The B2B portal confirms settlement with Authorization Macaroon <token>. This shorthand is accepted only for issuer-authorized prepaid scanner credits and uses the same merchant-side verification as L402 NWC_LOOKUP. Use Authorization Macaroon <token> or the original L402 Authorization on /api/scanner for different valid prompts. No additional invoices are generated for funded calls or exhausted credits.
+ * @summary Buy a USD-pegged Bitcoin scanner pack
  */
 export const MintScannerMacaroonHeader = zod.object({
   "Authorization": zod.string().optional()
 })
 
+export const MintScannerMacaroonBody = zod.object({
+  "pack": zod.enum(['heavy_swarm_1000']).optional()
+})
+
+
+
+
 export const MintScannerMacaroonResponse = zod.object({
   "macaroon": zod.string(),
-  "credits": zod.literal(100).describe('Original allocation, not remaining balance; reminting never replenishes credits.'),
-  "amount_sats": zod.literal(100000),
+  "credits": zod.union([zod.literal(100),zod.literal(1000)]).describe('Original allocation, not remaining balance; reminting never replenishes credits.'),
+  "amount_sats": zod.int().min(1),
   "valid_until": zod.int().describe('Exclusive expiration in epoch seconds.'),
   "scope": zod.enum(['/api/scanner'])
 })
@@ -516,7 +526,7 @@ export const GetEnterpriseDueDiligenceBriefResponse = zod.object({
   "service_levels": zod.string(),
   "technical_stewardship": zod.string(),
   "settlement": zod.string(),
-  "contact": zod.email()
+  "contact": zod.url()
 })
 }),
   "architecture": zod.object({
@@ -628,6 +638,10 @@ export const GetEscrowGenesisReceiptResponse = zod.object({
   "licensing_compliance": zod.object({
   "open_source_license": zod.string(),
   "commercial_exemption": zod.string(),
+  "terms": zod.string().optional(),
+  "waiver_quote_endpoint": zod.string().optional(),
+  "waiver_claim_endpoint": zod.string().optional(),
+  "waiver_usd_basis": zod.record(zod.string(), zod.int()).optional(),
   "procurement_url": zod.string()
 }).optional(),
   "ots_calendar_standard": zod.enum(['OpenTimestamps / RFC 6962 SHA-256']),
@@ -779,6 +793,10 @@ export const SettleEscrowResponse = zod.object({
   "licensing_compliance": zod.object({
   "open_source_license": zod.string(),
   "commercial_exemption": zod.string(),
+  "terms": zod.string().optional(),
+  "waiver_quote_endpoint": zod.string().optional(),
+  "waiver_claim_endpoint": zod.string().optional(),
+  "waiver_usd_basis": zod.record(zod.string(), zod.int()).optional(),
   "procurement_url": zod.string()
 }).optional(),
   "ots_calendar_standard": zod.enum(['OpenTimestamps / RFC 6962 SHA-256']),
@@ -1608,7 +1626,8 @@ export const QuoteMcpToolCostsBody = zod.object({
   "tools": zod.array(zod.string().min(1).max(quoteMcpToolCostsBodyToolsItemMax)).min(1).max(quoteMcpToolCostsBodyToolsMax)
 })
 
-export const quoteMcpToolCostsResponseBatchSettlementSupportedBatchSizesMax = 1;
+export const quoteMcpToolCostsResponseBatchSettlementSupportedBatchSizesMin = 4;
+export const quoteMcpToolCostsResponseBatchSettlementSupportedBatchSizesMax = 4;
 
 export const quoteMcpToolCostsResponsePerToolSatsMinOne = 0;
 
@@ -1627,20 +1646,24 @@ export const QuoteMcpToolCostsResponse = zod.object({
   "licensing_compliance": zod.object({
   "open_source_license": zod.string(),
   "commercial_exemption": zod.string(),
+  "terms": zod.string().optional(),
+  "waiver_quote_endpoint": zod.string().optional(),
+  "waiver_claim_endpoint": zod.string().optional(),
+  "waiver_usd_basis": zod.record(zod.string(), zod.int()).optional(),
   "procurement_url": zod.string()
 }).optional(),
   "batchSettlement": zod.object({
   "protocol": zod.literal("L402"),
   "settlementAsset": zod.literal("btc-lightning"),
   "requestHeader": zod.literal("X-L402-Batch-Size"),
-  "supportedBatchSizes": zod.array(zod.literal(100)).min(1).max(quoteMcpToolCostsResponseBatchSettlementSupportedBatchSizesMax),
+  "supportedBatchSizes": zod.array(zod.union([zod.literal(1),zod.literal(100),zod.literal(1000),zod.literal(10000)])).min(quoteMcpToolCostsResponseBatchSettlementSupportedBatchSizesMin).max(quoteMcpToolCostsResponseBatchSettlementSupportedBatchSizesMax),
   "exampleHeaderValue": zod.literal("100"),
-  "maxCalls": zod.literal(100),
+  "maxCalls": zod.literal(10000),
   "priceMultiplier": zod.literal(100),
   "credentialScope": zod.literal("exact MCP tool path"),
   "invoiceGeneratedByDiscovery": zod.literal(false),
   "instructions": zod.string()
-}).describe('Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.'),
+}).describe('Lightning-only exact-tool prepaid macro-macaroons for 1, 100, 1000 or 10000 calls at 250 sats per call. This is not a multi-tool aggregate invoice.'),
   "protocol": zod.literal("L402"),
   "currency": zod.literal("sats"),
   "perToolSats": zod.record(zod.string(), zod.int().min(quoteMcpToolCostsResponsePerToolSatsMinOne)),
@@ -1677,7 +1700,8 @@ export const QuoteMcpToolCostsResponse = zod.object({
   "batch": zod.object({
   "request_header": zod.literal("X-L402-Batch-Size"),
   "header_value": zod.literal("100"),
-  "max_requests": zod.literal(100),
+  "max_requests": zod.literal(10000),
+  "supported_batch_sizes": zod.array(zod.union([zod.literal(1),zod.literal(100),zod.literal(1000),zod.literal(10000)])).optional(),
   "price_multiplier": zod.literal(100),
   "credential_scope": zod.literal("exact MCP tool path")
 }).optional()
@@ -1702,7 +1726,8 @@ export const GetStratigraphyCostHeader = zod.object({
   "Accept-Asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']).optional().describe('Alias for X-Settlement-Asset.')
 })
 
-export const getStratigraphyCostResponseBatchSettlementSupportedBatchSizesMax = 1;
+export const getStratigraphyCostResponseBatchSettlementSupportedBatchSizesMin = 4;
+export const getStratigraphyCostResponseBatchSettlementSupportedBatchSizesMax = 4;
 
 
 export const getStratigraphyCostResponseAccessTiersMin = 2;
@@ -1735,20 +1760,24 @@ export const GetStratigraphyCostResponse = zod.object({
   "licensing_compliance": zod.object({
   "open_source_license": zod.string(),
   "commercial_exemption": zod.string(),
+  "terms": zod.string().optional(),
+  "waiver_quote_endpoint": zod.string().optional(),
+  "waiver_claim_endpoint": zod.string().optional(),
+  "waiver_usd_basis": zod.record(zod.string(), zod.int()).optional(),
   "procurement_url": zod.string()
 }).optional(),
   "batchSettlement": zod.object({
   "protocol": zod.literal("L402"),
   "settlementAsset": zod.literal("btc-lightning"),
   "requestHeader": zod.literal("X-L402-Batch-Size"),
-  "supportedBatchSizes": zod.array(zod.literal(100)).min(1).max(getStratigraphyCostResponseBatchSettlementSupportedBatchSizesMax),
+  "supportedBatchSizes": zod.array(zod.union([zod.literal(1),zod.literal(100),zod.literal(1000),zod.literal(10000)])).min(getStratigraphyCostResponseBatchSettlementSupportedBatchSizesMin).max(getStratigraphyCostResponseBatchSettlementSupportedBatchSizesMax),
   "exampleHeaderValue": zod.literal("100"),
-  "maxCalls": zod.literal(100),
+  "maxCalls": zod.literal(10000),
   "priceMultiplier": zod.literal(100),
   "credentialScope": zod.literal("exact MCP tool path"),
   "invoiceGeneratedByDiscovery": zod.literal(false),
   "instructions": zod.string()
-}).optional().describe('Existing Lightning-only, exact-tool, 100-call prepaid macro-macaroon contract. This is not a multi-tool aggregate invoice.'),
+}).optional().describe('Lightning-only exact-tool prepaid macro-macaroons for 1, 100, 1000 or 10000 calls at 250 sats per call. This is not a multi-tool aggregate invoice.'),
   "protocol": zod.literal("L402"),
   "settlement_asset": zod.enum(['btc-lightning', 'l-btc', 'taproot-assets']),
   "supported_assets": zod.array(zod.enum(['btc-lightning', 'l-btc', 'taproot-assets'])).min(1),
@@ -2632,6 +2661,64 @@ export const AttestMeshSnapshotResponse = zod.object({
   "about": zod.string().optional()
 })
 }).optional()
+})
+
+
+/**
+ * @summary Lock a self-serve Bitcoin copyright waiver quote for 30 minutes
+ */
+export const createAgplWaiverQuoteBodyLicenseeNameMax = 200;
+
+export const createAgplWaiverQuoteBodyLicenseeIdentifierMax = 200;
+
+
+
+export const CreateAgplWaiverQuoteBody = zod.object({
+  "tier": zod.enum(['swarm_monthly', 'swarm_annual', 'global_monthly', 'global_annual']),
+  "licensee_name": zod.string().min(1).max(createAgplWaiverQuoteBodyLicenseeNameMax),
+  "licensee_identifier": zod.string().min(1).max(createAgplWaiverQuoteBodyLicenseeIdentifierMax),
+  "terms_accepted": zod.literal(true)
+})
+
+export const CreateAgplWaiverQuoteResponse = zod.object({
+  "quote_id": zod.string(),
+  "tier": zod.string(),
+  "usd_basis": zod.int(),
+  "quoted_sats": zod.int(),
+  "btc_spot_usd": zod.number(),
+  "settlement_address": zod.string(),
+  "min_confirmations": zod.int(),
+  "expires_at": zod.string(),
+  "terms_sha256": zod.string()
+})
+
+
+/**
+ * @summary Claim a signed waiver after verified confirmed Bitcoin settlement
+ */
+export const claimAgplWaiverBodyTxidRegExp = new RegExp('^[0-9a-fA-F]{64}$');
+
+
+export const ClaimAgplWaiverBody = zod.object({
+  "quote_id": zod.string(),
+  "txid": zod.string().regex(claimAgplWaiverBodyTxidRegExp)
+})
+
+export const ClaimAgplWaiverResponse = zod.object({
+  "waiver_id": zod.string(),
+  "tier": zod.string(),
+  "licensee_name": zod.string(),
+  "licensee_identifier": zod.string(),
+  "txid": zod.string(),
+  "vout": zod.int(),
+  "sats_paid": zod.int(),
+  "usd_basis": zod.int(),
+  "issued_at": zod.string(),
+  "expires_at": zod.string(),
+  "terms_sha256": zod.string(),
+  "scope": zod.string(),
+  "issuer_key_id": zod.string(),
+  "signature": zod.string()
 })
 
 

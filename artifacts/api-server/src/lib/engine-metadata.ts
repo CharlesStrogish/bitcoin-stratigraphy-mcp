@@ -1,3 +1,4 @@
+import { AS_IS_TERMS } from "./as-is-terms";
 /** Discovery text only; this module does not configure or enable engine features. */
 export const ENGINE_SUMMARY =
   "Enterprise-grade L402 data vending engine serving real-time thermodynamic Bitcoin telemetry, cryptographic proof verification, and P2P mesh consensus to autonomous AI agents and LLM swarms.";
@@ -28,6 +29,8 @@ export const ENGINE_DESCRIPTION = [
   "",
   "Operational Boundaries:",
   ...ENGINE_OPERATIONAL_NOTES.map((note) => `- ${note}`),
+  "",
+  AS_IS_TERMS,
 ].join("\n");
 
 /** Namespace labels for discovery surfaces, not new MCP protocol capabilities. */

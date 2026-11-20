@@ -302,3 +302,7 @@
   .fn-prepaid-mint .fn-btn, .fn-prepaid-actions .fn-btn { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .fn-prepaid-pay, .fn-prepaid-done { animation: none; } }
+.fn-pack-select { border: 1px solid hsl(var(--border)); margin: 0; padding: 10px 12px; display: grid; gap: 8px; text-align: left; width: min(100%, 520px); }
+.fn-pack-select legend { padding: 0 6px; }
+.fn-pack-option { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.fn-pack-option input { margin-top: 4px; accent-color: hsl(var(--fn-amber, var(--primary))); }

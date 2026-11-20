@@ -17,9 +17,13 @@ const { quoteMcpTools } = await tsImport(
 
 test("pre-flight and settlement telemetry share exact machine-readable licensing metadata", () => {
   const expected = {
+    terms: licensingCompliance.terms,
+    waiver_quote_endpoint: "/api/v1/waivers/quote",
+    waiver_claim_endpoint: "/api/v1/waivers/claim",
+    waiver_usd_basis: { swarm_monthly: 2500, swarm_annual: 25000, global_monthly: 25000, global_annual: 250000 },
     open_source_license: "AGPLv3 (Viral Network Copyleft under Section 13)",
     commercial_exemption:
-      "Required for closed-source model weights, private VPC swarms, and proprietary enterprise logic ($250,000/yr Tier II Commercial Enterprise Exemption)",
+      "Self-serve, time-locked AGPLv3 Section 13 Commercial Copyright Waivers; AS-IS, zero SLAs",
     procurement_url: "https://bitcoinstratigraphy.com/#enterprise-licensing",
   };
   assert.deepEqual(licensingCompliance, expected);

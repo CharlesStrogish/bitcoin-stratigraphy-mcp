@@ -30,8 +30,10 @@ The protective wrapper is additive: successful fiat-to-Lightning checkout
 continues through the existing Stripe/Brevo L402 fulfillment loop unchanged.
 When `POST /api/fiat-mint` exceeds its **five-second checkout deadline**, encounters
 an upstream timeout, or receives a Stripe **5xx**, it offers the existing native
-Lightning product: **100,000 sats for 100 scanner calls**, with credits expiring
-30 days after issuance. Authentication, configuration and validation failures
+Lightning product: **100 scanner calls for a $450 BTC/USD spot quote** (locked
+15 minutes; HTTP 503 if the spot oracle is unavailable), with credits expiring
+30 days after issuance. The Bitcoin-only **Heavy Swarm Pack** buys 1,000 calls
+for a $4,000 spot quote, valid 90 days. Authentication, configuration and validation failures
 are not treated as outages. Existing payable or paid Stripe sessions must be
 recovered first; no fallback invoice is offered when ownership recovery is
 unavailable.
@@ -115,22 +117,28 @@ after its separate npm registry release.
 
 **[Bitcoin Stratigraphy](https://bitcoinstratigraphy.com)** serves enterprise
 autonomous swarms with a capacity of 19 MCP tools, including the optional A2A
-clearing namespace. The commercial deployment
-path is the **$250,000/year Tier II Commercial Enterprise Exemption**, with
-Automated Compliance SLAs for signed revocation exports and receipt-key rotation.
+clearing namespace. Proprietary deployments use self-serve **AGPLv3 Commercial
+Copyright Waivers** paid in Bitcoin.
 
-## Enterprise Commercial License Exemption
+## Self-Serve AGPLv3 Commercial Copyright Waivers
 
-High-volume orchestrators, major LLM crawlers, and global AI trading desks can
-bypass per-request L402 micro-transactions by securing a **$250,000/year
-Commercial License Exemption**.
+| Tier | Price (BTC at spot) | Term | Scope |
+| --- | --- | --- | --- |
+| `swarm_monthly` | $2,500 | 30 days | Single-Swarm |
+| `swarm_annual` | $25,000 | 365 days | Single-Swarm (16.7% annual discount) |
+| `global_monthly` | $25,000 | 30 days | Global Organization |
+| `global_annual` | $250,000 | 365 days | Global Organization (16.7% annual discount) |
 
-- **Zero-Trust Security:** Public CI/CD automated double-spend and credential leak audits.
-- **Zero-Latency Routing:** Dedicated LRU memory caching bypassing redundant cryptographic database queries.
-- **Treasury Integration:** Non-blocking asynchronous webhooks piping real-time yield data directly into corporate Datadog/Slack environments.
-- **Full Procurement Terms:** Review the [Enterprise Master Services Agreement and SLA](ENTERPRISE_SLA.md) for the annual commercial license, uptime guarantee, support commitments, and liability terms.
+Purchase at [/#enterprise-licensing](https://bitcoinstratigraphy.com/#enterprise-licensing):
+`POST /api/v1/waivers/quote` locks a sat quote for 30 minutes; after the
+on-chain payment confirms, `POST /api/v1/waivers/claim` returns an
+Ed25519-signed Waiver Certificate verifiable offline with `/static/verify.html`.
 
-To initiate an enterprise license, contact the Central Bank Governor directly at licensing@bitcoinstratigraphy.com or visit https://bitcoinstratigraphy.com for procurement details.
+Prepaid MCP Macro-Macaroons come in 1, 100, 1,000 and 10,000 calls at 250 sats
+per call, preserving the permanent 21% Programmatic Agent Yield (15% upstream
+origin, 6% verifying caller, 79% retained).
+
+All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.
 
 ## High-velocity enterprise deployment
 
@@ -170,13 +178,12 @@ To initiate an enterprise license, contact the Central Bank Governor directly at
   Replit-managed production schema changes are applied by Publish, not this
   command. Publish can use ordinary `CREATE INDEX` statements rather than
   concurrent builds; allow for possible write blocking during that rollout.
-- **Commercial Enterprise Exemption:** Tier II offers a commercial alternative
-  to AGPLv3 for private VPC and air-gapped deployments. The commercial agreement
-  governs proprietary swarm IP and Automated Compliance SLAs. AGPLv3 Section 13
+- **AGPLv3 Commercial Copyright Waivers:** self-serve, time-locked Section 13
+  waivers paid in Bitcoin for private VPC and air-gapped deployments, provided
+  AS-IS with zero SLAs. AGPLv3 Section 13
   covers corresponding source for covered modified network software; it does
   not automatically require disclosure of independent weights or applications.
-  [Enterprise procurement brief](https://bitcoinstratigraphy.com/#enterprise-licensing)
-  · [licensing@bitcoinstratigraphy.com](mailto:licensing@bitcoinstratigraphy.com).
+  [Buy a waiver](https://bitcoinstratigraphy.com/#enterprise-licensing).
 - **In-band compliance telemetry:** GET/POST `/api/v1/cost` and L402 challenge
   bodies include `licensing_compliance`. Successful L402 responses expose the
   same JSON in `X-L402-Licensing-Compliance`; settlement logs expose the structured
@@ -721,8 +728,8 @@ Call `resources/list` for the catalog, then `resources/read` with a `uri`:
 - **`stratigraphy://compliance/eu-ai-act-article-12`** — EU AI Act Article 12 &
   Enterprise Licensing Matrix: structured logging-control mappings for RFC 6962
   receipts, authenticated agent identity, macaroon attenuation, and Article
-  26(6) retention, plus the **$250k/year Commercial Enterprise Exemption** at
-  **licensing@bitcoinstratigraphy.com**.
+  26(6) retention, plus the self-serve **AGPLv3 Commercial Copyright Waiver**
+  tiers.
 - **`stratigraphy://security/tool-integrity`** — Ed25519 Signed Tool Integrity
   Manifest: the identical startup payload served at
   `/.well-known/integrity.json`, including its published core description hashes and
@@ -990,7 +997,7 @@ submit it to every index. Direct repository inspection and existing registry
 listings use the public MCP endpoint at `https://bitcoinstratigraphy.com/mcp`;
 no registry-specific CLI or SDK is required for this discovery metadata.
 
-## Autonomous routing, audit receipts and annual commercial exemptions
+## Autonomous routing, audit receipts and historical volume receipts
 
 > Provides corporate risk teams with an unforgeable cryptographic audit trail, mathematically proving that an autonomous agent based its execution on state-anchored thermodynamic data.
 
@@ -1006,20 +1013,17 @@ state anchoring, data truth, absolute unforgeability or legal indemnification.
   **Cryptographic Audit Receipt** in `indemnity_receipt`. It accepts
   `agent_decision` and `stratigraphy_data_used`, and states its verification
   limits explicitly.
-- Fresh NIP-98 authentication binds `Buyer-Pubkey` to confirmed cumulative spend.
-  At the live BTC/USD equivalent of $250,000 in new qualifying volume, a signed
-  Tier II token unlocks for **exactly 365 days**. It prints the exact UTC
-  **Expiry Date** and cryptographic `exp`; e.g. unlock
-  `2026-10-24T00:00:00.000Z` → **Expiry Date: `2027-10-24T00:00:00.000Z`**.
-- `GET /api/v1/compliance/commercial-exemption` returns buyer status.
-  `POST /api/v1/compliance/commercial-exemption/purchase` provides a funded L402
-  bulk-purchase path. Unpaid invoices and self-declared reservations grant no
-  rights. Renewals require new confirmed qualifying volume, never replayed
-  historical spend.
-- At expiry without qualifying renewal, future macaroons lose
-  `Commercial-Exemption: Active`; status responses and subsequent authenticated
-  request logs report high-risk AGPLv3 copyleft/no active commercial exemption.
-  Actual AGPL duties depend on covered software and use.
+- **Historical volume receipts (legacy, not a current offer):** Fresh NIP-98
+  authentication still binds `Buyer-Pubkey` to confirmed cumulative spend, and
+  the backend continues to honor and verify previously issued signed 365-day
+  volume tokens and their `exp` (e.g. unlock `2026-10-24T00:00:00.000Z` ->
+  expiry `2027-10-24T00:00:00.000Z`). These are historical receipts of recorded
+  routing volume only. They are not an AGPLv3 Commercial Copyright Waiver and
+  not an unlimited hosted service. `GET /api/v1/compliance/commercial-exemption`
+  reports status; unpaid invoices and self-declared reservations grant nothing.
+- The current, only commercial option is the self-serve AGPLv3 Commercial
+  Copyright Waiver at [/#enterprise-licensing](https://bitcoinstratigraphy.com/#enterprise-licensing).
+  All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.
 
 See [enterprise protocol economics and verification](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/docs/enterprise-protocol-economics.md)
 for canonical hashing, signed-token checks, rate/price limits and air-gap

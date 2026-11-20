@@ -29,6 +29,18 @@ function loadComponent(componentSource) {
     exports: module.exports,
     require: (path) => {
       if (path.endsWith(".css")) return {};
+      if (path === "./waiver-purchase") {
+        // The CommonJS sandbox has no import.meta; pin the base path to "/".
+        return loadComponent(
+          readFileSync(
+            new URL(
+              `${root}src/components/command-center/waiver-purchase.tsx`,
+              import.meta.url,
+            ),
+            "utf8",
+          ).replaceAll("import.meta.env.BASE_URL", '"/"'),
+        );
+      }
       if (path === "./copy-text-button") {
         return loadComponent(
           readFileSync(
@@ -70,17 +82,19 @@ test("licensing renders both tiers with every requested entitlement and price", 
     "AGPLv3 License",
     "Public Network Node",
     "Standard Tool Access",
-    "Commercial Enterprise Exemption",
-    "Proprietary IP Shield / No Viral Copyleft",
-    "Air-Gapped / VPC Deployment",
+    "AGPLv3 Commercial Copyright Waiver",
+    "Time-Locked AGPLv3 Section 13 Waiver",
+    "Self-Hosted Air-Gapped / VPC Deployment",
     "EU AI Act Article 12 & 26(6) Tamper-Evident Flight Recorders",
     "L402 Runaway Swarm Circuit Breakers",
     "Cryptographically Signed Tool Integrity",
-    "Automated Compliance SLAs Available",
+    "Ed25519-Signed Waiver Certificate, Verifiable Offline",
   ]) {
     assert.ok(text.includes(label), `renders ${label}`);
   }
-  assert.match(text, /Starting at\s*\$250k\s*\/Annual/);
+  assert.match(text, /From\s*\$2,500\s*\/30 days in BTC/);
+  // Superseded commercial/SLA offers are gone.
+  assert.doesNotMatch(text, /Automated Compliance SLAs|\$250k|Tier II|licensing@bitcoinstratigraphy\.com/);
   assert.equal((html.match(/<article\b/g) ?? []).length, 2);
   assert.equal((html.match(/<li\b/g) ?? []).length, 9);
   assert.doesNotMatch(
@@ -100,7 +114,7 @@ test("licensing links the public integrity manifest below the tier matrix", () =
   assert.doesNotMatch(source, /useEffect|useQuery|fetch\(/);
 });
 
-test("CISO risk brief is expandable below Tier II with a working procurement anchor", () => {
+test("CISO risk brief is expandable below the waiver tier with a working procurement anchor", () => {
   const html = renderMatrix();
   assert.match(html, /<section[^>]*id="enterprise-licensing"/);
   assert.match(html, /<\/article><details class="elm-risk-brief" data-testid="ciso-vendor-risk-brief"><summary>CISO Vendor Risk &amp; AGPLv3 Copyleft Brief<\/summary>/);
@@ -110,37 +124,44 @@ test("CISO risk brief is expandable below Tier II with a working procurement anc
   assert.doesNotMatch(html, /<details[^>]*\bopen\b/);
 });
 
-test("licensing uses the shared module kicker and offers a copyable email fallback", () => {
+const DISCLOSURE =
+  "All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.";
+
+test("licensing uses the shared module kicker and shows the verbatim AS-IS disclosure", () => {
   const html = renderMatrix();
   assert.match(
     html,
     /class="section-kicker">02 · DUAL-LICENSING &amp; COMPLIANCE MATRIX/,
   );
   assert.doesNotMatch(html, /elm-kicker-index|Module 02/);
-  assert.match(html, /Direct inquiry:.*licensing@bitcoinstratigraphy\.com/);
-  assert.match(html, /<button[^>]*data-testid="button-copy-licensing-email"/);
-  assert.ok(html.indexOf("elm-direct-inquiry") > html.indexOf("elm-cta-arrow"));
-  assert.match(source, /text=\{LICENSING_EMAIL\}/);
+  assert.match(html, /data-testid="text-waiver-disclosure">([^<]*)</);
+  const shown = html.match(/data-testid="text-waiver-disclosure">([^<]*)</)[1];
+  assert.equal(shown, DISCLOSURE);
+  assert.doesNotMatch(html, /data-testid="(?:button-copy-licensing-email|link-enterprise-licensing-intake)"/);
 });
 
-test("enterprise intake is a prominent accessible email link to licensing", () => {
+test("self-serve waiver form offers all four tiers and gates quoting on exact terms acceptance", () => {
   const html = renderMatrix();
   assert.match(html, /<section[^>]*aria-labelledby="cc-licensing-title"/);
   assert.match(html, /<h3 id="cc-licensing-title">/);
-  const link = html.match(
-    /<a\b[^>]*data-testid="link-enterprise-licensing-intake"[^>]*>/,
-  )?.[0];
-  assert.ok(link, "intake link is present");
-  const href = link.match(/href="([^"]+)"/)?.[1];
-  assert.ok(href);
-  const mailto = new URL(href);
-  assert.equal(mailto.protocol, "mailto:");
-  assert.equal(mailto.pathname, "licensing@bitcoinstratigraphy.com");
-  assert.equal(
-    mailto.searchParams.get("subject"),
-    "CISO Enterprise Licensing Intake",
+  for (const tier of ["swarm_monthly", "swarm_annual", "global_monthly", "global_annual"]) {
+    assert.match(html, new RegExp(`data-testid="radio-waiver-${tier}"`));
+  }
+  for (const price of ["$2,500", "$25,000", "$250,000"]) assert.ok(html.includes(price));
+  assert.match(html, /<input type="checkbox"[^>]*data-testid="checkbox-terms-accepted"/);
+  assert.doesNotMatch(html, /data-testid="checkbox-terms-accepted"[^>]*checked/);
+  assert.match(html, /<button type="submit"[^>]*disabled=""[^>]*data-testid="button-waiver-quote"/);
+  assert.match(html, /data-testid="input-licensee-name"/);
+  assert.match(html, /data-testid="input-licensee-identifier"/);
+  const waiver = readFileSync(
+    new URL(`${root}src/components/command-center/waiver-purchase.tsx`, import.meta.url),
+    "utf8",
   );
-  assert.match(html, /Request enterprise licensing/);
+  assert.match(waiver, /"api\/v1\/waivers\/quote"/);
+  assert.match(waiver, /"api\/v1\/waivers\/claim"/);
+  assert.match(waiver, /terms_accepted: accepted === true/);
+  assert.match(waiver, /static\/verify\.html/);
+  assert.doesNotMatch(waiver, /localhost/);
 });
 
 test("licensing has responsive containment and keyboard focus styles", () => {

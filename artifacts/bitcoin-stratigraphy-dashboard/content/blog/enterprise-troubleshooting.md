@@ -115,8 +115,8 @@ For the separate fiat scanner fallback, preserve the exact invoice and macaroon
 returned with `error="fiat_gateway_offline"` and
 `fallback="native_lightning_active"` in the challenge metadata. Validate the
 quote, pay once, then redeem through `POST /api/mint-macaroon`. This existing
-product costs **100,000 sats for 100 scanner calls**, expiring 30 days after
-issuance. Scanner credentials do not unlock unrelated MCP tools, and the
+product costs **a $450 BTC/USD spot quote for 100 scanner calls**, expiring 30 days after
+issuance (Heavy Swarm Pack: $4,000 spot quote for 1,000 calls, 90 days). Scanner credentials do not unlock unrelated MCP tools, and the
 example MCP budget above intentionally does not authorize this separate purchase.
 
 An HTTP 402 is not proof of payment. Reconcile unknown payment outcomes and keep

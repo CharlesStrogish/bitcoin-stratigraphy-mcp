@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. Licensed under AGPLv3 (Commercial Licenses Available).
 import { ESCROW_GENESIS } from "../services/escrowGenesis";
 import { mcpToolPrices } from "./mcp-pricing";
+import { AS_IS_TERMS } from "./as-is-terms";
 import {
   CANONICAL_ORIGIN,
   COMMERCIAL_LICENSE_PRICE,
@@ -56,7 +57,7 @@ export const CISO_INTAKE_QUESTIONNAIRE = [
     number: 5,
     topic: "In-House Technical Stewardship",
     question:
-      "Which Automated Compliance SLAs do you require for signed revocation snapshot exports, issuer-key rotation, and in-house deployment stewardship?",
+      "Which independently verifiable receipt exports and issuer-key rotation controls will your organization operate in-house?",
   },
 ] as const;
 
@@ -100,7 +101,7 @@ export const enterpriseDueDiligenceBrief = {
     licensing_contact: LICENSING_EMAIL,
   },
   executive_summary:
-    'The public engine is AGPLv3 software. Organizations that cannot meet AGPLv3 source-disclosure obligations for a covered deployment can obtain a Commercial Enterprise Exemption License, delivered "AS IS" for self-hosted and air-gapped operation with zero external SLAs and in-house technical stewardship.',
+    'The public engine is AGPLv3 software. Organizations that cannot meet Section 13 network source-disclosure obligations for a covered deployment can purchase a self-serve, time-locked AGPLv3 Commercial Copyright Waiver, delivered "AS IS" with zero SLAs and in-house technical stewardship.',
   licensing: {
     spdx: "(AGPL-3.0-only OR LicenseRef-Commercial)",
     agpl_copyleft_scope: {
@@ -113,10 +114,10 @@ export const enterpriseDueDiligenceBrief = {
         "AGPLv3 does not automatically cover independent programs that only exchange data with the engine over HTTP or MCP, or model weights trained separately. Combining engine code into your own codebase can bring that combined work within its terms; confirm your architecture with counsel.",
     },
     commercial_exemption: {
-      name: "Commercial Enterprise Exemption License",
+      name: "AGPLv3 Commercial Copyright Waiver",
       price: COMMERCIAL_LICENSE_PRICE,
       grant:
-        "An executed commercial agreement exempts the licensee's covered deployment and modifications from AGPLv3 source-disclosure obligations. API fees and payment credentials do not purchase a software license.",
+        AS_IS_TERMS,
       delivery:
         '"AS IS" self-hosted delivery for installation on licensee-controlled private or air-gapped infrastructure.',
       service_levels:
@@ -124,8 +125,8 @@ export const enterpriseDueDiligenceBrief = {
       technical_stewardship:
         "The licensee's own staff install, operate, monitor, patch, back up and secure the deployment.",
       settlement:
-        "Enterprise pricing is customized by swarm size and deployment needs, settled via a single Bitcoin transaction paid in full at the time of execution.",
-      contact: LICENSING_EMAIL,
+        "Self-serve USD-pegged Bitcoin quotes; confirmed, replay-safe on-chain settlement. 100% retained; no Agent Yield or hosted API credit is granted by a copyright waiver.",
+      contact: canonicalUrl("/#enterprise-licensing"),
     },
   },
   architecture: {
@@ -194,5 +195,5 @@ export const enterpriseDueDiligenceBrief = {
     questionnaire: CISO_INTAKE_QUESTIONNAIRE,
   },
   disclaimer:
-    "Informational summary for vendor due diligence. It is not legal advice, a certification, a statement of conformity or a grant of rights; only an executed commercial agreement grants a license.",
+    "Informational self-assessment summary. It is not legal advice, a certification, a statement of conformity or a grant of rights; the time-locked waiver is granted only by a signed certificate issued after confirmed Bitcoin settlement.",
 } as const;

@@ -159,6 +159,7 @@ export function createSubscriptionMacaroon(input: {
   baseAmountMsats?: number;
   highVelocityUnitMsats?: number;
   scannerCredits?: number;
+  scannerDynamic?: boolean;
   swarmReferral?: SwarmReferral;
   agentIdentity?: Pick<AgentIdentity, "pubkey" | "tier">;
   /** Sub-agent attribution; every use must declare the same ID. */
@@ -189,7 +190,8 @@ export function createSubscriptionMacaroon(input: {
   }
   const identifier = "bitcoin-stratigraphy-subscription-v1";
   if (input.scannerCredits !== undefined &&
-      (input.scannerCredits !== SCANNER_CREDITS || input.amountMsats !== SCANNER_CREDIT_SATS * 1000 ||
+      ((!input.scannerDynamic && (input.scannerCredits !== SCANNER_CREDITS || input.amountMsats !== SCANNER_CREDIT_SATS * 1000)) ||
+       (input.scannerDynamic && (![100, 1000].includes(input.scannerCredits) || !Number.isSafeInteger(input.amountMsats) || input.amountMsats! <= 0)) ||
        input.baseAmountMsats !== input.amountMsats || !input.paymentProvider ||
        input.highVelocityUnitMsats !== undefined || input.swarmReferral !== undefined)) {
     throw new RangeError("Invalid scanner credit funding");
@@ -223,7 +225,8 @@ export function createSubscriptionMacaroon(input: {
     ]),
     ...(input.scannerCredits === undefined ? [] : [
       `credits=${input.scannerCredits}`,
-      `scanner_credits_proof=${scannerCreditProof(input.secret, input.paymentHash, input.paymentProvider!, input.validUntil)}`,
+      `scanner_credits_proof=${scannerCreditProof(input.secret, input.paymentHash, input.paymentProvider!, input.validUntil,
+        input.scannerDynamic ? { amountMsats: input.amountMsats!, credits: input.scannerCredits } : undefined)}`,
     ]),
     ...(input.swarmReferral === undefined ? [] : [
       `swarm_referral=${input.swarmReferral.owner}:${input.swarmReferral.quotedAmountMsats}:${
@@ -409,13 +412,17 @@ export function inspectSubscriptionMacaroon(
     let scannerCreditScope: string | undefined;
     if (creditsValue !== undefined || creditProof !== undefined) {
       const provider = rootValues.get("payment_provider");
-      if (creditsValue !== String(SCANNER_CREDITS) || !provider ||
-          amountMsats !== SCANNER_CREDIT_SATS * 1000 || baseAmountMsats !== amountMsats ||
+      const dynamic = creditProof?.startsWith("v2-") === true;
+      const count = Number(creditsValue);
+      if (!provider || !Number.isSafeInteger(amountMsats) || amountMsats! <= 0 ||
+          (dynamic ? ![100, 1000].includes(count) : (count !== SCANNER_CREDITS || amountMsats !== SCANNER_CREDIT_SATS * 1000)) ||
+          baseAmountMsats !== amountMsats ||
           rootValues.has("high_velocity") || swarmReferral ||
-          !creditProof || !/^[0-9a-f]{64}$/.test(creditProof) ||
-          !timingSafeEqual(Buffer.from(creditProof, "hex"),
-            Buffer.from(scannerCreditProof(secret, paymentHash, provider, validUntil), "hex"))) return null;
-      scannerCredits = SCANNER_CREDITS;
+          !creditProof || !/^(?:v2-)?[0-9a-f]{64}$/.test(creditProof) ||
+          !timingSafeEqual(Buffer.from(creditProof),
+            Buffer.from(scannerCreditProof(secret, paymentHash, provider, validUntil,
+              dynamic ? { amountMsats: amountMsats!, credits: count } : undefined)))) return null;
+      scannerCredits = count;
       scannerCreditScope = `scanner-credits:${creditProof}`;
       requestLimits.push(scannerCredits);
       meteredScopes.unshift({ tokenId: scannerCreditScope, maxRequests: scannerCredits });

@@ -6,9 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type CreateFiatMintCheckout402AmountSats = typeof CreateFiatMintCheckout402AmountSats[keyof typeof CreateFiatMintCheckout402AmountSats];
+export type MintScannerMacaroonBodyPack = typeof MintScannerMacaroonBodyPack[keyof typeof MintScannerMacaroonBodyPack];
 
 
-export const CreateFiatMintCheckout402AmountSats = {
-  NUMBER_100000: 100000,
+export const MintScannerMacaroonBodyPack = {
+  heavy_swarm_1000: 'heavy_swarm_1000',
 } as const;

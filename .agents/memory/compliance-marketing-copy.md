@@ -7,7 +7,18 @@ Use the exact original copy the user supplied for the enterprise compliance sand
 
 **Why:** The user explicitly approved it as enterprise-tier marketing copy, not a binding legal contract, and rejected modifications to its wording.
 
-**How to apply:** Preserve the supplied wording when maintaining this page. This instruction is specific to the compliance marketing page; it does not authorize changing existing simulator behavior or other enterprise pages.
+**How to apply:** Preserve the supplied wording when maintaining this page, except for the user's superseding self-serve waiver terms below. This instruction is specific to the compliance marketing page; it does not authorize changing existing simulator behavior or other enterprise pages.
+
+The user superseded legacy SLA, manually negotiated licensing, and fixed native
+scanner-price copy with verbatim zero-SLA AS-IS terms for prepaid packs and
+time-locked Bitcoin copyright waivers. Preserve unrelated approved prose.
+
+**Why:** The user explicitly requested this licensing/pricing conversion while
+protecting the existing card funding loop and unrelated compliance content.
+
+**How to apply:** Do not restore legacy enterprise offers when maintaining
+marketing hashes or mirrored license riders. Keep the canonical AGPL text and
+vulnerability-reporting policy unchanged.
 
 Escrow-specific pricing and naming are an exception: the user requested the
 frontend to reflect live production Lightning micropayments through L402 and

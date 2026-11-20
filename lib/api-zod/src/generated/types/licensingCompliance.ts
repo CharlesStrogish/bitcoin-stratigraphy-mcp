@@ -5,9 +5,14 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+import type { LicensingComplianceWaiverUsdBasis } from './licensingComplianceWaiverUsdBasis';
 
 export interface LicensingCompliance {
   open_source_license: string;
   commercial_exemption: string;
+  terms?: string;
+  waiver_quote_endpoint?: string;
+  waiver_claim_endpoint?: string;
+  waiver_usd_basis?: LicensingComplianceWaiverUsdBasis;
   procurement_url: string;
 }

@@ -6,6 +6,23 @@ a fixed **$500 Enterprise API Block** with **100 scanner calls**, allocated
 values are **not a USD/BTC exchange-rate equivalence**. Other MCP tools are not
 included.
 
+## Card ledger unit vs. native Lightning quote
+
+Two different numbers apply and must not be confused:
+
+- **Card-funded ledger unit (unchanged):** each $500 card purchase still
+  reserves and funds a fixed **100,000 sats** from the treasury. This is an
+  internal funding/reservation unit for the Stripe path, not a public price.
+- **Public native Lightning price (dynamic):** buyers paying directly over
+  Lightning at `POST /api/mint-macaroon`, including the `fiat_gateway_offline`
+  continuity 402, receive a **$450 USD BTC/USD spot quote** for the same 100
+  calls / 30 days, locked for 15 minutes. The Bitcoin-only **Heavy Swarm Pack**
+  (`{"pack":"heavy_swarm_1000"}`) is a **$4,000 spot quote for 1,000 calls valid
+  90 days**. If no healthy spot feed is available the server returns HTTP 503
+  (`btc_spot_oracle_unavailable`) and never falls back to a fixed sat price.
+
+All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.
+
 ## Important financial boundary
 
 A successful live Stripe charge collects real USD; a test charge transfers

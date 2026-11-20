@@ -198,7 +198,8 @@ export function WaiverPurchase() {
   const btc = quote ? (quote.quoted_sats / 1e8).toFixed(8) : "";
 
   return (
-    <div className="wv" data-testid="panel-waiver-purchase">
+    <section id="enterprise-licensing" className="wv" aria-labelledby={`${id}-checkout`} data-testid="panel-waiver-purchase">
+      <h5 id={`${id}-checkout`} className="wv-checkout-heading">AGPLv3 Waiver Checkout</h5>
       {!quote && !cert && (
         <form className="wv-form" onSubmit={requestQuote} noValidate>
           <fieldset className="wv-tiers">
@@ -421,6 +422,6 @@ export function WaiverPurchase() {
           {error}
         </p>
       )}
-    </div>
+    </section>
   );
 }

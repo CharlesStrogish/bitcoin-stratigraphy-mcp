@@ -19,3 +19,15 @@ execution does not reproduce.
 **How to apply:** Use the package test runner for route tests that import the
 OpenAPI document; reserve direct tsx runs for source-only modules without bundled
 asset imports.
+
+For isolated audit bundles, preserve bare external imports and Node's package
+conditions. Do not replace them with paths obtained from `require.resolve`.
+Keep worker-owning logging packages external as well.
+
+**Why:** Resolving a dual-format Nostr dependency through CommonJS selected an
+entry without its ESM named exports. Bundling the development logger also moved
+its worker-relative paths away from the installed package.
+
+**How to apply:** Give disposable bundles access to the API package's installed
+dependencies, preserve import-time resolution, and locate copied data fixtures
+relative to the bundle without changing production asset code.

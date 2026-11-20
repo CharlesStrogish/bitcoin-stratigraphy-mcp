@@ -9,6 +9,11 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Includes section, heading, and form fragments; clears the measured sticky nav. */
+html body [id] {
+  scroll-margin-top: var(--anchor-offset, 96px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

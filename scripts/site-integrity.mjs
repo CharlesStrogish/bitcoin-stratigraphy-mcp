@@ -64,7 +64,14 @@ export function inspectHtml(html, label, { requireHero = true } = {}) {
   }
   for (const match of html.matchAll(/<(?:meta|link)\b[^>]*>|data-copy-text\s*=\s*"[^"]*"/gi))
     if (mangled.test(decode(match[0]))) failures.push(`${label}: Markdown URL inside metadata/copy attribute`);
-  return { failures, headings, links: [...html.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']+)["']/gi)].map((match) => decode(match[1])) };
+  const links = [...html.matchAll(/<(?:a|button|input)\b[^>]*>/gi)].flatMap(([tag]) => {
+    const direct = tag.match(/\b(?:href|data-href|formaction)\s*=\s*["']([^"']+)["']/i);
+    if (direct) return [decode(direct[1])];
+    const script = tag.match(/\bonclick\s*=\s*(["'])([\s\S]*?)\1/i)?.[2] ?? "";
+    const destination = script.match(/(?:location(?:\.href)?\s*=\s*|location\.(?:assign|replace)\s*\(\s*|window\.open\s*\(\s*)["']([^"']+)["']/);
+    return destination ? [decode(destination[1])] : [];
+  });
+  return { failures, headings, links };
 }
 
 export function inspectMarkdown(source, label) {

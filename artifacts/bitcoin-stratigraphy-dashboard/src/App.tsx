@@ -32,6 +32,7 @@ import FunnelNavigation from "@/components/funnel-navigation";
 import DevelopersPage from "@/pages/developers";
 import AuditPage from "@/pages/audit";
 import PrepaidApiAccess from "@/components/prepaid-api-access";
+import AnchorNavigation from "@/components/anchor-navigation";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -222,6 +223,7 @@ function Router() {
   return (
     <ErrorBoundary>
       <FunnelNavigation />
+      <AnchorNavigation />
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/standard" component={StandardPage} />

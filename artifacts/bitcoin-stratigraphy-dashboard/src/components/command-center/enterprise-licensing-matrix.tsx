@@ -20,7 +20,7 @@ const ENTERPRISE = [
 export function EnterpriseLicensingMatrix() {
   return (
     <section
-      id="enterprise-licensing"
+      id="enterprise-licensing-matrix"
       className="elm"
       aria-labelledby="cc-licensing-title"
       data-testid="module-enterprise-licensing"

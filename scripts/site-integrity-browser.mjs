@@ -69,16 +69,60 @@ export async function launchAuditBrowser() {
         return new Promise(() => {});
       };
     ` });
+    const evaluate = async (expression) => {
+      const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
+      if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+      return result.result.value;
+    };
+    const waitForPage = async (url) => {
+      for (let attempt = 0; attempt < 150; attempt++) {
+        if (await evaluate(`location.href === ${JSON.stringify(url)} && document.readyState === "complete" && !!document.querySelector("h1")`)) return;
+        await delay(100);
+      }
+      throw new Error(`Navigation did not finish: ${url}`);
+    };
     return {
+      async checkAnchor(url, width = 1440, selector, hashchange = false) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: width < 768 });
+        await send("Page.navigate", { url });
+        await waitForPage(url);
+        if (selector) {
+          const destination = await evaluate(`(() => {
+            const link = document.querySelector(${JSON.stringify(selector)});
+            if (!link) throw new Error("Missing navigation control");
+            const href = link.href; link.click(); return href;
+          })()`);
+          await waitForPage(destination);
+        }
+        for (let attempt = 0; attempt < 100; attempt++) {
+          if (await evaluate(`!location.hash || !!document.getElementById(decodeURIComponent(location.hash.slice(1)))`)) break;
+          await delay(20);
+        }
+        if (hashchange) await evaluate(`(() => {
+          const hash = location.hash;
+          history.replaceState(null, "", location.pathname + location.search);
+          window.scrollTo({top:0,behavior:"instant"});
+          location.hash = hash;
+        })()`);
+        await delay(900);
+        return evaluate(`(() => {
+          const id = decodeURIComponent(location.hash.slice(1));
+          const target = document.getElementById(id);
+          const bounds = target?.getBoundingClientRect();
+          return {pathname:location.pathname,hash:location.hash,scrollY,
+            top:bounds?.top,bottom:bounds?.bottom,height:innerHeight,
+            headerBottom:Math.max(0,document.querySelector(".fn-nav")?.getBoundingClientRect().bottom || 0),
+            tiers:target?.querySelectorAll('[data-testid^="radio-waiver-"]').length,
+            checkout:target?.matches('[data-testid="panel-waiver-purchase"]'),
+            licenseeTop:target?.querySelector('[data-testid="input-licensee-name"]')?.getBoundingClientRect().top,
+            licensee:!!target?.querySelector('[data-testid="input-licensee-name"]'),
+            identifier:!!target?.querySelector('[data-testid="input-licensee-identifier"]')};
+        })()`);
+      },
       async inspect(url, width = 1440) {
         errors.length = 0;
         await send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: width < 768 });
         await send("Page.navigate", { url });
-        const evaluate = async (expression) => {
-          const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
-          if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
-          return result.result.value;
-        };
         for (let attempt = 0; attempt < 150; attempt++) {
           if (await evaluate(`document.readyState === "complete" && document.querySelector("h1") !== null`)) break;
           await delay(100);

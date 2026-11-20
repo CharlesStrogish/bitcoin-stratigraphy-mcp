@@ -1,3 +1,7 @@
+html [id] {
+  scroll-margin-top: 96px;
+}
+
 :root {
   --bg: 222 34% 12%;
   --fg: 38 34% 92%;

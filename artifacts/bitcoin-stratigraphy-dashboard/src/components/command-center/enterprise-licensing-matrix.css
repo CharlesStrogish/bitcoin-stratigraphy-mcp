@@ -253,6 +253,7 @@
 }
 /* Self-serve waiver purchase */
 .wv { display: grid; gap: 12px; margin-top: 4px; min-width: 0; }
+.wv-checkout-heading { margin: 0; font-size: 16px; font-weight: 600; }
 .wv-form, .wv-claim { display: grid; gap: 12px; }
 .wv-tiers { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .wv-tiers legend { font: 9px var(--app-font-mono); letter-spacing: .1em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 8px; }

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { auditSources, checkSnippet, inspectClipboard, inspectHtml, inspectMarkdown, repositoryLinkFailure, root } from "../scripts/site-integrity.mjs";
-import { auditBuiltSite, internalLinkFailure } from "../scripts/audit-site-integrity.mjs";
+import { auditBuiltSite, internalLinkFailure, fragmentFailure, waiverLinkFailure } from "../scripts/audit-site-integrity.mjs";
 
 test("site guard rejects mangled URLs in code, metadata, and JSON-LD", () => {
   for (const html of [
@@ -49,6 +49,27 @@ test("site guard rejects broken internal links, SPA soft 404s and missing docume
   assert.equal(repositoryLinkFailure("README.md","CONNECT.md"), null);
 });
 
+test("navigation guard rejects missing cross-page IDs, encoded fragments, and homepage redirects", () => {
+  assert.equal(fragmentFailure("/enterprise", "/#enterprise-licensing", '<section id="enterprise-licensing">'), null);
+  assert.match(fragmentFailure("/enterprise", "/#enterprise-licensing", '<section id="wrong">'), /missing page fragment/);
+  assert.equal(fragmentFailure("/docs", "/docs#quoted%20section", "<h2 id='quoted section'>"), null);
+  assert.match(fragmentFailure("/docs", "/docs#%zz", ""), /invalid fragment/);
+  assert.match(internalLinkFailure({file:"/enterprise",href:"/missing",pathname:"/missing",response:{ok:true,status:200,pathname:"/"},routes:new Set(["/"])}), /redirected to homepage/);
+});
+
+test("waiver CTAs must use the one exact checkout target and same-page fragments", () => {
+  assert.equal(waiverLinkFailure("/enterprise", "/#enterprise-licensing"), null);
+  assert.equal(waiverLinkFailure("/", "#enterprise-licensing"), null);
+  for (const href of ["/", "/enterprise#enterprise-licensing", "/#wrong", "https://example.com/#enterprise-licensing"])
+    assert.match(waiverLinkFailure("/enterprise", href), /does not target the checkout/);
+  assert.match(waiverLinkFailure("/", "/#enterprise-licensing"), /same-page/);
+});
+
+test("navigation guard includes button destinations and inline navigation handlers", () => {
+  const result = inspectHtml(`<h1>Navigation</h1><button data-href="/enterprise">Enterprise</button>
+    <button onclick="location.href='/missing#target'">Jump</button>`, "fixture");
+  assert.deepEqual(result.links, ["/enterprise", "/missing#target"]);
+});
 test("site guard traces clipboard literals and inactive templated snippets", () => {
   const directory=mkdtempSync(path.join(tmpdir(),"site-copy-fixture-"));
   try {
@@ -84,6 +105,9 @@ test("fresh production pages pass desktop/mobile, clipboard, markup and internal
   assert.ok(result.pages.some((route) => route.includes("defending-autonomous")));
   assert.ok(result.copies.length > 10);
   assert.ok(result.links > 100);
+  assert.ok(result.waiverLinks.filter(link => link.file === "/enterprise").length >= 2);
+  assert.ok(result.anchorChecks.length >= 14);
+  assert.ok(result.anchorChecks.some(check => check.hashchange && check.width === 390));
   console.log(`Site integrity: ${result.pages.length} routes, ${result.markdownFiles} Markdown files, ${result.copies.length} clipboard controls, ${result.links} link occurrences.`);
   assert.deepEqual(result.failures, []);
 });

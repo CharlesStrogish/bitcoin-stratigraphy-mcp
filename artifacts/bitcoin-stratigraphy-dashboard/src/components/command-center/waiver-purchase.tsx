@@ -31,6 +31,7 @@ type Quote = {
   quoted_sats: number;
   btc_spot_usd: number;
   settlement_address: string;
+  derivation_index: number;
   min_confirmations: number;
   expires_at: number | string;
   terms_sha256: string;
@@ -60,8 +61,10 @@ async function post(path: string, body: unknown): Promise<unknown> {
     /* non-JSON body */
   }
   if (!res.ok) {
-    const d = data as { error?: unknown; message?: unknown } | null;
+    const d = data as { error?: unknown; message?: unknown; confirmations?: number; required_confirmations?: number } | null;
     const code = typeof d?.error === "string" ? d.error : `HTTP ${res.status}`;
+    if (code === "insufficient_confirmations")
+      throw new Error(`Payment pending: ${d?.confirmations ?? 0}/${d?.required_confirmations ?? "required"} confirmations. Click Check Status again after additional blocks. Keep this quote and do not pay again.`);
     const msg = typeof d?.message === "string" ? `: ${d.message}` : "";
     throw new Error(explain(code, res.status) + msg);
   }
@@ -71,8 +74,11 @@ async function post(path: string, body: unknown): Promise<unknown> {
 function explain(code: string, status: number): string {
   if (code === "btc_spot_oracle_unavailable")
     return "BTC/USD spot oracle unavailable; no quote issued";
-  if (code === "waiver_settlement_address_unconfigured")
+  if (code === "waiver_settlement_key_unconfigured" || code === "waiver_settlement_key_invalid")
     return "Waiver settlement is not configured on this server; no quote issued";
+  if (code === "waiver_legacy_quote_requires_review")
+    return "This older shared-address quote requires operator review. Keep its quote ID and TXID. Do not send another payment.";
+  if (status === 429) return "Quote limit reached (five per hour). Keep your existing quote; wait before requesting another.";
   if (status === 400) return `Request rejected (${code})`;
   if (status === 409) return `Settlement rejected (${code})`;
   return `Server error (${code})`;
@@ -87,7 +93,8 @@ function validQuote(q: unknown, tier: WaiverTier): q is Quote {
     Number.isSafeInteger(v.quoted_sats) &&
     v.quoted_sats > 0 &&
     typeof v.settlement_address === "string" &&
-    v.settlement_address.length > 0 &&
+    /^bc1q[ac-hj-np-z02-9]{38}$/.test(v.settlement_address) &&
+    Number.isSafeInteger(v.derivation_index) && v.derivation_index >= 0 &&
     typeof v.terms_sha256 === "string" &&
     /^[0-9a-f]{64}$/i.test(v.terms_sha256) &&
     Number.isFinite(toMs(v.expires_at))
@@ -300,6 +307,7 @@ export function WaiverPurchase() {
             context="waiver quote recovery" description="Save the quote ID before paying"
             testId="button-copy-waiver-quote-id" />
           <p className="wv-status">Save this quote ID before paying. It lets you recover the certificate after closing this tab without paying again.</p>
+          <p className="wv-status">This dedicated, single-use bc1q deposit address is uniquely bound to your saved quote ID. It is derived watch-only from cold storage. You have a 6-hour on-chain confirmation window for the first confirmation; additional required confirmations may accrue later. Never pay a different quote&apos;s address.</p>
           <h5 id={`${id}-q`} className="wv-amount" data-testid="text-waiver-sats">
             {quote.quoted_sats.toLocaleString("en-US")} <small>sats</small>
             <span className="wv-btc">{btc} BTC</span>
@@ -334,8 +342,8 @@ export function WaiverPurchase() {
             data-testid="status-waiver-quote"
           >
             {expired
-              ? "Quote expired. Do not send funds against it; request a new quote. If you already broadcast a payment, submit its TXID below and the server will decide."
-              : `Awaiting your on-chain payment. Quote locked for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}. Not paid until the server validates a confirmed transaction.`}
+              ? "The 6-hour first-confirmation window has ended. Do not send new funds. If your payment already received its first confirmation within the window, click Check Status below as additional confirmations accrue. Do not pay again."
+              : `6-hour first-confirmation window: ${Math.floor(left / 3600)}:${String(Math.floor(left / 60) % 60).padStart(2, "0")}:${String(left % 60).padStart(2, "0")} remaining. Not paid until the server validates the required confirmations.`}
           </p>
           <form className="wv-claim" onSubmit={claim}>
             <label className="wv-field">
@@ -358,7 +366,7 @@ export function WaiverPurchase() {
                 aria-busy={busy === "claim" || undefined}
                 data-testid="button-waiver-claim"
               >
-                {busy === "claim" ? "Verifying on-chain..." : "Verify payment and claim"}
+                {busy === "claim" ? "Verifying on-chain..." : "Check Status"}
               </button>
               <button type="button" className="wv-quiet" onClick={reset} data-testid="button-waiver-new-quote">
                 New quote
@@ -408,7 +416,8 @@ export function WaiverPurchase() {
       )}
 
       {error && (
-        <p className="wv-status is-bad" role="alert" data-testid="text-waiver-error">
+        <p className={`wv-status${error.startsWith("Payment pending:") ? "" : " is-bad"}`}
+          role={error.startsWith("Payment pending:") ? "status" : "alert"} data-testid="text-waiver-error">
           {error}
         </p>
       )}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { after } from "node:test";
-import { createHash, generateKeyPairSync, webcrypto } from "node:crypto";
+import { createHash, generateKeyPairSync, webcrypto, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import express, { type Request } from "express";
@@ -45,9 +45,11 @@ test("spot oracle falls back to Kraken but rejects divergent, non-finite and una
 
 function waiverFixture(storeOverride?: WaiverStore) {
   let time = 1800000000000;
+  let index = 0, first = true;
+  const client = "synthetic-waiver-" + randomUUID();
   const quotes = new Map<string,WaiverQuote>(), certificates = new Map<string,Certificate>(), outputs = new Set<string>();
   const store: WaiverStore = {
-    async saveQuote(q){quotes.set(q.quote_id,structuredClone(q));},
+    async createQuote(build){const q=build(index++);quotes.set(q.quote_id,structuredClone(q));return q;},
     async quote(id){return quotes.get(id)??null;},
     async certificate(id){return certificates.get(id)??null;},
     async issue(q,c){
@@ -59,20 +61,23 @@ function waiverFixture(storeOverride?: WaiverStore) {
   };
   const address = "1BoatSLRHtKNngkdXEeobR76b53LETtpyT";
   let chain = {confirmed:true,confirmations:2,blockTime:time+1000,outputs:[{address,sats:1000000000,vout:0}]};
-  const env: {WAIVER_BTC_ADDRESS?:string} = {WAIVER_BTC_ADDRESS:address};
+  const env: {WAIVER_BTC_ZPUB?:string} = {WAIVER_BTC_ZPUB:"zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs"};
   const service = createWaiverService({store:storeOverride??store,oracle,now:()=>time,chain:async()=>chain,env:()=>env,signingKey:()=>keys.privateKey});
-  const quote = (tier = "swarm_monthly")=>service.quote({tier,licensee_name:"Synthetic Test Org",licensee_identifier:"test-only-org",terms_accepted:true});
-  return {service,quote,env,quotes,setChain:(value:typeof chain)=>{chain=value;},chain:()=>chain,advance:(ms:number)=>{time+=ms;},now:()=>time};
+  const quote = async (tier = "swarm_monthly")=>{
+    const q=await service.quote({tier,licensee_name:"Synthetic Test Org",licensee_identifier:"test-only-org",terms_accepted:true},client);
+    if(first){chain.outputs[0]!.address=q.settlement_address;first=false;}return q;
+  };
+  return {service,quote,env,quotes,client,setChain:(value:typeof chain)=>{chain=value;},chain:()=>chain,advance:(ms:number)=>{time+=ms;},now:()=>time};
 }
 test("waiver quotes enforce explicit consent, address configuration, valid identifiers and exact USD bases", async () => {
   const f = waiverFixture();
   await assert.rejects(f.service.quote({tier:"swarm_monthly",licensee_name:"test",licensee_identifier:"x"}),{status:400});
   await assert.rejects(f.service.quote({tier:["swarm_monthly"],licensee_name:"test",licensee_identifier:"x",terms_accepted:true}),{status:400});
-  delete f.env.WAIVER_BTC_ADDRESS; await assert.rejects(f.quote(),{status:503,message:"waiver_settlement_address_unconfigured"});
+  delete f.env.WAIVER_BTC_ZPUB; await assert.rejects(f.quote(),{status:503,message:"waiver_settlement_key_unconfigured"});
   const g=waiverFixture();
   for (const [tier,usd] of [["swarm_monthly",2500],["swarm_annual",25000],["global_monthly",25000],["global_annual",250000]] as const) {
     const q=await g.quote(tier); assert.equal(q.usd_basis,usd); assert.equal(q.quoted_sats,usdToSats(usd,90000));
-    assert.equal(q.terms_sha256,WAIVER_TERMS_SHA256);assert.equal(Date.parse(q.expires_at)-Date.parse(q.created_at),1800000);
+    assert.equal(q.terms_sha256,WAIVER_TERMS_SHA256);assert.equal(Date.parse(q.expires_at)-Date.parse(q.created_at),21600000);
   }
 });
 test("on-chain reader falls back within a provider boundary and never overrides an unconfirmed payment", async () => {
@@ -91,7 +96,7 @@ test("on-chain reader falls back within a provider boundary and never overrides 
   assert.equal((await createWaiverChainReader(negative)(txid)).confirmed,false);assert.equal(negativeCalls,1);
 });
 test("timely confirmed waiver payments remain claimable while extra confirmations accrue after quote expiry", async () => {
-  const f=waiverFixture(),q=await f.quote();f.advance(1900000);
+  const f=waiverFixture(),q=await f.quote();f.advance(21700000);
   assert.equal((await f.service.claim({quote_id:q.quote_id,txid:"a".repeat(64)})).txid,"a".repeat(64));
 });
 test("PostgreSQL atomically rejects concurrent reuse of a waiver output without touching existing rows", {skip:!process.env.DATABASE_URL}, async () => {
@@ -106,6 +111,7 @@ test("PostgreSQL atomically rejects concurrent reuse of a waiver output without 
     const winner=results[0]!.status==="fulfilled"?q1:q2;
     assert.equal((await f.service.claim({quote_id:winner.quote_id,txid})).txid,txid);
   } finally {
+    await pool.query("DELETE FROM agpl_waiver_quote_limits WHERE client_key=$1",[f.client]);
     // Only synthetic quotes created by this test can match these fresh UUIDs.
     await pool.query("DELETE FROM agpl_waiver_certificates WHERE quote_id=ANY($1::text[])",[quoteIds]);
     await pool.query("DELETE FROM agpl_waiver_quotes WHERE id=ANY($1::text[])",[quoteIds]);
@@ -119,8 +125,8 @@ test("waiver claims reject malformed, unconfirmed, underpaid, pre-quote and expi
     if(kind==="unconfirmed")chain.confirmed=false;
     if(kind==="confirmations")chain.confirmations=1;
     if(kind==="underpaid")chain.outputs[0]!.sats=q.quoted_sats-1;
-    if(kind==="historical")chain.blockTime=Date.parse(q.created_at)-1;
-    if(kind==="expired"){f.advance(1800000);chain.blockTime=Date.parse(q.expires_at);}
+    if(kind==="historical")chain.blockTime=Date.parse(q.created_at)-900001;
+    if(kind==="expired"){f.advance(21600000);chain.blockTime=Date.parse(q.expires_at);}
     f.setChain(chain);
     await assert.rejects(f.service.claim({quote_id:q.quote_id,txid:"a".repeat(64)}),(e:any)=>e.status===409||e.status===410);
     assert.equal(await f.service.claim({quote_id:q.quote_id,txid:"not-a-txid"}).catch((e:any)=>e.status),400);
@@ -145,7 +151,7 @@ test("confirmed waiver certificates are idempotent, replay-safe and verifiable o
 });
 test("separate qualifying outputs in one transaction can fund separate quotes but never the same output twice", async () => {
   const f=waiverFixture(),q1=await f.quote(),q2=await f.quote(),q3=await f.quote();
-  const chain=f.chain();chain.outputs.push({...chain.outputs[0]!,vout:1});f.setChain(chain);f.advance(2000);
+  const chain=f.chain();chain.outputs.push({...chain.outputs[0]!,address:q2.settlement_address,vout:1});f.setChain(chain);f.advance(2000);
   const txid="b".repeat(64),c1=await f.service.claim({quote_id:q1.quote_id,txid}),c2=await f.service.claim({quote_id:q2.quote_id,txid});
   assert.equal(c1.vout,0);assert.equal(c2.vout,1);
   await assert.rejects(f.service.claim({quote_id:q3.quote_id,txid}),{status:409});

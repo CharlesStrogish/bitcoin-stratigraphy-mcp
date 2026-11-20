@@ -65,7 +65,7 @@ block provenance. Nostr quorum is not source truth. Prices and payment assets
 can vary; consult `/api/v1/cost` and the actual challenge before payment.
 
 The engine is AGPLv3; modified versions offered over a network must offer their
-Corresponding Source. Self-serve AGPLv3 Commercial Copyright Waivers: swarm_monthly $2,500/30 days, swarm_annual $25,000/365 days, global_monthly $25,000/30 days, global_annual $250,000/365 days (each quoted in BTC at spot, locked 30 minutes, settled on-chain via POST /api/v1/waivers/quote and POST /api/v1/waivers/claim, which returns an Ed25519-signed certificate verifiable offline at /static/verify.html).
+Corresponding Source. Self-serve AGPLv3 Commercial Copyright Waivers: swarm_monthly $2,500/30 days, swarm_annual $25,000/365 days, global_monthly $25,000/30 days, global_annual $250,000/365 days (each quoted in BTC at spot, dedicated watch-only BIP-84 bc1q address per quote and a 6-hour on-chain confirmation window, settled on-chain via POST /api/v1/waivers/quote and POST /api/v1/waivers/claim, which returns an Ed25519-signed certificate verifiable offline at /static/verify.html).
 
 All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.
 

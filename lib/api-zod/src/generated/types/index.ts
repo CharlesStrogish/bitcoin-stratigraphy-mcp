@@ -26,6 +26,7 @@ export * from './auditTraceResultStatus';
 export * from './batchSettlementDiscovery';
 export * from './batchSettlementDiscoverySupportedBatchSizesItem';
 export * from './claimAgplWaiver200';
+export * from './claimAgplWaiver409';
 export * from './claimAgplWaiverBody';
 export * from './closeEnterpriseCreditTab200';
 export * from './closeEnterpriseCreditTab402';

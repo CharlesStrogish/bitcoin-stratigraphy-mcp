@@ -169,7 +169,8 @@ export default function EnterprisePage() {
               Single-Swarm waivers cost $2,500 per 30 days or $25,000 per 365
               days; Global Organization waivers cost $25,000 per 30 days or
               $250,000 per 365 days. Each is quoted in BTC at spot, locked for
-              30 minutes and settled on-chain in a single transaction.
+              a 6-hour on-chain confirmation window and settled to a dedicated,
+              single-use watch-only BIP-84 bc1q address bound to your quote.
             </p>
             <p>
               {"All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction."} This page is not itself a grant of rights and

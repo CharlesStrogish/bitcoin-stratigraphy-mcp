@@ -2665,7 +2665,8 @@ export const AttestMeshSnapshotResponse = zod.object({
 
 
 /**
- * @summary Lock a self-serve Bitcoin copyright waiver quote for 30 minutes
+ * Each quote permanently reserves a unique watch-only BIP-84 bc1q deposit address. Five quote creations per IP per hour. Never reuse another quote's address. The first confirmation must fall within six hours, allowing 15 minutes of miner timestamp clock skew before creation; additional confirmations can accrue later.
+ * @summary Lock a self-serve Bitcoin waiver quote with a six-hour on-chain confirmation window
  */
 export const createAgplWaiverQuoteBodyLicenseeNameMax = 200;
 
@@ -2680,13 +2681,21 @@ export const CreateAgplWaiverQuoteBody = zod.object({
   "terms_accepted": zod.literal(true)
 })
 
+export const createAgplWaiverQuoteResponseSettlementAddressRegExp = new RegExp('^bc1q[a-z0-9]+$');
+export const createAgplWaiverQuoteResponseDerivationIndexMin = 0;
+export const createAgplWaiverQuoteResponseDerivationIndexMax = 2147483647;
+
+
+
 export const CreateAgplWaiverQuoteResponse = zod.object({
   "quote_id": zod.string(),
   "tier": zod.string(),
   "usd_basis": zod.int(),
   "quoted_sats": zod.int(),
   "btc_spot_usd": zod.number(),
-  "settlement_address": zod.string(),
+  "settlement_address": zod.string().regex(createAgplWaiverQuoteResponseSettlementAddressRegExp),
+  "derivation_index": zod.int().min(createAgplWaiverQuoteResponseDerivationIndexMin).max(createAgplWaiverQuoteResponseDerivationIndexMax),
+  "created_at": zod.string(),
   "min_confirmations": zod.int(),
   "expires_at": zod.string(),
   "terms_sha256": zod.string()
@@ -2718,7 +2727,8 @@ export const ClaimAgplWaiverResponse = zod.object({
   "terms_sha256": zod.string(),
   "scope": zod.string(),
   "issuer_key_id": zod.string(),
-  "signature": zod.string()
+  "signature": zod.string(),
+  "derivation_index": zod.int().nullish().describe('Derived receive index; absent on historical certificates')
 })
 
 

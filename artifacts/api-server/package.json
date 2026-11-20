@@ -18,6 +18,7 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "@replit/connectors-sdk": "^0.4.1",
     "@scure/base": "^2.0.0",
+    "@scure/bip32": "2.0.1",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "@x402/core": "^2.27.0",

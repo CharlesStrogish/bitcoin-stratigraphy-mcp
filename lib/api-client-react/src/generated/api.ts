@@ -24,6 +24,7 @@ import type {
   AuditReport,
   AuditSubmission,
   ClaimAgplWaiver200,
+  ClaimAgplWaiver409,
   ClaimAgplWaiverBody,
   CloseEnterpriseCreditTab200,
   CloseEnterpriseCreditTab402,
@@ -5841,7 +5842,8 @@ export const getCreateAgplWaiverQuoteUrl = () => {
 }
 
 /**
- * @summary Lock a self-serve Bitcoin copyright waiver quote for 30 minutes
+ * Each quote permanently reserves a unique watch-only BIP-84 bc1q deposit address. Five quote creations per IP per hour. Never reuse another quote's address. The first confirmation must fall within six hours, allowing 15 minutes of miner timestamp clock skew before creation; additional confirmations can accrue later.
+ * @summary Lock a self-serve Bitcoin waiver quote with a six-hour on-chain confirmation window
  */
 export const createAgplWaiverQuote = async (createAgplWaiverQuoteBody: CreateAgplWaiverQuoteBody, options?: Parameters<typeof customFetch>[1]): Promise<CreateAgplWaiverQuote200> => {
 
@@ -5890,7 +5892,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateAgplWaiverQuoteMutationError = ErrorType<void>
 
     /**
- * @summary Lock a self-serve Bitcoin copyright waiver quote for 30 minutes
+ * @summary Lock a self-serve Bitcoin waiver quote with a six-hour on-chain confirmation window
  */
 export const useCreateAgplWaiverQuote = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAgplWaiverQuote>>, TError,{data: BodyType<CreateAgplWaiverQuoteBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -5929,7 +5931,7 @@ export const claimAgplWaiver = async (claimAgplWaiverBody: ClaimAgplWaiverBody, 
 
 
 
-export const getClaimAgplWaiverMutationOptions = <TError = ErrorType<void>,
+export const getClaimAgplWaiverMutationOptions = <TError = ErrorType<void | ClaimAgplWaiver409>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimAgplWaiver>>, TError,{data: BodyType<ClaimAgplWaiverBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof claimAgplWaiver>>, TError,{data: BodyType<ClaimAgplWaiverBody>}, TContext> => {
 
@@ -5958,12 +5960,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ClaimAgplWaiverMutationResult = NonNullable<Awaited<ReturnType<typeof claimAgplWaiver>>>
     export type ClaimAgplWaiverMutationBody = BodyType<ClaimAgplWaiverBody>
-    export type ClaimAgplWaiverMutationError = ErrorType<void>
+    export type ClaimAgplWaiverMutationError = ErrorType<void | ClaimAgplWaiver409>
 
     /**
  * @summary Claim a signed waiver after verified confirmed Bitcoin settlement
  */
-export const useClaimAgplWaiver = <TError = ErrorType<void>,
+export const useClaimAgplWaiver = <TError = ErrorType<void | ClaimAgplWaiver409>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimAgplWaiver>>, TError,{data: BodyType<ClaimAgplWaiverBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof claimAgplWaiver>>,

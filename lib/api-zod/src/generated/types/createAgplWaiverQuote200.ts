@@ -12,7 +12,14 @@ export type CreateAgplWaiverQuote200 = {
   usd_basis: number;
   quoted_sats: number;
   btc_spot_usd: number;
+  /** @pattern ^bc1q[a-z0-9]+$ */
   settlement_address: string;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  derivation_index: number;
+  created_at: string;
   min_confirmations: number;
   expires_at: string;
   terms_sha256: string;

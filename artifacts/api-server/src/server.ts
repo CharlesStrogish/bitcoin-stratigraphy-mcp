@@ -9,6 +9,7 @@ import { startFiatMintWorker } from "./services/fiatMintRuntime";
 import { startNostrHeartbeat } from "./lib/nostr-heartbeat";
 import { startNip90Dvm } from "./services/dvm";
 import { albySettlementMode } from "./services/settlement/alby";
+import { logWaiverSettlementStatus } from "./services/btcAddressDeriver";
 import { isProductionClearing, loadProductionClearingKeys } from "./services/clearingKeys";
 import {
   prewarmZkVerifier,
@@ -49,6 +50,7 @@ export function startApplication({
   /** Milliseconds from process start until the port accepted connections. */
   portBoundMs: number;
 }): void {
+  logWaiverSettlementStatus(logger);
   if (isProductionClearing()) {
     const keys = loadProductionClearingKeys();
     logger.info(

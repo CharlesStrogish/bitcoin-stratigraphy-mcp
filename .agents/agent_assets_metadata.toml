@@ -126,3 +126,17 @@ mtime_ms = 1795134037759
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/7913dd8c-2e1f-42e3-869f-d5609df5579b/14f97dc4-6039-4b5f-bd89-46ddaa0c9960"
 storage_version_token = "1795134164702360"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "O3VFVMLUC6V1QbIP0j81d"
+uri = "file://.local/reports/waiver-zpub-verification.md"
+type = "text"
+title = "Watch-only waiver security verification"
+description = "Full regression counts, official BIP-84 vector results, all changed files, configuration, migration scope and custody safeguards."
+logical_id = "614b67a3-e099-4159-a1c8-5caa727d9960"
+content_hash = "sha256:9e506ec24d2d7f50937c2b003820f893b43259c03259a1db343383f3140c5fd4"
+size = 8938
+mtime_ms = 1795135685086
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/614b67a3-e099-4159-a1c8-5caa727d9960/92252016-26dc-4e8a-803e-cdbcb7916538"
+storage_version_token = "1795135698280812"
+content_type = "text/markdown"

@@ -3031,7 +3031,8 @@ paths:
   /v1/waivers/quote:
     post:
       operationId: createAgplWaiverQuote
-      summary: Lock a self-serve Bitcoin copyright waiver quote for 30 minutes
+      summary: Lock a self-serve Bitcoin waiver quote with a six-hour on-chain confirmation window
+      description: Each quote permanently reserves a unique watch-only BIP-84 bc1q deposit address. Five quote creations per IP per hour. Never reuse another quote's address. The first confirmation must fall within six hours, allowing 15 minutes of miner timestamp clock skew before creation; additional confirmations can accrue later.
       requestBody:
         required: true
         content:
@@ -3052,19 +3053,26 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [quote_id, tier, usd_basis, quoted_sats, btc_spot_usd, settlement_address, min_confirmations, expires_at, terms_sha256]
+                required: [quote_id, tier, usd_basis, quoted_sats, btc_spot_usd, settlement_address, derivation_index, min_confirmations, created_at, expires_at, terms_sha256]
                 properties:
                   quote_id: { type: string }
                   tier: { type: string }
                   usd_basis: { type: integer }
                   quoted_sats: { type: integer }
                   btc_spot_usd: { type: number }
-                  settlement_address: { type: string }
+                  settlement_address: { type: string, pattern: "^bc1q[a-z0-9]+$" }
+                  derivation_index: { type: integer, minimum: 0, maximum: 2147483647 }
+                  created_at: { type: string }
                   min_confirmations: { type: integer }
                   expires_at: { type: string }
                   terms_sha256: { type: string }
         "400": { description: Invalid fields or missing explicit terms acceptance }
-        "503": { description: "Spot oracle, address, signing configuration or storage unavailable" }
+        "429":
+          description: Five quotes per IP per hour exhausted; no address allocated
+          headers:
+            Retry-After:
+              schema: { type: integer }
+        "503": { description: "Spot oracle, watch-only WAIVER_BTC_ZPUB key, signing configuration or storage unavailable; waiver_settlement_key_unconfigured or waiver_settlement_key_invalid for invalid configuration" }
   /v1/waivers/claim:
     post:
       operationId: claimAgplWaiver
@@ -3104,11 +3112,22 @@ paths:
                   scope: { type: string }
                   issuer_key_id: { type: string }
                   signature: { type: string }
+                  derivation_index: { type: [integer, "null"], description: "Derived receive index; absent on historical certificates" }
         "400": { description: Invalid claim input }
         "404": { description: Unknown quote }
-        "409": { description: "Unconfirmed, historical, underpaid or previously claimed transaction output" }
+        "409":
+          description: "Payment pending, historical, underpaid, wrong address or previously claimed; retry the same quote and TXID without paying again"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
+                  confirmations: { type: integer, minimum: 0 }
+                  required_confirmations: { type: integer, minimum: 1 }
         "410": { description: Transaction confirmed outside the quote price-lock window }
-        "503": { description: "Chain verification, signing or storage unavailable" }
+        "503": { description: "Chain verification, signing or storage unavailable; unpaid legacy shared-address quotes require operator review (waiver_legacy_quote_requires_review)" }
 components:
   headers:
     PublicCorsOrigin:

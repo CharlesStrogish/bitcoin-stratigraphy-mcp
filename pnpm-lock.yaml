@@ -154,6 +154,9 @@ importers:
       '@scure/base':
         specifier: ^2.0.0
         version: 2.0.0
+      '@scure/bip32':
+        specifier: 2.0.1
+        version: 2.0.1
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod

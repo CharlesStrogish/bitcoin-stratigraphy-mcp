@@ -3119,7 +3119,14 @@ export type CreateAgplWaiverQuote200 = {
   usd_basis: number;
   quoted_sats: number;
   btc_spot_usd: number;
+  /** @pattern ^bc1q[a-z0-9]+$ */
   settlement_address: string;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  derivation_index: number;
+  created_at: string;
   min_confirmations: number;
   expires_at: string;
   terms_sha256: string;
@@ -3146,6 +3153,19 @@ export type ClaimAgplWaiver200 = {
   scope: string;
   issuer_key_id: string;
   signature: string;
+  /**
+     * Derived receive index; absent on historical certificates
+     * @nullable
+     */
+  derivation_index?: number | null;
   [key: string]: unknown;
  };
+
+export type ClaimAgplWaiver409 = {
+  error: string;
+  /** @minimum 0 */
+  confirmations?: number;
+  /** @minimum 1 */
+  required_confirmations?: number;
+};
 

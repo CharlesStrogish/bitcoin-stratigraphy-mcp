@@ -21,5 +21,10 @@ export type ClaimAgplWaiver200 = {
   scope: string;
   issuer_key_id: string;
   signature: string;
+  /**
+     * Derived receive index; absent on historical certificates
+     * @nullable
+     */
+  derivation_index?: number | null;
   [key: string]: unknown;
  };

@@ -130,9 +130,31 @@ Copyright Waivers** paid in Bitcoin.
 | `global_annual` | $250,000 | 365 days | Global Organization (16.7% annual discount) |
 
 Purchase at [/#enterprise-licensing](https://bitcoinstratigraphy.com/#enterprise-licensing):
-`POST /api/v1/waivers/quote` locks a sat quote for 30 minutes; after the
+`POST /api/v1/waivers/quote` locks a sat quote for a 6-hour on-chain confirmation window; after the
 on-chain payment confirms, `POST /api/v1/waivers/claim` returns an
 Ed25519-signed Waiver Certificate verifiable offline with `/static/verify.html`.
+
+Configure `WAIVER_BTC_ZPUB` with the **mainnet BIP-84 public account zpub**
+exported by cold storage (depth 3; typically `m/84'/0'/0'`). Never enter a seed,
+mnemonic, WIF or private extended key. Each quote permanently reserves its own
+single-use native SegWit `bc1q...` deposit address at external path `0/<index>`.
+Verify the startup index-0 address against your cold wallet before accepting
+funds. The server never receives signing keys or spends Bitcoin.
+
+Quote creation is limited to five per client IP per hour, shared across server
+instances; `429` includes `Retry-After`. Indices are never reset or recycled,
+even for expired or failed quotes. Keep the cold wallet's watch-only discovery
+range/gap limit above the highest allocated index; per-IP limits mitigate, but
+cannot eliminate, distributed gap-limit spam.
+
+The **first on-chain confirmation** must fall within the six-hour window;
+15 minutes of miner timestamp clock skew before quote creation are allowed.
+Additional confirmations can accrue afterward. A pending claim returns `409`
+`insufficient_confirmations` with `confirmations` and `required_confirmations`:
+click **Check Status** again using the same quote ID and TXID; do not pay again.
+`WAIVER_MIN_CONFIRMATIONS` remains optional (default `2`).
+Already-issued historical certificates remain recoverable. Unclaimed legacy
+shared-address quotes require operator review; never automatically pay again.
 
 Prepaid MCP Macro-Macaroons come in 1, 100, 1,000 and 10,000 calls at 250 sats
 per call, preserving the permanent 21% Programmatic Agent Yield (15% upstream

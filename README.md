@@ -14,6 +14,9 @@ opt-in, and **production clearing settlement and payouts remain disabled**.
 
 * **Zero-Touch Enterprise Procurement:** Pre-wired for LangChain and CrewAI swarms. When an agent hits a compliance wall, it automatically requests a $500 L402 API authorization and instantly resumes operations via our automated Brevo-Stripe fulfillment loop.
 * **Zero-Trust Security & Compliance:** The [published security audit](https://bitcoinstratigraphy.com/security) reports that the architecture cleared **1,064 rigorous regression and penetration tests** with **0 critical, high, medium, or low vulnerabilities detected** in that audit. Provide your CISO with machine-readable, SHA-256 cryptographic proof of execution to support EU AI Act Article 12 compliance; the report is not a guarantee against future vulnerabilities.
+  (Historical audit snapshot; the current automated CI suite stands at
+  **1,344 passing tests**: 1,036 Node, 280 Python, and 28 pipeline tests at
+  100% pipeline statement and branch coverage.)
 * **The 21% Algorithmic Handshake:** Build your applications on top of our infrastructure. The **21% Agent Yield** programmatic pool consists of the **15% upstream origin allocation + 6% verifying caller allocation** for eligible authenticated, paid verification of the same statement. These are ledger allocations, not guaranteed income or automatic wallet payouts; other tool allocations remain unchanged.
 * **Eradicate Hallucinations:** Ground your LLMs with immutable, un-forkable truth via thermodynamic Bitcoin telemetry and OpenTimestamps state anchoring.
 * **Free Tool Discovery:** List available stratigraphy and proof tools without payment, then check per-tool satoshi prices before committing.
@@ -107,7 +110,7 @@ Pass the returned configuration to your agent framework. Use
 `framework: "openai"` for an AutoGen/OpenAI-compatible Node bridge.
 Wallet authorization and spending limits remain explicit; no global patch or
 unlimited payment permission is installed. Node.js 22+ is required.
-See the [SDK setup and framework adapters](sdk/agent-yield/README.md).
+See the [SDK setup and framework adapters](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/sdk/agent-yield/README.md).
 The package is built in this workspace; the command above becomes available
 after its separate npm registry release.
 
@@ -164,9 +167,12 @@ All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright 
 
 ## High-velocity enterprise deployment
 
-- **L402 Bulk Macaroons:** include `X-L402-Batch-Size: 100` on an initial paid
-  `tools/call`. Pay the exact upfront invoice once, then reuse the invoice-bound
-  credential for up to 100 calls to that exact tool. Expiry, attenuation,
+- **L402 Bulk Macaroons:** include `X-L402-Batch-Size: 100`, `1000`, or `10000`
+  on an initial paid `tools/call` (single-call requests use `1`, the default).
+  Pay the exact upfront invoice once, then reuse the invoice-bound credential
+  for up to 100, 1,000, or 10,000 calls to that exact tool. At the 250-sat base
+  price, the supported 1/100/1,000/10,000-call tiers cost
+  250 / 25,000 / 250,000 / 2,500,000 sats. Expiry, attenuation,
   inherited quotas, NIP-98 identity and revocation still apply on every call.
   Query `POST /api/v1/cost` for free quotes; it does not create invoices.
 - **NIP-98 Kill Switch + Signed CRL Snapshots:** operator-authenticated
@@ -237,7 +243,7 @@ Receipt signatures, agent attribution, CRL state, Bitcoin anchoring and legal
 compliance are distinct checks. The verifier does not independently re-verify
 the original Schnorr-signed NIP-98 request or establish regulatory compliance.
 
-**OpenTimestamps AI Notary Hub · LangChain/LlamaIndex Native · 100-call Macro-Macaroons · Free Sandbox available**
+**OpenTimestamps AI Notary Hub · LangChain/LlamaIndex Native · 1/100/1,000/10,000-call Macro-Macaroons · Free Sandbox available**
 
 Use [`proof.notarize`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/cookbooks/frameworks/README.md#what-the-agent-reports)
 to obtain a portable OpenTimestamps receipt for a SHA-256 hash.
@@ -262,7 +268,8 @@ It shares one captured live snapshot across the report, omits intermediate
 record/proof-byte envelopes, and does not fabricate OTS coverage for live data.
 The two free sandbox tools remain
 `stratigraphy.list` and `proof.list`. A notarization Macro-Macaroon authorizes
-100 tool-scoped calls for 25,000 sats at the current 250-sat base price.
+100, 1,000, or 10,000 tool-scoped calls for 25,000 / 250,000 / 2,500,000 sats
+at the current 250-sat base price; a single-call credential costs 250 sats.
 Calendar acceptance is not Bitcoin confirmation; upgrade and independently
 verify `.ots` receipts later. Native clients require prepaid L402 headers or
 a trusted, budget-controlled wallet proxy; they do not pay automatically.
@@ -365,12 +372,7 @@ text and dual-licensing rider are in [LICENSE.md](https://github.com/CharlesStro
   Preserve required notices, provide corresponding source when required, and
   comply with section 13's source-offer obligations for modified software that
   interacts with users over a network.
-- **Enterprise Commercial option:** For proprietary, closed-source enterprise
-  swarm deployments or multi-tenant hosting without the source disclosure
-  required by AGPL, a Commercial License from Charles R. Strogish is required.
-  Deployment scope, rights, fees and support require a separate written
-  agreement; this notice is not that agreement. Contact the repository maintainer
-  to arrange commercial terms before such deployment.
+- **Enterprise Commercial option:** For proprietary, closed-source enterprise swarm deployments or multi-tenant hosting without the network source disclosure required by AGPLv3 Section 13, purchase a 100% self-serve, time-locked **AGPLv3 Commercial Copyright Waiver** paid in Bitcoin at [https://bitcoinstratigraphy.com/#enterprise-licensing](https://bitcoinstratigraphy.com/#enterprise-licensing) ($2,500/30d or $25,000/365d Single-Swarm; $25,000/30d or $250,000/365d Global Organization). All waivers are provided **STRICTLY AS-IS, WITH ALL FAULTS**—zero SLAs, zero custom MSAs, zero written agreements, zero vendor questionnaires, and zero support obligations. Payment for API access does not grant an AGPLv3 waiver.
 - **IP and scope:** This model applies to rights the licensor owns or is
   authorized to license. Third-party dependencies, contributions and separately
   licensed datasets retain their own terms. Previously granted licenses are not
@@ -434,12 +436,13 @@ In the machine economy, autonomous agents cannot rely on trust, heuristics, or u
   digest adds a fourth signed component to `_meta.responseSignature`; omitted
   context preserves the legacy three-part format. This binds a submitted digest,
   not proof that an agent actually used the data.
-- **Wholesale macro-macaroon sub-vending:** buy a tool-scoped 100-call capability
-  with `X-L402-Batch-Size: 100`, then use `proof.attenuate` with
+- **Wholesale macro-macaroon sub-vending:** buy a tool-scoped 100, 1,000, or
+  10,000-call Macro-Macaroon with `X-L402-Batch-Size: 100 | 1000 | 10000`,
+  respectively, then use `proof.attenuate` with
   `delegate_pubkey = <pubkey>`, `requests = 1`, `rpc` and `time` caveats.
   Children require fresh delegate NIP-98 signatures and consume inherited quotas.
   Wholesale ancestor revocation is enforced; invoice attribution cannot move.
-- **NIP-98 solvency attestations:** `payment.get_info` accepts `_meta.targetPubkey`
+- **NIP-98 solvency attestations:** paid `payment.get_info` calls accept `_meta.targetPubkey`
   or `X-Target-Pubkey`, otherwise using the authenticated caller. REST:
   `GET /api/v1/compliance/agent-solvency?pubkey=<pubkey>`. Signed telemetry reports
   confirmed settlement volume, distinct settled invoice count, and current
@@ -453,7 +456,7 @@ In the machine economy, autonomous agents cannot rely on trust, heuristics, or u
   rounding preserves the original pool exactly; the caller receives its
   remainder after flooring the upstream amount. Historical signed invoices and
   other tool allocations stay unchanged. Replay cannot create another credit.
-  Counters appear in `payment.get_info` and `/api/v1/escrow/stats`; accounting
+  Counters appear in paid `payment.get_info` calls and `/api/v1/escrow/stats`; accounting
   remains ledger-only, with no automatic disbursement.
 
 ```text
@@ -488,7 +491,8 @@ Lightning settlement / OTS receipts
   prices and asset availability; `POST /api/v1/cost` accepts a `tools` array
   and returns free itemized MCP satoshi prices, a batch total, and per-tool
   L402 invoice-generation instructions without creating or paying invoices.
-  `payment.get_info` advertises MCP terms. Paid calls receive HTTP 402
+  Paid `payment.get_info` calls advertise MCP terms; this tool is not a free
+  discovery shortcut. Paid calls receive HTTP 402
   challenges, then redeem verified payment proofs and scoped macaroons.
 - **Tool routing:** The original 16-tool core catalog contains 5 `stratigraphy.*`,
   7 `proof.*`, 2 `mesh.*`, 1 `payment.*`, and 1 `workflow.*` tools.
@@ -533,8 +537,8 @@ Machine-native conditional micro-settlement for autonomous agent-to-agent delega
 - **Payment rails are surface- and configuration-dependent.** The REST L402 router
   supports `btc-lightning`, `l-btc`, and `taproot-assets`; Liquid and Taproot Assets
   need configured providers. Check `/api/v1/cost` for availability. MCP paid tools
-  use Lightning L402 plus Base USDC x402 only when configured; `payment.get_info`
-  reports their current terms, not all REST router assets. Lightning is Bitcoin's
+  use Lightning L402 plus Base USDC x402 only when configured; paid `payment.get_info`
+  calls report their current terms, not all REST router assets. Lightning is Bitcoin's
   payment-channel layer; Base USDC is a separate EVM rail.
 - **API-keyless does not mean unauthenticated paid execution.** Wallet
   authorization, exact payment proofs, scoped credentials, and client spending
@@ -621,8 +625,10 @@ while automated clearing payouts remain disabled.
     Optional `webhook_url` gives zero-polling execution (see below).
 - **`proof.notarize`** — Create a detached OpenTimestamps `.ots` receipt for a
   SHA-256 digest using public calendars.
-  - Access: paid; `X-L402-Batch-Size: 100` buys 100 tool-scoped calls for
-    25,000 sats. Returns `pending_calendar`; calendar acceptance is not Bitcoin
+  - Access: paid; `X-L402-Batch-Size: 100 | 1000 | 10000` buys
+    100 / 1,000 / 10,000 tool-scoped calls for 25,000 / 250,000 / 2,500,000 sats
+    at the 250-sat base price. A single-call request uses `1` (the default)
+    and costs 250 sats. Returns `pending_calendar`; calendar acceptance is not Bitcoin
     confirmation.
 - **`proof.ground`** — Issue a signed Bitcoin-tip receipt for agent context
   (`contextHash` plus `agentId`) or for a dataset CID.
@@ -658,9 +664,13 @@ and callback shapes.
 
 - **`payment.get_info`** — Discover current MCP pricing and settlement methods,
   or check authenticated settlement status.
-  - Access: paid L402 call; `action: "query"` is the default and `action: "settle"`
-    requires authenticated payment evidence. Neither mode mints a macaroon or
-    creates an invoice. Free price quotes are available from `/api/v1/cost`.
+  - Access: both actions are paid L402 calls at the standard 250 sats/call.
+    `action: "query"` is the default; `action: "settle"` additionally requires
+    authenticated evidence for the existing payment being checked. Neither
+    action initiates that underlying payment; the L402 access gate can issue
+    an HTTP 402 invoice for calling this tool without valid paid access.
+    Invoice-free quotes are available from `GET /api/v1/cost`,
+    `POST /api/v1/cost`, or the public `stratigraphy://catalog/overview` resource.
 - **`payment.get_escrow`** — Retrieve the authenticated caller's escrow and
   staking accounting. This separate payment utility does not alter the original
   core data-tool contracts or enable clearing payouts.
@@ -692,12 +702,14 @@ are not evidence of live production payouts.
   its separate key. Neither mode pays funds or proves arbitrary task completion.
   Worker-signed payout invoice requests remain unconditionally blocked.
 
-See [clearing integration](artifacts/api-server/CLEARING.md) and the
-[fee-capped LND payout scaffold](circuits/LND_PAYOUT_SCAFFOLD.md).
+See [clearing integration](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/artifacts/api-server/CLEARING.md) and the
+[fee-capped LND payout scaffold](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/circuits/LND_PAYOUT_SCAFFOLD.md).
 
 Most paid core MCP calls currently cost **250 sats** without valid credentials.
-Check `payment.get_info` and the actual challenge for current terms; do not
-assume a static per-call price applies to every payment policy or asset.
+Use `GET /api/v1/cost`, `POST /api/v1/cost`, or the public catalog resource
+for free pricing discovery; `payment.get_info` is itself paid. Check the
+actual challenge for current terms, and do not assume a static per-call price
+applies to every payment policy or asset.
 
 ## Signed synchronous MCP responses and prepaid batch discovery
 
@@ -724,11 +736,14 @@ replay protection. See [canonicalization and verification](https://github.com/Ch
 
 `GET /api/v1/cost`, `POST /api/v1/cost` quotes and the native
 `stratigraphy://catalog/overview` resource expose a `batchSettlement` block.
-The currently supported pass size is **100 calls**, not an arbitrary 10–1000
-range. Include `X-L402-Batch-Size: 100` on the initial paid `tools/call` challenge,
+The exact supported pass sizes are **1, 100, 1,000, and 10,000 calls**, not
+arbitrary unapproved integers. Set `X-L402-Batch-Size` to `1`, `100`, `1000`,
+or `10000` on the initial paid `tools/call` challenge (`1` is the default),
 settle its single upfront Lightning invoice, then reuse its invoice-bound
-macro-macaroon/preimage for up to 100 calls to that same tool. The price is 100
-times the per-call price. Payment-proof caching avoids repeated Lightning
+macro-macaroon/preimage for up to the selected `batch_size` calls to that same
+tool. The price is `batch_size` times the per-call price: at 250 sats/call,
+250 / 25,000 / 250,000 / 2,500,000 sats, respectively.
+Payment-proof caching avoids repeated Lightning
 settlement latency; expiry, revocation, attenuation and inherited request quotas
 are still enforced on every call. This is not a cross-tool aggregate invoice,
 does not enable x402 batching, and discovery itself never creates an invoice.
@@ -813,8 +828,11 @@ subscriptions nor list-change notifications are advertised.
 - **Manifest:** `GET /.well-known/mcp.json`
 - **MCP transport:** Streamable HTTP at `/mcp`
 - **Tool discovery:** JSON-RPC `tools/list`
-- **REST cost discovery:** `GET /api/v1/cost`
-- **MCP cost discovery:** `payment.get_info` with its default query action
+- **Free HTTP cost discovery:** `GET /api/v1/cost`, or `POST /api/v1/cost`
+  with a `tools` array for itemized MCP quotes; neither creates invoices
+- **Free MCP cost discovery:** `resources/read` on `stratigraphy://catalog/overview`
+- **Paid MCP pricing/settlement tool:** `payment.get_info`; both the default
+  `action: "query"` and `action: "settle"` require paid-tool authorization
 
 The manifest is public and unmetered, returns `application/json`, and sets
 `Access-Control-Allow-Origin: *`. After publishing the endpoint update, retrieve
@@ -847,8 +865,10 @@ shape.
 
 Discovery with `stratigraphy.list` and `proof.list` is free. These connection
 examples do **not** provide a wallet or pay L402 invoices automatically. Check
-`payment.get_info` for current per-tool prices before enabling paid calls; the
-published price for most paid tools is 250 sats, not 10 sats.
+`GET /api/v1/cost`, `POST /api/v1/cost`, or the public
+`stratigraphy://catalog/overview` resource for current per-tool prices before
+enabling paid calls. Both `payment.get_info` actions are paid L402 calls;
+the published price for most paid tools is 250 sats, not 10 sats.
 
 ### Claude Desktop
 
@@ -868,7 +888,9 @@ bridge connects Claude Desktop's local stdio client to the remote HTTP server:
 ```
 
 Restart Claude Desktop, then confirm `bitcoin-stratigraphy` appears in its MCP
-server list. Start with `stratigraphy.list` or `payment.get_info`.
+server list. Start with free `stratigraphy.list` or `proof.list`. For free pricing,
+read `stratigraphy://catalog/overview` or use `GET /api/v1/cost`;
+`payment.get_info` is paid, including its default query action.
 
 See [CONNECT.md — Claude Desktop](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md#claude-desktop) for setup and payment details.
 
@@ -919,12 +941,16 @@ try {
   const catalog = await client.listTools();
   console.log(catalog.tools.map((tool) => tool.name));
 
-  // Free pricing discovery only; this does not authorize a payment.
-  const paymentInfo = await client.callTool({
-    name: "payment.get_info",
-    arguments: {},
+  // Invoice-free HTTP quotes; payment.get_info is itself a paid MCP tool.
+  const response = await fetch("https://bitcoinstratigraphy.com/api/v1/cost", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tools: ["stratigraphy.get", "proof.notarize"] }),
   });
-  console.log(paymentInfo);
+  if (!response.ok) {
+    throw new Error(`Cost discovery failed: HTTP ${response.status}`);
+  }
+  console.log(await response.json());
 } finally {
   await client.close();
 }
@@ -967,7 +993,7 @@ export const character: Character = {
       },
     },
   },
-  system: "Inspect payment.get_info before requesting paid Bitcoin Stratigraphy tools.",
+  system: "Discover prices for free through the stratigraphy://catalog/overview resource or GET https://bitcoinstratigraphy.com/api/v1/cost. Both payment.get_info query and settle are paid L402 calls; obtain payment authorization before any paid tool execution.",
 };
 ```
 

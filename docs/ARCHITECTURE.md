@@ -9,12 +9,16 @@ request's `_meta`) alongside handshake-era **2025-11-25** clients, and
 supports **19-tool full platform capacity**, including the host-enabled clearing
 extension. Production clearing settlement and payouts remain disabled.
 Discover the host's enabled catalog with `tools/list` and
-query `payment.get_info` for current prices rather than relying on static
+use GET/POST `/api/v1/cost` or `stratigraphy://catalog/overview` for invoice-free
+current prices rather than relying on static
 diagrams as a contract.
 
+Both `payment.get_info` query and settle are paid 250-sat L402 calls;
+settle additionally requires authenticated payment evidence.
+
 The service has distinct MCP and REST interfaces. MCP exposes the canonical
-tool catalog; paid REST operations include price discovery and a separate
-`GET /api/v1/stratigraphy/stream` Server-Sent Events (SSE) feed refreshed every
+tool catalog; REST price discovery is public and invoice-free. The separate paid
+`GET /api/v1/stratigraphy/stream` Server-Sent Events (SSE) feed is refreshed every
 30 seconds. That stream is not an MCP transport. `/api/v1/cost` is authoritative
 for current prices and settlement assets: the L402 router supports
 `btc-lightning`, `l-btc`, and `taproot-assets` where enabled. MCP uses Lightning

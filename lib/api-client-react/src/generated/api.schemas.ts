@@ -2617,11 +2617,11 @@ export const L402PaymentRequiredAgentAuthentication = {
 export type L402PaymentRequiredStagedPreview = { [key: string]: unknown };
 
 /**
- * L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Existing single-use and 100-call batch flows remain available. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+ * L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Exact same-tool pass sizes of 1, 100, 1000 and 10000 remain available at batch_size times the per-call price. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
  */
 export interface L402PaymentRequired {
   error?: string;
-  /** Path-scoped single-use, 100-call batch, or High-Velocity capability bound to the settled invoice. */
+  /** Path-scoped 1/100/1000/10000-call same-tool pass or High-Velocity capability bound to the settled invoice. */
   macaroon: string;
   /** BOLT11 Lightning invoice */
   invoice: string;

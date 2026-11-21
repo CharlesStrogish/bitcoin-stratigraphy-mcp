@@ -23,8 +23,11 @@ payment flow and is not implemented by the Lightning examples below. The
 separate REST router may advertise `btc-lightning`, `l-btc`, or
 `taproot-assets` according to configuration reported by `/api/v1/cost`; that
 does not make those rails available in this MCP flow. Current MCP price
-examples are 250 sats for most paid tools and 10 sats for `proof.list`; check
-`payment.get_info` for authoritative live prices.
+examples are 250 sats for most paid tools; `proof.list` and `stratigraphy.list`
+are permanently free. Discover live prices without invoices through GET/POST
+`/api/v1/cost` or `stratigraphy://catalog/overview`. Both `payment.get_info`
+query and settle are paid 250-sat L402 calls; settle additionally requires
+authenticated payment evidence.
 
 ## What happens during an L402 call
 

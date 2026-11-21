@@ -337,7 +337,10 @@ four-field circuit input.
 
 ### 4.1 Authentication mechanics
 
-1. Discover the actual schemas with `tools/list` and query `payment.get_info`.
+1. Discover schemas with `tools/list`; read invoice-free prices through
+   GET/POST `/api/v1/cost` or `stratigraphy://catalog/overview`.
+   Both `payment.get_info` query and settle are paid 250-sat L402 calls;
+   settle additionally requires authenticated payment evidence.
 2. A paid `tools/call` without usable authorization receives HTTP 402 before
    protected execution. Its challenge contains an exact invoice and an unpaid,
    invoice-bound, tool-scoped macaroon.
@@ -684,7 +687,8 @@ that every arbitrary JSON argument was committed by the macaroon.
   node/provider. Obtain key rotation/revocation history. Do not accept a key
   simply because the untrusted artifact supplies it.
 - [ ] **Snapshot discovery and pricing.** Archive `tools/list` and
-  `payment.get_info`, record the selected tool schemas and prices, and authorize
+  invoice-free HTTP cost quotes or the public catalog resource, record selected
+  tool schemas and prices, and authorize
   a bounded wallet budget. Prevent prompts from authorizing their own spending.
 - [ ] **Acquire original evidence.** Preserve the original snapshot, proof,
   public inputs, digest, agent execution/approval records, and earlier grounding

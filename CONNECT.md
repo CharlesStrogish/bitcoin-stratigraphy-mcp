@@ -110,7 +110,7 @@ export const character: Character = {
       },
     },
   },
-  system: "Inspect payment.get_info before requesting paid Bitcoin Stratigraphy tools.",
+  system: "Discover prices for free through GET/POST https://bitcoinstratigraphy.com/api/v1/cost or stratigraphy://catalog/overview. Both payment.get_info query and settle are paid 250-sat L402 calls; obtain payment authorization before paid execution.",
 };
 ```
 
@@ -139,20 +139,33 @@ The platform supports **19 Fiduciary-grade MCP Tools across 6 namespaces** at fu
 | `mesh.broadcast` | 250 | Sign and distribute a stored snapshot to mesh peers; has side effects. |
 | `workflow.audit_trajectory` | 250 | Deterministic composite workflow executing end-to-end thermodynamic audits. Returns signed deltas and compressed proof receipts in a single payload to save LLM context tokens. |
 
-Call `payment.get_info` with `{}` (equivalent to `{"action":"query"}`) for the complete `perToolSats` map, or `{"toolName":"stratigraphy.get_digest"}` to narrow it to one **case-sensitive, canonical** tool name. Unknown names fail validation. The query result includes accepted methods, invoice expiry, and challenge metadata. It does not issue an invoice; the actual invoice is issued only when a paid `tools/call` receives HTTP **402**. Use `{"action":"settle","paymentHash":"…","preimage":"…"}` with matching L402 Authorization, or, only when MCP Base USDC x402 is currently enabled, `{"action":"settle","paymentHash":"0x…","txHash":"0x…"}` with PAYMENT-SIGNATURE. Settlement does not authorize access to another tool.
+For invoice-free pricing and batch discovery, use `GET /api/v1/cost`,
+`POST /api/v1/cost` with `{"tools":["stratigraphy.get_digest"]}`, or read the
+public `stratigraphy://catalog/overview` resource. Both `payment.get_info`
+actions are paid 250-sat L402 calls: `{}` defaults to `{"action":"query"}`;
+`{"toolName":"stratigraphy.get_digest"}` narrows the map to one case-sensitive,
+canonical name. Unknown names fail validation. Query returns accepted methods,
+invoice expiry, and challenge metadata. Without valid paid access, calling this
+tool can itself return an HTTP **402** access invoice.
+Use `{"action":"settle","paymentHash":"…","preimage":"…"}` with matching L402
+Authorization, or, only when MCP Base USDC x402 is enabled,
+`{"action":"settle","paymentHash":"0x…","txHash":"0x…"}` with PAYMENT-SIGNATURE.
+Settlement additionally requires authenticated evidence for the existing payment;
+it neither initiates that payment nor authorizes access to another tool.
 
-For direct HTTP clients, a preflight request looks like:
+For direct HTTP clients, an invoice-free quote request looks like:
 
 ```http
-POST /mcp HTTP/1.1
+POST /api/v1/cost HTTP/1.1
 Content-Type: application/json
-Accept: application/json, text/event-stream
-MCP-Protocol-Version: 2026-07-28
-Mcp-Method: tools/call
-Mcp-Name: payment.get_info
 
-{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"payment.get_info","arguments":{"toolName":"stratigraphy.get_digest"},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}
+{"tools":["stratigraphy.get_digest"]}
 ```
+
+Same-tool Macro-Macaroons support exactly `X-L402-Batch-Size: 1`, `100`,
+`1000`, or `10000`: 250 / 25,000 / 250,000 / 2,500,000 sats at the 250-sat
+base tariff. Price is the selected batch size times the per-call price.
+Expiry, revocation, attenuation, identity, and inherited quotas still apply.
 
 The endpoint implements the stateless MCP `2026-07-28` transport. There is no
 `initialize` handshake and no `Mcp-Session-Id`, so any server instance can
@@ -182,7 +195,7 @@ type Rpc<T> = {
   error?: { code: number; message: string };
 };
 type ToolResult = { structuredContent?: unknown; content?: unknown[] };
-type PriceInfo = { structuredContent: { perToolSats: Record<string, number> } };
+type PriceInfo = { perToolSats: Record<string, number> };
 type Challenge = {
   macaroon: string;
   invoice: string;
@@ -235,11 +248,16 @@ export async function invokeWithL402(
   payInvoice: (invoice: string) => Promise<string>, // wallet returns 32-byte hex preimage
   maxSats: number,
 ): Promise<ToolResult> {
-  const prices = await readResult<PriceInfo>(
-    await send(1, "payment.get_info", { toolName }),
-    1,
-  );
-  const advertised = prices.structuredContent.perToolSats[toolName];
+  // Free HTTP discovery: payment.get_info is itself a paid MCP tool.
+  const quote = await fetch("https://bitcoinstratigraphy.com/api/v1/cost", {
+    method: "POST",
+    redirect: "error",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tools: [toolName] }),
+  });
+  if (!quote.ok) throw new Error(`Cost discovery HTTP ${quote.status}`);
+  const prices = (await quote.json()) as PriceInfo;
+  const advertised = prices.perToolSats[toolName];
   if (!Number.isInteger(advertised) || advertised < 0)
     throw new Error("Tool has no advertised price");
   if (advertised > maxSats) throw new Error("Advertised price exceeds spending limit");

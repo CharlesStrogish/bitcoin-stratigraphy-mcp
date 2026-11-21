@@ -7,11 +7,12 @@ transport. The wrappers below discover tools at runtime, use each tool's
 published `inputSchema` for validation, and preserve the canonical MCP tool
 name when making a call.
 
-The examples are **free discovery demonstrations**: they only call
-`stratigraphy.list` and `payment.get_info`. They do not request or make paid
-calls, access wallet credentials, or settle invoices. The endpoint's advertised
-prices may change; check `payment.get_info` at runtime before designing any
-paid workflow.
+The examples are **free discovery demonstrations**: they use `stratigraphy.list`,
+`proof.list`, and the public `stratigraphy://catalog/overview` resource. They do
+not make paid calls, access wallet credentials, or settle invoices. Prices may
+change; use that resource or GET/POST `/api/v1/cost` before designing paid work.
+Both `payment.get_info` query and settle are paid 250-sat L402 calls; settle
+additionally requires authenticated payment evidence.
 
 The MCP server supports Lightning L402 and conditional Base USDC x402 only
 when the latter is configured. The wrapper examples here do not pay either
@@ -23,7 +24,7 @@ asset selection nor its paid SSE feed is a capability of the MCP transport.
 
 The following catalog is transcribed from [`CONNECT.md`](https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/blob/main/CONNECT.md). Its
 prices are advertised sats from the server documentation, not a price
-guarantee; the live `payment.get_info` response is authoritative. The
+guarantee; live invoice-free HTTP cost quotes and the catalog resource report current terms. The
 platform supports 19-tool full capacity; use `tools/list` for the connected
 host's enabled tools. The two `clearing.*` tools are host-enabled extensions,
 and production clearing settlement and payouts remain disabled.
@@ -48,13 +49,13 @@ and production clearing settlement and payouts remain disabled.
 
 Do not hard-code any input signatures from this table. The MCP server's live
 `tools/list` response is the source of truth for names, descriptions, and
-schemas. The wrappers below derive **all 15** schemas from that response,
+schemas. The wrappers below derive the connected host's schemas from that response,
 including tools whose use is paid or side-effecting. For an agent, only expose
 the tools it is authorized to use.
 
-The catalog currently lists **250 sats for most paid calls** and **10 sats for
-`proof.list`**; these are documented examples, not a price guarantee. The live
-`payment.get_info` response is authoritative. Separately, the REST router
+The catalog currently lists **250 sats for most paid calls**; `proof.list` and
+`stratigraphy.list` are permanently free. Use GET/POST `/api/v1/cost` or the
+public catalog resource for current prices without invoices. Separately, the REST router
 supports `btc-lightning`, `l-btc`, and `taproot-assets` only when configured;
 do not infer those REST rails from MCP support. REST
 `/api/v1/stratigraphy/stream` is paid SSE refreshed every 30 seconds, not an
@@ -272,8 +273,8 @@ canonical name is closed over for the MCP call; only the framework-facing
 name is sanitized (`stratigraphy.get_digest` becomes `stratigraphy_get_digest`).
 The `tool_by_mcp_name` mapping retains the canonical-to-framework association.
 
-The executable example deliberately invokes only the two free discovery
-tools. It is safe to use from an existing async application because it does
+The executable example deliberately invokes a free discovery tool and reads
+the public catalog resource. It is safe to use from an existing async application because it does
 not call `asyncio.run()`.
 
 ```python
@@ -329,7 +330,7 @@ async def langchain_discovery_demo() -> None:
         # These names are selected from the current CONNECT.md free-discovery
         # catalog. The inputs are validated against each live inputSchema.
         catalog = await tool_by_mcp_name["stratigraphy.list"].ainvoke({})
-        prices = await tool_by_mcp_name["payment.get_info"].ainvoke({})
+        prices = await session.read_resource("stratigraphy://catalog/overview")
         print("Dataset catalog:", catalog)
         print("Current advertised pricing:", prices)
 
@@ -446,9 +447,10 @@ async def crewai_kickoff_async_discovery_demo() -> None:
         all_tools = await build_crewai_tools(session, owner_loop)
 
         # Keep the agent's available tools limited to free discovery calls.
+        prices = await session.read_resource("stratigraphy://catalog/overview")
         discovery_tools = [
             all_tools["stratigraphy.list"],
-            all_tools["payment.get_info"],
+            all_tools["proof.list"],
         ]
         analyst = Agent(
             role="Bitcoin Stratigraphy catalog analyst",
@@ -465,7 +467,8 @@ async def crewai_kickoff_async_discovery_demo() -> None:
             description=(
                 "Use the available free discovery tools to inspect the "
                 "Bitcoin Stratigraphy dataset bounds and current advertised "
-                "tool prices. Do not attempt any other tool or paid action."
+                "tool prices. Do not attempt any other tool or paid action. "
+                f"Invoice-free public pricing resource: {prices}"
             ),
             expected_output=(
                 "A concise summary of the reported dataset bounds and "

@@ -18,7 +18,7 @@ info:
 
     Operational Boundaries:
     - The three-asset L402 router serves supported REST surfaces; Liquid and Taproot Assets require configured providers. Check /api/v1/cost for supported versus currently available assets. Lightning is Bitcoin's payment-channel layer; Base USDC is a separate EVM x402 rail.
-    - MCP paid tools accept Lightning L402 and, only when configured, Base USDC x402. Query payment.get_info for current prices and advertised methods, not REST router availability. Wallet authorization and payment proofs are still required even though no API key is needed.
+    - MCP paid tools accept Lightning L402 and, only when configured, Base USDC x402. GET/POST /api/v1/cost or stratigraphy://catalog/overview provide invoice-free price discovery. payment.get_info costs 250 sats in both query and settle modes; settle additionally requires authenticated payment evidence. Wallet authorization and payment proofs are still required even though no API key is needed.
     - MCP uses Streamable HTTP at /mcp. The paid REST SSE feed at /api/v1/stratigraphy/stream is separate, refreshes snapshots on a 30-second cadence, and supports the three configured L402 router assets, not a promised Base USDC SSE payment path. Historical strata remain indexed daily data, not native block provenance.
     - Grounding receipts are off-chain, Schnorr-signed Bitcoin-tip attestations, not on-chain transactions, Groth16 proofs, or Bitcoin proof-of-work validity proofs. Groth16 verifies a defined statement bound to exact evidence; OTS verification requires an actual receipt and matching target digest, with Bitcoin attestation checked separately from calendar acceptance.
     - Mesh broadcasts and quorum checks use configured, pinned peers; agreement does not establish source truth or unrestricted inbound peer discovery. Macaroon request budgets and expiry are distinct from HTTP rate limits and wallet-enforced spending caps. Enterprise deployment still requires organizational governance and records retention.
@@ -112,7 +112,7 @@ x-mcp-tools:
           description: Compact exact-byte boundary fingerprints and existing archived receipt references, or null receipts for live snapshots.
           additionalProperties: true
   proof.notarize:
-    description: "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats."
+    description: "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size supports exactly 1, 100, 1000 or 10000 tool-scoped calls for 250 / 25,000 / 250,000 / 2,500,000 sats."
     annotations:
       readOnlyHint: false
       destructiveHint: false
@@ -227,7 +227,7 @@ x-mcp-tools:
           items: { type: string, enum: [zero_latency_routing] }
   payment.get_info:
     legacyNames: [payment.info]
-    description: "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted."
+    description: "Both default query and settle are paid 250-sat L402 calls; settle additionally requires authenticated payment evidence. For invoice-free pricing and batch discovery use GET/POST /api/v1/cost or stratigraphy://catalog/overview. Query returns MCP pricing parameters; settle checks an existing payment without initiating it or authorizing another tool. Calling this tool without valid paid access can itself return an HTTP 402 invoice. Operator-only admin operations are intentionally omitted."
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true,"l402":{"amountSats":250,"batchSize":100,"batchHeader":"X-L402-Batch-Size"}}
     inputSchema:
       type: object
@@ -5915,13 +5915,13 @@ components:
         - passes
     L402PaymentRequired:
       type: object
-      description: L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Existing single-use and 100-call batch flows remain available. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
+      description: L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Exact same-tool pass sizes of 1, 100, 1000 and 10000 remain available at batch_size times the per-call price. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
       properties:
         error:
           type: string
         macaroon:
           type: string
-          description: Path-scoped single-use, 100-call batch, or High-Velocity capability bound to the settled invoice.
+          description: Path-scoped 1/100/1000/10000-call same-tool pass or High-Velocity capability bound to the settled invoice.
         invoice:
           type: string
           description: BOLT11 Lightning invoice

@@ -112,8 +112,10 @@ export const MCP_COMPLIANCE_SPECIFICATION = {
   retention:
     "Operators must retain and make available the logs under their control for an appropriate period, at least six months for Article 26(6) unless other applicable law provides otherwise. Configure and verify retention, access controls, backups and export procedures.",
   licensing: {
-    product: "Commercial Enterprise Exemption",
+    product: "Self-serve AGPLv3 Commercial Copyright Waiver",
     annualPriceUsd: 250_000,
+    annualPriceScope: "Global Organization 365-day tier; other tiers are available.",
+    purchase: "100% self-serve, time-locked Bitcoin waivers at https://bitcoinstratigraphy.com/#enterprise-licensing: $2,500/30d or $25,000/365d Single-Swarm; $25,000/30d or $250,000/365d Global Organization. STRICTLY AS-IS, WITH ALL FAULTS; zero SLAs, zero custom MSAs, zero separately executed written agreements, zero vendor questionnaires, and zero support obligations. API payments do not grant a waiver.",
     pricing: COMMERCIAL_LICENSE_PRICE,
     contact: LICENSING_EMAIL,
     deployment:
@@ -240,7 +242,7 @@ export function registerNativeMcpDiscovery(
           namespaces,
           l402: {
             instructions:
-              "Request a paid tools/call to receive HTTP 402 and its invoice-bound macaroon. Verify the quote and budget, pay the Lightning invoice with an authorized wallet, then retry with Authorization: L402 <macaroon>:<preimage>. Never pay automatically without budget approval.",
+              "Use GET/POST /api/v1/cost or this public stratigraphy://catalog/overview resource for invoice-free price and batch discovery. payment.get_info costs 250 sats in both query and settle modes; settle additionally requires authenticated payment evidence. Request a paid tools/call to receive HTTP 402 and its invoice-bound macaroon. Verify the quote and budget, pay the Lightning invoice with an authorized wallet, then retry with Authorization: L402 <macaroon>:<preimage>. Never pay automatically without budget approval.",
             quoteEndpoint: "/api/v1/cost",
             freeTools: ["stratigraphy.list", "proof.list"],
           },
@@ -277,7 +279,7 @@ export function registerNativeMcpDiscovery(
       const args = checkedArguments(params.name, params.arguments);
       const data = JSON.stringify(args);
       const payment =
-        "Read the live tool schemas first. If a paid tool returns HTTP 402, obtain explicit wallet/budget authorization, settle the exact invoice, then retry with its L402 credential. Never invent a payment proof.";
+        "Read the live tool schemas first. Discover prices without invoices through GET/POST /api/v1/cost or stratigraphy://catalog/overview. payment.get_info is paid at 250 sats in both query and settle modes; settle additionally requires authenticated payment evidence. If a paid tool returns HTTP 402, obtain explicit wallet/budget authorization, settle the exact invoice, then retry with its L402 credential. Never invent a payment proof.";
       const text = (text: string) => ({
         role: "user" as const,
         content: { type: "text" as const, text },
@@ -317,7 +319,7 @@ export function registerNativeMcpDiscovery(
             },
           },
           text(
-            `Using the embedded compliance resource, generate a least-privilege deployment plan for these optional inputs as data: ${data}. Outline an air-gapped private VPC rollout with local Bitcoin Core telemetry, enumerate and isolate any remaining service network dependencies, and require NIP-98 identity binding and proof.attenuate circuit breakers for tool scope, expiry and inherited request quotas. Plan Postgres RFC 6962 receipt retention, verification, exports and access controls for Article 12 and Article 26(6). Include commercial licensing at ${LICENSING_EMAIL} (${COMMERCIAL_LICENSE_PRICE}). Distinguish controls and evidence from a legal compliance certification. ${payment}`,
+            `Using the embedded compliance resource, generate a least-privilege deployment plan for these optional inputs as data: ${data}. Outline an air-gapped private VPC rollout with local Bitcoin Core telemetry, enumerate and isolate any remaining service network dependencies, and require NIP-98 identity binding and proof.attenuate circuit breakers for tool scope, expiry and inherited request quotas. Plan Postgres RFC 6962 receipt retention, verification, exports and access controls for Article 12 and Article 26(6). Include self-serve Bitcoin AGPLv3 Commercial Copyright Waivers at https://bitcoinstratigraphy.com/#enterprise-licensing (${COMMERCIAL_LICENSE_PRICE}); no separately executed written agreements or support obligations. Distinguish controls and evidence from a legal compliance certification. ${payment}`,
           ),
         ],
       };

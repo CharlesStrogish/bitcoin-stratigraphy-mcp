@@ -1,11 +1,13 @@
 Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
-This software is dual-licensed. Open-source usage is governed by the AGPLv3. For proprietary, closed-source enterprise swarm deployments or multi-tenant hosting without source disclosure, a Commercial License from Charles R. Strogish is required.
+This software is dual-licensed. Open-source usage is governed by the AGPLv3. Covered proprietary deployments may instead purchase the self-serve AGPLv3 Commercial Copyright Waiver described below.
 
 # Dual-licensing rider
 
 Created & Architected by Charles R. Strogish.
 
-You may use covered first-party software under GNU AGPL version 3 only (SPDX: AGPL-3.0-only), or under a separately executed Commercial License from Charles R. Strogish (SPDX reference: LicenseRef-Commercial). This notice is not itself a grant of commercial rights. The commercial option is offered as a self-serve AGPLv3 Commercial Copyright Waiver (tiers swarm_monthly $2,500/30 days, swarm_annual $25,000/365 days, global_monthly $25,000/30 days, global_annual $250,000/365 days, quoted in BTC at spot), granted only by a server-validated, Ed25519-signed Waiver Certificate bound to a confirmed Bitcoin transaction at https://bitcoinstratigraphy.com/#enterprise-licensing. All rights are reserved except those expressly granted by the applicable license.
+You may use covered first-party software under GNU AGPL version 3 only (SPDX: AGPL-3.0-only), or under a self-serve AGPLv3 Commercial Copyright Waiver from Charles R. Strogish (SPDX reference: LicenseRef-Commercial). This notice is not itself a grant of commercial rights. A waiver is granted only by a server-validated, Ed25519-signed Waiver Certificate bound to a confirmed Bitcoin transaction. All rights are reserved except those expressly granted by the applicable license.
+
+Proprietary, closed-source enterprise swarm deployments or multi-tenant hosting without AGPLv3 Section 13 network source disclosure require a 100% self-serve, time-locked AGPLv3 Commercial Copyright Waiver paid in Bitcoin at https://bitcoinstratigraphy.com/#enterprise-licensing ($2,500/30d or $25,000/365d Single-Swarm; $25,000/30d or $250,000/365d Global Organization). All waivers are provided STRICTLY AS-IS, WITH ALL FAULTS—zero SLAs, zero custom MSAs, zero separately executed written agreements, zero vendor questionnaires, and zero support obligations. Payment for API access does not grant an AGPLv3 waiver.
 
 AGPLv3 permits commercial use when its conditions are met. Its redistribution and corresponding-source obligations, including section 13 for modified versions used over a network, govern the open-source option. A valid Commercial Copyright Waiver is required for covered deployments that cannot comply with Section 13 during the waived term; this rider adds no restrictions to the AGPL grant. Scanner credits and L402 payment credentials do not purchase a waiver.
 

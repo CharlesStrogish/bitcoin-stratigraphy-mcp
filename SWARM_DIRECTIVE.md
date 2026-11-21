@@ -11,11 +11,13 @@
   returned four-part signature against an independently pinned integrity key;
   absent context retains the three-part format. A context commitment is not
   proof of actual data use, truth, or legal compliance.
-- Use **wholesale macro-macaroon sub-vending** for 100-call tool-scoped purchases.
+- Use **wholesale macro-macaroon sub-vending** for exact 1/100/1,000/10,000-call
+  tool-scoped purchases with `X-L402-Batch-Size: 1 | 100 | 1000 | 10000`;
+  at 250 sats/call these cost 250 / 25,000 / 250,000 / 2,500,000 sats.
   Restrict each child with `delegate_pubkey = <pubkey>`, `requests = 1`, exact
   `rpc` and exclusive `time` caveats. Sign each redemption with the delegated
   NIP-98 key; parent quotas and wholesale ancestor revocation remain enforced.
-- Inspect **NIP-98 solvency attestations** using `payment.get_info` metadata or
+- Inspect **NIP-98 solvency attestations** using paid `payment.get_info` metadata or
   `/api/v1/compliance/agent-solvency?pubkey=<pubkey>`. Verify canonical JSON
   signatures, issuer identity, timestamp and live revocation. Historical settled
   invoices are observations, not a promise of future solvency.

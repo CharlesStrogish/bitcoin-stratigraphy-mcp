@@ -265,19 +265,23 @@ new_quote <= per_invoice_ceiling`}</code>
           Enterprise MCP Server (2026-07-28 specification) secured by Ed25519
           Cryptographically Signed Tool Integrity. It has an AGPLv3 open-source
           option.
-          A separately executed Enterprise Commercial License grants an
-          exemption from the AGPL obligations for the software and deployment
-          covered by that agreement. Enterprises can run the licensed engine
-          behind their own firewalls without AGPL-based disclosure of
-          proprietary AI code or model weights within the agreed commercial
-          scope.
+          Proprietary deployments without AGPLv3 Section 13 network source
+          disclosure require a 100% self-serve, time-locked AGPLv3 Commercial
+          Copyright Waiver paid in Bitcoin at{" "}
+          <a href="https://bitcoinstratigraphy.com/#enterprise-licensing">enterprise licensing</a>:
+          {" "}$2,500/30d or $25,000/365d Single-Swarm; $25,000/30d or
+          $250,000/365d Global Organization. Waivers are STRICTLY AS-IS, WITH
+          ALL FAULTS—zero SLAs, zero custom MSAs, zero separately executed
+          written agreements, zero vendor questionnaires, and zero support
+          obligations.
         </p>
         <p>
           AGPL does not automatically require all independent applications or
           model weights to be open-sourced. Third-party components and
           separately licensed data retain their own terms. API micropayments do
-          not purchase a commercial software license; deployment rights
-          and support require a written agreement.
+          not grant an AGPLv3 waiver. The self-serve waiver is bound to its
+          confirmed Bitcoin transaction and specified term; no manual agreement
+          or support engagement is required.
         </p>
         <p>
           Local event capture, Merkle construction, and proof checking can
@@ -290,13 +294,12 @@ new_quote <= per_invoice_ceiling`}</code>
           digest exports require an explicit information-security policy.
         </p>
         <p>
-          Enterprise pricing is customized to swarm size and deployment needs.
-          The agreed commercial license is settled in one upfront Bitcoin
-          transaction, paid in full at execution of the agreement. That payment
-          is distinct from public API Lightning micropayments or any separately
-          agreed notary-service charges. Scope, acceptance, and service
-          commitments are contractual terms, not promises implied by a timestamp
-          receipt.
+          Waiver tiers and terms are predefined in the self-serve Bitcoin
+          checkout. A waiver is granted only by a server-validated,
+          Ed25519-signed certificate bound to the confirmed Bitcoin transaction
+          and specified term. API micropayments and scanner packs are separate
+          products and do not purchase an AGPLv3 waiver. No custom licensing
+          negotiation or service commitments are included.
         </p>
         <p>
           See the <a href={`${BASE}standard`}>proposed SA-AI specification</a>{" "}

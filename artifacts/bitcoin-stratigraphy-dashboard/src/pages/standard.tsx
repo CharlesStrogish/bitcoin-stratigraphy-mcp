@@ -723,7 +723,8 @@ export default function StandardPage() {
               </a>
             </p>
             <p className="sa-hint">
-              A commercial grant must be agreed in writing. Qualified legal
+              Commercial waivers use the self-serve Bitcoin checkout; no
+              separately executed written agreement is required. Qualified legal
               review of ownership and enterprise terms is recommended.
             </p>
           </section>

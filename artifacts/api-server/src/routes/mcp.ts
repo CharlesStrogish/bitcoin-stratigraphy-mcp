@@ -3625,8 +3625,8 @@ const baseMcpToolDefinitions = [
     title: "Get MCP Payment Information",
     description: `Retrieve configured MCP pricing, Lightning invoice rules, and optional Base USDC x402 terms.
 
-- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Use \`payment.get_info\` instead of calling paid tools blindly when checking pricing upfront.
-- USAGE GUIDELINES: Use \`payment.get_info\` instead of \`proof.attenuate\` when discovering required sat fees or active auth schemes across tools. Do NOT use \`payment.get_info\` to settle payments or issue invoices (settlement occurs dynamically via HTTP payment challenge headers on target paid calls), and do NOT use it to restrict Macaroons (use \`proof.attenuate\` instead).
+- PURPOSE & BOUNDARIES: Inspect cost requirements and active auth schemes across the tool catalog. Both default query and settle are paid 250-sat L402 calls. For invoice-free pricing and batch discovery use GET/POST /api/v1/cost or stratigraphy://catalog/overview.
+- USAGE GUIDELINES: Use default query for paid pricing details; settle additionally requires authenticated evidence for an existing payment and does not initiate that payment or grant another tool's access. The access gate may issue an HTTP 402 invoice for calling this tool. Use \`proof.attenuate\` to restrict Macaroons, not to discover prices.
 - BEHAVIOR & CONSEQUENCES: Requires L402 authorization. Public HTTP cost quotes remain free. Returns Lightning rates and invoice expiry limits; Base USDC x402 terms appear only when authenticated settlement is ready. Passing an unknown \`toolName\` returns a validation error.`,
     annotations: {
       readOnlyHint: true,
@@ -3808,7 +3808,7 @@ const baseMcpToolDefinitions = [
             ),
             maxRequests: field(
               "integer",
-              "Default credentials allow one call; X-L402-Batch-Size: 100 buys a tool-scoped 100-call credential.",
+              "Default credentials allow one call; X-L402-Batch-Size supports exactly 1, 100, 1000 or 10000 tool-scoped calls at batch_size times the per-call price.",
               [1, 100],
               { enum: [1, 100] },
             ),
@@ -4231,7 +4231,7 @@ const notarizeToolDefinition = {
   name: "proof.notarize",
   title: "Notarize a SHA256 Digest with OpenTimestamps",
   description:
-    "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size: 100 purchases 100 tool-scoped calls for 25000 sats.",
+    "PURPOSE & BOUNDARIES: Create a detached OpenTimestamps .ots receipt for an agent-supplied SHA256 digest using public calendars. Do NOT use this as evidence of immediate Bitcoin confirmation or as a replacement for proof.verify. USAGE GUIDELINES: Submit exactly one 64-character hexadecimal hash; decode otsProofHex into binary to save the .ots file. BEHAVIOR & CONSEQUENCES: Submits a randomized commitment to public calendars, returns pending_calendar, and fails explicitly if calendars are unavailable. Costs 250 sats via L402; X-L402-Batch-Size supports exactly 1, 100, 1000 or 10000 tool-scoped calls for 250 / 25,000 / 250,000 / 2,500,000 sats.",
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -4374,7 +4374,7 @@ const canonicalMcpToolDefinitions = [
                 ...tool,
                 title: "Query MCP Prices or Verify Payment Settlement",
                 description:
-                  "Query MCP pricing parameters (`action='query'`, the default) or verify authenticated settlement (`action='settle'` with a payment hash and either an L402 preimage or Base transaction hash). Use `query` for price discovery before calling paid tools; use `settle` to check payment status, not to issue an invoice. Macaroons and Lightning invoices are issued dynamically via HTTP 402 challenges with bounded expiration; operator-only admin operations are intentionally omitted.",
+                  "Both default query and settle are paid 250-sat L402 calls; settle additionally requires authenticated payment evidence. For invoice-free pricing and batch discovery use GET/POST /api/v1/cost or stratigraphy://catalog/overview. Query returns MCP pricing parameters; settle checks an existing payment without initiating it or authorizing another tool. Calling this tool without valid paid access can itself return an HTTP 402 invoice. Operator-only admin operations are intentionally omitted.",
                 annotations: {
                   ...tool.annotations,
                   readOnlyHint: false,

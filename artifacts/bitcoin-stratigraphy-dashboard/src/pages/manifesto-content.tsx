@@ -342,7 +342,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                   />
                   <Item
                     label="payment.get_info"
-                    text="Discover current MCP pricing (standardizing at 250 sats per paid tool) and authenticate existing settlement status."
+                    text="Paid 250-sat L402 call in both query and settle modes; settle also requires authenticated payment evidence. Discover prices for free through GET/POST /api/v1/cost or stratigraphy://catalog/overview."
                   />
                 </ul>
               </section>
@@ -494,6 +494,12 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                   >
                     VIEW THE 1,064-POINT AI SECURITY AUDIT
                   </a>
+                </p>
+                <p>
+                  Historical security audit snapshot: 1,064 tests. Current
+                  automated CI suite: 1,344 passing tests—1,036 Node, 280 Python,
+                  and 28 pipeline tests with 100% statement and branch coverage
+                  for the pipeline.
                 </p>
                 <a href="#top" className="mf-top">
                   Back to top

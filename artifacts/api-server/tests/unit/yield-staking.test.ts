@@ -34,7 +34,7 @@ test("all original 16 MCP definitions retain their exact pre-staking contracts",
   const baseline = core.map(tool => tool.name === "mesh.broadcast" || tool.name === "mesh.get_status"
     ? { ...tool, description: tool.description.replace(meshNote, "") } : tool);
   assert.equal(createHash("sha256").update(JSON.stringify(baseline)).digest("hex"),
-    "56a85799a9933a62485b1fd17c35bc1af6550e7a49717794fbe3c033a32a2e12");
+    "6fbbcd41eecc33c8f4a3a6d3ea6cb873e0a18c81e366a7a1c399b2de6c9143a2");
 });
 
 test("yield staking uses durable, exclusive receipt reservations across PostgreSQL workers", async t => {

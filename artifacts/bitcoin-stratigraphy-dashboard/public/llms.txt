@@ -67,7 +67,7 @@ Credit card via genuine Stripe-hosted Checkout: **$500 USD for 100 prepaid heuri
 - `proof.list` — discover proof lifecycle records; free.
 - `proof.submit` — submit proof evidence; standard paid L402.
 - `proof.ground` — signed Bitcoin-tip context; standard paid L402.
-- `payment.get_info` — MCP payment terms or authenticated settlement verification; standard paid L402.
+- `payment.get_info` — paid 250-sat L402 in both default query and settle modes; settle additionally requires authenticated payment evidence. Invoice-free pricing and batch discovery uses GET/POST https://bitcoinstratigraphy.com/api/v1/cost or stratigraphy://catalog/overview.
 - `mesh.get_status` — configured peer status; standard paid L402.
 - `mesh.broadcast` — distribute a signed stored snapshot; standard paid L402.
 - `proof.notarize` — detached OpenTimestamps receipt request; standard paid L402.

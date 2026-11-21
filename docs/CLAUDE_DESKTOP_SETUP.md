@@ -161,24 +161,25 @@ Start with these prompts:
 > Use bitcoin-stratigraphy's stratigraphy.list tool to show the available
 > dataset bounds. Do not call any paid tools.
 
-> Call payment.get_info with action query to show current tool prices. Do not
-> request settlement, pay an invoice, or call a paid tool.
+> Read the public stratigraphy://catalog/overview resource for current tool
+> prices, or use GET/POST https://bitcoinstratigraphy.com/api/v1/cost. Do not
+> call payment.get_info: query and settle are both paid 250-sat L402 calls,
+> and settle additionally requires authenticated payment evidence.
 
-Approve only the matching tool invocation when Claude asks. The equivalent
-arguments for pricing discovery are:
+Approve only the matching free tool or resource read when Claude asks.
+The `resources/read` parameters for invoice-free pricing discovery are:
 
 ```json
 {
-  "action": "query"
+  "uri": "stratigraphy://catalog/overview"
 }
 ```
 
-For one tool's price, the pricing request arguments are:
+For one tool's price, POST this JSON to `https://bitcoinstratigraphy.com/api/v1/cost`:
 
 ```json
 {
-  "action": "query",
-  "toolName": "stratigraphy.get_digest"
+  "tools": ["stratigraphy.get_digest"]
 }
 ```
 
@@ -198,7 +199,8 @@ tool/transport error. That is not fixed by repeatedly approving the tool.
   explicitly authorized, budget-limited Lightning wallet.
 - Keep wallet secrets outside the desktop JSON. Never reuse service/operator
   wallet credentials or paste an invoice preimage into a prompt.
-- Inspect live prices with `payment.get_info` before deciding on a budget.
+- Inspect live prices without invoices through GET/POST `/api/v1/cost` or
+  `stratigraphy://catalog/overview` before deciding on a budget.
 - `proof.submit` and `mesh.broadcast` have side effects. Payment permission
   does not automatically authorize those operations.
 

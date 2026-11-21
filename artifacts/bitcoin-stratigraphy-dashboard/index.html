@@ -63,7 +63,7 @@
         "name": "Charles R. Strogish"
       },
       "license": "https://creativecommons.org/licenses/by/4.0/",
-      "conditionsOfAccess": "MCP discovery includes free tools; paid MCP tools use current per-tool L402 Lightning prices. GET /api/v1/cost reports REST tiers; POST /api/v1/cost returns free itemized MCP quotes and batch totals without generating invoices. Base USDC x402 depends on live configuration; query payment.get_info for MCP availability.",
+      "conditionsOfAccess": "MCP discovery includes free tools; paid MCP tools use current per-tool L402 Lightning prices. GET /api/v1/cost reports REST tiers; POST /api/v1/cost returns free itemized MCP quotes and batch totals without generating invoices. The public stratigraphy://catalog/overview resource also provides invoice-free MCP pricing and batch discovery. Base USDC x402 depends on live configuration. payment.get_info is paid at 250 sats in both query and settle modes; settle additionally requires authenticated payment evidence.",
       "isAccessibleForFree": false
     },
     {
@@ -105,7 +105,7 @@
         "proof.ground: Issue a signed Bitcoin-tip receipt for agent context or a dataset CID",
         "mesh.get_status: Inspect peer counts, topology health, cross-validation rate, latency and quorum",
         "mesh.broadcast: Sign a stored daily telemetry snapshot and distribute it to pinned mesh peers",
-        "payment.get_info: Query MCP pricing or verify authenticated settlement",
+        "payment.get_info: Paid 250-sat query or authenticated settlement verification; free quotes use GET/POST /api/v1/cost or stratigraphy://catalog/overview",
         "L402 standard paid MCP calls: 250 sats/call with Path A (preimage) and Path B (NWC_LOOKUP) settlement proofs; free discovery and separately funded clearing remain distinct",
         "Self-serve AGPLv3 Commercial Copyright Waiver (from $2,500/30 days in BTC)"
       ],

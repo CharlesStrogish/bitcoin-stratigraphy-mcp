@@ -1156,7 +1156,7 @@
     ["get_verification", "proof.get_by_hash", ""],
     ["mesh status / get_peers", "mesh.get_status", "No independent peer tool."],
     ["route_telemetry", "mesh.broadcast", "Broadcasts stored snapshots."],
-    ["quote_l402", "payment.get_info", ""],
+    ["quote_l402", "GET/POST /api/v1/cost", "Invoice-free quotes; payment.get_info query and settle are paid 250-sat L402 calls. Settle additionally requires authenticated payment evidence."],
     ["verify_macaroon", "Normal L402 authorization", "No standalone tool."],
     [
       "get_invoice",

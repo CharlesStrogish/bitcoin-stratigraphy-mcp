@@ -26,7 +26,7 @@ import {
   canonicalUrl,
 } from "./public-site";
 
-const MACRO_BATCH_CALLS = 100;
+const MACRO_BATCH_CALLS = 10000;
 
 /** Descriptors mirror the live tools/list registry; they do not register tools. */
 const toolDescriptors = mcpToolDefinitions.map((tool) => {
@@ -41,7 +41,7 @@ const toolDescriptors = mcpToolDefinitions.map((tool) => {
     payment_required: priceSats > 0,
     ...(tool.name === "payment.get_escrow" ? { authentication_required: "NIP-98" } : {}),
     ...(priceSats > 0
-      ? { batch: { max_calls: MACRO_BATCH_CALLS, header: "X-L402-Batch-Size" } }
+      ? { batch: { max_calls: MACRO_BATCH_CALLS, supported_batch_sizes: [1, 100, 1000, 10000], header: "X-L402-Batch-Size" } }
       : {}),
     annotations: {
       readOnlyHint: tool.annotations.readOnlyHint,
@@ -132,7 +132,7 @@ export const mcpDiscoveryManifest = {
     },
     invoice_proof_of_work: {
       request_endpoint: canonicalUrl("/invoice/request"),
-      scope: "New single-tool, 100-call macro and ordered pipeline L402 invoices at /mcp and /invoice/request; paid credential verification requires no new work.",
+      scope: "New single-tool, 1/100/1000/10000-call macro and ordered pipeline L402 invoices at /mcp and /invoice/request; paid credential verification requires no new work.",
       algorithm: "sha256",
       difficulty: 3,
       challenge_ttl_seconds: 120,
@@ -171,7 +171,7 @@ export const mcpDiscoveryManifest = {
   licensing: {
     spdx: "(AGPL-3.0-only OR LicenseRef-Commercial)",
     public_license: "AGPL-3.0-only",
-    commercial_exemption: `Commercial Enterprise License (${COMMERCIAL_LICENSE_PRICE})`,
+    commercial_exemption: `Self-serve AGPLv3 Commercial Copyright Waiver (${COMMERCIAL_LICENSE_PRICE}); purchase with Bitcoin at https://bitcoinstratigraphy.com/#enterprise-licensing. No separately executed written agreements or support obligations.`,
     contact: LICENSING_EMAIL,
     due_diligence_brief: canonicalUrl("/api/v1/enterprise/due-diligence-brief"),
   },

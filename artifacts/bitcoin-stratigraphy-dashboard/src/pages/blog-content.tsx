@@ -48,6 +48,7 @@ export default function BlogContent({
       </a>
       <header className="blog-top">
         <a className="blog-brand" href={BASE} data-testid="link-blog-brand">
+          <img src={`${BASE}favicon-32x32.png`} width="32" height="32" alt="" style={{ display: "inline-block", verticalAlign: "middle", marginRight: 8, objectFit: "contain" }} />
           Bitcoin <em>Stratigraphy</em>
         </a>
         <nav className="blog-nav" aria-label="Primary">
@@ -176,7 +177,7 @@ export default function BlogContent({
         )}
       </main>
       <footer className="blog-foot">
-        <a href={BASE}>Bitcoin Stratigraphy</a>
+        <a href={BASE}><img src={`${BASE}favicon-32x32.png`} width="32" height="32" alt="" style={{ display: "inline-block", verticalAlign: "middle", marginRight: 8, objectFit: "contain" }} />Bitcoin Stratigraphy</a>
         <a href={`${BASE}blog/`}>Blog index</a>
       </footer>
     </div>

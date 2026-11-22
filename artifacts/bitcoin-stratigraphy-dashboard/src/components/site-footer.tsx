@@ -53,6 +53,7 @@ export default function SiteFooter() {
             LINKS OPEN IN A NEW TAB
           </span>
           <span>
+            <img src={`${import.meta.env.BASE_URL}favicon-32x32.png`} width="32" height="32" alt="" style={{ display: "inline-block", verticalAlign: "middle", marginRight: 8, objectFit: "contain" }} />
             BITCOIN STRATIGRAPHY DATA ENGINE © 2026 | ARCHITECTED BY CHARLES R.
             STROGISH | ENTERPRISE MCP SERVER POWERED BY L402 MICROPAYMENTS, RFC
             6962 MERKLE PROOFS &amp; OPENTIMESTAMPS STATE ANCHORING.

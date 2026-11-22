@@ -98,6 +98,16 @@ export function renderBlogDocument(
 ${post?.keywords ? `<meta name="keywords" content="${escapeHtml(post.keywords.join(", "))}">` : ""}
 <link rel="canonical" href="${canonical}">
 <link rel="icon" type="image/png" href="${prefix}favicon.png">
+<link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 64x64 128x128" href="${prefix}favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="${prefix}favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="${prefix}favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="${prefix}apple-touch-icon.png">
+<link rel="mask-icon" href="${prefix}safari-pinned-tab.svg" color="#D4AF37">
+<link rel="manifest" href="${prefix}site.webmanifest">
+<meta name="theme-color" content="#0B0F19">
+<meta name="msapplication-TileColor" content="#0B0F19">
+<meta name="msapplication-TileImage" content="${prefix}mstile-150x150.png">
+<meta name="msapplication-config" content="${prefix}browserconfig.xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap">

@@ -11,11 +11,8 @@ export default function FunnelNavigation() {
   return (
     <nav className="fn-nav" aria-label="Primary">
       <a href="/" className="fn-nav-brand" aria-label="Bitcoin Stratigraphy home" data-testid="link-nav-home">
-        <span className="fn-nav-brand-text">Bitcoin <em>Stratigraphy</em></span>
-        <svg className="fn-nav-mark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
-          <path d="m12 2 9 10-9 10L3 12Z" />
-          <path d="m7.5 12 4.5 5 4.5-5-4.5-5Z" />
-        </svg>
+        <span className="fn-nav-brand-text"><img src={`${import.meta.env.BASE_URL}favicon-32x32.png`} width="32" height="32" alt="" style={{ display: "inline-block", verticalAlign: "middle", marginRight: 8, objectFit: "contain" }} />Bitcoin <em>Stratigraphy</em></span>
+        <img className="fn-nav-mark" src={`${import.meta.env.BASE_URL}favicon-32x32.png`} width="32" height="32" alt="" style={{ objectFit: "contain" }} />
       </a>
       <div className="fn-nav-choices">
         {CHOICES.map((c) => {

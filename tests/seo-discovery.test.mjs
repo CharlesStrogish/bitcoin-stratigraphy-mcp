@@ -10,7 +10,10 @@ test("homepage favicon points to a public square PNG", async () => {
   assert.ok(
     html.includes('<link rel="icon" type="image/png" href="/favicon.png" />'),
   );
-  assert.equal((html.match(/<link rel="icon"/g) ?? []).length, 1);
+  assert.equal((html.match(/<link rel="icon"/g) ?? []).length, 4);
+  for (const asset of ["favicon.ico", "favicon-32x32.png", "favicon-16x16.png", "apple-touch-icon.png", "safari-pinned-tab.svg", "site.webmanifest"]) {
+    assert.ok(html.includes(`href="/${asset}"`), asset);
+  }
   const png = await readFile(
     new URL("../artifacts/bitcoin-stratigraphy-dashboard/public/favicon.png", import.meta.url),
   );

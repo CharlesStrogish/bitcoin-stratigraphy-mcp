@@ -84,6 +84,7 @@ function Header() {
       <div className="header-main homepage-header-main">
         <div>
           <h1>
+            <img src={`${import.meta.env.BASE_URL}logo.png`} width="48" height="48" alt="" style={{ display: "inline-block", verticalAlign: "middle", marginRight: 12, objectFit: "contain" }} />
             Bitcoin <span>Stratigraphy</span>
           </h1>
           <h2 className="subtitle">

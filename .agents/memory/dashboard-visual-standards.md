@@ -44,14 +44,17 @@ directory entry, not a fake SVG embed.
 **How to apply:** Preserve the distinction between a linked official directory
 entry and a provider-issued verification badge when updating the trust row.
 
-The user designated the supplied dark rounded tile with a white “M” and amber
-“CP” as this project's official MCP logo.
+The user replaced the earlier white “M” / amber “CP” tile with the supplied
+gold-and-navy isometric cryptographic emblem. Crop away its decorative frame;
+preserve the emblem's geometry, metallic colors, and aspect ratio.
 
-**Why:** The user supplied it as “our official MCP logo.”
+**Why:** The user explicitly requested this custom mark as the site's premium
+brand identity, superseding the earlier MCP tile.
 
-**How to apply:** Use the supplied mark for this project's MCP branding rather
-than inventing a replacement. It is project branding, not a protocol-wide
-certification or a third-party verification seal.
+**How to apply:** Use the cropped emblem for website and metadata branding.
+Keep the existing dark grid, typography, navigation, content, and color
+variables unchanged during asset-only passes. It is project branding, not a
+protocol-wide certification or a third-party verification seal.
 
 The Live REST Escrow terminal must sit directly below the hero, trust badges
 and quick-action grid, above the Enterprise & Machine-Native Command Center.

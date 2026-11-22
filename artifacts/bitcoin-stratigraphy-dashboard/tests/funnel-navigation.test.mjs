@@ -15,6 +15,7 @@ const output = await transformWithEsbuild(source, fileURLToPath(sourcePath), {
   loader: "tsx",
   format: "cjs",
   jsx: "automatic",
+  define: { "import.meta.env.BASE_URL": '"/"' },
 });
 const filename = fileURLToPath(new URL("./navigation-render.cjs", import.meta.url));
 const compiled = new Module(filename);
@@ -29,6 +30,7 @@ const css = await readFile(new URL("../src/pages/funnel.css", import.meta.url), 
 test("navigation preserves desktop branding and exposes a mobile home icon", () => {
   assert.match(html, /Bitcoin <em>Stratigraphy<\/em>/);
   assert.match(html, /aria-label="Bitcoin Stratigraphy home"/);
+  assert.match(html, /<img class="fn-nav-mark" src="\/favicon-32x32.png" width="32" height="32" alt=""/);
   assert.match(html, /<a href="\/" class="fn-nav-brand"[^>]*>.*fn-nav-brand-text.*fn-nav-mark.*<\/a>/);
   assert.match(css, /\.fn-nav-mark\s*\{\s*display:\s*none/);
   assert.match(css, /\.fn-nav-mobile-label\s*\{\s*display:\s*none/);

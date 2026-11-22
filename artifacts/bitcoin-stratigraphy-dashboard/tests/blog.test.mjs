@@ -264,7 +264,7 @@ test("blog footer has crawlable home and index anchors on index and article page
       assert.ok(footer, "shared blog footer is rendered in initial HTML");
       assert.equal(
         footer[1],
-        `<a href="${base}">Bitcoin Stratigraphy</a><a href="${base}blog/">Blog index</a>`,
+        `<a href="${base}"><img src="${base}favicon-32x32.png" width="32" height="32" alt="" style="display:inline-block;vertical-align:middle;margin-right:8px;object-fit:contain"/>Bitcoin Stratigraphy</a><a href="${base}blog/">Blog index</a>`,
       );
     }
   }

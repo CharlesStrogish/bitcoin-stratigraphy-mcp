@@ -140,3 +140,17 @@ mtime_ms = 1795135685086
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/614b67a3-e099-4159-a1c8-5caa727d9960/92252016-26dc-4e8a-803e-cdbcb7916538"
 storage_version_token = "1795135698280812"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "uCmlZg7yDZjn394u7fK7I"
+uri = "file://artifacts/bitcoin-stratigraphy-dashboard/public/logo.png"
+type = "image"
+title = "Cropped Bitcoin Stratigraphy brand mark"
+description = "512×512 emblem from your supplied image, with the decorative frame removed and original proportions and colors preserved."
+logical_id = "436a72f8-fcb2-4850-a935-cd147f0e4b51"
+content_hash = "sha256:a7aab7282cef92aedced63f954b120e35e7669a9f41b3e262769da8e9b15f9cb"
+size = 342958
+mtime_ms = 1795365937385
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/436a72f8-fcb2-4850-a935-cd147f0e4b51/330b8dc6-1313-4029-b05d-51eb06351e5e"
+storage_version_token = "1795366228089274"
+content_type = "image/png"

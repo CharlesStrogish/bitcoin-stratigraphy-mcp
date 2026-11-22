@@ -75,3 +75,5 @@ Credit card via genuine Stripe-hosted Checkout: **$500 USD for 100 prepaid heuri
 - `payment.get_escrow` — authorized escrow lookup, not flat-fee MCP access.
 - `clearing.create_contract` — host-enabled contract and Lightning invoice for the requested funding amount.
 - `clearing.settle_contract` — authenticated funded-contract proof settlement when enabled; no automated payout or refund.
+
+Privacy Policy: https://bitcoinstratigraphy.com/privacy/ — factual records, optional card checkout and public Bitcoin commitments; no user accounts or ad tracking.

@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ManifestoContent from "./src/pages/manifesto-content";
 import SecurityContent from "./src/pages/security-content";
 import CeremonyContent from "./src/pages/ceremony-content";
+import PrivacyContent from "./src/pages/privacy-content";
+import { PRIVACY_DESCRIPTION, PRIVACY_TITLE, PRIVACY_URL } from "./src/lib/privacy-seo";
 import { readFileSync } from "node:fs";
 import {
   CEREMONY_DESCRIPTION, CEREMONY_TITLE, CEREMONY_URL,
@@ -42,6 +44,12 @@ import { AGENT_STRUCTURED_DATA, AgentDiscoveryContent } from "./src/lib/agent-se
 
 const routes = [
   ...FUNNEL_PAGES,
+  {
+    path: "privacy",
+    title: PRIVACY_TITLE,
+    description: PRIVACY_DESCRIPTION,
+    url: PRIVACY_URL,
+  },
   {
     path: "ceremony",
     title: CEREMONY_TITLE,
@@ -171,6 +179,10 @@ function pageHead(html: string, page: (typeof routes)[number]): string {
       `<script id="${page.path}-article-jsonld" type="application/ld+json">${JSON.stringify(article).replace(/</g, "\\u003c")}</script>\n  </head>`,
     );
     const content = renderToStaticMarkup(createElement(isSecurity ? SecurityContent : ManifestoContent, { base: "/" }));
+    result = result.replace('<div id="root"></div>', `<div id="root">${content}</div>`);
+  }
+  if (page.path === "privacy") {
+    const content = renderToStaticMarkup(createElement(PrivacyContent, { base: "/" }));
     result = result.replace('<div id="root"></div>', `<div id="root">${content}</div>`);
   }
   return result;

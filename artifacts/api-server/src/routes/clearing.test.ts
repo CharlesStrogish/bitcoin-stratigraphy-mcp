@@ -204,6 +204,10 @@ test("clearing catalog and dispatch never replace any sealed core contract", asy
     clearingToolDefinitions.map((t) => t.name),
     ["clearing.create_contract", "clearing.settle_contract"],
   );
+  assert.deepEqual(
+    listed.body.result.tools.slice(-2).map((tool: { title: string }) => tool.title),
+    ["Create A2A Execution Clearing Contract", "Settle A2A Clearing Contract Proof"],
+  );
   for (const name of ["clearing.create_contract", "clearing.settle_contract"]) {
     const tool = listed.body.result.tools.find(
       (tool: { name: string }) => tool.name === name,

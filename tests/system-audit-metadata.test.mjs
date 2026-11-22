@@ -41,7 +41,7 @@ test("each dedicated page is served its own head, not the homepage's", () => {
   )].map((match) => [match[1], match[2]]);
   const catchAll = rewrites.findIndex(([from]) => from === "/*");
   assert.ok(catchAll >= 0);
-  for (const page of ["simulator", "compliance", "standard", "enterprise", "whitepaper", "manifesto", "security"]) {
+  for (const page of ["simulator", "compliance", "standard", "enterprise", "whitepaper", "manifesto", "security", "privacy"]) {
     for (const from of [`/${page}`, `/${page}/`]) {
       const index = rewrites.findIndex(([source]) => source === from);
       assert.ok(index >= 0 && index < catchAll, from);

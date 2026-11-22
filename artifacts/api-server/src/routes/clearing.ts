@@ -64,6 +64,7 @@ const settleInput = z
 export const clearingToolDefinitions = [
   {
     name: "clearing.create_contract",
+    title: "Create A2A Execution Clearing Contract",
     description:
       "Create a worker contract; return its contract ID (escrow_id) and Lightning funding invoice (invoice). Requires fresh buyer NIP-98 authentication. New request IDs create separate contracts even for the same task_hash; byte-identical retries by the same buyer reuse the contract and its unexpired invoice. Funds remain merchant-controlled; an unpaid invoice is not funding. No automated payouts. Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
     inputSchema: {
@@ -108,6 +109,7 @@ export const clearingToolDefinitions = [
   },
   {
     name: "clearing.settle_contract",
+    title: "Settle A2A Clearing Contract Proof",
     description:
       "Record a funded escrow contract as settled with a signed Groth16 preimage receipt. Production uses the Solo Founder Genesis key; opted-in local development retains its separate key and receipt domain. Requires the exact NIP-98 worker, task/escrow-bound proof and merchant-confirmed invoice funding before an atomic, idempotent evidence commit. No automated payout, arbitrary-execution guarantee or legal indemnity. Funds remain merchant-controlled. Note: Contract state polling, listing, cancellations, and automated refunds are intentionally disabled in this namespace by design to enforce strict manual payout verification and prevent automated drain attacks.",
     inputSchema: {

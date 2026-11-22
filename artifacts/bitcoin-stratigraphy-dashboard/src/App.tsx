@@ -19,6 +19,7 @@ import WhitepaperLink from "@/components/whitepaper-link";
 import SiteFooter from "@/components/site-footer";
 import Article12VerifierLink from "@/components/article12-verifier-link";
 import StandardPage from "@/pages/standard";
+import PrivacyPage from "@/pages/privacy";
 import SimulatorPage from "@/pages/simulator";
 import CompliancePage from "@/pages/compliance";
 import ComplianceGuideLink from "@/components/compliance-guide-link";
@@ -227,6 +228,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/standard" component={StandardPage} />
+        <Route path="/privacy" component={PrivacyPage} />
         <Route path="/enterprise" component={EnterprisePage} />
         <Route path="/whitepaper" component={WhitepaperPage} />
         <Route path="/manifesto" component={ManifestoPage} />

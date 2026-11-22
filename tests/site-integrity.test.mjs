@@ -100,6 +100,7 @@ test("fresh production pages pass desktop/mobile, clipboard, markup and internal
   const result = await auditBuiltSite();
   assert.ok(result.pages.includes("/"));
   assert.ok(result.pages.includes("/docs"));
+  assert.ok(result.pages.includes("/privacy"));
   assert.ok(result.pages.includes("/cookbooks"));
   assert.ok(result.pages.includes("/static/verify.html"));
   assert.ok(result.pages.some((route) => route.includes("defending-autonomous")));

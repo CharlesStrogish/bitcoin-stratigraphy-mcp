@@ -99,7 +99,7 @@
 - [Public receipt broadcast trust](nostr-receipt-privacy.md) — publish only persisted, allowlisted proof summaries; relay failure never changes settlement or execution status.
 - [Invoice compute admission](invoice-pow-admission.md) — gate new MCP invoices, not paid verification; preserve request binding and atomic replay protection across workers.
 - [Enterprise credit tabs](enterprise-credit-tabs.md) — authenticated paid-history threshold, shared debt cap, explicit session closing and exact-once whole-tab settlement.
-- [Glama ownership](glama-ownership.md) — ownership claims are exact provider-supplied documents; preserve legacy connector metadata and the MCP manifest.
+- [Glama metadata](glama-ownership.md) — preserve ownership documents and legacy aliases; check the live schema before adding publisher links.
 - [Mainnet Treasury safety](mainnet-treasury-safety.md) — outbound claims use NWC; schemas/state machine are frozen, unknown outcomes stay reserved and tests never spend real funds.
 - [Yield staking policy](yield-staking-policy.md) — preserve explicit withdrawals; staking and Treasury must reserve the same yield exclusively, without automatic payouts.
 - [Clearing trust boundaries](clearing-scaffold-scope.md) — production needs independent contributors, worker-signed invoices and escrow-funded capped fees; protect core tools and staking.

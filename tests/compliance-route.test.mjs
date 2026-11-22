@@ -210,7 +210,7 @@ test("agent SEO is additive and all dedicated pages emit initial HTML discovery"
   );
   assert.deepEqual(
     emitted.map((asset) => asset.fileName),
-    ["developers/index.html", "audit/index.html", "ceremony/index.html", "security/index.html", "manifesto/index.html", "simulator/index.html", "standard/index.html", "enterprise/index.html",
+    ["developers/index.html", "audit/index.html", "privacy/index.html", "ceremony/index.html", "security/index.html", "manifesto/index.html", "simulator/index.html", "standard/index.html", "enterprise/index.html",
       "whitepaper/index.html", "compliance/index.html"],
   );
   for (const asset of emitted) {

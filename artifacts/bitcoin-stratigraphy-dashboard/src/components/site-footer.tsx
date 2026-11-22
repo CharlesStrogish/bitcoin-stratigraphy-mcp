@@ -27,6 +27,13 @@ export default function SiteFooter() {
             </a>
             <a
               className="control-button"
+              href={`${import.meta.env.BASE_URL}privacy`}
+              data-testid="link-footer-privacy"
+            >
+              Privacy Policy
+            </a>
+            <a
+              className="control-button"
               href={`${import.meta.env.BASE_URL}ceremony`}
               data-testid="link-footer-ceremony"
             >

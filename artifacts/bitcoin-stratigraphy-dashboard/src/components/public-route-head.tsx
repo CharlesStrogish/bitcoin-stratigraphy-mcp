@@ -11,19 +11,20 @@ import {
 } from "@/lib/security-seo";
 import { CEREMONY_DESCRIPTION, CEREMONY_TITLE } from "@/lib/ceremony-seo";
 import { FUNNEL_PAGES } from "@/lib/funnel-seo";
+import { PRIVACY_DESCRIPTION, PRIVACY_TITLE } from "@/lib/privacy-seo";
 
 /** Keep crawler-facing URLs and escrow attribution correct after SPA navigation. */
 export function PublicRouteHead() {
   const [location] = useLocation();
   useEffect(() => {
     const path = location.split("?")[0]!.replace(/\/$/, "") || "/";
-    const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance", "/manifesto", "/security", "/ceremony", "/developers", "/audit"];
+    const publicPaths = ["/", "/standard", "/enterprise", "/whitepaper", "/simulator", "/compliance", "/manifesto", "/security", "/ceremony", "/developers", "/audit", "/privacy"];
     if (!publicPaths.includes(path)) return;
     const url = path === "/" ? siteUrl("/") : pageUrl(path);
     document.querySelector('link[rel="canonical"]')?.setAttribute("href", url);
     document.querySelector('meta[property="og:url"]')?.setAttribute("content", url);
     document.querySelector('meta[name="twitter:url"]')?.setAttribute("content", url);
-    if (path === "/developers" || path === "/audit") {
+    if (path === "/developers" || path === "/audit" || path === "/privacy") {
       document.getElementById("escrow-application-jsonld")?.remove();
       return;
     }
@@ -41,7 +42,9 @@ export function PublicRouteHead() {
   }, [location]);
   useEffect(() => {
     const path = location.split("?")[0]!.replace(/\/$/, "");
-    const page = FUNNEL_PAGES.find((entry) => `/${entry.path}` === path);
+    const page = path === "/privacy"
+      ? { title: PRIVACY_TITLE, description: PRIVACY_DESCRIPTION }
+      : FUNNEL_PAGES.find((entry) => `/${entry.path}` === path);
     if (!page) return;
     const previousTitle = document.title;
     document.title = page.title;

@@ -84,7 +84,6 @@ function Header() {
       <div className="header-main homepage-header-main">
         <div>
           <h1>
-            <img src={`${import.meta.env.BASE_URL}logo.png`} width="48" height="48" alt="" style={{ display: "inline-block", verticalAlign: "middle", marginRight: 12, objectFit: "contain" }} />
             Bitcoin <span>Stratigraphy</span>
           </h1>
           <h2 className="subtitle">
@@ -93,11 +92,13 @@ function Header() {
             for EU AI Act Article 12 compliance — Created &amp; Architected by
             Charles R. Strogish.
             <br />
-            Anchoring autonomous agents in thermodynamic truth to mathematically eliminate hallucinations.
+            Anchoring autonomous agents in thermodynamic truth to mathematically detect state drift and stop cascading peer hallucinations.
           </h2>
           <TrustBadges />
         </div>
         <div className="header-actions homepage-actions">
+          <section className="hero-primary-actions" aria-label="Primary actions">
+          <EnterpriseLicenseLink />
           <a
             className="control-button live-escrow-button"
             href={LIVE_ESCROW_HASH}
@@ -106,9 +107,9 @@ function Header() {
           >
             <Zap size={14} /> Live REST Escrow
           </a>
-          <EnterpriseLicenseLink />
           <Article12VerifierLink />
-          <WhitepaperLink />
+          </section>
+          <nav className="hero-reference-dock" aria-label="Technical and reference links">
           <a
             className="control-button"
             href={`${import.meta.env.BASE_URL}#article12-sandbox`}
@@ -116,6 +117,7 @@ function Header() {
           >
             <Terminal size={14} aria-hidden="true" /> Art. 12 Sandbox
           </a>
+          <WhitepaperLink />
           <a
             className="control-button"
             href={`${import.meta.env.BASE_URL}manifesto`}
@@ -141,7 +143,7 @@ function Header() {
             className="control-button"
             href={`${import.meta.env.BASE_URL}docs`}
           >
-            <FileText size={14} /> Developer docs
+            <FileText size={14} /> Developer Docs
           </a>
           <a
             className="control-button"
@@ -155,14 +157,14 @@ function Header() {
             href={`${import.meta.env.BASE_URL}standard`}
             data-testid="link-standard"
           >
-            <Check size={14} /> SA-AI standard
+            <Check size={14} /> SA-AI Standard
           </a>
           <a
             className="control-button"
             href={`${import.meta.env.BASE_URL}simulator`}
             data-testid="link-simulator"
           >
-            <Play size={14} /> Enterprise preview
+            <Play size={14} /> Enterprise Preview
           </a>
           <a
             className="control-button"
@@ -171,6 +173,8 @@ function Header() {
           >
             <LayoutGrid size={14} aria-hidden="true" /> 19-Tool Capacity
           </a>
+          <ComplianceGuideLink />
+          </nav>
         </div>
       </div>
     </header>
@@ -209,7 +213,6 @@ function Home() {
           tabIndex={-1}
           data-testid="section-escrow-terminal"
         >
-          <ComplianceGuideLink />
           <EscrowTerminal />
         </section>
         <Article12Sandbox />

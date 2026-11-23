@@ -35,5 +35,9 @@
 .escrow-term .et-field input,.escrow-term .et-field textarea{font:11px var(--app-font-mono);background:hsl(var(--background));color:hsl(var(--foreground));border:1px solid hsl(var(--border));padding:6px 8px;min-width:0;width:100%;resize:vertical}
 .escrow-term .et-field input:focus,.escrow-term .et-field textarea:focus{outline:none;border-color:hsl(var(--primary))}
 .escrow-term .et-form{max-width:520px}
+.escrow-term .et-admin-footer{margin-top:16px;padding-top:10px;border-top:1px solid hsl(var(--border));color:hsl(var(--muted-foreground));font-size:11px}
+.escrow-term .et-admin-footer summary{width:fit-content;cursor:pointer}
+.escrow-term .et-admin-footer summary:hover{color:hsl(var(--foreground))}
+.escrow-term .et-admin-footer summary:focus-visible{outline:2px solid hsl(var(--primary));outline-offset:3px}
 .escrow-term .et-pay{border:1px dashed hsl(var(--primary));padding:12px;margin:12px 0}
 .escrow-term .et-pay p{font-size:12px;margin:6px 0}

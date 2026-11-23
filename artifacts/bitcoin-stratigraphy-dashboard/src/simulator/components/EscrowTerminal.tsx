@@ -201,13 +201,6 @@ export function EscrowTerminal() {
         <span className="et-tag">LOCKED = RFC 6962 MERKLE COMMITMENT · OPENTIMESTAMPS READY · TECHNICAL AUDIT RECEIPT</span>
       </div>
 
-      <div className="et-form">
-        <details>
-          <summary>Optional Admin Override</summary>
-          {inp("operator-token", "Operator token (X-Escrow-Operator-Token, kept in memory only)", token, setToken, { type: "password" })}
-        </details>
-      </div>
-
       <div className="et-steps">
         <div className="et-step" data-state={st(0)} data-testid="stage-1">
           <div className="section-kicker">1 Create escrow</div>
@@ -298,6 +291,14 @@ export function EscrowTerminal() {
           <pre tabIndex={0} data-testid="text-escrow-proof">{exportJson}</pre>
         </>
       )}
+      <footer className="et-admin-footer">
+        <div className="et-form">
+          <details>
+            <summary>Optional Admin Override</summary>
+            {inp("operator-token", "Operator token (X-Escrow-Operator-Token, kept in memory only)", token, setToken, { type: "password" })}
+          </details>
+        </div>
+      </footer>
     </section>
   );
 }

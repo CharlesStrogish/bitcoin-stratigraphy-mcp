@@ -63,7 +63,8 @@ test("manifesto serves its full article, metadata and conversion links without o
   for (const id of ["link-starter-top", "link-starter-bottom"]) {
     assert.match(html, new RegExp(`<a[^>]*href="https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/tree/main/starter-swarm-python"[^>]*data-testid="${id}"`));
   }
-  assert.ok(html.includes('href="mailto:licensing@bitcoinstratigraphy.com"'));
+  assert.match(html, /<a[^>]*href="\/#enterprise-licensing"[^>]*data-testid="link-licensing-top"[^>]*>View Enterprise Licensing<\/a>/);
+  assert.match(html, /<a[^>]*href="\/#enterprise-licensing"[^>]*data-testid="link-licensing-waiver"[^>]*>Buy a self-serve AGPLv3 waiver in BTC<\/a>/);
   assert.match(html, /href="\/whitepaper"[^>]*>Truth Receipts<\/a>/);
   assert.match(html, /href="\/whitepaper"[^>]*>compliance<\/a>/);
   assert.match(html, /href="\/whitepaper"[^>]*>circuit breakers<\/a>/);

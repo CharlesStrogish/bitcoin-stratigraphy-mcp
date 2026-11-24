@@ -154,3 +154,17 @@ mtime_ms = 1795365937385
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/436a72f8-fcb2-4850-a935-cd147f0e4b51/330b8dc6-1313-4029-b05d-51eb06351e5e"
 storage_version_token = "1795366228089274"
 content_type = "image/png"
+
+[[outputs]]
+id = "HRKF9beK4Gn3-abJnL7zy"
+uri = "file://generated-artifacts/sales-cta-sweep.html"
+type = "html"
+title = "Sales CTA sweep: every file and line"
+description = "All 27 original matches, with removed sales CTAs separated from retained contracts, test markers, and historical references."
+logical_id = "cb303b38-61e9-4730-9283-b9ed64dee8ac"
+content_hash = "sha256:0bb5f785b155629f948adb4a6bf40e9e6b2b53731e33c124b33ff0fabb98350c"
+size = 5927
+mtime_ms = 1795531785030
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/cb303b38-61e9-4730-9283-b9ed64dee8ac/eed751fa-8c5c-4e5e-b32e-95ee8bbf0ffc"
+storage_version_token = "1795531902961652"
+content_type = "text/html"

@@ -265,5 +265,5 @@ Production compliance depends on your complete deployment and operating process.
 
 **Deploy Fiduciary Flight Recorders to your swarm today.**
 
-[Explore the Enterprise License and Contact Sales](https://bitcoinstratigraphy.com/enterprise)
-for commercial licensing, private infrastructure and enterprise sizing.
+[Buy a self-serve AGPLv3 waiver in BTC](https://bitcoinstratigraphy.com/#enterprise-licensing)
+for covered deployments on private infrastructure.

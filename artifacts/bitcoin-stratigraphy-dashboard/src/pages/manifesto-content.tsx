@@ -3,7 +3,6 @@ import React from "react";
 import type { ReactNode } from "react";
 import ManifestoTrustBadge from "../components/manifesto-trust-badge";
 
-const EMAIL = "licensing@bitcoinstratigraphy.com";
 const STARTER =
   "https://github.com/CharlesStrogish/bitcoin-stratigraphy-mcp/tree/main/starter-swarm-python";
 
@@ -16,7 +15,7 @@ const NAV: [string, string, string][] = [
 ];
 
 const TERMS =
-  /(compliance|Truth Receipts|TruthReceipt|circuit breakers|circuit breaker|licensing@bitcoinstratigraphy\.com)/gi;
+  /(compliance|Truth Receipts|TruthReceipt|circuit breakers|circuit breaker)/gi;
 
 const SECTIONS = [
   ["fiduciary-armor", "1", "Fiduciary Armor"],
@@ -35,16 +34,11 @@ const TITLE =
 export default function ManifestoContent({ base = "/" }: { base?: string }) {
   const BASE = base.endsWith("/") ? base : `${base}/`;
   const WP = `${BASE}whitepaper`;
+  const LICENSING = `${BASE}#enterprise-licensing`;
   let k = 0;
   function L(text: string): ReactNode[] {
     return text.split(TERMS).map((part, i) => {
       if (i % 2 === 0) return part;
-      if (part.toLowerCase() === EMAIL)
-        return (
-          <a key={`m${k++}`} href={`mailto:${EMAIL}`}>
-            {part}
-          </a>
-        );
       return (
         <a key={`w${k++}`} href={WP}>
           {part}
@@ -104,11 +98,11 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 Fork the Starter Swarm
               </a>
               <a
-                href={`mailto:${EMAIL}`}
+                href={LICENSING}
                 className="mf-cta mf-cta-alt"
                 data-testid="link-licensing-top"
               >
-                Contact Licensing
+                View Enterprise Licensing
               </a>
             </div>
           </section>
@@ -425,15 +419,15 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 </ul>
                 <p>
                   {L(
-                    "All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction. Purchase a waiver at /#enterprise-licensing. Licensing correspondence address:",
+                    "All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction.",
                   )}
                 </p>
                 <a
                   className="mf-mail"
-                  href={`mailto:${EMAIL}`}
-                  data-testid="link-licensing-email"
+                  href={LICENSING}
+                  data-testid="link-licensing-waiver"
                 >
-                  {EMAIL}
+                  Buy a self-serve AGPLv3 waiver in BTC
                 </a>
               </section>
 

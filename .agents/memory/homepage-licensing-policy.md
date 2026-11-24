@@ -14,3 +14,9 @@ The user replaced the Tier II “AS IS” No-SLA marketing bullet with “Automa
 **Why:** The user explicitly requested this positioning to remove corporate procurement friction.
 
 **How to apply:** Do not restore the older No-SLA marketing bullet when maintaining the enterprise pricing matrix or aligning tests.
+
+Public licensing purchase CTAs must lead directly to the self-serve Bitcoin waiver checkout at `/#enterprise-licensing`, not to an email, sales call, or sizing request.
+
+**Why:** The waiver is a 100% self-serve purchase; a sales contact CTA gives readers the wrong path.
+
+**How to apply:** Check rendered pages and static documentation as well as React source. Distinguish purchase buttons from the separate CISO due-diligence contract, non-sales disclosures, and historical documentation.

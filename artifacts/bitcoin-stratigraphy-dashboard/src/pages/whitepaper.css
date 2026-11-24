@@ -38,8 +38,8 @@
   max-width: 56ch;
 }
 .wp-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 40px;
 }
@@ -64,16 +64,17 @@
     opacity 0.15s;
 }
 .wp-cta-alt {
-  background: transparent;
-  color: hsl(var(--primary));
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
 }
 .wp-cta:hover {
   opacity: 0.9;
   transform: translateY(-1px);
 }
 @media (max-width: 520px) {
-  .wp-cta {
-    width: 100%;
+  .wp-actions {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 .wp-hero h1 {

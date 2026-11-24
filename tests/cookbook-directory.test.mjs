@@ -23,10 +23,10 @@ test("cookbook directory advertises the current catalog and enterprise security"
   assert.doesNotMatch(text, /SDK natively supports/);
 });
 
-test("cookbook licensing CTA is a direct email link with responsive wrapping", () => {
+test("cookbook licensing CTA links to self-serve checkout with responsive wrapping", () => {
   assert.match(
     html,
-    /<a class="btn primary license-cta" href="mailto:licensing@bitcoinstratigraphy\.com">Deploying internally\? Request Commercial Enterprise License<\/a>/,
+    /<a class="btn primary license-cta" href="\/#enterprise-licensing">Deploying internally\? Buy a self-serve AGPLv3 waiver in BTC<\/a>/,
   );
   assert.match(html, /\.license-cta \{[^}]*max-width: 100%[^}]*white-space: normal/);
 });

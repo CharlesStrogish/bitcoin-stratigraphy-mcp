@@ -8,7 +8,6 @@ import WhitepaperContent, { WHITEPAPER_SECTIONS } from "./whitepaper-content";
 import "./whitepaper.css";
 
 const BASE = import.meta.env.BASE_URL;
-const MAIL = "mailto:licensing@bitcoinstratigraphy.com";
 
 const NAV: [string, string, string][] = [
   ["dashboard", "Dashboard", ""],
@@ -84,15 +83,15 @@ export default function WhitepaperPage() {
           </section>
           <WhitepaperContent />
           <div className="wp-actions">
-            <a href={MAIL} className="wp-cta" data-testid="link-contact-sales">
-              Contact Sales for Enterprise Sizing
-            </a>
             <a
-              href="#deployment"
-              className="wp-cta wp-cta-alt"
+              href={`${BASE}#enterprise-licensing`}
+              className="wp-cta"
               data-testid="link-enterprise-licensing"
             >
               View Enterprise Licensing
+            </a>
+            <a href={`${BASE}security`} className="wp-cta wp-cta-alt">
+              Zero-Trust Security Audit
             </a>
           </div>
         </main>

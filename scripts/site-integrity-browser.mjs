@@ -119,14 +119,50 @@ export async function launchAuditBrowser() {
             identifier:!!target?.querySelector('[data-testid="input-licensee-identifier"]')};
         })()`);
       },
-      async inspect(url, width = 1440) {
+      async inspect(url, width = 1440, { height = 1000, responsive = false } = {}) {
         errors.length = 0;
-        await send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: width < 768 });
+        await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 768 });
         await send("Page.navigate", { url });
-        for (let attempt = 0; attempt < 150; attempt++) {
-          if (await evaluate(`document.readyState === "complete" && document.querySelector("h1") !== null`)) break;
-          await delay(100);
-        }
+        await waitForPage(url);
+        const layout = !responsive ? undefined : await evaluate(`(() => {
+          const visible = e => {
+            const r = e.getBoundingClientRect();
+            const s = getComputedStyle(e);
+            return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility === "visible";
+          };
+          const box = e => {
+            const r = e.getBoundingClientRect();
+            return {width:Math.round(r.width),height:Math.round(r.height),left:Math.round(r.left),right:Math.round(r.right)};
+          };
+          const text = e => (e.textContent || "").trim().replace(/\\s+/g," ").slice(0,160);
+          const els = selector => [...document.querySelectorAll(selector)].filter(visible);
+          const contained = e => {
+            for (let p=e.parentElement;p && p!==document.body;p=p.parentElement) {
+              if (/(auto|scroll)/.test(getComputedStyle(p).overflowX) && p.clientWidth > 0) return true;
+            }
+            return false;
+          };
+          const subnav = els('.topbar nav[aria-label="Primary"] > .control-button, .topbar .header-actions:not(.homepage-actions) > .control-button');
+          const clipped = els('main a, main button, .topbar a, .topbar button, footer a, form input, pre, table').filter(e => {
+            const r = e.getBoundingClientRect();
+            return (r.left < -2 || r.right > innerWidth + 2) && !contained(e);
+          }).slice(0,18).map(e => ({tag:e.tagName,id:e.id,className:String(e.className),text:text(e),...box(e)}));
+          const links = els('a[href]').map(e => ({href:e.getAttribute('href'),text:text(e)}));
+          const images = els('img').filter(e => e.complete && !e.naturalWidth).map(e => e.currentSrc || e.getAttribute("src"));
+          const disclosures = els('details > summary').map(e => {
+            const detail = e.parentElement;
+            const wasOpen = detail.open;
+            e.click();
+            const works = detail.open !== wasOpen;
+            if (works) e.click();
+            return {text:text(e),works};
+          });
+          const overflow = els('pre,table').filter(e => e.scrollWidth > e.clientWidth + 2 &&
+            !/(auto|scroll)/.test(getComputedStyle(e).overflowX) && !contained(e)).map(e => ({tag:e.tagName,text:text(e),...box(e)}));
+          return {width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,
+            subnav:subnav.map(e=>({text:text(e),...box(e),scrollWidth:e.scrollWidth,clientWidth:e.clientWidth})),
+            clipped,overflow,links,images,disclosures};
+        })()`);
         const result = await evaluate(`(async () => {
           const copies = [], variants = [];
           async function captureCopies() {
@@ -159,7 +195,7 @@ export async function launchAuditBrowser() {
             width:innerWidth, scrollWidth:document.documentElement.scrollWidth,
             headings:[...document.querySelectorAll("h1,h2,h3,h4,h5,h6")].map(e=>({level:Number(e.tagName[1]),title:e.textContent.trim()}))};
         })()`);
-        return { ...result, errors: [...errors] };
+        return { ...result, layout, errors: [...errors] };
       },
       async close() {
         socket.close();

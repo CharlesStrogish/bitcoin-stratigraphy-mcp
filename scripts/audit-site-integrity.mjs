@@ -36,7 +36,7 @@ export function waiverLinkFailure(file, href) {
   return null;
 }
 
-export async function auditBuiltSite({ mobile = true } = {}) {
+export async function auditBuiltSite({ mobile = true, responsive = false } = {}) {
   const source = auditSources();
   const failures = [...source.failures];
   const output = path.join(dashboard, "dist/public");
@@ -61,6 +61,7 @@ export async function auditBuiltSite({ mobile = true } = {}) {
   const copies = [];
   const waiverLinks = [];
   const anchorChecks = [];
+  const responsiveChecks = [];
   try {
     const routes = new Set(documents.map((file) => {
       const relative = path.relative(output, file).split(path.sep).join("/");
@@ -77,7 +78,7 @@ export async function auditBuiltSite({ mobile = true } = {}) {
       if (!response.ok) { failures.push(`${route}: HTTP ${response.status}`); continue; }
       const initial = await response.text();
       failures.push(...inspectHtml(initial, `${route} [built]`, { requireHero: !/<div id="root"><\/div>/.test(initial) }).failures);
-      const rendered = await browser.inspect(base + route);
+      const rendered = await browser.inspect(base + route, 1440, { height: responsive ? 900 : 1000, responsive });
       const result = inspectHtml(rendered.html, route);
       renderedDocuments.set(route.replace(/\/$/, "") || "/", rendered.html);
       failures.push(...result.failures, ...rendered.errors.map((error) => `${route}: console error: ${error}`));
@@ -105,9 +106,10 @@ export async function auditBuiltSite({ mobile = true } = {}) {
         waiverLinks.push({ file: route, href: match[1] });
       }
       if (mobile) {
-        const phone = await browser.inspect(base + route, 390);
+        const phone = await browser.inspect(base + route, responsive ? 375 : 390, { height: responsive ? 812 : 1000, responsive });
         failures.push(...inspectHtml(phone.html, `${route} [mobile]`).failures, ...phone.errors.map((error) => `${route}: mobile console error: ${error}`));
         if (phone.scrollWidth > phone.width + 1) failures.push(`${route}: mobile page overflow ${phone.scrollWidth}/${phone.width}`);
+        if (responsive) responsiveChecks.push({ route, mobile: phone.layout, desktop: rendered.layout });
       }
       pages.push(route);
     }
@@ -168,11 +170,11 @@ export async function auditBuiltSite({ mobile = true } = {}) {
     rmSync(stagedPublic, { recursive: true, force: true });
     cleanupApi();
   }
-  return { failures: [...new Set(failures)], pages, markdownFiles: source.documents.length, clipboardSources: source.clipboard, copies, links: linkChecks.size, waiverLinks, anchorChecks };
+  return { failures: [...new Set(failures)], pages, markdownFiles: source.documents.length, clipboardSources: source.clipboard, copies, links: linkChecks.size, waiverLinks, anchorChecks, ...(responsive ? { responsiveChecks } : {}) };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
-  const result = await auditBuiltSite({ mobile: !process.argv.includes("--desktop-only") });
+  const result = await auditBuiltSite({ mobile: !process.argv.includes("--desktop-only"), responsive: process.argv.includes("--responsive") });
   console.log(JSON.stringify(result, null, 2));
   if (result.failures.length) process.exitCode = 1;
 }

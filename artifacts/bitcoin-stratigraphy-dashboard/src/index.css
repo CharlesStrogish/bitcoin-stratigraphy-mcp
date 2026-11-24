@@ -1703,6 +1703,36 @@ h1,
 .header-actions {
   flex-wrap: wrap;
 }
+/* Secondary page headers share one layout; the homepage has its own actions. */
+:is(.topbar nav[aria-label="Primary"], .topbar .header-actions:not(.homepage-actions)) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  max-width: 100%;
+  gap: 8px;
+}
+:is(.topbar nav[aria-label="Primary"], .topbar .header-actions:not(.homepage-actions)) > .control-button {
+  flex: 0 0 auto;
+  justify-content: center;
+  height: 42px;
+  min-height: 42px;
+  padding-inline: 10px;
+  white-space: nowrap;
+  text-align: center;
+  text-decoration: none;
+}
+@media (max-width: 767px) {
+  :is(.topbar nav[aria-label="Primary"], .topbar .header-actions:not(.homepage-actions)) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  :is(.topbar nav[aria-label="Primary"], .topbar .header-actions:not(.homepage-actions)) > .article12-verifier-link {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+}
+
 /* Keep the final navigation link balanced without a separate export row. */
 .homepage-header-main {
   flex-direction: column;

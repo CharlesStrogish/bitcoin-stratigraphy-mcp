@@ -201,6 +201,10 @@ h3 {
   gap: 7px;
   flex-wrap: wrap;
 }
+.header-actions > .btn {
+  min-height: 42px;
+  white-space: nowrap;
+}
 .btn {
   display: inline-flex;
   align-items: center;

@@ -523,8 +523,8 @@ export default function StandardPage() {
               <TrustBadges />
             </div>
             <div className="header-actions">
-              <EnterpriseLicenseLink />
               <Article12VerifierLink />
+              <EnterpriseLicenseLink />
               <WhitepaperLink />
               <Link
                 href="/"

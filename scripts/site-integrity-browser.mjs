@@ -82,8 +82,8 @@ export async function launchAuditBrowser() {
       throw new Error(`Navigation did not finish: ${url}`);
     };
     return {
-      async checkAnchor(url, width = 1440, selector, hashchange = false) {
-        await send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: width < 768 });
+      async checkAnchor(url, width = 1440, selector, hashchange = false, height = 1000) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 768 });
         await send("Page.navigate", { url });
         await waitForPage(url);
         if (selector) {
@@ -142,8 +142,8 @@ export async function launchAuditBrowser() {
             }
             return false;
           };
-          const subnav = els('.topbar nav[aria-label="Primary"] > .control-button, .topbar .header-actions:not(.homepage-actions) > .control-button');
-          const clipped = els('main a, main button, .topbar a, .topbar button, footer a, form input, pre, table').filter(e => {
+          const subnav = els('.topbar nav[aria-label="Primary"] > .control-button, .topbar .header-actions:not(.homepage-actions) > :is(.control-button,.btn), .blog-nav > a, .cookbook-directory nav > .btn');
+          const clipped = els('main a, main button, header a, header button, footer a, form input, pre, table, main .panel, main .card').filter(e => {
             const r = e.getBoundingClientRect();
             return (r.left < -2 || r.right > innerWidth + 2) && !contained(e);
           }).slice(0,18).map(e => ({tag:e.tagName,id:e.id,className:String(e.className),text:text(e),...box(e)}));
@@ -159,9 +159,33 @@ export async function launchAuditBrowser() {
           });
           const overflow = els('pre,table').filter(e => e.scrollWidth > e.clientWidth + 2 &&
             !/(auto|scroll)/.test(getComputedStyle(e).overflowX) && !contained(e)).map(e => ({tag:e.tagName,text:text(e),...box(e)}));
+          const rgb = color => color.match(/^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*1)?\\)$/)?.slice(1).map(Number);
+          const luminance = values => values.map(v => v/255).map(v => v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4)
+            .reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);
+          const gold = els('a,button:not([disabled])').flatMap(e => {
+            const style = getComputedStyle(e);
+            const bg=rgb(style.backgroundColor), fg=rgb(style.color);
+            if (!bg || !fg || bg[0]<180 || bg[1]<100 || bg[0]<bg[1]*1.05 || bg[1]<bg[2]*1.5) return [];
+            const values = [luminance(bg),luminance(fg)];
+            return [{text:text(e),ratio:Math.round((Math.max(...values)+0.05)/(Math.min(...values)+0.05)*100)/100}];
+          });
+          const overlap = subnav.flatMap((e,i) => subnav.slice(i+1).flatMap(next => {
+            const a=e.getBoundingClientRect(), b=next.getBoundingClientRect();
+            return Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1
+              ? [[text(e),text(next)]] : [];
+          }));
+          const rail = links.find(l => {
+            const url = new URL(l.href, location.href);
+            return ['https://bitcoinstratigraphy.com',location.origin].includes(url.origin) &&
+              ((url.pathname==='/' && url.hash==='#enterprise-licensing') ||
+               /^\\/(enterprise|audit|developers|docs)\\/?$/.test(url.pathname));
+          });
           return {width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,
             subnav:subnav.map(e=>({text:text(e),...box(e),scrollWidth:e.scrollWidth,clientWidth:e.clientWidth})),
-            clipped,overflow,links,images,disclosures};
+            clipped,overflow,rail,gold,overlap,images,disclosures,
+            sales:links.filter(l=>/contact sales|enterprise sizing|book a demo|schedule a call|request a quote/i.test(l.text) ||
+              /^mailto:.*(?:sales|licensing)@/i.test(l.href)),
+            scanner:els('[data-testid="button-run-scan"]').map(text)};
         })()`);
         const result = await evaluate(`(async () => {
           const copies = [], variants = [];

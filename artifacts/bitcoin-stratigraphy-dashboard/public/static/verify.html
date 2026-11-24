@@ -79,6 +79,7 @@ dd.empty{color:hsl(var(--mfg))}
 .warn{border-left:3px solid hsl(var(--accent))}
 .side{display:grid;gap:14px;align-content:start}
 footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:hsl(var(--mfg));display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+footer a{color:hsl(var(--primary));text-underline-offset:3px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .proto{margin-top:14px;border-left:3px solid hsl(var(--primary))}
 .proto .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -239,7 +240,7 @@ footer{margin-top:18px;font:9px var(--mono);letter-spacing:.06em;text-transform:
   <p class="hint">This verifies signed terms and expiration using your clock. It does not independently verify the Bitcoin transaction, copyright ownership, current key revocation, or legal enforceability. Never trust a key supplied only by the certificate.</p>
  </form>
 </section>
-<footer><span>Bitcoin Stratigraphy · Article 12 verifier · article12-ed25519-v1</span><span>Self-contained · works from file://</span></footer>
+<footer><span>Bitcoin Stratigraphy · Article 12 verifier · article12-ed25519-v1</span><a href="https://bitcoinstratigraphy.com/developers" target="_blank" rel="noopener noreferrer">MCP Integration (opens online)</a><span>Self-contained · works from file://</span></footer>
 </div>
 <script>
 /* Offline waiver verifier: exported pure logic is shared with deterministic tests. */

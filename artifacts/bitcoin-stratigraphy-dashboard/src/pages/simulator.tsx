@@ -233,8 +233,8 @@ export default function SimulatorPage() {
               <TrustBadges />
             </div>
             <div className="header-actions">
-              <EnterpriseLicenseLink />
               <Article12VerifierLink />
+              <EnterpriseLicenseLink />
               <WhitepaperLink />
               <Link href="/" className="control-button" data-testid="link-home">
                 <ArrowLeft size={14} /> Dashboard

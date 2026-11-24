@@ -168,3 +168,17 @@ mtime_ms = 1795531785030
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/cb303b38-61e9-4730-9283-b9ed64dee8ac/eed751fa-8c5c-4e5e-b32e-95ee8bbf0ffc"
 storage_version_token = "1795531902961652"
 content_type = "text/html"
+
+[[outputs]]
+id = "gEIG3CwDPlTZwpvnRmM5o"
+uri = "file://generated-artifacts/full-site-audit-and-fix-report.html"
+type = "html"
+title = "Full-Site Audit & Fix Report"
+description = "Mobile and desktop PASS/FIXED scorecards for all 33 audited routes, before-and-after details, screenshots, and the exact changed-file list."
+logical_id = "6f6dda73-ff29-4ab9-97c8-32c81f3dbaeb"
+content_hash = "sha256:fbc73f8e94335719779c9f838474b04db3f35c58556f8d6ccd180463bef6f0d2"
+size = 307119
+mtime_ms = 1795533559329
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/6f6dda73-ff29-4ab9-97c8-32c81f3dbaeb/a6a4b6e1-50bf-4bd9-a086-686e3893adcb"
+storage_version_token = "1795533565904871"
+content_type = "text/html"

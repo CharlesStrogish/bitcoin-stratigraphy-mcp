@@ -97,7 +97,7 @@ body.blog-document *::after {
   position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 42px;
   padding: 0 13px;
   border: 1px solid hsl(var(--b-line));
   color: hsl(var(--b-text));

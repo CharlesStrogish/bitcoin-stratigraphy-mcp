@@ -109,7 +109,27 @@ export async function auditBuiltSite({ mobile = true, responsive = false } = {})
         const phone = await browser.inspect(base + route, responsive ? 375 : 390, { height: responsive ? 812 : 1000, responsive });
         failures.push(...inspectHtml(phone.html, `${route} [mobile]`).failures, ...phone.errors.map((error) => `${route}: mobile console error: ${error}`));
         if (phone.scrollWidth > phone.width + 1) failures.push(`${route}: mobile page overflow ${phone.scrollWidth}/${phone.width}`);
-        if (responsive) responsiveChecks.push({ route, mobile: phone.layout, desktop: rendered.layout });
+        if (responsive) {
+          responsiveChecks.push({ route, mobile: phone.layout, desktop: rendered.layout });
+          for (const view of [phone.layout, rendered.layout]) {
+            const context = `${route} @ ${view.width}×${view.height}`;
+            if (view.scrollWidth > view.width) failures.push(`${context}: horizontal page overflow`);
+            if (!view.rail) failures.push(`${context}: no visible conversion path`);
+            for (const field of ["clipped", "overflow", "images", "overlap", "sales"]) {
+              if (view[field].length) failures.push(`${context}: ${field}: ${JSON.stringify(view[field])}`);
+            }
+            for (const button of view.subnav) {
+              if (button.height < 40 || button.scrollWidth > button.clientWidth + 1)
+                failures.push(`${context}: sub-navigation target: ${JSON.stringify(button)}`);
+            }
+            for (const disclosure of view.disclosures) {
+              if (!disclosure.works) failures.push(`${context}: stuck disclosure ${disclosure.text}`);
+            }
+            for (const button of view.gold) {
+              if (button.ratio < 4.5) failures.push(`${context}: low-contrast gold control ${button.text} (${button.ratio}:1)`);
+            }
+          }
+        }
       }
       pages.push(route);
     }
@@ -162,6 +182,21 @@ export async function auditBuiltSite({ mobile = true, responsive = false } = {})
           failures.push(`${url} (${width}): fragment not visible below sticky header: ${JSON.stringify(state)}`);
         if (state.hash === "#enterprise-licensing" && (!state.checkout || state.tiers !== 4 || !state.licensee || !state.identifier || state.licenseeTop >= state.height))
           failures.push(`${url} (${width}): waiver target does not contain the four tiers and licensee form`);
+      }
+    }
+    if (responsive) {
+      for (const [width, height] of [[375, 812], [1440, 900]]) {
+        for (const [url, selector] of [
+          ["/whitepaper", '[data-testid="link-enterprise-licensing"]'],
+          ["/", '[data-testid="link-live-escrow"]'],
+          ["/", '[data-testid="link-article12-sandbox"]'],
+          ["/developers#dev-prepaid", undefined],
+        ]) {
+          const state = await browser.checkAnchor(base + url, width, selector, false, height);
+          anchorChecks.push({ url, width, selector, ...state });
+          if (!state.hash || state.top === undefined || state.top < state.headerBottom - 1 || state.top >= height)
+            failures.push(`${url} (${width}×${height}): CTA target not in view below the header: ${JSON.stringify(state)}`);
+        }
       }
     }
   } finally {

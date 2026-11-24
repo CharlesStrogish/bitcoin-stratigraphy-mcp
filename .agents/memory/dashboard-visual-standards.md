@@ -77,3 +77,12 @@ a bridge into the simulation, with breathing room below the live terminal.
 
 **How to apply:** Preserve this live-first hierarchy when reorganizing the
 preview; it is separate from the homepage placement rule above.
+
+Public subpage navigation needs uniform targets at least 40 px high across
+320–1440 px. On mobile, give the Article 12 Verifier its own full-width row
+instead of letting it shrink beside shorter controls.
+
+**Why:** The shared label broke into a tall, narrow control on small screens.
+
+**How to apply:** Keep the verifier's visual position and keyboard order aligned,
+and apply the subpage layout separately from the approved homepage hero.

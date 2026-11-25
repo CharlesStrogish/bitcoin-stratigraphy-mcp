@@ -49,8 +49,10 @@ export default function AnchorNavigation() {
             measureHeader();
             target.scrollIntoView({
               block: "start",
+              // Keep the checkout form immediately visible, even on long pages.
               behavior:
                 event &&
+                id !== "enterprise-licensing" &&
                 !window.matchMedia("(prefers-reduced-motion: reduce)").matches
                   ? "smooth"
                   : "instant",

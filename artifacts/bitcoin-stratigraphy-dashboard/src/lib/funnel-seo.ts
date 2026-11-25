@@ -5,14 +5,14 @@ export const FUNNEL_PAGES = [
     path: "developers",
     title: "BitcoinStratigraphy MCP Server | L402 Agentic Payments",
     description:
-      "AI failover protocols and LLM disaster recovery for enterprise swarms: integrate native Lightning continuity, L402 payments and 19 MCP tools with Bitcoin Stratigraphy.",
+      "AI failover protocols and LLM disaster recovery: Lightning continuity, L402 payments, and 19-tool capacity across 6 namespaces. Discover the host's enabled tools.",
     url: pageUrl("/developers"),
   },
   {
     path: "audit",
-    title: "AI Article 12 Compliance Audit | ZK-Indemnity",
+    title: "Article 12 Heuristic Prompt Risk Scan | Bitcoin Stratigraphy",
     description:
-      "Run an instant, cryptographically verified EU AI Act compliance scan on your enterprise AI prompts using Lightning Network settlement.",
+      "Run a paid keyword-based prompt risk review with a SHA-256 report hash. Results support evidence review, not legal certification, ZK proof, or Bitcoin timestamp.",
     url: pageUrl("/audit"),
   },
 ] as const;

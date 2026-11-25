@@ -37,7 +37,7 @@ test("landing copy and crawler metadata expose the three registry architecture p
   const software = schema["@graph"].find(node => node["@type"] === "SoftwareApplication");
   assert.equal(
     html.match(/<meta name="description" content="([^"]+)"/)[1],
-    "Enterprise L402 Central Bank for AI. Earn 21% yield with 1-line Python/Node SDKs. Secure swarms with spend circuit breakers and Ed25519 Truth Receipts.",
+    "Non-custodial L402 notary for AI. Verify Ed25519 receipts, anchor Bitcoin state, enforce spend controls, and accrue qualifying 21% Agent Yield credits.",
   );
   for (const tag of ["og:description", "twitter:description"]) {
     const content = html.match(new RegExp(`<meta (?:name|property)="${tag}" content="([^"]+)"`))[1];

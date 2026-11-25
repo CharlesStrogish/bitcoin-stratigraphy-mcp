@@ -5,7 +5,7 @@ import { pageUrl, siteUrl } from "./site";
 export const COMPLIANCE_TITLE =
   "EU AI Act Article 12 Compliance Sandbox | Bitcoin Stratigraphy";
 export const COMPLIANCE_DESCRIPTION =
-  "Simulate autonomous L402 proof-of-execution and ensure your multi-agent swarms meet EU AI Act Article 12 compliance with RFC 6962 Merkle flight recorders.";
+  "Explore a client-side evidence preview and RFC 6962 Merkle flight recorders supporting EU AI Act Article 12 record-keeping, not regulatory certification.";
 export const COMPLIANCE_URL = pageUrl("/compliance");
 
 export const COMPLIANCE_ARTICLE = {

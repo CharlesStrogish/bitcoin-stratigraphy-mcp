@@ -1,7 +1,7 @@
 ---
-title: "How to Make Autonomous AI Agents EU AI Act-Compliant Using Groth16 Proofs and Stripe"
+title: "Supporting EU AI Act Record-Keeping with AI Evidence and Prepaid Scanner Access"
 date: "2026-11-10"
-description: "Explore EU AI Act compliance workflows for autonomous AI agents, Groth16 proofs, and Stripe-to-Lightning enterprise integrations."
+description: "Explore tamper-evident AI evidence, scoped Groth16 verification, and separate prepaid scanner procurement supporting EU AI Act record-keeping."
 slug: "eu-ai-act-compliance-agents"
 ---
 
@@ -17,18 +17,18 @@ However, a critical gap exists in the enterprise adoption of L402:
 ## The Zero-Knowledge Flight Recorder
 To resolve the audit gap, enterprise agents must be equipped with a "cryptographic flight recorder." Rather than logging raw, sensitive prompts and outputs, the agent's actions are hashed and submitted to a centralized stratigraphy engine. 
 
-Using Groth16 cryptographic receipts, the engine returns a mathematical proof that a specific action occurred at a specific time, executing a specific heuristic scan. This proof can be verified by any third-party auditor or regulatory body, mathematically guaranteeing the integrity of the agent's history without ever exposing the underlying corporate data. 
+Signed receipts and retained Merkle commitments bind captured bytes to an issuer or trusted checkpoint. Groth16 proofs establish only the relation encoded by the selected circuit; they do not prove arbitrary agent actions or an exact execution time. The heuristic scanner's hash is not a zero-knowledge proof. Auditors need the original logs and applicable verification evidence to assess the recorded history.
 
 ## Bridging Fiat to Machine Micropayments
-To solve the finance gap, engineering teams can now utilize a dedicated B2B fiat-to-Lightning bridge. By wrapping the L402 payment requirements in a traditional SaaS billing model, companies can fund their AI fleets without altering their accounting practices.
+Engineering teams can purchase prepaid heuristic scanner access through Stripe-hosted Checkout. This is distinct from native Lightning L402 pay-per-call access and is not a general-purpose fiat-to-Lightning wallet or subscription.
 
-For example, a corporate engineering manager can securely purchase a **$500 Enterprise API Block** using a standard corporate credit card via Stripe. This fiat transaction automatically funds a dedicated treasury wallet, minting an enterprise Macaroon that grants the organization's AI agents **100 prepaid heuristic scanner calls valid for 30 days**. 
+The **$500 Enterprise API Block** purchases **100 prepaid heuristic scanner calls valid for 30 days** through Stripe. The corresponding BTC Scanner Pack is quoted at **$450 in BTC**; the Heavy Swarm Pack is **$4,000 in BTC** for 1,000 calls over 90 days. Fulfillment issues a scoped scanner credential after the required payment checks; it does not create a general-purpose customer treasury wallet.
 
-The agents consume these calls autonomously via the Model Context Protocol (MCP), generating Groth16 cryptographic receipts for every action. The finance team gets a standard Stripe fiat invoice; the compliance team gets a zero-knowledge audit trail; the AI agent gets instant, programmatic access to 19 distinct A-graded telemetry and processing tools.
+The scanner credential authorizes the heuristic scanner, not blanket access to all MCP tools or an AGPLv3 waiver. The separate platform has 19-tool capacity across 6 namespaces: 16 frozen core contracts, one additional payment utility, and two host-enabled clearing tools. Discover the enabled catalog on the connected host. Scanner results and their hashes are not Groth16 proofs or regulatory certification.
 
 ## Implementing the Trojan Horse
 For developers tasked with bringing their AI agents into compliance, building this cryptographic infrastructure from scratch is a multi-month engineering distraction.
 
 Instead, enterprise teams can integrate a drop-in boilerplate directly into frameworks like LangChain or CrewAI. By cloning a standard Zero-Knowledge Flight Recorder template, developers can instantly wire their agents to a live L402 data engine, securely handling the cryptographic handshakes and Macaroon storage behind the scenes. 
 
-The transition to the machine economy requires enterprise guardrails. By combining Stripe fiat onboarding, L402 machine payments, and Groth16 cryptographic auditing, organizations can unleash their autonomous agents with complete legal and financial confidence.
+Stripe prepaid procurement, L402 payments, and cryptographic evidence serve different roles. Organizations must assess their own legal duties, spending controls, retention policies, and proof scope before deploying autonomous agents.

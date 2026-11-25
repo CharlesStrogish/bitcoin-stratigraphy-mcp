@@ -1,77 +1,79 @@
 ---
-title: "Eradicating AI Hallucinations: Grounding Autonomous Swarms with Thermodynamic Bitcoin Telemetry"
+title: "Detecting AI State Drift: Grounding Autonomous Swarms with Bitcoin Telemetry"
 date: "2026-11-17"
 dateModified: "2026-11-17"
 slug: "eradicating-ai-hallucinations-bitcoin-telemetry"
-description: "How enterprise AI architects are using L402-gated MCP tools and OpenTimestamps to eliminate LLM hallucinations and pass zero-trust security audits."
+description: "Use L402-gated MCP telemetry, signed receipts, and OpenTimestamps to detect state drift and retain tamper-evident evidence for AI swarm review."
 authorName: "Charles Strogish"
 authorUrl: "https://bitcoinstratigraphy.com"
 publisherLogo: "https://bitcoinstratigraphy.com/static/bitcoin-stratigraphy-mcp-logo.jpeg"
 ---
 
-With over 2.2 billion autonomous agents expected to come online in the next few years, enterprise engineering teams are facing an acute crisis: **AI swarms hallucinate.**
+Enterprise engineering teams face a practical risk: **AI swarms can hallucinate.**
 
 Whether you are deploying LangChain, CrewAI, or AutoGPT, Large Language Models operate probabilistically. When an autonomous agent lacks an immutable anchor to objective reality, it invents one. In a sandboxed weekend project, a hallucination is a nuisance. In an enterprise financial or compliance deployment, it is a catastrophic liability.
 
-To build the #1 Enterprise Data Engine for autonomous AI swarms, I realized that prompting wasn't the solution. The solution was physics. At [BitcoinStratigraphy.com](https://bitcoinstratigraphy.com), we have engineered a zero-trust architecture that forces AI agents to verify their outputs against thermodynamic Bitcoin telemetry and OpenTimestamps before they are permitted to execute a state change.
+At [BitcoinStratigraphy.com](https://bitcoinstratigraphy.com), signed telemetry and retained cryptographic evidence give applications concrete checks for payload integrity and state drift. Applications must explicitly verify that evidence and enforce their own stop policies before allowing a state change. The service does not automatically validate every output of an arbitrary AI agent.
 
 ## The Problem with Probabilistic Swarms
 
-When a multi-agent system runs a complex reasoning loop, context degrades over time. If an agent is tasked with auditing a dataset or executing a financial smart contract, it cannot rely on its own generated logic. It requires an external, un-forgeable source of truth.
+When a multi-agent system runs a complex reasoning loop, context can drift. An agent auditing a dataset needs independently checked inputs and explicit execution policies, not just confidence in its generated reasoning.
 
-Traditional databases can be altered, rolled back, or spoofed. Thermodynamic Bitcoin state cannot.
+Bitcoin commitments can make later modifications detectable under the relevant consensus and verification assumptions. They do not make an incorrect source measurement true.
 
-By vending this telemetry through a Model Context Protocol (MCP) data server, we equip your agents with a Zero-Knowledge flight recorder. Every decision is cryptographically anchored to a specific block height, proving exactly *when* an agent made a decision and *what* data it used to make it.
+The MCP server exposes signed telemetry and proof-producing paths. RFC 6962-style Merkle flight recorders commit to ordered log bytes; detached OpenTimestamps receipts can later provide independently verifiable Bitcoin inclusion evidence. A pending calendar receipt is not a confirmed Bitcoin anchor. These records do not prove an exact legal execution time, the truth of arbitrary statements, or every decision an agent made. A Merkle path is not itself a zero-knowledge proof.
 
-## Validating the Architecture: A 1,064-Point Zero-Vulnerability Audit
+## Reviewing the Historical 1,064-Test Audit Report
 
-Enterprise architecture requires more than theoretical whitepapers. It requires cryptographic proof of resilience.
+Enterprise architecture requires evidence with a clear scope and stated limitations.
 
-Before releasing this infrastructure to production, we subjected the Bitcoin Stratigraphy data engine to a 12-hour continuous penetration and logic audit. We deployed a swarm of paid Claude Opus 5.5 agents on MAX Mode (the highest available thinking protocol) to aggressively hammer the core API, the L402 circuit breakers, and our NIP-98 authentication layer.
+The published historical report describes a 12-hour review of the core API, L402 circuit breakers, and NIP-98 authentication.
 
-The final artifact output? **1,064 passed tests and zero vulnerabilities.**
+Its stated result was **1,064 passed tests and zero vulnerabilities detected within the reported scope**. This historical summary is not the current test count or proof that the software has no vulnerabilities.
 
-This is the standard required for Fortune 500 CISOs operating under Article 12 of the EU AI Act. (The raw machine-readable audit log and its SHA-256 cryptographic hash are available for verification on our `/security` page).
+The `/security` page provides the published machine-readable summary and its SHA-256 hash. A matching hash establishes artifact consistency, not auditor identity, security certification, or EU AI Act compliance. Article 12 record-keeping also requires appropriate application logging, retention, and operational governance.
 
 ## Implementing the L402 Interceptor in CrewAI
 
-To leverage this telemetry, your swarm needs to handle machine-to-machine micropayments autonomously. Our backend utilizes an automated Brevo-to-Stripe fulfillment loop via the L402 protocol, ensuring agents only pay for the exact cryptographic proofs they consume.
+Native MCP payment challenges use Lightning L402. Stripe-hosted card checkout is a separate prepaid Scanner Pack purchase flow, not a way to automatically solve arbitrary Lightning invoices. Neither API tolls nor Scanner Packs grant an AGPLv3 commercial copyright waiver.
 
-Here is a simplified architectural breakdown of how an enterprise Python application intercepts the `402 Payment Required` challenge when querying our MCP tools:
+This example inspects a native challenge without paying it. Use an approved wallet and the supported SDK to verify the invoice, enforce a spend cap, and retry the exact request only after obtaining the matching payment proof:
 
 ```python
 import requests
-import json
-from auth.macaroon import solve_challenge
 
-def fetch_thermodynamic_state(agent_query, tool_endpoint="https://api.bitcoinstratigraphy.com/v1/telemetry"):
-    # Step 1: Agent attempts to access the restricted MCP tool
-    response = requests.get(tool_endpoint)
-
-    # Step 2: The Bitcoin Stratigraphy Engine issues an L402 Challenge
+def inspect_telemetry_challenge():
+    response = requests.post(
+        "https://bitcoinstratigraphy.com/mcp",
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+            "MCP-Protocol-Version": "2026-07-28",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "stratigraphy.get", "arguments": {}},
+        },
+        timeout=30,
+        allow_redirects=False,
+    )
     if response.status_code == 402:
-        authenticate_header = response.headers.get('WWW-Authenticate')
-
-        # Step 3: Agent automatically solves the invoice (Fiat-to-Lightning via Stripe)
-        macaroon, preimage = solve_challenge(authenticate_header)
-
-        # Step 4: Agent re-requests the telemetry with the L402 Authorization
-        headers = {
-            'Authorization': f'L402 {macaroon}:{preimage}'
-        }
-        secure_response = requests.get(tool_endpoint, headers=headers)
-
-        return secure_response.json()
-
+        challenge = response.headers.get("WWW-Authenticate")
+        if not challenge:
+            raise RuntimeError("Payment challenge header is missing")
+        return {"payment_required": True, "challenge": challenge}
+    response.raise_for_status()
     return response.json()
 ```
 
 ## The 21% Algorithmic Handshake
 
-Eradicating hallucinations isn't just about risk mitigation; it is highly profitable for the orchestrators who build it.
+Verifiable inputs can support risk controls, but do not guarantee that an AI system will stop hallucinating or become profitable.
 
-We hard-coded an unalterable financial incentive directly into the permanent code of the Bitcoin Stratigraphy engine. Lead Architects and syndicate resellers who build their applications on top of our infrastructure receive a mathematically guaranteed **21% Agent Yield** on every L402 transaction routed through their master tab.
+Qualifying paid executions accrue **21% programmatic Agent Yield credits**, allocated as **15% upstream origin + 6% verifying caller**. Credits can offset API tolls under the applicable authentication and eligibility rules. This is not guaranteed fiat income, an automatic wallet payout, or an allocation from clearing escrow principal.
 
-You secure your AI agents, you achieve drop-in EU AI Act compliance, and your infrastructure generates programmatic yield simultaneously.
+Applications remain responsible for their own security, custody model, regulatory obligations, and review of retained evidence.
 
-The truth is now one call away. Plug your agents into the engine and stop the hallucinations today.
+Verify the payload, retain the original evidence, and stop execution when your checks fail.

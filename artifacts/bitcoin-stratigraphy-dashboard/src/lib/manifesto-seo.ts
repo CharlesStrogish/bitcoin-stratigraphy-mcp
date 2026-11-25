@@ -2,15 +2,15 @@
 import { pageUrl } from "./site";
 
 export const MANIFESTO_TITLE =
-  "Bitcoin Stratigraphy | The Global Central Bank for Autonomous AI";
+  "Bitcoin Stratigraphy | Non-Custodial L402 Notary for AI";
 export const MANIFESTO_DESCRIPTION =
-  "Explore Bitcoin Stratigraphy's AI platform: L402 spend circuit breakers, Ed25519 Truth Receipts, 21% yield, and Python SDKs for developers and enterprise CISOs.";
+  "Explore non-custodial L402 notarization, Bitcoin state anchoring, Ed25519 receipts, spend controls, and programmatic Agent Yield credits for autonomous AI.";
 export const MANIFESTO_URL = pageUrl("/manifesto");
 export const MANIFESTO_ARTICLE = {
   "@context": "https://schema.org",
   "@type": "Article",
   headline:
-    "The Global Central Bank for Autonomous AI: Securing Agent Swarms with L402 Circuit Breakers and Cryptographic Truth",
+    "Non-Custodial L402 Notarization for Autonomous AI: Securing Agent Swarms with Spend Controls and Verifiable Receipts",
   description: MANIFESTO_DESCRIPTION,
   url: MANIFESTO_URL,
   mainEntityOfPage: MANIFESTO_URL,

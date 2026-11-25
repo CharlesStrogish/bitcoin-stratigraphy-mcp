@@ -182,3 +182,17 @@ mtime_ms = 1795533559329
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/6f6dda73-ff29-4ab9-97c8-32c81f3dbaeb/a6a4b6e1-50bf-4bd9-a086-686e3893adcb"
 storage_version_token = "1795533565904871"
 content_type = "text/html"
+
+[[outputs]]
+id = "fZ8B4pAltGGQ3GJOU6kCW"
+uri = "file://generated-artifacts/zero-contradiction-audit-report.html"
+type = "html"
+title = "Zero-Contradiction Audit Report"
+description = "Nine exact branding dispositions; file-by-file findings; full compliance and blog Before → After diffs; all 19 modified test lines, including both approved hashes; 33-route metadata scorecard and verification results."
+logical_id = "be246be5-28ef-4bb1-81bb-d9e663ed9164"
+content_hash = "sha256:46ea154da616370731c474bda5615fb31de2c1926181d2940742fa9e9783c802"
+size = 47226
+mtime_ms = 1795576395897
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:0dee9e2c-20d4-4b54-9d7a-4035b113f10f/be246be5-28ef-4bb1-81bb-d9e663ed9164/ce205d39-7c66-49a1-9ee2-3ab87521bdbc"
+storage_version_token = "1795576404213801"
+content_type = "text/html"

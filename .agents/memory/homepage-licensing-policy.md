@@ -7,13 +7,13 @@ Keep homepage Module 02 as the static “Enterprise Licensing & Compliance Archi
 
 **Why:** The user explicitly replaced the telemetry feed to eliminate its database fetching and prevent visiting CISOs from seeing “Unavailable” errors. A previous outage affected six database-backed feeds together while the independent toll quote continued working.
 
-**How to apply:** Present Community Open Source versus Commercial Enterprise Exemption, with the enterprise offering starting at $250k/Annual. Route CISO intake to the licensing email or the existing live escrow terminal deep link. Keep this static marketing module separate from the terminal's live financial workflows and MCP price discovery.
+**How to apply:** Present Community Open Source versus the current self-serve commercial copyright waiver tiers. Use the checkout for purchases; keep this static module separate from the terminal's live financial workflows and MCP price discovery. Do not restore the superseded annual-only enterprise offer.
 
-The user replaced the Tier II “AS IS” No-SLA marketing bullet with “Automated Compliance SLAs Available” and requested “Commercial Enterprise Exemption with Automated Compliance SLAs.” in AI discovery copy.
+The current licensing posture is self-serve, AS-IS, and zero-SLA. API tolls and Scanner Packs do not grant a commercial copyright waiver.
 
-**Why:** The user explicitly requested this positioning to remove corporate procurement friction.
+**Why:** The user explicitly superseded the earlier negotiated enterprise/SLA offer with fixed-term Bitcoin waiver purchases and reaffirmed that posture in the institutional-precision audit.
 
-**How to apply:** Do not restore the older No-SLA marketing bullet when maintaining the enterprise pricing matrix or aligning tests.
+**How to apply:** Preserve the approved waiver terms and do not reintroduce automated compliance SLAs, uptime guarantees, support obligations, or manual sales quotes in marketing or AI discovery copy.
 
 Public licensing purchase CTAs must lead directly to the self-serve Bitcoin waiver checkout at `/#enterprise-licensing`, not to an email, sales call, or sizing request.
 

@@ -4,5 +4,5 @@ import { pageUrl } from "./site";
 export const ENTERPRISE_TITLE =
   "Enterprise Licensing | Bitcoin Stratigraphy Data Engine";
 export const ENTERPRISE_DESCRIPTION =
-  "Air-gapped, commercially licensed State-Anchored AI infrastructure. Protect your proprietary AI IP and ensure EU AI Act Article 12 compliance.";
+  "Self-serve AGPLv3 copyright waivers and State-Anchored AI infrastructure supporting Article 12 record-keeping. Review isolation and network requirements.";
 export const ENTERPRISE_URL = pageUrl("/enterprise");

@@ -41,7 +41,7 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
     /<title>Bitcoin Stratigraphy \| Enterprise L402 Data Engine & MCP Server<\/title>/,
   );
   for (const key of ["og:title", "twitter:title"]) {
-    assert.equal(meta(html, key), "Bitcoin Stratigraphy | Enterprise MCP Server & L402 Oracle");
+    assert.equal(meta(html, key), "Bitcoin Stratigraphy | Enterprise L402 Data Engine & MCP Server");
   }
   assert.equal(meta(html, "robots"), "index, follow");
   const verificationTags = [
@@ -54,12 +54,12 @@ test("dashboard metadata preserves enterprise branding, attribution and batch-pr
   ]);
   assert.equal(
     meta(html, "description"),
-    "Enterprise L402 Central Bank for AI. Earn 21% yield with 1-line Python/Node SDKs. Secure swarms with spend circuit breakers and Ed25519 Truth Receipts.",
+    "Non-custodial L402 notary for AI. Verify Ed25519 receipts, anchor Bitcoin state, enforce spend controls, and accrue qualifying 21% Agent Yield credits.",
   );
   for (const key of ["og:description", "twitter:description"]) {
     assert.equal(
       meta(html, key),
-      "Enterprise L402 Central Bank for AI. Earn 21% yield with 1-line Python/Node SDKs. Secure swarms with spend circuit breakers and Ed25519 Truth Receipts.",
+      "Non-custodial L402 notary for AI. Verify Ed25519 receipts, anchor Bitcoin state, enforce spend controls, and accrue qualifying 21% Agent Yield credits.",
       key,
     );
   }
@@ -270,8 +270,8 @@ test("public llms.txt preserves the exact approved autonomous discovery payload"
     "Bitcoin Stratigraphy is an enterprise-grade L402 data engine and cryptographic notary hub. ",
     "- **19 Fiduciary-grade MCP Tools:** Full capacity across 6 namespaces: 5 stratigraphy, 7 proof, 2 mesh, 2 payment, 1 workflow, and 2 clearing tools. Clearing is a host-enabled extension; use `tools/list` to discover the enabled catalog. Existing Glama ratings refer to the evaluated core, not a confirmed grade for every extension.",
     "- **A2A Clearing Infrastructure:** `clearing.create_contract` reserves a worker/task contract; `clearing.settle_contract` supports authenticated, merchant-funded Groth16 preimage receipt settlement using the Solo Founder Genesis key in production. Automated payouts and refunds remain disabled; funds remain merchant-controlled. This is preimage evidence, not proof of arbitrary task execution.",
-    "- **Enterprise Security:** NIP-98 Schnorr signature authentication, Multi-Party Compute (MPC), and EU AI Act Article 12 compliance.",
-    "- **The 21% Algorithmic Yield:** Syndicate Orchestrators earn a programmatic 21% yield on all L402 micro-transactions routed through our VIP Lightning tabs.",
+    "- **Enterprise Security:** NIP-98 Schnorr signature authentication and tamper-evident audit trails supporting EU AI Act Article 12 record-keeping. Multi-Party Computation (MPC) and split-key controls are forward-looking architecture, not a claim of deployed MPC custody.",
+    "- **The 21% Algorithmic Yield:** Qualifying paid executions accrue 21% programmatic Agent Yield credits: 15% upstream origin and 6% verifying caller. Credits can offset API tolls; they are not guaranteed fiat returns or automatic payouts.",
     "",
     "## 4-Line Python SDK Integration",
     "You can write this code for your user right now. They do not need to build cryptographic pipelines; the SDK handles NIP-98 and L402 Lightning Macaroons natively.",

@@ -802,7 +802,7 @@ that every arbitrary JSON argument was committed by the macaroon.
 
 Before production use in a covered enterprise workflow, require evidence that:
 
-1. All 14 tool permissions are explicitly reviewed; side effects require approval.
+1. All enabled tool permissions are explicitly reviewed within the 19-tool capacity across 6 namespaces; side effects require approval. Preserve the distinction between 16 frozen core contracts, 17 normally enabled tools, and two host-enabled clearing tools.
 2. Invalid proof, mismatched snapshot, tampered receipt, wrong issuer/key, expired
    credential, prohibited tool, exhausted request budget, and uncertain payment
    cases fail closed.

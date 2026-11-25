@@ -54,7 +54,7 @@ test("manifesto serves its full article, metadata and conversion links without o
   const plugin = enterpriseSeoPlugin();
   const template = load("artifacts/bitcoin-stratigraphy-dashboard/index.html");
   const html = plugin.transformIndexHtml.handler(template, { path: "/manifesto/" });
-  assert.match(html, /<title>Bitcoin Stratigraphy \| The Global Central Bank for Autonomous AI<\/title>/);
+  assert.match(html, /<title>Bitcoin Stratigraphy \| Non-Custodial L402 Notary for AI<\/title>/);
   assert.equal((html.match(/<h1>/g) ?? []).length, 1);
   for (const section of [
     "fiduciary-armor", "fiduciary-oracle", "developer-friction", "canonical-tools",
@@ -118,12 +118,12 @@ test("security attestation is public, prerendered and interlinked without changi
       "max_spend_sats",
       "tool_name:timestamp:contentSha256",
       "FiduciaryTamperingError",
-      "guaranteeing zero risk of runaway context billing.",
+      "they do not guarantee zero billing risk.",
     ]) assert.ok(html.includes(text), text);
-    assert.match(html, /name="description" content="[^"]*1,064-test zero-vulnerability/);
+    assert.match(html, /name="description" content="[^"]*historical 1,064-test audit report/);
     const text = html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
-    assert.ok(text.includes("Payload Tampering Rejection: Passed 100% in the exhaustive audit of the fully deployed 19-tool core. 1-byte mutation tests on the tool_name:timestamp:contentSha256 payload successfully triggered a FiduciaryTamperingError, proving the un-forgeability of the entire current suite."));
-    assert.ok(text.includes("Your swarm is only as secure as its data engine. Deploy the Bitcoin Stratigraphy MCP today to achieve drop-in EU AI Act compliance, eradicate LLM hallucinations, and capture a guaranteed 21% Agent Yield on all routed L402 transactions."));
+    assert.ok(text.includes("Payload Tampering Rejection: The historical report records rejection of 1-byte mutations to the tool_name:timestamp:contentSha256 payload with a FiduciaryTamperingError. This is evidence for the tested receipt path, not proof of universal security or coverage of all 19 tools. Current capacity spans 6 namespaces: 16 frozen core contracts, one additional payment utility, and two host-enabled clearing tools; enabled catalogs vary by host."));
+    assert.ok(text.includes("Deploy Bitcoin Stratigraphy MCP for verifiable payload integrity, spend controls, and tamper-evident audit trails supporting EU AI Act Article 12 record-keeping. Qualifying paid executions accrue 21% programmatic Agent Yield credits: 15% upstream origin and 6% verifying caller. These controls do not certify regulatory compliance, eliminate LLM hallucinations, or guarantee financial returns."));
     assert.ok(html.indexOf('id="machine-readable-verification"') < html.indexOf('id="enterprise-deployment"'));
     assert.ok(html.indexOf('id="enterprise-deployment"') < html.indexOf('aria-label="Continue reading"'));
     assert.match(html, /<section id="enterprise-deployment" class="panel sec-deployment" aria-labelledby="enterprise-deployment-title">/);

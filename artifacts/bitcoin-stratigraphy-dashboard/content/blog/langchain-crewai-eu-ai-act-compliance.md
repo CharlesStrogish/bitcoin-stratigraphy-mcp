@@ -1,17 +1,17 @@
 ---
-title: "Securing LangChain & CrewAI Swarms: Drop-In EU AI Act Compliance via Zero-Knowledge MCPs"
+title: "Securing LangChain & CrewAI Swarms: Tamper-Evident MCP Records for Article 12 Review"
 date: "2026-11-13"
 slug: "langchain-crewai-eu-ai-act-compliance"
-description: "How enterprise engineering teams are using L402 micropayments, NIP-98 kill switches, and a Zero-Knowledge flight recorder to secure autonomous AI swarms against regulatory failure."
+description: "Use L402 payments, NIP-98 identity binding, and retained Merkle evidence to support Article 12 record-keeping for LangChain and CrewAI swarms."
 ---
 
 As enterprise engineering teams scale autonomous AI swarms using orchestration frameworks like LangChain, AutoGPT, and CrewAI, a massive structural vulnerability is emerging in production environments: **liability without traceability.**
 
-Deploying a multi-agent swarm to autonomously execute tasks, query proprietary corporate databases, and trigger external APIs without a mathematically verifiable chain-of-custody is a direct violation of emerging global regulatory standards, most notably Article 12 of the EU AI Act. 
+High-risk AI deployments require appropriate event-recording controls under Article 12 of the EU AI Act. Cryptographically verifiable commitments can support evidence review, but Article 12 does not prescribe a specific blockchain or automatically make every deployment without one unlawful.
 
 When an autonomous swarm hallucinates a destructive action, leaks proprietary context, or falls victim to an indirect prompt injection attack, standard plaintext server logs are entirely insufficient for post-mortem audits. Risk management teams, compliance officers, and enterprise CISOs now require cryptographic, immutable proof of an agent’s exact execution history. 
 
-Bitcoin Stratigraphy was architected to solve this natively. By operating as a premier Layer-402 Model Context Protocol (MCP) Notary Hub, we provide drop-in regulatory compliance, distributed DDoS deflection, and secure machine-to-machine payment infrastructure for enterprise AI deployments. 
+Bitcoin Stratigraphy provides a non-custodial L402 notary and Bitcoin state-anchoring layer with tamper-evident records, admission controls, and scoped machine-to-machine payments. These are implementation controls, not drop-in regulatory compliance.
 
 ## The Emerging Threat: Liability Without Traceability
 
@@ -22,26 +22,26 @@ If Agent C executes a catastrophic API call—such as deleting a production data
 ### The Failure of Traditional Logging
 Currently, most engineering teams attempt to solve this by dumping agent context windows into traditional vector databases, REST outputs, or internal telemetry dashboards like Datadog or Splunk. For an enterprise CISO, this presents two fatal architectural flaws:
 
-1. **Proprietary Data and PII Leakage:** Storing raw AI context windows in central, searchable databases exposes highly sensitive corporate Intellectual Property (IP) and Personally Identifiable Information (PII). This immediately violates strict data residency laws like GDPR and HIPAA. You cannot secure a system by creating a centralized honeypot of plaintext agent thoughts.
+1. **Proprietary Data and PII Leakage:** Centralized raw context storage can expose sensitive corporate IP and personal data if access, minimization, retention, and applicable transfer controls are inadequate. Centralized storage is not inherently unlawful; GDPR and HIPAA obligations depend on the data, parties, jurisdiction, and safeguards.
 2. **The Mutability of Plaintext Logs:** Traditional logging relies entirely on internal trust. Plaintext logs can be easily spoofed, altered, or deleted by a compromised agent, an internal bad actor, or a network intruder. Regulators do not accept mutable spreadsheets as proof of compliance.
 
 To safely deploy autonomous swarms into high-stakes production environments, engineering teams need a **Zero-Knowledge Flight Recorder**—an architecture that anchors agent actions in objective truth without exposing the underlying payload.
 
 ## Enter the Zero-Knowledge Flight Recorder
 
-Bitcoin Stratigraphy is an enterprise-grade L402 data engine featuring 19 natively integrated, A-Graded Model Context Protocol (MCP) tools designed explicitly for autonomous AI agents. 
+Bitcoin Stratigraphy supports 19-tool capacity across 6 namespaces. The 16 frozen core contracts and additional payment utility are distinct from two host-enabled clearing tools. Use discovery to inspect the connected host's enabled catalog; a core registry evaluation is not an independently confirmed grade for every extension.
 
 Instead of relying on trusted central servers, our infrastructure requires autonomous agents to cryptographically anchor their execution traces to the thermodynamic truth of the Bitcoin base layer. 
 
 ### Thermodynamic Anchoring via OpenTimestamps
-When an agent utilizes our MCP endpoints, thousands of agent thoughts and state changes are compressed into a single Merkle root. Using OpenTimestamps, this root is mathematically anchored to a Bitcoin block. This creates a time-stamped, un-cheat-able cryptographic receipt of the agent's execution history. 
+Applications can commit captured events to a Merkle root and request a detached OpenTimestamps receipt. Calendar acceptance is pending evidence until Bitcoin inclusion is verified. Retain the original log bytes and trusted checkpoints; ordinary MCP calls do not automatically capture every agent thought.
 
-During a regulatory audit, the enterprise can present a Groth16 Zero-Knowledge proof. This mathematically proves that a specific agent took a specific action at a specific time, *without* having to reveal the proprietary contents of the agent's context window to the public. 
+During review, auditors can verify supported Groth16 relations against the corresponding circuit and public signals. A proof does not establish arbitrary actions, an exact execution time, or regulatory compliance. Signed receipts and Merkle paths are separate evidence types, not automatically zero-knowledge proofs.
 
 ### The NIP-98 Enterprise Kill Switch
-Beyond auditing, CISOs need active countermeasures. Every agent request routed through the Bitcoin Stratigraphy Notary Hub requires strict NIP-98 identity binding. 
+Beyond auditing, CISOs need active countermeasures. NIP-98 binds identity on the paths that require it; public discovery and anonymous paid access are distinct from identity-bound operations.
 
-This enables corporate risk teams to mathematically validate Ed25519 signatures and RFC 6962 Merkle inclusion proofs completely offline. If a swarm commander detects a compute-exhaustion drain attack or anomalous behavior, they can trigger our Enterprise NIP-98 Kill Switch. This instantly and permanently severs the compromised agent's cryptographic keys from the network.
+Risk teams can verify supported Ed25519 signatures and Merkle inclusion evidence offline using retained bytes and independently trusted keys or roots. Spending latches and scoped credential revocation protect their covered authorization paths. NIP-98 authenticates requests; it is not a universal kill switch that destroys a key or removes an agent from every network.
 
 ## Standardizing Procurement: The Fiat-to-Lightning L402 Bridge
 
@@ -51,9 +51,9 @@ Autonomous agents cannot hold corporate credit cards, and traditional corporate 
 
 Bitcoin Stratigraphy bridges this protocol gap seamlessly. 
 
-Engineering managers secure API access for their swarms via a standard **$500 Enterprise API Block** using a traditional Stripe checkout. This fiat transaction automatically funds a dedicated, isolated treasury wallet on our backend, instantly minting a secure L402 Macaroon (a verifiable, cryptographically signed digital bearer token). 
+Engineering managers can purchase a **$500 Enterprise API Block** through Stripe-hosted Checkout for 100 heuristic scanner calls valid for 30 days. The native Scanner Pack is **$450 in BTC**; the Heavy Swarm Pack is **$4,000 in BTC** for 1,000 calls over 90 days. After the required payment checks, fulfillment issues a scoped scanner macaroon, not an isolated customer treasury wallet or universal MCP credential.
 
-This Macaroon is injected directly into the autonomous agent's environment variables, granting the swarm 100 prepaid heuristic scanner calls. Our Nostr Wallet Connect (NWC) pipeline enforces hardcoded treasury caps, mathematically protecting corporate budgets from runaway LLM loops. 
+The purchaser must deliver and store the credential securely; the service does not inject secrets into an unrelated agent's environment. Scanner credits do not grant an AGPLv3 waiver. Native Lightning L402 calls use separate payment challenges, with configured SDK spend limits and wallet policies controlling the covered payment paths.
 
 ## Drop-In Integration for LangChain & CrewAI
 
@@ -62,31 +62,21 @@ Wiring your agents to the Bitcoin Stratigraphy notary hub requires zero structur
 ### LangChain Implementation
 
 ```python
-import os
 import asyncio
-from langchain.agents import AgentExecutor
-from mcp.client.stdio import stdio_client
-from stratigraphy.auth import MacaroonAuthenticator
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
 
-# 1. Initialize the L402 Macaroon granted from the $500 Stripe fiat procurement block
-macaroon_token = os.getenv("STRATIGRAPHY_MACAROON")
-auth = MacaroonAuthenticator(token=macaroon_token)
-
-# 2. Connect the LangChain Swarm to the Bitcoin Stratigraphy MCP Server
-server_parameters = stdio_client.ServerParameters(
-    command="npx",
-    args=["-y", "@bitcoinstratigraphy/mcp-server"],
-    env={"MACAROON_AUTH": auth.serialize()}
-)
-
-async def run_compliant_langchain_swarm():
-    async with stdio_client(server_parameters) as (read, write):
+async def discover_enabled_tools():
+    # Read-only MCP discovery; no prepaid scanner token or payment is needed.
+    async with streamable_http_client(
+        "https://bitcoinstratigraphy.com/mcp"
+    ) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
-            # The swarm now has access to 19 A-graded telemetry and zk-proof tools
-            mcp_tools = await session.list_tools()
-            print("LangChain Swarm secured. Zero-Knowledge Flight Recorder active.")
+            tools = await session.list_tools()
+            print([tool.name for tool in tools.tools])
+
+asyncio.run(discover_enabled_tools())
 ```
 
 ## Scale Safely with Bitcoin Stratigraphy

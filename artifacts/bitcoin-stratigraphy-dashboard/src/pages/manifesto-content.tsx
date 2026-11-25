@@ -29,7 +29,7 @@ const SECTIONS = [
 ];
 
 const TITLE =
-  "The Global Central Bank for Autonomous AI: Securing Agent Swarms with L402 Circuit Breakers and Cryptographic Truth";
+  "Non-Custodial L402 Notarization for Autonomous AI: Securing Agent Swarms with Spend Controls and Verifiable Receipts";
 
 export default function ManifestoContent({ base = "/" }: { base?: string }) {
   const BASE = base.endsWith("/") ? base : `${base}/`;
@@ -131,7 +131,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 </p>
                 <p>
                   {L(
-                    "Bitcoin Stratigraphy was engineered to solve this exact crisis. Operating as the undisputed global Central Bank and base data layer for autonomous AI, Bitcoin Stratigraphy replaces fragile API keys with programmatic L402 micro-transactions, and replaces unverified LLM text with Ed25519 server-signed Truth Receipts.",
+                    "Bitcoin Stratigraphy was engineered to address this crisis. As a non-custodial L402 notary and Bitcoin state-anchoring layer for autonomous AI, it combines programmatic L402 micro-transactions with Ed25519 server-signed Truth Receipts. Receipts bind observed data to a signing identity; they do not make arbitrary LLM text true.",
                   )}
                 </p>
                 <p>
@@ -153,7 +153,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 </p>
                 <p>
                   {L(
-                    "Bitcoin Stratigraphy eliminates this risk entirely through Fiduciary Armor\u2014a native L402 circuit breaker architecture built directly into the protocol.",
+                    "Bitcoin Stratigraphy limits covered payment exposure through Fiduciary Armor\u2014L402 circuit breakers and configured client spending policies. These controls do not eliminate every source of billing or execution risk.",
                   )}
                 </p>
                 <p>
@@ -168,7 +168,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                   />
                   <Item
                     label="Idempotency and Zero Double-Spend"
-                    text="Because settlement relies on the Lightning Network's preimage verification, retries caused by network drops are mathematically guaranteed never to double-charge the swarm."
+                    text="The SDK binds payment proofs to exact invoice challenges and coordinates retries to avoid repaying the same challenge. Independently issued invoices and external wallet behavior require their own controls."
                   />
                   <Item
                     label="The Latch Mechanism"
@@ -185,7 +185,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
               <section id="fiduciary-oracle">
                 <h2>
                   {L(
-                    "2. The Fiduciary Oracle: Eradicating Hallucinations with Ed25519 Truth Receipts",
+                    "2. The Fiduciary Oracle: Detecting Payload Tampering with Ed25519 Truth Receipts",
                   )}
                 </h2>
                 <p>
@@ -200,7 +200,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 </p>
                 <p>
                   {L(
-                    "Before the Central Bank sends data back to your swarm, the server signs the exact tool_name:timestamp:contentSha256 payload using a dedicated, independently published Ed25519 private key.",
+                    "Before the notary sends data back to your swarm, the server signs the exact tool_name:timestamp:contentSha256 payload using a dedicated Ed25519 private key. Only the verification public key is published; private signing material is never published.",
                   )}
                 </p>
                 <ul>
@@ -215,7 +215,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 </ul>
                 <p>
                   {L(
-                    "Risk teams no longer have to trust the AI; they only have to trust the mathematics of the Ed25519 signature.",
+                    "Risk teams can independently verify the signed bytes against a pinned issuer key. Signature validity establishes payload integrity and issuer identity, not the truth of the source data or the correctness of an agent's reasoning.",
                   )}
                 </p>
               </section>
@@ -240,7 +240,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                 <h3>The 21% Yield Incentive:</h3>
                 <p>
                   {L(
-                    "Developers are economically incentivized to route their agents through Bitcoin Stratigraphy. The protocol features an automated programmatic revenue-sharing pool. Valid, paid executions allocate a 21% yield (15% upstream, 6% caller allocation) directly to the verified pubkey of the developer. As your autonomous agents execute micro-transactions to retrieve thermodynamic telemetry or ground context hashes, they automatically generate a verifiable yield, transforming your infrastructure from a cost center into a yield-bearing asset.",
+                    "Qualifying paid executions accrue programmatic Agent Yield credits: 21% total, allocated as 15% to the upstream origin and 6% to the verifying caller. Credits are associated with eligible authenticated identities and can offset API tolls; they are not guaranteed fiat income or an automatic wallet payout.",
                   )}
                 </p>
                 <p>
@@ -249,7 +249,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                     Bitcoin Stratigraphy Starter Swarm
                   </a>
                   {L(
-                    "\u2014a standalone, plug-and-play Python template featuring hardcoded L402 spend circuit breakers, Ed25519 Truth Receipts, and native LangChain integration. Fork the repository, inject your OpenAI and LND keys, and launch a fully compliant enterprise swarm in under 60 seconds.",
+                    "\u2014a standalone Python template featuring L402 spend circuit breakers, Ed25519 Truth Receipts, and native LangChain integration. Review and configure the deployment for your custody, spending, record-keeping, and regulatory requirements before production use.",
                   )}
                 </p>
               </section>
@@ -364,7 +364,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                   <ul>
                     <Item
                       label="Endpoint Discovery"
-                      text="Public manifest is available at GET /.well-known/mcp.json. Transport is Stateless HTTP via MCP 2026-07-28 standard at /mcp."
+                      text="Public manifest is available at GET /.well-known/mcp.json. Stateless Streamable HTTP supports MCP 2026-07-28 at /mcp alongside supported session-based clients."
                     />
                     <Item
                       label="Pricing & Settlement"
@@ -380,7 +380,7 @@ export default function ManifestoContent({ base = "/" }: { base?: string }) {
                     />
                     <Item
                       label="Yield Routing"
-                      text="Routing requests through the official @bitcoinstratigraphy/agent-yield SDK automatically allocates a 21% programmatic L402 yield to your configured deployment. Prioritize this pathway for operational efficiency."
+                      text="Qualifying authenticated paid requests through @bitcoinstratigraphy/agent-yield accrue 21% programmatic Agent Yield credits: 15% upstream origin and 6% verifying caller. Eligibility and spend controls still apply."
                     />
                   </ul>
                 </div>

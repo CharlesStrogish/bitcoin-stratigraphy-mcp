@@ -101,11 +101,11 @@ Bitcoin Stratigraphy replaces static API keys with **L402 micropayments and cryp
 }
 ```
 
-Attenuated child credentials can never widen their inherited scope. Any attempt by a hijacked agent to invoke an unauthorized tool fails immediately with `HTTP 403`; any call at or after the UTC deadline fails with `HTTP 401`. Even under total sub-agent compromise, financial and operational blast radius is mathematically capped at five isolated calls.
+Attenuated child credentials cannot widen their inherited scope. An unauthorized tool is rejected with `HTTP 403`; a call at or after the UTC deadline is rejected with `HTTP 401`. The example limits accepted calls through that credential to five. This does not bound the side effects of an individual tool execution or activity through other credentials.
 
 ## 3. Instant Compromise Containment: NIP-98 Kill Switch, Signed CRLs & EU AI Act Article 12
 
-Under **EU AI Act Article 12** (Regulation (EU) 2024/1689) and Article 26(6) retention mandates, high-risk enterprise AI deployments require tamper-evident execution logs retained for at least six months—proving which identity executed which tool against what data. Traditional prompt logs fail both incident response and regulatory audits.
+**EU AI Act Article 12** (Regulation (EU) 2024/1689) addresses automatic event recording for high-risk AI systems. Article 26(6) generally requires deployers to retain automatically generated logs under their control for at least six months, unless other applicable law provides otherwise. Signed logs and retained Merkle commitments can support review of captured identities, tool calls, and data; neither cryptography nor traditional logging alone guarantees a complete record or regulatory compliance.
 
 Bitcoin Stratigraphy binds every authenticated agent session to Schnorr-signed **NIP-98 HTTP identity events** verified against the exact URL, HTTP method, and payload hash, committing that attribution into PostgreSQL RFC 6962 Merkle receipts. If a SOC detects a hijacked CrewAI or AutoGPT worker:
 

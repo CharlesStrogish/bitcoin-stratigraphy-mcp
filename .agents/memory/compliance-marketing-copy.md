@@ -3,11 +3,11 @@ name: Compliance marketing copy
 description: User's verbatim marketing-copy requirements for compliance surfaces and the SDK README.
 ---
 
-Use the exact original copy the user supplied for the enterprise compliance sandbox page. Do not add qualifications, corrections, labels, or warnings to that page's UI.
+Preserve approved compliance marketing copy except where it conflicts with the user's superseding institutional-precision policy: correct confirmed factual, legal, custody, pricing, proof-scope, or regulatory overclaims.
 
-**Why:** The user explicitly approved it as enterprise-tier marketing copy, not a binding legal contract, and rejected modifications to its wording.
+**Why:** The user originally required verbatim marketing copy, then explicitly authorized a full-site contradiction audit and corrections to the compliance page's confirmed contradictions. Do not restore the superseded overclaims.
 
-**How to apply:** Preserve the supplied wording when maintaining this page, except for the user's superseding self-serve waiver terms below. This instruction is specific to the compliance marketing page; it does not authorize changing existing simulator behavior or other enterprise pages.
+**How to apply:** Keep unrelated approved wording and layout. Do not imply that API use alone requires publishing unrelated proprietary code or model weights, that cryptographic evidence certifies compliance, or that a license makes network-dependent services offline. Preserve prose-hash assertions when updating approved copy, and never substitute them for the frozen MCP contract snapshot.
 
 The user superseded legacy SLA, manually negotiated licensing, and fixed native
 scanner-price copy with verbatim zero-SLA AS-IS terms for prepaid packs and

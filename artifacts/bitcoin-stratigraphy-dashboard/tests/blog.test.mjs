@@ -14,7 +14,7 @@ const { parseBlogPost, readBlogPosts } = await tsImport(
 const { blogPlugin, renderBlogDocument, blogSchema, blogSitemap } =
   await tsImport("../blog-plugin.ts", import.meta.url);
 const title =
-  "How to Make Autonomous AI Agents EU AI Act-Compliant Using Groth16 Proofs and Stripe";
+  "Supporting EU AI Act Record-Keeping with AI Evidence and Prepaid Scanner Access";
 const origin = "https://bitcoinstratigraphy.com";
 const fixture = ({
   title = "Enterprise engineering",

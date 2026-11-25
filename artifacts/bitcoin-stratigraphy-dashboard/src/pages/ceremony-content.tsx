@@ -17,7 +17,7 @@ export default function CeremonyContent({
 }: { markdown: string; base?: string }) {
   const BASE = base.endsWith("/") ? base : `${base}/`;
   const blocks = parseMarkdown(markdown);
-  const title = "The Genesis Ceremony: Securing the Autonomous Central Bank";
+  const title = "The Genesis Ceremony: Securing the L402 Notary";
   const sections = blocks.flatMap((b) => (b.kind === "heading" && b.level === 2 ? [b.text] : []));
 
   return (
@@ -39,13 +39,13 @@ export default function CeremonyContent({
         <main>
           <section className="panel cr-hero" aria-labelledby="cr-ethos">
             <div className="eyebrow">
-              <span className="eyebrow-line" /> OFFICIAL ETHOS / FIDUCIARY CENTRAL BANK
+              <span className="eyebrow-line" /> OFFICIAL ETHOS / NON-CUSTODIAL L402 NOTARY
             </div>
             <figure className="cr-quote">
               <blockquote id="cr-ethos" data-testid="text-ethos">
                 <p>&ldquo;Deterministic data for AI swarms. Trustless clearing for autonomous capital.&rdquo;</p>
               </blockquote>
-              <figcaption>Official ethos of the Fiduciary Central Bank</figcaption>
+              <figcaption>Official ethos of the non-custodial L402 notary</figcaption>
             </figure>
             <div className="cr-hero-foot">
               <div>

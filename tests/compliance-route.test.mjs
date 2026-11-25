@@ -85,7 +85,7 @@ test("compliance marketing copy preserves approved text with live escrow pricing
   assert.doesNotMatch(blocks.join("\n"), /\$250k|Automated Compliance SLAs/);
   assert.equal(
     createHash("sha256").update(blocks.join("\n")).digest("hex"),
-    "d88d8fbcc663aaca9d117497fc4c2da6a60f57ef5df0e8ccea0b924e3d978499",
+    "0ebaaf5212f56d2c8d35d1080ef2be27922e6caa518db4402c157c46822eead2",
   );
 });
 
@@ -129,8 +129,8 @@ test("compliance solution and enterprise exemption include the exact approved cr
   walk(renderPage(), (node) => {
     if (node.type === "section") sections[node.props.id] = text(node).replace(/\s+/gu, " ").trim();
   });
-  assert.ok(sections.solution.includes("NIP-98 Agent Identity Binding: Satisfies Article 12 chain-of-custody requirements by using Schnorr signatures to mathematically authenticate exactly which autonomous sub-agent executed a decision, anchoring their identity permanently into the Merkle receipt."));
-  assert.ok(sections.licensing.includes("Cryptographic Tool Integrity: Defeats LLM tool-poisoning attacks by hashing and signing all MCP tool descriptions via an immutable Ed25519 public manifest."));
+  assert.ok(sections.solution.includes("NIP-98 Agent Identity Binding: Schnorr signatures authenticate the key signing an identity-bound HTTP request. Binding that identity into a Merkle receipt supports provenance review; it does not independently prove which software process executed a decision or satisfy every Article 12 requirement."));
+  assert.ok(sections.licensing.includes("Cryptographic Tool Integrity: Clients can pin and verify the Ed25519-signed tool manifest to detect changed metadata. A valid signature is not a guarantee against every tool-poisoning or prompt-injection attack."));
   assert.ok(sections.licensing.includes("Stateless Horizontal Scaling: Upgraded to the stateless MCP 2026-07-28 transport, completely removing session bottlenecks for high-concurrency agent swarms."));
 });
 
@@ -165,9 +165,9 @@ test("dual funnels prerender exact SEO metadata and keep scanner and escrow iden
   const input = read("index.html");
   for (const [route, title, description] of [
     ["developers", "BitcoinStratigraphy MCP Server | L402 Agentic Payments",
-      "AI failover protocols and LLM disaster recovery for enterprise swarms: integrate native Lightning continuity, L402 payments and 19 MCP tools with Bitcoin Stratigraphy."],
-    ["audit", "AI Article 12 Compliance Audit | ZK-Indemnity",
-      "Run an instant, cryptographically verified EU AI Act compliance scan on your enterprise AI prompts using Lightning Network settlement."],
+      "AI failover protocols and LLM disaster recovery: Lightning continuity, L402 payments, and 19-tool capacity across 6 namespaces. Discover the host's enabled tools."],
+    ["audit", "Article 12 Heuristic Prompt Risk Scan | Bitcoin Stratigraphy",
+      "Run a paid keyword-based prompt risk review with a SHA-256 report hash. Results support evidence review, not legal certification, ZK proof, or Bitcoin timestamp."],
   ]) {
     for (const suffix of ["", "/"]) {
       const html = plugin.transformIndexHtml.handler(input, { path: `/${route}${suffix}` });

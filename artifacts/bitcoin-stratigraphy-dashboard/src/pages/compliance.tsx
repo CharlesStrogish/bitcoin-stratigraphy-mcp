@@ -119,24 +119,24 @@ export default function CompliancePage() {
           <section id="problem" className="panel cmp-sec">
             <h2>1. The Enterprise Compliance Problem</h2>
             <p>
-              Under Article 12 of the EU AI Act, organizations deploying high-risk autonomous AI systems must ensure the automatic, tamper-proof recording of events throughout the system's lifetime. When a regulatory auditor investigates an AI agent's decision six months after execution, standard IT logs are legally insufficient. A traditional log file can be quietly edited, overwritten, or deleted by a system administrator without leaving a trace, entirely breaking the chain of custody. If an enterprise cannot cryptographically prove that an agent's execution trace was complete, unaltered, and properly governed, they face severe regulatory penalties.
+              Article 12 of the EU AI Act addresses automatic event recording for high-risk AI systems. Ordinary logs can be edited, overwritten, or deleted unless appropriate controls are applied. Cryptographic commitments can help detect changes to retained logs, but Article 12 does not universally mandate Bitcoin anchoring or make ordinary IT logs legally insufficient. Organizations remain responsible for logging scope, retention, access controls, and applicable legal requirements.
             </p>
           </section>
 
           <section id="solution" className="panel cmp-sec">
             <h2>2. The L402 + RFC 6962 Solution</h2>
             <p>
-              The Bitcoin Stratigraphy Data Engine solves the Article 12 mandate natively by replacing mutable databases with mathematically non-repudiable state-anchoring. We combine two protocols to create an enterprise-grade "Flight Recorder" for multi-agent swarms:
+              The Bitcoin Stratigraphy Data Engine provides cryptographic evidence that can support Article 12 record-keeping. Applications integrate event capture and retain original logs alongside commitments; the following controls do not independently establish regulatory compliance:
             </p>
             <ul>
               <li>
                 <strong>L402 Micro-Settlements:</strong> Autonomous agents do not wait for human procurement. They programmatically fund their own execution traces using Lightning Network micro-settlements with a current 24-sat (~$0.02) toll preview and dynamic server pricing, bypassing API key bottlenecks and credit card walls.
               </li>
               <li>
-                <strong>RFC 6962 Merkle Evidence:</strong> Every agent thought, context window, and tool execution is hashed into an append-only Merkle tree. If a single comma in a historical agent log is altered, the cryptographic root hash fractures, immediately alerting auditors to tampering.
+                <strong>RFC 6962 Merkle Evidence:</strong> Captured events can be committed to an ordered Merkle tree. Verification detects changes to committed bytes against a trusted retained root. Integrators must capture the required events and retain checkpoints; hashing alone does not prove completeness or automatically alert auditors.
               </li>
               <li>
-                <strong>NIP-98 Agent Identity Binding:</strong> Satisfies Article 12 chain-of-custody requirements by using Schnorr signatures to mathematically authenticate exactly which autonomous sub-agent executed a decision, anchoring their identity permanently into the Merkle receipt.
+                <strong>NIP-98 Agent Identity Binding:</strong> Schnorr signatures authenticate the key signing an identity-bound HTTP request. Binding that identity into a Merkle receipt supports provenance review; it does not independently prove which software process executed a decision or satisfy every Article 12 requirement.
               </li>
             </ul>
           </section>
@@ -165,14 +165,14 @@ export default function CompliancePage() {
           <section id="licensing" className="panel cmp-sec">
             <h2>4. Enterprise Air-Gapped Licensing</h2>
             <p>
-              The public Bitcoin Stratigraphy network operates under the AGPLv3 Open-Source License. If you connect your proprietary internal AI swarms to the public network, the AGPLv3 legally mandates that you open-source your entire proprietary AI codebase and model weights to the public. For massive technology corporations that cannot expose proprietary agent logic, we provide self-serve <strong>AGPLv3 Commercial Copyright Waivers</strong>: $2,500/30 days or $25,000/365 days per swarm, and $25,000/30 days or $250,000/365 days for a global organization, quoted in BTC at spot.
+              Bitcoin Stratigraphy is available under AGPLv3. Merely calling a public API does not by itself require publication of an unrelated proprietary codebase or model weights. Obligations depend on how the covered software is modified, combined, conveyed, or offered over a network; review the license for your deployment. We provide separate self-serve <strong>AGPLv3 Commercial Copyright Waivers</strong>: $2,500/30 days or $25,000/365 days per swarm, and $25,000/30 days or $250,000/365 days for a global organization, quoted in BTC at spot.
             </p>
             <p>A confirmed waiver supports:</p>
             <ul>
               <li>Complete IP Protection: A time-locked waiver from AGPLv3 Section 13 network source-disclosure requirements for the purchased term.</li>
               <li>Air-Gapped Deployment: The legal right to deploy the Notary Hub and Escrow Oracle entirely on-premises or within isolated internal networks.</li>
-              <li>Zero-Telemetry Sovereign Guarantee: 100% offline, self-contained execution with zero vendor backdoors, network phone-home pings, or third-party dependencies.</li>
-              <li><strong>Cryptographic Tool Integrity:</strong> Defeats LLM tool-poisoning attacks by hashing and signing all MCP tool descriptions via an immutable Ed25519 public manifest.</li>
+              <li>Local Deployment Controls: Configure local telemetry and review service dependencies for isolated deployments. Lightning settlement, public Bitcoin data, and public timestamp calendars require network access unless replaced with suitable local infrastructure; a waiver does not itself make the system air-gapped.</li>
+              <li><strong>Cryptographic Tool Integrity:</strong> Clients can pin and verify the Ed25519-signed tool manifest to detect changed metadata. A valid signature is not a guarantee against every tool-poisoning or prompt-injection attack.</li>
               <li><strong>Stateless Horizontal Scaling:</strong> Upgraded to the stateless MCP 2026-07-28 transport, completely removing session bottlenecks for high-concurrency agent swarms.</li>
             </ul>
             <p>{"All prepaid MCP Macro-Macaroons, Scanner Packs, and AGPLv3 Commercial Copyright Waivers are 100% self-serve and provided STRICTLY AS-IS, WITH ALL FAULTS. Zero SLAs, zero uptime warranties, zero indemnity, zero custom MSAs, zero vendor questionnaires, and zero support obligations. Full source code is publicly inspectable under AGPLv3 for independent self-hosting. Payment for a Commercial Copyright Waiver strictly grants a time-locked, non-negotiable waiver from AGPLv3 Section 13 network source-disclosure requirements for the specified term, anchored cryptographically to your confirmed Bitcoin transaction."}</p>

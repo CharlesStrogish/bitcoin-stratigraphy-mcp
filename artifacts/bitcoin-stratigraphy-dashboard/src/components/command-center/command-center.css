@@ -32,6 +32,46 @@
   color: hsl(var(--muted-foreground));
 }
 
+.cc-capability-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 24px;
+}
+.cc-capability-card {
+  min-width: 0;
+  padding: clamp(18px, 2vw, 24px);
+  border: 1px solid hsl(var(--primary) / 0.25);
+  background: hsl(var(--card));
+  overflow-wrap: anywhere;
+}
+.cc-capability-card h3 {
+  margin: 0 0 12px;
+  color: hsl(var(--primary));
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.cc-capability-card p {
+  max-width: none;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.cc-capability-featured {
+  border-color: hsl(var(--primary) / 0.5);
+  border-inline-start: 3px solid hsl(var(--primary));
+  background: linear-gradient(hsl(var(--primary) / 0.035), hsl(var(--primary) / 0.035)),
+    hsl(var(--card));
+}
+@media (min-width: 768px) {
+  .cc-capability-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cc-capability-featured {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Module shell */
 .cc-module {
   min-width: 0;

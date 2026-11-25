@@ -21,14 +21,14 @@ const publicSite = read("artifacts/api-server/src/lib/public-site.ts");
 test("landing copy and crawler metadata expose the three registry architecture pillars", () => {
   const copy = commandCenter.replace(/\s+/g, " ");
   for (const title of [
-    "The 21% Algorithmic Handshake:",
-    "VIP Credit Tabs:",
-    "Distributed Hashcash DDoS Shield:",
-  ]) assert.ok(copy.includes(`<strong>${title}</strong>`), title);
+    "The 21% Algorithmic Handshake",
+    "VIP Credit Tabs",
+    "Distributed Hashcash DDoS Shield",
+  ]) assert.ok(copy.includes(`<h3>${title}</h3>`), title);
   for (const phrase of [
-    "Programmatic 21% AI agent yield credits extend operational runways.",
-    "Batch tolls and bypass per-call L402 Lightning payments for high-reputation NIP-98 identities, then settle the tab once.",
-    "SHA-256 Proof-of-Work deflects compute-exhaustion bots before invoice creation.",
+    "Programmatic 21% Agent Yield credits automatically accrue to qualifying swarm identities, offsetting API tolls and extending autonomous operational runways.",
+    "Batch tolls and bypass per-call L402 Lightning friction for high-reputation NIP-98 identities, settling accrued usage cleanly on a single tab.",
+    "SHA-256 Proof-of-Work challenges deflect compute-exhaustion bots before invoice creation, protecting endpoints and Lightning capacity under load.",
   ]) assert.ok(copy.includes(phrase), phrase);
   const html = read(`${dashboard}/index.html`);
   const schema = JSON.parse(
@@ -53,27 +53,27 @@ const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 test("enterprise vault copy positions MPC and split-key controls as a forward-looking model", () => {
   const copy = commandCenter.replace(/\s+/g, " ");
   assert.ok(
-    copy.includes("<strong>Cryptographic Vault for AI Swarms:</strong>"),
+    copy.includes("<h3>Cryptographic Vault Architecture (Forward-Looking)</h3>"),
   );
   for (const phrase of [
-    "For Fortune 500 risk teams",
-    "the architecture is built to support a forward-looking Multi-Party Compute (MPC) and Split-Key Security model",
-    "for sovereign AI treasuries.",
-    "The target control invariant: no single server holds a master orchestration key.",
+    "Engineered for institutional risk teams planning",
+    "Multi-Party Computation (MPC) and split-key security",
+    "for sovereign AI treasuries,",
+    "targeting a strict control invariant where no single server holds a master orchestration key.",
   ]) assert.ok(copy.includes(phrase), phrase);
 });
 
 test("landing invites white-label resellers to earn Commander yield on the shared engine", () => {
   const copy = commandCenter.replace(/\s+/g, " ");
   assert.ok(
-    copy.includes("<strong>White-Label Resellers &amp; Syndicate Orchestrators:</strong>"),
+    copy.includes("<h3>White-Label Resellers &amp; Syndicate Orchestrators</h3>"),
   );
   for (const phrase of [
-    "White-label the engine, not the infrastructure.",
-    "Instead of spending millions attempting to rebuild L402 Lightning nodes and Hashcash defenses",
-    "operate as Commanders: route your users through Bitcoin Stratigraphy&apos;s backend master tab",
-    "pocket the 21% Agent Yield as your own profit margin.",
-    "the un-forkable &ldquo;Central Bank&rdquo; and base money layer.",
+    "White-label the experience, not the infrastructure.",
+    "Instead of spending millions building and maintaining L402 Lightning nodes, Hashcash defenses, and verification rails,",
+    "route your users through Bitcoin Stratigraphy's master tab",
+    "capture the programmatic 21% Agent Yield credit allocation to boost unit economics.",
+    "Build directly on a non-custodial L402 notary and Bitcoin state-anchoring layer.",
   ]) assert.ok(copy.includes(phrase), phrase);
 });
 

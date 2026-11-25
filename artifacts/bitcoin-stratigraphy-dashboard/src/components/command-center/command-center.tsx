@@ -21,37 +21,38 @@ export function CommandCenter() {
         <h2 id="command-center-title">
           Enterprise &amp; Machine-Native Command Center
         </h2>
-        <p>
-          <strong>Cryptographic Vault for AI Swarms:</strong>{" "}
-          For Fortune 500 risk teams, the architecture is built to support a
-          forward-looking Multi-Party Compute (MPC) and Split-Key Security model
-          for sovereign AI treasuries. The target control invariant: no single
-          server holds a master orchestration key.
-        </p>
-        <p>
-          <strong>The 21% Algorithmic Handshake:</strong>{" "}
-          Programmatic 21% AI agent yield credits extend operational runways.
-        </p>
-        <p>
-          <strong>VIP Credit Tabs:</strong>{" "}
-          Batch tolls and bypass per-call L402 Lightning payments for
-          high-reputation NIP-98 identities, then settle the tab once.
-        </p>
-        <p>
-          <strong>Distributed Hashcash DDoS Shield:</strong>{" "}
-          SHA-256 Proof-of-Work deflects compute-exhaustion bots before invoice
-          creation.
-        </p>
-        <p>
-          <strong>White-Label Resellers &amp; Syndicate Orchestrators:</strong>{" "}
-          White-label the engine, not the infrastructure. Instead of spending
-          millions attempting to rebuild L402 Lightning nodes and Hashcash
-          defenses, operate as Commanders: route your users through Bitcoin
-          Stratigraphy&apos;s backend master tab and pocket the 21% Agent Yield
-          as your own profit margin. Build your applications on Bitcoin
-          Stratigraphy, the un-forkable &ldquo;Central Bank&rdquo; and base money
-          layer.
-        </p>
+        <div className="cc-capability-grid">
+          <article className="cc-capability-card">
+            <h3>VIP Credit Tabs</h3>
+            <p>
+              Batch tolls and bypass per-call L402 Lightning friction for high-reputation NIP-98 identities, settling accrued usage cleanly on a single tab.
+            </p>
+          </article>
+          <article className="cc-capability-card">
+            <h3>Distributed Hashcash DDoS Shield</h3>
+            <p>
+              SHA-256 Proof-of-Work challenges deflect compute-exhaustion bots before invoice creation, protecting endpoints and Lightning capacity under load.
+            </p>
+          </article>
+          <article className="cc-capability-card">
+            <h3>The 21% Algorithmic Handshake</h3>
+            <p>
+              Programmatic 21% Agent Yield credits automatically accrue to qualifying swarm identities, offsetting API tolls and extending autonomous operational runways.
+            </p>
+          </article>
+          <article className="cc-capability-card">
+            <h3>Cryptographic Vault Architecture (Forward-Looking)</h3>
+            <p>
+              Engineered for institutional risk teams planning Multi-Party Computation (MPC) and split-key security for sovereign AI treasuries, targeting a strict control invariant where no single server holds a master orchestration key.
+            </p>
+          </article>
+          <article className="cc-capability-card cc-capability-featured">
+            <h3>White-Label Resellers &amp; Syndicate Orchestrators</h3>
+            <p>
+              White-label the experience, not the infrastructure. Instead of spending millions building and maintaining L402 Lightning nodes, Hashcash defenses, and verification rails, route your users through Bitcoin Stratigraphy's master tab and capture the programmatic 21% Agent Yield credit allocation to boost unit economics. Build directly on a non-custodial L402 notary and Bitcoin state-anchoring layer.
+            </p>
+          </article>
+        </div>
       </header>
       <SdkShowcase />
       <McpToolsMatrix />

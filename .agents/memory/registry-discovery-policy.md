@@ -35,3 +35,14 @@ mandatory for the enterprise SLA; editing evidence would invalidate its receipt.
 
 **How to apply:** Remove obsolete integration code and current marketing, but
 never rewrite or delete historical audit bundles to obtain a zero-match scan.
+
+SEP-2127 MCP cards describe static remote connectivity only: omit tool,
+resource, prompt and runtime capability lists, credentials, and internal hosts.
+Keep them additive and separate from legacy registry discovery; preserve legacy
+payloads and headers byte-for-byte.
+
+**Why:** The user explicitly requires minimal SEP-2127 domain discovery without
+changing existing directory integrations or MCP execution contracts.
+
+**How to apply:** Reuse public server identity and protocol metadata, and scope
+any new caching or CORS behavior to the new documents rather than legacy routes.

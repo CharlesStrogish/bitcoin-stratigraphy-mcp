@@ -30,6 +30,7 @@ export async function registerNavigationApi(app) {
         contents: `
         export { registerOpenApiRoute } from "./src/routes/openapi";
         export { registerMcpServerCardRoute } from "./src/routes/mcp-server-card";
+        export { registerSep2127DiscoveryRoutes } from "./src/routes/sep2127-discovery";
         export { registerToolIntegrityRoute } from "./src/routes/tool-integrity";
         export { registerStratigraphyRoutes } from "./src/routes/stratigraphy";
         export { mcpToolDefinitions } from "./src/routes/mcp";
@@ -68,6 +69,9 @@ export async function registerNavigationApi(app) {
       "/openapi.json",
       "/.well-known/mcp.json",
       "/.well-known/mcp/server-card.json",
+      "/.well-known/ai-catalog.json",
+      "/mcp/server-card",
+      "/server-card",
       "/.well-known/integrity.json",
       "/api/v1/cost",
       "/mcp",
@@ -89,6 +93,7 @@ export async function registerNavigationApi(app) {
     };
     routes.registerOpenApiRoute(capture);
     routes.registerMcpServerCardRoute(capture);
+    routes.registerSep2127DiscoveryRoutes(capture);
     const key = generateKeyPairSync("ed25519").privateKey;
     routes.registerToolIntegrityRoute(capture, routes.mcpToolDefinitions, key);
     routes.registerMcpDirectoryRoutes(capture);

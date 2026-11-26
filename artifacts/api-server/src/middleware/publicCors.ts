@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { LIMITATION_OF_LIABILITY } from "./liability-notice";
 import { CANONICAL_ORIGIN } from "../lib/public-site";
+import { isSep2127DiscoveryPath } from "../lib/sep2127-discovery";
 
 export const PUBLIC_ALLOWED_ORIGINS: readonly string[] = [
   CANONICAL_ORIGIN,
@@ -44,6 +45,15 @@ export function registerPublicCors(
         "X-L402-Subscription-Tiers",
       ].join(", "),
     });
+    // Apply only to the new static discovery documents, including preflights.
+    // Legacy discovery headers and non-discovery CORS remain byte-for-byte.
+    if (isSep2127DiscoveryPath(req.path)) {
+      res.set({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Expose-Headers": `${res.getHeader("Access-Control-Expose-Headers")}, ETag`,
+      });
+    }
     // A wildcard origin cannot be combined with credentialed browser CORS.
     res.removeHeader("Access-Control-Allow-Credentials");
     next();

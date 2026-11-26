@@ -17,6 +17,7 @@ import {
 } from "./routes/mcp";
 import { registerToolIntegrityRoute } from "./routes/tool-integrity";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
+import { registerSep2127DiscoveryRoutes } from "./routes/sep2127-discovery";
 import { pool as clearingPool } from "@workspace/db";
 import { ClearingContracts } from "./services/clearingContracts";
 import { logger } from "./lib/logger";
@@ -137,6 +138,7 @@ app.use(
   }),
 );
 registerPublicCors(app, createPublicWebRateLimitMiddleware(publicRateLimiter));
+registerSep2127DiscoveryRoutes(app);
 registerMcpRequestGuard(app);
 // This host already mounts clearing below; metadata does not activate settlement.
 registerMcpDirectoryRoutes(app, true);

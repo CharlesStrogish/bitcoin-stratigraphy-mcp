@@ -141,8 +141,9 @@ Configure `WAIVER_BTC_ZPUB` with the **mainnet BIP-84 public account zpub**
 exported by cold storage (depth 3; typically `m/84'/0'/0'`). Never enter a seed,
 mnemonic, WIF or private extended key. Each quote permanently reserves its own
 single-use native SegWit `bc1q...` deposit address at external path `0/<index>`.
-Verify the startup index-0 address against your cold wallet before accepting
-funds. The server never receives signing keys or spends Bitcoin.
+Independently verify the exported account against your cold wallet before
+accepting funds. Startup and readiness checks never derive or log addresses.
+The server never receives signing keys or spends Bitcoin.
 
 Quote creation is limited to five per client IP per hour, shared across server
 instances; `429` includes `Retry-After`. Indices are never reset or recycled,

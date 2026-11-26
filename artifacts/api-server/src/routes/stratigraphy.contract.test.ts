@@ -10,6 +10,8 @@ import {
   type McpBatchCostQuote,
 } from "@workspace/api-zod";
 import { createHash, createHmac } from "node:crypto";
+import { HDKey } from "@scure/bip32";
+import { isValidWaiverBtcZpub } from "../services/btcAddressDeriver";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { after, before, test } from "node:test";
@@ -1519,6 +1521,10 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
     type: "object",
     properties: {
       status: { type: "string", enum: ["ready", "not_ready"] },
+      waiver_zpub_configured: {
+        type: "boolean",
+        description: "Informational only. True when the configured BIP-84 public account key passes in-memory serialized-key validation without child derivation or I/O. Does not affect readiness status and exposes no key material or addresses.",
+      },
       dependencies: {
         type: "object",
         properties: {
@@ -1536,7 +1542,7 @@ test("keeps served and shared payment OpenAPI contracts in parity", async () => 
         required: ["wallet_configuration", "challenge_coordination"],
       },
     },
-    required: ["status", "dependencies"],
+    required: ["status", "dependencies", "waiver_zpub_configured"],
   });
   assert.deepEqual(
     (
@@ -6141,6 +6147,7 @@ test("reports ready when payment dependencies are available", async () => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
       status: "ready",
+      waiver_zpub_configured: isValidWaiverBtcZpub(process.env.WAIVER_BTC_ZPUB),
       dependencies: {
         wallet_configuration: "available",
         challenge_coordination: "available",
@@ -6164,6 +6171,7 @@ test("reports not ready when wallet configuration is missing", async () => {
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), {
       status: "not_ready",
+      waiver_zpub_configured: isValidWaiverBtcZpub(process.env.WAIVER_BTC_ZPUB),
       dependencies: {
         wallet_configuration: "unavailable",
         challenge_coordination: "available",
@@ -6215,6 +6223,7 @@ test("reports not ready when challenge coordination is unavailable", async () =>
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), {
       status: "not_ready",
+      waiver_zpub_configured: isValidWaiverBtcZpub(process.env.WAIVER_BTC_ZPUB),
       dependencies: {
         wallet_configuration: "available",
         challenge_coordination: "unavailable",
@@ -6224,6 +6233,82 @@ test("reports not ready when challenge coordination is unavailable", async () =>
     readinessServer.close();
     if (configuredNwcUri === undefined) delete process.env.NWC_URI;
     else process.env.NWC_URI = configuredNwcUri;
+  }
+});
+
+test("waiver readiness is boolean-only and informational with no derivation, database access or outbound requests", async (t) => {
+  // Official public BIP-84 test vector, never the operator's configured key.
+  const publicVector = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs";
+  const keys = ["WAIVER_BTC_ZPUB", "NWC_URI", "ALBY_NWC_URI", "NWC_FALLBACK_URI"] as const;
+  const original = keys.map(key => process.env[key]);
+  const readinessApp = express();
+  readinessApp.use("/api", healthRouter);
+  let challengeHealthChecks = 0;
+  let challengeHealthy = true;
+  const store = createMemoryPaymentChallengeStore();
+  store.checkHealth = async () => {
+    challengeHealthChecks++;
+    if (!challengeHealthy) throw new Error("Synthetic challenge store unavailable");
+  };
+  readinessApp.use((req, _res, next) => {
+    (req as any).log = { error: () => undefined };
+    next();
+  });
+  registerStratigraphyRoutes(readinessApp, undefined, undefined, store);
+  const server = readinessApp.listen(0);
+  await new Promise<void>(resolve => server.once("listening", resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const request = globalThis.fetch.bind(globalThis);
+  const forbidden = () => { throw new Error("Readiness side effect forbidden"); };
+  const guards = [
+    t.mock.method(HDKey.prototype, "derive", forbidden),
+    t.mock.method(HDKey.prototype, "deriveChild", forbidden),
+    t.mock.method(pool, "query", forbidden),
+    t.mock.method(pool, "connect", forbidden),
+    t.mock.method(store, "getOrCreate", forbidden),
+    t.mock.method(store, "consume", forbidden),
+    t.mock.method(globalThis, "fetch", forbidden),
+  ];
+  try {
+    delete process.env.ALBY_NWC_URI;
+    delete process.env.NWC_FALLBACK_URI;
+    for (const [walletHealthy, storeHealthy] of [[true, true], [false, true], [true, false]] as const) {
+      if (walletHealthy) process.env.NWC_URI = "nostr+walletconnect://synthetic";
+      else delete process.env.NWC_URI;
+      challengeHealthy = storeHealthy;
+      for (const [raw, configured] of [[publicVector, true], [undefined, false], ["invalid", false], [publicVector + " ", false]] as const) {
+        if (raw === undefined) delete process.env.WAIVER_BTC_ZPUB;
+        else process.env.WAIVER_BTC_ZPUB = raw;
+        const response = await request(`${base}/api/readyz`);
+        const ready = walletHealthy && storeHealthy;
+        assert.equal(response.status, ready ? 200 : 503);
+        const text = await response.text();
+        assert.deepEqual(JSON.parse(text), {
+          status: ready ? "ready" : "not_ready",
+          waiver_zpub_configured: configured,
+          dependencies: {
+            wallet_configuration: walletHealthy ? "available" : "unavailable",
+            challenge_coordination: storeHealthy ? "available" : "unavailable",
+          },
+        });
+        // The required field name contains "zpub"; no value may contain key material.
+        assert.ok(!text.includes(publicVector));
+        assert.ok(!/zpub|bc1q/.test(JSON.stringify(Object.values(JSON.parse(text)))));
+        assert.equal(response.headers.has("www-authenticate"), false);
+      }
+    }
+    assert.equal(challengeHealthChecks, 12);
+    const liveness = await request(`${base}/api/healthz`);
+    assert.equal(liveness.status, 200);
+    assert.deepEqual(await liveness.json(), { status: "ok" });
+    for (const guard of guards) assert.equal(guard.mock.callCount(), 0);
+  } finally {
+    keys.forEach((key, index) => {
+      if (original[index] === undefined) delete process.env[key];
+      else process.env[key] = original[index];
+    });
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
   }
 });
 

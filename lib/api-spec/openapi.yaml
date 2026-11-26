@@ -5209,6 +5209,9 @@ components:
           enum:
             - ready
             - not_ready
+        waiver_zpub_configured:
+          type: boolean
+          description: Informational only. True when the configured BIP-84 public account key passes in-memory serialized-key validation without child derivation or I/O. Does not affect readiness status and exposes no key material or addresses.
         dependencies:
           type: object
           properties:
@@ -5229,6 +5232,7 @@ components:
       required:
         - status
         - dependencies
+        - waiver_zpub_configured
     StratigraphyCost:
       type: object
       properties:

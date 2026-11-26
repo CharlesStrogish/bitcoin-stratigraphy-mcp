@@ -10,5 +10,7 @@ import type { ReadinessStatusStatus } from './readinessStatusStatus';
 
 export interface ReadinessStatus {
   status: ReadinessStatusStatus;
+  /** Informational only. True when the configured BIP-84 public account key passes in-memory serialized-key validation without child derivation or I/O. Does not affect readiness status and exposes no key material or addresses. */
+  waiver_zpub_configured: boolean;
   dependencies: ReadinessStatusDependencies;
 }

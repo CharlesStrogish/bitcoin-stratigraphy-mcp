@@ -1,6 +1,6 @@
 ---
 name: Waiver confirmation policy
-description: Business rationale for the waiver confirmation window and irreversible cold-storage address allocation.
+description: Waiver confirmation windows, irreversible cold-storage address allocation, and privacy-preserving readiness.
 ---
 
 Waiver buyers need a six-hour first-confirmation window and 15 minutes of
@@ -24,3 +24,14 @@ reach the server.
 external state. Never reset it to make tests or wallet discovery easier.
 Database restore procedures must reconcile exposed addresses before receiving
 new funds; increase the wallet discovery range rather than reusing addresses.
+
+Cold-storage readiness is informational only and must not change payment
+readiness gating. Readiness and startup checks must never derive child keys or
+addresses, allocate indices, contact external services, or disclose key material
+or derived addresses in responses or logs.
+
+**Why:** The user requires a strictly side-effect-free readiness signal without
+exposing cold-storage configuration or changing existing checkout behavior.
+
+**How to apply:** Validate serialized public account material locally, expose
+only a boolean, and keep derivation and address allocation confined to checkout.

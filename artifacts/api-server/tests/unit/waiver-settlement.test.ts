@@ -4,9 +4,10 @@ import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import express from "express";
-import { base58 } from "@scure/base";
+import { base58, bech32 } from "@scure/base";
+import { HDKey } from "@scure/bip32";
 import { pool } from "@workspace/db";
-import { btcAddressDeriver, logWaiverSettlementStatus } from "../../src/services/btcAddressDeriver";
+import { btcAddressDeriver, isValidWaiverBtcZpub, logWaiverSettlementStatus } from "../../src/services/btcAddressDeriver";
 import { createWaiverService, WaiverError, type WaiverStore, type WaiverQuote, type Certificate,
   type ChainSettlement } from "../../src/services/agplWaivers";
 import { createPostgresWaiverStore } from "../../src/services/agplWaiverStore";
@@ -65,9 +66,35 @@ test("strict public account serialization rejects bad versions, checksums, depth
   assert.throws(()=>btcAddressDeriver(undefined),{status:503,message:"waiver_settlement_key_unconfigured"});
   const messages:string[]=[];const log={info:(m:string)=>messages.push(m),error:(m:string)=>messages.push(m)};
   logWaiverSettlementStatus(log,zpub);
-  assert.equal(messages.length,1);assert.ok(messages[0]!.includes(firstAddress));assert.ok(!messages[0]!.includes(zpub));
+  assert.deepEqual(messages,["Waiver settlement key configured"]);
   logWaiverSettlementStatus(log,"zprv-synthetic-private-marker");
   assert.equal(messages[1],"waiver_settlement_key_invalid: waiver quote creation disabled");
+});
+test("pure zpub validation and startup logging never derive children, encode addresses, access the database or call the network",(t)=>{
+  const forbidden=()=>{throw new Error("Side effect forbidden during configuration validation");};
+  const guards=[
+    t.mock.method(HDKey.prototype,"derive",forbidden),
+    t.mock.method(HDKey.prototype,"deriveChild",forbidden),
+    t.mock.method(bech32,"encode",forbidden),
+    t.mock.method(pool,"query",forbidden),
+    t.mock.method(pool,"connect",forbidden),
+    t.mock.method(globalThis,"fetch",forbidden),
+  ];
+  const invalid: (string | undefined)[] = [undefined,""," ",zpub+" "," "+zpub,zpub+"\n",
+    "zprv-synthetic-private-marker","xpub-invalid",zpub.slice(0,-1)+"r",zpub.slice(1),
+    reserialize(p=>p.writeUInt32BE(0x0488b21e,0)),reserialize(p=>{p[4]=2;}),
+    reserialize(p=>p.writeUInt32BE(0,9)),reserialize(p=>{p[45]=0;}),
+    reserialize(p=>p.fill(255,46,78))];
+  assert.equal(isValidWaiverBtcZpub(zpub),true);
+  for(const raw of invalid)assert.equal(isValidWaiverBtcZpub(raw),false);
+  const messages:string[]=[];
+  const log={info:(m:string)=>messages.push(m),error:(m:string)=>messages.push(m)};
+  logWaiverSettlementStatus(log,zpub);
+  logWaiverSettlementStatus(log,"invalid");
+  logWaiverSettlementStatus(log,"");
+  assert.deepEqual(messages,["Waiver settlement key configured","waiver_settlement_key_invalid: waiver quote creation disabled"]);
+  assert.ok(!/zpub|bc1q/.test(JSON.stringify(messages)));
+  for(const guard of guards)assert.equal(guard.mock.callCount(),0);
 });
 test("front-running Quote A's confirmed payment against Quote B fails; only the address-bound licensee receives a certificate",async()=>{
   const f=fixture(),a=await f.service.quote(input),b=await f.service.quote({...input,licensee_identifier:"other.test"});

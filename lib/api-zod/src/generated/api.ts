@@ -1492,6 +1492,7 @@ export const DatasetHealthCheckResponse = zod.object({
  */
 export const ReadinessCheckResponse = zod.object({
   "status": zod.enum(['ready', 'not_ready']),
+  "waiver_zpub_configured": zod.boolean().describe('Informational only. True when the configured BIP-84 public account key passes in-memory serialized-key validation without child derivation or I\/O. Does not affect readiness status and exposes no key material or addresses.'),
   "dependencies": zod.object({
   "wallet_configuration": zod.enum(['available', 'unavailable']).describe('Availability of either the primary Coinos or fallback Alby\/NWC settlement configuration'),
   "challenge_coordination": zod.enum(['available', 'unavailable'])

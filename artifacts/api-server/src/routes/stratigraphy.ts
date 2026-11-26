@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { type Express, type Request, type Response } from "express";
 import { createL402Middleware } from "../middleware/l402";
+import { isValidWaiverBtcZpub } from "../services/btcAddressDeriver";
 import { quoteMcpTools } from "../lib/mcp-pricing";
 import { bindEnterpriseInvoiceToContext, enterpriseChallengeScope } from "../lib/enterprise-economics";
 import { liabilityChallengeScope } from "../middleware/liability-notice";
@@ -1229,6 +1230,7 @@ export function registerStratigraphyRoutes(
       challengeCoordination === "available";
     const data = ReadinessCheckResponse.parse({
       status: ready ? "ready" : "not_ready",
+      waiver_zpub_configured: isValidWaiverBtcZpub(process.env.WAIVER_BTC_ZPUB),
       dependencies: {
         wallet_configuration: walletConfiguration,
         challenge_coordination: challengeCoordination,

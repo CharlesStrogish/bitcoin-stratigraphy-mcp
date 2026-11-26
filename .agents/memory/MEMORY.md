@@ -112,4 +112,4 @@
 - [Stripe email fulfillment trust](stripe-email-fulfillment-trust.md) — Stripe purchases reuse funded scanner issuance; do not invent a universal key or bypass existing Treasury controls.
 - [Flight recorder viewer scope](flight-recorder-viewer-scope.md) — free local open-source viewer with a paid enterprise gate; Phase 1 telemetry is explicitly mock.
 - [Interceptor distribution scope](interceptor-distribution-scope.md) — Phase 2 is a developer-installed human procurement hook; HTTP authorization failures are not legal or ZK findings.
-- [Waiver confirmation policy](waiver-confirmation-policy.md) — six-hour first confirmations support institutional approvals; preserve watch-only custody and never recycle exposed addresses.
+- [Waiver confirmation policy](waiver-confirmation-policy.md) — six-hour first confirmations, irreversible watch-only address allocation, and informational zero-derivation readiness.

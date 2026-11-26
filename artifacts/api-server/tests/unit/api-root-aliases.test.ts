@@ -24,6 +24,8 @@ test("maps /api aliases of root documents and the MCP endpoint to their root rou
     ["/api/mcp/server-card", "/mcp/server-card"],
     ["/api/server-card", "/server-card"],
     ["/api/.well-known/ai-catalog.json", "/.well-known/ai-catalog.json"],
+    ["/api/.well-known/agent-card.json", "/.well-known/agent-card.json"],
+    ["/api/.well-known/jwks.json", "/.well-known/jwks.json"],
     ["/api/mcp?session=1", "/mcp?session=1"],
     ["/api/.well-known/nostr.json?name=_", "/.well-known/nostr.json?name=_"],
     [

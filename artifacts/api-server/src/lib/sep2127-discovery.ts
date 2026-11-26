@@ -52,6 +52,11 @@ export function buildSep2127Discovery() {
           type: MCP_SERVER_CARD_MEDIA_TYPE,
           url: canonicalUrl("/mcp/server-card"),
         },
+        {
+          identifier: `urn:air:${domain}:a2a:bitcoin-stratigraphy`,
+          type: "application/a2a-agent-card+json",
+          url: canonicalUrl("/.well-known/agent-card.json"),
+        },
       ],
     },
   };

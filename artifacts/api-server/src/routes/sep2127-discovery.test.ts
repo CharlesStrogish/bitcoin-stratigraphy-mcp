@@ -27,6 +27,7 @@ import { registerMcpServerCardRoute } from "./mcp-server-card";
 import { mcpToolDefinitions } from "./mcp";
 import { registerToolIntegrityRoute } from "./tool-integrity";
 import { registerSep2127DiscoveryRoutes } from "./sep2127-discovery";
+import { registerA2aDiscoveryRoutes } from "./a2a-discovery";
 
 async function serve(app: express.Express, t: TestContext) {
   const server = app.listen(0, "127.0.0.1");
@@ -91,7 +92,7 @@ test("SEP-2127 card contains only static canonical connectivity and shared live 
   );
 });
 
-test("AI Catalog has one URL-only MCP card entry with canonical did:web and urn:air identifiers", () => {
+test("AI Catalog has URL-only MCP and A2A card entries with canonical did:web and urn:air identifiers", () => {
   const { catalog } = buildSep2127Discovery();
   const domain = new URL(CANONICAL_ORIGIN).hostname;
   assert.deepEqual(catalog, {
@@ -105,6 +106,11 @@ test("AI Catalog has one URL-only MCP card entry with canonical did:web and urn:
         identifier: `urn:air:${domain}:mcp:bitcoin-stratigraphy`,
         type: MCP_SERVER_CARD_MEDIA_TYPE,
         url: canonicalUrl("/mcp/server-card"),
+      },
+      {
+        identifier: `urn:air:${domain}:a2a:bitcoin-stratigraphy`,
+        type: "application/a2a-agent-card+json",
+        url: canonicalUrl("/.well-known/agent-card.json"),
       },
     ],
   });
@@ -239,10 +245,11 @@ test("legacy discovery, integrity and connector payloads/headers are unchanged b
   app.use(apiRootAliases);
   registerPublicCors(app);
   registerMcpServerCardRoute(app);
+  const integrityKey = generateKeyPairSync("ed25519").privateKey;
   registerToolIntegrityRoute(
     app,
     mcpToolDefinitions,
-    generateKeyPairSync("ed25519").privateKey,
+    integrityKey,
   );
   const base = await serve(app, t);
   const paths = [
@@ -268,6 +275,7 @@ test("legacy discovery, integrity and connector payloads/headers are unchanged b
     });
   }
   registerSep2127DiscoveryRoutes(app);
+  registerA2aDiscoveryRoutes(app, integrityKey);
   for (const [index, path] of paths.entries()) {
     const response = await fetch(base + path, {
       headers: { Origin: CANONICAL_ORIGIN },

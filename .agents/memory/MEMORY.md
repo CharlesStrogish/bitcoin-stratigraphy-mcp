@@ -43,6 +43,7 @@
 - [Vendored archive integrity](vendored-archive-integrity.md) — a repacked local SDK archive can make unrelated frozen installs fail after lockfile regeneration.
 - [Nested Replit config validation](nested-replit-config-validation.md) — the validator replaces the workspace root .replit even when its temp file lives in a subdirectory.
 - [Registry discovery policy](registry-discovery-policy.md) — Glama/mcpservers.org only; minimal SEP-2127 cards stay separate from unchanged legacy discovery.
+- [A2A discovery trust](a2a-discovery-trust.md) — custom MCP binding only; share the integrity identity and isolate JCS/JWS from legacy signatures.
 - [Public training export policy](public-training-export-policy.md) — crawler dataset exports stay open while interactive MCP queries remain L402-paid; describe index/proof limits plainly.
 - [OTS pool receipt calendars](ots-pool-receipt-calendars.md) — public pools can return underlying calendar URLs; inspect real receipts before tightening the accepted issuer list.
 - [Independent audit evidence](independent-audit-evidence.md) — confirm Bitcoin commitments without paid MCP access; distinguish calendar acceptance, public-header corroboration, and full-node validation.

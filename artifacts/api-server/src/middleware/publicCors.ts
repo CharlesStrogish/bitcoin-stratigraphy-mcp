@@ -2,6 +2,7 @@ import type { Express, RequestHandler } from "express";
 import { LIMITATION_OF_LIABILITY } from "./liability-notice";
 import { CANONICAL_ORIGIN } from "../lib/public-site";
 import { isSep2127DiscoveryPath } from "../lib/sep2127-discovery";
+import { isA2aDiscoveryPath } from "../lib/a2a-agent-card";
 
 export const PUBLIC_ALLOWED_ORIGINS: readonly string[] = [
   CANONICAL_ORIGIN,
@@ -47,7 +48,7 @@ export function registerPublicCors(
     });
     // Apply only to the new static discovery documents, including preflights.
     // Legacy discovery headers and non-discovery CORS remain byte-for-byte.
-    if (isSep2127DiscoveryPath(req.path)) {
+    if (isSep2127DiscoveryPath(req.path) || isA2aDiscoveryPath(req.path)) {
       res.set({
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",

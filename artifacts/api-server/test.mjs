@@ -5,6 +5,8 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/jcs.test.js",
+  "./dist/a2a-discovery.test.js",
   "./dist/sep2127-discovery.test.js",
   "./dist/dynamic-pricing.test.js",
   "./dist/waiver-settlement.test.js",
@@ -186,6 +188,8 @@ await build({
     "fiat-mint.test": "./src/routes/fiat-mint.test.ts",
     "mcp-directory.test": "./src/routes/mcp-directory.test.ts",
     "sep2127-discovery.test": "./src/routes/sep2127-discovery.test.ts",
+    "jcs.test": "./src/lib/jcs.test.ts",
+    "a2a-discovery.test": "./src/routes/a2a-discovery.test.ts",
     "clearing.test": "./src/routes/clearing.test.ts",
     "yield-staking.test": "./tests/unit/yield-staking.test.ts",
     "genesis-grant.test": "./tests/unit/genesis-grant.test.ts",

@@ -18,6 +18,7 @@ import {
 import { registerToolIntegrityRoute } from "./routes/tool-integrity";
 import { registerMcpServerCardRoute } from "./routes/mcp-server-card";
 import { registerSep2127DiscoveryRoutes } from "./routes/sep2127-discovery";
+import { registerA2aDiscoveryRoutes } from "./routes/a2a-discovery";
 import { pool as clearingPool } from "@workspace/db";
 import { ClearingContracts } from "./services/clearingContracts";
 import { logger } from "./lib/logger";
@@ -138,6 +139,9 @@ app.use(
   }),
 );
 registerPublicCors(app, createPublicWebRateLimitMiddleware(publicRateLimiter));
+// Reuse the existing integrity/webhook identity for public A2A discovery.
+const toolIntegrityKey = loadToolIntegrityKey();
+registerA2aDiscoveryRoutes(app, toolIntegrityKey);
 registerSep2127DiscoveryRoutes(app);
 registerMcpRequestGuard(app);
 // This host already mounts clearing below; metadata does not activate settlement.
@@ -197,7 +201,6 @@ registerDocsRoutes(app);
 registerMcpServerCardRoute(app);
 // One Ed25519 identity signs the tool-description manifest and every async
 // webhook callback, so receivers verify both with the same public key.
-const toolIntegrityKey = loadToolIntegrityKey();
 registerMcpRoute(app, {
   clearing: new ClearingContracts(clearingPool),
   genesisGrantStore: createPostgresGenesisGrantStore(),

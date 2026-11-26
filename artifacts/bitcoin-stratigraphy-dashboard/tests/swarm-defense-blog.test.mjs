@@ -96,14 +96,14 @@ test("swarm defense initial head publishes exact canonical, social metadata and 
   assert.doesNotMatch(html, /type="module"|id="root"/);
 });
 
-test("swarm defense is newest and sitemap preserves older article canonicals", () => {
-  assert.equal(posts[0].slug, slug);
+test("swarm defense remains L05 below L06 and sitemap preserves older article canonicals", () => {
+  assert.equal(posts[1].slug, slug);
   const index = renderBlogDocument(posts);
-  const first = index.match(/data-testid="card-post-([^"]+)"/);
-  assert.equal(first[1], slug);
+  const cards = [...index.matchAll(/data-testid="card-post-([^"]+)"/g)];
+  assert.equal(cards[1][1], slug);
   const sitemap = blogSitemap(posts);
   assert.ok(sitemap.includes(`<loc>${canonical}</loc><lastmod>2026-11-19</lastmod>`));
-  for (const previous of posts.filter((entry) => entry.slug !== slug))
+  for (const previous of posts.filter((entry) => entry.date < post.date))
     assert.ok(sitemap.includes(`<loc>https://bitcoinstratigraphy.com/blog/${previous.slug}/</loc>`));
 });
 

@@ -145,7 +145,7 @@ test("third article shares the existing index and article styling with complete 
   const post = posts.find((entry) => entry.slug === slug);
   assert.ok(post);
   assert.ok(posts.length >= 3);
-  assert.equal(posts[0].slug, "defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking");
+  assert.equal(posts[0].slug, "l402-vs-x402-enterprise-mcp-servers-lightning-macaroons");
   assert.equal(post.date, "2026-11-17");
   const html = renderBlogDocument(posts, post);
   const index = renderBlogDocument(posts);

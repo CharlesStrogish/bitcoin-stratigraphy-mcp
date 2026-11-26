@@ -3,7 +3,7 @@ title: "L402 vs. x402 for Enterprise MCP Servers: Why Capability Macaroons and L
 date: "2026-11-26"
 dateModified: "2026-11-26"
 slug: "l402-vs-x402-enterprise-mcp-servers-lightning-macaroons"
-canonicalUrl: "https://bitcoinstratigraphy.com/blog/l402-vs-x402-enterprise-mcp-servers-lightning-macaroons"
+canonicalUrl: "https://bitcoinstratigraphy.com/blog/l402-vs-x402-enterprise-mcp-servers-lightning-macaroons/"
 description: "Compare L402 Lightning macaroons, x402 v2 USDC facilitators, and MPP on the wire—and wire LangChain, CrewAI, and Claude swarms to live Bitcoin settlement."
 authorName: "Charles R. Strogish"
 authorUrl: "https://bitcoinstratigraphy.com"

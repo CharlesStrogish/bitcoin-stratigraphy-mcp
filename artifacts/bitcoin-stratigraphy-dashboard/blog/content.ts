@@ -4,7 +4,7 @@ import path from "node:path";
 import MarkdownIt from "markdown-it";
 import { parseDocument } from "yaml";
 import type { BlogPost } from "../src/pages/blog-content";
-import { siteUrl } from "../src/lib/site";
+import { pageUrl } from "../src/lib/site";
 
 export const CONTENT_DIRECTORY = fileURLToPath(
   new URL("../content/blog/", import.meta.url),
@@ -81,9 +81,9 @@ export function parseBlogPost(
     return invalid("authorUrl requires authorName");
   if (
     metadata.canonicalUrl !== undefined &&
-    metadata.canonicalUrl !== siteUrl(`/blog/${slug}`)
+    metadata.canonicalUrl !== pageUrl(`/blog/${slug}`)
   )
-    return invalid("canonicalUrl must be the exact same-site article URL");
+    return invalid("canonicalUrl must be the exact same-site trailing-slash article URL");
   for (const field of ["keywords", "schemaKeywords"]) {
     const values = metadata[field];
     if (

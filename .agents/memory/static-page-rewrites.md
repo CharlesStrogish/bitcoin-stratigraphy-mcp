@@ -22,13 +22,14 @@ canonical with the shared page-URL helper and extend the rewrite-ordering
 test. Check the production head at the trailing-slash URL after publishing.
 Leave the license JSON-LD URL as it is unless the user asks.
 
-An explicitly requested article canonical can override the trailing-slash
-default for that article only. The November 19, 2026 swarm-defense article uses
-the exact bare URL supplied by the user; older article canonicals remain intact.
+All blog articles, including explicitly supplied canonical overrides, must use
+the final HTTP 200 trailing-slash URL consistently in canonical tags, social
+URLs, JSON-LD identities, sitemap locations, and internal links.
 
-**Why:** The publication request specified an exact canonical and prohibited
-altering existing articles.
+**Why:** The user superseded the earlier exact bare-URL publication exceptions
+after a live audit showed L05 and L06 advertising URLs that redirected with
+HTTP 301. The user requires permanent parity for existing and future entries.
 
-**How to apply:** Keep the shared trailing-slash default for other pages. Do not
-normalize this article's canonical, social URL, JSON-LD identity, or sitemap
-location independently of one another.
+**How to apply:** Preserve non-slash-to-slash HTTP 301 consolidation; reject
+bare canonical overrides rather than restoring the superseded exceptions.
+Change URL values together without altering article prose or code examples.

@@ -10,7 +10,7 @@ const { blogSchema, blogSitemap, renderBlogDocument } = await tsImport(
   import.meta.url,
 );
 const slug = "l402-vs-x402-enterprise-mcp-servers-lightning-macaroons";
-const canonical = `https://bitcoinstratigraphy.com/blog/${slug}`;
+const canonical = `https://bitcoinstratigraphy.com/blog/${slug}/`;
 const title = "L402 vs. x402 for Enterprise MCP Servers: Why Capability Macaroons and Lightning Beat Stablecoin Wallets";
 const description = "Compare L402 Lightning macaroons, x402 v2 USDC facilitators, and MPP on the wire—and wire LangChain, CrewAI, and Claude swarms to live Bitcoin settlement.";
 const posts = readBlogPosts();

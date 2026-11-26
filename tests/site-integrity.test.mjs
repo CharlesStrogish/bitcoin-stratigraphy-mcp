@@ -7,6 +7,20 @@ import test from "node:test";
 import { auditSources, checkSnippet, inspectClipboard, inspectHtml, inspectMarkdown, repositoryLinkFailure, root } from "../scripts/site-integrity.mjs";
 import { auditBuiltSite, internalLinkFailure, fragmentFailure, waiverLinkFailure } from "../scripts/audit-site-integrity.mjs";
 
+test("site-wide blog links must target trailing-slash URLs even when fetch follows a redirect", () => {
+  for (const pathname of ["/blog", "/blog/current-entry", "/blog/future-entry"]) {
+    const input = {
+      file: "/developers", href: pathname, pathname,
+      response: { ok: true, status: 200, pathname: `${pathname}/`, type: "text/html", document: "<main>Article</main>" },
+      routes: new Set([`${pathname}/`]),
+    };
+    assert.match(internalLinkFailure(input), /trailing-slash HTTP 200/);
+    assert.equal(internalLinkFailure({
+      ...input, href: `${pathname}/`, pathname: `${pathname}/`,
+    }), null);
+  }
+});
+
 test("site guard rejects mangled URLs in code, metadata, and JSON-LD", () => {
   for (const html of [
     '<h1>Test</h1><pre><code>fetch("[https://example.com](https://example.com)")</code></pre>',

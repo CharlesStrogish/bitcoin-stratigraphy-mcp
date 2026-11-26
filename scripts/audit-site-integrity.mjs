@@ -11,6 +11,8 @@ import { registerNavigationApi } from "./site-navigation-api.mjs";
 
 const origin = "https://bitcoinstratigraphy.com";
 export function internalLinkFailure({ file, href, pathname, response, routes }) {
+  if ((pathname === "/blog" || pathname.startsWith("/blog/")) && !pathname.endsWith("/"))
+    return `${file}: blog link must target its trailing-slash HTTP 200 URL: ${href}`;
   if (!response.ok || response.status !== undefined && response.status !== 200) return `${file}: dead internal link ${href} (${response.status})`;
   if (response.pathname === "/" && pathname !== "/") return `${file}: internal link redirected to homepage: ${href}`;
   if (response.type?.includes("text/html") && /<div id="root"><\/div>/.test(response.document) &&

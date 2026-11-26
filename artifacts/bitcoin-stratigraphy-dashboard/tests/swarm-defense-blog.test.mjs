@@ -7,7 +7,7 @@ import { tsImport } from "tsx/esm/api";
 const { parseBlogPost, readBlogPosts } = await tsImport("../blog/content.ts", import.meta.url);
 const { blogSchema, blogSitemap, renderBlogDocument } = await tsImport("../blog-plugin.ts", import.meta.url);
 const slug = "defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking";
-const canonical = `https://bitcoinstratigraphy.com/blog/${slug}`;
+const canonical = `https://bitcoinstratigraphy.com/blog/${slug}/`;
 const posts = readBlogPosts();
 const post = posts.find((entry) => entry.slug === slug);
 const source = await readFile(new URL(`../content/blog/${slug}.md`, import.meta.url), "utf8");

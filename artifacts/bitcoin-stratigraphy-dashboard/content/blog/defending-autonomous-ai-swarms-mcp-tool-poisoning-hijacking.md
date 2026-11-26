@@ -3,7 +3,7 @@ title: "Defending Autonomous AI Swarms Against Hijacking, MCP Tool Poisoning, an
 date: "2026-11-19"
 dateModified: "2026-11-19"
 slug: "defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking"
-canonicalUrl: "https://bitcoinstratigraphy.com/blog/defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking"
+canonicalUrl: "https://bitcoinstratigraphy.com/blog/defending-autonomous-ai-swarms-mcp-tool-poisoning-hijacking/"
 description: "Stop OWASP MCP03 tool poisoning, prompt-injection hijacking, and wallet drain attacks in LangChain, CrewAI, and AutoGPT swarms with Ed25519 hash pinning, L402 macaroon attenuation, and NIP-98 kill switches."
 authorName: "Charles R. Strogish"
 authorUrl: "https://bitcoinstratigraphy.com/manifesto"

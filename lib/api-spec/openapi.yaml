@@ -1934,6 +1934,70 @@ paths:
                 $ref: "#/components/schemas/McpJsonRpcResponse"
         "503":
           description: Proof admission capacity or durable pipeline storage unavailable
+  /v1/mcp/elicitation/{elicitationId}:
+    get:
+      operationId: getMcpCheckoutHandoffStatus
+      tags: [mcp]
+      summary: Poll an owner-bound checkout handoff without payment side effects
+      description: >-
+        Finite HTTP clients use completion_strategy=poll_and_retry. Send the same
+        separate client-generated 256-bit X-MCP-Owner-Key, or a fresh request-bound
+        NIP-98 signature from the same owner. A handoff UUID, requestState or MCP
+        session ID alone never grants access. TTL is 15 minutes, not renewed by
+        polling. Completion reflects only verified existing scanner fulfillment or
+        a verified waiver claim; it is not a payment credential or MCP authorization.
+      parameters:
+        - name: elicitationId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: X-MCP-Owner-Key
+          in: header
+          description: Separate client-generated 256-bit ownership proof, never a payment credential. May be replaced with fresh NIP-98 authentication.
+          schema: { type: string }
+        - name: X-Nostr-Authorization
+          in: header
+          description: Fresh NIP-98 signature binding this exact GET URL, from the same handoff owner.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Owner-bound status with no payment credentials, owner hash or checkout reference
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpCheckoutHandoffStatus"
+        "403": { description: Missing or invalid cryptographic owner proof }
+        "404": { description: Unknown handoff or different owner }
+        "409": { description: Cancelled handoff }
+        "410": { description: Handoff TTL expired; recover any existing purchase before paying again }
+        "503": { description: Durable storage or owner verification unavailable }
+  /v1/mcp/checkout-handoff:
+    get:
+      operationId: openMcpCheckoutHandoff
+      tags: [mcp]
+      summary: Open the side-effect-free verified human checkout landing page
+      description: >-
+        This public page neither creates Stripe sessions nor allocates waiver
+        quotes or BIP-84 indices. A separate owner proof and explicit human action
+        are required before the existing checkout routes are called. Query values
+        are non-secret correlation metadata only. Existing checkout, recovery,
+        fulfillment, signature and on-chain settlement checks remain authoritative.
+      parameters:
+        - name: handoff
+          in: query
+          schema: { type: string }
+        - name: intent
+          in: query
+          schema: { type: string, enum: [scanner_pack, agpl_waiver] }
+      responses:
+        "200":
+          description: No-store human landing page; no checkout side effects
+          content:
+            text/html:
+              schema: { type: string }
   /mcp/payload-key:
     servers:
       - url: /
@@ -2025,6 +2089,20 @@ paths:
         SDK clients may advertise application/json and
         text/event-stream, but POST returns finite JSON. Cookies are not used for
         cross-origin auth.
+        Additive non-tool checkout/handoff accepts params.intent
+        scanner_pack_checkout or agpl_waiver_checkout only when the client
+        explicitly declares capabilities.elicitation.url. Legacy 2025-11-25
+        consent can be bound during initialize to a separate 256-bit
+        X-MCP-Owner-Key or authenticated NIP-98 owner; 2026-07-28 sends capabilities
+        in its existing per-request metadata. Legacy capable requests receive
+        -32042 with data.elicitations in URL mode; modern capable requests receive
+        resultType=input_required, inputRequests and opaque non-secret requestState.
+        completion_strategy=poll_and_retry never requires a persistent SSE stream.
+        Retry this explicit handoff request with the same requestState, or poll
+        /api/v1/mcp/elicitation/{elicitationId} with the same owner proof.
+        Completion does not execute or authorize any paid tool. No new canonical
+        tool, payment credential, Stripe session or waiver address is created
+        by requesting or opening a handoff.
       security: []
       parameters:
         - name: MCP-Protocol-Version
@@ -4082,6 +4160,17 @@ components:
         service:
           type: string
           const: MCP Server
+    McpCheckoutHandoffStatus:
+      type: object
+      additionalProperties: false
+      required: [elicitationId, intent, status, createdAt, expiresAt]
+      properties:
+        elicitationId: { type: string }
+        intent: { type: string, enum: [scanner_pack_checkout, agpl_waiver_checkout] }
+        status: { type: string, enum: [pending, completed, expired, cancelled] }
+        createdAt: { type: integer, description: Creation time in Unix milliseconds }
+        expiresAt: { type: integer, description: Strict expiration time in Unix milliseconds }
+        completedAt: { type: integer, description: Verified completion time in Unix milliseconds }
     McpJsonRpcRequest:
       type: object
       required: [jsonrpc, method]

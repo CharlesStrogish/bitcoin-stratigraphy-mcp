@@ -1104,6 +1104,41 @@ export const RequestMcpInvoiceResponse = zod.void()
 
 
 /**
+ * Finite HTTP clients use completion_strategy=poll_and_retry. Send the same separate client-generated 256-bit X-MCP-Owner-Key, or a fresh request-bound NIP-98 signature from the same owner. A handoff UUID, requestState or MCP session ID alone never grants access. TTL is 15 minutes, not renewed by polling. Completion reflects only verified existing scanner fulfillment or a verified waiver claim; it is not a payment credential or MCP authorization.
+ * @summary Poll an owner-bound checkout handoff without payment side effects
+ */
+export const GetMcpCheckoutHandoffStatusParams = zod.object({
+  "elicitationId": zod.coerce.string()
+})
+
+export const GetMcpCheckoutHandoffStatusHeader = zod.object({
+  "X-MCP-Owner-Key": zod.string().optional().describe('Separate client-generated 256-bit ownership proof, never a payment credential. May be replaced with fresh NIP-98 authentication.'),
+  "X-Nostr-Authorization": zod.string().optional().describe('Fresh NIP-98 signature binding this exact GET URL, from the same handoff owner.')
+})
+
+export const GetMcpCheckoutHandoffStatusResponse = zod.object({
+  "elicitationId": zod.string(),
+  "intent": zod.enum(['scanner_pack_checkout', 'agpl_waiver_checkout']),
+  "status": zod.enum(['pending', 'completed', 'expired', 'cancelled']),
+  "createdAt": zod.int().describe('Creation time in Unix milliseconds'),
+  "expiresAt": zod.int().describe('Strict expiration time in Unix milliseconds'),
+  "completedAt": zod.int().optional().describe('Verified completion time in Unix milliseconds')
+})
+
+
+/**
+ * This public page neither creates Stripe sessions nor allocates waiver quotes or BIP-84 indices. A separate owner proof and explicit human action are required before the existing checkout routes are called. Query values are non-secret correlation metadata only. Existing checkout, recovery, fulfillment, signature and on-chain settlement checks remain authoritative.
+ * @summary Open the side-effect-free verified human checkout landing page
+ */
+export const OpenMcpCheckoutHandoffQueryParams = zod.object({
+  "handoff": zod.coerce.string().optional(),
+  "intent": zod.enum(['scanner_pack', 'agpl_waiver']).optional()
+})
+
+export const OpenMcpCheckoutHandoffResponse = zod.unknown()
+
+
+/**
  * Informational public key only. Clients must independently authenticate and pin this SPKI PEM key; never trust a replacement from an untrusted response.
  * @summary Public Ed25519 payload signing identity
  */
@@ -1139,7 +1174,7 @@ export const PreflightMcpResponse = zod.unknown()
 
 
 /**
- * Stateless MCP 2026-07-28 (no initialize handshake and no Mcp-Session-Id): call server/discover, tools/list or tools/call, sending params._meta["io.modelcontextprotocol/protocolVersion"] and params._meta["io.modelcontextprotocol/clientCapabilities"] on every request with matching MCP-Protocol-Version and Mcp-Method headers, plus Mcp-Name for tools/call. Stateless failures are strict JSON-RPC; payment challenge fields appear in error.data. Handshake-era clients (2025-11-25 and earlier) may still call initialize, ping, tools/list or tools/call without _meta. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. New L402 invoices first require the same single-use SHA-256 proof of work as /invoice/request; missing or invalid proof returns HTTP 400 before Lightning invoice generation. Paid credential verification is unchanged. A cost quote grants no tool entitlement. Optional Whale Protocol funding: send X-Requested-Budget as an integer sats budget (for example 5000) for a fixed-base-price tool. It must be an exact multiple of the base fee, fund at least two calls, and not exceed 1000000 sats. Do not combine it with X-L402-Batch-Size or x402 payment headers. New invoices retain proof-of-work admission. Pay the whole invoice once, then omit the funding header and reuse the returned L402 macaroon and payment proof for the same tool. The issued max_requests is budget/base fee, atomically shared by descendants and workers. Both funding and prepaid calls are immune to thermodynamic surge; expiry, revocation, tool/path and delegated restrictions still apply. Variable-priced and exact-current-toll operations are ineligible. Conditional simulated yield is exactly 21 percent of the full confirmed bulk invoice, claimable once per payment hash through /api/claim-yield; execution does not repeatedly accrue yield or send outbound Lightning. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * Stateless MCP 2026-07-28 (no initialize handshake and no Mcp-Session-Id): call server/discover, tools/list or tools/call, sending params._meta["io.modelcontextprotocol/protocolVersion"] and params._meta["io.modelcontextprotocol/clientCapabilities"] on every request with matching MCP-Protocol-Version and Mcp-Method headers, plus Mcp-Name for tools/call. Stateless failures are strict JSON-RPC; payment challenge fields appear in error.data. Handshake-era clients (2025-11-25 and earlier) may still call initialize, ping, tools/list or tools/call without _meta. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. New L402 invoices first require the same single-use SHA-256 proof of work as /invoice/request; missing or invalid proof returns HTTP 400 before Lightning invoice generation. Paid credential verification is unchanged. A cost quote grants no tool entitlement. Optional Whale Protocol funding: send X-Requested-Budget as an integer sats budget (for example 5000) for a fixed-base-price tool. It must be an exact multiple of the base fee, fund at least two calls, and not exceed 1000000 sats. Do not combine it with X-L402-Batch-Size or x402 payment headers. New invoices retain proof-of-work admission. Pay the whole invoice once, then omit the funding header and reuse the returned L402 macaroon and payment proof for the same tool. The issued max_requests is budget/base fee, atomically shared by descendants and workers. Both funding and prepaid calls are immune to thermodynamic surge; expiry, revocation, tool/path and delegated restrictions still apply. Variable-priced and exact-current-toll operations are ineligible. Conditional simulated yield is exactly 21 percent of the full confirmed bulk invoice, claimable once per payment hash through /api/claim-yield; execution does not repeatedly accrue yield or send outbound Lightning. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth. Additive non-tool checkout/handoff accepts params.intent scanner_pack_checkout or agpl_waiver_checkout only when the client explicitly declares capabilities.elicitation.url. Legacy 2025-11-25 consent can be bound during initialize to a separate 256-bit X-MCP-Owner-Key or authenticated NIP-98 owner; 2026-07-28 sends capabilities in its existing per-request metadata. Legacy capable requests receive -32042 with data.elicitations in URL mode; modern capable requests receive resultType=input_required, inputRequests and opaque non-secret requestState. completion_strategy=poll_and_retry never requires a persistent SSE stream. Retry this explicit handoff request with the same requestState, or poll /api/v1/mcp/elicitation/{elicitationId} with the same owner proof. Completion does not execute or authorize any paid tool. No new canonical tool, payment credential, Stripe session or waiver address is created by requesting or opening a handoff.
  * @summary JSON-RPC discovery and execution of the 16 canonical MCP tools
  */
 export const executeMcpRequestHeaderXRequestedBudgetMin = 2;

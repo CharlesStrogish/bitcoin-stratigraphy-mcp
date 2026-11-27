@@ -974,6 +974,36 @@ export const McpProbeValue = {
 } as const;
 export type McpProbe = typeof McpProbeValue;
 
+export type McpCheckoutHandoffStatusIntent = typeof McpCheckoutHandoffStatusIntent[keyof typeof McpCheckoutHandoffStatusIntent];
+
+
+export const McpCheckoutHandoffStatusIntent = {
+  scanner_pack_checkout: 'scanner_pack_checkout',
+  agpl_waiver_checkout: 'agpl_waiver_checkout',
+} as const;
+
+export type McpCheckoutHandoffStatusStatus = typeof McpCheckoutHandoffStatusStatus[keyof typeof McpCheckoutHandoffStatusStatus];
+
+
+export const McpCheckoutHandoffStatusStatus = {
+  pending: 'pending',
+  completed: 'completed',
+  expired: 'expired',
+  cancelled: 'cancelled',
+} as const;
+
+export interface McpCheckoutHandoffStatus {
+  elicitationId: string;
+  intent: McpCheckoutHandoffStatusIntent;
+  status: McpCheckoutHandoffStatusStatus;
+  /** Creation time in Unix milliseconds */
+  createdAt: number;
+  /** Strict expiration time in Unix milliseconds */
+  expiresAt: number;
+  /** Verified completion time in Unix milliseconds */
+  completedAt?: number;
+}
+
 export type McpJsonRpcRequestParams = { [key: string]: unknown } | unknown[];
 
 export interface McpJsonRpcRequest {
@@ -3126,6 +3156,19 @@ export type GetNip05IdentityParams = {
  */
 name?: string;
 };
+
+export type OpenMcpCheckoutHandoffParams = {
+handoff?: string;
+intent?: OpenMcpCheckoutHandoffIntent;
+};
+
+export type OpenMcpCheckoutHandoffIntent = typeof OpenMcpCheckoutHandoffIntent[keyof typeof OpenMcpCheckoutHandoffIntent];
+
+
+export const OpenMcpCheckoutHandoffIntent = {
+  scanner_pack: 'scanner_pack',
+  agpl_waiver: 'agpl_waiver',
+} as const;
 
 export type ExportHuggingFaceDatasetParams = {
 /**

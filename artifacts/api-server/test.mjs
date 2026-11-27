@@ -5,6 +5,7 @@ process.env.NOSTR_PRIVATE_KEY ??= "01".padStart(64, "0");
 process.env.NODE_ENV = "test";
 
 const outputs = [
+  "./dist/mcp-url-elicitation.test.js",
   "./dist/http402-next-action.test.js",
   "./dist/jcs.test.js",
   "./dist/a2a-discovery.test.js",
@@ -182,6 +183,7 @@ await build({
 
 await build({
   entryPoints: {
+    "mcp-url-elicitation.test": "./tests/unit/mcp-url-elicitation.test.ts",
     "http402-next-action.test": "./tests/unit/http402-next-action.test.ts",
     "dynamic-pricing.test": "./tests/unit/dynamic-pricing.test.ts",
     "waiver-settlement.test": "./tests/unit/waiver-settlement.test.ts",

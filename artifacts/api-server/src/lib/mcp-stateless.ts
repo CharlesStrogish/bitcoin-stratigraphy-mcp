@@ -90,6 +90,8 @@ export const STATELESS_MCP_METHODS: ReadonlySet<string> = new Set([
   "tasks/get",
   "tasks/update",
   "tasks/cancel",
+  // Explicit capability-gated checkout handoff; not a canonical tool.
+  "checkout/handoff",
 ]);
 
 /**

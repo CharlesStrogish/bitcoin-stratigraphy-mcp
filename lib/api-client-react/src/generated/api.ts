@@ -69,6 +69,7 @@ import type {
   MacaroonRevocationRequest,
   MacaroonRevocationResponse,
   McpBatchCostQuote,
+  McpCheckoutHandoffStatus,
   McpConfigurationManifest,
   McpDiscoveryManifest,
   McpJsonRpcRequest,
@@ -83,6 +84,7 @@ import type {
   NostrAgentIdentity,
   NostrHeartbeatStatus,
   NostrIdentityInput,
+  OpenMcpCheckoutHandoffParams,
   PaidStratigraphyResponse,
   PayloadSigningIdentity,
   PaymentChallengeRateLimitError,
@@ -3172,6 +3174,169 @@ export const useRequestMcpInvoice = <TError = ErrorType<McpJsonRpcResponse | voi
       return useMutation(getRequestMcpInvoiceMutationOptions(options));
     }
 
+export const getGetMcpCheckoutHandoffStatusUrl = (elicitationId: string,) => {
+
+
+
+
+  return `/api/v1/mcp/elicitation/${elicitationId}`
+}
+
+/**
+ * Finite HTTP clients use completion_strategy=poll_and_retry. Send the same separate client-generated 256-bit X-MCP-Owner-Key, or a fresh request-bound NIP-98 signature from the same owner. A handoff UUID, requestState or MCP session ID alone never grants access. TTL is 15 minutes, not renewed by polling. Completion reflects only verified existing scanner fulfillment or a verified waiver claim; it is not a payment credential or MCP authorization.
+ * @summary Poll an owner-bound checkout handoff without payment side effects
+ */
+export const getMcpCheckoutHandoffStatus = async (elicitationId: string, options?: Parameters<typeof customFetch>[1]): Promise<McpCheckoutHandoffStatus> => {
+
+  return customFetch<McpCheckoutHandoffStatus>(getGetMcpCheckoutHandoffStatusUrl(elicitationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMcpCheckoutHandoffStatusQueryKey = (elicitationId: string,) => {
+    return [
+    `/api/v1/mcp/elicitation/${elicitationId}`
+    ] as const;
+    }
+
+
+export const getGetMcpCheckoutHandoffStatusQueryOptions = <TData = Awaited<ReturnType<typeof getMcpCheckoutHandoffStatus>>, TError = ErrorType<void>>(elicitationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpCheckoutHandoffStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMcpCheckoutHandoffStatusQueryKey(elicitationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMcpCheckoutHandoffStatus>>> = ({ signal }) => getMcpCheckoutHandoffStatus(elicitationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: elicitationId !== null && elicitationId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMcpCheckoutHandoffStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMcpCheckoutHandoffStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getMcpCheckoutHandoffStatus>>>
+export type GetMcpCheckoutHandoffStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Poll an owner-bound checkout handoff without payment side effects
+ */
+
+export function useGetMcpCheckoutHandoffStatus<TData = Awaited<ReturnType<typeof getMcpCheckoutHandoffStatus>>, TError = ErrorType<void>>(
+ elicitationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMcpCheckoutHandoffStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMcpCheckoutHandoffStatusQueryOptions(elicitationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getOpenMcpCheckoutHandoffUrl = (params?: OpenMcpCheckoutHandoffParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/mcp/checkout-handoff?${stringifiedParams}` : `/api/v1/mcp/checkout-handoff`
+}
+
+/**
+ * This public page neither creates Stripe sessions nor allocates waiver quotes or BIP-84 indices. A separate owner proof and explicit human action are required before the existing checkout routes are called. Query values are non-secret correlation metadata only. Existing checkout, recovery, fulfillment, signature and on-chain settlement checks remain authoritative.
+ * @summary Open the side-effect-free verified human checkout landing page
+ */
+export const openMcpCheckoutHandoff = async (params?: OpenMcpCheckoutHandoffParams, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getOpenMcpCheckoutHandoffUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOpenMcpCheckoutHandoffQueryKey = (params?: OpenMcpCheckoutHandoffParams,) => {
+    return [
+    `/api/v1/mcp/checkout-handoff`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getOpenMcpCheckoutHandoffQueryOptions = <TData = Awaited<ReturnType<typeof openMcpCheckoutHandoff>>, TError = ErrorType<unknown>>(params?: OpenMcpCheckoutHandoffParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof openMcpCheckoutHandoff>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOpenMcpCheckoutHandoffQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof openMcpCheckoutHandoff>>> = ({ signal }) => openMcpCheckoutHandoff(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof openMcpCheckoutHandoff>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OpenMcpCheckoutHandoffQueryResult = NonNullable<Awaited<ReturnType<typeof openMcpCheckoutHandoff>>>
+export type OpenMcpCheckoutHandoffQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Open the side-effect-free verified human checkout landing page
+ */
+
+export function useOpenMcpCheckoutHandoff<TData = Awaited<ReturnType<typeof openMcpCheckoutHandoff>>, TError = ErrorType<unknown>>(
+ params?: OpenMcpCheckoutHandoffParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof openMcpCheckoutHandoff>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOpenMcpCheckoutHandoffQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetMcpPayloadKeyUrl = () => {
 
 
@@ -3478,7 +3643,7 @@ export const getExecuteMcpRequestUrl = () => {
 }
 
 /**
- * Stateless MCP 2026-07-28 (no initialize handshake and no Mcp-Session-Id): call server/discover, tools/list or tools/call, sending params._meta["io.modelcontextprotocol/protocolVersion"] and params._meta["io.modelcontextprotocol/clientCapabilities"] on every request with matching MCP-Protocol-Version and Mcp-Method headers, plus Mcp-Name for tools/call. Stateless failures are strict JSON-RPC; payment challenge fields appear in error.data. Handshake-era clients (2025-11-25 and earlier) may still call initialize, ping, tools/list or tools/call without _meta. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. New L402 invoices first require the same single-use SHA-256 proof of work as /invoice/request; missing or invalid proof returns HTTP 400 before Lightning invoice generation. Paid credential verification is unchanged. A cost quote grants no tool entitlement. Optional Whale Protocol funding: send X-Requested-Budget as an integer sats budget (for example 5000) for a fixed-base-price tool. It must be an exact multiple of the base fee, fund at least two calls, and not exceed 1000000 sats. Do not combine it with X-L402-Batch-Size or x402 payment headers. New invoices retain proof-of-work admission. Pay the whole invoice once, then omit the funding header and reuse the returned L402 macaroon and payment proof for the same tool. The issued max_requests is budget/base fee, atomically shared by descendants and workers. Both funding and prepaid calls are immune to thermodynamic surge; expiry, revocation, tool/path and delegated restrictions still apply. Variable-priced and exact-current-toll operations are ineligible. Conditional simulated yield is exactly 21 percent of the full confirmed bulk invoice, claimable once per payment hash through /api/claim-yield; execution does not repeatedly accrue yield or send outbound Lightning. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth.
+ * Stateless MCP 2026-07-28 (no initialize handshake and no Mcp-Session-Id): call server/discover, tools/list or tools/call, sending params._meta["io.modelcontextprotocol/protocolVersion"] and params._meta["io.modelcontextprotocol/clientCapabilities"] on every request with matching MCP-Protocol-Version and Mcp-Method headers, plus Mcp-Name for tools/call. Stateless failures are strict JSON-RPC; payment challenge fields appear in error.data. Handshake-era clients (2025-11-25 and earlier) may still call initialize, ping, tools/list or tools/call without _meta. All sixteen input and output schemas, namespaces, side effects and prices are described in x-mcp-tools and x-mcp-tool-groups. tools/list is the live authoritative catalog. Tool calls use params.name and params.arguments. Paid calls require a scoped L402 Authorization credential obtained from the HTTP 402 WWW-Authenticate challenge. New L402 invoices first require the same single-use SHA-256 proof of work as /invoice/request; missing or invalid proof returns HTTP 400 before Lightning invoice generation. Paid credential verification is unchanged. A cost quote grants no tool entitlement. Optional Whale Protocol funding: send X-Requested-Budget as an integer sats budget (for example 5000) for a fixed-base-price tool. It must be an exact multiple of the base fee, fund at least two calls, and not exceed 1000000 sats. Do not combine it with X-L402-Batch-Size or x402 payment headers. New invoices retain proof-of-work admission. Pay the whole invoice once, then omit the funding header and reuse the returned L402 macaroon and payment proof for the same tool. The issued max_requests is budget/base fee, atomically shared by descendants and workers. Both funding and prepaid calls are immune to thermodynamic surge; expiry, revocation, tool/path and delegated restrictions still apply. Variable-priced and exact-current-toll operations are ineligible. Conditional simulated yield is exactly 21 percent of the full confirmed bulk invoice, claimable once per payment hash through /api/claim-yield; execution does not repeatedly accrue yield or send outbound Lightning. SDK clients may advertise application/json and text/event-stream, but POST returns finite JSON. Cookies are not used for cross-origin auth. Additive non-tool checkout/handoff accepts params.intent scanner_pack_checkout or agpl_waiver_checkout only when the client explicitly declares capabilities.elicitation.url. Legacy 2025-11-25 consent can be bound during initialize to a separate 256-bit X-MCP-Owner-Key or authenticated NIP-98 owner; 2026-07-28 sends capabilities in its existing per-request metadata. Legacy capable requests receive -32042 with data.elicitations in URL mode; modern capable requests receive resultType=input_required, inputRequests and opaque non-secret requestState. completion_strategy=poll_and_retry never requires a persistent SSE stream. Retry this explicit handoff request with the same requestState, or poll /api/v1/mcp/elicitation/{elicitationId} with the same owner proof. Completion does not execute or authorize any paid tool. No new canonical tool, payment credential, Stripe session or waiver address is created by requesting or opening a handoff.
  * @summary JSON-RPC discovery and execution of the 16 canonical MCP tools
  */
 export const executeMcpRequest = async (mcpJsonRpcRequest: McpJsonRpcRequest, options?: Parameters<typeof customFetch>[1]): Promise<McpJsonRpcResponse> => {

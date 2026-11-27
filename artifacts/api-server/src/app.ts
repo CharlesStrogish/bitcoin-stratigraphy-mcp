@@ -64,6 +64,8 @@ import { createPostgresNip98RevocationStore } from "./lib/nip98-revocation-store
 import { registerComplianceRoutes } from "./routes/compliance";
 import { registerScannerRoute, createScannerMintHandler } from "./routes/scanner";
 import { registerAgplWaiverRoutes } from "./routes/agpl-waivers";
+import { McpUrlElicitation } from "./lib/mcp-url-elicitation";
+import { registerMcpUrlElicitationRoutes } from "./routes/mcp-url-elicitation";
 import { registerFiatMintRoutes, registerFiatWebhook } from "./routes/fiat-mint";
 import { fulfillEnterpriseEvent } from "./services/enterpriseFulfillmentRuntime";
 import { fiatMint } from "./services/fiatMintRuntime";
@@ -182,6 +184,8 @@ registerNip98RevocationAdmin(app, nip98Revocations);
 registerComplianceRoutes(app, nip98Revocations);
 
 const macaroonUsageStore = createPostgresMacaroonUsageStore();
+const urlElicitation = new McpUrlElicitation();
+registerMcpUrlElicitationRoutes(app, urlElicitation);
 registerFiatMintRoutes(app, fiatMint, fiatPublicOrigin, {
   nativeLightning: createScannerMintHandler({
     usageStore: macaroonUsageStore,
@@ -202,6 +206,7 @@ registerMcpServerCardRoute(app);
 // One Ed25519 identity signs the tool-description manifest and every async
 // webhook callback, so receivers verify both with the same public key.
 registerMcpRoute(app, {
+  urlElicitation,
   clearing: new ClearingContracts(clearingPool),
   genesisGrantStore: createPostgresGenesisGrantStore(),
   pipelineReceiptStore: withPipelineReceiptBroadcast(postgresPipelineReceiptStore()),

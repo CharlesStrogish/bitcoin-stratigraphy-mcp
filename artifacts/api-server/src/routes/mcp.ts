@@ -4,6 +4,8 @@ import { createHash } from "node:crypto";
 import { createMcpPipelineHandler, type PipelineReceiptStore } from "../lib/mcp-pipeline";
 import { loadArticle12IssuerKey } from "../lib/article12-signature";
 import { frameMcpErrors, validateMcpEnvelope } from "../middleware/mcpJsonRpc";
+import { mcpUrlElicitation } from "../middleware/mcpUrlElicitation";
+import { McpUrlElicitation } from "../lib/mcp-url-elicitation";
 import { verifySwarmReferralKey } from "../lib/swarm-referral";
 import {
   MCP_SERVER_INFO,
@@ -5433,6 +5435,7 @@ export function registerMcpRoute(
     /** Background runner for webhook_url calls; one per process by default. */
     asyncTaskRunner?: McpAsyncTaskRunner;
     tasksExtension?: McpTasksExtension;
+    urlElicitation?: McpUrlElicitation;
     pipelineReceiptStore?: PipelineReceiptStore;
     yieldStaking?: YieldStaking;
     /** Isolated host-mounted extension; the sealed 17-tool core is unchanged. */
@@ -5845,6 +5848,9 @@ export function registerMcpRoute(
     // Selects the protocol era and validates 2026-07-28 metadata and routing
     // headers before any payment, delegation or tool work.
     negotiateMcpProtocol,
+    mcpUrlElicitation(options.urlElicitation ?? new McpUrlElicitation(
+      undefined, () => options.sessionSecret ?? process.env.SESSION_SECRET,
+    )),
     ...(options.clearing ? [clearingController({
       store: options.clearing, settlementRouter,
       secret: options.sessionSecret ?? process.env.SESSION_SECRET,

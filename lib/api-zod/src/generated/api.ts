@@ -1104,6 +1104,99 @@ export const RequestMcpInvoiceResponse = zod.void()
 
 
 /**
+ * Never creates a quote, allocates an address, charges a toll or issues a certificate. Prove ownership using the same fresh NIP-98 signer or separate X-MCP-Owner-Key as the quote's checkout handoff. Supply handoff_id on first registration, or opt in with X-MCP-Finality-Tracking:true and the owner proof on the original quote request, which returns X-MCP-Finality-Task. A quote UUID alone is never ownership proof. Exact repeated registrations return the same durable task. claim_submitted denotes a registered TXID claim, not verified payment. Use the unchanged claim endpoint for issuance. OTS tasks are attached as optional _meta.finality_task to a successfully paid proof.notarize call when the same header, owner proof and existing MCP Tasks client capability are present. No untrusted receipt URLs are accepted.
+ * @summary Register owner-bound read-only observation of an existing waiver quote
+ */
+export const RegisterFinalityTaskHeader = zod.object({
+  "X-MCP-Owner-Key": zod.string().optional(),
+  "X-Nostr-Authorization": zod.string().optional()
+})
+
+export const RegisterFinalityTaskBody = zod.object({
+  "task_type": zod.enum(['waiver_finality']),
+  "quote_id": zod.string(),
+  "txid": zod.string().optional(),
+  "handoff_id": zod.string().optional()
+})
+
+export const RegisterFinalityTaskResponse = zod.object({
+  "taskId": zod.string(),
+  "status": zod.enum(['working', 'completed', 'cancelled', 'failed']),
+  "statusMessage": zod.string(),
+  "createdAt": zod.string(),
+  "lastUpdatedAt": zod.string(),
+  "pollInterval": zod.int(),
+  "ttlMs": zod.int(),
+  "finality": zod.object({
+  "domain": zod.enum(['ots_finality', 'waiver_finality']),
+  "execution_status": zod.enum(['receipt_issued', 'quote_active', 'claim_submitted', 'certificate_issued']),
+  "finality_status": zod.enum(['pending_calendar', 'bitcoin_anchored', 'awaiting_broadcast', 'confirming', 'confirmed', 'expired', 'failed']),
+  "next_step": zod.string(),
+  "idempotency_key": zod.string(),
+  "confirmations_observed": zod.int().optional(),
+  "confirmations_required": zod.int().optional(),
+  "quote_expires_at": zod.string().optional(),
+  "certificate_ready": zod.boolean().optional(),
+  "txid": zod.string().optional(),
+  "block_height": zod.int().optional(),
+  "block_hash": zod.string().optional(),
+  "upgraded_proof_sha256": zod.string().optional(),
+  "observation_status": zod.enum(['available', 'temporarily_unavailable']).optional(),
+  "certificate_reference": zod.object({
+  "waiver_id": zod.string(),
+  "txid": zod.string(),
+  "vout": zod.int()
+}).optional()
+})
+})
+
+
+/**
+ * Returns standard task fields and independent finality telemetry. No L402 toll, quote creation, derivation, signing or certificate issuance occurs. Receipt copies may be upgraded for observation; original receipts are immutable. Transient provider outages remain pending/unavailable, never synthetic confirmation. Cancel via existing MCP tasks/cancel; cancellation leaves the underlying notarization, transaction and quote unchanged. Task metadata is retained for 30 days; pollInterval is in milliseconds.
+ * @summary Inspect an owner-bound finality task without repeating execution
+ */
+export const GetFinalityTaskParams = zod.object({
+  "taskId": zod.coerce.string()
+})
+
+export const GetFinalityTaskHeader = zod.object({
+  "X-MCP-Owner-Key": zod.string().optional(),
+  "X-Nostr-Authorization": zod.string().optional()
+})
+
+export const GetFinalityTaskResponse = zod.object({
+  "taskId": zod.string(),
+  "status": zod.enum(['working', 'completed', 'cancelled', 'failed']),
+  "statusMessage": zod.string(),
+  "createdAt": zod.string(),
+  "lastUpdatedAt": zod.string(),
+  "pollInterval": zod.int(),
+  "ttlMs": zod.int(),
+  "finality": zod.object({
+  "domain": zod.enum(['ots_finality', 'waiver_finality']),
+  "execution_status": zod.enum(['receipt_issued', 'quote_active', 'claim_submitted', 'certificate_issued']),
+  "finality_status": zod.enum(['pending_calendar', 'bitcoin_anchored', 'awaiting_broadcast', 'confirming', 'confirmed', 'expired', 'failed']),
+  "next_step": zod.string(),
+  "idempotency_key": zod.string(),
+  "confirmations_observed": zod.int().optional(),
+  "confirmations_required": zod.int().optional(),
+  "quote_expires_at": zod.string().optional(),
+  "certificate_ready": zod.boolean().optional(),
+  "txid": zod.string().optional(),
+  "block_height": zod.int().optional(),
+  "block_hash": zod.string().optional(),
+  "upgraded_proof_sha256": zod.string().optional(),
+  "observation_status": zod.enum(['available', 'temporarily_unavailable']).optional(),
+  "certificate_reference": zod.object({
+  "waiver_id": zod.string(),
+  "txid": zod.string(),
+  "vout": zod.int()
+}).optional()
+})
+})
+
+
+/**
  * Finite HTTP clients use completion_strategy=poll_and_retry. Send the same separate client-generated 256-bit X-MCP-Owner-Key, or a fresh request-bound NIP-98 signature from the same owner. A handoff UUID, requestState or MCP session ID alone never grants access. TTL is 15 minutes, not renewed by polling. Completion reflects only verified existing scanner fulfillment or a verified waiver claim; it is not a payment credential or MCP authorization.
  * @summary Poll an owner-bound checkout handoff without payment side effects
  */

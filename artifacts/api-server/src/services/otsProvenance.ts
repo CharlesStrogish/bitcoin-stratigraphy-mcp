@@ -406,6 +406,22 @@ const otsCli: OtsCli = {
   },
 };
 
+/** Upgrade a detached copy only. Never stamp again or mutate provenance/receipt records. */
+export async function observeOtsFinality(proofHex: string, digest: string, dependencies: {
+  cli?: Pick<OtsCli,"inspectDigest"|"upgrade">;
+  verify?: typeof verifyOtsProofRecord;
+} = {}) {
+  const proof=checkedProof(Buffer.from(proofHex,"hex"));
+  const cli=dependencies.cli??otsCli;
+  if((await cli.inspectDigest(proof)).toLowerCase()!==digest)
+    throw new Error("Archived receipt is not bound to the requested digest");
+  const upgraded=await cli.upgrade(proof);
+  const verification=await(dependencies.verify??verifyOtsProofRecord)({otsProof:upgraded.toString("hex"),targetHash:digest});
+  return {anchored:verification.valid,
+    ...(verification.valid?{blockHeight:verification.blockHeight!,blockHash:verification.bitcoinHeaderHash!,
+      proofSha256:createHash("sha256").update(upgraded).digest("hex")}:{})};
+}
+
 export type OtsVerificationResult = {
   valid: boolean;
   status: "bitcoin_block_attested" | "unverified";

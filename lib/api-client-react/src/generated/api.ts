@@ -48,6 +48,8 @@ import type {
   EscrowTollQuote,
   ExportHuggingFaceDatasetParams,
   FiatMintCheckoutRequest,
+  FinalityRegistration,
+  FinalityTask,
   FleetRegistration,
   FleetStatement,
   GetEnterpriseCreditTab200,
@@ -3173,6 +3175,156 @@ export const useRequestMcpInvoice = <TError = ErrorType<McpJsonRpcResponse | voi
       > => {
       return useMutation(getRequestMcpInvoiceMutationOptions(options));
     }
+
+export const getRegisterFinalityTaskUrl = () => {
+
+
+
+
+  return `/api/v1/finality/tasks`
+}
+
+/**
+ * Never creates a quote, allocates an address, charges a toll or issues a certificate. Prove ownership using the same fresh NIP-98 signer or separate X-MCP-Owner-Key as the quote's checkout handoff. Supply handoff_id on first registration, or opt in with X-MCP-Finality-Tracking:true and the owner proof on the original quote request, which returns X-MCP-Finality-Task. A quote UUID alone is never ownership proof. Exact repeated registrations return the same durable task. claim_submitted denotes a registered TXID claim, not verified payment. Use the unchanged claim endpoint for issuance. OTS tasks are attached as optional _meta.finality_task to a successfully paid proof.notarize call when the same header, owner proof and existing MCP Tasks client capability are present. No untrusted receipt URLs are accepted.
+ * @summary Register owner-bound read-only observation of an existing waiver quote
+ */
+export const registerFinalityTask = async (finalityRegistration: FinalityRegistration, options?: Parameters<typeof customFetch>[1]): Promise<FinalityTask> => {
+
+  return customFetch<FinalityTask>(getRegisterFinalityTaskUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(finalityRegistration)
+  }
+);}
+
+
+
+
+
+export const getRegisterFinalityTaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerFinalityTask>>, TError,{data: BodyType<FinalityRegistration>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerFinalityTask>>, TError,{data: BodyType<FinalityRegistration>}, TContext> => {
+
+const mutationKey = ['registerFinalityTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerFinalityTask>>, {data: BodyType<FinalityRegistration>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerFinalityTask(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterFinalityTaskMutationResult = NonNullable<Awaited<ReturnType<typeof registerFinalityTask>>>
+    export type RegisterFinalityTaskMutationBody = BodyType<FinalityRegistration>
+    export type RegisterFinalityTaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Register owner-bound read-only observation of an existing waiver quote
+ */
+export const useRegisterFinalityTask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerFinalityTask>>, TError,{data: BodyType<FinalityRegistration>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerFinalityTask>>,
+        TError,
+        {data: BodyType<FinalityRegistration>},
+        TContext
+      > => {
+      return useMutation(getRegisterFinalityTaskMutationOptions(options));
+    }
+
+export const getGetFinalityTaskUrl = (taskId: string,) => {
+
+
+
+
+  return `/api/v1/finality/tasks/${taskId}`
+}
+
+/**
+ * Returns standard task fields and independent finality telemetry. No L402 toll, quote creation, derivation, signing or certificate issuance occurs. Receipt copies may be upgraded for observation; original receipts are immutable. Transient provider outages remain pending/unavailable, never synthetic confirmation. Cancel via existing MCP tasks/cancel; cancellation leaves the underlying notarization, transaction and quote unchanged. Task metadata is retained for 30 days; pollInterval is in milliseconds.
+ * @summary Inspect an owner-bound finality task without repeating execution
+ */
+export const getFinalityTask = async (taskId: string, options?: Parameters<typeof customFetch>[1]): Promise<FinalityTask> => {
+
+  return customFetch<FinalityTask>(getGetFinalityTaskUrl(taskId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFinalityTaskQueryKey = (taskId: string,) => {
+    return [
+    `/api/v1/finality/tasks/${taskId}`
+    ] as const;
+    }
+
+
+export const getGetFinalityTaskQueryOptions = <TData = Awaited<ReturnType<typeof getFinalityTask>>, TError = ErrorType<void>>(taskId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFinalityTask>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFinalityTaskQueryKey(taskId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFinalityTask>>> = ({ signal }) => getFinalityTask(taskId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: taskId !== null && taskId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFinalityTask>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFinalityTaskQueryResult = NonNullable<Awaited<ReturnType<typeof getFinalityTask>>>
+export type GetFinalityTaskQueryError = ErrorType<void>
+
+
+/**
+ * @summary Inspect an owner-bound finality task without repeating execution
+ */
+
+export function useGetFinalityTask<TData = Awaited<ReturnType<typeof getFinalityTask>>, TError = ErrorType<void>>(
+ taskId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFinalityTask>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFinalityTaskQueryOptions(taskId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetMcpCheckoutHandoffStatusUrl = (elicitationId: string,) => {
 

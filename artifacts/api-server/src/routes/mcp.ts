@@ -6,6 +6,8 @@ import { loadArticle12IssuerKey } from "../lib/article12-signature";
 import { frameMcpErrors, validateMcpEnvelope } from "../middleware/mcpJsonRpc";
 import { mcpUrlElicitation } from "../middleware/mcpUrlElicitation";
 import { McpUrlElicitation } from "../lib/mcp-url-elicitation";
+import { type McpFinalityTasks, FinalityError } from "../lib/mcp-finality-tasks";
+import { UrlHandoffError } from "../lib/mcp-url-elicitation";
 import { verifySwarmReferralKey } from "../lib/swarm-referral";
 import {
   MCP_SERVER_INFO,
@@ -5312,7 +5314,12 @@ function mcpServerFactory(
     locals.primaryStratigraphy as PrimaryStratigraphyResult | undefined,
     locals.readToolIntegrity as (() => ReturnType<typeof createToolIntegrityManifest>) | undefined,
     locals.signToolResponse as ((name: string, result: CallToolResult) => CallToolResult) | undefined,
-    locals.onToolResult as ((name: string, args: Record<string, unknown>, result: CallToolResult) => Promise<CallToolResult>) | undefined,
+    async (name, args, result) => {
+      const original=locals.onToolResult as ((name:string,args:Record<string,unknown>,result:CallToolResult)=>Promise<CallToolResult>)|undefined;
+      const observed=original?await original(name,args,result):result;
+      const decorate=locals.decorateFinality as ((name:string,result:CallToolResult)=>Promise<CallToolResult>)|undefined;
+      return decorate?decorate(name,observed):observed;
+    },
     (locals.genesisGrant as GenesisGrantReservation | undefined)?.complete,
     locals.yieldEscrow as YieldEscrow | undefined,
   );
@@ -5435,6 +5442,7 @@ export function registerMcpRoute(
     /** Background runner for webhook_url calls; one per process by default. */
     asyncTaskRunner?: McpAsyncTaskRunner;
     tasksExtension?: McpTasksExtension;
+    finalityTasks?: McpFinalityTasks;
     urlElicitation?: McpUrlElicitation;
     pipelineReceiptStore?: PipelineReceiptStore;
     yieldStaking?: YieldStaking;
@@ -5821,6 +5829,12 @@ export function registerMcpRoute(
   };
   app.all(
     ["/mcp", "/invoice/request"],
+    (req,res,next)=>{
+      if(["tasks/get","tasks/cancel","tasks/update"].includes(req.body?.method)&&
+        typeof req.body?.params?.taskId==="string"&&req.body.params.taskId.startsWith("fin_"))
+        res.setHeader("Cache-Control","no-store");
+      next();
+    },
     rateLimit,
     (req, res, next) => {
       res.locals.x402Configured = x402Ready;
@@ -5851,6 +5865,31 @@ export function registerMcpRoute(
     mcpUrlElicitation(options.urlElicitation ?? new McpUrlElicitation(
       undefined, () => options.sessionSecret ?? process.env.SESSION_SECRET,
     )),
+    (req,res,next)=>{
+      if(!options.finalityTasks||req.body?.method!=="tools/call"||req.body?.params?.name!=="proof.notarize"||
+        req.get("X-MCP-Finality-Tracking")!=="true")return next();
+      res.setHeader("Cache-Control","no-store");
+      try{
+        if(!taskCapabilities(res)){taskError(req,res,-32021,"Finality tracking requires the existing MCP Tasks capability");return;}
+        const tasks=options.finalityTasks,owner=tasks.dependencies.ownership.ownerHash(req);
+        res.locals.decorateFinality=async(name:string,result:CallToolResult)=>{
+          if(name!=="proof.notarize"||result.isError)return result;
+          const receipt=result.structuredContent as {hash:string;otsProofHex:string};
+          try{
+            const task=await tasks.registerOts(owner,receipt);
+            return{...result,_meta:{...result._meta,finality_task:tasks.handle(task)}};
+          }catch{
+            // A paid receipt has already been issued: never hide it or repeat execution.
+            return{...result,_meta:{...result._meta,finality_tracking:{status:"unavailable",next_step:"retain_receipt; do_not_repeat_paid_execution"}}};
+          }
+        };
+        next();
+      }catch(error){
+        res.setHeader("Cache-Control","no-store");
+        res.status(error instanceof UrlHandoffError?error.status:503).json({jsonrpc:"2.0",id:req.body.id,
+          error:{code:-32004,message:"Finality ownership verification unavailable or invalid"}});
+      }
+    },
     ...(options.clearing ? [clearingController({
       store: options.clearing, settlementRouter,
       secret: options.sessionSecret ?? process.env.SESSION_SECRET,
@@ -5983,10 +6022,28 @@ export function registerMcpRoute(
         res.locals.traceparent = requestTraceparent(req);
         const method = req.body?.method;
         if (["tasks/get", "tasks/update", "tasks/cancel"].includes(method)) {
+          const finalityId=req.body.params?.taskId;
+          if(typeof finalityId==="string"&&finalityId.startsWith("fin_"))res.setHeader("Cache-Control","no-store");
           if (!taskCapabilities(res)) {
             res.status(400).json({ jsonrpc: "2.0", id: req.body.id,
               error: { code: -32021, message: "Missing required client capability",
                 data: { requiredCapabilities: { extensions: { [TASKS_EXTENSION]: {} } } } } });
+            return;
+          }
+          if(typeof finalityId==="string"&&finalityId.startsWith("fin_")){
+            try{
+              const finality=options.finalityTasks;
+              if(!finality)throw new FinalityError(404,"Finality task not found");
+              const owner=finality.dependencies.ownership.ownerHash(req);
+              await finality.owned(finalityId,owner);
+              if(method==="tasks/get")taskReply(req,res,finality.view(await finality.inspect(finalityId,owner)));
+              else if(method==="tasks/cancel"){await finality.cancel(finalityId,owner);taskReply(req,res,{resultType:"complete"});}
+              else taskError(req,res,-32602,"Finality tasks observe existing execution; use tasks/get or tasks/cancel");
+            }catch(error){
+              const known=error instanceof FinalityError||error instanceof UrlHandoffError;
+              res.status(known?error.status:503).json({jsonrpc:"2.0",id:req.body.id,
+                error:{code:-32004,message:known?error.message:"Finality tracking unavailable"}});
+            }
             return;
           }
           const task = await pollingTasks.get(req.body.params?.taskId);

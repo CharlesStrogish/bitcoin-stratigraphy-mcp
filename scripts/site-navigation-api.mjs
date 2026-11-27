@@ -38,6 +38,8 @@ export async function registerNavigationApi(app) {
         export { registerMcpDirectoryRoutes } from "./src/routes/mcp-directory";
         export { registerEnterpriseRoutes } from "./src/routes/enterprise";
         export { registerComplianceRoutes } from "./src/routes/compliance";
+        export { registerFinalityRoutes } from "./src/routes/mcp-finality";
+        export { FinalityError } from "./src/lib/mcp-finality-tasks";
       `,
         resolveDir: api,
         loader: "ts",
@@ -80,6 +82,7 @@ export async function registerNavigationApi(app) {
       "/mcp",
       "/api/v1/enterprise/due-diligence-brief",
       "/api/v1/compliance/revocation-snapshot",
+      "/api/v1/finality/tasks/:taskId",
     ]);
     const capture = {
       locals: {},
@@ -112,6 +115,9 @@ export async function registerNavigationApi(app) {
       },
       () => key,
     );
+    routes.registerFinalityRoutes(capture, {
+      dependencies: { ownership: { ownerHash() { throw new routes.FinalityError(403, "Owner proof required"); } } },
+    });
     routes.registerStratigraphyRoutes(capture, () => {
       throw new Error("Wallet use forbidden in navigation audit");
     });

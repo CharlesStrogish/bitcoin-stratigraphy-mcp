@@ -15,6 +15,7 @@
     "@coinbase/cdp-sdk": "^1.60.0",
     "@getalby/sdk": "8.0.3",
     "@getbrevo/brevo": "6.2.0",
+    "@google-cloud/storage": "^9.0.0",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@replit/connectors-sdk": "^0.4.1",
     "@scure/base": "^2.0.0",

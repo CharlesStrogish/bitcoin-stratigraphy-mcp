@@ -1934,6 +1934,71 @@ paths:
                 $ref: "#/components/schemas/McpJsonRpcResponse"
         "503":
           description: Proof admission capacity or durable pipeline storage unavailable
+  /v1/finality/tasks:
+    post:
+      operationId: registerFinalityTask
+      tags: [mcp]
+      summary: Register owner-bound read-only observation of an existing waiver quote
+      description: >-
+        Never creates a quote, allocates an address, charges a toll or issues a
+        certificate. Prove ownership using the same fresh NIP-98 signer or separate
+        X-MCP-Owner-Key as the quote's checkout handoff. Supply handoff_id on first
+        registration, or opt in with X-MCP-Finality-Tracking:true and the owner
+        proof on the original quote request, which returns X-MCP-Finality-Task.
+        A quote UUID alone is never ownership proof. Exact repeated registrations
+        return the same durable task. claim_submitted denotes a registered TXID
+        claim, not verified payment. Use the unchanged claim endpoint for issuance.
+        OTS tasks are attached as optional _meta.finality_task to a successfully
+        paid proof.notarize call when the same header, owner proof and existing MCP
+        Tasks client capability are present. No untrusted receipt URLs are accepted.
+      parameters:
+        - { name: X-MCP-Owner-Key, in: header, schema: { type: string } }
+        - { name: X-Nostr-Authorization, in: header, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FinalityRegistration" }
+      responses:
+        "200":
+          description: Registered idempotent tracking; no underlying execution or payment mutation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FinalityTask" }
+        "400": { description: Invalid registration }
+        "403": { description: Cryptographic quote ownership required }
+        "404": { description: Owner-bound quote or handoff not found }
+        "410": { description: Checkout ownership handoff expired before first tracking registration }
+        "503": { description: Durable tracking unavailable }
+  /v1/finality/tasks/{taskId}:
+    get:
+      operationId: getFinalityTask
+      tags: [mcp]
+      summary: Inspect an owner-bound finality task without repeating execution
+      description: >-
+        Returns standard task fields and independent finality telemetry. No L402
+        toll, quote creation, derivation, signing or certificate issuance occurs.
+        Receipt copies may be upgraded for observation; original receipts are
+        immutable. Transient provider outages remain pending/unavailable, never
+        synthetic confirmation. Cancel via existing MCP tasks/cancel; cancellation
+        leaves the underlying notarization, transaction and quote unchanged.
+        Task metadata is retained for 30 days; pollInterval is in milliseconds.
+      parameters:
+        - { name: taskId, in: path, required: true, schema: { type: string } }
+        - { name: X-MCP-Owner-Key, in: header, schema: { type: string } }
+        - { name: X-Nostr-Authorization, in: header, schema: { type: string } }
+      responses:
+        "200":
+          description: Owner-verified read-only finality status
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FinalityTask" }
+        "403": { description: Missing or invalid cryptographic ownership }
+        "404": { description: Unknown task or different owner }
+        "503": { description: Durable tracking unavailable }
   /v1/mcp/elicitation/{elicitationId}:
     get:
       operationId: getMcpCheckoutHandoffStatus
@@ -4160,6 +4225,54 @@ components:
         service:
           type: string
           const: MCP Server
+    FinalityRegistration:
+      type: object
+      additionalProperties: false
+      required: [task_type, quote_id]
+      properties:
+        task_type: { type: string, enum: [waiver_finality] }
+        quote_id: { type: string }
+        txid: { type: string }
+        handoff_id: { type: string }
+    FinalityTask:
+      type: object
+      additionalProperties: false
+      required: [taskId, status, statusMessage, createdAt, lastUpdatedAt, pollInterval, ttlMs, finality]
+      properties:
+        taskId: { type: string }
+        status: { type: string, enum: [working, completed, cancelled, failed] }
+        statusMessage: { type: string }
+        createdAt: { type: string }
+        lastUpdatedAt: { type: string }
+        pollInterval: { type: integer }
+        ttlMs: { type: integer }
+        finality:
+          type: object
+          additionalProperties: false
+          required: [domain, execution_status, finality_status, next_step, idempotency_key]
+          properties:
+            domain: { type: string, enum: [ots_finality, waiver_finality] }
+            execution_status: { type: string, enum: [receipt_issued, quote_active, claim_submitted, certificate_issued] }
+            finality_status: { type: string, enum: [pending_calendar, bitcoin_anchored, awaiting_broadcast, confirming, confirmed, expired, failed] }
+            next_step: { type: string }
+            idempotency_key: { type: string }
+            confirmations_observed: { type: integer }
+            confirmations_required: { type: integer }
+            quote_expires_at: { type: string }
+            certificate_ready: { type: boolean }
+            txid: { type: string }
+            block_height: { type: integer }
+            block_hash: { type: string }
+            upgraded_proof_sha256: { type: string }
+            observation_status: { type: string, enum: [available, temporarily_unavailable] }
+            certificate_reference:
+              type: object
+              additionalProperties: false
+              required: [waiver_id, txid, vout]
+              properties:
+                waiver_id: { type: string }
+                txid: { type: string }
+                vout: { type: integer }
     McpCheckoutHandoffStatus:
       type: object
       additionalProperties: false

@@ -974,6 +974,104 @@ export const McpProbeValue = {
 } as const;
 export type McpProbe = typeof McpProbeValue;
 
+export type FinalityRegistrationTaskType = typeof FinalityRegistrationTaskType[keyof typeof FinalityRegistrationTaskType];
+
+
+export const FinalityRegistrationTaskType = {
+  waiver_finality: 'waiver_finality',
+} as const;
+
+export interface FinalityRegistration {
+  task_type: FinalityRegistrationTaskType;
+  quote_id: string;
+  txid?: string;
+  handoff_id?: string;
+}
+
+export type FinalityTaskStatus = typeof FinalityTaskStatus[keyof typeof FinalityTaskStatus];
+
+
+export const FinalityTaskStatus = {
+  working: 'working',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  failed: 'failed',
+} as const;
+
+export type FinalityTaskFinalityDomain = typeof FinalityTaskFinalityDomain[keyof typeof FinalityTaskFinalityDomain];
+
+
+export const FinalityTaskFinalityDomain = {
+  ots_finality: 'ots_finality',
+  waiver_finality: 'waiver_finality',
+} as const;
+
+export type FinalityTaskFinalityExecutionStatus = typeof FinalityTaskFinalityExecutionStatus[keyof typeof FinalityTaskFinalityExecutionStatus];
+
+
+export const FinalityTaskFinalityExecutionStatus = {
+  receipt_issued: 'receipt_issued',
+  quote_active: 'quote_active',
+  claim_submitted: 'claim_submitted',
+  certificate_issued: 'certificate_issued',
+} as const;
+
+export type FinalityTaskFinalityFinalityStatus = typeof FinalityTaskFinalityFinalityStatus[keyof typeof FinalityTaskFinalityFinalityStatus];
+
+
+export const FinalityTaskFinalityFinalityStatus = {
+  pending_calendar: 'pending_calendar',
+  bitcoin_anchored: 'bitcoin_anchored',
+  awaiting_broadcast: 'awaiting_broadcast',
+  confirming: 'confirming',
+  confirmed: 'confirmed',
+  expired: 'expired',
+  failed: 'failed',
+} as const;
+
+export type FinalityTaskFinalityObservationStatus = typeof FinalityTaskFinalityObservationStatus[keyof typeof FinalityTaskFinalityObservationStatus];
+
+
+export const FinalityTaskFinalityObservationStatus = {
+  available: 'available',
+  temporarily_unavailable: 'temporarily_unavailable',
+} as const;
+
+export type FinalityTaskFinalityCertificateReference = {
+  waiver_id: string;
+  txid: string;
+  vout: number;
+};
+
+export type FinalityTaskFinality = {
+  domain: FinalityTaskFinalityDomain;
+  execution_status: FinalityTaskFinalityExecutionStatus;
+  finality_status: FinalityTaskFinalityFinalityStatus;
+  next_step: string;
+  idempotency_key: string;
+  confirmations_observed?: number;
+  confirmations_required?: number;
+  quote_expires_at?: string;
+  certificate_ready?: boolean;
+  txid?: string;
+  block_height?: number;
+  block_hash?: string;
+  upgraded_proof_sha256?: string;
+  observation_status?: FinalityTaskFinalityObservationStatus;
+  certificate_reference?: FinalityTaskFinalityCertificateReference;
+};
+
+export interface FinalityTask {
+  taskId: string;
+  status: FinalityTaskStatus;
+  statusMessage: string;
+  createdAt: string;
+  lastUpdatedAt: string;
+  pollInterval: number;
+  ttlMs: number;
+  finality: FinalityTaskFinality;
+}
+
 export type McpCheckoutHandoffStatusIntent = typeof McpCheckoutHandoffStatusIntent[keyof typeof McpCheckoutHandoffStatusIntent];
 
 

@@ -66,6 +66,8 @@ import { registerScannerRoute, createScannerMintHandler } from "./routes/scanner
 import { registerAgplWaiverRoutes } from "./routes/agpl-waivers";
 import { McpUrlElicitation } from "./lib/mcp-url-elicitation";
 import { registerMcpUrlElicitationRoutes } from "./routes/mcp-url-elicitation";
+import { createFinalityRuntime } from "./services/finalityRuntime";
+import { registerFinalityRoutes } from "./routes/mcp-finality";
 import { registerFiatMintRoutes, registerFiatWebhook } from "./routes/fiat-mint";
 import { fulfillEnterpriseEvent } from "./services/enterpriseFulfillmentRuntime";
 import { fiatMint } from "./services/fiatMintRuntime";
@@ -185,6 +187,9 @@ registerComplianceRoutes(app, nip98Revocations);
 
 const macaroonUsageStore = createPostgresMacaroonUsageStore();
 const urlElicitation = new McpUrlElicitation();
+const finalityTasks=createFinalityRuntime(urlElicitation);
+registerFinalityRoutes(app,finalityTasks);
+app.locals.stopFinalityTracking=finalityTasks.start();
 registerMcpUrlElicitationRoutes(app, urlElicitation);
 registerFiatMintRoutes(app, fiatMint, fiatPublicOrigin, {
   nativeLightning: createScannerMintHandler({
@@ -206,6 +211,7 @@ registerMcpServerCardRoute(app);
 // One Ed25519 identity signs the tool-description manifest and every async
 // webhook callback, so receivers verify both with the same public key.
 registerMcpRoute(app, {
+  finalityTasks,
   urlElicitation,
   clearing: new ClearingContracts(clearingPool),
   genesisGrantStore: createPostgresGenesisGrantStore(),

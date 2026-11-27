@@ -15,9 +15,13 @@ export type TaskRecord = {
   result?: Record<string, unknown>;
   error?: { code: number; message: string };
   traceparent?: string;
+  /** Private finality tracking data. Never return via the legacy task view. */
+  finality?: import("./mcp-finality-tasks").FinalityTracking;
 };
 
 export interface McpTaskStore {
+  createFinality?(task: TaskRecord): Promise<boolean>;
+  workingFinality?(): Promise<TaskRecord[]>;
   create(task: TaskRecord): Promise<void>;
   get(id: string): Promise<TaskRecord | undefined>;
   replace(task: TaskRecord, revision: number): Promise<boolean>;
@@ -28,6 +32,18 @@ export interface McpTaskStore {
 export function memoryMcpTaskStore(): McpTaskStore {
   const rows = new Map<string, TaskRecord>();
   return {
+    async createFinality(task) {
+      if (rows.has(task.taskId)) return false;
+      rows.set(task.taskId, structuredClone(task));
+      return true;
+    },
+    async workingFinality() {
+      return [...rows.values()]
+        .filter((row) => row.finality && row.status === "working")
+        .sort((a, b) => a.lastUpdatedAt.localeCompare(b.lastUpdatedAt))
+        .slice(0, 20)
+        .map((row) => structuredClone(row));
+    },
     async create(task) {
       rows.set(task.taskId, structuredClone(task));
     },
@@ -64,6 +80,24 @@ export function postgresMcpTaskStore(): McpTaskStore {
     await ready;
   };
   return {
+    async createFinality(task) {
+      try {
+        await this.create(task);
+        return true;
+      } catch (error) {
+        if ((error as { code?: string }).code === "23505") return false;
+        // A competing identical registration may have filled the last slot.
+        if (await this.get(task.taskId)) return false;
+        throw error;
+      }
+    },
+    async workingFinality() {
+      await ensure();
+      const result = await pool.query(
+        "SELECT state FROM mcp_extension_tasks WHERE expires_at > now() AND state->>'status'='working' AND state ? 'finality' ORDER BY state->>'lastUpdatedAt' LIMIT 20",
+      );
+      return result.rows.map((row) => row.state as TaskRecord);
+    },
     async create(task) {
       await ensure();
       // Serializes admission across replicas without storing any payment secrets.

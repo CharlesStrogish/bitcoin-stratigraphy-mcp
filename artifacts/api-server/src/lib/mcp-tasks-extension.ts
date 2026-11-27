@@ -34,6 +34,7 @@ export class McpTasksExtension {
       revision: _revision,
       inputKey: _inputKey,
       traceparent: _traceparent,
+      finality: _privateFinality,
       ...view
     } = task;
     return { resultType, ...view };
@@ -91,13 +92,14 @@ export class McpTasksExtension {
   }
 
   async get(id: unknown) {
-    if (typeof id !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(id))
+    if (typeof id !== "string" || !/^(?:fin_)?[A-Za-z0-9_-]{43}$/.test(id))
       return undefined;
     let task = await this.store.get(id);
     if (!task || Date.now() >= Date.parse(task.createdAt) + task.ttlMs)
       return undefined;
     // Never replay charged work after a worker crash or process restart.
     if (
+      !task.finality &&
       task.status === "working" &&
       Date.now() - Date.parse(task.lastUpdatedAt) > MAX_EXECUTION_MS + 30_000
     ) {

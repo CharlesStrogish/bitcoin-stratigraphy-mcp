@@ -9,5 +9,6 @@
 export interface McpJsonRpcError {
   code: number;
   message: string;
+  /** Arbitrary error details, including Http402NextAction at next_action for stateless HTTP 402; retained without stripping. */
   data?: unknown;
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { assertNextAction } from "../../src/lib/testing/next-action";
 import { after, test } from "node:test";
 import { pool } from "@workspace/db";
 import {
@@ -116,6 +117,8 @@ test("credit charges serialize across workers, stop at 2000 sats, settle once an
     assert.equal((await h.tabs.status(agent.pubkey)).unpaid_sats, 2000);
     assert.equal(await h.ledger.getTotalVolume(), 0);
     const quote = results.find((r) => r.status === 402)!.data;
+    assertNextAction(quote, "credit_tab_settlement", "POST", tabPath + "/settle");
+    assert.equal(quote.next_action.alternatives, undefined);
     const invoice = h.invoices.get(quote.payment_hash)!;
     assert.equal(invoice.amount, 2_000_000);
     const allocation = await h.economicStore.transaction("read", (tx) =>
@@ -256,6 +259,10 @@ test("session close and idle timeout freeze the whole tab; wrong identities and 
     assert.equal(state.body.trust_score, 51);
     const closed = await h.request(a, {}, agent, { path: tabPath + "/close" });
     assert.equal(closed.status, 402);
+    assertNextAction(closed.body, "credit_tab_settlement", "POST", tabPath + "/settle");
+    assert.equal(closed.body.next_action.alternatives, undefined);
+    assert.equal(closed.headers.has("PAYMENT-REQUIRED"), false);
+    assert.equal(closed.headers.get("www-authenticate"), `L402 macaroon="${closed.body.macaroon}", invoice="${closed.body.invoice}"`);
     const invoice = h.invoices.get(closed.body.payment_hash)!;
     const auth = `L402 ${closed.body.macaroon}:${invoice.preimage}`;
     invoice.paid = true;

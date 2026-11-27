@@ -12,6 +12,7 @@
 - [Settlement failover invariants](settlement-failover-invariants.md) — abort timed-out clients, single-probe recovery, and cache fallback invoices under predicted and actual providers.
 - [Paid SSE lifecycle](paid-sse-lifecycle.md) — authenticate before headers, propagate disconnect aborts through paid checks, bound upstream reads, and stop shared timers at zero listeners.
 - [L402 SDK payment coordination](l402-sdk-payment-coordination.md) — bind preimages to challenge hashes and never let delayed 402 responses replace or repay newer credentials.
+- [HTTP 402 next-action trust](http402-next-action-trust.md) — additive guidance copies exact body capabilities; x402 alternatives require an emitted header and strict MCP framing.
 - [Agent-bound L402 identity](agent-bound-l402-identity.md) — discounted passes bind NIP-98 pubkey and tier; every use must present the same fresh identity.
 - [Multi-asset settlement ownership](multi-asset-settlement-ownership.md) — bind every payment to asset, issuer, caller, and the full invoice redemption window.
 - [SNARK worker bundling](snark-worker-bundling.md) — keep worker-spawning crypto out of bundles; Groth16 verifies on one worker thread (single-threaded curve, web-worker shim).

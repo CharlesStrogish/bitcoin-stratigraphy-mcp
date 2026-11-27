@@ -5,5 +5,9 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+import type { Http402NextAction } from './http402NextAction';
 
-export type SettleEnterpriseCreditTab402 = { [key: string]: unknown };
+export type SettleEnterpriseCreditTab402 = {
+  next_action?: Http402NextAction;
+  [key: string]: unknown;
+ };

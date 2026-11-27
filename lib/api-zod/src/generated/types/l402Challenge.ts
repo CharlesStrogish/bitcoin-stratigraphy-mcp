@@ -6,12 +6,14 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { AgentReputationMetadata } from './agentReputationMetadata';
+import type { Http402NextAction } from './http402NextAction';
 import type { L402Preflight } from './l402Preflight';
 import type { L402SettlementPath } from './l402SettlementPath';
 import type { L402SubscriptionPass } from './l402SubscriptionPass';
 import type { SettlementAsset } from './settlementAsset';
 
 export interface L402Challenge {
+  next_action?: Http402NextAction;
   /** Single-use capability bound to the quoted record range, route, invoice amount and issuer. Retain it for merchant NWC verification when no preimage is available. */
   macaroon?: string;
   /** Invoice or payment request for the selected settlement asset */

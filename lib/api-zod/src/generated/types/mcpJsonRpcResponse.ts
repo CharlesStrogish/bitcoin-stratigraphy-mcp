@@ -5,6 +5,7 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+import type { Http402NextAction } from './http402NextAction';
 import type { McpJsonRpcError } from './mcpJsonRpcError';
 
 export type McpJsonRpcResponse = (unknown & ({
@@ -12,6 +13,8 @@ export type McpJsonRpcResponse = (unknown & ({
   /** @nullable */
   id: string | number | null;
   result?: unknown;
+  /** Handshake-era HTTP 402 only; stateless challenges place this envelope exclusively in error.data.next_action. */
+  next_action?: Http402NextAction;
   error?: McpJsonRpcError;
   [key: string]: unknown;
  }));

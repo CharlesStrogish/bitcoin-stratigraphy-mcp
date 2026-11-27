@@ -804,6 +804,8 @@ paths:
                   payment_endpoint: { type: string, enum: [/api/mint-macaroon] }
                   purchase_recovery: { type: string, enum: [/api/fiat-mint/status] }
                   continuity_note: { type: string }
+                  next_action:
+                    $ref: "#/components/schemas/Http402NextAction"
         "409": { description: Existing purchase must be recovered first }
         "502": { description: Native Lightning invoice creation also unavailable; no payment or authorization bypass }
         "503": { description: Stripe configuration unavailable }
@@ -1390,7 +1392,12 @@ paths:
           description: Full-tab L402 macro-invoice with macaroon, amount_sats and payment_hash
           content:
             application/json:
-              schema: {type: object, additionalProperties: true}
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  next_action:
+                    $ref: "#/components/schemas/Http402NextAction"
         "401": {description: Missing or invalid fresh NIP-98 signature}
         "409": {description: An older invoice is already paid and must be redeemed}
         "503": {description: Storage or settlement unavailable; debt remains frozen}
@@ -1412,7 +1419,12 @@ paths:
           description: Full-tab L402 invoice
           content:
             application/json:
-              schema: {type: object, additionalProperties: true}
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  next_action:
+                    $ref: "#/components/schemas/Http402NextAction"
         "401": {description: Missing or invalid NIP-98 authentication}
         "403": {description: "Wrong identity, invoice, amount, asset or proof"}
         "409": {description: Payment not confirmed}
@@ -4096,6 +4108,9 @@ components:
         id:
           type: [string, number, "null"]
         result: {}
+        next_action:
+          description: Handshake-era HTTP 402 only; stateless challenges place this envelope exclusively in error.data.next_action.
+          $ref: "#/components/schemas/Http402NextAction"
         error:
           $ref: "#/components/schemas/McpJsonRpcError"
       oneOf:
@@ -4109,7 +4124,8 @@ components:
           type: integer
         message:
           type: string
-        data: {}
+        data:
+          description: Arbitrary error details, including Http402NextAction at next_action for stateless HTTP 402; retained without stripping.
     McpToolCostSelection:
       type: object
       additionalProperties: false
@@ -5866,9 +5882,50 @@ components:
         - target_multiplier
         - difficulty_epoch_progress
         - thermodynamic_signal
+    Http402NextAction:
+      type: object
+      required: [schema_version, action, protocol, reason, payment, retry]
+      properties:
+        schema_version: { type: string, enum: ["1.0"] }
+        action: { type: string, enum: [pay_l402_invoice] }
+        protocol: { type: string, enum: [L402] }
+        reason:
+          type: string
+          enum: [toll_required, fiat_gateway_offline, range_pass_required, credit_tab_settlement]
+        payment:
+          type: object
+          required: [method, invoice, payment_hash, macaroon]
+          properties:
+            method: { type: string, enum: [lightning_bolt11] }
+            invoice: { type: string }
+            payment_hash: { type: string }
+            macaroon: { type: string }
+            amount_sats: { type: number }
+        retry:
+          type: object
+          required: [method, path, auth_header, auth_scheme, auth_format, persist_preimage_before_retry]
+          properties:
+            method: { type: string }
+            path: { type: string }
+            auth_header: { type: string, enum: [Authorization] }
+            auth_scheme: { type: string, enum: [L402] }
+            auth_format: { type: string, enum: ["L402 <macaroon>:<preimage_hex>"] }
+            persist_preimage_before_retry: { type: boolean, enum: [true] }
+        alternatives:
+          type: array
+          items:
+            type: object
+            required: [protocol, action]
+            properties:
+              protocol: { type: string }
+              action: { type: string }
+              header: { type: string }
+              path: { type: string }
     L402Challenge:
       type: object
       properties:
+        next_action:
+          $ref: "#/components/schemas/Http402NextAction"
         macaroon:
           type: string
           description: Single-use capability bound to the quoted record range, route, invoice amount and issuer. Retain it for merchant NWC verification when no preimage is available.
@@ -5921,6 +5978,8 @@ components:
       type: object
       description: L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Exact same-tool pass sizes of 1, 100, 1000 and 10000 remain available at batch_size times the per-call price. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
       properties:
+        next_action:
+          $ref: "#/components/schemas/Http402NextAction"
         error:
           type: string
         macaroon:

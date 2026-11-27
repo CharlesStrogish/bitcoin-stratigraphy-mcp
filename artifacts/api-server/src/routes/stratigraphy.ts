@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { type Express, type Request, type Response } from "express";
 import { createL402Middleware } from "../middleware/l402";
+import { buildHttp402NextAction } from "../lib/http402-next-action";
 import { isValidWaiverBtcZpub } from "../services/btcAddressDeriver";
 import { quoteMcpTools } from "../lib/mcp-pricing";
 import { bindEnterpriseInvoiceToContext, enterpriseChallengeScope } from "../lib/enterprise-economics";
@@ -745,6 +746,15 @@ async function sendPaymentChallenge(
       macaroon: rangeMacaroon,
       payment_hash: legacyResult.challenge.paymentHash,
       settlement_asset: paymentAsset,
+      next_action: buildHttp402NextAction({
+        reason: "range_pass_required",
+        invoice: legacyResult.challenge.invoice,
+        payment_hash: legacyResult.challenge.paymentHash,
+        macaroon: rangeMacaroon,
+        amount_sats: amountMsats / 1000,
+        method: req.method,
+        path: req.originalUrl,
+      }),
       supported_assets: supportedSettlementAssets(settlementRouter),
       available_assets: availableSettlementAssets(settlementRouter),
       agent: agent

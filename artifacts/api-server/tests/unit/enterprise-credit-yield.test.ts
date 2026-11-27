@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { assertNextAction } from "../../src/lib/testing/next-action";
 import { after, test } from "node:test";
 import { pool } from "@workspace/db";
 import {
@@ -82,6 +83,10 @@ test("a 2000-sat payment opens a -420-sat balance and discounts the next 2000-sa
     const second = await close();
     assert.equal(second.body.gross_amount_sats, 2000);
     assert.equal(second.body.amount_sats, 1580);
+    assertNextAction(second.body, "credit_tab_settlement", "POST", tabPath + "/settle");
+    assert.equal(second.body.next_action.payment.amount_sats, 1580);
+    assert.equal(second.body.next_action.alternatives, undefined);
+    assert.equal(second.headers.has("PAYMENT-REQUIRED"), false);
     assert.equal(second.body.yield_applied_msats, 420000);
     assert.equal(second.body.balance_sats, 1580);
     const secondInvoice = h.invoices.get(second.body.payment_hash)!;

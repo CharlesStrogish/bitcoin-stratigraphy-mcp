@@ -984,9 +984,103 @@ export interface McpJsonRpcRequest {
   params?: McpJsonRpcRequestParams;
 }
 
+export type Http402NextActionSchemaVersion = typeof Http402NextActionSchemaVersion[keyof typeof Http402NextActionSchemaVersion];
+
+
+export const Http402NextActionSchemaVersion = {
+  '10': '1.0',
+} as const;
+
+export type Http402NextActionAction = typeof Http402NextActionAction[keyof typeof Http402NextActionAction];
+
+
+export const Http402NextActionAction = {
+  pay_l402_invoice: 'pay_l402_invoice',
+} as const;
+
+export type Http402NextActionProtocol = typeof Http402NextActionProtocol[keyof typeof Http402NextActionProtocol];
+
+
+export const Http402NextActionProtocol = {
+  L402: 'L402',
+} as const;
+
+export type Http402NextActionReason = typeof Http402NextActionReason[keyof typeof Http402NextActionReason];
+
+
+export const Http402NextActionReason = {
+  toll_required: 'toll_required',
+  fiat_gateway_offline: 'fiat_gateway_offline',
+  range_pass_required: 'range_pass_required',
+  credit_tab_settlement: 'credit_tab_settlement',
+} as const;
+
+export type Http402NextActionPaymentMethod = typeof Http402NextActionPaymentMethod[keyof typeof Http402NextActionPaymentMethod];
+
+
+export const Http402NextActionPaymentMethod = {
+  lightning_bolt11: 'lightning_bolt11',
+} as const;
+
+export type Http402NextActionRetryAuthHeader = typeof Http402NextActionRetryAuthHeader[keyof typeof Http402NextActionRetryAuthHeader];
+
+
+export const Http402NextActionRetryAuthHeader = {
+  Authorization: 'Authorization',
+} as const;
+
+export type Http402NextActionRetryAuthScheme = typeof Http402NextActionRetryAuthScheme[keyof typeof Http402NextActionRetryAuthScheme];
+
+
+export const Http402NextActionRetryAuthScheme = {
+  L402: 'L402',
+} as const;
+
+export type Http402NextActionRetryAuthFormat = typeof Http402NextActionRetryAuthFormat[keyof typeof Http402NextActionRetryAuthFormat];
+
+
+export const Http402NextActionRetryAuthFormat = {
+  'L402_<macaroon>:<preimage_hex>': 'L402 <macaroon>:<preimage_hex>',
+} as const;
+
+export type Http402NextActionPayment = {
+  method: Http402NextActionPaymentMethod;
+  invoice: string;
+  payment_hash: string;
+  macaroon: string;
+  amount_sats?: number;
+};
+
+export type Http402NextActionRetry = {
+  method: string;
+  path: string;
+  auth_header: Http402NextActionRetryAuthHeader;
+  auth_scheme: Http402NextActionRetryAuthScheme;
+  auth_format: Http402NextActionRetryAuthFormat;
+  persist_preimage_before_retry: true;
+};
+
+export type Http402NextActionAlternativesItem = {
+  protocol: string;
+  action: string;
+  header?: string;
+  path?: string;
+};
+
+export interface Http402NextAction {
+  schema_version: Http402NextActionSchemaVersion;
+  action: Http402NextActionAction;
+  protocol: Http402NextActionProtocol;
+  reason: Http402NextActionReason;
+  payment: Http402NextActionPayment;
+  retry: Http402NextActionRetry;
+  alternatives?: Http402NextActionAlternativesItem[];
+}
+
 export interface McpJsonRpcError {
   code: number;
   message: string;
+  /** Arbitrary error details, including Http402NextAction at next_action for stateless HTTP 402; retained without stripping. */
   data?: unknown;
 }
 
@@ -995,6 +1089,8 @@ export type McpJsonRpcResponse = (unknown & ({
   /** @nullable */
   id: string | number | null;
   result?: unknown;
+  /** Handshake-era HTTP 402 only; stateless challenges place this envelope exclusively in error.data.next_action. */
+  next_action?: Http402NextAction;
   error?: McpJsonRpcError;
   [key: string]: unknown;
  }));
@@ -2535,6 +2631,7 @@ export interface L402SubscriptionPass {
 }
 
 export interface L402Challenge {
+  next_action?: Http402NextAction;
   /** Single-use capability bound to the quoted record range, route, invoice amount and issuer. Retain it for merchant NWC verification when no preimage is available. */
   macaroon?: string;
   /** Invoice or payment request for the selected settlement asset */
@@ -2622,6 +2719,7 @@ export type L402PaymentRequiredStagedPreview = { [key: string]: unknown };
  * L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Exact same-tool pass sizes of 1, 100, 1000 and 10000 remain available at batch_size times the per-call price. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
  */
 export interface L402PaymentRequired {
+  next_action?: Http402NextAction;
   error?: string;
   /** Path-scoped 1/100/1000/10000-call same-tool pass or High-Velocity capability bound to the settled invoice. */
   macaroon: string;
@@ -2949,6 +3047,7 @@ export type CreateFiatMintCheckout402 = {
   payment_endpoint: CreateFiatMintCheckout402PaymentEndpoint;
   purchase_recovery: CreateFiatMintCheckout402PurchaseRecovery;
   continuity_note?: string;
+  next_action?: Http402NextAction;
 };
 
 export type GetFiatMintStatus200Status = typeof GetFiatMintStatus200Status[keyof typeof GetFiatMintStatus200Status];
@@ -2996,11 +3095,17 @@ export type GetEnterpriseCreditTab200 = { [key: string]: unknown };
 
 export type CloseEnterpriseCreditTab200 = { [key: string]: unknown };
 
-export type CloseEnterpriseCreditTab402 = { [key: string]: unknown };
+export type CloseEnterpriseCreditTab402 = {
+  next_action?: Http402NextAction;
+  [key: string]: unknown;
+ };
 
 export type SettleEnterpriseCreditTab200 = { [key: string]: unknown };
 
-export type SettleEnterpriseCreditTab402 = { [key: string]: unknown };
+export type SettleEnterpriseCreditTab402 = {
+  next_action?: Http402NextAction;
+  [key: string]: unknown;
+ };
 
 export type RevokeNip98Key200 = {
   pubkey: string;

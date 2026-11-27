@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { assertNextAction } from "../../src/lib/testing/next-action";
 import { powFetch as fetch } from "../helpers/pow-fetch";
 import { createHash, randomBytes } from "node:crypto";
 import type { Server } from "node:http";
@@ -460,6 +461,8 @@ test("L402 challenges arrive as strict JSON-RPC data and paid retries succeed", 
   assert.equal(challenge.body?.result, undefined);
   const data = error.data ?? {};
   assert.equal(typeof data.macaroon, "string");
+  assertNextAction(data, "toll_required", "POST", "/mcp");
+  assert.equal(Boolean(data.next_action.alternatives), challenge.response.headers.has("PAYMENT-REQUIRED"));
   assert.equal(data.amount_sats, 250);
   const payment = invoices.get(data.payment_hash);
   assert.ok(payment);
@@ -572,6 +575,8 @@ test("handshake-era clients keep initialize and legacy payment framing", async (
   assert.equal(unpaid.response.status, 402);
   assert.equal(unpaid.body?.error?.code, -32002);
   assert.equal(typeof unpaid.body?.macaroon, "string");
+  assertNextAction(unpaid.body!, "toll_required", "POST", "/mcp");
+  assert.equal(Boolean(unpaid.body?.next_action.alternatives), unpaid.response.headers.has("PAYMENT-REQUIRED"));
 
   const mismatched = await post(
     { jsonrpc: "2.0", id: 4, method: "tools/list" },

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
+import { assertNextAction } from "../lib/testing/next-action";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
@@ -122,6 +123,9 @@ for (const failure of [500, 502, 503, 504, 599]) {
       assert.equal(body.credits, 100);
       assert.equal(body.payment_endpoint, "/api/mint-macaroon");
       assert.equal(body.purchase_recovery, "/api/fiat-mint/status");
+      assertNextAction(body, "fiat_gateway_offline", "POST", body.payment_endpoint);
+      assert.equal(body.next_action?.alternatives, undefined);
+      assert.equal(res.headers.has("PAYMENT-REQUIRED"), false);
       assert.equal(res.headers.get("cache-control"), "no-store");
       assert.equal(f.counts().checkoutCalls, 1);
       assert.equal(f.counts().invoices, 1);
@@ -186,6 +190,7 @@ for (const eligible of [async () => false, async (): Promise<boolean> => { throw
       assert.equal(res.status, 503);
       assert.equal(res.headers.get("www-authenticate"), null);
       assert.equal(f.counts().invoices, 0);
+      assert.equal((await res.json() as { next_action?: unknown }).next_action, undefined);
     } finally { await f.close(); }
   });
 }

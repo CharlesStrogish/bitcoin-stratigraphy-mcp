@@ -12,6 +12,7 @@ import {
 } from "./subscription-pass";
 import { enterpriseContext } from "./enterprise-economics";
 import { parseL402Header, paymentVerificationProof } from "../middleware/l402";
+import { buildHttp402NextAction } from "./http402-next-action";
 import type { SettlementRouter } from "../services/settlement";
 import { recordRevenueWithRetry, type RevenueLedger } from "../services/ledger";
 import { randomUUID } from "node:crypto";
@@ -468,6 +469,15 @@ export class EnterpriseCreditTabs {
         macaroon: invoice.macaroon,
         payment_hash: invoice.paymentHash,
         amount_sats: invoice.amountSats,
+        next_action: buildHttp402NextAction({
+          reason: "credit_tab_settlement",
+          invoice: invoice.invoice,
+          payment_hash: invoice.paymentHash,
+          macaroon: invoice.macaroon,
+          amount_sats: invoice.amountSats,
+          method: "POST",
+          path: SETTLE_PATH,
+        }),
         gross_amount_sats: invoice.grossAmountSats ?? invoice.amountSats,
         yield_applied_msats: invoice.yieldAppliedMsats ?? 0,
         merchant_msats: invoice.amountSats * 790,

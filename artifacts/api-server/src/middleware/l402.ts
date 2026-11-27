@@ -2,6 +2,7 @@ import { attachLicensingCompliance, licensingCompliance, logLicensingSettlement 
 import { createHash, randomUUID } from "node:crypto";
 import { clientKey } from "../lib/client-address";
 import { L402EdgeCache } from "../lib/l402-edge-cache";
+import { buildHttp402NextAction } from "../lib/http402-next-action";
 import { l402CredentialCache } from "../lib/l402-credential-cache";
 import { createThermodynamicPricing } from "../lib/thermodynamic-pricing";
 import type { createInvoicePow } from "../lib/invoice-pow";
@@ -335,6 +336,16 @@ export function createL402Middleware(
         invoice: invoice.invoice,
         payment_hash: invoice.paymentHash,
         amount_sats: amountSats,
+        next_action: buildHttp402NextAction({
+          reason: options.fiatContinuity ? "fiat_gateway_offline" : "toll_required",
+          invoice: invoice.invoice,
+          payment_hash: invoice.paymentHash,
+          macaroon,
+          amount_sats: amountSats,
+          method: req.method,
+          path: options.fiatContinuity ? "/api/mint-macaroon"
+            : req.path === "/invoice/request" ? "/mcp" : req.originalUrl,
+        }),
         dynamic_fee_sats: amountSats,
         base_fee_sats: quote.baseAmountSats,
         load_multiplier: quote.multiplier,

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Charles R. Strogish. All Rights Reserved.
 // Dual-licensed under AGPLv3 and Commercial terms.
 import assert from "node:assert/strict";
+import { assertNextAction } from "../lib/testing/next-action";
 import { powFetch as fetch } from "../lib/testing/pow-fetch";
 import {
   GetEnterpriseDueDiligenceBriefResponse,
@@ -6093,6 +6094,18 @@ test("keeps OpenAPI public while the paid dataset requires L402", async () => {
 
         const paidResponse = await fetch(`${paidUrl}?days=1`);
         assert.equal(paidResponse.status, 402);
+        const challenge = await paidResponse.json() as Record<string, any>;
+        assertNextAction({ ...challenge, amount_sats: 5 }, "range_pass_required", "GET", new URL(`${paidUrl}?days=1`).pathname + "?days=1");
+        assert.equal(challenge.next_action.payment.macaroon, challenge.macaroon);
+        assert.notEqual(challenge.macaroon, challenge.payment_hash);
+        const header = paidResponse.headers.get("www-authenticate")!;
+        assert.ok(header.startsWith(`L402 macaroon="${challenge.payment_hash}", invoice="${challenge.invoice}"`));
+        for (const pass of challenge.passes) {
+          assert.ok(header.includes(`L402 macaroon="${pass.macaroon}", invoice="${pass.invoice}", tier="${pass.tier}", price_sats="${pass.price_sats}", agent_tier="${pass.agent_tier}"`));
+        }
+        assert.equal(paidResponse.headers.get("cache-control"), "no-store");
+        assert.equal(paidResponse.headers.has("PAYMENT-REQUIRED"), false);
+        assert.equal(challenge.next_action.alternatives, undefined);
         assert.match(
           paidResponse.headers.get("www-authenticate") ?? "",
           /^L402 /,

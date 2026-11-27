@@ -1170,10 +1170,37 @@ export const ExecuteMcpRequestResponse = zod.union([zod.unknown(),zod.unknown()]
   "jsonrpc": zod.literal("2.0"),
   "id": zod.union([zod.string(),zod.number()]).nullable(),
   "result": zod.unknown().optional(),
+  "next_action": zod.object({
+  "schema_version": zod.enum(['1.0']),
+  "action": zod.enum(['pay_l402_invoice']),
+  "protocol": zod.enum(['L402']),
+  "reason": zod.enum(['toll_required', 'fiat_gateway_offline', 'range_pass_required', 'credit_tab_settlement']),
+  "payment": zod.object({
+  "method": zod.enum(['lightning_bolt11']),
+  "invoice": zod.string(),
+  "payment_hash": zod.string(),
+  "macaroon": zod.string(),
+  "amount_sats": zod.number().optional()
+}),
+  "retry": zod.object({
+  "method": zod.string(),
+  "path": zod.string(),
+  "auth_header": zod.enum(['Authorization']),
+  "auth_scheme": zod.enum(['L402']),
+  "auth_format": zod.enum(['L402 <macaroon>:<preimage_hex>']),
+  "persist_preimage_before_retry": zod.literal(true)
+}),
+  "alternatives": zod.array(zod.object({
+  "protocol": zod.string(),
+  "action": zod.string(),
+  "header": zod.string().optional(),
+  "path": zod.string().optional()
+})).optional()
+}).optional().describe('Handshake-era HTTP 402 only; stateless challenges place this envelope exclusively in error.data.next_action.'),
   "error": zod.object({
   "code": zod.int(),
   "message": zod.string(),
-  "data": zod.unknown().optional()
+  "data": zod.unknown().optional().describe('Arbitrary error details, including Http402NextAction at next_action for stateless HTTP 402; retained without stripping.')
 }).optional()
 }))
 

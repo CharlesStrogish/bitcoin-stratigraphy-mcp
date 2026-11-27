@@ -5,6 +5,7 @@
  * Enterprise L402 Data Engine & MCP Server providing State-Anchored AI data layers, EU AI Act Article 12 compliance, and 21% algorithmic yield.
  * OpenAPI spec version: 1.0.0
  */
+import type { Http402NextAction } from './http402NextAction';
 import type { L402PaymentRequiredAgentAuthentication } from './l402PaymentRequiredAgentAuthentication';
 import type { L402PaymentRequiredEvStatus } from './l402PaymentRequiredEvStatus';
 import type { L402PaymentRequiredPaymentBridgeInstructions } from './l402PaymentRequiredPaymentBridgeInstructions';
@@ -19,6 +20,7 @@ import type { L402SettlementPath } from './l402SettlementPath';
  * L402 challenge body with bounded admission-pressure surge pricing. Optional X-Requested-Budget funding on fixed-base-price routes creates a tool/path-scoped High-Velocity Macaroon with an atomically shared budget/base-fee request cap and surge immunity. Variable-price and exact-toll routes cannot use this upgrade. Exact same-tool pass sizes of 1, 100, 1000 and 10000 remain available at batch_size times the per-call price. Fixed-current-amount settlement routes retain their authoritative fee. Paying the invoice does not itself execute the request; retry the identical request with one of settlement_paths.
  */
 export interface L402PaymentRequired {
+  next_action?: Http402NextAction;
   error?: string;
   /** Path-scoped 1/100/1000/10000-call same-tool pass or High-Velocity capability bound to the settled invoice. */
   macaroon: string;

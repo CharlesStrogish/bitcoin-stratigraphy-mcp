@@ -1,6 +1,7 @@
 import type { RequestHandler, Request } from "express";
 import { x402ResourceServer } from "@x402/core/server";
 import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
+import { withX402NextActionAlternative } from "../lib/http402-next-action";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 
 export const X402_NETWORK: PaymentRequirements["network"] = "eip155:8453";
@@ -147,7 +148,7 @@ export function createX402PaymentMiddleware(
         void createChallengeHeader(req)
           .then((challenge) => {
             res.setHeader("PAYMENT-REQUIRED", challenge);
-            sendJson(body);
+            sendJson(withX402NextActionAlternative(body));
           })
           .catch((error: unknown) => {
             req.log?.error(

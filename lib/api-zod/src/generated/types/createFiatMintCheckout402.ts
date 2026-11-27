@@ -10,6 +10,7 @@ import type { CreateFiatMintCheckout402Error } from './createFiatMintCheckout402
 import type { CreateFiatMintCheckout402Fallback } from './createFiatMintCheckout402Fallback';
 import type { CreateFiatMintCheckout402PaymentEndpoint } from './createFiatMintCheckout402PaymentEndpoint';
 import type { CreateFiatMintCheckout402PurchaseRecovery } from './createFiatMintCheckout402PurchaseRecovery';
+import type { Http402NextAction } from './http402NextAction';
 
 export type CreateFiatMintCheckout402 = {
   error: CreateFiatMintCheckout402Error;
@@ -23,4 +24,5 @@ export type CreateFiatMintCheckout402 = {
   payment_endpoint: CreateFiatMintCheckout402PaymentEndpoint;
   purchase_recovery: CreateFiatMintCheckout402PurchaseRecovery;
   continuity_note?: string;
+  next_action?: Http402NextAction;
 };
